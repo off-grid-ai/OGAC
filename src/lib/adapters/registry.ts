@@ -13,6 +13,7 @@ import {
   PROVENANCE,
   type RegEntry,
   RETRIEVAL_ENTRIES,
+  SANDBOX,
   SIEM,
   langfuseEntry,
 } from './services';
@@ -88,6 +89,7 @@ const ALL: Record<Capability, RegEntry[]> = {
   flags: FLAGS,
   provenance: PROVENANCE,
   bi: BI,
+  sandbox: SANDBOX,
 };
 
 // One row per capability — active adapter + swappable alternatives + live health (when probed).
