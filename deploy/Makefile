@@ -1,7 +1,7 @@
 # Off Grid Console — canonical OSS stack lifecycle. Profiles map to capabilities.
 COMPOSE = docker compose -f docker-compose.yml
 
-.PHONY: up full config ps logs down smoke verify \
+.PHONY: up full config ps logs down smoke verify identity-setup \
         data secrets observability guardrails policy identity lineage llmops agents ai
 
 full up:       ## Bring up the FULL 5-layer stack (everything)
@@ -51,3 +51,6 @@ smoke:         ## Health-check the running services
 
 verify:        ## Behavior-test the swappable adapters (not just reachability)
 	@bash ../scripts/verify-adapters.sh
+
+identity-setup: ## Provision the Keycloak realm/client/user + print the AUTH_KEYCLOAK_* env
+	@bash ../scripts/keycloak-setup.sh

@@ -206,19 +206,22 @@ Keycloak is a real **sign-in provider** (OIDC), not just an embed — it self-ac
 when its client env is set, and a "Continue with Keycloak" button appears on `/signin`.
 
 ```bash
-cd deploy && make identity                    # Keycloak on :8080 (admin / admin)
+cd deploy && make identity          # Keycloak on :8080 (admin / offgrid-dev)
+cd deploy && make identity-setup    # provision realm + OIDC client + test user, prints the env
 ```
-In the Keycloak admin console: create a realm (e.g. `offgrid`) → Clients → create an **OIDC**
-client (confidential, standard flow) → set the redirect URI to
-`http://localhost:3000/api/auth/callback/keycloak` → copy the client secret. Then:
+`make identity-setup` (script: `scripts/keycloak-setup.sh`) is idempotent — it creates the
+`offgrid` realm, a confidential `offgrid-console` client with the right redirect URI, and a test
+user, then prints the exact env block. Paste it into `.env.local`:
 ```ini
-AUTH_KEYCLOAK_ID=<client-id>
-AUTH_KEYCLOAK_SECRET=<client-secret>
+AUTH_KEYCLOAK_ID=offgrid-console
+AUTH_KEYCLOAK_SECRET=<printed by the script>
 AUTH_KEYCLOAK_ISSUER=http://localhost:8080/realms/offgrid
 ```
-Confirm: restart the console, open `/signin` → the Keycloak button is present → it redirects to
-Keycloak and back. New users default to the `viewer` role (map realm roles → console roles as a
-follow-up). Optionally also surface the Keycloak admin UI as an embed via `OFFGRID_KEYCLOAK_URL`.
+Confirm: restart the console, open `/signin` → the "Continue with Keycloak" button redirects to
+Keycloak and back (test user `advisor` / `advisor-pw`). `make verify` asserts the OIDC discovery
+doc automatically. New users default to the `viewer` role (map realm roles → console roles as a
+follow-up). To set up against your own realm by hand: create an OIDC client (confidential, standard
+flow) with redirect `http://localhost:3000/api/auth/callback/keycloak` and copy its secret.
 
 ### Secrets → OpenBao · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
 
