@@ -138,19 +138,101 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-  langfuse:
-    image: langfuse/langfuse:2
+  # Langfuse v3 — split web + worker, backed by ClickHouse (analytics), MinIO (event blobs) and
+  # Redis (queue), in addition to the Postgres above. v3 is what accepts OTLP traces directly
+  # (POST /api/public/otel/v1/traces), so the console's span fan-out lands here. Heavier than v2
+  # (4 extra containers) → scoped to the llmops/all profiles; `make smoke`/`down` are unaffected.
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    profiles: [llmops, all]
+    environment:
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+      - clickhouselogs:/var/log/clickhouse-server
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-minio:
+    image: minio/minio:latest
+    profiles: [llmops, all]
+    entrypoint: sh
+    # pre-create the event bucket so Langfuse's S3 client finds it on first write
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes: [langfuseminio:/data]
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-redis:
+    image: redis:7-alpine
+    profiles: [llmops, all]
+    command: ['redis-server', '--maxmemory-policy', 'noeviction']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
     profiles: [llmops, all]
     restart: on-failure
     depends_on:
-      langfuse-db:
-        condition: service_healthy
-    environment:
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-minio: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+    environment: &langfuse-env
       DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      SALT: offgrid-dev-salt
+      ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      TELEMETRY_ENABLED: 'false'
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: '6379'
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  langfuse:
+    image: langfuse/langfuse:3
+    profiles: [llmops, all]
+    restart: on-failure
+    depends_on:
+      langfuse-worker: { condition: service_started }
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-minio: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+    environment:
+      <<: *langfuse-env
       NEXTAUTH_URL: http://localhost:3030
       NEXTAUTH_SECRET: offgrid-dev-secret
-      SALT: offgrid-dev-salt
-      TELEMETRY_ENABLED: 'false'
+      # Headless bootstrap: create an org/project + a fixed API key pair on first boot, so the
+      # OTLP auth header is known ahead of time (no manual click-through to get keys).
+      LANGFUSE_INIT_ORG_ID: offgrid
+      LANGFUSE_INIT_PROJECT_ID: console
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-offgrid-console
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-offgrid-console
+      LANGFUSE_INIT_USER_EMAIL: dev@offgrid.local
+      LANGFUSE_INIT_USER_PASSWORD: offgrid-dev-pw
+      LANGFUSE_INIT_USER_NAME: Off Grid Dev
     ports: ['3030:3000']
 
   # ── LINEAGE & PROVENANCE (source → chunk → answer) ────────────────────────────────
@@ -306,6 +388,9 @@ volumes:
   vmdata:
   vldata:
   langfusedb:
+  clickhouse:
+  clickhouselogs:
+  langfuseminio:
   marquezdb:
   temporaldb:
   opensearch:

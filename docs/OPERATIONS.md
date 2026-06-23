@@ -139,10 +139,13 @@ database`: text/file index directly, **images are captioned via the gateway (mul
 
 ### 3.5 Observability — `observability` 🟢
 
-- **Tools:** OpenTelemetry Collector (OTLP in) → VictoriaMetrics (metrics) + VictoriaLogs (logs).
-  SigNoz is the rich-UI embed alternative.
+- **Tools:** OpenTelemetry Collector (OTLP in) → VictoriaMetrics (metrics) + VictoriaLogs (logs) +
+  Jaeger (traces). SigNoz is the rich-UI embed alternative; Langfuse v3 ingests the same spans as
+  LLM traces.
 - **Port:** `ObservabilityPort` (`emitSpan`). When `OFFGRID_OTLP_URL` is set, `emitSpan` exports
-  real OTLP/HTTP JSON; otherwise it's a no-op (`OTEL_DEBUG=true` echoes locally).
+  real OTLP/HTTP JSON; otherwise it's a no-op (`OTEL_DEBUG=true` echoes locally). Set
+  `OFFGRID_LANGFUSE_OTLP_URL` + `OFFGRID_LANGFUSE_AUTH` to **also** fan each span to Langfuse v3
+  (verified: span → `/api/public/otel/v1/traces` → queryable trace).
 - **Operate:** `make observability` (profile). Collector config: `deploy/otel-collector.yaml`.
 - **Verify:** `docker compose logs otel-collector | grep offgrid-console` after any audited action.
 
@@ -249,7 +252,8 @@ cd deploy && make verify     # behavior: Presidio detects PII · OPA allow/deny 
 ```
 
 `make verify` (script: `scripts/verify-adapters.sh`) is the honest answer to "how do I know the
-integrations work?" — it's repeatable and asserts on real responses. Last run: 5/5 pass.
+integrations work?" — it's repeatable and asserts on real responses. Last run: 6/6 pass
+(Presidio · OPA allow · OPA deny · Marquez emit · Marquez query · Langfuse v3 OTLP).
 
 Per-integration manual checks:
 
