@@ -1,7 +1,7 @@
 # Off Grid Console — canonical OSS stack lifecycle. Profiles map to capabilities.
 COMPOSE = docker compose -f docker-compose.yml
 
-.PHONY: up full config ps logs down smoke \
+.PHONY: up full config ps logs down smoke verify \
         data secrets observability guardrails policy identity lineage llmops agents ai
 
 full up:       ## Bring up the FULL 5-layer stack (everything)
@@ -48,3 +48,6 @@ smoke:         ## Health-check the running services
 	@echo "marquez         $$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9000/api/v1/namespaces)"
 	@echo "langfuse        $$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3030/api/public/health)"
 	@echo "temporal-ui     $$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/)"
+
+verify:        ## Behavior-test the swappable adapters (not just reachability)
+	@bash ../scripts/verify-adapters.sh
