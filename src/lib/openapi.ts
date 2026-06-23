@@ -481,6 +481,58 @@ export const openApiSpec = {
         responses: { '200': { description: 'Routing decision.' } },
       },
     },
+    '/api/v1/admin/flags': {
+      get: {
+        tags: ['admin'],
+        summary: 'List feature flags (runtime toggles)',
+        responses: { '200': { description: 'Flags.' } },
+      },
+      patch: {
+        tags: ['admin'],
+        summary: 'Toggle a feature flag',
+        responses: { '200': { description: 'Updated.' }, '400': { description: 'Invalid.' } },
+      },
+    },
+    '/api/v1/admin/prompts': {
+      get: {
+        tags: ['admin'],
+        summary: 'List prompt templates',
+        responses: { '200': { description: 'Prompts.' } },
+      },
+      post: {
+        tags: ['admin'],
+        summary: 'Create a prompt template',
+        responses: { '201': { description: 'Created.' }, '400': { description: 'Invalid.' } },
+      },
+    },
+    '/api/v1/admin/prompts/{id}/versions': {
+      get: {
+        tags: ['admin'],
+        summary: 'List a prompt’s versions',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Versions, newest first.' } },
+      },
+      post: {
+        tags: ['admin'],
+        summary: 'Publish a new immutable prompt version',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '201': { description: 'Created.' },
+          '404': { description: 'Unknown prompt.' },
+        },
+      },
+    },
+    '/api/v1/admin/sign': {
+      post: {
+        tags: ['admin'],
+        summary: 'Sign a payload (or verify with `signature`) — tamper-evident provenance',
+        responses: {
+          '201': { description: 'Signature.' },
+          '200': { description: 'Verification result.' },
+          '400': { description: 'Invalid.' },
+        },
+      },
+    },
     '/api/v1/admin/cache': {
       get: {
         tags: ['admin'],

@@ -12,9 +12,12 @@ import {
   datasets,
   devices,
   enrollmentTokens,
+  featureFlags,
   governanceItems,
   ingestJobs,
   maskingRules,
+  promptVersions,
+  prompts,
   policies,
   routingRules,
   tenants,
@@ -677,6 +680,101 @@ function routeAsAbac(r: RoutingRule): AbacRule {
     value: r.value,
     effect: 'allow',
   };
+}
+
+// ─── Feature flags (runtime toggles) ───────────────────────────────────────────
+export interface FeatureFlag {
+  key: string;
+  enabled: boolean;
+  description: string;
+}
+
+export async function listFlags(): Promise<FeatureFlag[]> {
+  const rows = await db.select().from(featureFlags).orderBy(featureFlags.key);
+  return rows.map((r) => ({ key: r.key, enabled: r.enabled, description: r.description }));
+}
+
+export async function setFlag(key: string, enabled: boolean, description = ''): Promise<void> {
+  await db
+    .insert(featureFlags)
+    .values({ key, enabled, description })
+    .onConflictDoUpdate({ target: featureFlags.key, set: { enabled, updatedAt: new Date() } });
+}
+
+// Runtime check with a default. Falls back to the default when the flag is unset.
+export async function isEnabled(key: string, fallback = false): Promise<boolean> {
+  const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
+  return row ? row.enabled : fallback;
+}
+
+// ─── Prompt registry (templates + versioning) ──────────────────────────────────
+export interface Prompt {
+  id: string;
+  name: string;
+  description: string;
+  latestVersion: number;
+}
+export interface PromptVersion {
+  id: string;
+  version: number;
+  body: string;
+  label: string;
+  createdAt: string;
+}
+
+export async function listPrompts(): Promise<Prompt[]> {
+  const rows = await db.select().from(prompts).orderBy(desc(prompts.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    latestVersion: r.latestVersion,
+  }));
+}
+
+export async function listPromptVersions(promptId: string): Promise<PromptVersion[]> {
+  const rows = await db
+    .select()
+    .from(promptVersions)
+    .where(eq(promptVersions.promptId, promptId))
+    .orderBy(desc(promptVersions.version));
+  return rows.map((r) => ({
+    id: r.id,
+    version: r.version,
+    body: r.body,
+    label: r.label,
+    createdAt: iso(r.createdAt),
+  }));
+}
+
+export async function createPrompt(name: string, description: string): Promise<Prompt> {
+  const [row] = await db
+    .insert(prompts)
+    .values({ id: `pr_${randomUUID().slice(0, 8)}`, name, description })
+    .returning();
+  return { id: row.id, name: row.name, description: row.description, latestVersion: 0 };
+}
+
+// Publish a new version of a prompt (immutable history; bumps the prompt's latestVersion).
+export async function addPromptVersion(
+  promptId: string,
+  body: string,
+  label: string,
+): Promise<PromptVersion | null> {
+  const [p] = await db.select().from(prompts).where(eq(prompts.id, promptId)).limit(1);
+  if (!p) return null;
+  const version = p.latestVersion + 1;
+  const [row] = await db
+    .insert(promptVersions)
+    .values({ id: `pv_${randomUUID().slice(0, 8)}`, promptId, version, body, label })
+    .returning();
+  await db.update(prompts).set({ latestVersion: version }).where(eq(prompts.id, promptId));
+  return { id: row.id, version, body, label, createdAt: iso(row.createdAt) };
+}
+
+export async function deletePrompt(id: string): Promise<void> {
+  await db.delete(promptVersions).where(eq(promptVersions.promptId, id));
+  await db.delete(prompts).where(eq(prompts.id, id));
 }
 
 // ─── Governance registry (Phase E org wrapper) ─────────────────────────────────
