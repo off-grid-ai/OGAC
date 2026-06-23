@@ -481,6 +481,13 @@ export const openApiSpec = {
         responses: { '200': { description: 'Routing decision.' } },
       },
     },
+    '/api/v1/admin/cache': {
+      get: {
+        tags: ['admin'],
+        summary: 'Response-cache stats (size, hit rate, exact vs semantic)',
+        responses: { '200': { description: 'Cache stats.' } },
+      },
+    },
     '/api/v1/admin/governance': {
       get: {
         tags: ['admin'],

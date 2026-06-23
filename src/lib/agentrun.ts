@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
 import { getGrounding } from '@/lib/adapters/registry';
 import { AGENTS } from '@/lib/agents';
+import { cacheLookup, cacheStore } from '@/lib/cache';
 import { emitSpan } from '@/lib/otel';
 import { route } from '@/lib/retrieval/router';
 import type { RetrievalHit } from '@/lib/retrieval/types';
@@ -73,8 +74,14 @@ async function gatewayAnswer(query: string, context: string): Promise<string | n
 
 async function compose(query: string, hits: RetrievalHit[]): Promise<string> {
   const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
+  const cacheKey = `${query}\n${context}`;
+  const cached = await cacheLookup(cacheKey);
+  if (cached.hit && cached.answer) return cached.answer;
   const answer = await gatewayAnswer(query, context);
-  if (answer) return answer;
+  if (answer) {
+    await cacheStore(cacheKey, answer);
+    return answer;
+  }
   return hits[0] ? `Based on ${hits.length} source(s): ${hits[0].snippet}` : 'No sources found.';
 }
 
