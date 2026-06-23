@@ -31,6 +31,12 @@ export const HANDBOOK: HandbookDoc[] = [
     file: 'INTEGRATIONS.md',
   },
   {
+    slug: 'catalog',
+    title: 'Integration catalog',
+    blurb: 'Every service: what · why · when · how to configure (env, profile, adapter id).',
+    file: 'CATALOG.md',
+  },
+  {
     slug: 'operations',
     title: 'Operations runbook',
     blurb: 'Every integration: how it works, how to operate, verify, swap.',
