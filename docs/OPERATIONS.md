@@ -260,8 +260,9 @@ cd deploy && make verify     # behavior: Presidio detects PII · OPA allow/deny 
 ```
 
 `make verify` (script: `scripts/verify-adapters.sh`) is the honest answer to "how do I know the
-integrations work?" — it's repeatable and asserts on real responses. Last run: 6/6 pass
-(Presidio · OPA allow · OPA deny · Marquez emit · Marquez query · Langfuse v3 OTLP).
+integrations work?" — it's repeatable and asserts on real responses. Last run: **11/11 pass**
+(Presidio PII · OPA allow · OPA deny · Marquez emit · Marquez query · Langfuse v3 OTLP · Keycloak
+OIDC discovery · OpenBao KV round-trip · Redis SET/GET · OpenSearch index/search).
 
 Per-integration manual checks:
 
