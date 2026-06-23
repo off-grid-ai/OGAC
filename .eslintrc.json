@@ -1,0 +1,18 @@
+{
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": ["src/components/ui/**"],
+  "rules": {
+    "complexity": ["error", 8],
+    "no-console": "error",
+    "no-magic-numbers": "off",
+    "@next/next/no-html-link-for-pages": "off",
+    "import/order": [
+      "error",
+      {
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+        "newlines-between": "never",
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
+      }
+    ]
+  }
+}

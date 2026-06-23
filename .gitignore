@@ -1,0 +1,23 @@
+# dependencies
+/node_modules
+
+# next
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# component catalog — cloned for DISCOVERY only, never committed (see README)
+/vendor/component-library-animations/
+
+# env
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# LanceDB (Brain vector store)
+/.lancedb/
