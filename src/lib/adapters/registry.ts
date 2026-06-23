@@ -21,6 +21,7 @@ import {
   SIEM,
   langfuseEntry,
 } from './services';
+import { SIGNING_PORTS } from './signing';
 import type {
   AdapterMeta,
   Capability,
@@ -31,6 +32,7 @@ import type {
   PiiPort,
   PolicyPort,
   SecretsPort,
+  SigningPort,
 } from './types';
 
 // The adapter registry. Each capability lists its available adapters; the active one is the
@@ -77,6 +79,10 @@ export function getPii(): PiiPort {
 
 export function getLineage(): LineagePort {
   return pick('lineage', LINEAGE_PORTS);
+}
+
+export function getSigning(): SigningPort {
+  return pick('provenance', SIGNING_PORTS);
 }
 
 export interface CapabilityBinding {

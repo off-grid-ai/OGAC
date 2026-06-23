@@ -183,8 +183,12 @@ database`: text/file index directly, **images are captioned via the gateway (mul
 - **Today:** the **`LineagePort`** — `native` is a no-op (lineage implicit in the audit trace).
 - **In-path swap:** `OFFGRID_ADAPTER_LINEAGE=marquez` emits real OpenLineage run events on every
   ingest + retrieval (`brain.ingest` / `brain.retrieve` jobs), best-effort and non-blocking. Pairs
-  with grounding for end-to-end answer provenance. (Sigstore signing remains mapped.)
-- **Verify:** `make verify` (OpenLineage round-trip) or the Marquez web UI (`:3001`).
+  with grounding for end-to-end answer provenance.
+- **Signing (`SigningPort`):** `OFFGRID_ADAPTER_PROVENANCE=ed25519` upgrades export signing from
+  HMAC (shared secret) to asymmetric ed25519 — verifiable with only the public key
+  (`GET /api/v1/admin/sign`), no secret shared. C2PA / Sigstore remain mapped behind the same port.
+- **Verify:** `make verify` (OpenLineage round-trip), the Marquez web UI (`:3001`), and the
+  sign→verify→tamper→public-key-only round-trip on `/api/v1/admin/sign`.
 
 ### 3.10 Agent runtime & durability — ⚪
 

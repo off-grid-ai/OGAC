@@ -246,7 +246,18 @@ export const PROVENANCE: RegEntry[] = [
       license: 'first-party',
       render: 'native',
       description:
-        'Every answer carries source refs (router) + verified citations (grounding), recorded on the run/audit trace. Always on.',
+        'Every answer carries source refs (router) + verified citations (grounding), recorded on the run/audit trace. Always on. Signs with HMAC-SHA256.',
+    },
+  },
+  {
+    meta: {
+      id: 'ed25519',
+      capability: 'provenance',
+      vendor: 'Off Grid ed25519 signatures',
+      license: 'first-party',
+      render: 'headless',
+      description:
+        'Asymmetric (public-key) signatures over answers/exports — offline-verifiable with only the public key, no shared secret. The first step toward full C2PA/Sigstore.',
     },
   },
   {
