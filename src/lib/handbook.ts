@@ -13,6 +13,12 @@ export interface HandbookDoc {
 
 export const HANDBOOK: HandbookDoc[] = [
   {
+    slug: 'concepts',
+    title: 'Concepts — who does what & why',
+    blurb: 'Each control: what it is, who owns it, how to set up/configure, and why.',
+    file: 'CONCEPTS.md',
+  },
+  {
     slug: 'running',
     title: 'Running the full stack',
     blurb: 'One command for all five layers; profiles, ports, variants.',

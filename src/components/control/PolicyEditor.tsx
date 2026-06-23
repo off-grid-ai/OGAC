@@ -13,10 +13,12 @@ import type { PolicyBundle } from '@/lib/store';
 
 function ChipList({
   label,
+  hint,
   items,
   onChange,
 }: {
   label: string;
+  hint: string;
   items: string[];
   onChange: (next: string[]) => void;
 }) {
@@ -31,6 +33,7 @@ function ChipList({
   return (
     <div className="space-y-2">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground/80">{hint}</p>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <Badge key={item} variant="secondary" className="gap-1">
@@ -96,12 +99,18 @@ export function PolicyEditor({ initial }: { initial: PolicyBundle }) {
 
   return (
     <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm">Policy · v{version}</CardTitle>
-        <Button size="sm" onClick={publish} disabled={busy}>
-          <Save className="size-4" />
-          {busy ? 'Publishing…' : 'Publish'}
-        </Button>
+      <CardHeader className="space-y-0">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm">Policy · v{version}</CardTitle>
+          <Button size="sm" onClick={publish} disabled={busy}>
+            <Save className="size-4" />
+            {busy ? 'Publishing…' : 'Publish'}
+          </Button>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The org-wide policy every enrolled node enforces. Set it here → <strong>Publish</strong>{' '}
+          bumps the version → nodes converge on their next poll. See Handbook → How-tos.
+        </p>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex items-center justify-between rounded-md border border-border px-3 py-2.5">
@@ -113,8 +122,18 @@ export function PolicyEditor({ initial }: { initial: PolicyBundle }) {
           </div>
           <Switch checked={egress} onCheckedChange={setEgress} aria-label="Toggle cloud egress" />
         </div>
-        <ChipList label="Guardrails" items={guardrails} onChange={setGuardrails} />
-        <ChipList label="Allowed models" items={models} onChange={setModels} />
+        <ChipList
+          label="Guardrails"
+          hint="Checks run on every request, e.g. pii-input · injection-scan · grounding. Type one and press Enter."
+          items={guardrails}
+          onChange={setGuardrails}
+        />
+        <ChipList
+          label="Allowed models"
+          hint="Models nodes may use, e.g. gemma-local · whisper-local. Anything not listed is blocked."
+          items={models}
+          onChange={setModels}
+        />
       </CardContent>
     </Card>
   );
