@@ -190,6 +190,7 @@ services:
     environment:
       MARQUEZ_HOST: marquez
       MARQUEZ_PORT: '5000'
+      WEB_PORT: '3000'
     ports: ['3001:3000']
 
   # ── AGENT RUNTIME (durable workflows) ─────────────────────────────────────────────
