@@ -1,0 +1,829 @@
+// Persistence for the node↔console state — real Postgres via Drizzle. Same exported
+// signatures the routes/UI already use (now async). Schema lives in src/db/schema.ts.
+import { randomUUID } from 'crypto';
+import { and, desc, eq } from 'drizzle-orm';
+import { db } from '@/db';
+import {
+  abacRules,
+  apiKeys,
+  auditEvents,
+  commands,
+  connectors,
+  datasets,
+  devices,
+  enrollmentTokens,
+  governanceItems,
+  ingestJobs,
+  maskingRules,
+  policies,
+  routingRules,
+  tenants,
+  tools,
+  users,
+} from '@/db/schema';
+import type { CheckResult } from '@/lib/checks';
+import { emitSpan } from '@/lib/otel';
+
+export type DeviceOS = 'macOS' | 'iOS' | 'Windows';
+export type DeviceStatus = 'online' | 'offline';
+
+export interface Device {
+  id: string;
+  name: string;
+  os: DeviceOS;
+  role: string;
+  status: DeviceStatus;
+  lastSeen: string;
+  policyVersion: number;
+  enrolledAt: string;
+}
+
+export interface RoutingRule {
+  id: string;
+  name: string;
+  priority: number;
+  attribute: string;
+  operator: string;
+  value: string;
+  action: string; // local | cloud | block
+  model: string;
+  fallback: string;
+  enabled: boolean;
+}
+
+export interface PolicyBundle {
+  version: number;
+  egressAllowed: boolean;
+  guardrails: string[];
+  allowedModels: string[];
+  routingRules: RoutingRule[];
+  updatedAt: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  deviceId: string;
+  ts: string;
+  model: string;
+  tokens: number;
+  leftDevice: boolean;
+  tool: string | null;
+  outcome: 'ok' | 'blocked' | 'redacted';
+  latencyMs?: number;
+  checks?: CheckResult[];
+  keyId?: string | null;
+}
+
+export interface EnrollmentToken {
+  token: string;
+  role: string;
+  createdAt: string;
+  used: boolean;
+}
+
+export interface Command {
+  id: string;
+  deviceId: string;
+  type: 'kill' | 'reprovision';
+  createdAt: string;
+  consumed: boolean;
+}
+
+type DeviceRow = typeof devices.$inferSelect;
+type PolicyRow = typeof policies.$inferSelect;
+type AuditRow = typeof auditEvents.$inferSelect;
+type CommandRow = typeof commands.$inferSelect;
+
+function iso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function toDevice(r: DeviceRow): Device {
+  return {
+    id: r.id,
+    name: r.name,
+    os: r.os as DeviceOS,
+    role: r.role,
+    status: r.status as DeviceStatus,
+    lastSeen: r.lastSeen,
+    policyVersion: r.policyVersion,
+    enrolledAt: iso(r.enrolledAt),
+  };
+}
+
+function toPolicy(r: PolicyRow): PolicyBundle {
+  return {
+    version: r.version,
+    egressAllowed: r.egressAllowed,
+    guardrails: r.guardrails,
+    allowedModels: r.allowedModels,
+    routingRules: [],
+    updatedAt: iso(r.updatedAt),
+  };
+}
+
+function toAudit(r: AuditRow): AuditEvent {
+  return {
+    id: r.id,
+    deviceId: r.deviceId,
+    ts: iso(r.ts),
+    model: r.model,
+    tokens: r.tokens,
+    leftDevice: r.leftDevice,
+    tool: r.tool,
+    outcome: r.outcome as AuditEvent['outcome'],
+    latencyMs: r.latencyMs,
+    checks: (r.checks as CheckResult[] | null) ?? undefined,
+    keyId: r.keyId,
+  };
+}
+
+function toCommand(r: CommandRow): Command {
+  return {
+    id: r.id,
+    deviceId: r.deviceId,
+    type: r.type as Command['type'],
+    createdAt: iso(r.createdAt),
+    consumed: r.consumed,
+  };
+}
+
+export async function listDevices(): Promise<Device[]> {
+  const rows = await db.select().from(devices);
+  return rows.map(toDevice);
+}
+
+export async function getDevice(id: string): Promise<Device | undefined> {
+  const [row] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
+  return row ? toDevice(row) : undefined;
+}
+
+export async function createEnrollmentToken(role: string): Promise<EnrollmentToken> {
+  const [row] = await db
+    .insert(enrollmentTokens)
+    .values({ token: `enr_${randomUUID().slice(0, 12)}`, role })
+    .returning();
+  return { token: row.token, role: row.role, createdAt: iso(row.createdAt), used: row.used };
+}
+
+export async function enrollDevice(
+  token: string,
+  name: string,
+  os: DeviceOS,
+): Promise<Device | null> {
+  const [rec] = await db
+    .select()
+    .from(enrollmentTokens)
+    .where(eq(enrollmentTokens.token, token))
+    .limit(1);
+  if (!rec || rec.used) return null;
+  await db.update(enrollmentTokens).set({ used: true }).where(eq(enrollmentTokens.token, token));
+  const policy = await getOrgPolicy();
+  const [row] = await db
+    .insert(devices)
+    .values({
+      id: `dev_${randomUUID().slice(0, 6)}`,
+      name,
+      os,
+      role: rec.role,
+      status: 'online',
+      lastSeen: 'just now',
+      policyVersion: policy.version,
+    })
+    .returning();
+  return toDevice(row);
+}
+
+export async function getOrgPolicy(): Promise<PolicyBundle> {
+  const [row] = await db.select().from(policies).orderBy(desc(policies.version)).limit(1);
+  const rules = await listRoutingRules();
+  if (!row) {
+    return {
+      version: 0,
+      egressAllowed: false,
+      guardrails: [],
+      allowedModels: [],
+      routingRules: rules,
+      updatedAt: iso(new Date()),
+    };
+  }
+  return { ...toPolicy(row), routingRules: rules };
+}
+
+export async function pushPolicy(
+  patch: Partial<Omit<PolicyBundle, 'version' | 'updatedAt'>>,
+): Promise<PolicyBundle> {
+  const current = await getOrgPolicy();
+  const [row] = await db
+    .insert(policies)
+    .values({
+      version: current.version + 1,
+      egressAllowed: patch.egressAllowed ?? current.egressAllowed,
+      guardrails: patch.guardrails ?? current.guardrails,
+      allowedModels: patch.allowedModels ?? current.allowedModels,
+    })
+    .returning();
+  return toPolicy(row);
+}
+
+// A node pulling its policy: it converges to the org version and reports in.
+export async function pullPolicyForDevice(id: string): Promise<PolicyBundle | null> {
+  const device = await getDevice(id);
+  if (!device) return null;
+  const policy = await getOrgPolicy();
+  await db
+    .update(devices)
+    .set({ policyVersion: policy.version, status: 'online', lastSeen: 'just now' })
+    .where(eq(devices.id, id));
+  return policy;
+}
+
+export async function appendAudit(
+  deviceId: string,
+  events: Omit<AuditEvent, 'id' | 'deviceId'>[],
+): Promise<number> {
+  await db
+    .update(devices)
+    .set({ status: 'online', lastSeen: 'just now' })
+    .where(eq(devices.id, deviceId));
+  if (events.length === 0) return 0;
+  await db.insert(auditEvents).values(
+    events.map((e) => ({
+      id: randomUUID(),
+      deviceId,
+      ts: new Date(e.ts),
+      model: e.model,
+      tokens: e.tokens,
+      leftDevice: e.leftDevice,
+      tool: e.tool,
+      outcome: e.outcome,
+      latencyMs: e.latencyMs ?? 200 + Math.floor(Math.random() * 1800),
+      checks: e.checks ?? null,
+      keyId: e.keyId ?? null,
+    })),
+  );
+  for (const e of events) {
+    emitSpan('audit.event', { deviceId, model: e.model, outcome: e.outcome, tokens: e.tokens });
+  }
+  return events.length;
+}
+
+export async function listAudit(opts?: {
+  deviceId?: string;
+  limit?: number;
+}): Promise<AuditEvent[]> {
+  const limit = opts?.limit ?? 100;
+  const base = db.select().from(auditEvents).orderBy(desc(auditEvents.ts)).limit(limit);
+  const rows = opts?.deviceId
+    ? await db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.deviceId, opts.deviceId))
+        .orderBy(desc(auditEvents.ts))
+        .limit(limit)
+    : await base;
+  return rows.map(toAudit);
+}
+
+export async function queueKill(deviceId: string): Promise<Command | null> {
+  const device = await getDevice(deviceId);
+  if (!device) return null;
+  const [row] = await db
+    .insert(commands)
+    .values({ id: randomUUID(), deviceId, type: 'kill' })
+    .returning();
+  return toCommand(row);
+}
+
+export async function takeCommands(deviceId: string): Promise<Command[]> {
+  const rows = await db
+    .update(commands)
+    .set({ consumed: true })
+    .where(and(eq(commands.deviceId, deviceId), eq(commands.consumed, false)))
+    .returning();
+  return rows.map(toCommand);
+}
+
+export async function listPolicyHistory(): Promise<PolicyBundle[]> {
+  const rows = await db.select().from(policies).orderBy(desc(policies.version));
+  return rows.map(toPolicy);
+}
+
+export interface ConsoleUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string;
+}
+
+export async function listUsers(): Promise<ConsoleUser[]> {
+  return db
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+    .from(users);
+}
+
+export async function setUserRole(id: string, role: string): Promise<ConsoleUser | null> {
+  const [row] = await db
+    .update(users)
+    .set({ role })
+    .where(eq(users.id, id))
+    .returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+  return row ?? null;
+}
+
+// ─── Data plane (M3) ──────────────────────────────────────────────────────────
+export interface Connector {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  lastSync: string | null;
+}
+
+export interface IngestJob {
+  id: string;
+  connectorId: string;
+  connectorName: string;
+  status: string;
+  records: number;
+  startedAt: string;
+}
+
+export interface MaskingRule {
+  id: string;
+  kind: string;
+  action: string;
+  enabled: boolean;
+}
+
+export interface Dataset {
+  id: string;
+  name: string;
+  source: string;
+  rows: number;
+  classification: string;
+  updatedAt: string;
+}
+
+const SYNC_MIN = 100;
+const SYNC_RANGE = 5000;
+
+export async function listConnectors(): Promise<Connector[]> {
+  const rows = await db.select().from(connectors).orderBy(desc(connectors.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    status: r.status,
+    lastSync: r.lastSync ? iso(r.lastSync) : null,
+  }));
+}
+
+export async function createConnector(name: string, type: string): Promise<Connector> {
+  const [row] = await db
+    .insert(connectors)
+    .values({ id: `con_${randomUUID().slice(0, 6)}`, name, type })
+    .returning();
+  return { id: row.id, name: row.name, type: row.type, status: row.status, lastSync: null };
+}
+
+export async function deleteConnector(id: string): Promise<void> {
+  await db.delete(ingestJobs).where(eq(ingestJobs.connectorId, id));
+  await db.delete(connectors).where(eq(connectors.id, id));
+}
+
+export async function syncConnector(id: string): Promise<IngestJob | null> {
+  const [con] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
+  if (!con) return null;
+  const records = SYNC_MIN + Math.floor(Math.random() * SYNC_RANGE);
+  await db
+    .update(connectors)
+    .set({ lastSync: new Date(), status: 'connected' })
+    .where(eq(connectors.id, id));
+  const [job] = await db
+    .insert(ingestJobs)
+    .values({
+      id: `job_${randomUUID().slice(0, 6)}`,
+      connectorId: id,
+      connectorName: con.name,
+      status: 'completed',
+      records,
+    })
+    .returning();
+  return {
+    id: job.id,
+    connectorId: job.connectorId,
+    connectorName: job.connectorName,
+    status: job.status,
+    records: job.records,
+    startedAt: iso(job.startedAt),
+  };
+}
+
+export async function listIngestJobs(limit = 20): Promise<IngestJob[]> {
+  const rows = await db.select().from(ingestJobs).orderBy(desc(ingestJobs.startedAt)).limit(limit);
+  return rows.map((r) => ({
+    id: r.id,
+    connectorId: r.connectorId,
+    connectorName: r.connectorName,
+    status: r.status,
+    records: r.records,
+    startedAt: iso(r.startedAt),
+  }));
+}
+
+export async function listMaskingRules(): Promise<MaskingRule[]> {
+  const rows = await db.select().from(maskingRules).orderBy(desc(maskingRules.createdAt));
+  return rows.map((r) => ({ id: r.id, kind: r.kind, action: r.action, enabled: r.enabled }));
+}
+
+export async function createMaskingRule(kind: string, action: string): Promise<MaskingRule> {
+  const [row] = await db
+    .insert(maskingRules)
+    .values({ id: `msk_${randomUUID().slice(0, 6)}`, kind, action })
+    .returning();
+  return { id: row.id, kind: row.kind, action: row.action, enabled: row.enabled };
+}
+
+export async function setMaskingRuleEnabled(id: string, enabled: boolean): Promise<void> {
+  await db.update(maskingRules).set({ enabled }).where(eq(maskingRules.id, id));
+}
+
+export async function listDatasets(): Promise<Dataset[]> {
+  const rows = await db.select().from(datasets).orderBy(desc(datasets.updatedAt));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    source: r.source,
+    rows: r.rows,
+    classification: r.classification,
+    updatedAt: iso(r.updatedAt),
+  }));
+}
+
+// DSAR / right-to-erasure (stub): reports how many sensitive datasets the subject spans.
+// Real propagation crosses lake + KB + vector index + memory; here we report scope.
+export async function eraseSubjectScope(): Promise<number> {
+  const rows = await db.select().from(datasets);
+  return rows.filter((r) => r.classification === 'pii' || r.classification === 'phi').length;
+}
+
+// ─── Multi-tenant + ABAC (#10) ────────────────────────────────────────────────
+export interface Tenant {
+  id: string;
+  name: string;
+  plan: string;
+  enabledModules: string[];
+  createdAt: string;
+}
+
+export interface AbacRule {
+  id: string;
+  role: string;
+  attribute: string;
+  operator: string;
+  value: string;
+  resource: string;
+  effect: string;
+}
+
+export interface AbacContext {
+  role: string;
+  attributes: Record<string, string>;
+  resource: string;
+}
+
+function toTenant(r: typeof tenants.$inferSelect): Tenant {
+  return {
+    id: r.id,
+    name: r.name,
+    plan: r.plan,
+    enabledModules: r.enabledModules,
+    createdAt: iso(r.createdAt),
+  };
+}
+
+export async function listTenants(): Promise<Tenant[]> {
+  const rows = await db.select().from(tenants).orderBy(desc(tenants.createdAt));
+  return rows.map(toTenant);
+}
+
+export async function createTenant(
+  name: string,
+  plan: string,
+  enabledModules: string[],
+): Promise<Tenant> {
+  const [row] = await db
+    .insert(tenants)
+    .values({ id: `org_${randomUUID().slice(0, 6)}`, name, plan, enabledModules })
+    .returning();
+  return toTenant(row);
+}
+
+export async function deleteTenant(id: string): Promise<void> {
+  await db.delete(tenants).where(eq(tenants.id, id));
+}
+
+export async function setTenantModules(id: string, modules: string[]): Promise<Tenant | null> {
+  const [row] = await db
+    .update(tenants)
+    .set({ enabledModules: modules })
+    .where(eq(tenants.id, id))
+    .returning();
+  return row ? toTenant(row) : null;
+}
+
+export async function listAbacRules(): Promise<AbacRule[]> {
+  const rows = await db.select().from(abacRules).orderBy(desc(abacRules.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    role: r.role,
+    attribute: r.attribute,
+    operator: r.operator,
+    value: r.value,
+    resource: r.resource,
+    effect: r.effect,
+  }));
+}
+
+export async function createAbacRule(rule: Omit<AbacRule, 'id'>): Promise<AbacRule> {
+  const [row] = await db
+    .insert(abacRules)
+    .values({ id: `abac_${randomUUID().slice(0, 6)}`, ...rule })
+    .returning();
+  return {
+    id: row.id,
+    role: row.role,
+    attribute: row.attribute,
+    operator: row.operator,
+    value: row.value,
+    resource: row.resource,
+    effect: row.effect,
+  };
+}
+
+export async function deleteAbacRule(id: string): Promise<void> {
+  await db.delete(abacRules).where(eq(abacRules.id, id));
+}
+
+function ruleMatches(rule: AbacRule, ctx: AbacContext): boolean {
+  if (rule.role !== '*' && rule.role !== ctx.role) return false;
+  if (rule.resource !== '*' && rule.resource !== ctx.resource) return false;
+  const attr = ctx.attributes[rule.attribute];
+  if (rule.operator === 'in') return rule.value.split(',').includes(attr);
+  if (rule.operator === 'neq') return attr !== rule.value;
+  return attr === rule.value;
+}
+
+// ABAC decision: deny-overrides. A matching deny wins; else a matching allow grants; else deny.
+export async function evaluateAbac(
+  ctx: AbacContext,
+): Promise<{ allow: boolean; matched: AbacRule[] }> {
+  const rules = await listAbacRules();
+  const matched = rules.filter((r) => ruleMatches(r, ctx));
+  if (matched.some((r) => r.effect === 'deny')) return { allow: false, matched };
+  return { allow: matched.some((r) => r.effect === 'allow'), matched };
+}
+
+// ─── Model routing rules (smart + conditional routing / cloud leash) ───────────
+function toRoutingRule(r: typeof routingRules.$inferSelect): RoutingRule {
+  return {
+    id: r.id,
+    name: r.name,
+    priority: r.priority,
+    attribute: r.attribute,
+    operator: r.operator,
+    value: r.value,
+    action: r.action,
+    model: r.model,
+    fallback: r.fallback,
+    enabled: r.enabled,
+  };
+}
+
+export async function listRoutingRules(): Promise<RoutingRule[]> {
+  const rows = await db.select().from(routingRules).orderBy(routingRules.priority);
+  return rows.map(toRoutingRule);
+}
+
+export async function createRoutingRule(
+  input: Omit<RoutingRule, 'id' | 'enabled'>,
+): Promise<RoutingRule> {
+  const [row] = await db
+    .insert(routingRules)
+    .values({ id: `route_${randomUUID().slice(0, 8)}`, ...input })
+    .returning();
+  return toRoutingRule(row);
+}
+
+export async function setRoutingRuleEnabled(id: string, enabled: boolean): Promise<void> {
+  await db.update(routingRules).set({ enabled }).where(eq(routingRules.id, id));
+}
+
+export async function deleteRoutingRule(id: string): Promise<void> {
+  await db.delete(routingRules).where(eq(routingRules.id, id));
+}
+
+export interface RoutingDecision {
+  action: 'local' | 'cloud' | 'block';
+  effective: 'local' | 'cloud' | 'block';
+  model: string | null;
+  fallback: string | null;
+  matched: string | null;
+  reason: string;
+}
+
+// Evaluate where a request runs: first enabled rule (by ascending priority) whose condition
+// matches wins. The org egress switch is the master leash — a `cloud` action with egress off is
+// downgraded to `block`. No match → local (the safe default).
+export async function evaluateRouting(ctx: {
+  attributes: Record<string, string>;
+}): Promise<RoutingDecision> {
+  const [rules, policy] = await Promise.all([listRoutingRules(), getOrgPolicy()]);
+  const abacCtx: AbacContext = { role: '*', resource: '*', attributes: ctx.attributes };
+  const hit = rules.find((r) => r.enabled && ruleMatches(routeAsAbac(r), abacCtx));
+  if (!hit) {
+    return {
+      action: 'local',
+      effective: 'local',
+      model: null,
+      fallback: null,
+      matched: null,
+      reason: 'no rule matched; defaulted to local',
+    };
+  }
+  const action = hit.action as RoutingDecision['action'];
+  const leashed = action === 'cloud' && !policy.egressAllowed;
+  return {
+    action,
+    effective: leashed ? 'block' : action,
+    model: hit.model || null,
+    fallback: hit.fallback || null,
+    matched: hit.name,
+    reason: leashed ? `${hit.name} → cloud, but org egress is OFF (leashed to block)` : hit.name,
+  };
+}
+
+// Reuse the ABAC matcher: a routing rule's attribute/operator/value is an AbacRule shape.
+function routeAsAbac(r: RoutingRule): AbacRule {
+  return {
+    id: r.id,
+    role: '*',
+    resource: '*',
+    attribute: r.attribute,
+    operator: r.operator,
+    value: r.value,
+    effect: 'allow',
+  };
+}
+
+// ─── Governance registry (Phase E org wrapper) ─────────────────────────────────
+export interface GovernanceItem {
+  id: string;
+  kind: string;
+  title: string;
+  owner: string;
+  status: string;
+  detail: string;
+  reviewedAt: string;
+}
+
+function toGovernance(r: typeof governanceItems.$inferSelect): GovernanceItem {
+  return {
+    id: r.id,
+    kind: r.kind,
+    title: r.title,
+    owner: r.owner,
+    status: r.status,
+    detail: r.detail,
+    reviewedAt: r.reviewedAt,
+  };
+}
+
+export async function listGovernance(): Promise<GovernanceItem[]> {
+  const rows = await db.select().from(governanceItems).orderBy(governanceItems.kind);
+  return rows.map(toGovernance);
+}
+
+export async function createGovernance(input: Omit<GovernanceItem, 'id'>): Promise<GovernanceItem> {
+  const [row] = await db
+    .insert(governanceItems)
+    .values({ id: `gov_${randomUUID().slice(0, 8)}`, ...input })
+    .returning();
+  return toGovernance(row);
+}
+
+export async function deleteGovernance(id: string): Promise<void> {
+  await db.delete(governanceItems).where(eq(governanceItems.id, id));
+}
+
+// ─── FinOps: virtual keys (token issuance) ─────────────────────────────────────
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  subjectType: string;
+  subject: string;
+  budgetUsd: number | null;
+  enabled: boolean;
+}
+
+function toApiKey(r: typeof apiKeys.$inferSelect): ApiKey {
+  return {
+    id: r.id,
+    name: r.name,
+    prefix: r.prefix,
+    subjectType: r.subjectType,
+    subject: r.subject,
+    budgetUsd: r.budgetUsd,
+    enabled: r.enabled,
+  };
+}
+
+export async function listApiKeys(): Promise<ApiKey[]> {
+  const rows = await db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  return rows.map(toApiKey);
+}
+
+// Issue a key: returns the one-time secret token (shown once) + the stored record.
+export async function createApiKey(input: {
+  name: string;
+  subjectType: string;
+  subject: string;
+  budgetUsd: number | null;
+}): Promise<{ key: ApiKey; token: string }> {
+  const id = `key_${randomUUID().slice(0, 8)}`;
+  const secret = randomUUID().replace(/-/g, '');
+  const token = `ogk_${secret}`;
+  const prefix = `ogk_${secret.slice(0, 6)}…`;
+  const [row] = await db
+    .insert(apiKeys)
+    .values({
+      id,
+      name: input.name,
+      prefix,
+      subjectType: input.subjectType,
+      subject: input.subject,
+      budgetUsd: input.budgetUsd,
+    })
+    .returning();
+  return { key: toApiKey(row), token };
+}
+
+export async function setApiKeyEnabled(id: string, enabled: boolean): Promise<void> {
+  await db.update(apiKeys).set({ enabled }).where(eq(apiKeys.id, id));
+}
+
+export async function deleteApiKey(id: string): Promise<void> {
+  await db.delete(apiKeys).where(eq(apiKeys.id, id));
+}
+
+// ─── Tool registry (the router's `tool` source) ───────────────────────────────
+export interface Tool {
+  id: string;
+  name: string;
+  type: string;
+  endpoint: string;
+  description: string;
+  enabled: boolean;
+}
+
+export async function listTools(): Promise<Tool[]> {
+  const rows = await db.select().from(tools).orderBy(desc(tools.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    endpoint: r.endpoint,
+    description: r.description,
+    enabled: r.enabled,
+  }));
+}
+
+export async function createTool(input: {
+  name: string;
+  type: string;
+  endpoint: string;
+  description: string;
+}): Promise<Tool> {
+  const [row] = await db
+    .insert(tools)
+    .values({ id: `tool_${randomUUID().slice(0, 8)}`, ...input })
+    .returning();
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    endpoint: row.endpoint,
+    description: row.description,
+    enabled: row.enabled,
+  };
+}
+
+export async function setToolEnabled(id: string, enabled: boolean): Promise<void> {
+  await db.update(tools).set({ enabled }).where(eq(tools.id, id));
+}
+
+export async function deleteTool(id: string): Promise<void> {
+  await db.delete(tools).where(eq(tools.id, id));
+}

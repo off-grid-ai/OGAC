@@ -1,0 +1,251 @@
+import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+
+// ─── Fleet / control-plane tables ────────────────────────────────────────────
+export const devices = pgTable('devices', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  os: text('os').notNull(),
+  role: text('role').notNull(),
+  status: text('status').notNull().default('offline'),
+  lastSeen: text('last_seen').notNull().default('never'),
+  policyVersion: integer('policy_version').notNull().default(0),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Append-only policy versions; the current policy is the highest version.
+export const policies = pgTable('policies', {
+  version: integer('version').primaryKey(),
+  egressAllowed: boolean('egress_allowed').notNull().default(false),
+  guardrails: jsonb('guardrails').$type<string[]>().notNull(),
+  allowedModels: jsonb('allowed_models').$type<string[]>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const auditEvents = pgTable('audit_events', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull(),
+  ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
+  model: text('model').notNull(),
+  tokens: integer('tokens').notNull().default(0),
+  leftDevice: boolean('left_device').notNull().default(false),
+  tool: text('tool'),
+  outcome: text('outcome').notNull(),
+  latencyMs: integer('latency_ms').notNull().default(0),
+  checks: jsonb('checks').$type<{ name: string; verdict: string; score?: number; ms?: number }[]>(),
+  keyId: text('key_id'), // virtual key this call was billed to (FinOps attribution)
+});
+
+// ─── FinOps: virtual keys (token issuance) — scoped to a user or project, with a budget ───
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  prefix: text('prefix').notNull(), // display token prefix, e.g. ogk_ab12…
+  subjectType: text('subject_type').notNull().default('user'), // user | project
+  subject: text('subject').notNull(),
+  budgetUsd: integer('budget_usd'), // monthly budget in whole USD; null = unlimited
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const enrollmentTokens = pgTable('enrollment_tokens', {
+  token: text('token').primaryKey(),
+  role: text('role').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  used: boolean('used').notNull().default(false),
+});
+
+export const commands = pgTable('commands', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull(),
+  type: text('type').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  consumed: boolean('consumed').notNull().default(false),
+});
+
+// ─── Data plane (M3) ──────────────────────────────────────────────────────────
+export const connectors = pgTable('connectors', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  type: text('type').notNull(),
+  status: text('status').notNull().default('connected'),
+  lastSync: timestamp('last_sync', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const ingestJobs = pgTable('ingest_jobs', {
+  id: text('id').primaryKey(),
+  connectorId: text('connector_id').notNull(),
+  connectorName: text('connector_name').notNull(),
+  status: text('status').notNull().default('queued'),
+  records: integer('records').notNull().default(0),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const maskingRules = pgTable('masking_rules', {
+  id: text('id').primaryKey(),
+  kind: text('kind').notNull(),
+  action: text('action').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const datasets = pgTable('datasets', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  source: text('source').notNull(),
+  rows: integer('rows').notNull().default(0),
+  classification: text('classification').notNull().default('internal'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Evals + golden sets ──────────────────────────────────────────────────────
+export const goldenCases = pgTable('golden_cases', {
+  id: text('id').primaryKey(),
+  query: text('query').notNull(),
+  expected: text('expected').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const evalRuns = pgTable('eval_runs', {
+  id: text('id').primaryKey(),
+  score: integer('score').notNull().default(0),
+  total: integer('total').notNull().default(0),
+  passed: integer('passed').notNull().default(0),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  results:
+    jsonb('results').$type<
+      { query: string; expected: string; pass: boolean; top: string; score: number }[]
+    >(),
+});
+
+// ─── Multi-tenant + ABAC (#10) ────────────────────────────────────────────────
+export const tenants = pgTable('tenants', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  plan: text('plan').notNull().default('standard'),
+  enabledModules: jsonb('enabled_modules').$type<string[]>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const abacRules = pgTable('abac_rules', {
+  id: text('id').primaryKey(),
+  role: text('role').notNull(),
+  attribute: text('attribute').notNull(),
+  operator: text('operator').notNull(),
+  value: text('value').notNull(),
+  resource: text('resource').notNull(),
+  effect: text('effect').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Governance registry (Phase E org wrapper: policies, committees, processes) ──
+// The org/regulatory placards that are functions/processes, not tools — tracked as attestable
+// records (AI-use policy, ethics board, RACI, training, vendor, insurance, tabletop drills).
+export const governanceItems = pgTable('governance_items', {
+  id: text('id').primaryKey(),
+  kind: text('kind').notNull(), // policy | ethics_review | raci | training | vendor | insurance | drill | impact_assessment
+  title: text('title').notNull(),
+  owner: text('owner').notNull().default(''),
+  status: text('status').notNull().default('draft'), // draft | active | due | expired
+  detail: text('detail').notNull().default(''),
+  reviewedAt: text('reviewed_at').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Agent run traces (handoffs + provenance + citations) ─────────────────────
+// A run is a multi-step trace: plan → retrieve → handoff → ground → answer. Each step records
+// the sources it touched (provenance); the final answer carries the grounded citation set.
+export const agentRuns = pgTable('agent_runs', {
+  id: text('id').primaryKey(),
+  agentId: text('agent_id').notNull(),
+  query: text('query').notNull(),
+  answer: text('answer').notNull().default(''),
+  status: text('status').notNull().default('done'),
+  steps:
+    jsonb('steps').$type<
+      { kind: string; label: string; detail: string; refs: string[]; ms: number }[]
+    >(),
+  citations:
+    jsonb('citations').$type<
+      { ref: string; title: string; snippet: string; score: number; supported: boolean }[]
+    >(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Model routing rules (smart + conditional routing / cloud leash) ──────────
+// Evaluated by ascending priority; first match decides where a request runs. Folded into the
+// policy bundle the node pulls, so the gateway enforces it as the chokepoint.
+export const routingRules = pgTable('routing_rules', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  priority: integer('priority').notNull().default(100),
+  attribute: text('attribute').notNull(), // data_class | task | cost | region | …
+  operator: text('operator').notNull(), // eq | neq | in
+  value: text('value').notNull(),
+  action: text('action').notNull(), // local | cloud | block
+  model: text('model').notNull().default(''), // target model (optional)
+  fallback: text('fallback').notNull().default(''), // fallback model on unavailability
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Tool registry (router's `tool` source / MCP & HTTP invocations) ──────────
+export const tools = pgTable('tools', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  type: text('type').notNull().default('http'), // 'http' | 'mcp'
+  endpoint: text('endpoint').notNull().default(''),
+  description: text('description').notNull().default(''), // when-to-use, for intent matching
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Auth.js tables (Drizzle adapter) + RBAC role on the user ─────────────────
+export const users = pgTable('user', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text('name'),
+  email: text('email').unique(),
+  emailVerified: timestamp('email_verified', { mode: 'date' }),
+  image: text('image'),
+  role: text('role').notNull().default('viewer'),
+});
+
+export const accounts = pgTable(
+  'account',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    provider: text('provider').notNull(),
+    providerAccountId: text('provider_account_id').notNull(),
+    refresh_token: text('refresh_token'),
+    access_token: text('access_token'),
+    expires_at: integer('expires_at'),
+    token_type: text('token_type'),
+    scope: text('scope'),
+    id_token: text('id_token'),
+    session_state: text('session_state'),
+  },
+  (account) => [primaryKey({ columns: [account.provider, account.providerAccountId] })],
+);
+
+export const sessions = pgTable('session', {
+  sessionToken: text('session_token').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  expires: timestamp('expires', { mode: 'date' }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  'verification_token',
+  {
+    identifier: text('identifier').notNull(),
+    token: text('token').notNull(),
+    expires: timestamp('expires', { mode: 'date' }).notNull(),
+  },
+  (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
+);
