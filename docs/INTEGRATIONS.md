@@ -34,25 +34,25 @@ interface AdapterMeta {
 
 ## Capabilities & ports today
 
-| Capability      | Default adapter          | Swappable for (OSS)  | How the OSS is wired         |
-| --------------- | ------------------------ | -------------------- | ---------------------------- |
-| `inference`     | Off Grid AI Gateway      | (always the gateway) | in-path (the one gateway)    |
-| `retrieval`     | LanceDB                  | pgvector · Qdrant    | in-path (vector search)      |
-| `grounding`     | Gateway NLI              | Lexical (offline)    | in-path (entailment)         |
-| `guardrails`    | Off Grid checks (regex)  | Microsoft Presidio   | **in-path** (PiiPort)        |
-| `policy`        | Off Grid RBAC + ABAC     | Open Policy Agent    | **in-path** (PolicyPort)     |
-| `lineage`       | native (no-op)           | Marquez              | **in-path** (LineagePort)    |
-| `observability` | OpenTelemetry (OTLP)     | SigNoz · Langfuse    | in-path (span fan-out)       |
-| `identity`      | Auth.js                  | Keycloak             | embed UI + OIDC              |
-| `secrets`       | Process env              | OpenBao              | in-path (SecretsPort)        |
-| `caching`       | In-process (exact)       | Redis (+ semantic)   | in-path (cache lookup)       |
-| `siem`          | Off Grid audit store     | OpenSearch           | embed UI + log shipping      |
-| `flags`         | Off Grid flags (env)     | Unleash              | embed UI                     |
-| `bi`            | (none)                   | Superset · Metabase  | embed UI                     |
+| Capability      | Default adapter         | Swappable for (OSS)  | How the OSS is wired      |
+| --------------- | ----------------------- | -------------------- | ------------------------- |
+| `inference`     | Off Grid AI Gateway     | (always the gateway) | in-path (the one gateway) |
+| `retrieval`     | LanceDB                 | pgvector · Qdrant    | in-path (vector search)   |
+| `grounding`     | Gateway NLI             | Lexical (offline)    | in-path (entailment)      |
+| `guardrails`    | Off Grid checks (regex) | Microsoft Presidio   | **in-path** (PiiPort)     |
+| `policy`        | Off Grid RBAC + ABAC    | Open Policy Agent    | **in-path** (PolicyPort)  |
+| `lineage`       | native (no-op)          | Marquez              | **in-path** (LineagePort) |
+| `observability` | OpenTelemetry (OTLP)    | SigNoz · Langfuse    | in-path (span fan-out)    |
+| `identity`      | Auth.js                 | Keycloak             | **in-path** (OIDC login)  |
+| `secrets`       | Process env             | OpenBao              | in-path (SecretsPort)     |
+| `caching`       | In-process (exact)      | Redis (+ semantic)   | in-path (cache lookup)    |
+| `siem`          | Off Grid audit store    | OpenSearch           | embed UI + log shipping   |
+| `flags`         | Off Grid flags (env)    | Unleash              | embed UI                  |
+| `bi`            | (none)                  | Superset · Metabase  | embed UI                  |
 
-**In-path vs embed.** *In-path* adapters actually perform the work when selected — flipping
+**In-path vs embed.** _In-path_ adapters actually perform the work when selected — flipping
 `OFFGRID_ADAPTER_GUARDRAILS=presidio` routes real PII scans through Presidio; the call site
-(`getPii().scan()`) never knows which engine answered. *Embed* adapters surface a rich OSS UI
+(`getPii().scan()`) never knows which engine answered. _Embed_ adapters surface a rich OSS UI
 behind an SSO'd iframe (mere aggregation; their license never touches our core). Every in-path
 OSS adapter **falls back to the first-party engine if its service is unreachable**, so a swap is
 always reversible and never a hard dependency.
@@ -119,7 +119,7 @@ make smoke                           # 3. reachability — every service answers
 make verify                          # 4. BEHAVIOR — the swaps actually change behavior (see below)
 ```
 
-`make smoke` proves a service is *up*. `make verify` proves the *contract*: it sends the exact
+`make smoke` proves a service is _up_. `make verify` proves the _contract_: it sends the exact
 request each in-path adapter sends and asserts on the response (Presidio detects an email entity,
 OPA returns allow/deny, Marquez accepts an OpenLineage event and the job graph is then queryable).
 A green `verify` is the difference between "reachable" and "wired." Script:
@@ -135,10 +135,12 @@ the env lines in `.env.local` (copy from `deploy/.env.example`). Restart the con
 ```bash
 cd deploy && make guardrails                 # presidio-analyzer on :5002, anonymizer on :5001
 ```
+
 ```ini
 OFFGRID_ADAPTER_GUARDRAILS=presidio
 OFFGRID_PRESIDIO_URL=http://127.0.0.1:5002
 ```
+
 Confirm: `curl -s -XPOST localhost:5002/analyze -H 'content-type: application/json' \`
 `-d '{"text":"jane@acme.com","language":"en"}'` → returns an `EMAIL_ADDRESS` entity. In the
 console, the `pii` check on any request now reports `PII (presidio): …`. Unset the env to revert
@@ -151,10 +153,12 @@ cd deploy && make policy                      # OPA on :8181
 # load your policy under package offgrid.authz with an `allow` rule:
 curl -XPUT localhost:8181/v1/policies/offgrid --data-binary @your-policy.rego
 ```
+
 ```ini
 OFFGRID_ADAPTER_POLICY=opa
 OFFGRID_OPA_URL=http://127.0.0.1:8181
 ```
+
 Confirm: `POST /api/v1/admin/abac/evaluate {"role":"compliance","resource":"audit"}` → the
 response `engine` field reads `opa` (vs `abac` for the built-in). OPA must expose
 `/v1/data/offgrid/authz` returning `{"result":{"allow":bool}}`. Down/unset → falls back to ABAC.
@@ -164,11 +168,13 @@ response `engine` field reads `opa` (vs `abac` for the built-in). OPA must expos
 ```bash
 cd deploy && make lineage                     # marquez API :9000, web UI :3001
 ```
+
 ```ini
 OFFGRID_ADAPTER_LINEAGE=marquez
 OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000
 OFFGRID_LINEAGE_NAMESPACE=offgrid-console
 ```
+
 Confirm: ingest a doc or run a retrieval, then open the Marquez web UI (`:3001`) → namespace
 `offgrid-console` shows `brain.ingest` / `brain.retrieve` jobs with their input→output datasets.
 Default (`native`) is a no-op — lineage stays implicit in the audit log.
@@ -178,6 +184,7 @@ Default (`native`) is a no-op — lineage stays implicit in the audit log.
 ```bash
 cd deploy && make observability               # OTel Collector :4318 → VictoriaMetrics / Jaeger
 ```
+
 ```ini
 OFFGRID_OTLP_URL=http://127.0.0.1:4318        # emitSpan exports real OTLP here
 OFFGRID_ADAPTER_OBSERVABILITY=signoz          # optional: label/route to SigNoz
@@ -186,21 +193,42 @@ OFFGRID_ADAPTER_OBSERVABILITY=signoz          # optional: label/route to SigNoz
 OFFGRID_LANGFUSE_OTLP_URL=http://127.0.0.1:3030/api/public/otel
 OFFGRID_LANGFUSE_AUTH=cGstbGYtb2ZmZ3JpZC1jb25zb2xlOnNrLWxmLW9mZmdyaWQtY29uc29sZQ==
 ```
+
 Confirm: trigger any traced action (an agent run), then find the span in Jaeger (`:16686`); with
 the Langfuse vars set the same span also lands in Langfuse (`:3030`, login `dev@offgrid.local` /
 `offgrid-dev-pw`). `make verify` asserts the OTLP round-trip automatically. **Langfuse v3** ships
 as a 5-container set (web + worker + ClickHouse + MinIO + Redis), scoped to the `llmops` profile —
 heavier than the rest, so only `make llmops`/`make up` start it.
 
-### Secrets → OpenBao · Identity → Keycloak · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
+### Identity → Keycloak (SSO login, in-path)
+
+Keycloak is a real **sign-in provider** (OIDC), not just an embed — it self-activates in Auth.js
+when its client env is set, and a "Continue with Keycloak" button appears on `/signin`.
+
+```bash
+cd deploy && make identity                    # Keycloak on :8080 (admin / admin)
+```
+In the Keycloak admin console: create a realm (e.g. `offgrid`) → Clients → create an **OIDC**
+client (confidential, standard flow) → set the redirect URI to
+`http://localhost:3000/api/auth/callback/keycloak` → copy the client secret. Then:
+```ini
+AUTH_KEYCLOAK_ID=<client-id>
+AUTH_KEYCLOAK_SECRET=<client-secret>
+AUTH_KEYCLOAK_ISSUER=http://localhost:8080/realms/offgrid
+```
+Confirm: restart the console, open `/signin` → the Keycloak button is present → it redirects to
+Keycloak and back. New users default to the `viewer` role (map realm roles → console roles as a
+follow-up). Optionally also surface the Keycloak admin UI as an embed via `OFFGRID_KEYCLOAK_URL`.
+
+### Secrets → OpenBao · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
 
 ```ini
 OFFGRID_ADAPTER_SECRETS=openbao      ; OFFGRID_OPENBAO_URL=http://127.0.0.1:8200
-OFFGRID_ADAPTER_IDENTITY=keycloak    ; OFFGRID_KEYCLOAK_URL=http://127.0.0.1:8080
 OFFGRID_ADAPTER_CACHING=redis        ; OFFGRID_REDIS_URL=redis://127.0.0.1:6379
 OFFGRID_ADAPTER_SIEM=opensearch      ; OFFGRID_OPENSEARCH_URL=http://127.0.0.1:9200
 OFFGRID_ADAPTER_FLAGS=unleash        ; OFFGRID_UNLEASH_URL=http://127.0.0.1:4242
 ```
+
 Bring each up with its profile (`make secrets|identity|… `), confirm with `make smoke`. The full
 env reference with every URL is `deploy/.env.example`; every service's config knobs are in
 `CATALOG.md`.
