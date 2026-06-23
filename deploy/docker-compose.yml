@@ -1,0 +1,280 @@
+# Off Grid Console — THE canonical OSS stack. One file, all five planes, profiled by capability.
+# Variants (lean / enterprise / air-gapped) are derived from this — never hand-rolled separately.
+#
+#   docker compose --profile all up -d              # full 5-layer depth (everything below)
+#   docker compose --profile data --profile ai up   # pick planes/capabilities à la carte
+#
+# Profiles map 1:1 to capabilities, so a deployment runs only what it licensed:
+#   data · secrets · observability · guardrails · policy · identity · lineage · llmops · agents · ai
+#
+# The Off Grid AI Gateway is first-party and runs SEPARATELY (127.0.0.1:7878) — never in compose.
+# FinOps/cost + token issuance + per-user/per-project usage are FIRST-PARTY console capabilities
+# (we own the gateway), not containers. All images here are permissive (Apache-2.0 / MIT / MPL-2.0
+# / BSD / PostgreSQL) — see ../LICENSES.md. Dev-mode creds below are NOT for production.
+name: offgrid-console
+
+services:
+  # ── DATA PLANE ────────────────────────────────────────────────────────────────
+  # Postgres + pgvector: console state, append-only audit, AND the server-scale Brain vector store.
+  postgres:
+    image: pgvector/pgvector:pg16
+    profiles: [data, ai, all]
+    environment:
+      POSTGRES_USER: offgrid
+      POSTGRES_PASSWORD: offgrid
+      POSTGRES_DB: offgrid_console
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U offgrid']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Object store for documents/artifacts (S3-compatible, Apache-2.0).
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    profiles: [data, all]
+    command: 'server -dir=/data -s3 -s3.port=8333'
+    ports: ['8333:8333', '9333:9333']
+    volumes: [seaweed:/data]
+
+  # ── AI PLANE — vector store alternative (Brain bridge) ─────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    profiles: [ai, all]
+    ports: ['6333:6333']
+    volumes: [qdrant:/qdrant/storage]
+
+  # ── SECRETS ────────────────────────────────────────────────────────────────────
+  openbao:
+    image: openbao/openbao:latest
+    profiles: [secrets, all]
+    cap_add: [IPC_LOCK]
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: offgrid-dev-token
+      BAO_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports: ['8200:8200']
+    healthcheck:
+      test: ['CMD', 'bao', 'status', '-address=http://127.0.0.1:8200']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ── IDENTITY (SSO) ──────────────────────────────────────────────────────────────
+  # Keycloak dev mode (in-memory H2) — self-contained for local; back with Postgres in prod.
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    profiles: [identity, all]
+    command: ['start-dev']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: offgrid-dev
+      KC_HTTP_PORT: '8080'
+    ports: ['8080:8080']
+
+  # ── POLICY (policy-as-code) ──────────────────────────────────────────────────────
+  opa:
+    image: openpolicyagent/opa:latest
+    profiles: [policy, all]
+    command: ['run', '--server', '--addr=0.0.0.0:8181', '--log-level=error']
+    ports: ['8181:8181']
+
+  # ── GUARDRAILS (PII detection / redaction) ────────────────────────────────────────
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    profiles: [guardrails, all]
+    ports: ['5002:3000']
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    profiles: [guardrails, all]
+    ports: ['5001:3000']
+
+  # ── OBSERVABILITY (metrics/logs/traces — one OTLP wire, any backend) ───────────────
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    profiles: [observability, all]
+    command: ['-storageDataPath=/vmdata', '-httpListenAddr=:8428', '-retentionPeriod=1']
+    ports: ['8428:8428']
+    volumes: [vmdata:/vmdata]
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8428/health']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    profiles: [observability, all]
+    command: ['-storageDataPath=/vldata', '-httpListenAddr=:9428']
+    ports: ['9428:9428']
+    volumes: [vldata:/vldata]
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    profiles: [observability, all]
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes: ['./otel-collector.yaml:/etc/otelcol/config.yaml:ro']
+    ports: ['4318:4318', '4317:4317']
+    depends_on: [victoriametrics, jaeger]
+
+  # Distributed-trace backend (app-layer tracing): OTLP in → queryable trace UI on :16686.
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    profiles: [observability, all]
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports: ['16686:16686']
+
+  # ── LLMOps (LLM tracing, evals, cost per trace/user/project) ──────────────────────
+  langfuse-db:
+    image: postgres:16-alpine
+    profiles: [llmops, all]
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes: [langfusedb:/var/lib/postgresql/data]
+  langfuse:
+    image: langfuse/langfuse:2
+    profiles: [llmops, all]
+    depends_on: [langfuse-db]
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3030
+      NEXTAUTH_SECRET: offgrid-dev-secret
+      SALT: offgrid-dev-salt
+      TELEMETRY_ENABLED: 'false'
+    ports: ['3030:3000']
+
+  # ── LINEAGE & PROVENANCE (source → chunk → answer) ────────────────────────────────
+  marquez-db:
+    image: postgres:16-alpine
+    profiles: [lineage, all]
+    environment:
+      POSTGRES_USER: marquez
+      POSTGRES_PASSWORD: marquez
+      POSTGRES_DB: marquez
+    volumes: [marquezdb:/var/lib/postgresql/data]
+  marquez:
+    image: marquezproject/marquez:latest
+    profiles: [lineage, all]
+    depends_on: [marquez-db]
+    environment:
+      MARQUEZ_PORT: '5000'
+      MARQUEZ_ADMIN_PORT: '5010'
+      POSTGRES_HOST: marquez-db
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: marquez
+      POSTGRES_USER: marquez
+      POSTGRES_PASSWORD: marquez
+    ports: ['9000:5000', '5010:5010']
+  marquez-web:
+    image: marquezproject/marquez-web:latest
+    profiles: [lineage, all]
+    depends_on: [marquez]
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: '5000'
+    ports: ['3001:3000']
+
+  # ── AGENT RUNTIME (durable workflows) ─────────────────────────────────────────────
+  temporal-db:
+    image: postgres:16-alpine
+    profiles: [agents, all]
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes: [temporaldb:/var/lib/postgresql/data]
+  temporal:
+    image: temporalio/auto-setup:latest
+    profiles: [agents, all]
+    depends_on: [temporal-db]
+    environment:
+      DB: postgres12
+      DB_PORT: '5432'
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-db
+    ports: ['7233:7233']
+  temporal-ui:
+    image: temporalio/ui:latest
+    profiles: [agents, all]
+    depends_on: [temporal]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports: ['8081:8080']
+
+  # ── CACHING & RATE LIMITS (Redis: semantic/exact response cache + rate limiting) ──
+  redis:
+    image: redis:7-alpine
+    profiles: [caching, all]
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ── SIEM (OpenSearch: audit/log search + dashboards) ──────────────────────────────
+  opensearch:
+    image: opensearchproject/opensearch:2
+    profiles: [siem, all]
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+      OPENSEARCH_JAVA_OPTS: '-Xms512m -Xmx512m'
+      bootstrap.memory_lock: 'true'
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    ports: ['9200:9200']
+    volumes: [opensearch:/usr/share/opensearch/data]
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2
+    profiles: [siem, all]
+    depends_on: [opensearch]
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: 'true'
+    ports: ['5601:5601']
+
+  # ── FEATURE FLAGS (Unleash: modular capability/module control) ────────────────────
+  unleash-db:
+    image: postgres:16-alpine
+    profiles: [flags, all]
+    environment:
+      POSTGRES_USER: unleash
+      POSTGRES_PASSWORD: unleash
+      POSTGRES_DB: unleash
+    volumes: [unleashdb:/var/lib/postgresql/data]
+  unleash:
+    image: unleashorg/unleash-server:latest
+    profiles: [flags, all]
+    depends_on: [unleash-db]
+    environment:
+      DATABASE_URL: postgres://unleash:unleash@unleash-db:5432/unleash
+      DATABASE_SSL: 'false'
+    ports: ['4242:4242']
+
+  # ── BI / DATA EXPLORATION (Apache Superset: view, SQL, pivot/transpose, dashboards) ──
+  # First run: `docker compose exec superset superset init` (creates admin + metadata).
+  superset:
+    image: apache/superset:latest
+    profiles: [bi, all]
+    environment:
+      SUPERSET_SECRET_KEY: offgrid-dev-superset-secret
+    ports: ['8088:8088']
+    volumes: [superset:/app/superset_home]
+
+volumes:
+  pgdata:
+  seaweed:
+  qdrant:
+  vmdata:
+  vldata:
+  langfusedb:
+  marquezdb:
+  temporaldb:
+  opensearch:
+  unleashdb:
+  superset:
