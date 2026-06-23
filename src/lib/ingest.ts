@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+import { getLineage } from '@/lib/adapters/registry';
 import { addDocument, type BrainDoc } from '@/lib/brain';
 import { listDatasets } from '@/lib/store';
 
@@ -7,6 +9,19 @@ import { listDatasets } from '@/lib/store';
 // through addDocument() so chunking/embedding/storage stays in one place.
 const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 const VISION_MODEL = process.env.OFFGRID_VISION_MODEL ?? 'gemma-local';
+
+// Record source→document lineage through the lineage port (no-op by default, Marquez when
+// configured). Funnels every ingest path so the provenance graph stays complete.
+async function recordIngest(source: string, doc: BrainDoc): Promise<BrainDoc> {
+  await getLineage().emit({
+    job: 'brain.ingest',
+    run: randomUUID(),
+    status: 'COMPLETE',
+    inputs: [source],
+    outputs: [doc.title],
+  });
+  return doc;
+}
 
 export type IngestKind = 'text' | 'file' | 'image' | 'database';
 
@@ -45,17 +60,17 @@ async function captionImage(dataUrl: string): Promise<string> {
 }
 
 export async function ingestText(title: string, text: string, source = 'Text'): Promise<BrainDoc> {
-  return addDocument(title, source, text);
+  return recordIngest(source, await addDocument(title, source, text));
 }
 
 export async function ingestFile(name: string, text: string): Promise<BrainDoc> {
-  return addDocument(name, `File · ${name}`, text);
+  return recordIngest(`File · ${name}`, await addDocument(name, `File · ${name}`, text));
 }
 
 export async function ingestImage(title: string, dataUrl: string): Promise<BrainDoc> {
   const caption = await captionImage(dataUrl);
   const text = caption || `Image: ${title} (no caption — vision model unavailable).`;
-  return addDocument(title, `Image · ${title}`, text);
+  return recordIngest(`Image · ${title}`, await addDocument(title, `Image · ${title}`, text));
 }
 
 export async function ingestDatabase(datasetId: string): Promise<BrainDoc | null> {
@@ -64,5 +79,6 @@ export async function ingestDatabase(datasetId: string): Promise<BrainDoc | null
   const text =
     `Dataset "${dataset.name}" from ${dataset.source}: ${dataset.rows.toLocaleString()} rows, ` +
     `classification ${dataset.classification}. Structured records available for query.`;
-  return addDocument(dataset.name, `Database · ${dataset.source}`, text);
+  const source = `Database · ${dataset.source}`;
+  return recordIngest(source, await addDocument(dataset.name, source, text));
 }

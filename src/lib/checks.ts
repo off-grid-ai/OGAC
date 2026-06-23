@@ -1,3 +1,5 @@
+import { getPii } from './adapters/registry';
+
 // The findings spine. Guardrail/eval checks run as hooks (pre/post) and produce normalized
 // results stamped onto the audit record — the Portkey `hook_results` / Bifrost PostHook pattern.
 // Each tool (Presidio, an injection scanner, a grounding/eval scorer) is a CheckAdapter.
@@ -24,21 +26,19 @@ export interface CheckAdapter {
   run(ctx: CheckContext): Promise<CheckResult> | CheckResult;
 }
 
-const EMAIL = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
-const PHONE = /\b\+?\d[\d ()-]{7,}\d\b/;
 const INJECTION = /\b(ignore (all |the )?previous|disregard (the )?instructions|system prompt)\b/i;
 
-// Sample adapters — thin stand-ins for the real OSS tools (Presidio, etc.). Swap the body
-// for an adapter call; the interface stays the same.
+// PII runs through the guardrails port — regex by default, Presidio when OFFGRID_ADAPTER_GUARDRAILS
+// =presidio. The verdict shape is identical regardless of which engine answered.
 export const piiCheck: CheckAdapter = {
   name: 'pii',
   phase: 'pre',
-  run(ctx) {
-    const hit = EMAIL.test(ctx.input ?? '') || PHONE.test(ctx.input ?? '');
+  async run(ctx) {
+    const result = await getPii().scan(ctx.input ?? '');
     return {
       name: 'pii',
-      verdict: hit ? 'redacted' : 'pass',
-      detail: hit ? 'PII detected' : undefined,
+      verdict: result.hits ? 'redacted' : 'pass',
+      detail: result.hits ? `PII (${result.engine}): ${result.entities.join(', ')}` : undefined,
     };
   },
 };
