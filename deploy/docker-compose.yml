@@ -133,10 +133,18 @@ services:
       POSTGRES_PASSWORD: langfuse
       POSTGRES_DB: langfuse
     volumes: [langfusedb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U langfuse']
+      interval: 5s
+      timeout: 3s
+      retries: 20
   langfuse:
     image: langfuse/langfuse:2
     profiles: [llmops, all]
-    depends_on: [langfuse-db]
+    restart: on-failure
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
       NEXTAUTH_URL: http://localhost:3030
@@ -154,10 +162,18 @@ services:
       POSTGRES_PASSWORD: marquez
       POSTGRES_DB: marquez
     volumes: [marquezdb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U marquez']
+      interval: 5s
+      timeout: 3s
+      retries: 20
   marquez:
     image: marquezproject/marquez:latest
     profiles: [lineage, all]
-    depends_on: [marquez-db]
+    restart: on-failure
+    depends_on:
+      marquez-db:
+        condition: service_healthy
     environment:
       MARQUEZ_PORT: '5000'
       MARQUEZ_ADMIN_PORT: '5010'
@@ -185,10 +201,18 @@ services:
       POSTGRES_PASSWORD: temporal
       POSTGRES_DB: temporal
     volumes: [temporaldb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal']
+      interval: 5s
+      timeout: 3s
+      retries: 20
   temporal:
     image: temporalio/auto-setup:latest
     profiles: [agents, all]
-    depends_on: [temporal-db]
+    restart: on-failure
+    depends_on:
+      temporal-db:
+        condition: service_healthy
     environment:
       DB: postgres12
       DB_PORT: '5432'
@@ -247,10 +271,18 @@ services:
       POSTGRES_PASSWORD: unleash
       POSTGRES_DB: unleash
     volumes: [unleashdb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U unleash']
+      interval: 5s
+      timeout: 3s
+      retries: 20
   unleash:
     image: unleashorg/unleash-server:latest
     profiles: [flags, all]
-    depends_on: [unleash-db]
+    restart: on-failure
+    depends_on:
+      unleash-db:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://unleash:unleash@unleash-db:5432/unleash
       DATABASE_SSL: 'false'
