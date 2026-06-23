@@ -1,0 +1,128 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Off Grid brand tokens. Light is the default (:root); dark via [data-theme='dark']. */
+:root {
+  --og-primary: #059669;
+  --og-background: #f7f8f8;
+  --og-surface: #ffffff;
+  --og-surface-light: #f1f2f4;
+  --og-text: #0f1115;
+  --og-text-secondary: #4b5563;
+  --og-text-muted: #9097a1;
+  --og-border: #e6e8eb;
+  --og-border-light: #eef0f2;
+  --og-border-focus: #059669;
+  --og-error: #dc2626;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --og-primary: #34d399;
+  --og-background: #0a0a0a;
+  --og-surface: #141414;
+  --og-surface-light: #1e1e1e;
+  --og-text: #ffffff;
+  --og-text-secondary: #b0b0b0;
+  --og-text-muted: #808080;
+  --og-border: #232323;
+  --og-border-light: #2a2a2a;
+  --og-border-focus: #34d399;
+  --og-error: #c75050;
+  color-scheme: dark;
+}
+
+/* Map Tailwind palette + shadcn semantic tokens to brand, so utility classes and pulled
+   library components inherit Off Grid and flip light/dark with zero per-component styling. */
+@theme {
+  --font-mono: 'Menlo', ui-monospace, SFMono-Regular, monospace;
+  --radius: 0.625rem;
+
+  --color-neutral-950: var(--og-background);
+  --color-neutral-900: var(--og-surface);
+  --color-neutral-800: var(--og-surface-light);
+  --color-neutral-700: var(--og-border-light);
+  --color-neutral-600: var(--og-text-muted);
+  --color-neutral-500: var(--og-text-muted);
+  --color-neutral-400: var(--og-text-secondary);
+  --color-neutral-300: var(--og-text-secondary);
+  --color-neutral-200: var(--og-text);
+  --color-neutral-100: var(--og-text);
+  --color-white: var(--og-text);
+  --color-black: var(--og-background);
+  --color-green-400: var(--og-primary);
+  --color-green-500: var(--og-primary);
+  --color-red-400: var(--og-error);
+  --color-red-500: var(--og-error);
+
+  --color-background: var(--og-background);
+  --color-foreground: var(--og-text);
+  --color-card: var(--og-surface);
+  --color-card-foreground: var(--og-text);
+  --color-popover: var(--og-surface);
+  --color-popover-foreground: var(--og-text);
+  --color-primary: var(--og-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--og-surface-light);
+  --color-secondary-foreground: var(--og-text);
+  --color-muted: var(--og-surface-light);
+  --color-muted-foreground: var(--og-text-muted);
+  --color-accent: var(--og-surface-light);
+  --color-accent-foreground: var(--og-text);
+  --color-destructive: var(--og-error);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--og-border);
+  --color-input: var(--og-border);
+  --color-ring: var(--og-primary);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--og-background);
+  color: var(--og-text);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+@theme inline {
+  --animate-shiny-text: shiny-text 8s infinite;
+  @keyframes shiny-text {
+    0%,
+    90%,
+    100% {
+      background-position: calc(-100% - var(--shiny-width)) 0;
+    }
+    30%,
+    60% {
+      background-position: calc(100% + var(--shiny-width)) 0;
+    }
+  }
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+}
