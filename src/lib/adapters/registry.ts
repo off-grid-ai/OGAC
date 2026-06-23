@@ -1,6 +1,9 @@
 import { heuristicGrounding, modelGrounding } from './grounding';
 import { gatewayInference, localInference } from './inference';
+import { LINEAGE_PORTS } from './lineage';
 import { otelObservability, signozObservability } from './observability';
+import { PII_PORTS } from './pii';
+import { POLICY_PORTS } from './policy';
 import { envSecrets, openBaoSecrets } from './secrets';
 import {
   BI,
@@ -23,7 +26,10 @@ import type {
   Capability,
   GroundingPort,
   InferencePort,
+  LineagePort,
   ObservabilityPort,
+  PiiPort,
+  PolicyPort,
   SecretsPort,
 } from './types';
 
@@ -56,6 +62,21 @@ export function getSecrets(): SecretsPort {
 
 export function getGrounding(): GroundingPort {
   return pick('grounding', GROUNDING);
+}
+
+// Behavior ports for the capabilities whose OSS swap-in actually performs the work in-path (not
+// just an embedded UI). Each falls back to the first-party adapter internally if its service is
+// unreachable, so selecting an OSS adapter is reversible and never a hard dependency.
+export function getPolicy(): PolicyPort {
+  return pick('policy', POLICY_PORTS);
+}
+
+export function getPii(): PiiPort {
+  return pick('guardrails', PII_PORTS);
+}
+
+export function getLineage(): LineagePort {
+  return pick('lineage', LINEAGE_PORTS);
 }
 
 export interface CapabilityBinding {

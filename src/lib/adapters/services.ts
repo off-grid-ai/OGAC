@@ -77,6 +77,16 @@ export const IDENTITY: RegEntry[] = [
 export const LINEAGE: RegEntry[] = [
   {
     meta: {
+      id: 'native',
+      capability: 'lineage',
+      vendor: 'Off Grid (implicit)',
+      license: 'first-party',
+      render: 'native',
+      description: 'Lineage implicit in the audit trace; no separate graph (default, zero-OSS).',
+    },
+  },
+  {
+    meta: {
       id: 'marquez',
       capability: 'lineage',
       vendor: 'OpenLineage + Marquez',
