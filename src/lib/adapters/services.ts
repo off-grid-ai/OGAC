@@ -353,6 +353,43 @@ export const SANDBOX: RegEntry[] = [
   },
 ];
 
+// Evals. Default is the first-party golden-set (recall over the Brain). promptfoo (Node) adds an
+// assertion matrix across providers; Ragas/DeepEval (Python service) add RAG metrics — faithfulness,
+// context precision/recall, answer relevancy. All run offline against recorded outputs.
+export const EVALS: RegEntry[] = [
+  {
+    meta: {
+      id: 'golden',
+      capability: 'evals',
+      vendor: 'Off Grid golden set',
+      license: 'first-party',
+      render: 'native',
+      description: 'Recall-scored golden query→expected-doc set over the Brain (always on).',
+    },
+  },
+  {
+    meta: {
+      id: 'promptfoo',
+      capability: 'evals',
+      vendor: 'promptfoo',
+      license: 'MIT',
+      render: 'headless',
+      description: 'Assertion-matrix evals across providers (Node-native).',
+    },
+  },
+  {
+    meta: {
+      id: 'ragas',
+      capability: 'evals',
+      vendor: 'Ragas + DeepEval',
+      license: 'Apache-2.0',
+      render: 'headless',
+      embedUrl: env.OFFGRID_RAGAS_URL,
+      description: 'RAG metrics — faithfulness, context precision/recall, answer relevancy.',
+    },
+  },
+];
+
 // Langfuse is an additional observability adapter (LLM traces + per-trace/user/project cost).
 export const langfuseEntry: RegEntry = {
   meta: {
