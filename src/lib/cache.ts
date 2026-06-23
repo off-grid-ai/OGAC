@@ -46,6 +46,17 @@ export interface CacheHit {
   score?: number;
 }
 
+// Best semantic match among fresh entries (extracted to keep cacheLookup simple).
+function bestSemantic(vec: number[]): { e: Entry; score: number } | null {
+  let best: { e: Entry; score: number } | null = null;
+  for (const e of store.values()) {
+    if (!fresh(e)) continue;
+    const score = cosine(vec, e.vector);
+    if (!best || score > best.score) best = { e, score };
+  }
+  return best;
+}
+
 export async function cacheLookup(prompt: string): Promise<CacheHit> {
   const exact = store.get(hash(prompt));
   if (exact && fresh(exact)) {
@@ -53,14 +64,7 @@ export async function cacheLookup(prompt: string): Promise<CacheHit> {
     stats.exact += 1;
     return { hit: true, mode: 'exact', answer: exact.answer, score: 1 };
   }
-  // Semantic: embed the prompt and compare to recent entries.
-  let best: { e: Entry; score: number } | null = null;
-  const vec = await getInference().embed(prompt);
-  for (const e of store.values()) {
-    if (!fresh(e)) continue;
-    const score = cosine(vec, e.vector);
-    if (!best || score > best.score) best = { e, score };
-  }
+  const best = bestSemantic(await getInference().embed(prompt));
   if (best && best.score >= SEMANTIC_THRESHOLD) {
     stats.hits += 1;
     stats.semantic += 1;
