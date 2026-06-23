@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+import { getLineage } from '@/lib/adapters/registry';
 import { SOURCES } from './sources';
 import type { RetrievalHit, RouteDecision, RouteResult, SourceKind } from './types';
 
@@ -45,7 +47,16 @@ export async function route(query: string, k = 8): Promise<RouteResult> {
   const decision = classify(query);
   const selected = SOURCES.filter((s) => decision.intent.includes(s.kind));
   const lists = await Promise.all(selected.map((s) => s.search(query, k)));
-  return { query, decision, hits: fuse(lists, k) };
+  const hits = fuse(lists, k);
+  // Record which sources fed this retrieval through the lineage port (no-op unless configured).
+  await getLineage().emit({
+    job: 'brain.retrieve',
+    run: randomUUID(),
+    status: 'COMPLETE',
+    inputs: selected.map((s) => s.label),
+    outputs: ['retrieval-result'],
+  });
+  return { query, decision, hits };
 }
 
 export function listSources(): { id: string; kind: SourceKind; label: string; describe: string }[] {

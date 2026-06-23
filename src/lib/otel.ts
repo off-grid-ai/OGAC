@@ -6,6 +6,27 @@ import { randomBytes } from 'crypto';
 type SpanAttrs = Record<string, string | number | boolean | undefined>;
 
 const OTLP_URL = process.env.OFFGRID_OTLP_URL;
+// Langfuse ingests OTLP traces directly (Basic-auth with its key pair). Setting these turns the
+// same span stream into LLM traces in Langfuse — no separate SDK, just a second OTLP target.
+const LANGFUSE_OTLP_URL = process.env.OFFGRID_LANGFUSE_OTLP_URL;
+const LANGFUSE_AUTH = process.env.OFFGRID_LANGFUSE_AUTH; // base64 of "public-key:secret-key"
+
+interface SpanTarget {
+  url: string;
+  headers: Record<string, string>;
+}
+
+function targets(): SpanTarget[] {
+  const out: SpanTarget[] = [];
+  if (OTLP_URL) out.push({ url: `${OTLP_URL}/v1/traces`, headers: {} });
+  if (LANGFUSE_OTLP_URL && LANGFUSE_AUTH) {
+    out.push({
+      url: `${LANGFUSE_OTLP_URL}/v1/traces`,
+      headers: { authorization: `Basic ${LANGFUSE_AUTH}` },
+    });
+  }
+  return out;
+}
 
 function anyValue(v: string | number | boolean): Record<string, unknown> {
   if (typeof v === 'boolean') return { boolValue: v };
@@ -44,18 +65,21 @@ function exportSpan(name: string, attrs: SpanAttrs): void {
       },
     ],
   };
-  // Fire-and-forget — observability must never block or break the request path.
-  fetch(`${OTLP_URL}/v1/traces`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(3000),
-  }).catch(() => {});
+  // Fire-and-forget to every configured target — observability must never block the request path.
+  const payload = JSON.stringify(body);
+  for (const t of targets()) {
+    fetch(t.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...t.headers },
+      body: payload,
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => {});
+  }
 }
 
 export function emitSpan(name: string, attrs: SpanAttrs): void {
   if (process.env.OTEL_DEBUG === 'true') {
     process.stdout.write(`[otel] ${name} ${JSON.stringify(attrs)}\n`);
   }
-  if (OTLP_URL) exportSpan(name, attrs);
+  if (targets().length > 0) exportSpan(name, attrs);
 }
