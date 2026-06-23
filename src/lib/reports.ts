@@ -83,59 +83,125 @@ export const REPORTS: ReportDef[] = [
   },
 ];
 
-// What each regulator typically asks — mapped to the frameworks + the live evidence we hold.
+// Regulator response packs grounded in current (mid-2026) Indian guidance. `status` honestly
+// flags binding vs advisory/draft, because most AI-specific instruments are NOT yet binding —
+// enforceable obligations map to in-force generic directions (IT/cyber/outsourcing/localization)
+// + the final DPDP Rules 2025 + CERT-In. `artifacts` = the evidence a compliance team keeps ready.
 interface RegulatorSpec {
   name: string;
+  status: string;
   frameworks: string[];
   questions: string[];
+  artifacts: string[];
 }
 
 const REGULATORS: Record<string, RegulatorSpec> = {
   irdai: {
-    name: 'IRDAI (Insurance Regulatory and Development Authority of India)',
-    frameworks: ['dpdp', 'iso-42001', 'eu-ai-act'],
+    name: 'IRDAI — insurers',
+    status:
+      'No standalone IRDAI AI rule exists. AI is governed indirectly via the IN-FORCE Information & Cyber Security Guidelines 2023, Policyholder Protection Regs 2024, Bima Bharosa grievance, Sandbox Regs 2025, and DPDP. "Explainable AI" is best practice, not a current IRDAI mandate.',
+    frameworks: ['dpdp', 'iso-42001', 'hipaa'],
     questions: [
-      'Which AI models touch underwriting / claims, and do they run on-device or in the cloud?',
-      'How is policyholder (PII/PHI) data masked and prevented from leaving the device?',
-      'Are AI decisions explainable and grounded to a cited source?',
-      'Is there an algorithmic impact assessment and a human review path?',
+      'What data trains/feeds the model and the lawful basis/consent (DPDP) per category — esp. health/telematics/wearables?',
+      'Bias / disparate-impact testing across protected + proxy variables in underwriting / pricing / claims — how often?',
+      'For an adverse automated decision (decline / loading / claim rejection): a human-understandable explanation + audit trail?',
+      'Where is the human in the loop before the policyholder is bound?',
+      'How does an AI decision surface in the Bima Bharosa grievance flow, and within what TAT is it reviewed / reversed?',
+      'Cyber/data controls on the model (encryption, access, VAPT) + incident reporting (CERT-In 6h / IRDAI 24h)?',
+    ],
+    artifacts: [
+      'Model inventory + model cards (data lineage, features used/excluded)',
+      'Bias/fairness reports + explainability + decision audit logs',
+      'Human-oversight policy + sign-off matrix',
+      'DPDP pack (consent, notices, DPIA, retention)',
+      'Board-approved ICSP + ISRMC minutes + CISO appointment; TRA/VAPT + localization attestation',
+      'Grievance MIS showing AI-complaint resolution times',
     ],
   },
   rbi: {
-    name: 'RBI (Reserve Bank of India)',
+    name: 'RBI — banks / NBFCs',
+    status:
+      'AI-specific instruments are NON-BINDING (FREE-AI report Aug 2025; draft Model-Risk-in-Credit Aug 2024). Enforceable obligations come from the IN-FORCE IT Outsourcing MD (2023), Payment Data Localization (2018), and IT Governance/GRCA MD (2024).',
     frameworks: ['dpdp', 'occ-sr-11-7', 'dora', 'iso-42001'],
     questions: [
-      'Model risk governance: inventory, validation, monitoring, and the model-risk framework?',
-      'Data localization / residency: is regulated data kept in-country / on-device?',
-      'Outsourcing & third-party (vendor) controls for any cloud model?',
-      'Is there a complete, tamper-evident audit trail and a kill switch?',
+      'Board-approved AI / model-risk policy over the model lifecycle + named accountable owner — last board review?',
+      'Independent pre-deployment validation + ≥annual revalidation, with drift/performance monitoring — show reports.',
+      'Bias testing across protected attributes + an explanation for an individual adverse decision (e.g. loan rejection)?',
+      'For external/hosted models: vendor due diligence, right-to-audit, and where payment/customer data is stored (India)?',
+      'Is the customer told AI was used, with a grievance path that triggers human review / override?',
+      'Audit trails for inputs/outputs/changes + incident process incl. RBI reporting within 6 hours?',
+    ],
+    artifacts: [
+      'Board-approved AI/MRM policy + review minutes; model inventory + per-model documentation',
+      'Independent validation + drift/performance reports',
+      'Bias tests + sample adverse-action explanations',
+      'Vendor due-diligence + right-to-audit + concentration assessment',
+      'Payment-data residency map + CERT-In System Audit Report',
+      'Incident runbook with the 6-hour RBI step; consumer disclosure + human-override workflow',
     ],
   },
   sebi: {
-    name: 'SEBI (Securities and Exchange Board of India)',
+    name: 'SEBI — market participants',
+    status:
+      'IN FORCE: the 2019 AI/ML quarterly reporting circulars (file within 15 days of quarter-end). DRAFT: Responsible AI/ML Guidelines (Jun 2025 consultation) — not yet binding, but signals ≥5-yr input/output retention, accountability, and explainability.',
     frameworks: ['iso-42001', 'occ-sr-11-7', 'eu-ai-act'],
     questions: [
-      'AI/ML governance, accountability (RACI), and the review board?',
-      'Audit trail of every model decision and who is accountable?',
-      'Investor-protection controls: guardrails, grounding, and disclosure?',
+      'What is the system used for (advice / algo execution / surveillance / KYC), is it investor-facing, in-house/vendor/joint?',
+      'Named senior accountable person + where the human-in-the-loop sits?',
+      'Pre-deployment testing (segregated env, stressed/unstressed, shadow) + production monitoring?',
+      'Bias detection/removal + outputs explainable, traceable, repeatable?',
+      'Client disclosures (risks, model accuracy, fees) + AI grievance handling?',
+      'Vendor risk (agreements, fallback, concentration) + data/cyber/breach controls?',
+    ],
+    artifacts: [
+      'Quarterly AI/ML reporting forms (Annexure A) + filing receipts',
+      'AI inventory (use-case, investor-facing flag, build model)',
+      'Model documentation + explainability + accuracy; testing evidence (segregated/stressed/shadow)',
+      'Governance: named owner, human-review workflow, committee minutes',
+      'Vendor file (contracts, fallback/BCP, concentration analysis)',
+      'Model input/output data retained ≥5 years; client disclosures + grievance records',
     ],
   },
   dpdp: {
-    name: 'DPDP Act 2023 / MeitY',
+    name: 'DPDP Act 2023 / DPDP Rules 2025 (MeitY)',
+    status:
+      'FINAL — Rules notified 14 Nov 2025, phased. Core duties (notice/consent, rights, breach, retention) + Significant-Data-Fiduciary obligations (DPO, annual DPIA + independent audit, algorithmic-fairness verification) land by ~13 May 2027. Country lists / SDF designations pending notification.',
     frameworks: ['dpdp', 'gdpr', 'hipaa'],
     questions: [
-      'Data-principal rights: access, correction, and erasure (DSAR)?',
-      'PII masking / tokenization at ingest, and data localization?',
-      'Consent, purpose limitation, and breach-response process?',
+      'Lawful basis/consent per personal-data category used in training/fine-tuning/inference — notice + affirmative consent, no repurposing?',
+      'Why each field is necessary + how you correct/erase a principal’s data, including data embedded in trained models / vector stores?',
+      'SDF: what verifies the algorithm does not endanger principals’ rights (bias testing, model cards, human review)?',
+      'How do erasure + default retention propagate across training sets / embeddings / caches / backups?',
+      'On a data leak (memorization / prompt-injection / vector exfiltration): immediate principal notice + 72-hour Board report?',
+      'Where is processing hosted, any restricted-jurisdiction transfer, do processor / LLM-API contracts flow down the Rule-6 safeguards?',
+    ],
+    artifacts: [
+      'RoPA / data map for the AI system; consent + multi-language notices + withdrawal evidence',
+      'DPIA + independent data audit (SDF, annual); algorithmic fairness/transparency assessment',
+      'Rule-6 security evidence (encryption, access, ≥1-yr logs, IR plan, processor DPAs)',
+      'Retention/erasure SOP + proof of deletion across embeddings/backups',
+      'Breach playbook (Board + principal templates, 72h); DPO + grievance officer + cross-border register',
     ],
   },
   'cert-in': {
-    name: 'CERT-In',
+    name: 'CERT-In (2022 Directions)',
+    status:
+      'IN FORCE since Jun 2022 under IT Act s.70B. Annexure-I explicitly lists AI/ML-system incidents.',
     frameworks: ['iso-42001', 'dora'],
     questions: [
-      'Are logs retained and synchronized with traceability (audit + traces)?',
-      'Incident detection, tabletop drills, and the response runbook?',
-      'Can a compromised node be isolated / killed in seconds?',
+      'Are all clocks synced to NIC / NPL NTP — config + drift monitoring?',
+      'Are logs retained ≥180 rolling days, stored within India — location + policy?',
+      'Can you file with CERT-In within 6 hours of awareness (not confirmation)?',
+      'Who is your 24x7 registered point of contact + escalation procedure?',
+      'For an AI/ML system: how is a model/pipeline compromise detected, classified against Annexure I, and reported?',
+      'Can you reconstruct the timeline of a past incident on demand?',
+    ],
+    artifacts: [
+      'NTP config evidence + drift monitoring',
+      'Log-retention policy + proof of 180-day India-resident storage',
+      'IR runbook with the 6-hour CERT-In step + incident register',
+      'Designated 24x7 PoC + CERT-In registration ack',
+      'Incident → Annexure-I mapping incl. the AI/ML category',
     ],
   },
 };
@@ -161,27 +227,47 @@ async function regulatorPack(id: string): Promise<{ filename: string; body: stri
     listDevices(),
     listRoutingRules(),
   ]);
-  const l: string[] = [];
-  h(l, `Regulator Response Pack — ${spec.name}`);
-  l.push(`Generated: ${c.generatedAt}`, `Overall control posture: ${c.posture}%`, '');
-  l.push('## Questions you may ask — and where the evidence is');
-  for (const q of spec.questions) l.push(`- ${q}`);
-  l.push('', '## Framework coverage', ...frameworkLines(c, spec.frameworks));
-  l.push('', '## Controls (live)');
-  for (const ctrl of c.controls) {
-    l.push(`- **${ctrl.name}** — ${ctrl.status.toUpperCase()} — ${ctrl.evidence}`);
-  }
-  l.push('', '## Governance (policies, committees, processes)', ...governanceLines(governance));
-  l.push('', '## Data residency & model routing');
-  l.push(`- Cloud egress: ${policy.egressAllowed ? 'allowed (leashed)' : 'blocked'}`);
-  l.push(`- Allowed models: ${policy.allowedModels.join(', ') || 'none'}`);
-  for (const r of routes.filter((x) => x.attribute === 'region')) {
-    l.push(`- Region rule: ${r.value} → ${r.action} (${r.model || 'default'})`);
-  }
-  l.push('', '## Data inventory');
-  for (const d of datasets) l.push(`- ${d.name} — ${d.classification} (${d.source})`);
-  l.push('', `## Fleet: ${devices.length} enrolled devices (kill switch available per device).`);
-  return { filename: `offgrid-regulator-${id}.md`, body: l.join('\n') };
+  const residency = [
+    `- Cloud egress: ${policy.egressAllowed ? 'allowed (leashed)' : 'blocked'}`,
+    `- Allowed models: ${policy.allowedModels.join(', ') || 'none'}`,
+    ...routes
+      .filter((x) => x.attribute === 'region')
+      .map((r) => `- Region rule: ${r.value} → ${r.action} (${r.model || 'default'})`),
+  ];
+  const body = [
+    `# Regulator Response Pack — ${spec.name}`,
+    `Generated: ${c.generatedAt}`,
+    `Overall control posture: ${c.posture}%`,
+    '',
+    '## Regulatory status',
+    `> ${spec.status}`,
+    '',
+    '## Questions you may ask — and where the evidence is',
+    ...spec.questions.map((q) => `- ${q}`),
+    '',
+    '## Evidence to have ready',
+    ...spec.artifacts.map((a) => `- ${a}`),
+    '',
+    '## Framework coverage',
+    ...frameworkLines(c, spec.frameworks),
+    '',
+    '## Controls (live)',
+    ...c.controls.map(
+      (ctrl) => `- **${ctrl.name}** — ${ctrl.status.toUpperCase()} — ${ctrl.evidence}`,
+    ),
+    '',
+    '## Governance (policies, committees, processes)',
+    ...governanceLines(governance),
+    '',
+    '## Data residency & model routing',
+    ...residency,
+    '',
+    '## Data inventory',
+    ...datasets.map((d) => `- ${d.name} — ${d.classification} (${d.source})`),
+    '',
+    `## Fleet: ${devices.length} enrolled devices (kill switch available per device).`,
+  ];
+  return { filename: `offgrid-regulator-${id}.md`, body: body.join('\n') };
 }
 
 function h(lines: string[], title: string): void {
