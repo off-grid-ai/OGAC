@@ -128,13 +128,14 @@ database`: text/file index directly, **images are captioned via the gateway (mul
   forces the offline baseline.
 - **Verify:** `POST /api/v1/admin/grounding/verify {answer, sources[]}` → per-claim verdicts + score.
 
-### 3.4 Guardrails — `guardrails` 🟡 (⚪ external optional)
+### 3.4 Guardrails — `guardrails` 🟢 (Presidio swap in-path)
 
 - **Today:** the first-party checks spine (`src/lib/checks.ts`): PII + injection hooks, results
-  normalized onto the audit record.
-- **Mapped alternatives:** Microsoft Presidio (PII), NeMo Guardrails, Guardrails AI, Rebuff
-  (injection). Out-of-process (HTTP), so copyleft never links into a closed module.
-- **Verify:** any audited request stamps `checks[]` (see the Control plane audit table).
+  normalized onto the audit record. PII detection runs through the **`PiiPort`**.
+- **In-path swap:** `OFFGRID_ADAPTER_GUARDRAILS=presidio` routes the PII scan through Microsoft
+  Presidio (`/analyze`); the check reports `PII (presidio): …`. Falls back to the regex if Presidio
+  is unreachable. (NeMo Guardrails / Rebuff remain mapped for injection.) Out-of-process (HTTP).
+- **Verify:** `make verify` (Presidio entity assertion) or any audited request stamps `checks[]`.
 
 ### 3.5 Observability — `observability` 🟢
 
@@ -162,15 +163,21 @@ database`: text/file index directly, **images are captioned via the gateway (mul
   SeaweedFS (object store). Enabled only for the Data plane.
 - **Operate:** `make data`. `DATABASE_URL=postgres://offgrid:offgrid@127.0.0.1:5432/offgrid_console`.
 
-### 3.8 Policy & authorization — ⚪
+### 3.8 Policy & authorization — 🟢 (OPA swap in-path)
 
-- **Mapped:** Open Policy Agent (Rego), Cedar, OpenFGA. The console ships native RBAC + ABAC
-  (deny-overrides) today; OPA is the Tier-2 native policy seam (OPA has no heavy UI).
+- **Today:** native RBAC + ABAC (deny-overrides) via the **`PolicyPort`** — `/admin/abac/evaluate`.
+- **In-path swap:** `OFFGRID_ADAPTER_POLICY=opa` delegates the decision to Open Policy Agent
+  (`POST /v1/data/offgrid/authz` → `{result:{allow}}`); the response `engine` reads `opa`. Falls
+  back to ABAC if OPA is unreachable. (Cedar / OpenFGA remain mapped.)
+- **Verify:** `make verify` (OPA allow/deny assertions).
 
-### 3.9 Lineage & provenance — ⚪
+### 3.9 Lineage & provenance — 🟢 (Marquez swap in-path)
 
-- **Mapped:** OpenLineage + Marquez (pipeline lineage), Sigstore (signing). Pairs with the
-  grounding capability for end-to-end answer provenance.
+- **Today:** the **`LineagePort`** — `native` is a no-op (lineage implicit in the audit trace).
+- **In-path swap:** `OFFGRID_ADAPTER_LINEAGE=marquez` emits real OpenLineage run events on every
+  ingest + retrieval (`brain.ingest` / `brain.retrieve` jobs), best-effort and non-blocking. Pairs
+  with grounding for end-to-end answer provenance. (Sigstore signing remains mapped.)
+- **Verify:** `make verify` (OpenLineage round-trip) or the Marquez web UI (`:3001`).
 
 ### 3.10 Agent runtime & durability — ⚪
 
@@ -230,9 +237,34 @@ Confirm the bindings: `GET /api/v1/admin/adapters?health=1` or **Admin → Integ
 
 ---
 
-## 6. Verifying each integration (smoke tests)
+## 6. Verifying each integration
+
+**Two levels.** `make smoke` proves each service is *reachable* (answers `/health`). `make verify`
+proves the *behavior contract* of the in-path adapters — it sends the exact request each one sends
+and asserts the response, so green means "the swap actually works," not just "the container is up."
 
 ```bash
+cd deploy && make smoke      # reachability: every service → HTTP 200
+cd deploy && make verify     # behavior: Presidio detects PII · OPA allow/deny · Marquez round-trip
+```
+
+`make verify` (script: `scripts/verify-adapters.sh`) is the honest answer to "how do I know the
+integrations work?" — it's repeatable and asserts on real responses. Last run: 5/5 pass.
+
+Per-integration manual checks:
+
+```bash
+# Guardrails (Presidio): the request shape PiiPort sends
+curl -s -XPOST localhost:5002/analyze -H 'content-type: application/json' \
+  -d '{"text":"jane@acme.com","language":"en"}'      # → EMAIL_ADDRESS entity
+
+# Policy (OPA): the decision shape PolicyPort reads
+curl -s -XPOST localhost:8181/v1/data/offgrid/authz -H 'content-type: application/json' \
+  -d '{"input":{"role":"compliance","resource":"audit"}}'   # → {"result":{"allow":true}}
+
+# Lineage (Marquez): after an ingest/retrieve, the job graph is queryable
+curl -s localhost:9000/api/v1/namespaces/offgrid-console/jobs   # → brain.ingest / brain.retrieve
+
 # Secrets (OpenBao): write, then read back through the adapter
 curl -s -H "X-Vault-Token: offgrid-dev-token" -XPOST \
   http://127.0.0.1:8200/v1/secret/data/demo -d '{"data":{"value":"hello"}}'

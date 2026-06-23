@@ -91,11 +91,18 @@ and `HOWTO.md` (feature how-tos).
 **Trigger:** scaling past the first-party default (e.g. real PII engine, KMS, SSO).
 
 1. Bring up the service: `make secrets` (OpenBao) / `make guardrails` (Presidio) / `make identity`
-   (Keycloak) / `make policy` (OPA) …
-2. Set the env: `OFFGRID_ADAPTER_<CAP>=<id>` + the service URL (see `deploy/.env.example`).
+   (Keycloak) / `make policy` (OPA) / `make lineage` (Marquez) …
+2. Set the env: `OFFGRID_ADAPTER_<CAP>=<id>` + the service URL (see `deploy/.env.example`). The
+   exact env block per tool is in `INTEGRATIONS.md` → "Configure each integration (cookbook)".
 3. Restart the console (adapters read URLs at process start).
-4. **Verify:** **Admin → Integrations · adapters** shows the new active adapter + `healthy`.
-5. Rollback: unset the env var → reverts to the first-party default (no data loss).
+4. **Verify reachability:** `make smoke` + **Admin → Integrations · adapters** shows the new active
+   adapter + `healthy`.
+5. **Verify behavior** (in-path adapters — guardrails/policy/lineage): `make verify` sends the real
+   request and asserts the response. Or confirm in-product: a PII check now reads
+   `PII (presidio): …`; `/admin/abac/evaluate` returns `engine: opa`; the Marquez UI shows the
+   `brain.ingest`/`brain.retrieve` jobs.
+6. Rollback: unset the env var → reverts to the first-party default (no data loss). In-path OSS
+   adapters also auto-fall-back to the default if the service goes unreachable.
 
 ---
 
