@@ -10,6 +10,8 @@ PRESIDIO="${OFFGRID_PRESIDIO_URL:-http://127.0.0.1:5002}"
 OPA="${OFFGRID_OPA_URL:-http://127.0.0.1:8181}"
 MARQUEZ="${OFFGRID_MARQUEZ_URL:-http://127.0.0.1:9000}"
 NS="${OFFGRID_LINEAGE_NAMESPACE:-offgrid-console}"
+LF_OTLP="${OFFGRID_LANGFUSE_OTLP_URL:-http://127.0.0.1:3030/api/public/otel}"
+LF_AUTH="${OFFGRID_LANGFUSE_AUTH:-cGstbGYtb2ZmZ3JpZC1jb25zb2xlOnNrLWxmLW9mZmdyaWQtY29uc29sZQ==}"
 
 pass=0
 fail=0
@@ -43,6 +45,15 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$MARQUEZ/api/v1/lineage" 
 [ "$code" = "200" ] || [ "$code" = "201" ] && check "accepts OpenLineage event ($code)" ok || check "accepts OpenLineage event ($code)" ""
 curl -s "$MARQUEZ/api/v1/namespaces/$NS/jobs" | grep -q 'verify.ingest' \
   && check "job graph queryable after emit" ok || check "job graph queryable after emit" ""
+
+echo "── observability: Langfuse v3 OTLP ingestion (otel.ts fan-out) ─────────"
+now=$(( $(date +%s) * 1000000000 ))
+tid=$(openssl rand -hex 16 2>/dev/null || echo "$(date +%s)0000000000000000000000")
+sid=$(openssl rand -hex 8 2>/dev/null || echo "verifyspan000000")
+otlp=$(printf '{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"offgrid-console"}}]},"scopeSpans":[{"scope":{"name":"offgrid-console"},"spans":[{"traceId":"%s","spanId":"%s","name":"verify.span","kind":1,"startTimeUnixNano":"%s","endTimeUnixNano":"%s","attributes":[]}]}]}]}' "$tid" "$sid" "$now" "$now")
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$LF_OTLP/v1/traces" \
+  -H 'content-type: application/json' -H "authorization: Basic $LF_AUTH" -d "$otlp")
+[ "$code" = "200" ] || [ "$code" = "202" ] && check "accepts OTLP trace ($code)" ok || check "accepts OTLP trace ($code)" ""
 
 echo
 echo "verify-adapters: $pass passed, $fail failed"

@@ -181,13 +181,16 @@ cd deploy && make observability               # OTel Collector :4318 → Victori
 ```ini
 OFFGRID_OTLP_URL=http://127.0.0.1:4318        # emitSpan exports real OTLP here
 OFFGRID_ADAPTER_OBSERVABILITY=signoz          # optional: label/route to SigNoz
-# Langfuse direct OTLP (LLM traces) — REQUIRES Langfuse v3 (the compose pin is v2):
-# OFFGRID_LANGFUSE_OTLP_URL=http://127.0.0.1:3030/api/public/otel
-# OFFGRID_LANGFUSE_AUTH=<base64 of "public-key:secret-key">
+# Langfuse direct OTLP (LLM traces) — compose runs Langfuse v3 with a headless key pair, so this
+# works out of the box (AUTH = base64("public:secret")). Bring up: `make llmops`.
+OFFGRID_LANGFUSE_OTLP_URL=http://127.0.0.1:3030/api/public/otel
+OFFGRID_LANGFUSE_AUTH=cGstbGYtb2ZmZ3JpZC1jb25zb2xlOnNrLWxmLW9mZmdyaWQtY29uc29sZQ==
 ```
-Confirm: trigger any traced action (an agent run), then find the span in Jaeger (`:16686`). With
-the Langfuse OTLP vars set on a **v3** instance, the same span also lands in Langfuse. On the
-pinned **v2**, use the Langfuse embed UI instead (it predates OTLP ingestion).
+Confirm: trigger any traced action (an agent run), then find the span in Jaeger (`:16686`); with
+the Langfuse vars set the same span also lands in Langfuse (`:3030`, login `dev@offgrid.local` /
+`offgrid-dev-pw`). `make verify` asserts the OTLP round-trip automatically. **Langfuse v3** ships
+as a 5-container set (web + worker + ClickHouse + MinIO + Redis), scoped to the `llmops` profile —
+heavier than the rest, so only `make llmops`/`make up` start it.
 
 ### Secrets → OpenBao · Identity → Keycloak · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
 
