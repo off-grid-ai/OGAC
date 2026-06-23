@@ -12,6 +12,8 @@ MARQUEZ="${OFFGRID_MARQUEZ_URL:-http://127.0.0.1:9000}"
 NS="${OFFGRID_LINEAGE_NAMESPACE:-offgrid-console}"
 LF_OTLP="${OFFGRID_LANGFUSE_OTLP_URL:-http://127.0.0.1:3030/api/public/otel}"
 LF_AUTH="${OFFGRID_LANGFUSE_AUTH:-cGstbGYtb2ZmZ3JpZC1jb25zb2xlOnNrLWxmLW9mZmdyaWQtY29uc29sZQ==}"
+KC="${OFFGRID_KEYCLOAK_URL:-http://127.0.0.1:8080}"
+KC_REALM="${KC_REALM:-offgrid}"
 
 pass=0
 fail=0
@@ -54,6 +56,15 @@ otlp=$(printf '{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$LF_OTLP/v1/traces" \
   -H 'content-type: application/json' -H "authorization: Basic $LF_AUTH" -d "$otlp")
 [ "$code" = "200" ] || [ "$code" = "202" ] && check "accepts OTLP trace ($code)" ok || check "accepts OTLP trace ($code)" ""
+
+echo "── identity: Keycloak OIDC discovery (Auth.js federation) ──────────────"
+disc=$(curl -s "$KC/realms/$KC_REALM/.well-known/openid-configuration")
+echo "$disc" | grep -q "\"issuer\":\"$KC/realms/$KC_REALM\"" \
+  && check "OIDC discovery advertises the realm issuer" ok \
+  || check "OIDC discovery advertises the realm issuer (run scripts/keycloak-setup.sh)" ""
+echo "$disc" | grep -q 'token_endpoint' \
+  && check "token + authorization endpoints present" ok \
+  || check "token + authorization endpoints present" ""
 
 echo
 echo "verify-adapters: $pass passed, $fail failed"
