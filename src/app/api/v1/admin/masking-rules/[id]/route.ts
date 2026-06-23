@@ -1,0 +1,12 @@
+import { NextResponse } from 'next/server';
+import { setMaskingRuleEnabled } from '@/lib/store';
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await req.json().catch(() => null);
+  if (typeof body?.enabled !== 'boolean') {
+    return NextResponse.json({ error: 'enabled (boolean) required' }, { status: 400 });
+  }
+  await setMaskingRuleEnabled(id, body.enabled);
+  return NextResponse.json({ id, enabled: body.enabled });
+}
