@@ -81,6 +81,58 @@ export interface GroundingPort {
   health(): Promise<boolean>;
 }
 
+// Policy — an access decision (deny-overrides). The first-party port evaluates the in-console
+// ABAC rules; the OPA port asks a Rego decision API. Same contract either way, so the call site
+// never knows which engine answered.
+export interface PolicyInput {
+  role: string;
+  resource: string;
+  attributes: Record<string, string>;
+}
+
+export interface PolicyDecision {
+  allow: boolean;
+  reason: string;
+  engine: string;
+}
+
+export interface PolicyPort {
+  meta: AdapterMeta;
+  evaluate(input: PolicyInput): Promise<PolicyDecision>;
+}
+
+// PII / guardrails — detect (and optionally redact) sensitive spans in text. First-party is a
+// regex scan; Presidio is the production detector. Both answer the same shape so the checks spine
+// is agnostic to which one ran.
+export interface PiiResult {
+  hits: boolean;
+  entities: string[];
+  redacted?: string;
+  engine: string;
+}
+
+export interface PiiPort {
+  meta: AdapterMeta;
+  scan(text: string): Promise<PiiResult>;
+  health(): Promise<boolean>;
+}
+
+// Lineage — record that a job consumed inputs and produced outputs. First-party is a no-op
+// (lineage is implicit in the audit trace); Marquez receives real OpenLineage run events so the
+// source→answer graph is queryable. Emission is best-effort and never blocks the request.
+export interface LineageEvent {
+  job: string;
+  run: string;
+  status: 'START' | 'COMPLETE' | 'FAIL';
+  inputs?: string[];
+  outputs?: string[];
+}
+
+export interface LineagePort {
+  meta: AdapterMeta;
+  emit(event: LineageEvent): Promise<void>;
+}
+
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;
 
 // Embedding width — one dimension throughout the Brain and the inference port.
