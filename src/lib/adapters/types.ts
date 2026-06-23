@@ -19,7 +19,8 @@ export type Capability =
   | 'flags'
   | 'provenance'
   | 'bi'
-  | 'sandbox';
+  | 'sandbox'
+  | 'evals';
 
 export type RenderMode = 'native' | 'embed' | 'headless';
 

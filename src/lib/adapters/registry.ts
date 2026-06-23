@@ -5,6 +5,7 @@ import { envSecrets, openBaoSecrets } from './secrets';
 import {
   BI,
   CACHING,
+  EVALS,
   FLAGS,
   GUARDRAIL_ENTRIES,
   IDENTITY,
@@ -90,6 +91,7 @@ const ALL: Record<Capability, RegEntry[]> = {
   provenance: PROVENANCE,
   bi: BI,
   sandbox: SANDBOX,
+  evals: EVALS,
 };
 
 // One row per capability — active adapter + swappable alternatives + live health (when probed).
