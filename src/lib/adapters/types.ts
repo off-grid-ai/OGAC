@@ -133,6 +133,18 @@ export interface LineagePort {
   emit(event: LineageEvent): Promise<void>;
 }
 
+// Provenance signing — make an answer/export tamper-evident. HMAC (default) is a shared-secret
+// MAC; ed25519 is an asymmetric signature so a verifier needs only the PUBLIC key (the real
+// provenance property — third parties can verify without holding the signing secret). C2PA /
+// Sigstore are the heavier external upgrades behind the same port.
+export interface SigningPort {
+  meta: AdapterMeta;
+  algorithm: string;
+  sign(payload: unknown): string;
+  verify(payload: unknown, signature: string): boolean;
+  publicKey(): string | null; // PEM for asymmetric adapters; null for HMAC (no public half)
+}
+
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;
 
 // Embedding width — one dimension throughout the Brain and the inference port.

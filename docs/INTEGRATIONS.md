@@ -200,6 +200,24 @@ the Langfuse vars set the same span also lands in Langfuse (`:3030`, login `dev@
 as a 5-container set (web + worker + ClickHouse + MinIO + Redis), scoped to the `llmops` profile —
 heavier than the rest, so only `make llmops`/`make up` start it.
 
+### Provenance → ed25519 signing (public-key, in-path, no OSS needed)
+
+Exported answers are signed so they're tamper-evident. The default is HMAC (shared secret);
+ed25519 produces **asymmetric** signatures a third party can verify with only the public key — the
+real provenance property. No container required (first-party crypto).
+
+```ini
+OFFGRID_ADAPTER_PROVENANCE=ed25519
+# production: pin a stable keypair (else one is generated per process)
+# OFFGRID_ED25519_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+```
+
+Confirm: `POST /api/v1/admin/sign {"payload":{…}}` → returns `{signature, algorithm:"Ed25519",
+publicKey}`; re-POST with that `signature` → `{valid:true}`; tamper the payload → `{valid:false}`;
+`GET /api/v1/admin/sign` returns the public key alone, with which anyone can verify offline (no
+shared secret). C2PA Content Credentials / Sigstore are the heavier external upgrades behind this
+same port.
+
 ### Identity → Keycloak (SSO login, in-path)
 
 Keycloak is a real **sign-in provider** (OIDC), not just an embed — it self-activates in Auth.js
@@ -209,14 +227,17 @@ when its client env is set, and a "Continue with Keycloak" button appears on `/s
 cd deploy && make identity          # Keycloak on :8080 (admin / offgrid-dev)
 cd deploy && make identity-setup    # provision realm + OIDC client + test user, prints the env
 ```
+
 `make identity-setup` (script: `scripts/keycloak-setup.sh`) is idempotent — it creates the
 `offgrid` realm, a confidential `offgrid-console` client with the right redirect URI, and a test
 user, then prints the exact env block. Paste it into `.env.local`:
+
 ```ini
 AUTH_KEYCLOAK_ID=offgrid-console
 AUTH_KEYCLOAK_SECRET=<printed by the script>
 AUTH_KEYCLOAK_ISSUER=http://localhost:8080/realms/offgrid
 ```
+
 Confirm: restart the console, open `/signin` → the "Continue with Keycloak" button redirects to
 Keycloak and back (test user `advisor` / `advisor-pw`). `make verify` asserts the OIDC discovery
 doc automatically. New users default to the `viewer` role (map realm roles → console roles as a
