@@ -31,6 +31,24 @@ export const HANDBOOK: HandbookDoc[] = [
     file: 'OPERATIONS.md',
   },
   {
+    slug: 'runbooks',
+    title: 'Runbooks',
+    blurb: 'Step-by-step operational procedures: enroll, kill, rotate, incident, backup, swap.',
+    file: 'RUNBOOKS.md',
+  },
+  {
+    slug: 'use-cases',
+    title: 'Use cases',
+    blurb: 'End-to-end scenarios across the planes (regulator, residency, cost, audit, SOPs).',
+    file: 'USECASES.md',
+  },
+  {
+    slug: 'how-to',
+    title: 'How-tos',
+    blurb: 'Concrete recipes (UI + API): keys, routing, ingest, evals, grounding, SDK.',
+    file: 'HOWTO.md',
+  },
+  {
     slug: 'licenses',
     title: 'Licensing & legal',
     blurb: 'Dual-license model and the permissive OSS audit.',
