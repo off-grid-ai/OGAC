@@ -1,5 +1,6 @@
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddGoldenCaseButton } from '@/components/brain/AddGoldenCaseButton';
+import { AddPromptButton } from '@/components/brain/AddPromptButton';
 import { AddToolButton } from '@/components/brain/AddToolButton';
 import { BrainSearch } from '@/components/brain/BrainSearch';
 import { IngestMenu } from '@/components/brain/IngestMenu';
@@ -19,7 +20,7 @@ import {
 import { listDocuments } from '@/lib/brain';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
 import { requireModule } from '@/lib/modules';
-import { listDatasets, listTools } from '@/lib/store';
+import { listDatasets, listPrompts, listTools } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,12 +31,13 @@ const TOOL_TYPE: Record<string, string> = {
 
 export default async function BrainPage() {
   requireModule('brain');
-  const [docs, cases, runs, datasets, tools] = await Promise.all([
+  const [docs, cases, runs, datasets, tools, promptList] = await Promise.all([
     listDocuments(),
     listGoldenCases(),
     listEvalRuns(1),
     listDatasets(),
     listTools(),
+    listPrompts(),
   ]);
   const latest = runs[0];
   const datasetOpts = datasets.map((d) => ({ id: d.id, name: d.name }));
@@ -128,6 +130,44 @@ export default async function BrainPage() {
               <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{d.text}</p>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="text-sm">Prompt registry · {promptList.length}</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Versioned, immutable prompt templates — publishing a change creates a new version.
+            </p>
+          </div>
+          <AddPromptButton />
+        </CardHeader>
+        <CardContent>
+          {promptList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No prompts yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Version</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {promptList.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium text-foreground">{p.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{p.description || '—'}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      v{p.latestVersion}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

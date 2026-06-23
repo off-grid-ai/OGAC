@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
+import { addPromptVersion, createPrompt, listFlags, listPrompts, setFlag } from '../lib/store';
 import {
   abacRules,
   apiKeys,
@@ -411,8 +412,51 @@ async function seedGovernance(): Promise<void> {
   process.stdout.write('seed: inserted 8 governance items\n');
 }
 
+// [key, enabled, description]
+const SEED_FLAGS: ReadonlyArray<[string, boolean, string]> = [
+  ['semantic_cache', true, 'Serve near-duplicate prompts from the semantic response cache.'],
+  ['content_capture', false, 'Persist raw request/response bodies for replay (off by default).'],
+  ['cloud_egress', false, 'Allow leashed routing to a cloud model when a rule matches.'],
+  ['grounding_required', true, 'Block answers that fail per-claim citation verification.'],
+];
+
+async function seedFlags(): Promise<void> {
+  const existing = await listFlags();
+  if (existing.length > 0) return;
+  for (const [key, enabled, description] of SEED_FLAGS) {
+    await setFlag(key, enabled, description);
+  }
+  process.stdout.write(`seed: inserted ${SEED_FLAGS.length} feature flags\n`);
+}
+
+// [name, description, body]
+const SEED_PROMPTS: ReadonlyArray<[string, string, string]> = [
+  [
+    'claims-triage',
+    'Classify an FNOL into a claim type and urgency.',
+    'You are a claims triage assistant. Given a first notice of loss, output the claim type and an urgency from low/medium/high. Cite the policy clause you relied on.',
+  ],
+  [
+    'kyc-verify',
+    'Guide an advisor through identity verification.',
+    'You are a KYC assistant. Walk the advisor through verifying the customer identity using only the documents on file. Never invent a document that was not provided.',
+  ],
+];
+
+async function seedPrompts(): Promise<void> {
+  const existing = await listPrompts();
+  if (existing.length > 0) return;
+  for (const [name, description, body] of SEED_PROMPTS) {
+    const p = await createPrompt(name, description);
+    await addPromptVersion(p.id, body, 'v1');
+  }
+  process.stdout.write(`seed: inserted ${SEED_PROMPTS.length} prompts (each at v1)\n`);
+}
+
 async function seed(): Promise<void> {
   await seedUsers();
+  await seedFlags();
+  await seedPrompts();
   await seedGovernance();
   await seedDataPlane();
   await seedAnalyticsBackfill();

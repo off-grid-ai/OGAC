@@ -2,6 +2,7 @@ import { AddAbacRuleButton } from '@/components/admin/AddAbacRuleButton';
 import { AddTenantButton } from '@/components/admin/AddTenantButton';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { EmbedFrame } from '@/components/admin/EmbedFrame';
+import { FlagToggle } from '@/components/admin/FlagToggle';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { listBindings, listEmbeds } from '@/lib/adapters/registry';
 import { requireModule } from '@/lib/modules';
-import { listAbacRules, listTenants } from '@/lib/store';
+import { listAbacRules, listFlags, listTenants } from '@/lib/store';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -36,10 +37,11 @@ function labelOf(id: string): string {
 
 export default async function AdminPage() {
   requireModule('admin');
-  const [tenants, rules, bindings] = await Promise.all([
+  const [tenants, rules, bindings, flags] = await Promise.all([
     listTenants(),
     listAbacRules(),
     listBindings(true),
+    listFlags(),
   ]);
   const embeds = listEmbeds();
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
@@ -117,6 +119,42 @@ export default async function AdminPage() {
               <EmbedFrame title={e.vendor} url={e.embedUrl} />
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Feature flags</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Runtime toggles for capabilities/features (the first-party flag store; Unleash backs it
+            at scale). Flip without a redeploy.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {flags.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No flags yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Flag</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-16">On</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {flags.map((f) => (
+                  <TableRow key={f.key}>
+                    <TableCell className="font-mono text-xs text-foreground">{f.key}</TableCell>
+                    <TableCell className="text-muted-foreground">{f.description || '—'}</TableCell>
+                    <TableCell>
+                      <FlagToggle flagKey={f.key} enabled={f.enabled} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
