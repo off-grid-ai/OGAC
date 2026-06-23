@@ -138,6 +138,32 @@ export const abacRules = pgTable('abac_rules', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Feature flags (runtime toggles; the flags capability's first-party store) ────
+export const featureFlags = pgTable('feature_flags', {
+  key: text('key').primaryKey(),
+  enabled: boolean('enabled').notNull().default(true),
+  description: text('description').notNull().default(''),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Prompt registry (templates + versioning) ─────────────────────────────────
+export const prompts = pgTable('prompts', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  latestVersion: integer('latest_version').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const promptVersions = pgTable('prompt_versions', {
+  id: text('id').primaryKey(),
+  promptId: text('prompt_id').notNull(),
+  version: integer('version').notNull(),
+  body: text('body').notNull(),
+  label: text('label').notNull().default(''), // e.g. production | staging
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Governance registry (Phase E org wrapper: policies, committees, processes) ──
 // The org/regulatory placards that are functions/processes, not tools — tracked as attestable
 // records (AI-use policy, ethics board, RACI, training, vendor, insurance, tabletop drills).
