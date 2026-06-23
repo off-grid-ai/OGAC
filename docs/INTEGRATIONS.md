@@ -34,20 +34,28 @@ interface AdapterMeta {
 
 ## Capabilities & ports today
 
-| Capability      | Default adapter          | Swappable for (OSS)  | License of OSS |
-| --------------- | ------------------------ | -------------------- | -------------- |
-| `inference`     | Off Grid AI Gateway      | (always the gateway) | first-party    |
-| `retrieval`     | LanceDB                  | pgvector · Qdrant    | Apache/PG      |
-| `grounding`     | Gateway NLI              | Lexical (offline)    | first-party    |
-| `guardrails`    | Off Grid checks (native) | Microsoft Presidio   | MIT            |
-| `policy`        | Off Grid RBAC + ABAC     | Open Policy Agent    | Apache-2.0     |
-| `identity`      | Auth.js                  | Keycloak             | Apache-2.0     |
-| `secrets`       | Process env              | OpenBao              | MPL-2.0        |
-| `observability` | OpenTelemetry (OTLP)     | SigNoz · Langfuse    | MIT/Apache     |
-| `lineage`       | (OpenLineage emit)       | Marquez              | Apache-2.0     |
-| `caching`       | In-process (exact)       | Redis (+ semantic)   | BSD-3          |
-| `siem`          | Off Grid audit store     | OpenSearch           | Apache-2.0     |
-| `flags`         | Off Grid flags (env)     | Unleash              | Apache-2.0     |
+| Capability      | Default adapter          | Swappable for (OSS)  | How the OSS is wired         |
+| --------------- | ------------------------ | -------------------- | ---------------------------- |
+| `inference`     | Off Grid AI Gateway      | (always the gateway) | in-path (the one gateway)    |
+| `retrieval`     | LanceDB                  | pgvector · Qdrant    | in-path (vector search)      |
+| `grounding`     | Gateway NLI              | Lexical (offline)    | in-path (entailment)         |
+| `guardrails`    | Off Grid checks (regex)  | Microsoft Presidio   | **in-path** (PiiPort)        |
+| `policy`        | Off Grid RBAC + ABAC     | Open Policy Agent    | **in-path** (PolicyPort)     |
+| `lineage`       | native (no-op)           | Marquez              | **in-path** (LineagePort)    |
+| `observability` | OpenTelemetry (OTLP)     | SigNoz · Langfuse    | in-path (span fan-out)       |
+| `identity`      | Auth.js                  | Keycloak             | embed UI + OIDC              |
+| `secrets`       | Process env              | OpenBao              | in-path (SecretsPort)        |
+| `caching`       | In-process (exact)       | Redis (+ semantic)   | in-path (cache lookup)       |
+| `siem`          | Off Grid audit store     | OpenSearch           | embed UI + log shipping      |
+| `flags`         | Off Grid flags (env)     | Unleash              | embed UI                     |
+| `bi`            | (none)                   | Superset · Metabase  | embed UI                     |
+
+**In-path vs embed.** *In-path* adapters actually perform the work when selected — flipping
+`OFFGRID_ADAPTER_GUARDRAILS=presidio` routes real PII scans through Presidio; the call site
+(`getPii().scan()`) never knows which engine answered. *Embed* adapters surface a rich OSS UI
+behind an SSO'd iframe (mere aggregation; their license never touches our core). Every in-path
+OSS adapter **falls back to the first-party engine if its service is unreachable**, so a swap is
+always reversible and never a hard dependency.
 
 First-party defaults mean the console works with **zero OSS**; each OSS entry is a one-env-var
 swap (`OFFGRID_ADAPTER_<CAP>`). The full runnable stack is `deploy/docker-compose.yml` (one
@@ -100,17 +108,99 @@ endpoint never touches retrieval code.
 ## Running the real OSS (testable end-to-end)
 
 The adapters aren't stubs — they talk to real services. `deploy/` ships a profiled Docker Compose
-that brings up the permissive OSS so every integration is testable:
+that brings up the permissive OSS so every integration is testable. Profiles map 1:1 to
+capabilities, so you run only what you've licensed.
 
 ```bash
-cd deploy && make up && make smoke   # or: make secrets | make observability | make data
+cd deploy
+cp .env.example ../.env.local        # 1. copy the env template, edit URLs if needed
+make up                              # 2. bring up the full stack (or: make policy | guardrails | …)
+make smoke                           # 3. reachability — every service answers /health
+make verify                          # 4. BEHAVIOR — the swaps actually change behavior (see below)
 ```
 
-Then point the console at them (`deploy/.env.example` → `.env.local`) and flip the adapter:
-`OFFGRID_ADAPTER_SECRETS=openbao` reads from OpenBao's KV; `OFFGRID_ADAPTER_OBSERVABILITY=signoz`
+`make smoke` proves a service is *up*. `make verify` proves the *contract*: it sends the exact
+request each in-path adapter sends and asserts on the response (Presidio detects an email entity,
+OPA returns allow/deny, Marquez accepts an OpenLineage event and the job graph is then queryable).
+A green `verify` is the difference between "reachable" and "wired." Script:
+`scripts/verify-adapters.sh`.
 
-- `OFFGRID_OTLP_URL` makes `emitSpan` export real OTLP to the collector. Profiles map to
-  capabilities, so you run only what you've licensed. See `deploy/README.md`.
+## Configure each integration (cookbook)
+
+Every integration is the same three moves: **bring it up → set the env → confirm it works.** Put
+the env lines in `.env.local` (copy from `deploy/.env.example`). Restart the console after editing.
+
+### Guardrails → Microsoft Presidio (PII detection, in-path)
+
+```bash
+cd deploy && make guardrails                 # presidio-analyzer on :5002, anonymizer on :5001
+```
+```ini
+OFFGRID_ADAPTER_GUARDRAILS=presidio
+OFFGRID_PRESIDIO_URL=http://127.0.0.1:5002
+```
+Confirm: `curl -s -XPOST localhost:5002/analyze -H 'content-type: application/json' \`
+`-d '{"text":"jane@acme.com","language":"en"}'` → returns an `EMAIL_ADDRESS` entity. In the
+console, the `pii` check on any request now reports `PII (presidio): …`. Unset the env to revert
+to the built-in regex.
+
+### Policy → Open Policy Agent (Rego decisions, in-path)
+
+```bash
+cd deploy && make policy                      # OPA on :8181
+# load your policy under package offgrid.authz with an `allow` rule:
+curl -XPUT localhost:8181/v1/policies/offgrid --data-binary @your-policy.rego
+```
+```ini
+OFFGRID_ADAPTER_POLICY=opa
+OFFGRID_OPA_URL=http://127.0.0.1:8181
+```
+Confirm: `POST /api/v1/admin/abac/evaluate {"role":"compliance","resource":"audit"}` → the
+response `engine` field reads `opa` (vs `abac` for the built-in). OPA must expose
+`/v1/data/offgrid/authz` returning `{"result":{"allow":bool}}`. Down/unset → falls back to ABAC.
+
+### Lineage → Marquez (OpenLineage graph, in-path)
+
+```bash
+cd deploy && make lineage                     # marquez API :9000, web UI :3001
+```
+```ini
+OFFGRID_ADAPTER_LINEAGE=marquez
+OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000
+OFFGRID_LINEAGE_NAMESPACE=offgrid-console
+```
+Confirm: ingest a doc or run a retrieval, then open the Marquez web UI (`:3001`) → namespace
+`offgrid-console` shows `brain.ingest` / `brain.retrieve` jobs with their input→output datasets.
+Default (`native`) is a no-op — lineage stays implicit in the audit log.
+
+### Observability → OTLP collector (+ SigNoz / Langfuse, in-path)
+
+```bash
+cd deploy && make observability               # OTel Collector :4318 → VictoriaMetrics / Jaeger
+```
+```ini
+OFFGRID_OTLP_URL=http://127.0.0.1:4318        # emitSpan exports real OTLP here
+OFFGRID_ADAPTER_OBSERVABILITY=signoz          # optional: label/route to SigNoz
+# Langfuse direct OTLP (LLM traces) — REQUIRES Langfuse v3 (the compose pin is v2):
+# OFFGRID_LANGFUSE_OTLP_URL=http://127.0.0.1:3030/api/public/otel
+# OFFGRID_LANGFUSE_AUTH=<base64 of "public-key:secret-key">
+```
+Confirm: trigger any traced action (an agent run), then find the span in Jaeger (`:16686`). With
+the Langfuse OTLP vars set on a **v3** instance, the same span also lands in Langfuse. On the
+pinned **v2**, use the Langfuse embed UI instead (it predates OTLP ingestion).
+
+### Secrets → OpenBao · Identity → Keycloak · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
+
+```ini
+OFFGRID_ADAPTER_SECRETS=openbao      ; OFFGRID_OPENBAO_URL=http://127.0.0.1:8200
+OFFGRID_ADAPTER_IDENTITY=keycloak    ; OFFGRID_KEYCLOAK_URL=http://127.0.0.1:8080
+OFFGRID_ADAPTER_CACHING=redis        ; OFFGRID_REDIS_URL=redis://127.0.0.1:6379
+OFFGRID_ADAPTER_SIEM=opensearch      ; OFFGRID_OPENSEARCH_URL=http://127.0.0.1:9200
+OFFGRID_ADAPTER_FLAGS=unleash        ; OFFGRID_UNLEASH_URL=http://127.0.0.1:4242
+```
+Bring each up with its profile (`make secrets|identity|… `), confirm with `make smoke`. The full
+env reference with every URL is `deploy/.env.example`; every service's config knobs are in
+`CATALOG.md`.
 
 ## Adding an adapter
 
