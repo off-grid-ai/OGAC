@@ -1,7 +1,7 @@
 import { TerminalWindow as TerminalSquare } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import { signIn } from '@/auth';
-import { devLoginEnabled, googleEnabled, microsoftEnabled } from '@/auth.config';
+import { devLoginEnabled, googleEnabled, keycloakEnabled, microsoftEnabled } from '@/auth.config';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -15,13 +15,39 @@ async function withMicrosoft(): Promise<void> {
   await signIn('microsoft-entra-id', { redirectTo: '/fleet' });
 }
 
+async function withKeycloak(): Promise<void> {
+  'use server';
+  await signIn('keycloak', { redirectTo: '/fleet' });
+}
+
 async function withDev(): Promise<void> {
   'use server';
   await signIn('dev', { redirectTo: '/fleet' });
 }
 
+interface ProviderButton {
+  enabled: boolean;
+  action: () => Promise<void>;
+  label: string;
+  primary?: boolean;
+  dev?: boolean;
+}
+
+const PROVIDERS: ProviderButton[] = [
+  { enabled: googleEnabled, action: withGoogle, label: 'Continue with Google' },
+  { enabled: microsoftEnabled, action: withMicrosoft, label: 'Continue with Microsoft' },
+  { enabled: keycloakEnabled, action: withKeycloak, label: 'Continue with Keycloak' },
+  {
+    enabled: devLoginEnabled,
+    action: withDev,
+    label: 'Dev sign-in (admin)',
+    primary: true,
+    dev: true,
+  },
+];
+
 export default function SignInPage() {
-  const noProviders = !googleEnabled && !microsoftEnabled && !devLoginEnabled;
+  const active = PROVIDERS.filter((p) => p.enabled);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -32,31 +58,18 @@ export default function SignInPage() {
           <CardDescription>Sign in to govern your fleet.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2.5">
-          {googleEnabled ? (
-            <form action={withGoogle}>
-              <Button type="submit" variant="outline" className="w-full">
-                Continue with Google
+          {active.map((p) => (
+            <form key={p.label} action={p.action}>
+              <Button type="submit" variant={p.primary ? 'default' : 'outline'} className="w-full">
+                {p.dev ? <TerminalSquare className="size-4" /> : null}
+                {p.label}
               </Button>
             </form>
-          ) : null}
-          {microsoftEnabled ? (
-            <form action={withMicrosoft}>
-              <Button type="submit" variant="outline" className="w-full">
-                Continue with Microsoft
-              </Button>
-            </form>
-          ) : null}
-          {devLoginEnabled ? (
-            <form action={withDev}>
-              <Button type="submit" className="w-full">
-                <TerminalSquare className="size-4" />
-                Dev sign-in (admin)
-              </Button>
-            </form>
-          ) : null}
-          {noProviders ? (
+          ))}
+          {active.length === 0 ? (
             <p className="text-center text-xs text-muted-foreground">
-              No SSO providers configured. Add Google or Microsoft credentials in .env.local.
+              No SSO providers configured. Add Google, Microsoft, or Keycloak credentials in
+              .env.local.
             </p>
           ) : null}
           <p className="pt-2 text-center text-[10px] uppercase tracking-wide text-muted-foreground">

@@ -149,15 +149,19 @@ database`: text/file index directly, **images are captioned via the gateway (mul
 - **Operate:** `make observability` (profile). Collector config: `deploy/otel-collector.yaml`.
 - **Verify:** `docker compose logs otel-collector | grep offgrid-console` after any audited action.
 
-### 3.6 Secrets / Identity — `secrets` 🟢 + identity ⚪
+### 3.6 Secrets / Identity — `secrets` 🟢 + identity 🟢
 
 - **Tools:** OpenBao (KV v2 secrets, default `secret/data/<key>` → `.value`); `env` adapter
-  (process env) as the offline default. Identity/SSO: Auth.js today (Google/Entra), Keycloak mapped.
+  (process env) as the offline default. Identity/SSO: Auth.js with Google, Microsoft Entra, **and
+  Keycloak** (all self-activating on env presence) + dev-login.
 - **Port:** `SecretsPort` (`get`, `has`). Falls back to env when OpenBao is unreachable.
-- **Operate:** `make secrets`. Set `OFFGRID_OPENBAO_URL` + `OFFGRID_OPENBAO_TOKEN`
+- **Operate (secrets):** `make secrets`. Set `OFFGRID_OPENBAO_URL` + `OFFGRID_OPENBAO_TOKEN`
   (+ `OFFGRID_OPENBAO_MOUNT`, default `secret`).
-- **Verify:** write `curl -H "X-Vault-Token: …" -XPOST $URL/v1/secret/data/k -d '{"data":{"value":"v"}}'`,
-  then read through the adapter.
+- **Operate (identity/Keycloak):** `make identity` → set `AUTH_KEYCLOAK_ID/_SECRET/_ISSUER`. A
+  "Continue with Keycloak" button then appears on `/signin`. New users default to `viewer`. See
+  the Keycloak cookbook in `INTEGRATIONS.md` for realm/client setup.
+- **Verify:** secrets — write `curl -H "X-Vault-Token: …" -XPOST $URL/v1/secret/data/k …` then read
+  through the adapter; identity — open `/signin`, the configured provider buttons render.
 
 ### 3.7 Data plane / ingestion — `data` 🟢 core (⚪ ingestion optional)
 
@@ -242,8 +246,8 @@ Confirm the bindings: `GET /api/v1/admin/adapters?health=1` or **Admin → Integ
 
 ## 6. Verifying each integration
 
-**Two levels.** `make smoke` proves each service is *reachable* (answers `/health`). `make verify`
-proves the *behavior contract* of the in-path adapters — it sends the exact request each one sends
+**Two levels.** `make smoke` proves each service is _reachable_ (answers `/health`). `make verify`
+proves the _behavior contract_ of the in-path adapters — it sends the exact request each one sends
 and asserts the response, so green means "the swap actually works," not just "the container is up."
 
 ```bash
