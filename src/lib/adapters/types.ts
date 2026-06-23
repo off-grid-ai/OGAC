@@ -18,7 +18,8 @@ export type Capability =
   | 'siem'
   | 'flags'
   | 'provenance'
-  | 'bi';
+  | 'bi'
+  | 'sandbox';
 
 export type RenderMode = 'native' | 'embed' | 'headless';
 

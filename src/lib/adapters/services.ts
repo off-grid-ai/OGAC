@@ -305,6 +305,54 @@ export const BI: RegEntry[] = [
   },
 ];
 
+// Runtime sandboxing for agent tool/code execution. Default is first-party "no-exec" (tools run
+// only through the registered, scoped tool registry — arbitrary code is refused). E2B / Firecracker
+// give real isolation when agents must run untrusted code; Falco adds runtime threat detection.
+export const SANDBOX: RegEntry[] = [
+  {
+    meta: {
+      id: 'none',
+      capability: 'sandbox',
+      vendor: 'Off Grid (no-exec)',
+      license: 'first-party',
+      render: 'native',
+      description:
+        'No arbitrary code execution; tools run only via the scoped registry. Safe default.',
+    },
+  },
+  {
+    meta: {
+      id: 'e2b',
+      capability: 'sandbox',
+      vendor: 'E2B',
+      license: 'Apache-2.0',
+      render: 'headless',
+      embedUrl: env.OFFGRID_E2B_URL,
+      description: 'Cloud sandboxes for agent code execution (firecracker microVMs).',
+    },
+  },
+  {
+    meta: {
+      id: 'firecracker',
+      capability: 'sandbox',
+      vendor: 'Firecracker',
+      license: 'Apache-2.0',
+      render: 'headless',
+      description: 'Self-hosted microVM isolation for untrusted tool/code execution.',
+    },
+  },
+  {
+    meta: {
+      id: 'falco',
+      capability: 'sandbox',
+      vendor: 'Falco',
+      license: 'Apache-2.0',
+      render: 'headless',
+      description: 'Runtime threat detection on the execution host (syscall anomalies).',
+    },
+  },
+];
+
 // Langfuse is an additional observability adapter (LLM traces + per-trace/user/project cost).
 export const langfuseEntry: RegEntry = {
   meta: {
