@@ -1,0 +1,85 @@
+// The findings spine. Guardrail/eval checks run as hooks (pre/post) and produce normalized
+// results stamped onto the audit record — the Portkey `hook_results` / Bifrost PostHook pattern.
+// Each tool (Presidio, an injection scanner, a grounding/eval scorer) is a CheckAdapter.
+export type CheckVerdict = 'pass' | 'warn' | 'redacted' | 'blocked' | 'fail';
+
+export interface CheckResult {
+  name: string;
+  verdict: CheckVerdict;
+  score?: number;
+  ms?: number;
+  detail?: string;
+}
+
+export interface CheckContext {
+  phase: 'pre' | 'post';
+  input?: string;
+  output?: string;
+  model?: string;
+}
+
+export interface CheckAdapter {
+  name: string;
+  phase: 'pre' | 'post';
+  run(ctx: CheckContext): Promise<CheckResult> | CheckResult;
+}
+
+const EMAIL = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
+const PHONE = /\b\+?\d[\d ()-]{7,}\d\b/;
+const INJECTION = /\b(ignore (all |the )?previous|disregard (the )?instructions|system prompt)\b/i;
+
+// Sample adapters — thin stand-ins for the real OSS tools (Presidio, etc.). Swap the body
+// for an adapter call; the interface stays the same.
+export const piiCheck: CheckAdapter = {
+  name: 'pii',
+  phase: 'pre',
+  run(ctx) {
+    const hit = EMAIL.test(ctx.input ?? '') || PHONE.test(ctx.input ?? '');
+    return {
+      name: 'pii',
+      verdict: hit ? 'redacted' : 'pass',
+      detail: hit ? 'PII detected' : undefined,
+    };
+  },
+};
+
+export const injectionCheck: CheckAdapter = {
+  name: 'injection',
+  phase: 'pre',
+  run(ctx) {
+    const hit = INJECTION.test(ctx.input ?? '');
+    return {
+      name: 'injection',
+      verdict: hit ? 'blocked' : 'pass',
+      detail: hit ? 'injection pattern' : undefined,
+    };
+  },
+};
+
+export const groundingCheck: CheckAdapter = {
+  name: 'grounding',
+  phase: 'post',
+  run(ctx) {
+    const grounded = /\[\d+\]|source:|cite/i.test(ctx.output ?? '');
+    return { name: 'grounding', verdict: grounded ? 'pass' : 'warn', score: grounded ? 0.9 : 0.4 };
+  },
+};
+
+const REGISTRY: CheckAdapter[] = [piiCheck, injectionCheck, groundingCheck];
+
+export async function runChecks(phase: 'pre' | 'post', ctx: CheckContext): Promise<CheckResult[]> {
+  const out: CheckResult[] = [];
+  for (const adapter of REGISTRY.filter((a) => a.phase === phase)) {
+    const start = Date.now();
+    const r = await adapter.run({ ...ctx, phase });
+    out.push({ ...r, ms: r.ms ?? Date.now() - start });
+  }
+  return out;
+}
+
+// Derive the request outcome from the worst verdict across all checks.
+export function outcomeFromChecks(checks: CheckResult[]): 'ok' | 'redacted' | 'blocked' {
+  if (checks.some((c) => c.verdict === 'blocked' || c.verdict === 'fail')) return 'blocked';
+  if (checks.some((c) => c.verdict === 'redacted')) return 'redacted';
+  return 'ok';
+}
