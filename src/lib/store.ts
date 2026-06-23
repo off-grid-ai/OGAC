@@ -23,6 +23,7 @@ import {
 } from '@/db/schema';
 import type { CheckResult } from '@/lib/checks';
 import { emitSpan } from '@/lib/otel';
+import { shipAudit } from '@/lib/siem';
 
 export type DeviceOS = 'macOS' | 'iOS' | 'Windows';
 export type DeviceStatus = 'online' | 'offline';
@@ -247,24 +248,25 @@ export async function appendAudit(
     .set({ status: 'online', lastSeen: 'just now' })
     .where(eq(devices.id, deviceId));
   if (events.length === 0) return 0;
-  await db.insert(auditEvents).values(
-    events.map((e) => ({
-      id: randomUUID(),
-      deviceId,
-      ts: new Date(e.ts),
-      model: e.model,
-      tokens: e.tokens,
-      leftDevice: e.leftDevice,
-      tool: e.tool,
-      outcome: e.outcome,
-      latencyMs: e.latencyMs ?? 200 + Math.floor(Math.random() * 1800),
-      checks: e.checks ?? null,
-      keyId: e.keyId ?? null,
-    })),
-  );
+  const rows = events.map((e) => ({
+    id: randomUUID(),
+    deviceId,
+    ts: new Date(e.ts),
+    model: e.model,
+    tokens: e.tokens,
+    leftDevice: e.leftDevice,
+    tool: e.tool,
+    outcome: e.outcome,
+    latencyMs: e.latencyMs ?? 200 + Math.floor(Math.random() * 1800),
+    checks: e.checks ?? null,
+    keyId: e.keyId ?? null,
+  }));
+  await db.insert(auditEvents).values(rows);
   for (const e of events) {
     emitSpan('audit.event', { deviceId, model: e.model, outcome: e.outcome, tokens: e.tokens });
   }
+  // Mirror to the SIEM (OpenSearch) if configured — best-effort, off the request path.
+  shipAudit(rows.map((r) => ({ ...r, ts: r.ts.toISOString() })));
   return events.length;
 }
 
