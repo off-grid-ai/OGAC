@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // LanceDB ships a native binary — keep it out of the webpack bundle.
-  serverExternalPackages: ['@lancedb/lancedb'],
+  // Native / vendored-binary packages — keep them out of the webpack bundle (require at runtime).
+  // c2pa-node ships a native binding + a vendored sharp; sigstore is required server-side only.
+  serverExternalPackages: ['@lancedb/lancedb', 'c2pa-node', 'sigstore'],
 };
 
 export default nextConfig;

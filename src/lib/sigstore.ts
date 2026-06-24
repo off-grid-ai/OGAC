@@ -44,8 +44,8 @@ export interface SigstoreVerifyResult {
 // Verify a Sigstore bundle against the (optional) original payload. Standalone — no token needed.
 export async function sigstoreVerify(bundle: Bundle, payload?: string): Promise<SigstoreVerifyResult> {
   try {
-    if (payload !== undefined) verify(bundle, Buffer.from(payload));
-    else verify(bundle);
+    if (payload !== undefined) await verify(bundle, Buffer.from(payload));
+    else await verify(bundle);
     return { valid: true };
   } catch (e) {
     return { valid: false, error: e instanceof Error ? e.message : 'verification failed' };
