@@ -174,6 +174,44 @@ OSS swap-in, graceful fallback).
   Bundled Python sidecar. **When:** report-grade drift test suites. **Configure:**
   `OFFGRID_ADAPTER_DRIFT=evidently` + `OFFGRID_EVIDENTLY_URL`. `make qa`. Falls back to first-party PSI.
 
+## Provenance & tamper-evidence
+
+Make answers, exports, and assets verifiable. All options below are free OSS — no fees, no API keys.
+
+### ed25519 export manifests · first-party · always on
+
+- **What/why:** detached, signed provenance for report exports — the file's SHA-256 + metadata,
+  signed with an asymmetric key so anyone verifies with only the **public** key (no shared secret).
+- **When:** every report download. **Configure:** none (`OFFGRID_SIGNING_KEY`/`OFFGRID_ADAPTER_PROVENANCE`
+  optional). Export: `/admin/reports/[id]/export?format=pdf|md&manifest=1`; verify:
+  `POST /admin/provenance/verify`.
+
+### C2PA Content Credentials · permissive (CAI) · `c2pa-node` (no container)
+
+- **What/why:** the industry-standard signed manifest **embedded in image assets** (PNG/JPEG).
+  Bundled test signer by default (no fees/keys); `OFFGRID_C2PA_CERT/_KEY` for a real identity.
+- **When:** signing generated/exported images. **Note:** images only — text/PDF use the ed25519
+  manifest above. Endpoint: `POST /admin/provenance/c2pa` (sign / verify).
+
+### Sigstore · Apache-2.0 · `sigstore-js` (no container)
+
+- **What/why:** keyless signing/attestation — OIDC identity → short-lived Fulcio cert → Rekor
+  transparency log → a self-contained bundle anyone verifies. No long-lived key.
+- **When:** attesting artifacts/exports with a public audit trail. **Configure:** public-good
+  Fulcio/Rekor (free, no key) or `OFFGRID_FULCIO_URL`/`OFFGRID_REKOR_URL` to self-host; signing
+  needs an OIDC token (`OFFGRID_SIGSTORE_IDENTITY_TOKEN`). Endpoint: `POST /admin/provenance/sigstore`.
+
+## Sandbox — isolated agent code execution
+
+### Off Grid Docker sandbox · first-party · default beyond no-exec
+
+- **What/why:** runs agent-authored code in an **ephemeral container** — `--network none`, memory/CPU/PID
+  caps, read-only root, dropped caps, non-root, hard timeout. Free, no API key, no Linux/KVM host.
+- **When:** an agent must run code. **Configure:** `OFFGRID_ADAPTER_SANDBOX=docker` + enable the
+  `agent-code-exec` flag (default OFF). Default is `none` (refuses). Endpoint: `POST /admin/sandbox/run`.
+- **Swap-ins:** E2B (cloud microVMs — **paid**, not default), self-hosted Firecracker (free, Linux/KVM),
+  Falco (free, runtime threat detection on the host). The Docker sandbox is the free OSS default.
+
 ---
 
 ## At a glance
@@ -196,3 +234,5 @@ OSS swap-in, graceful fallback).
 | evals               | golden set            | promptfoo · Ragas (sidecar)              | qa                     |
 | drift               | PSI (first-party)     | Evidently (sidecar)                      | qa                     |
 | online scoring      | LLM-as-judge → Langfuse | —                                      | llmops                 |
+| provenance          | ed25519 manifest      | C2PA (images) · Sigstore                 | (in-process)           |
+| sandbox             | none (no-exec)        | Docker (free) · E2B paid · Firecracker   | (docker/host)          |
