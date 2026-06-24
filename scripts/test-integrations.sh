@@ -17,6 +17,8 @@ REDIS_URL="${OFFGRID_REDIS_URL:-redis://127.0.0.1:6379}"
 QDRANT_URL="${OFFGRID_QDRANT_URL:-http://127.0.0.1:6333}"
 UNLEASH_URL="${OFFGRID_UNLEASH_URL:-http://127.0.0.1:4242}"
 LANGFUSE_URL="${OFFGRID_LANGFUSE_URL:-http://127.0.0.1:3030}"
+EVIDENTLY_URL="${OFFGRID_EVIDENTLY_URL:-http://127.0.0.1:8001}"
+RAGAS_URL="${OFFGRID_RAGAS_URL:-http://127.0.0.1:8002}"
 
 PASS=0 FAIL=0 SKIP=0
 ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; PASS=$((PASS+1)); }
@@ -132,6 +134,23 @@ else
     bad "Langfuse score round-trip" "ingestion rejected: $ing"
   fi
 fi
+
+# Evidently drift sidecar — prove real drift detection: stable window vs a collapsed window.
+if up "$EVIDENTLY_URL/" >/dev/null 2>&1 || curl -s --max-time 3 "$EVIDENTLY_URL/" >/dev/null 2>&1; then
+  d0="$(curl -s --max-time 20 -X POST "$EVIDENTLY_URL/iterate/itest" -H 'content-type: application/json' \
+    -d '{"reference":[100,98,99,97,100,98,99,96],"current":[99,97,98,96,100,95,99,97]}')"
+  d1="$(curl -s --max-time 20 -X POST "$EVIDENTLY_URL/iterate/itest" -H 'content-type: application/json' \
+    -d '{"reference":[100,98,99,97,100,98,99,96],"current":[40,35,50,30,45,38,42,33]}')"
+  { echo "$d0" | grep -q '"drift_detected":false' && echo "$d1" | grep -q '"drift_detected":true'; } \
+    && ok "Evidently sidecar → stable=no-drift, collapsed=drift (real DataDriftPreset)" \
+    || bad "Evidently drift sidecar" "stable=$d0 collapsed=$d1"
+else
+  skip "Evidently drift sidecar" "$EVIDENTLY_URL down (make qa)"
+fi
+
+# Ragas sidecar — health (a full eval needs a loaded gateway model; covered by /admin/evals/run).
+rgh="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$RAGAS_URL/health" 2>/dev/null)"
+[ "$rgh" = 200 ] && ok "Ragas sidecar GET /health → 200 (RAG-metrics backend)" || skip "Ragas sidecar" "got $rgh from $RAGAS_URL (make qa)"
 
 # ── summary ──────────────────────────────────────────────────────────────────
 hdr "Result"

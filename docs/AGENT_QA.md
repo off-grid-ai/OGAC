@@ -31,8 +31,10 @@ POST /api/v1/admin/evals/run    →  EvalRunResult { engine, score, total, passe
   Brain's retrieval, scored as recall. Edit cases in the console or via `/admin/golden-cases`.
 - **`promptfoo`** — runs an assertion matrix via the promptfoo CLI against the gateway. Activates
   when the `promptfoo` binary is on `PATH` (or set `OFFGRID_PROMPTFOO_BIN`). Falls back to golden.
-- **`ragas`** *(planned / configure-to-activate)* — RAG metrics (faithfulness, context
-  precision/recall, answer relevancy) via a Ragas/DeepEval sidecar at `OFFGRID_RAGAS_URL`.
+- **`ragas`** — RAG metrics (faithfulness, answer relevancy, context recall) via the **bundled
+  Ragas sidecar** (`make qa`, `OFFGRID_RAGAS_URL`). The console assembles the dataset (Brain
+  contexts + gateway answers + golden ground-truth); the sidecar scores it through the gateway.
+  Falls back to golden if the sidecar/model is unavailable.
 
 ## 2. Online scoring — Langfuse
 
@@ -58,8 +60,8 @@ GET /api/v1/admin/qa/drift    →  DriftReport { engine, status, metrics[], base
 - **`native`** (default, always on) — splits the eval-score history into a baseline window and a
   recent window and computes **Population Stability Index** (distribution shift) and
   **mean-degradation** (quality drop). Status is `stable | warning | drift`. Needs ≥4 eval runs.
-- **`evidently`** *(planned / configure-to-activate)* — full data / embedding / output drift test
-  suites via an Evidently collector at `OFFGRID_EVIDENTLY_URL`. Falls back to native PSI.
+- **`evidently`** — real Evidently `DataDriftPreset` over the baseline vs current windows, via the
+  **bundled Evidently sidecar** (`make qa`, `OFFGRID_EVIDENTLY_URL`). Falls back to native PSI.
 
 ## One-call summary
 
@@ -72,14 +74,13 @@ This is the endpoint a dashboard or monitor polls.
 
 ---
 
-## What is live vs configure-to-activate
+## What is live vs needs a service up
 
 - **Live by default, no extra service:** golden evals, native PSI drift/degradation.
+- **Bundled — bring up the `qa` profile (`make qa`):** Ragas sidecar (`:8002`), Evidently sidecar
+  (`:8001`). Both fall back to the first-party default if down.
 - **Live when their service is up:** online scoring (needs Langfuse + a loaded gateway model),
   promptfoo (needs the CLI).
-- **Configure-to-activate (planned swap-ins):** Ragas/DeepEval sidecar, Evidently collector. The
-  adapters are wired (real HTTP contracts) and fall back to the live default until you point them at
-  a running service.
 
 ## Verify it
 

@@ -307,7 +307,7 @@ export const STAGES: JourneyStage[] = [
     reality:
       'One narrow agent, one team, heavy human-in-the-loop, real evaluation from day one. You prove value and learn what a single agent actually costs.',
     console:
-      'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) run on the gateway with grounded retrieval, citation checks, and a golden-set eval — feedback wired in from the first request.',
+      'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) run on the gateway with grounded retrieval, citation checks, and Agent QA from day one — golden-set + Ragas offline evals plus LLM-as-judge scoring on live traffic, recorded in Langfuse.',
   },
   {
     n: '3',
@@ -315,7 +315,7 @@ export const STAGES: JourneyStage[] = [
     reality:
       'The platform consolidates. New agents ship in weeks, not months, because they inherit the same knowledge base, tools, and policy. An ops dashboard shows the fleet.',
     console:
-      'Capability ports + the Brain (versioned knowledge), shared tool registry, RBAC/ABAC, and Fleet/Analytics mean a new agent reuses everything that already passed production.',
+      'Capability ports + the Brain (versioned knowledge), shared tool registry, RBAC/ABAC, and Fleet/Analytics mean a new agent reuses everything that already passed production — and Agent QA watches the whole fleet, with Evidently drift + degradation detection flagging any agent that regresses.',
   },
   {
     n: '4',
