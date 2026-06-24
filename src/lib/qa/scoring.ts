@@ -27,6 +27,7 @@ export interface JudgeVerdict {
 export interface ScoreResult {
   traceId: string;
   verdict: JudgeVerdict;
+  judged: boolean; // did the gateway judge return a verdict (false if the gateway was unreachable)
   posted: boolean; // did Langfuse accept the scores
 }
 
@@ -62,7 +63,7 @@ async function judge(i: Interaction): Promise<JudgeVerdict> {
       response_format: { type: 'json_object' },
       chat_template_kwargs: { enable_thinking: false },
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(90_000), // local reasoning models can be slow, esp. cold
   });
   if (!res.ok) throw new Error('gateway judge unavailable');
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -118,13 +119,20 @@ async function postToLangfuse(i: Interaction, traceId: string, v: JudgeVerdict):
   }
 }
 
-// Judge one interaction and record its scores in Langfuse. Returns the verdict even if Langfuse
-// is down (posted:false), so online scoring degrades gracefully.
+// Judge one interaction and record its scores in Langfuse. Degrades gracefully: if the gateway
+// judge is unreachable it returns judged:false (and skips the Langfuse write so a fabricated 0
+// score never pollutes the trace); if Langfuse is down it returns posted:false.
 export async function scoreInteraction(i: Interaction): Promise<ScoreResult> {
   const traceId = i.traceId ?? randomUUID().replace(/-/g, '');
-  const verdict = await judge(i);
+  let verdict: JudgeVerdict;
+  try {
+    verdict = await judge(i);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : 'judge unavailable';
+    return { traceId, verdict: { quality: 0, faithfulness: 0, reasoning: reason }, judged: false, posted: false };
+  }
   const posted = await postToLangfuse(i, traceId, verdict);
-  return { traceId, verdict, posted };
+  return { traceId, verdict, judged: true, posted };
 }
 
 export function scoringConfigured(): boolean {

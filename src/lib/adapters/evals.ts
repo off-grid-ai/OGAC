@@ -164,7 +164,9 @@ export const ragasEvals: EvalsPort = {
     license: 'Apache-2.0',
     render: 'headless',
     embedUrl: RAGAS_URL,
-    description: 'RAG metrics — faithfulness, context precision/recall, answer relevancy (sidecar).',
+    status: 'planned',
+    description:
+      'RAG metrics — faithfulness, context precision/recall, answer relevancy. Configure-to-activate: point OFFGRID_RAGAS_URL at a Ragas/DeepEval sidecar (golden + promptfoo run today).',
   },
   async run() {
     if (!RAGAS_URL) return goldenEvals.run();
