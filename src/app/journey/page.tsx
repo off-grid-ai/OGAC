@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ChartLineUp,
+  Gauge,
   Lock,
   Plugs,
   Scroll,
@@ -80,6 +81,11 @@ const GUARANTEES: Guarantee[] = [
     icon: Plugs,
     title: 'No lock-in',
     body: 'Permissive open source behind swappable ports — change any tool via one env var.',
+  },
+  {
+    icon: Gauge,
+    title: 'Proven agents',
+    body: 'Automated QA: offline evals, online scoring on live traffic, and drift/degradation alerts.',
   },
 ];
 
@@ -219,7 +225,7 @@ export default function JourneyPage() {
       <section className="border-t border-border">
         <div className="mx-auto max-w-6xl px-6 py-16">
           <h2 className="text-xl font-semibold tracking-tight">What a CIO can sign off on</h2>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {GUARANTEES.map((g) => (
               <BlurFade key={g.title} inView>
                 <MagicCard className="h-full rounded-xl border border-border p-5">

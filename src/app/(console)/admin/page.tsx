@@ -86,9 +86,25 @@ export default async function AdminPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {b.alternatives.length === 0
-                      ? '—'
-                      : b.alternatives.map((a) => a.vendor).join(', ')}
+                    {b.alternatives.length === 0 ? (
+                      '—'
+                    ) : (
+                      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                        {b.alternatives.map((a) => (
+                          <span key={a.id} className="whitespace-nowrap">
+                            {a.vendor}
+                            {a.status === 'planned' ? (
+                              <Badge
+                                variant="secondary"
+                                className="ml-1 bg-muted text-muted-foreground"
+                              >
+                                planned
+                              </Badge>
+                            ) : null}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -37,6 +37,10 @@ export const openApiSpec = {
   tags: [
     { name: 'node', description: 'Called by Off Grid nodes (Desktop/Mobile).' },
     { name: 'admin', description: 'Called by the console / admins.' },
+    {
+      name: 'agent-qa',
+      description: 'Automated agent QA — offline evals, online scoring, drift & degradation.',
+    },
   ],
   paths: {
     '/api/v1/devices': {
@@ -752,8 +756,55 @@ export const openApiSpec = {
     '/api/v1/admin/evals/run': {
       post: {
         tags: ['admin'],
-        summary: 'Run the golden set against the Brain (recall scoring)',
-        responses: { '201': { description: 'Scored run.' } },
+        summary: 'Run an offline eval through the active adapter (golden / promptfoo / Ragas)',
+        description:
+          'Runs the evals capability’s active adapter (OFFGRID_ADAPTER_EVALS). golden (default) scores recall over the Brain; promptfoo runs an assertion matrix via its CLI; Ragas calls a sidecar. OSS adapters fall back to golden if unavailable.',
+        responses: { '201': { description: 'Scored run (EvalRunResult).' } },
+      },
+    },
+    '/api/v1/admin/qa/drift': {
+      get: {
+        tags: ['agent-qa'],
+        summary: 'Drift / degradation report',
+        description:
+          'Compares a recent window of eval scores against a baseline window. Active drift adapter (OFFGRID_ADAPTER_DRIFT): native (Population Stability Index + mean-degradation, default) or evidently. Returns status stable | warning | drift.',
+        responses: { '200': { description: 'DriftReport.' } },
+      },
+    },
+    '/api/v1/admin/qa/score': {
+      post: {
+        tags: ['agent-qa'],
+        summary: 'Online eval — judge one interaction and push scores to Langfuse',
+        description:
+          'LLM-as-judge (via the gateway) scores an interaction’s quality + faithfulness, then writes the scores to Langfuse (where they trend over time = the degradation signal). Gated by the `online-evals` feature flag. Degrades gracefully: judged:false if the gateway is unreachable, posted:false if Langfuse is.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['input', 'output'],
+                properties: {
+                  input: { type: 'string' },
+                  output: { type: 'string' },
+                  sources: { type: 'array', items: { type: 'string' } },
+                  traceId: { type: 'string', description: 'attach scores to an existing trace' },
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'ScoreResult (traceId, verdict, judged, posted).' } },
+      },
+    },
+    '/api/v1/admin/qa/status': {
+      get: {
+        tags: ['agent-qa'],
+        summary: 'Agent-QA summary — offline score, drift verdict, online-scoring state',
+        description:
+          'One call answering "are the agents still doing a good job?": latest offline eval score, the drift/degradation verdict, and whether online scoring is configured + enabled.',
+        responses: { '200': { description: 'QA summary (offline, drift, online).' } },
       },
     },
   },
