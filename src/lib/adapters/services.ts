@@ -159,29 +159,9 @@ export const RETRIEVAL_ENTRIES: RegEntry[] = [
   },
 ];
 
-export const CACHING: RegEntry[] = [
-  {
-    meta: {
-      id: 'memory',
-      capability: 'caching',
-      vendor: 'Off Grid in-process cache',
-      license: 'first-party',
-      render: 'native',
-      description: 'Exact-match response cache in the gateway (default).',
-    },
-  },
-  {
-    meta: {
-      id: 'redis',
-      capability: 'caching',
-      vendor: 'Redis',
-      license: 'BSD-3-Clause',
-      render: 'headless',
-      embedUrl: env.OFFGRID_REDIS_URL,
-      description: 'Exact + semantic response cache and rate limiting at scale.',
-    },
-  },
-];
+// Caching and feature flags are now real behavior ports (src/lib/adapters/cache.ts and flags.ts):
+// the in-process default and the Redis / Unleash swap-ins actually perform the work in-path, with
+// fallback to the default. Registered from those port arrays in the registry.
 
 export const SIEM: RegEntry[] = [
   {
@@ -205,31 +185,6 @@ export const SIEM: RegEntry[] = [
       description: 'Log search + SIEM dashboards over the audit stream.',
     },
     health: ping(env.OFFGRID_OPENSEARCH_URL, '/'),
-  },
-];
-
-export const FLAGS: RegEntry[] = [
-  {
-    meta: {
-      id: 'native',
-      capability: 'flags',
-      vendor: 'Off Grid flags',
-      license: 'first-party',
-      render: 'native',
-      description: 'Module/capability enablement via env + per-tenant config (default).',
-    },
-  },
-  {
-    meta: {
-      id: 'unleash',
-      capability: 'flags',
-      vendor: 'Unleash',
-      license: 'Apache-2.0',
-      render: 'embed',
-      embedUrl: env.OFFGRID_UNLEASH_URL,
-      description: 'Feature-flag service — the backbone of modular control at scale.',
-    },
-    health: ping(env.OFFGRID_UNLEASH_URL, '/health'),
   },
 ];
 
@@ -267,8 +222,9 @@ export const PROVENANCE: RegEntry[] = [
       vendor: 'C2PA Content Credentials',
       license: 'permissive (CAI)',
       render: 'headless',
+      status: 'planned',
       description:
-        'Cryptographically sign answers/exports with their source chain — tamper-evident, offline-verifiable (c2pa-node).',
+        'Cryptographically sign answers/exports with their source chain — tamper-evident, offline-verifiable (c2pa-node). Planned — ed25519 signing is live today.',
     },
   },
   {
@@ -278,7 +234,8 @@ export const PROVENANCE: RegEntry[] = [
       vendor: 'Sigstore',
       license: 'Apache-2.0',
       render: 'headless',
-      description: 'Keyless signing / attestation of artifacts and exports.',
+      status: 'planned',
+      description: 'Keyless signing / attestation of artifacts and exports. Planned.',
     },
   },
   {
@@ -349,7 +306,8 @@ export const SANDBOX: RegEntry[] = [
       license: 'Apache-2.0',
       render: 'headless',
       embedUrl: env.OFFGRID_E2B_URL,
-      description: 'Cloud sandboxes for agent code execution (firecracker microVMs).',
+      status: 'planned',
+      description: 'Cloud sandboxes for agent code execution (firecracker microVMs). Planned.',
     },
   },
   {
@@ -359,7 +317,8 @@ export const SANDBOX: RegEntry[] = [
       vendor: 'Firecracker',
       license: 'Apache-2.0',
       render: 'headless',
-      description: 'Self-hosted microVM isolation for untrusted tool/code execution.',
+      status: 'planned',
+      description: 'Self-hosted microVM isolation for untrusted tool/code execution. Planned.',
     },
   },
   {
@@ -369,47 +328,15 @@ export const SANDBOX: RegEntry[] = [
       vendor: 'Falco',
       license: 'Apache-2.0',
       render: 'headless',
-      description: 'Runtime threat detection on the execution host (syscall anomalies).',
+      status: 'planned',
+      description: 'Runtime threat detection on the execution host (syscall anomalies). Planned.',
     },
   },
 ];
 
-// Evals. Default is the first-party golden-set (recall over the Brain). promptfoo (Node) adds an
-// assertion matrix across providers; Ragas/DeepEval (Python service) add RAG metrics — faithfulness,
-// context precision/recall, answer relevancy. All run offline against recorded outputs.
-export const EVALS: RegEntry[] = [
-  {
-    meta: {
-      id: 'golden',
-      capability: 'evals',
-      vendor: 'Off Grid golden set',
-      license: 'first-party',
-      render: 'native',
-      description: 'Recall-scored golden query→expected-doc set over the Brain (always on).',
-    },
-  },
-  {
-    meta: {
-      id: 'promptfoo',
-      capability: 'evals',
-      vendor: 'promptfoo',
-      license: 'MIT',
-      render: 'headless',
-      description: 'Assertion-matrix evals across providers (Node-native).',
-    },
-  },
-  {
-    meta: {
-      id: 'ragas',
-      capability: 'evals',
-      vendor: 'Ragas + DeepEval',
-      license: 'Apache-2.0',
-      render: 'headless',
-      embedUrl: env.OFFGRID_RAGAS_URL,
-      description: 'RAG metrics — faithfulness, context precision/recall, answer relevancy.',
-    },
-  },
-];
+// Evals and drift are now real behavior ports (src/lib/adapters/evals.ts, drift.ts): golden (the
+// always-on default) plus promptfoo / Ragas (offline) and the first-party PSI detector / Evidently
+// (drift) actually run in-path, with fallback to the default. Registered from those port arrays.
 
 // Langfuse is an additional observability adapter (LLM traces + per-trace/user/project cost).
 export const langfuseEntry: RegEntry = {
