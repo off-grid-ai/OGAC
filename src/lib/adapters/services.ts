@@ -222,9 +222,8 @@ export const PROVENANCE: RegEntry[] = [
       vendor: 'C2PA Content Credentials',
       license: 'permissive (CAI)',
       render: 'headless',
-      status: 'planned',
       description:
-        'Cryptographically sign answers/exports with their source chain — tamper-evident, offline-verifiable (c2pa-node). Planned — ed25519 signing is live today.',
+        'Content Credentials for image assets (PNG/JPEG) — embed a signed, offline-verifiable manifest via /admin/provenance/c2pa (c2pa-node, bundled signer). Text/document exports use ed25519 detached manifests.',
     },
   },
   {
