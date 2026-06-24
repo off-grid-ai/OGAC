@@ -1,0 +1,45 @@
+A precise technical software architecture diagram, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Every component is a rectangular box with a thin black 1px border, a bold monospace title, and one small monospace line under it describing what it does. Arrows are thin solid black lines with clear arrowheads, each carrying a short monospace label naming what flows. Use a single emerald-green (#34D399) fill only for the Off Grid Console spine and the gateway box; everything else is black-on-white. Monospace (Menlo / terminal) lettering throughout, sharp and legible. Aligned to a grid, dense but organized. Title at the top in bold monospace: "OFF GRID CONSOLE — THE FIVE-PLANE AGENTIC STACK".
+
+Layout: five horizontal lanes stacked top to bottom, each lane a labelled row. A tall emerald-green vertical bar labelled "OFF GRID CONSOLE (control plane)" runs down the left edge touching all five lanes, with small emerald arrows branching right into each lane labelled "govern / audit". Lanes from BOTTOM to TOP:
+
+LANE 1 (bottom) — label on left "DATA PLANE". Boxes left to right:
+- "POSTGRES — state + append-only audit"
+- "CONNECTORS — pull source data"
+- "PRESIDIO via MASKING — redact / tokenise PII"
+- "DATASETS — classified, DSAR-erasable"
+- "SEAWEEDFS — object store"
+Arrow from CONNECTORS to MASKING labelled "raw rows", arrow from MASKING to DATASETS labelled "masked".
+
+LANE 2 — label on left "CONTROL PLANE". Boxes:
+- "AUDIT LOG — every request, source of truth"
+- "OPA — policy decision (allow/deny)"
+- "PRESIDIO — guardrail PII scan"
+- "OPENBAO — secrets"  / "KEYCLOAK — SSO/OIDC"
+- "KILL SWITCH — halt a node"
+Arrow from OPA and PRESIDIO down into AUDIT LOG labelled "findings".
+
+LANE 3 (centre, emphasised) — label on left "AI PLANE". A large emerald box in the middle: "THE ONE GATEWAY — multimodal, MCP, all inference". Around it:
+- "BRAIN / LANCEDB — vector retrieval"
+- "ROUTER — intent to KB / DB / TOOL"
+- "GROUNDING — verify citations"
+- "TEMPORAL — durable agent runs"
+Arrows: ROUTER to BRAIN "query", BRAIN to GROUNDING "sources", everything connecting into the emerald GATEWAY box with an arrow labelled "every prompt + response".
+
+LANE 4 — label on left "REGULATORY PLANE". Boxes:
+- "REPORT PACKS — IRDAI / RBI / SEBI / DPDP"
+- "ed25519 SIGNING — tamper-evident provenance"
+- "FRAMEWORK COVERAGE — posture + gaps"
+- "DPIA / EVIDENCE EXPORT"
+Arrow from AUDIT LOG (lane 2) up to REPORT PACKS labelled "evidence".
+
+LANE 5 (top) — label on left "CONSUMPTION". Boxes:
+- "FLEET CONTROL — enroll, command, analytics"
+- "AGENTS — claims/FNOL, KYC, sales copilot, SOP"
+- "DESKTOP NODES — on-device"
+Arrow from AGENTS down into the GATEWAY labelled "all calls", arrow from FLEET CONTROL to DESKTOP NODES labelled "policy push".
+
+Cross-cutting: a thin labelled rail along the right edge spanning lanes 2-5 labelled "OTEL → LANGFUSE / JAEGER (traces) · MARQUEZ (lineage)" with small tap arrows into the gateway and audit log.
+
+Style notes: flat, sharp, technical, like a clean engineering blueprint with monospace labels. Keep every label short and readable. Emerald used ONLY for the Console spine and the gateway box, to show they are the load-bearing centre. The reader should be able to point at any real component (Postgres, OPA, Presidio, the gateway, LanceDB, Temporal, Marquez, Keycloak) and see exactly what it does and how it connects.
+
+The meaning the viewer should sense: Off Grid Console is one control plane spanning all five planes; every component is a named, real piece of software; the single gateway in the centre is where all inference passes, and everything is audited and traced.

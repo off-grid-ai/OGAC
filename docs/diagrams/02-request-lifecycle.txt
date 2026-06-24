@@ -1,0 +1,31 @@
+A precise technical software architecture diagram showing a request's lifecycle, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Components are rectangular boxes with thin black 1px borders, a bold monospace title and one small line of what they do. Arrows are thin solid black lines with arrowheads and a short monospace label naming the data/operation on each. A single emerald-green (#34D399) fill is used only for the central GATEWAY box and the main left-to-right request arrow. Monospace (Menlo / terminal) lettering, sharp and legible, grid-aligned. Title top in bold monospace: "OFF GRID CONSOLE — ONE GATEWAY, EVERY REQUEST GOVERNED".
+
+The main flow reads left to right along a bold emerald arrow labelled "EVERY PROMPT · EVERY RESPONSE". Boxes in order along the flow:
+
+1. Far left: "CLIENT / AGENT — desktop node or use case" with an arrow right labelled "prompt (text / image)".
+
+2. "GATEWAY :7878 (emerald) — multimodal, MCP, the single egress" — the large central box all traffic enters. Inside or stacked just under it, a vertical pipeline of inline steps, each a small box with an arrow down the chain:
+   - "INPUT GUARDRAIL → PRESIDIO — detect / redact PII"  (arrow labelled "pii scan")
+   - "POLICY → OPA — allow / deny by user + purpose"      (arrow labelled "decision")
+   - "ROUTE → ROUTER — intent: KB / DB / TOOL"            (arrow labelled "intent")
+   - "RETRIEVE → BRAIN / LANCEDB — versioned knowledge"   (arrow labelled "top-k sources")
+   - "GENERATE → LOCAL MODEL (gemma) — on-device"         (arrow labelled "draft")
+   - "OUTPUT CHECK → GROUNDING — verify every citation"   (arrow labelled "citations")
+
+3. Right of the gateway: "RESPONSE — answer + citations" box, with an arrow out to the right labelled "grounded answer" returning to a small "CLIENT / AGENT" box.
+
+4. A branch off ROUTE labelled "tool call" to a box "MODEL ROUTING — local default; cloud only if policy allows (leashed)", with a small red "EGRESS LEASH" tag.
+
+ACROSS THE BOTTOM — the record, every step taps down into it:
+A wide box spanning the width labelled "AUDIT LOG (POSTGRES) — user · purpose · model · tokens · verdict · checks[]  (append-only, source of truth)". Thin downward arrows from each pipeline step into it labelled "log".
+
+ALONG THE RIGHT EDGE — observability + provenance rail (vertical), with tap arrows from the gateway:
+- "OTEL → LANGFUSE v3 / JAEGER — traces, LLM cost"  (arrow "span")
+- "MARQUEZ — lineage: source → answer"               (arrow "run event")
+- "ed25519 SIGN — tamper-evident export"             (arrow "sign")
+
+TOP RIGHT — a heavy box "KILL SWITCH — one pull halts the node" with a cord drawn into the gateway.
+
+Style notes: flat, sharp, engineering-blueprint feel, monospace labels, dense but legible. Emerald used ONLY for the gateway box and the main request arrow to show it is the single chokepoint. Every box is a real named component (Presidio, OPA, Router, LanceDB, gemma, Grounding, Postgres, Langfuse, Marquez). Keep labels short.
+
+The meaning the viewer should sense: one gateway sits between every client and every model; each request is scanned for PII, checked against policy, routed, answered from versioned knowledge, citation-verified, and written to one append-only audit log, with traces, lineage and signatures captured on the side, all on-device and all stoppable with one switch.
