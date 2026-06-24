@@ -41,6 +41,11 @@ export const openApiSpec = {
       name: 'agent-qa',
       description: 'Automated agent QA — offline evals, online scoring, drift & degradation.',
     },
+    {
+      name: 'provenance',
+      description: 'Tamper-evidence — C2PA image credentials, Sigstore, ed25519 export manifests.',
+    },
+    { name: 'sandbox', description: 'Isolated execution of agent-authored code.' },
   ],
   paths: {
     '/api/v1/devices': {
@@ -805,6 +810,56 @@ export const openApiSpec = {
         description:
           'One call answering "are the agents still doing a good job?": latest offline eval score, the drift/degradation verdict, and whether online scoring is configured + enabled.',
         responses: { '200': { description: 'QA summary (offline, drift, online).' } },
+      },
+    },
+    '/api/v1/admin/provenance/c2pa': {
+      post: {
+        tags: ['provenance'],
+        summary: 'C2PA Content Credentials for images (sign / verify)',
+        description:
+          'POST { image (base64), mimeType: image/png|image/jpeg, action?: sign|verify }. sign embeds a signed manifest (c2pa-node, bundled signer — no fees/keys); verify reads + validates it. Text/document exports use the ed25519 detached manifest instead.',
+        responses: {
+          '201': { description: 'Signed image { image (base64), bytes }.' },
+          '200': { description: 'Verify result { hasManifest, valid, ... }.' },
+        },
+      },
+    },
+    '/api/v1/admin/provenance/sigstore': {
+      get: {
+        tags: ['provenance'],
+        summary: 'Sigstore signing availability',
+        responses: { '200': { description: '{ signingConfigured }.' } },
+      },
+      post: {
+        tags: ['provenance'],
+        summary: 'Sigstore keyless sign / verify',
+        description:
+          'POST { action: sign|verify, payload?, identityToken?, bundle? }. sign → keyless Sigstore bundle (public-good Fulcio/Rekor, free; OFFGRID_FULCIO_URL/_REKOR_URL to self-host; needs an OIDC identity token). verify → standalone bundle verification.',
+        responses: {
+          '201': { description: 'Sigstore bundle.' },
+          '200': { description: 'Verify result { valid, error? }.' },
+        },
+      },
+    },
+    '/api/v1/admin/provenance/verify': {
+      post: {
+        tags: ['provenance'],
+        summary: 'Verify a detached export provenance manifest',
+        description:
+          'POST { manifest, sha256? }. Verifies the manifest signature with the active signing port (ed25519 needs only the public key) and, if sha256 is given, that it matches the file.',
+        responses: { '200': { description: 'Verify result { signatureValid, hashMatches?, algorithm }.' } },
+      },
+    },
+    '/api/v1/admin/sandbox/run': {
+      post: {
+        tags: ['sandbox'],
+        summary: 'Run agent-authored code in the active sandbox',
+        description:
+          'POST { language: python|node, code, timeoutMs? }. Double-gated: the agent-code-exec flag (default OFF) and the no-exec default both must allow it. Engine: none (refuses) | docker (ephemeral, network-disabled, resource-capped container — free, no key, no Linux/KVM host).',
+        responses: {
+          '200': { description: 'Run result { engine, ok, stdout, stderr, exitCode, timedOut }.' },
+          '403': { description: 'Refused — flag off or no-exec default.' },
+        },
       },
     },
   },
