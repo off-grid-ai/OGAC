@@ -219,6 +219,28 @@ export interface FlagsPort {
   health(): Promise<boolean>;
 }
 
+// Sandbox — execute agent-authored code under isolation. The default refuses (tools run only via
+// the scoped registry); the `docker` engine runs code in an ephemeral, network-disabled,
+// resource-capped container (free, no API key, no Linux/KVM host needed); E2B / Firecracker are
+// heavier isolation for prod. Always gated by the `agent-code-exec` flag.
+export type SandboxLanguage = 'python' | 'node';
+
+export interface SandboxResult {
+  engine: string;
+  ok: boolean; // ran to completion with exit 0
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+  refused?: string; // set by the no-exec default — execution was declined, not attempted
+}
+
+export interface SandboxPort {
+  meta: AdapterMeta;
+  run(language: SandboxLanguage, code: string, timeoutMs?: number): Promise<SandboxResult>;
+  health(): Promise<boolean>;
+}
+
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;
 
 // Embedding width — one dimension throughout the Brain and the inference port.

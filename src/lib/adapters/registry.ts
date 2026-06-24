@@ -8,6 +8,7 @@ import { LINEAGE_PORTS } from './lineage';
 import { otelObservability, signozObservability } from './observability';
 import { PII_PORTS } from './pii';
 import { POLICY_PORTS } from './policy';
+import { SANDBOX_PORTS } from './sandbox';
 import { envSecrets, openBaoSecrets } from './secrets';
 import {
   BI,
@@ -36,6 +37,7 @@ import type {
   ObservabilityPort,
   PiiPort,
   PolicyPort,
+  SandboxPort,
   SecretsPort,
   SigningPort,
 } from './types';
@@ -106,6 +108,10 @@ export function getFlags(): FlagsPort {
   return pick('flags', FLAGS_PORTS);
 }
 
+export function getSandbox(): SandboxPort {
+  return pick('sandbox', SANDBOX_PORTS);
+}
+
 export interface CapabilityBinding {
   capability: Capability;
   active: AdapterMeta;
@@ -138,7 +144,7 @@ const ALL: Record<Capability, RegEntry[]> = {
   flags: portEntries(FLAGS_PORTS),
   provenance: PROVENANCE,
   bi: BI,
-  sandbox: SANDBOX,
+  sandbox: [...portEntries(SANDBOX_PORTS), ...SANDBOX],
   evals: portEntries(EVALS_PORTS),
   drift: portEntries(DRIFT_PORTS),
 };
