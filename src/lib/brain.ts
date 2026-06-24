@@ -1,12 +1,21 @@
 import { randomUUID } from 'crypto';
 import * as lancedb from '@lancedb/lancedb';
 import { getInference } from '@/lib/adapters/registry';
+import { qdrantAdd, qdrantList, qdrantSearch } from '@/lib/qdrant';
 
-// The Brain — the ingestion→retrieval (RAG) pipeline on LanceDB. Embeddings come through the
+// The Brain — the ingestion→retrieval (RAG) pipeline. LanceDB (embedded, on-disk) is the default
+// store; Qdrant is the server-scale swap-in, selected with OFFGRID_ADAPTER_RETRIEVAL=qdrant — the
+// public functions delegate to it without changing any caller. Embeddings come through the
 // inference port (gateway by default, deterministic fallback offline), so swapping the model
 // endpoint never touches this file. One dimension throughout.
 const LANCEDB_PATH = process.env.LANCEDB_PATH ?? './.lancedb';
 const TABLE = 'documents';
+
+// Retrieval backend selection — mirrors the registry's OFFGRID_ADAPTER_<CAP> convention so the
+// Brain honours the same swap as the adapters surface. Default (unset / 'lancedb') = LanceDB.
+function qdrantSelected(): boolean {
+  return process.env.OFFGRID_ADAPTER_RETRIEVAL === 'qdrant';
+}
 
 export interface BrainDoc {
   id: string;
@@ -64,12 +73,14 @@ async function getTable(): Promise<lancedb.Table> {
 }
 
 export async function listDocuments(): Promise<BrainDoc[]> {
+  if (qdrantSelected()) return qdrantList();
   const tbl = await getTable();
   const rows = (await tbl.query().limit(1000).toArray()) as DocRow[];
   return rows.map((r) => ({ id: r.id, title: r.title, source: r.source, text: r.text }));
 }
 
 export async function addDocument(title: string, source: string, text: string): Promise<BrainDoc> {
+  if (qdrantSelected()) return qdrantAdd(title, source, text);
   const tbl = await getTable();
   const doc: DocRow = {
     id: randomUUID(),
@@ -83,6 +94,7 @@ export async function addDocument(title: string, source: string, text: string): 
 }
 
 export async function searchDocuments(query: string, k = 5): Promise<BrainHit[]> {
+  if (qdrantSelected()) return qdrantSearch(query, k);
   const tbl = await getTable();
   const vector = await embed(query);
   const rows = (await tbl.search(vector).limit(k).toArray()) as Array<

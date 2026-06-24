@@ -1,3 +1,7 @@
+import { CACHE_PORTS } from './cache';
+import { DRIFT_PORTS } from './drift';
+import { EVALS_PORTS } from './evals';
+import { FLAGS_PORTS } from './flags';
 import { heuristicGrounding, modelGrounding } from './grounding';
 import { gatewayInference, localInference } from './inference';
 import { LINEAGE_PORTS } from './lineage';
@@ -7,9 +11,6 @@ import { POLICY_PORTS } from './policy';
 import { envSecrets, openBaoSecrets } from './secrets';
 import {
   BI,
-  CACHING,
-  EVALS,
-  FLAGS,
   GUARDRAIL_ENTRIES,
   IDENTITY,
   LINEAGE,
@@ -24,7 +25,11 @@ import {
 import { SIGNING_PORTS } from './signing';
 import type {
   AdapterMeta,
+  CachePort,
   Capability,
+  DriftPort,
+  EvalsPort,
+  FlagsPort,
   GroundingPort,
   InferencePort,
   LineagePort,
@@ -85,6 +90,22 @@ export function getSigning(): SigningPort {
   return pick('provenance', SIGNING_PORTS);
 }
 
+export function getEvals(): EvalsPort {
+  return pick('evals', EVALS_PORTS);
+}
+
+export function getDrift(): DriftPort {
+  return pick('drift', DRIFT_PORTS);
+}
+
+export function getCache(): CachePort {
+  return pick('caching', CACHE_PORTS);
+}
+
+export function getFlags(): FlagsPort {
+  return pick('flags', FLAGS_PORTS);
+}
+
 export interface CapabilityBinding {
   capability: Capability;
   active: AdapterMeta;
@@ -112,13 +133,14 @@ const ALL: Record<Capability, RegEntry[]> = {
   policy: POLICY,
   identity: IDENTITY,
   lineage: LINEAGE,
-  caching: CACHING,
+  caching: portEntries(CACHE_PORTS),
   siem: SIEM,
-  flags: FLAGS,
+  flags: portEntries(FLAGS_PORTS),
   provenance: PROVENANCE,
   bi: BI,
   sandbox: SANDBOX,
-  evals: EVALS,
+  evals: portEntries(EVALS_PORTS),
+  drift: portEntries(DRIFT_PORTS),
 };
 
 // One row per capability — active adapter + swappable alternatives + live health (when probed).

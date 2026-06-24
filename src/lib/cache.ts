@@ -1,12 +1,14 @@
 import { createHash } from 'crypto';
-import { getInference } from '@/lib/adapters/registry';
+import { getCache, getInference } from '@/lib/adapters/registry';
 
 // Response cache — the gateway-level cost/latency win (Portkey/Bifrost-style). Two layers:
-// (1) EXACT: hash of the normalized prompt. (2) SEMANTIC: embedding cosine vs recent entries, so
-// near-duplicate prompts hit too. First-party in-memory by default (Redis is the scale backend —
-// `OFFGRID_ADAPTER_CACHING=redis`). Bounded + TTL'd so it never grows unbounded.
+// (1) EXACT: hash of the normalized prompt, stored through the caching PORT so Redis
+// (`OFFGRID_ADAPTER_CACHING=redis`) makes it shared + persistent across processes; the default
+// keeps it in-process. (2) SEMANTIC: embedding cosine vs recent entries (in-process), so
+// near-duplicate prompts hit too. Bounded + TTL'd so it never grows unbounded.
 const MAX = 500;
 const TTL_MS = 60 * 60 * 1000; // 1h
+const TTL_S = TTL_MS / 1000;
 const SEMANTIC_THRESHOLD = 0.92;
 
 interface Entry {
@@ -58,11 +60,12 @@ function bestSemantic(vec: number[]): { e: Entry; score: number } | null {
 }
 
 export async function cacheLookup(prompt: string): Promise<CacheHit> {
-  const exact = store.get(hash(prompt));
-  if (exact && fresh(exact)) {
+  // EXACT layer — through the caching port (Redis when selected, in-process otherwise).
+  const exact = await getCache().get(`resp:${hash(prompt)}`);
+  if (exact !== null) {
     stats.hits += 1;
     stats.exact += 1;
-    return { hit: true, mode: 'exact', answer: exact.answer, score: 1 };
+    return { hit: true, mode: 'exact', answer: exact, score: 1 };
   }
   const best = bestSemantic(await getInference().embed(prompt));
   if (best && best.score >= SEMANTIC_THRESHOLD) {
@@ -80,6 +83,8 @@ export async function cacheLookup(prompt: string): Promise<CacheHit> {
 }
 
 export async function cacheStore(prompt: string, answer: string): Promise<void> {
+  // EXACT layer through the port (persisted in Redis when selected); SEMANTIC layer in-process.
+  await getCache().set(`resp:${hash(prompt)}`, answer, TTL_S);
   const vector = await getInference().embed(prompt);
   store.set(hash(prompt), { key: hash(prompt), answer, vector, ts: Date.now() });
   // Evict oldest beyond the cap.

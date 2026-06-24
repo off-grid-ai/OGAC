@@ -20,9 +20,15 @@ export type Capability =
   | 'provenance'
   | 'bi'
   | 'sandbox'
-  | 'evals';
+  | 'evals'
+  | 'drift';
 
 export type RenderMode = 'native' | 'embed' | 'headless';
+
+// Lifecycle of an adapter's integration. 'active' (default, omitted) = wired and doing real work
+// in-path; 'planned' = listed on the roadmap but NOT yet executed in-path (configure-to-activate),
+// surfaced honestly in the UI/docs so nothing claims to work that doesn't.
+export type AdapterStatus = 'active' | 'planned';
 
 export interface AdapterMeta {
   id: string;
@@ -32,6 +38,7 @@ export interface AdapterMeta {
   render: RenderMode;
   embedUrl?: string;
   description: string;
+  status?: AdapterStatus;
 }
 
 export type SpanAttrs = Record<string, string | number | boolean | undefined>;
@@ -143,6 +150,73 @@ export interface SigningPort {
   sign(payload: unknown): string;
   verify(payload: unknown, signature: string): boolean;
   publicKey(): string | null; // PEM for asymmetric adapters; null for HMAC (no public half)
+}
+
+// Evals — run an offline evaluation and return a scored run. golden (default) scores retrieval
+// recall over the Brain; promptfoo runs an assertion matrix via its CLI against the gateway;
+// Ragas/DeepEval call a RAG-metrics sidecar. All answer the same EvalRunResult shape, so the
+// /admin/qa surface is agnostic to which evaluator ran. OSS adapters fall back to golden if their
+// tool/service is unavailable, so selecting one is never a hard dependency.
+export interface EvalRunResult {
+  id: string;
+  engine: string;
+  score: number; // 0..100 (pass rate / aggregate metric)
+  total: number;
+  passed: number;
+  startedAt: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface EvalsPort {
+  meta: AdapterMeta;
+  run(): Promise<EvalRunResult>;
+  health(): Promise<boolean>;
+}
+
+// Drift / degradation — compare a recent window of quality signals against a baseline window and
+// report whether the agent has drifted (distribution shift) or degraded (mean quality drop).
+// First-party computes Population Stability Index over the eval-score history; Evidently runs full
+// data/embedding-drift test suites behind the same verdict shape.
+export type DriftStatus = 'stable' | 'warning' | 'drift';
+
+export interface DriftMetric {
+  name: string;
+  value: number;
+  status: DriftStatus;
+}
+
+export interface DriftReport {
+  engine: string;
+  status: DriftStatus;
+  metrics: DriftMetric[];
+  baseline: number; // samples in the baseline window
+  current: number; // samples in the current window
+  note?: string;
+}
+
+export interface DriftPort {
+  meta: AdapterMeta;
+  analyze(): Promise<DriftReport>;
+  health(): Promise<boolean>;
+}
+
+// Caching — exact + semantic response cache. First-party is an in-process Map (bounded, TTL'd);
+// Redis is the shared/at-scale backend. Same get/set contract; Redis falls back to memory if the
+// server is unreachable, so the cache is never a hard dependency.
+export interface CachePort {
+  meta: AdapterMeta;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ttlSeconds: number): Promise<void>;
+  health(): Promise<boolean>;
+}
+
+// Feature flags — runtime capability/feature enablement. First-party reads the in-console flag
+// store (Postgres) + env; Unleash queries a central flag service. Same isEnabled() contract;
+// Unleash falls back to the first-party store if unreachable.
+export interface FlagsPort {
+  meta: AdapterMeta;
+  isEnabled(key: string, fallback?: boolean): Promise<boolean>;
+  health(): Promise<boolean>;
 }
 
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;
