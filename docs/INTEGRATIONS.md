@@ -225,24 +225,32 @@ when its client env is set, and a "Continue with Keycloak" button appears on `/s
 
 ```bash
 cd deploy && make identity          # Keycloak on :8080 (admin / offgrid-dev)
-cd deploy && make identity-setup    # provision realm + OIDC client + test user, prints the env
 ```
 
-`make identity-setup` (script: `scripts/keycloak-setup.sh`) is idempotent — it creates the
-`offgrid` realm, a confidential `offgrid-console` client with the right redirect URI, and a test
-user, then prints the exact env block. Paste it into `.env.local`:
+That's it — `make identity` auto-imports `deploy/keycloak/offgrid-realm.json` on boot
+(`--import-realm`), which creates the `offgrid` realm, the confidential `offgrid-console` client
+(with a fixed dev secret and the right redirect URI), and a test user. **The realm is
+deterministic and survives `make down`** — it re-imports every boot, so there's no runtime setup
+step. The matching env is already in `.env.example`:
 
 ```ini
 AUTH_KEYCLOAK_ID=offgrid-console
-AUTH_KEYCLOAK_SECRET=<printed by the script>
+AUTH_KEYCLOAK_SECRET=offgrid-dev-keycloak-secret
 AUTH_KEYCLOAK_ISSUER=http://localhost:8080/realms/offgrid
 ```
 
 Confirm: restart the console, open `/signin` → the "Continue with Keycloak" button redirects to
 Keycloak and back (test user `advisor` / `advisor-pw`). `make verify` asserts the OIDC discovery
 doc automatically. New users default to the `viewer` role (map realm roles → console roles as a
-follow-up). To set up against your own realm by hand: create an OIDC client (confidential, standard
-flow) with redirect `http://localhost:3000/api/auth/callback/keycloak` and copy its secret.
+follow-up).
+
+**Production / your own realm:** edit `deploy/keycloak/offgrid-realm.json` (or create a realm by
+hand: an OIDC client, confidential, standard flow, redirect
+`http://localhost:3000/api/auth/callback/keycloak`), replace the dev secret, and point
+`AUTH_KEYCLOAK_*` at it. To federate to an existing IdP (Google Workspace / Entra / Okta), add it
+as an Identity Provider inside the realm. `scripts/keycloak-setup.sh` (`make identity-setup`)
+remains available to provision a realm against a running Keycloak via the admin API if you prefer
+that over the import file.
 
 ### Secrets → OpenBao · Cache → Redis · SIEM → OpenSearch · Flags → Unleash
 

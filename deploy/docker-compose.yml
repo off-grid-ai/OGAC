@@ -66,11 +66,16 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     profiles: [identity, all]
-    command: ['start-dev']
+    # --import-realm re-imports keycloak/offgrid-realm.json on every boot, so the realm + client +
+    # test user are deterministic and survive `make down` — no runtime setup script needed. (Dev
+    # mode; for production use a real DB + secrets and remove the committed dev secret.)
+    command: ['start-dev', '--import-realm']
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: offgrid-dev
       KC_HTTP_PORT: '8080'
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
     ports: ['8080:8080']
 
   # ── POLICY (policy-as-code) ──────────────────────────────────────────────────────
