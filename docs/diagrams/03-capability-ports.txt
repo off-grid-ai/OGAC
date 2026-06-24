@@ -1,27 +1,24 @@
-A precise technical software architecture diagram of a plugin / adapter system, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Boxes have thin black 1px borders, bold monospace titles, one small line of detail. Arrows are thin solid black lines with arrowheads. A single emerald-green (#34D399) fill is used only for the central console core and for the active default adapter in each row. Monospace (Menlo / terminal) lettering, sharp, grid-aligned. Title top in bold monospace: "OFF GRID CONSOLE — CAPABILITY PORTS, SWAPPABLE ADAPTERS".
+Charcoal drawing on plain white paper, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Hand-drawn, sketchy, loose charcoal strokes, no color, no shading beyond charcoal grey. Pure white background, no border. This illustration DOES use labels and arrows, hand-lettered in rough charcoal capitals, sparse and clear. Components are hand-sketched boxes with a hand-lettered name; connections are charcoal arrows with short hand-lettered labels. Title hand-lettered across the top: "OFF GRID CONSOLE — CAPABILITY PORTS, SWAPPABLE ADAPTERS".
 
-LEFT SIDE: a tall emerald box "OFF GRID CONSOLE CORE — calls getX() ports, never a tool directly". From it, a vertical stack of small labelled sockets (ports), each a notch on the right edge of the core, labelled with the capability name. Caption under the core: "swap = one env var  OFFGRID_ADAPTER_<CAP>".
+LEFT SIDE: a tall sketched cabinet drawn in charcoal labelled "OFF GRID CONSOLE CORE — CALLS getX() PORTS, NEVER A TOOL DIRECTLY". Down its right edge, a column of small hand-drawn sockets / notches, each labelled with a capability name. A hand-lettered caption beneath the cabinet: "SWAP = ONE ENV VAR  OFFGRID_ADAPTER_<CAP>".
 
-For each port, a horizontal row to the right: the port name, then an arrow labelled "active" pointing to the DEFAULT adapter box (emerald outline), then a lighter arrow labelled "or swap" to one or two alternative adapter boxes (black outline). Rows top to bottom:
+For each socket, a horizontal row to the right: a charcoal arrow labelled "ACTIVE" to the DEFAULT adapter (drawn as a box with a small plug seated in the socket), then a lighter dashed arrow labelled "OR SWAP" to one or two alternative adapter boxes (plugs drawn pulled out, waiting). Rows top to bottom:
+- "INFERENCE"     → "OFF GRID GATEWAY (ALWAYS)"      (tiny note "SINGLE EGRESS, NO SWAP")
+- "RETRIEVAL"     → "LANCEDB"        or "PGVECTOR · QDRANT"
+- "GUARDRAILS"    → "REGEX CHECKS"   or "MICROSOFT PRESIDIO"
+- "POLICY"        → "RBAC + ABAC"    or "OPEN POLICY AGENT"
+- "IDENTITY"      → "AUTH.JS"        or "KEYCLOAK"
+- "SECRETS"       → "PROCESS ENV"    or "OPENBAO"
+- "OBSERVABILITY" → "OTEL"           or "LANGFUSE · SIGNOZ"
+- "LINEAGE"       → "NONE (IMPLICIT)" or "MARQUEZ"
+- "AGENT-RUNTIME" → "IN-PROCESS"     or "TEMPORAL (DURABLE)"
+- "CACHING"       → "IN-PROCESS"     or "REDIS"
+- "SIEM"          → "AUDIT STORE"    or "OPENSEARCH"
+- "FLAGS"         → "ENV FLAGS"      or "UNLEASH"
+- "PROVENANCE"    → "HMAC"           or "ed25519 · C2PA"
 
-- PORT "inference"   → default "OFF GRID GATEWAY (always)"        (no swap — note "single egress")
-- PORT "retrieval"   → default "LANCEDB"        or "PGVECTOR" / "QDRANT"
-- PORT "guardrails"  → default "REGEX CHECKS"   or "MICROSOFT PRESIDIO"
-- PORT "policy"      → default "RBAC + ABAC"    or "OPEN POLICY AGENT (OPA)"
-- PORT "identity"    → default "AUTH.JS"        or "KEYCLOAK (OIDC)"
-- PORT "secrets"     → default "PROCESS ENV"    or "OPENBAO"
-- PORT "observability"→ default "OTEL"          or "LANGFUSE v3" / "SIGNOZ"
-- PORT "lineage"     → default "NONE (implicit)" or "MARQUEZ (OpenLineage)"
-- PORT "agent-runtime"→ default "IN-PROCESS"    or "TEMPORAL (durable)"
-- PORT "caching"     → default "IN-PROCESS"     or "REDIS"
-- PORT "siem"        → default "AUDIT STORE"    or "OPENSEARCH"
-- PORT "flags"       → default "ENV FLAGS"      or "UNLEASH"
-- PORT "provenance"  → default "HMAC"           or "ed25519" / "C2PA"
+A hand-lettered caption bar across the bottom: "FALLBACK — IF AN OSS ADAPTER IS UNREACHABLE, THE PORT REVERTS TO THE FIRST-PARTY DEFAULT. A SWAP IS NEVER A HARD DEPENDENCY."
 
-Mark the in-path ports (guardrails, policy, lineage, agent-runtime, retrieval, secrets, caching, provenance, observability) with a small tag "IN-PATH — performs the work". Mark embed-style ones (siem dashboards, flags UI, bi) with a small tag "EMBED — SSO'd UI".
+Style: rough charcoal throughout, expressive but readable; labels hand-lettered in loose charcoal capitals, kept sparse. The plug-and-socket metaphor (default plug seated, OSS plug waiting) should make the eye read 'default is first-party; OSS is the swap-in'. Every adapter is a real, named tool.
 
-BOTTOM CAPTION BAR spanning the width: "FALLBACK: if an OSS adapter is unreachable, the port reverts to the first-party default — a swap is never a hard dependency."
-
-Style notes: flat, sharp, like an engineering port/adapter map, monospace labels, dense but legible. Emerald used ONLY for the console core and the active default adapter in each row, so the eye reads 'default is first-party; OSS is the swap-in'. Every adapter is a real named tool. Keep labels short.
-
-The meaning the viewer should sense: the console depends on capability ports, not on any single tool; each capability ships a first-party default and one or two real OSS swap-ins selectable by a single environment variable; in-path adapters actually do the work, and the console always falls back to its own default if the OSS is down.
+The meaning the viewer should sense: the console depends on capability ports, not on any single tool; each capability ships a first-party default and one or two real open-source swap-ins, selectable by a single environment variable; the console always falls back to its own default if the OSS is down.

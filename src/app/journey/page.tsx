@@ -176,6 +176,19 @@ export default function JourneyPage() {
           </p>
         </BlurFade>
 
+        <BlurFade inView>
+          <div className="relative mt-10 overflow-hidden rounded-xl border border-border bg-black p-2 shadow-sm">
+            <Image
+              src="/diagrams/journey-stages.jpg"
+              alt="From Shadow AI to a self-serve platform — the six stages"
+              width={1400}
+              height={760}
+              className="h-auto w-full rounded-lg"
+              priority
+            />
+          </div>
+        </BlurFade>
+
         <section className="mt-14">
           {STAGES.map((s, i) => (
             <StageRow key={s.n} stage={s} last={i === STAGES.length - 1} />

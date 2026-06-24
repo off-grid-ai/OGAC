@@ -1,45 +1,19 @@
-A precise technical software architecture diagram, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Every component is a rectangular box with a thin black 1px border, a bold monospace title, and one small monospace line under it describing what it does. Arrows are thin solid black lines with clear arrowheads, each carrying a short monospace label naming what flows. Use a single emerald-green (#34D399) fill only for the Off Grid Console spine and the gateway box; everything else is black-on-white. Monospace (Menlo / terminal) lettering throughout, sharp and legible. Aligned to a grid, dense but organized. Title at the top in bold monospace: "OFF GRID CONSOLE — THE FIVE-PLANE AGENTIC STACK".
+Charcoal drawing on plain white paper, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Hand-drawn, sketchy, loose charcoal strokes, no color, no shading beyond charcoal grey. Pure white background, no border. This illustration DOES use labels and arrows, hand-lettered in rough charcoal capitals, sparse and clear. Every component is a hand-sketched rectangular box with its name hand-lettered inside and one tiny line under it; connections are charcoal arrows with a short hand-lettered label. Title hand-lettered across the top in bold charcoal capitals: "OFF GRID CONSOLE — THE FIVE-PLANE AGENTIC STACK".
 
-Layout: five horizontal lanes stacked top to bottom, each lane a labelled row. A tall emerald-green vertical bar labelled "OFF GRID CONSOLE (control plane)" runs down the left edge touching all five lanes, with small emerald arrows branching right into each lane labelled "govern / audit". Lanes from BOTTOM to TOP:
+The scene is a cross-section of a single tall building drawn in charcoal, with five stacked floors. A thick charcoal vertical spine runs down the left edge through all five floors, hand-lettered up its length "OFF GRID CONSOLE — ONE CONTROL PLANE", with short charcoal arrows branching right into each floor labelled "GOVERN / AUDIT". The floors, BOTTOM to TOP, each with a hand-lettered floor label on the left margin:
 
-LANE 1 (bottom) — label on left "DATA PLANE". Boxes left to right:
-- "POSTGRES — state + append-only audit"
-- "CONNECTORS — pull source data"
-- "PRESIDIO via MASKING — redact / tokenise PII"
-- "DATASETS — classified, DSAR-erasable"
-- "SEAWEEDFS — object store"
-Arrow from CONNECTORS to MASKING labelled "raw rows", arrow from MASKING to DATASETS labelled "masked".
+FLOOR 1 (bottom) "DATA PLANE": sketched boxes — "POSTGRES — state + audit", "CONNECTORS — pull source data", "PRESIDIO MASKING — redact PII", "DATASETS — classified, erasable", "SEAWEEDFS — object store". Charcoal arrow CONNECTORS→MASKING "RAW ROWS", MASKING→DATASETS "MASKED".
 
-LANE 2 — label on left "CONTROL PLANE". Boxes:
-- "AUDIT LOG — every request, source of truth"
-- "OPA — policy decision (allow/deny)"
-- "PRESIDIO — guardrail PII scan"
-- "OPENBAO — secrets"  / "KEYCLOAK — SSO/OIDC"
-- "KILL SWITCH — halt a node"
-Arrow from OPA and PRESIDIO down into AUDIT LOG labelled "findings".
+FLOOR 2 "CONTROL PLANE": boxes — "AUDIT LOG — source of truth" (drawn as an unrolled scroll), "OPA — allow / deny", "PRESIDIO — pii scan", "OPENBAO — secrets", "KEYCLOAK — SSO", and a heavy lever labelled "KILL SWITCH". Arrows from OPA and PRESIDIO down into the AUDIT scroll labelled "FINDINGS".
 
-LANE 3 (centre, emphasised) — label on left "AI PLANE". A large emerald box in the middle: "THE ONE GATEWAY — multimodal, MCP, all inference". Around it:
-- "BRAIN / LANCEDB — vector retrieval"
-- "ROUTER — intent to KB / DB / TOOL"
-- "GROUNDING — verify citations"
-- "TEMPORAL — durable agent runs"
-Arrows: ROUTER to BRAIN "query", BRAIN to GROUNDING "sources", everything connecting into the emerald GATEWAY box with an arrow labelled "every prompt + response".
+FLOOR 3 (centre, drawn heaviest) "AI PLANE": a large fortified box in the middle "THE ONE GATEWAY — multimodal · MCP · all inference". Around it: "BRAIN / LANCEDB — retrieval", "ROUTER — KB / DB / TOOL", "GROUNDING — verify citations", "TEMPORAL — durable agent runs". Arrows ROUTER→BRAIN "QUERY", BRAIN→GROUNDING "SOURCES", and a bold arrow through the gateway "EVERY PROMPT + RESPONSE".
 
-LANE 4 — label on left "REGULATORY PLANE". Boxes:
-- "REPORT PACKS — IRDAI / RBI / SEBI / DPDP"
-- "ed25519 SIGNING — tamper-evident provenance"
-- "FRAMEWORK COVERAGE — posture + gaps"
-- "DPIA / EVIDENCE EXPORT"
-Arrow from AUDIT LOG (lane 2) up to REPORT PACKS labelled "evidence".
+FLOOR 4 "REGULATORY PLANE": boxes — "REPORT PACKS — IRDAI / RBI / SEBI / DPDP" (drawn as sealed folders), "ed25519 SIGNING — tamper-evident", "FRAMEWORK COVERAGE", "DPIA / EVIDENCE". Arrow from the AUDIT scroll up to REPORT PACKS labelled "EVIDENCE".
 
-LANE 5 (top) — label on left "CONSUMPTION". Boxes:
-- "FLEET CONTROL — enroll, command, analytics"
-- "AGENTS — claims/FNOL, KYC, sales copilot, SOP"
-- "DESKTOP NODES — on-device"
-Arrow from AGENTS down into the GATEWAY labelled "all calls", arrow from FLEET CONTROL to DESKTOP NODES labelled "policy push".
+FLOOR 5 (top) "CONSUMPTION": boxes — "FLEET CONTROL — enroll · command · analytics", "AGENTS — claims / KYC / SOP", "DESKTOP NODES — on-device". Arrow AGENTS down into the gateway "ALL CALLS", arrow FLEET→NODES "POLICY PUSH".
 
-Cross-cutting: a thin labelled rail along the right edge spanning lanes 2-5 labelled "OTEL → LANGFUSE / JAEGER (traces) · MARQUEZ (lineage)" with small tap arrows into the gateway and audit log.
+Along the right edge, a thin hand-drawn rail spanning floors 2-5 labelled "OTEL → LANGFUSE / JAEGER (TRACES) · MARQUEZ (LINEAGE)" with small tap arrows into the gateway and the audit scroll.
 
-Style notes: flat, sharp, technical, like a clean engineering blueprint with monospace labels. Keep every label short and readable. Emerald used ONLY for the Console spine and the gateway box, to show they are the load-bearing centre. The reader should be able to point at any real component (Postgres, OPA, Presidio, the gateway, LanceDB, Temporal, Marquez, Keycloak) and see exactly what it does and how it connects.
+Style: rough charcoal throughout, expressive but readable; labels hand-lettered in loose charcoal capitals, kept sparse — only the ones named. The fortified gateway on the AI floor is the heaviest structure; the single spine clearly threads all five floors. Every box is a real, named piece of software.
 
-The meaning the viewer should sense: Off Grid Console is one control plane spanning all five planes; every component is a named, real piece of software; the single gateway in the centre is where all inference passes, and everything is audited and traced.
+The meaning the viewer should sense: Off Grid Console is one control plane holding all five layers of the agentic stack, data at the base, consumption on top, a single gateway at the heart — everything governed and audited in one place, on the user's own machines.

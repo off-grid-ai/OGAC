@@ -1,31 +1,27 @@
-A precise technical software architecture diagram showing a request's lifecycle, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Components are rectangular boxes with thin black 1px borders, a bold monospace title and one small line of what they do. Arrows are thin solid black lines with arrowheads and a short monospace label naming the data/operation on each. A single emerald-green (#34D399) fill is used only for the central GATEWAY box and the main left-to-right request arrow. Monospace (Menlo / terminal) lettering, sharp and legible, grid-aligned. Title top in bold monospace: "OFF GRID CONSOLE — ONE GATEWAY, EVERY REQUEST GOVERNED".
+Charcoal drawing on plain white paper, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Hand-drawn, sketchy, loose charcoal strokes, no color, no shading beyond charcoal grey. Pure white background, no border. This illustration DOES use labels and arrows, hand-lettered in rough charcoal capitals, sparse and clear. Components are hand-sketched boxes with a hand-lettered name; connections are charcoal arrows with a short hand-lettered label. Title hand-lettered across the top: "OFF GRID CONSOLE — ONE GATEWAY, EVERY REQUEST GOVERNED".
 
-The main flow reads left to right along a bold emerald arrow labelled "EVERY PROMPT · EVERY RESPONSE". Boxes in order along the flow:
+The scene reads left to right along a single bold charcoal arrow labelled "EVERY PROMPT · EVERY RESPONSE".
 
-1. Far left: "CLIENT / AGENT — desktop node or use case" with an arrow right labelled "prompt (text / image)".
+FAR LEFT: a small figure at a desk labelled "CLIENT / AGENT — desktop node or use case", an arrow right labelled "PROMPT (TEXT / IMAGE)".
 
-2. "GATEWAY :7878 (emerald) — multimodal, MCP, the single egress" — the large central box all traffic enters. Inside or stacked just under it, a vertical pipeline of inline steps, each a small box with an arrow down the chain:
-   - "INPUT GUARDRAIL → PRESIDIO — detect / redact PII"  (arrow labelled "pii scan")
-   - "POLICY → OPA — allow / deny by user + purpose"      (arrow labelled "decision")
-   - "ROUTE → ROUTER — intent: KB / DB / TOOL"            (arrow labelled "intent")
-   - "RETRIEVE → BRAIN / LANCEDB — versioned knowledge"   (arrow labelled "top-k sources")
-   - "GENERATE → LOCAL MODEL (gemma) — on-device"         (arrow labelled "draft")
-   - "OUTPUT CHECK → GROUNDING — verify every citation"   (arrow labelled "citations")
+CENTRE: a large fortified clearing-house drawn with thick charcoal walls, one inbound door on the left and one outbound door on the right, labelled "GATEWAY :7878 — MULTIMODAL · MCP · THE SINGLE EGRESS". Inside, a vertical stack of inline inspection stations, each a small sketched shed with a hand-lettered label, connected top-to-bottom by short arrows:
+- "INPUT GUARDRAIL → PRESIDIO — DETECT / REDACT PII" (a figure holding a sieve)
+- "POLICY → OPA — ALLOW / DENY BY USER + PURPOSE" (a figure with a rulebook)
+- "ROUTE → ROUTER — INTENT: KB / DB / TOOL" (a signpost with three forks)
+- "RETRIEVE → BRAIN / LANCEDB — VERSIONED KNOWLEDGE" (a vault of numbered boxes)
+- "GENERATE → LOCAL MODEL (GEMMA) — ON-DEVICE"
+- "OUTPUT CHECK → GROUNDING — VERIFY EVERY CITATION" (a stamp coming down)
 
-3. Right of the gateway: "RESPONSE — answer + citations" box, with an arrow out to the right labelled "grounded answer" returning to a small "CLIENT / AGENT" box.
+RIGHT of the clearing-house: a box "RESPONSE — ANSWER + CITATIONS", arrow out labelled "GROUNDED ANSWER" returning to a small "CLIENT / AGENT" figure receiving a sealed envelope.
 
-4. A branch off ROUTE labelled "tool call" to a box "MODEL ROUTING — local default; cloud only if policy allows (leashed)", with a small red "EGRESS LEASH" tag.
+A branch off ROUTE labelled "TOOL CALL" to a box "MODEL ROUTING — LOCAL DEFAULT; CLOUD ONLY IF POLICY ALLOWS", with a small lever tag "EGRESS LEASH".
 
-ACROSS THE BOTTOM — the record, every step taps down into it:
-A wide box spanning the width labelled "AUDIT LOG (POSTGRES) — user · purpose · model · tokens · verdict · checks[]  (append-only, source of truth)". Thin downward arrows from each pipeline step into it labelled "log".
+ABOVE the clearing-house: a heavy lever on a high mount, cord running into the roof, labelled "KILL SWITCH — ONE PULL HALTS THE NODE".
 
-ALONG THE RIGHT EDGE — observability + provenance rail (vertical), with tap arrows from the gateway:
-- "OTEL → LANGFUSE v3 / JAEGER — traces, LLM cost"  (arrow "span")
-- "MARQUEZ — lineage: source → answer"               (arrow "run event")
-- "ed25519 SIGN — tamper-evident export"             (arrow "sign")
+ACROSS THE BOTTOM: a long unrolled charcoal scroll spanning the whole width labelled "AUDIT LOG (POSTGRES) — USER · PURPOSE · MODEL · TOKENS · VERDICT · CHECKS — APPEND-ONLY, SOURCE OF TRUTH". Thin arrows drop from each inspection station into the scroll labelled "LOG".
 
-TOP RIGHT — a heavy box "KILL SWITCH — one pull halts the node" with a cord drawn into the gateway.
+ALONG THE RIGHT EDGE: a vertical rail with tap arrows from the gateway — "OTEL → LANGFUSE / JAEGER — TRACES, COST", "MARQUEZ — LINEAGE: SOURCE → ANSWER", "ed25519 SIGN — TAMPER-EVIDENT EXPORT".
 
-Style notes: flat, sharp, engineering-blueprint feel, monospace labels, dense but legible. Emerald used ONLY for the gateway box and the main request arrow to show it is the single chokepoint. Every box is a real named component (Presidio, OPA, Router, LanceDB, gemma, Grounding, Postgres, Langfuse, Marquez). Keep labels short.
+Style: rough charcoal throughout, expressive but readable; labels hand-lettered in loose charcoal capitals, kept sparse. The bold left-to-right arrow through the clearing-house and the long bottom scroll frame the whole scene. Every box is a real, named piece of software (Presidio, OPA, Router, LanceDB, gemma, Grounding, Postgres, Langfuse, Marquez).
 
-The meaning the viewer should sense: one gateway sits between every client and every model; each request is scanned for PII, checked against policy, routed, answered from versioned knowledge, citation-verified, and written to one append-only audit log, with traces, lineage and signatures captured on the side, all on-device and all stoppable with one switch.
+The meaning the viewer should sense: one gateway sits between every client and every model; each request is scanned for PII, checked against policy, routed, answered from versioned knowledge, citation-verified, and written to one append-only audit log — traces, lineage and signatures captured on the side, all on-device and all stoppable with one switch.

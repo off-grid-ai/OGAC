@@ -25,7 +25,13 @@ export const openApiSpec = {
     description:
       'The node↔console contract for the common control plane. Nodes enroll, pull policy, ' +
       'push audit, and poll commands; admins issue tokens, push policy, trigger the kill ' +
-      'switch, and read the fleet audit. On-prem, local-first.',
+      'switch, and read the fleet audit. On-prem, local-first.\n\n' +
+      '📖 **[Open the Handbook](/handbook)** — concepts, integration guides, operations, ' +
+      'and runbooks for the whole platform.',
+  },
+  externalDocs: {
+    description: 'Handbook — concepts, integrations, operations & runbooks',
+    url: '/handbook',
   },
   servers: [{ url: '/', description: 'This deployment' }],
   tags: [
