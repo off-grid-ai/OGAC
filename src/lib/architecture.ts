@@ -323,7 +323,7 @@ export const STAGES: JourneyStage[] = [
     reality:
       'Durable, multi-step agent workflows that survive a crash and resume. Majority-machine, minority-human — humans only on the edges that matter.',
     console:
-      'The agent-runtime port swaps to Temporal for durable execution; lineage (Marquez) and traces (Langfuse/OTLP) make every autonomous step replayable and explainable.',
+      'The agent-runtime port swaps to Temporal for durable execution; lineage (Marquez) and traces (Langfuse/OTLP) make every autonomous step replayable and explainable. Agent-authored code runs in an isolated, network-disabled sandbox, and every export is tamper-evident — signed (ed25519/C2PA) and Sigstore-attestable.',
   },
   {
     n: '5',
