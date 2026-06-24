@@ -1,0 +1,27 @@
+A precise technical software architecture diagram of a plugin / adapter system, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Boxes have thin black 1px borders, bold monospace titles, one small line of detail. Arrows are thin solid black lines with arrowheads. A single emerald-green (#34D399) fill is used only for the central console core and for the active default adapter in each row. Monospace (Menlo / terminal) lettering, sharp, grid-aligned. Title top in bold monospace: "OFF GRID CONSOLE — CAPABILITY PORTS, SWAPPABLE ADAPTERS".
+
+LEFT SIDE: a tall emerald box "OFF GRID CONSOLE CORE — calls getX() ports, never a tool directly". From it, a vertical stack of small labelled sockets (ports), each a notch on the right edge of the core, labelled with the capability name. Caption under the core: "swap = one env var  OFFGRID_ADAPTER_<CAP>".
+
+For each port, a horizontal row to the right: the port name, then an arrow labelled "active" pointing to the DEFAULT adapter box (emerald outline), then a lighter arrow labelled "or swap" to one or two alternative adapter boxes (black outline). Rows top to bottom:
+
+- PORT "inference"   → default "OFF GRID GATEWAY (always)"        (no swap — note "single egress")
+- PORT "retrieval"   → default "LANCEDB"        or "PGVECTOR" / "QDRANT"
+- PORT "guardrails"  → default "REGEX CHECKS"   or "MICROSOFT PRESIDIO"
+- PORT "policy"      → default "RBAC + ABAC"    or "OPEN POLICY AGENT (OPA)"
+- PORT "identity"    → default "AUTH.JS"        or "KEYCLOAK (OIDC)"
+- PORT "secrets"     → default "PROCESS ENV"    or "OPENBAO"
+- PORT "observability"→ default "OTEL"          or "LANGFUSE v3" / "SIGNOZ"
+- PORT "lineage"     → default "NONE (implicit)" or "MARQUEZ (OpenLineage)"
+- PORT "agent-runtime"→ default "IN-PROCESS"    or "TEMPORAL (durable)"
+- PORT "caching"     → default "IN-PROCESS"     or "REDIS"
+- PORT "siem"        → default "AUDIT STORE"    or "OPENSEARCH"
+- PORT "flags"       → default "ENV FLAGS"      or "UNLEASH"
+- PORT "provenance"  → default "HMAC"           or "ed25519" / "C2PA"
+
+Mark the in-path ports (guardrails, policy, lineage, agent-runtime, retrieval, secrets, caching, provenance, observability) with a small tag "IN-PATH — performs the work". Mark embed-style ones (siem dashboards, flags UI, bi) with a small tag "EMBED — SSO'd UI".
+
+BOTTOM CAPTION BAR spanning the width: "FALLBACK: if an OSS adapter is unreachable, the port reverts to the first-party default — a swap is never a hard dependency."
+
+Style notes: flat, sharp, like an engineering port/adapter map, monospace labels, dense but legible. Emerald used ONLY for the console core and the active default adapter in each row, so the eye reads 'default is first-party; OSS is the swap-in'. Every adapter is a real named tool. Keep labels short.
+
+The meaning the viewer should sense: the console depends on capability ports, not on any single tool; each capability ships a first-party default and one or two real OSS swap-ins selectable by a single environment variable; in-path adapters actually do the work, and the console always falls back to its own default if the OSS is down.

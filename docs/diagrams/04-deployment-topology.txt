@@ -1,0 +1,30 @@
+A precise technical deployment / container topology diagram, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Clean flat vector style, NOT hand-drawn. Pure white background, no border. Each service is a rectangular box with a thin black 1px border, a bold monospace name and a small monospace port number. Related services are enclosed in labelled dashed-border groups (the compose profiles). Arrows are thin solid black lines with arrowheads and short monospace labels. A single emerald-green (#34D399) fill is used only for the three core boxes (Console, Gateway, Postgres). Monospace (Menlo / terminal) lettering, sharp, grid-aligned. Title top in bold monospace: "OFF GRID CONSOLE — BUNDLED STACK (docker compose profiles = capabilities)".
+
+CENTRE — three emerald core boxes grouped in a solid box labelled "REQUIRED CORE":
+- "OFF GRID CONSOLE — Next.js, :3000"
+- "AI GATEWAY — :7878 (separate process)"
+- "POSTGRES — state + audit"
+The console has arrows to the gateway labelled "inference" and to Postgres labelled "state + audit".
+
+AROUND THE CORE — dashed-border groups, each labelled with its profile name, each containing its real containers with ports. Arrange them orbiting the core, each group connected to the Console with one labelled arrow:
+
+- Group "data" → boxes "SEAWEEDFS :8333 (object store)", "QDRANT :6333 (vectors, opt)"; arrow "datasets"
+- Group "secrets" → "OPENBAO :8200"; arrow "get secrets"
+- Group "guardrails" → "PRESIDIO-ANALYZER :5002", "PRESIDIO-ANONYMIZER :5001"; arrow "pii scan"
+- Group "policy" → "OPA :8181"; arrow "allow/deny"
+- Group "identity" → "KEYCLOAK :8080"; arrow "OIDC login"
+- Group "observability" → "OTEL-COLLECTOR :4318", "VICTORIAMETRICS :8428", "VICTORIALOGS", "JAEGER :16686"; arrow "OTLP spans"
+- Group "lineage" → "MARQUEZ :9000", "MARQUEZ-WEB :3001"; arrow "OpenLineage"
+- Group "llmops" → "LANGFUSE v3 :3030", "LANGFUSE-WORKER", "CLICKHOUSE", "MINIO", "REDIS"; arrow "LLM traces" (small note on the group: "5 containers")
+- Group "agents" → "TEMPORAL :7233", "TEMPORAL-UI :8081"; arrow "durable runs"
+- Group "caching" → "REDIS :6379"; arrow "cache"
+- Group "siem" → "OPENSEARCH :9200", "OPENSEARCH-DASHBOARDS :5601"; arrow "ship logs"
+- Group "flags" → "UNLEASH :4242"; arrow "flags"
+- Group "bi" → "SUPERSET :8088"; arrow "explore data"
+- Embedded (no container, inside the Console box as a small tag): "LANCEDB — on-disk vectors"
+
+BOTTOM CAPTION BAR spanning the width: "Each group is one compose profile. Run only what you license:  make up (all) · make policy · make guardrails · make llmops …  The three emerald core boxes are the only hard requirements."
+
+Style notes: flat, sharp, like a real container/deployment map, monospace labels with port numbers, dashed boxes for profile groups, dense but legible. Emerald only on the three required-core boxes so the reader sees what is mandatory vs optional. Every box is a real container with its real port. Keep labels short.
+
+The meaning the viewer should sense: this is exactly what is bundled, grouped by compose profile that maps one-to-one to a capability; only the console, the gateway and Postgres are required; everything else (Presidio, OPA, Keycloak, OpenBao, Marquez, Langfuse, Temporal, OpenSearch, Redis, Unleash, Superset) is an optional profile you bring up only if you use it.
