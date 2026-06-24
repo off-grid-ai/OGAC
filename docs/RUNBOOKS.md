@@ -21,7 +21,27 @@ and `HOWTO.md` (feature how-tos).
    - **Langfuse / Marquez / Temporal:** allow ~60s for DB migrations on first boot.
 6. Copy `deploy/.env.example` → `../.env.local`, set the adapter URLs + `OFFGRID_ADAPTER_<CAP>`.
 7. `npx drizzle-kit push && npx tsx src/db/seed.ts` (first run), then start the console.
-8. **Verify:** open **Admin → Integrations · adapters** — each licensed capability shows `healthy`.
+8. **Verify:** `cd deploy && make verify` (expect 11/11), or open **Admin → Integrations · adapters**.
+
+### Teardown → restart (deterministic)
+
+`make down` stops everything but **keeps the named volumes**, so Postgres audit data, ClickHouse,
+MinIO and OpenSearch all persist. Two services rebuild their own runtime state on boot, so no
+manual setup step is needed:
+
+- **Keycloak** re-imports `deploy/keycloak/offgrid-realm.json` (`--import-realm`) → realm, client
+  (fixed dev secret) and test user are back automatically.
+- **Langfuse v3** re-runs its headless init → project + fixed key pair are back automatically.
+
+So the full deterministic cycle is just:
+
+```bash
+cd deploy && make down            # stop; volumes (and audit history) survive
+cd deploy && make up && make verify   # back up, realm + Langfuse keys auto-restore, 11/11
+```
+
+The gateway (`:7878`) is a separate first-party process — start it independently; `make down`
+does not touch it.
 
 ---
 
