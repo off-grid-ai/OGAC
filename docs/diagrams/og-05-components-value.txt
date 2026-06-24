@@ -1,0 +1,19 @@
+Charcoal drawing on plain white paper, landscape orientation, aspect ratio 1024:572 (wide, roughly 16:9). Hand-drawn, sketchy, loose charcoal strokes, no color, no shading beyond charcoal grey. Pure white background, no border. This illustration DOES use labels and arrows, hand-lettered in rough charcoal capitals, sparse and clear. Each component is a hand-sketched box with its name hand-lettered inside, and a small hand-lettered VALUE TAG beneath it (a short phrase of what it buys you). Title hand-lettered across the top: "OFF GRID CONSOLE — WHAT EACH PART DOES & THE VALUE IT BRINGS".
+
+Layout: five stacked horizontal BANDS, each a hand-drawn dashed lane labelled at its left edge with the layer name. A single heavier vertical charcoal arrow (the SPINE) runs top-to-bottom through all bands, hand-lettered "EVERY REQUEST PASSES THROUGH ONE GATEWAY". Inside each band, a row of 3–4 component boxes, each with a value tag under it.
+
+BAND 1 — "DATA": boxes "SEAWEEDFS / OBJECT STORE" (tag "your files, your infra"), "INGEST + PII MASKING" (tag "AI-ready, de-identified"), "POSTGRES — AUDIT LOG" (tag "the system of record").
+
+BAND 2 — "AI": boxes "BRAIN / RAG (LANCEDB·QDRANT)" (tag "answers from YOUR knowledge"), "RETRIEVAL ROUTER" (tag "right source per query"), "GROUNDING / CITATIONS" (tag "catches hallucination"), "CACHE (REDIS)" (tag "cuts cost + latency").
+
+BAND 3 — "CONTROL": boxes "AI GATEWAY :7878" (drawn heaviest, tag "single egress + KILL SWITCH"), "GUARDRAILS / PRESIDIO" (tag "stops PII leak + injection"), "POLICY RBAC+ABAC / OPA" (tag "who can do what"), "IDENTITY / KEYCLOAK" (tag "enterprise SSO"), "AUDIT / OPENSEARCH" (tag "forensics").
+
+BAND 4 — "AGENT QA & TRUST": boxes "EVALS (GOLDEN·PROMPTFOO·RAGAS)" (tag "regression-test agents"), "DRIFT (PSI·EVIDENTLY)" (tag "catch quality decay"), "ONLINE SCORING → LANGFUSE" (tag "QA on live traffic"), "PROVENANCE (ed25519·C2PA·SIGSTORE)" (tag "tamper-evident outputs"), "SANDBOX (DOCKER)" (tag "run agent code safely").
+
+BAND 5 — "REGULATORY + CONSUMPTION": boxes "REPORT PACKS (IRDAI·RBI·SEBI·DPDP)" (tag "pass the audit"), "FINOPS + VIRTUAL KEYS" (tag "cost control + chargeback"), "CONSOLE / FLEET / ANALYTICS" (tag "one pane of glass").
+
+A hand-lettered caption bar across the bottom: "EVERY BOX IS REPLACEABLE OSS BEHIND ONE PORT — ALL SELF-HOSTED, NO PER-TOKEN FEES, NO API KEYS, NO LOCK-IN."
+
+Style: rough charcoal throughout, expressive but readable; labels and value tags hand-lettered in loose charcoal capitals, kept sparse. The AI GATEWAY box in the CONTROL band is drawn heaviest because everything funnels through it. Each component is a real, named tool with a one-line value.
+
+The meaning the viewer should sense: this is the whole agentic stack on one page — every layer, every component, and the concrete value each brings — unified under one console, all open source, owned and run by you.
