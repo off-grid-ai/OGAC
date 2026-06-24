@@ -3,6 +3,8 @@ import {
   BookOpen,
   Stack as Boxes,
   Brain,
+  ChartLineUp,
+  Code,
   Lock,
   ShareNetwork as Network,
   Scroll as ScrollText,
@@ -122,10 +124,22 @@ function Nav() {
             Off Grid Console
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/journey">
+              <ChartLineUp className="size-4" />
+              <span className="hidden sm:inline">Journey</span>
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/handbook">
+              <BookOpen className="size-4" />
+              <span className="hidden sm:inline">Handbook</span>
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="sm">
             <a href="/docs" target="_blank" rel="noopener noreferrer">
-              <BookOpen className="size-4" />
+              <Code className="size-4" />
               <span className="hidden sm:inline">API docs</span>
             </a>
           </Button>
