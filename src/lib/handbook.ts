@@ -37,6 +37,12 @@ export const HANDBOOK: HandbookDoc[] = [
     file: 'CATALOG.md',
   },
   {
+    slug: 'agent-qa',
+    title: 'Agent QA — evals, scoring & drift',
+    blurb: 'Automated QA for agents: offline evals, online Langfuse scoring, drift/degradation.',
+    file: 'AGENT_QA.md',
+  },
+  {
     slug: 'operations',
     title: 'Operations runbook',
     blurb: 'Every integration: how it works, how to operate, verify, swap.',
