@@ -74,6 +74,42 @@ else
   [ "$STATUS" = 200 ] \
     && ok "POST /admin/retrieve → routed hits" \
     || bad "POST /admin/retrieve" "status=$STATUS body=$BODY"
+
+  # C2PA — sign a PNG then verify the embedded Content Credentials round-trip.
+  PNG='iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGklEQVR4nGMwuTzzPyWYYdSAUQNGDRguBgAAOF6fH/u2UhwAAAAASUVORK5CYII='
+  api POST /api/v1/admin/provenance/c2pa "{\"image\":\"$PNG\",\"mimeType\":\"image/png\",\"title\":\"itest\"}"
+  signed="$(echo "$BODY" | grep -o '"image":"[^"]*"' | sed 's/"image":"//;s/"//')"
+  if [ "$STATUS" = 201 ] && [ -n "$signed" ]; then
+    api POST /api/v1/admin/provenance/c2pa "{\"image\":\"$signed\",\"mimeType\":\"image/png\",\"action\":\"verify\"}"
+    echo "$BODY" | grep -q '"valid":true' \
+      && ok "C2PA sign→verify image Content Credentials (valid)" \
+      || bad "C2PA verify" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+  else
+    bad "C2PA sign" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+  fi
+
+  # Report export provenance — fetch the detached manifest, then verify its signature.
+  api GET '/api/v1/admin/reports/audit-summary/export?manifest=1'
+  if [ "$STATUS" = 200 ] && echo "$BODY" | grep -q '"signature"'; then
+    api POST /api/v1/admin/provenance/verify "{\"manifest\":$BODY}"
+    echo "$BODY" | grep -q '"signatureValid":true' \
+      && ok "Report export → ed25519 manifest signs + verifies" \
+      || bad "Report manifest verify" "body=$(echo "$BODY" | head -c 120)"
+  else
+    bad "Report export manifest" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+  fi
+
+  # Sigstore — verification is standalone; a garbage bundle must be rejected (graceful, not 500).
+  api POST /api/v1/admin/provenance/sigstore '{"action":"verify","bundle":{"not":"a bundle"}}'
+  echo "$BODY" | grep -q '"valid":false' \
+    && ok "Sigstore verify rejects an invalid bundle (graceful)" \
+    || bad "Sigstore verify" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+
+  # Sandbox — the agent-code-exec flag is OFF by default, so execution must be refused (403).
+  api POST /api/v1/admin/sandbox/run '{"language":"python","code":"print(1)"}'
+  [ "$STATUS" = 403 ] \
+    && ok "Sandbox run gated by agent-code-exec flag (403 when off)" \
+    || bad "Sandbox gate" "expected 403, status=$STATUS body=$(echo "$BODY" | head -c 120)"
 fi
 
 # ── 2. OSS SERVICE APIs ─────────────────────────────────────────────────────────
