@@ -4,12 +4,12 @@ Four diagrams that show the real Off Grid Console system — actual components, 
 how they connect. Rendered with Gemini "Nano Banana Pro" (Gemini 3 Pro Image), the same image
 pipeline the proposal generator uses.
 
-| # | Prompt | What it shows |
-|---|--------|---------------|
-| 1 | `01-five-planes.txt` | The five-plane agentic stack (Data / Control / AI / Regulatory / Consumption) with the console as the spine and the real component in each lane |
-| 2 | `02-request-lifecycle.txt` | One request through the single gateway: PII scan → policy → route → retrieve → generate → citation check, all logged + traced |
-| 3 | `03-capability-ports.txt` | Capability ports + swappable adapters (first-party default ⟷ OSS swap-in, one env var) |
-| 4 | `04-deployment-topology.txt` | The bundled containers grouped by compose profile; only Console + Gateway + Postgres are required |
+| #   | Prompt                       | What it shows                                                                                                                                   |
+| --- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `01-five-planes.txt`         | The five-plane agentic stack (Data / Control / AI / Regulatory / Consumption) with the console as the spine and the real component in each lane |
+| 2   | `02-request-lifecycle.txt`   | One request through the single gateway: PII scan → policy → route → retrieve → generate → citation check, all logged + traced                   |
+| 3   | `03-capability-ports.txt`    | Capability ports + swappable adapters (first-party default ⟷ OSS swap-in, one env var)                                                          |
+| 4   | `04-deployment-topology.txt` | The bundled containers grouped by compose profile; only Console + Gateway + Postgres are required                                               |
 
 ## Generate
 

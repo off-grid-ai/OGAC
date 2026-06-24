@@ -274,3 +274,63 @@ export const ARCH: ArchPhase[] = [
 export function getPhase(id: string): ArchPhase | undefined {
   return ARCH.find((p) => p.id === id);
 }
+
+// The maturity journey a CIO actually lives through — from ungoverned consumer AI to a
+// self-serve platform. Each stage earns the next; you can't skip. Drives /journey.
+export interface JourneyStage {
+  n: string;
+  name: string;
+  reality: string; // where the org is at this stage, in the CIO's terms
+  console: string; // what Off Grid Console gives you to reach / hold this stage
+}
+
+export const STAGES: JourneyStage[] = [
+  {
+    n: '0',
+    name: 'Shadow AI',
+    reality:
+      'Staff paste company data into consumer chatbots. No gateway, no policy, no line item. You have zero visibility into what leaves the building or what it costs.',
+    console:
+      'The starting point, not a destination. The console exists to end it — give people sanctioned AI before they route around you.',
+  },
+  {
+    n: '1',
+    name: 'Sanctioned access',
+    reality:
+      'One gateway. Every model call routes through it, keyed per user and team, under one AI-use policy. Shadow AI stops because the sanctioned path is easier.',
+    console:
+      'The single Off Grid AI Gateway is the chokepoint: PII scanned in, policy enforced, every request logged to an append-only audit. Issue virtual keys with budgets in minutes.',
+  },
+  {
+    n: '2',
+    name: 'First production use case',
+    reality:
+      'One narrow agent, one team, heavy human-in-the-loop, real evaluation from day one. You prove value and learn what a single agent actually costs.',
+    console:
+      'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) run on the gateway with grounded retrieval, citation checks, and a golden-set eval — feedback wired in from the first request.',
+  },
+  {
+    n: '3',
+    name: 'Multiple agents, shared platform',
+    reality:
+      'The platform consolidates. New agents ship in weeks, not months, because they inherit the same knowledge base, tools, and policy. An ops dashboard shows the fleet.',
+    console:
+      'Capability ports + the Brain (versioned knowledge), shared tool registry, RBAC/ABAC, and Fleet/Analytics mean a new agent reuses everything that already passed production.',
+  },
+  {
+    n: '4',
+    name: 'Autonomous workflows',
+    reality:
+      'Durable, multi-step agent workflows that survive a crash and resume. Majority-machine, minority-human — humans only on the edges that matter.',
+    console:
+      'The agent-runtime port swaps to Temporal for durable execution; lineage (Marquez) and traces (Langfuse/OTLP) make every autonomous step replayable and explainable.',
+  },
+  {
+    n: '5',
+    name: 'Org-wide platform',
+    reality:
+      'Idea to product in days, with no platform team in the loop. Model risk is a board-level line item. Teams spin up new use cases self-serve, inside the guardrails.',
+    console:
+      'Multi-tenant provisioning, the governance registry, and IRDAI/RBI/SEBI/DPDP report packs turn the platform into something a regulator and a board can both sign off on.',
+  },
+];

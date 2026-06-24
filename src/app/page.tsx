@@ -260,6 +260,13 @@ export default function LandingPage() {
             The reference architecture for a production AI estate — and exactly how Off Grid maps
             onto it.
           </p>
+          <Link
+            href="/journey"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            See the six-stage journey, from Shadow AI to a self-serve platform
+            <ArrowRight className="size-4" />
+          </Link>
           <BlurFade inView>
             <div className="relative mt-8 overflow-hidden rounded-xl border border-border bg-[#ffffff] p-3 shadow-sm">
               <Image
