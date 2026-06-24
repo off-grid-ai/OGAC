@@ -233,8 +233,8 @@ export const PROVENANCE: RegEntry[] = [
       vendor: 'Sigstore',
       license: 'Apache-2.0',
       render: 'headless',
-      status: 'planned',
-      description: 'Keyless signing / attestation of artifacts and exports. Planned.',
+      description:
+        'Keyless signing / attestation of artifacts & exports via /admin/provenance/sigstore (sigstore-js). Public-good Fulcio/Rekor (free, no key) or self-hosted via OFFGRID_FULCIO_URL/_REKOR_URL. Signing needs an OIDC identity token; verification is standalone.',
     },
   },
   {
