@@ -7,18 +7,14 @@ const { auth } = NextAuth(authConfig);
 // Node endpoints authenticate with device/enrollment tokens, not user SSO — left public here.
 const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/;
 
+// Marketing, docs, and auth surfaces that never require an SSO session.
+const PUBLIC_EXACT = ['/', '/docs', '/openapi.json'];
+const PUBLIC_PREFIX = ['/architecture', '/journey', '/handbook', '/signin', '/api/auth'];
+
 function isPublic(pathname: string): boolean {
-  return (
-    pathname === '/' ||
-    pathname.startsWith('/architecture') ||
-    pathname.startsWith('/journey') ||
-    pathname.startsWith('/handbook') ||
-    pathname.startsWith('/signin') ||
-    pathname.startsWith('/api/auth') ||
-    pathname === '/docs' ||
-    pathname === '/openapi.json' ||
-    NODE_API.test(pathname)
-  );
+  if (PUBLIC_EXACT.includes(pathname)) return true;
+  if (PUBLIC_PREFIX.some((p) => pathname.startsWith(p))) return true;
+  return NODE_API.test(pathname);
 }
 
 // User/admin surface (console UI + admin/audit APIs) requires an SSO session.
