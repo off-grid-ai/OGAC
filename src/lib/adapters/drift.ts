@@ -127,7 +127,9 @@ export const evidentlyDrift: DriftPort = {
     license: 'Apache-2.0',
     render: 'headless',
     embedUrl: EVIDENTLY_URL,
-    description: 'Data / embedding / output drift test suites + degradation monitoring.',
+    status: 'planned',
+    description:
+      'Data / embedding / output drift test suites + degradation monitoring. Configure-to-activate: point OFFGRID_EVIDENTLY_URL at a running Evidently collector (first-party PSI drift is live by default).',
   },
   async analyze() {
     const scores = await scoreHistory();
