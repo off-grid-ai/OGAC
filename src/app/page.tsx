@@ -5,10 +5,12 @@ import {
   Brain,
   ChartLineUp,
   Code,
+  Cube,
   Gauge,
   Lock,
   ShareNetwork as Network,
   Scroll as ScrollText,
+  SealCheck,
   ShieldCheck,
   TrendUp as TrendingUp,
 } from '@phosphor-icons/react/dist/ssr';
@@ -116,6 +118,16 @@ const VALUE = [
     title: 'Agent QA',
     body: 'Know the agents still work. Offline evals, online LLM-as-judge scoring on live traffic, and drift + degradation detection — one surface that answers “are the agents still doing a good job, and if not, which one regressed and when?”',
   },
+  {
+    icon: SealCheck,
+    title: 'Provenance & tamper-evidence',
+    body: 'Every report export carries a signed, offline-verifiable manifest (ed25519); images get C2PA Content Credentials; artifacts can be Sigstore-attested. Prove what was produced, by whom, unaltered — with only a public key.',
+  },
+  {
+    icon: Cube,
+    title: 'Safe code execution',
+    body: 'When an agent needs to run code, it runs in an ephemeral, network-isolated, resource-capped sandbox — off by default, gated by policy. Free and self-hosted; no third-party execution service.',
+  },
 ];
 
 const ALL_TOOLS = INTEGRATIONS.flatMap((l) => l.tools);
@@ -218,7 +230,7 @@ export default function LandingPage() {
             From the field force to the DPO — democratize your organization’s intelligence to every
             person and device, on one private control plane.
           </p>
-          <div className="mt-8 flex snap-x gap-4 overflow-x-auto pb-3 [&>*]:w-[80vw] [&>*]:max-w-xs [&>*]:shrink-0 [&>*]:snap-start md:grid md:grid-cols-2 md:overflow-visible md:pb-0 md:[&>*]:w-auto md:[&>*]:max-w-none lg:grid-cols-4">
+          <div className="mt-8 flex snap-x gap-4 overflow-x-auto pb-3 [&>*]:w-[80vw] [&>*]:max-w-xs [&>*]:shrink-0 [&>*]:snap-start md:grid md:grid-cols-2 md:overflow-visible md:pb-0 md:[&>*]:w-auto md:[&>*]:max-w-none lg:grid-cols-3">
             {VALUE.map((v, i) => (
               <BlurFade key={v.title} delay={0.06 * i} inView>
                 <MagicCard

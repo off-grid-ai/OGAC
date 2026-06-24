@@ -15,7 +15,10 @@ For each socket, a horizontal row to the right: a charcoal arrow labelled "ACTIV
 - "CACHING"       → "IN-PROCESS"     or "REDIS"
 - "SIEM"          → "AUDIT STORE"    or "OPENSEARCH"
 - "FLAGS"         → "ENV FLAGS"      or "UNLEASH"
-- "PROVENANCE"    → "HMAC"           or "ed25519 · C2PA"
+- "EVALS"         → "GOLDEN SET"     or "PROMPTFOO · RAGAS"
+- "DRIFT"         → "PSI (NATIVE)"   or "EVIDENTLY"
+- "PROVENANCE"    → "ed25519 / HMAC" or "C2PA · SIGSTORE"
+- "SANDBOX"       → "NONE (NO-EXEC)" or "DOCKER · E2B"
 
 A hand-lettered caption bar across the bottom: "FALLBACK — IF AN OSS ADAPTER IS UNREACHABLE, THE PORT REVERTS TO THE FIRST-PARTY DEFAULT. A SWAP IS NEVER A HARD DEPENDENCY."
 

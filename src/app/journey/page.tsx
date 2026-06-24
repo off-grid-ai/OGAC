@@ -69,8 +69,8 @@ const GUARANTEES: Guarantee[] = [
   },
   {
     icon: Scroll,
-    title: 'Auditable',
-    body: 'Every model call, tool call, and byte of egress on one append-only record.',
+    title: 'Auditable & provable',
+    body: 'Every model/tool call + byte of egress on one append-only record — and every export is tamper-evident, signed and offline-verifiable.',
   },
   {
     icon: ShieldCheck,
