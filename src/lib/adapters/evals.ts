@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
+import { searchDocuments } from '@/lib/brain';
 import { listGoldenCases, runEval } from '@/lib/evals';
 import type { EvalRunResult, EvalsPort } from './types';
 
@@ -127,17 +128,64 @@ interface RagasResponse {
   metrics?: Record<string, number>;
 }
 
-async function runRagas(): Promise<EvalRunResult> {
+interface RagasSample {
+  question: string;
+  answer: string;
+  contexts: string[];
+  ground_truth: string;
+}
+
+// Generate an answer for one query, grounded in the retrieved contexts, through the gateway.
+async function generateAnswer(question: string, contexts: string[]): Promise<string> {
+  const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
+  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: EVAL_MODEL,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: 'Answer only from the provided context. Be concise.' },
+        { role: 'user', content: `CONTEXT:\n${ctx}\n\nQUESTION: ${question}` },
+      ],
+      chat_template_kwargs: { enable_thinking: false },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error('gateway answer generation failed');
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  return data.choices?.[0]?.message?.content ?? '';
+}
+
+// Build the RAG eval dataset the console owns (Brain for contexts, gateway for answers, the golden
+// `expected` as ground truth), then let the sidecar score it with Ragas.
+async function buildDataset(): Promise<RagasSample[]> {
   const cases = await listGoldenCases();
+  const samples: RagasSample[] = [];
+  for (const c of cases) {
+    const hits = await searchDocuments(c.query, 3);
+    const contexts = hits.map((h) => h.text);
+    samples.push({
+      question: c.query,
+      answer: await generateAnswer(c.query, contexts),
+      contexts,
+      ground_truth: c.expected,
+    });
+  }
+  return samples;
+}
+
+async function runRagas(): Promise<EvalRunResult> {
+  const dataset = await buildDataset();
   const res = await fetch(`${RAGAS_URL}/evaluate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, cases }),
-    signal: AbortSignal.timeout(120_000),
+    body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, dataset }),
+    signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) throw new Error('ragas sidecar error');
   const data = (await res.json()) as RagasResponse;
-  const total = data.total ?? cases.length;
+  const total = data.total ?? dataset.length;
   const passed = data.passed ?? 0;
   const faithfulness = data.metrics?.faithfulness;
   return {
@@ -164,9 +212,8 @@ export const ragasEvals: EvalsPort = {
     license: 'Apache-2.0',
     render: 'headless',
     embedUrl: RAGAS_URL,
-    status: 'planned',
     description:
-      'RAG metrics — faithfulness, context precision/recall, answer relevancy. Configure-to-activate: point OFFGRID_RAGAS_URL at a Ragas/DeepEval sidecar (golden + promptfoo run today).',
+      'RAG metrics — faithfulness, answer relevancy, context recall. Runs the bundled Ragas sidecar (compose `qa` profile) with the gateway as judge + embeddings; falls back to golden.',
   },
   async run() {
     if (!RAGAS_URL) return goldenEvals.run();

@@ -1,0 +1,5 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+ragas==0.2.6
+langchain-openai==0.2.10
+datasets==3.1.0

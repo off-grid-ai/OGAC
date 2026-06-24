@@ -129,6 +129,51 @@ these (first-party defaults); each is an opt-in swap. All permissive-licensed �
   Metabase is AGPL → embed-only). First run: `docker compose exec superset superset init`.
 - **When:** analysts need to explore/transpose data. **Configure:** `OFFGRID_SUPERSET_URL`. Tier-3 embed.
 
+## Agent QA — evals, scoring & drift
+
+The capability that answers "are the agents still doing a good job?" Full reference:
+**[Agent QA handbook](/handbook/agent-qa)**. Three lanes, each a swappable port (first-party default +
+OSS swap-in, graceful fallback).
+
+### Off Grid golden set · first-party · always on
+
+- **What/why:** offline eval — `query → expected source` scored as recall over the Brain. The
+  zero-OSS default for the evals lane. **When:** baseline regression check. **Configure:** none;
+  edit cases in the console. Run: `POST /api/v1/admin/evals/run`.
+
+### promptfoo · MIT · CLI (no container)
+
+- **What/why:** offline eval — assertion matrix across prompts/providers, run against the gateway.
+- **When:** CI regression gating. **Configure:** `OFFGRID_ADAPTER_EVALS=promptfoo` + the `promptfoo`
+  binary on PATH (or `OFFGRID_PROMPTFOO_BIN`). Falls back to golden.
+
+### Ragas + DeepEval (sidecar) · `:8002` · Apache-2.0 · profile `qa`
+
+- **What/why:** offline RAG metrics — faithfulness, answer relevancy, context recall. Bundled Python
+  sidecar that runs Ragas through the on-device gateway (judge + embeddings); the console assembles
+  the dataset (Brain contexts + gateway answers + golden ground-truth).
+- **When:** measure grounding quality of a RAG agent. **Configure:** `OFFGRID_ADAPTER_EVALS=ragas` +
+  `OFFGRID_RAGAS_URL`. `make qa`. Falls back to golden if the model/sidecar is unavailable.
+
+### Langfuse online scoring · MIT · profile `llmops`
+
+- **What/why:** online eval — LLM-as-judge (via the gateway) scores live interactions for quality +
+  faithfulness and writes them to Langfuse, where the trend over time is the degradation signal.
+- **When:** continuous QA on production traffic. **Configure:** `OFFGRID_LANGFUSE_URL` +
+  `OFFGRID_LANGFUSE_AUTH`; gated by the `online-evals` flag. `POST /api/v1/admin/qa/score`.
+
+### Off Grid drift (PSI) · first-party · always on
+
+- **What/why:** drift/degradation — Population Stability Index + mean-drop over the eval-score
+  history. The zero-OSS default for the drift lane. **When:** spot regressions without extra infra.
+  **Configure:** none. `GET /api/v1/admin/qa/drift`.
+
+### Evidently (sidecar) · `:8001` · Apache-2.0 · profile `qa`
+
+- **What/why:** drift — real Evidently `DataDriftPreset` over baseline vs current eval-score windows.
+  Bundled Python sidecar. **When:** report-grade drift test suites. **Configure:**
+  `OFFGRID_ADAPTER_DRIFT=evidently` + `OFFGRID_EVIDENTLY_URL`. `make qa`. Falls back to first-party PSI.
+
 ---
 
 ## At a glance
@@ -148,3 +193,6 @@ these (first-party defaults); each is an opt-in swap. All permissive-licensed �
 | flags               | env                   | Unleash                                  | flags                  |
 | bi                  | —                     | Superset (· Metabase embed)              | bi                     |
 | agents (durability) | in-process            | Temporal                                 | agents                 |
+| evals               | golden set            | promptfoo · Ragas (sidecar)              | qa                     |
+| drift               | PSI (first-party)     | Evidently (sidecar)                      | qa                     |
+| online scoring      | LLM-as-judge → Langfuse | —                                      | llmops                 |
