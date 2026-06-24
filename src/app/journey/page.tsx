@@ -30,6 +30,12 @@ interface Diagram {
 
 const DIAGRAMS: Diagram[] = [
   {
+    img: 'og-05-components-value',
+    badge: 'Every component, one page',
+    title: 'What each part does — and the value it brings',
+    body: 'The whole agentic stack on a single page: every component across all five layers, each with the concrete value it delivers, funnelled through one gateway. Every box is replaceable open source behind a port — self-hosted, no per-token fees, no API keys, no lock-in.',
+  },
+  {
     img: 'og-01-five-planes',
     badge: 'The whole system',
     title: 'One control plane, five layers',
