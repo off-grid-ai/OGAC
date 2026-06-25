@@ -43,6 +43,12 @@ export const HANDBOOK: HandbookDoc[] = [
     file: 'AGENT_QA.md',
   },
   {
+    slug: 'fleet-control',
+    title: 'Fleet Control — devices + intelligence',
+    blurb: 'Baseline device fleet (FleetDM/osquery) + the Off Grid field-force intelligence layer.',
+    file: 'FLEET_CONTROL.md',
+  },
+  {
     slug: 'operations',
     title: 'Operations runbook',
     blurb: 'Every integration: how it works, how to operate, verify, swap.',
