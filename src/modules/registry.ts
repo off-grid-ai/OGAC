@@ -7,10 +7,13 @@ export type ModuleId =
   | 'data'
   | 'brain'
   | 'agents'
+  | 'observability'
   | 'analytics'
   | 'finops'
   | 'reports'
+  | 'lineage'
   | 'regulatory'
+  | 'integrations'
   | 'admin';
 
 export interface ModuleDef {
@@ -69,6 +72,14 @@ export const MODULES: readonly ModuleDef[] = [
     service: 'agents',
   },
   {
+    id: 'observability',
+    label: 'Observability',
+    description:
+      'Agent QA: eval scores, online LLM-as-judge scores, drift, and full run traces (Langfuse-backed).',
+    route: '/observability',
+    service: 'qa',
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     description: 'Usage, cost, latency, and drift across the fleet.',
@@ -90,11 +101,26 @@ export const MODULES: readonly ModuleDef[] = [
     service: 'reports',
   },
   {
+    id: 'lineage',
+    label: 'Lineage',
+    description: 'Source→answer data lineage for every agent run (OpenLineage/Marquez-backed).',
+    route: '/lineage',
+    service: 'lineage',
+  },
+  {
     id: 'regulatory',
     label: 'Regulatory',
     description: 'DPO view, framework mapping, audit/DPIA exports.',
     route: '/regulatory',
     service: 'regulatory',
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    description: 'Configure every underlying service (adapters, URLs, secrets, health) from the UI.',
+    route: '/integrations',
+    service: 'integrations',
+    internal: true,
   },
   {
     id: 'admin',

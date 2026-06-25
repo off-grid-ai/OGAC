@@ -6,11 +6,14 @@ import {
   Buildings as Building2,
   Coins,
   Database,
+  Microscope,
   Devices as MonitorSmartphone,
   ShareNetwork as Network,
   Scales as Scale,
   Scroll as ScrollText,
   ShieldCheck,
+  TreeStructure,
+  Vault,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -21,9 +24,12 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   data: Database,
   brain: Brain,
   agents: Bot,
+  observability: Microscope,
   analytics: BarChart3,
   finops: Coins,
   reports: ScrollText,
+  lineage: TreeStructure,
   regulatory: Scale,
+  integrations: Vault,
   admin: Building2,
 };

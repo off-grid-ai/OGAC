@@ -63,6 +63,20 @@ export async function listEvalRuns(limit = 10): Promise<EvalRun[]> {
   }));
 }
 
+// A single eval run by id — the per-case drilldown (Observability → eval detail).
+export async function getEvalRun(id: string): Promise<EvalRun | null> {
+  const [r] = await db.select().from(evalRuns).where(eq(evalRuns.id, id)).limit(1);
+  if (!r) return null;
+  return {
+    id: r.id,
+    score: r.score,
+    total: r.total,
+    passed: r.passed,
+    startedAt: iso(r.startedAt),
+    results: r.results ?? undefined,
+  };
+}
+
 async function evalCase(c: GoldenCase): Promise<EvalResult> {
   const hits = await searchDocuments(c.query, 3);
   const exp = c.expected.toLowerCase();
