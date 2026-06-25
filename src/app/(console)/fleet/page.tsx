@@ -4,6 +4,7 @@ import {
   ClockCounterClockwise as FileClock,
   ShieldCheck,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { DeviceActions } from '@/components/fleet/DeviceActions';
 import { EnrollDeviceButton } from '@/components/fleet/EnrollDeviceButton';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getMdm } from '@/lib/adapters/registry';
 import { requireModule } from '@/lib/modules';
 import { getOrgPolicy, listAudit, listDevices } from '@/lib/store';
 
@@ -35,6 +37,7 @@ export default async function FleetPage() {
     listAudit({ limit: 500 }),
   ]);
   const online = devices.filter((d) => d.status === 'online').length;
+  const mdm = getMdm().meta;
 
   const stats: Stat[] = [
     { label: 'Devices', value: devices.length, icon: Cpu },
@@ -45,6 +48,18 @@ export default async function FleetPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+          MDM backend
+        </span>
+        <Badge variant="secondary" className="bg-primary/10 text-primary">
+          {mdm.vendor}
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          swap with OFFGRID_ADAPTER_MDM (native registry · FleetDM/osquery)
+        </span>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label} className="shadow-sm">
@@ -82,7 +97,11 @@ export default async function FleetPage() {
             <TableBody>
               {devices.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-medium text-foreground">{d.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    <Link href={`/fleet/${d.id}`} className="hover:text-primary">
+                      {d.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{d.os}</TableCell>
                   <TableCell className="text-muted-foreground">{d.role}</TableCell>
                   <TableCell>
