@@ -116,6 +116,19 @@ else
   { [ "$STATUS" = 200 ] && echo "$BODY" | grep -q '"backend"'; } \
     && ok "GET /admin/mdm/devices → inventory (backend: $(echo "$BODY" | grep -o '"backend":"[^"]*"'))" \
     || bad "GET /admin/mdm/devices" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+
+  # Scheduled QA sweep — eval + drift → degradation verdict (200 healthy / 503 degraded; both valid).
+  api POST /api/v1/admin/qa/sweep
+  { { [ "$STATUS" = 200 ] || [ "$STATUS" = 503 ]; } && echo "$BODY" | grep -q '"degraded"'; } \
+    && ok "POST /admin/qa/sweep → verdict (degraded=$(echo "$BODY" | grep -o '"degraded":[a-z]*' | head -1 | cut -d: -f2), status $STATUS)" \
+    || bad "POST /admin/qa/sweep" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
+
+  # Interaction pipeline — one agent run must fire the whole chain in-path: policy gate, guardrail
+  # checks, grounding, and a persisted provenance signature.
+  api POST /api/v1/admin/agents/runs '{"agentId":"sop-synth","query":"KYC verification steps"}'
+  { [ "$STATUS" = 201 ] && echo "$BODY" | grep -q '"kind":"policy"' && echo "$BODY" | grep -q '"kind":"sign"' && echo "$BODY" | grep -q '"provenance":{'; } \
+    && ok "agent run pipeline → policy→guard→ground→sign + provenance signature persisted" \
+    || bad "agent run pipeline" "status=$STATUS body=$(echo "$BODY" | head -c 160)"
 fi
 
 # ── 2. OSS SERVICE APIs ─────────────────────────────────────────────────────────
