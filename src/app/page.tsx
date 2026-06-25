@@ -3,6 +3,7 @@ import {
   BookOpen,
   Stack as Boxes,
   Brain,
+  Broadcast,
   ChartLineUp,
   Code,
   Cube,
@@ -143,6 +144,12 @@ function Nav() {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/fleet-control">
+              <Broadcast className="size-4" />
+              <span className="hidden sm:inline">Fleet Control</span>
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href="/features">
               <Boxes className="size-4" />

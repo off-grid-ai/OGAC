@@ -285,6 +285,9 @@ export default function FeaturesPage() {
                 </Link>
               </Button>
               <Button asChild variant="outline">
+                <Link href="/fleet-control">Fleet Control</Link>
+              </Button>
+              <Button asChild variant="outline">
                 <Link href="/journey">See the maturity journey</Link>
               </Button>
               <Button asChild variant="ghost">
