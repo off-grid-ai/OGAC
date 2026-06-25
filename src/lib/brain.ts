@@ -79,6 +79,12 @@ export async function listDocuments(): Promise<BrainDoc[]> {
   return rows.map((r) => ({ id: r.id, title: r.title, source: r.source, text: r.text }));
 }
 
+// A single document by id (the document inspector page).
+export async function getDocument(id: string): Promise<BrainDoc | null> {
+  const docs = await listDocuments();
+  return docs.find((d) => d.id === id) ?? null;
+}
+
 export async function addDocument(title: string, source: string, text: string): Promise<BrainDoc> {
   if (qdrantSelected()) return qdrantAdd(title, source, text);
   const tbl = await getTable();
