@@ -374,3 +374,25 @@ AGPL options — fine to embed, avoided only in the _bundled_ permissive stack �
 - Pin image tags (the compose uses `:latest` for convenience) and scan them in CI.
 - Back up the Postgres volume; treat the audit table as append-only/WORM.
 - For k8s, the Helm charts (roadmap) mirror these profiles as toggleable subcharts.
+
+## 10. Agent QA, provenance, sandbox, Fleet Control — operate & verify
+
+All follow the capability-port rule: a first-party default that always works + an OSS swap-in via
+`OFFGRID_ADAPTER_<CAP>`, falling back to the default if unreachable.
+
+- **Agent QA** — `OFFGRID_ADAPTER_EVALS` (golden | promptfoo | ragas), `OFFGRID_ADAPTER_DRIFT`
+  (native PSI | evidently). Sidecars: `make qa` (Evidently `:8001`, Ragas `:8002`). Online scoring
+  posts to Langfuse (`OFFGRID_LANGFUSE_URL/_AUTH`), gated by the `online-evals` flag +
+  `OFFGRID_QA_SAMPLE_RATE`. **Schedule** `POST /admin/qa/sweep` (cron/CI) — 200 healthy / 503
+  degraded; emits a `qa.sweep` span (alert on `degraded=true`). **Verify:** `make test-integrations`.
+- **Provenance** — report exports carry an ed25519 detached manifest (`?manifest=1`); verify at
+  `POST /admin/provenance/verify`. Images: `/admin/provenance/c2pa` (bundled signer, or
+  `OFFGRID_C2PA_CERT/_KEY`). Sigstore: `/admin/provenance/sigstore` (public-good Fulcio/Rekor or
+  `OFFGRID_FULCIO_URL/_REKOR_URL`; signing needs an OIDC token, verify is standalone).
+- **Sandbox** — default `none` refuses. `OFFGRID_ADAPTER_SANDBOX=docker` + the `agent-code-exec`
+  flag (default OFF) enables ephemeral, `--network none`, resource-capped containers. `/admin/sandbox/run`.
+- **Fleet Control (MDM)** — default first-party registry. `OFFGRID_ADAPTER_MDM=fleetdm` +
+  `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`; `make mdm` (Fleet `:8070`, then create a token with
+  `fleetctl`). **Verify:** `GET /admin/mdm/devices` (shows `backend`), FleetDM `/healthz`.
+- **The interaction pipeline** (`agentrun.ts`) fires policy → guardrails → ground → provenance on
+  every run; inspect a run's `steps[]` + `checks[]` + `provenance` via `GET /admin/agents/runs`.

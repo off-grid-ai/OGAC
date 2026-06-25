@@ -129,3 +129,41 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 - **Who:** Platform admin / Security.
 - **How:** issue an enrollment token → the desktop node enrolls (Settings → Fleet Console).
 - **Why:** every node pulls policy + reports audit, closing the loop from device to control plane.
+
+## The interaction pipeline
+
+- **What:** one ordered chain every agent run flows through — policy gate → guardrails(in) →
+  retrieve → answer (cached) → ground → guardrails(out) → provenance-sign → audit/lineage/trace,
+  plus an async online QA score after the response.
+- **Who:** Platform (automatic). **How:** `src/lib/agentrun.ts`; runs fire it via
+  `/admin/agents/runs`. Safety checks on every request; the LLM-judge score runs out-of-band
+  (`next/server after()`) so it adds no latency.
+- **Why:** the capabilities below aren't just admin endpoints — they *fire in-path* on real work.
+
+## Agent QA (`/handbook/agent-qa`)
+
+- **What:** are the agents still doing a good job? Offline evals (golden / promptfoo / Ragas),
+  online LLM-as-judge scoring → Langfuse, drift/degradation (PSI / Evidently).
+- **Who:** Platform / ML owner. **How:** `/admin/qa/{drift,score,status,sweep}`,
+  `OFFGRID_ADAPTER_{EVALS,DRIFT}`; schedule `POST /admin/qa/sweep` (200 healthy / 503 degraded).
+- **Why:** catch regression and drift before a customer or regulator does.
+
+## Provenance & tamper-evidence
+
+- **What:** signed, offline-verifiable outputs — ed25519 detached manifests on report exports, C2PA
+  Content Credentials on images, Sigstore attestation on artifacts.
+- **Who:** Compliance / Security. **How:** `/admin/provenance/{verify,c2pa,sigstore}`,
+  `/admin/reports/[id]/export?manifest=1`. **Why:** prove what was produced, unaltered, with a public key.
+
+## Sandbox (agent code execution)
+
+- **What:** agent-authored code runs in an ephemeral, network-isolated, resource-capped container.
+- **Who:** Platform / Security. **How:** `OFFGRID_ADAPTER_SANDBOX=docker` + the `agent-code-exec`
+  flag (default OFF); `/admin/sandbox/run`. Default no-exec refuses. **Why:** autonomy without
+  handing agents your production host.
+
+## Fleet Control (`/handbook/fleet-control`)
+
+- **What:** device fleet management (FleetDM/osquery, MIT core) + Off Grid's field-force intelligence.
+- **Who:** Platform / Frontline ops. **How:** `OFFGRID_ADAPTER_MDM=fleetdm` + `make mdm`;
+  `/admin/mdm/devices`. **Why:** manage every AI-enabled device *and* coach the workforce on it.

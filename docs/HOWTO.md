@@ -131,3 +131,87 @@ npx @openapitools/openapi-generator-cli generate -i $URL/openapi.json -g typescr
 ```
 
 Agents call the **gateway** with any OpenAI-compatible SDK; devices use the desktop node client.
+
+---
+
+## Agent QA — run evals, score live traffic, watch for drift
+
+All admin routes accept either an SSO session or `Authorization: Bearer $OFFGRID_ADMIN_TOKEN`.
+Set `BASE=http://127.0.0.1:3000` (or your host) for the examples below.
+
+### Run an offline eval
+```bash
+curl -sX POST "$BASE/api/v1/admin/evals/run" -H "authorization: Bearer $TOKEN"
+# → { "id", "engine": "golden", "score": 0..100, "passed", "total", "startedAt" }
+```
+Switch the evaluator with `OFFGRID_ADAPTER_EVALS=golden|promptfoo|ragas`. `promptfoo` needs the
+`promptfoo` binary on PATH; `ragas` needs the sidecar (`make qa`, `OFFGRID_RAGAS_URL`). Both fall
+back to `golden` if unavailable — so this call always records a run.
+
+### Score a live interaction (online eval → Langfuse)
+```bash
+curl -sX POST "$BASE/api/v1/admin/qa/score" -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"input":"What is the contestability window?","output":"Two years from issue.","sources":["Claims SOP: …within two years of issue."]}'
+# → { "traceId", "verdict": {"quality":0..1,"faithfulness":0..1,"reasoning"}, "judged": bool, "posted": bool }
+```
+`judged:false` = the gateway judge was unreachable (no fabricated score is written). `posted:false`
+= Langfuse down. Needs `OFFGRID_LANGFUSE_URL` + `OFFGRID_LANGFUSE_AUTH`. In the agent pipeline this
+fires automatically after each run (gated by the `online-evals` flag + `OFFGRID_QA_SAMPLE_RATE`).
+
+### Check drift / degradation
+```bash
+curl -s "$BASE/api/v1/admin/qa/drift"   -H "authorization: Bearer $TOKEN"  # PSI + mean-delta, status stable|warning|drift
+curl -s "$BASE/api/v1/admin/qa/status"  -H "authorization: Bearer $TOKEN"  # offline score + drift + online state
+```
+`OFFGRID_ADAPTER_DRIFT=native` (PSI over eval history, default) or `evidently` (`make qa`).
+
+### Schedule the QA sweep (cron / CI gate)
+```bash
+curl -sX POST "$BASE/api/v1/admin/qa/sweep" -H "authorization: Bearer $TOKEN"
+# 200 + {degraded:false,…}  |  503 + {degraded:true, reasons:[…]}  → emits a qa.sweep span
+# cron example: */30 * * * *  curl -fsX POST … || alert
+```
+
+## Provenance — sign & verify exports and assets
+
+### Export a report with a signed manifest, then verify
+```bash
+curl -s "$BASE/api/v1/admin/reports/audit-summary/export?format=pdf&manifest=1" -H "authorization: Bearer $TOKEN" > manifest.json
+curl -sX POST "$BASE/api/v1/admin/provenance/verify" -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d "{\"manifest\": $(cat manifest.json)}"
+# → { "signatureValid": true, "algorithm": "ed25519|HMAC-SHA256" }
+```
+
+### C2PA Content Credentials on an image
+```bash
+B64=$(base64 < logo.png)
+curl -sX POST "$BASE/api/v1/admin/provenance/c2pa" -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d "{\"image\":\"$B64\",\"mimeType\":\"image/png\"}"   # → { image: signed-base64 }
+# verify: re-POST the signed image with "action":"verify" → { hasManifest, valid }
+```
+
+### Sigstore (keyless attestation)
+```bash
+curl -s "$BASE/api/v1/admin/provenance/sigstore" -H "authorization: Bearer $TOKEN"   # { signingConfigured }
+curl -sX POST "$BASE/api/v1/admin/provenance/sigstore" -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"action":"verify","bundle":{}}'             # → { valid, error? }
+```
+Signing needs an OIDC identity token (`OFFGRID_SIGSTORE_IDENTITY_TOKEN`); public-good Fulcio/Rekor by
+default, or self-host via `OFFGRID_FULCIO_URL` / `OFFGRID_REKOR_URL`.
+
+## Sandbox — run agent code safely
+```bash
+# Enable first: OFFGRID_ADAPTER_SANDBOX=docker + turn on the agent-code-exec flag (Admin → Flags).
+curl -sX POST "$BASE/api/v1/admin/sandbox/run" -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"language":"python","code":"print(2**10)"}'
+# → { engine:"docker", ok:true, stdout:"1024\n", exitCode:0 }   (403 if the flag is off / no-exec default)
+```
+Runs `--network none`, memory/CPU/PID-capped, read-only, non-root, with a hard timeout.
+
+## Fleet Control — device inventory
+```bash
+curl -s "$BASE/api/v1/admin/mdm/devices" -H "authorization: Bearer $TOKEN"   # { backend:"native|fleetdm", data:[…] }
+```
+Point at FleetDM with `OFFGRID_ADAPTER_MDM=fleetdm` + `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`
+(`make mdm`; see RUNBOOKS for the `fleetctl` token steps). Falls back to the registry if unreachable.

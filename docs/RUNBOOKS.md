@@ -183,3 +183,45 @@ does not touch it.
 1. Pull new images: `docker compose --profile all pull`, then `make up`.
 2. Schema changes: `npx drizzle-kit push` (additive). Seeds are idempotent (skip if data present).
 3. **Verify:** typecheck/lint clean in CI; `make smoke` green; `/docs` + `/handbook` 200.
+
+## RB-13 · Turn on Agent QA (offline + online + drift)
+
+1. `cd deploy && make qa` — brings up Evidently (`:8001`) + Ragas (`:8002`) sidecars.
+2. Offline: `OFFGRID_ADAPTER_EVALS=ragas` (or leave `golden`); run `POST /admin/evals/run`.
+3. Online: set `OFFGRID_LANGFUSE_URL` + `OFFGRID_LANGFUSE_AUTH`; ensure the `online-evals` flag is
+   ON (Admin → Flags). Per-run scores then post to Langfuse automatically; tune
+   `OFFGRID_QA_SAMPLE_RATE` (1 = every run).
+4. Drift: `OFFGRID_ADAPTER_DRIFT=evidently` (needs ≥4 eval runs for a verdict).
+5. Schedule the sweep: cron `*/30 * * * * curl -fsX POST $BASE/api/v1/admin/qa/sweep -H "authorization: Bearer $TOKEN" || alert`. 503 = degraded.
+6. **Verify:** `make test-integrations` (QA + sweep checks green).
+
+## RB-14 · Verify an exported report's provenance
+
+1. Export with the manifest: `GET /admin/reports/<id>/export?format=pdf&manifest=1` → `manifest.json`.
+2. Verify: `POST /admin/provenance/verify` with `{ "manifest": <manifest.json> }` →
+   `signatureValid:true`. For ed25519, a third party verifies offline with the public key in the
+   manifest — no shared secret. Hash mismatch ⇒ the file was altered after signing.
+
+## RB-15 · Enable the sandbox for agent code execution
+
+1. `OFFGRID_ADAPTER_SANDBOX=docker` (Docker available on the host); pre-pull `python:3.11-slim`,
+   `node:20-slim`.
+2. Turn ON the `agent-code-exec` flag (Admin → Flags) — OFF by default; the no-exec default refuses.
+3. Test: `POST /admin/sandbox/run {"language":"python","code":"print(1)"}` → exit 0. Containers run
+   `--network none`, memory/CPU/PID-capped, read-only, non-root, with a hard timeout.
+4. For a sandbox tool an agent can call: create a tool with `type:sandbox`, script in `endpoint`;
+   when routed to (flag on), the run executes it and records a `sandbox` step.
+
+## RB-16 · Onboard FleetDM (Fleet Control)
+
+1. `cd deploy && make mdm` — Fleet (`:8070`) + MySQL + Redis; first boot runs DB migrations.
+2. Create an admin + API token:
+   ```bash
+   docker compose exec fleet fleetctl setup --email a@b.co --password '<pw>' --org-name OffGrid
+   docker compose exec fleet sh -c 'fleetctl config set --address https://127.0.0.1:8070 --tls-skip-verify \
+     && fleetctl login --email a@b.co --password "<pw>" && fleetctl get api-token'
+   ```
+3. Set `OFFGRID_ADAPTER_MDM=fleetdm`, `OFFGRID_FLEET_URL`, `OFFGRID_FLEET_TOKEN`; restart the console.
+4. Enroll desktops: `fleetctl package --type=msi|pkg|deb --fleet-url … --enroll-secret …` → install
+   fleetd. (Mobile stays an Off Grid node — osquery doesn't run on iOS/Android.)
+5. **Verify:** `GET /admin/mdm/devices` shows `backend:"fleetdm"` + hosts; FleetDM `/healthz` 200.

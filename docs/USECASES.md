@@ -96,3 +96,22 @@ compose profile. No caller code changes; the console keeps working if it's down 
 **Path:** Fleet → **Kill** the device (consumed on next poll) + revoke its key (FinOps) + block
 egress. Pull the **CERT-In pack** and the audit/trace window for the report.
 **Outcome:** isolate in seconds, report within the 6-hour CERT-In window with evidence in hand.
+
+## UC-10 · "An agent quietly starts degrading"
+
+**Planes:** AI (Agent QA) · Observability.
+**Path:** the scheduled **`/admin/qa/sweep`** (cron) runs offline evals + drift; the score slips
+below threshold or PSI crosses into `drift` → it returns **503** and emits a `qa.sweep` span → the
+monitor alerts. Drill in via `/admin/qa/status` and the per-run **online scores** in Langfuse.
+**Outcome:** quality decay caught from telemetry, not a customer complaint — with a signed run trace
+of exactly what changed.
+
+## UC-11 · "Coach a frontline field force"
+
+**Planes:** Consumption (Fleet Control) · AI (Brain).
+**Path:** **FleetDM** gives device inventory + compliance per rep; the **Off Grid node** (desktop +
+mobile, opt-in capture) shows how top performers actually work; the **Brain** distils it into
+citable SOPs and the on-device **copilot** surfaces next-best-action — all governed by the gateway +
+audit.
+**Outcome:** every rep sells with your best rep's know-how, on devices you fully manage and can
+kill-switch, with no per-seat AI fee.
