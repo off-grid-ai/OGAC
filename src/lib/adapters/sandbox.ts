@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { existsSync } from 'fs';
 import type { SandboxLanguage, SandboxPort, SandboxResult } from './types';
 
 // Sandbox engines for agent-authored code execution.
@@ -10,8 +11,13 @@ import type { SandboxLanguage, SandboxPort, SandboxResult } from './types';
 //   no API key, and runs anywhere Docker does (no Linux/KVM host required). The activatable default
 //   beyond no-exec.
 //
-// E2B (cloud microVMs — needs an API key), Firecracker, and Falco (Linux/KVM + eBPF hosts) are
-// registered as metadata swap-ins in services.ts; they target production Linux hosts.
+// - `firecracker`: runs each job in an ephemeral Firecracker MICROVM (hardware-virtualized, a far
+//   stronger boundary than a container) on a Linux/KVM host, via a one-shot microVM runner
+//   (Weave Ignite by default; any `docker run`-compatible runner works). Requires `/dev/kvm`, so it
+//   refuses cleanly on non-KVM hosts (e.g. macOS dev) instead of pretending to run.
+//
+// E2B (cloud microVMs — needs an API key) and Falco (runtime threat detection) remain metadata
+// swap-ins in services.ts.
 const DOCKER_BIN = process.env.OFFGRID_DOCKER_BIN ?? 'docker';
 const DEFAULT_TIMEOUT = 10_000;
 const IMAGES: Record<SandboxLanguage, string> = {
@@ -51,11 +57,11 @@ function classify(err: ExecErr | null): { timedOut: boolean; exitCode: number } 
   return { timedOut, exitCode: typeof err.code === 'number' ? err.code : 1 };
 }
 
-function toResult(err: ExecErr | null, stdout: string, stderr: string): SandboxResult {
+function toResult(engine: string, err: ExecErr | null, stdout: string, stderr: string): SandboxResult {
   const { timedOut, exitCode } = classify(err);
   const errText = err && !timedOut ? String(err) : '';
   return {
-    engine: 'docker',
+    engine,
     ok: !err,
     stdout: stdout.slice(0, 100_000),
     stderr: (stderr || errText).slice(0, 100_000),
@@ -64,20 +70,22 @@ function toResult(err: ExecErr | null, stdout: string, stderr: string): SandboxR
   };
 }
 
-function runDocker(args: string[], timeoutMs: number): Promise<SandboxResult> {
+// Run a binary with a hard timeout, mapping the result/errors into a SandboxResult. Shared by the
+// Docker and Firecracker engines (both shell out to a `run`-style CLI with the same contract).
+function runProc(engine: string, bin: string, args: string[], timeoutMs: number): Promise<SandboxResult> {
   return new Promise((resolve) => {
     const child = execFile(
-      DOCKER_BIN,
+      bin,
       args,
       { timeout: timeoutMs, maxBuffer: 1024 * 1024 },
-      (err, stdout, stderr) => resolve(toResult(err as ExecErr | null, stdout, stderr)),
+      (err, stdout, stderr) => resolve(toResult(engine, err as ExecErr | null, stdout, stderr)),
     );
     child.on('error', () =>
       resolve({
-        engine: 'docker',
+        engine,
         ok: false,
         stdout: '',
-        stderr: 'docker not available',
+        stderr: `${bin} not available`,
         exitCode: null,
         timedOut: false,
       }),
@@ -110,12 +118,75 @@ export const dockerSandbox: SandboxPort = {
       'Ephemeral, network-disabled, resource-capped container per run (free, no API key, no Linux/KVM host). The activatable code-exec isolation.',
   },
   run(language, code, timeoutMs = DEFAULT_TIMEOUT) {
-    return runDocker(dockerArgs(language, code), timeoutMs);
+    return runProc('docker', DOCKER_BIN, dockerArgs(language, code), timeoutMs);
   },
   async health() {
-    const r = await runDocker(['version', '--format', '{{.Server.Version}}'], 5000);
+    const r = await runProc('docker', DOCKER_BIN, ['version', '--format', '{{.Server.Version}}'], 5000);
     return r.ok;
   },
 };
 
-export const SANDBOX_PORTS: SandboxPort[] = [noExecSandbox, dockerSandbox];
+// ─── Firecracker microVM sandbox ──────────────────────────────────────────────
+// Each job runs in a throwaway Firecracker microVM — a real hardware-virtualization boundary
+// (separate guest kernel), much stronger than a shared-kernel container, for genuinely untrusted
+// code. Firecracker needs a Linux host with KVM (`/dev/kvm`); there is no macOS/Windows path, so we
+// detect KVM and refuse cleanly elsewhere. We drive microVMs through a one-shot, `docker run`-style
+// runner — Weave Ignite (`ignite`) by default — set via OFFGRID_FIRECRACKER_BIN. The runner must
+// accept `run --rm <image> <cmd...>` and propagate stdout/stderr/exit code.
+const FC_BIN = process.env.OFFGRID_FIRECRACKER_BIN ?? 'ignite';
+const FC_KVM = process.env.OFFGRID_KVM_DEVICE ?? '/dev/kvm';
+const FC_IMAGES: Record<SandboxLanguage, string> = {
+  python: process.env.OFFGRID_FC_PY_IMAGE ?? 'python:3.11-slim',
+  node: process.env.OFFGRID_FC_NODE_IMAGE ?? 'node:20-slim',
+};
+
+function kvmAvailable(): boolean {
+  return existsSync(FC_KVM);
+}
+
+function refusedNoKvm(): SandboxResult {
+  return {
+    engine: 'firecracker',
+    ok: false,
+    stdout: '',
+    stderr: '',
+    exitCode: null,
+    timedOut: false,
+    refused: `Firecracker needs a Linux host with KVM (${FC_KVM} not found). Use the Docker sandbox on this host, or run the console on a KVM host.`,
+  };
+}
+
+// One-shot microVM invocation: capped memory/CPU, no network, auto-removed, code via the
+// interpreter's -c/-e (no host mounts). Mirrors the Docker flags on an Ignite-compatible runner.
+function firecrackerArgs(language: SandboxLanguage, code: string): string[] {
+  const interp = language === 'python' ? ['python3', '-c', code] : ['node', '-e', code];
+  return [
+    'run', '--rm', '--network', 'none',
+    '--memory', '256MB', '--cpus', '1',
+    FC_IMAGES[language],
+    '--', ...interp,
+  ];
+}
+
+export const firecrackerSandbox: SandboxPort = {
+  meta: {
+    id: 'firecracker',
+    capability: 'sandbox',
+    vendor: 'Firecracker (microVM)',
+    license: 'Apache-2.0',
+    render: 'native',
+    description:
+      'Hardware-isolated microVM per run on a Linux/KVM host (stronger than containers, free, no API key). Refuses on non-KVM hosts.',
+  },
+  run(language, code, timeoutMs = DEFAULT_TIMEOUT) {
+    if (!kvmAvailable()) return Promise.resolve(refusedNoKvm());
+    return runProc('firecracker', FC_BIN, firecrackerArgs(language, code), timeoutMs);
+  },
+  async health() {
+    if (!kvmAvailable()) return false;
+    const r = await runProc('firecracker', FC_BIN, ['version'], 5000);
+    return r.ok;
+  },
+};
+
+export const SANDBOX_PORTS: SandboxPort[] = [noExecSandbox, dockerSandbox, firecrackerSandbox];

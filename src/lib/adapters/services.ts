@@ -283,10 +283,10 @@ export const BI: RegEntry[] = [
 ];
 
 // Runtime sandboxing for agent tool/code execution. Default is first-party "no-exec" (tools run
-// only through the registered, scoped tool registry — arbitrary code is refused). E2B / Firecracker
-// give real isolation when agents must run untrusted code; Falco adds runtime threat detection.
-// The no-exec default and the Docker sandbox are real behavior ports (src/lib/adapters/sandbox.ts);
-// these are the heavier production swap-ins (registered after the ports in the registry).
+// only through the registered, scoped tool registry — arbitrary code is refused). The no-exec
+// default, the Docker sandbox, AND Firecracker microVMs are real behavior ports now
+// (src/lib/adapters/sandbox.ts). E2B (cloud, paid) and Falco (runtime threat detection) remain
+// metadata swap-ins below.
 export const SANDBOX: RegEntry[] = [
   {
     meta: {
@@ -299,17 +299,6 @@ export const SANDBOX: RegEntry[] = [
       status: 'planned',
       description:
         'Cloud microVM sandboxes. PAID (needs an E2B API key) — not used by default. The free OSS path is the Docker sandbox (default) or self-hosted Firecracker; nothing here requires payment.',
-    },
-  },
-  {
-    meta: {
-      id: 'firecracker',
-      capability: 'sandbox',
-      vendor: 'Firecracker',
-      license: 'Apache-2.0',
-      render: 'headless',
-      status: 'planned',
-      description: 'Self-hosted microVM isolation for untrusted tool/code execution. Planned.',
     },
   },
   {
