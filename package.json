@@ -12,6 +12,8 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "db:push": "drizzle-kit push",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:api": "node scripts/smoke.mjs --api",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
     "test": "node --test"
@@ -51,6 +53,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.6",
+    "playwright": "^1.61.1",
     "prettier": "^3.4.2",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.22.4",
