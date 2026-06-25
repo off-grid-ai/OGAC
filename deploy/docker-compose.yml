@@ -17,7 +17,7 @@ services:
   # ── DATA PLANE ────────────────────────────────────────────────────────────────
   # Postgres + pgvector: console state, append-only audit, AND the server-scale Brain vector store.
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.0-pg16
     profiles: [data, ai, all]
     environment:
       POSTGRES_USER: offgrid
@@ -33,7 +33,7 @@ services:
 
   # Object store for documents/artifacts (S3-compatible, Apache-2.0).
   seaweedfs:
-    image: chrislusf/seaweedfs:latest
+    image: chrislusf/seaweedfs:3.80
     profiles: [data, all]
     command: 'server -dir=/data -s3 -s3.port=8333'
     ports: ['8333:8333', '9333:9333']
@@ -41,14 +41,14 @@ services:
 
   # ── AI PLANE — vector store alternative (Brain bridge) ─────────────────────────
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.12.5
     profiles: [ai, all]
     ports: ['6333:6333']
     volumes: [qdrant:/qdrant/storage]
 
   # ── SECRETS ────────────────────────────────────────────────────────────────────
   openbao:
-    image: openbao/openbao:latest
+    image: openbao/openbao:2.1.0
     profiles: [secrets, all]
     cap_add: [IPC_LOCK]
     environment:
@@ -64,7 +64,7 @@ services:
   # ── IDENTITY (SSO) ──────────────────────────────────────────────────────────────
   # Keycloak dev mode (in-memory H2) — self-contained for local; back with Postgres in prod.
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
+    image: quay.io/keycloak/keycloak:26.0.7
     profiles: [identity, all]
     # --import-realm re-imports keycloak/offgrid-realm.json on every boot, so the realm + client +
     # test user are deterministic and survive `make down` — no runtime setup script needed. (Dev
@@ -80,24 +80,24 @@ services:
 
   # ── POLICY (policy-as-code) ──────────────────────────────────────────────────────
   opa:
-    image: openpolicyagent/opa:latest
+    image: openpolicyagent/opa:0.70.0
     profiles: [policy, all]
     command: ['run', '--server', '--addr=0.0.0.0:8181', '--log-level=error']
     ports: ['8181:8181']
 
   # ── GUARDRAILS (PII detection / redaction) ────────────────────────────────────────
   presidio-analyzer:
-    image: mcr.microsoft.com/presidio-analyzer:latest
+    image: mcr.microsoft.com/presidio-analyzer:2.2.356
     profiles: [guardrails, all]
     ports: ['5002:3000']
   presidio-anonymizer:
-    image: mcr.microsoft.com/presidio-anonymizer:latest
+    image: mcr.microsoft.com/presidio-anonymizer:2.2.356
     profiles: [guardrails, all]
     ports: ['5001:3000']
 
   # ── OBSERVABILITY (metrics/logs/traces — one OTLP wire, any backend) ───────────────
   victoriametrics:
-    image: victoriametrics/victoria-metrics:latest
+    image: victoriametrics/victoria-metrics:v1.106.1
     profiles: [observability, all]
     command: ['-storageDataPath=/vmdata', '-httpListenAddr=:8428', '-retentionPeriod=1']
     ports: ['8428:8428']
@@ -108,13 +108,13 @@ services:
       timeout: 3s
       retries: 12
   victorialogs:
-    image: victoriametrics/victoria-logs:latest
+    image: victoriametrics/victoria-logs:v1.3.2-victorialogs
     profiles: [observability, all]
     command: ['-storageDataPath=/vldata', '-httpListenAddr=:9428']
     ports: ['9428:9428']
     volumes: [vldata:/vldata]
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.116.0
     profiles: [observability, all]
     command: ['--config=/etc/otelcol/config.yaml']
     volumes: ['./otel-collector.yaml:/etc/otelcol/config.yaml:ro']
@@ -123,7 +123,7 @@ services:
 
   # Distributed-trace backend (app-layer tracing): OTLP in → queryable trace UI on :16686.
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.62.0
     profiles: [observability, all]
     environment:
       COLLECTOR_OTLP_ENABLED: 'true'
@@ -131,7 +131,7 @@ services:
 
   # ── LLMOps (LLM tracing, evals, cost per trace/user/project) ──────────────────────
   langfuse-db:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine
     profiles: [llmops, all]
     environment:
       POSTGRES_USER: langfuse
@@ -165,7 +165,7 @@ services:
       timeout: 3s
       retries: 20
   langfuse-minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     profiles: [llmops, all]
     entrypoint: sh
     # pre-create the event bucket so Langfuse's S3 client finds it on first write
@@ -180,7 +180,7 @@ services:
       timeout: 3s
       retries: 20
   langfuse-redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     profiles: [llmops, all]
     command: ['redis-server', '--maxmemory-policy', 'noeviction']
     healthcheck:
@@ -189,7 +189,7 @@ services:
       timeout: 3s
       retries: 20
   langfuse-worker:
-    image: langfuse/langfuse-worker:3
+    image: langfuse/langfuse-worker:3.30.0
     profiles: [llmops, all]
     restart: on-failure
     depends_on:
@@ -217,7 +217,7 @@ services:
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
   langfuse:
-    image: langfuse/langfuse:3
+    image: langfuse/langfuse:3.30.0
     profiles: [llmops, all]
     restart: on-failure
     depends_on:
@@ -243,7 +243,7 @@ services:
 
   # ── LINEAGE & PROVENANCE (source → chunk → answer) ────────────────────────────────
   marquez-db:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine
     profiles: [lineage, all]
     environment:
       POSTGRES_USER: marquez
@@ -256,7 +256,7 @@ services:
       timeout: 3s
       retries: 20
   marquez:
-    image: marquezproject/marquez:latest
+    image: marquezproject/marquez:0.50.0
     profiles: [lineage, all]
     restart: on-failure
     depends_on:
@@ -272,7 +272,7 @@ services:
       POSTGRES_PASSWORD: marquez
     ports: ['9000:5000', '5010:5010']
   marquez-web:
-    image: marquezproject/marquez-web:latest
+    image: marquezproject/marquez-web:0.50.0
     profiles: [lineage, all]
     depends_on: [marquez]
     environment:
@@ -283,7 +283,7 @@ services:
 
   # ── AGENT RUNTIME (durable workflows) ─────────────────────────────────────────────
   temporal-db:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine
     profiles: [agents, all]
     environment:
       POSTGRES_USER: temporal
@@ -296,7 +296,7 @@ services:
       timeout: 3s
       retries: 20
   temporal:
-    image: temporalio/auto-setup:latest
+    image: temporalio/auto-setup:1.25.2
     profiles: [agents, all]
     restart: on-failure
     depends_on:
@@ -310,7 +310,7 @@ services:
       POSTGRES_SEEDS: temporal-db
     ports: ['7233:7233']
   temporal-ui:
-    image: temporalio/ui:latest
+    image: temporalio/ui:2.32.0
     profiles: [agents, all]
     depends_on: [temporal]
     environment:
@@ -319,7 +319,7 @@ services:
 
   # ── CACHING & RATE LIMITS (Redis: semantic/exact response cache + rate limiting) ──
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     profiles: [caching, all]
     command: ['redis-server', '--save', '', '--appendonly', 'no']
     ports: ['6379:6379']
@@ -331,7 +331,7 @@ services:
 
   # ── SIEM (OpenSearch: audit/log search + dashboards) ──────────────────────────────
   opensearch:
-    image: opensearchproject/opensearch:2
+    image: opensearchproject/opensearch:2.18.0
     profiles: [siem, all]
     environment:
       discovery.type: single-node
@@ -343,7 +343,7 @@ services:
     ports: ['9200:9200']
     volumes: [opensearch:/usr/share/opensearch/data]
   opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2
+    image: opensearchproject/opensearch-dashboards:2.18.0
     profiles: [siem, all]
     depends_on: [opensearch]
     environment:
@@ -353,7 +353,7 @@ services:
 
   # ── FEATURE FLAGS (Unleash: modular capability/module control) ────────────────────
   unleash-db:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine
     profiles: [flags, all]
     environment:
       POSTGRES_USER: unleash
@@ -366,7 +366,7 @@ services:
       timeout: 3s
       retries: 20
   unleash:
-    image: unleashorg/unleash-server:latest
+    image: unleashorg/unleash-server:6.6
     profiles: [flags, all]
     restart: on-failure
     depends_on:
@@ -402,7 +402,7 @@ services:
   # ── BI / DATA EXPLORATION (Apache Superset: view, SQL, pivot/transpose, dashboards) ──
   # First run: `docker compose exec superset superset init` (creates admin + metadata).
   superset:
-    image: apache/superset:latest
+    image: apache/superset:4.1.1
     profiles: [bi, all]
     environment:
       SUPERSET_SECRET_KEY: offgrid-dev-superset-secret
@@ -414,7 +414,7 @@ services:
   #   docker compose exec fleet fleetctl setup --email a@b.co --password '...' --org-name OffGrid
   #   then `fleetctl login` + `fleetctl get api-token` → set OFFGRID_FLEET_TOKEN.
   fleet-mysql:
-    image: mysql:8.0
+    image: mysql:8.0.40
     profiles: [mdm, all]
     environment:
       MYSQL_ROOT_PASSWORD: fleet
@@ -428,10 +428,10 @@ services:
       timeout: 3s
       retries: 30
   fleet-redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     profiles: [mdm, all]
   fleet:
-    image: fleetdm/fleet:latest
+    image: fleetdm/fleet:v4.87.0
     profiles: [mdm, all]
     depends_on:
       fleet-mysql:
