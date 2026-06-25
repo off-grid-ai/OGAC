@@ -1,7 +1,7 @@
+import { AbacTester } from '@/components/admin/AbacTester';
 import { AddAbacRuleButton } from '@/components/admin/AddAbacRuleButton';
 import { AddTenantButton } from '@/components/admin/AddTenantButton';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
-import { EmbedFrame } from '@/components/admin/EmbedFrame';
 import { FlagToggle } from '@/components/admin/FlagToggle';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { listBindings, listEmbeds } from '@/lib/adapters/registry';
+import { listBindings } from '@/lib/adapters/registry';
 import { requireModule } from '@/lib/modules';
 import { listAbacRules, listFlags, listTenants } from '@/lib/store';
 import { MODULES } from '@/modules/registry';
@@ -43,7 +43,6 @@ export default async function AdminPage() {
     listBindings(true),
     listFlags(),
   ]);
-  const embeds = listEmbeds();
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
 
   return (
@@ -110,31 +109,6 @@ export default async function AdminPage() {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Embedded consoles · Tier-3</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Rich OSS UIs we don&apos;t rebuild — surfaced as SSO&apos;d iframes to your own instance
-            (mere aggregation; the tool&apos;s license never touches the core). Set the adapter URL
-            to enable.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {embeds.map((e) => (
-            <div key={`${e.capability}-${e.id}`} className="rounded-md border border-border p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">{e.vendor}</span>
-                <Badge variant="secondary">{e.capability}</Badge>
-                <Badge variant="secondary" className="text-muted-foreground">
-                  {e.license}
-                </Badge>
-              </div>
-              <EmbedFrame title={e.vendor} url={e.embedUrl} />
-            </div>
-          ))}
         </CardContent>
       </Card>
 
@@ -259,9 +233,10 @@ export default async function AdminPage() {
               ))}
             </TableBody>
           </Table>
-          <p className="mt-4 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-            Deny overrides allow · evaluate via POST /api/v1/admin/abac/evaluate
+          <p className="mb-4 mt-4 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            Deny overrides allow · test a decision below
           </p>
+          <AbacTester />
         </CardContent>
       </Card>
     </div>

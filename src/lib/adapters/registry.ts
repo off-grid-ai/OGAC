@@ -174,32 +174,3 @@ export async function listBindings(withHealth = false): Promise<CapabilityBindin
   );
 }
 
-export interface EmbedTarget {
-  capability: Capability;
-  id: string;
-  vendor: string;
-  license: string;
-  embedUrl?: string;
-  configured: boolean;
-}
-
-// Tier-3 embeds: adapters whose UI we don't rebuild but surface as an SSO'd iframe. An embed is
-// a separate, customer-run instance (mere aggregation) — so its license never touches our core.
-// `configured` is false until the deployment sets the adapter's URL env.
-export function listEmbeds(): EmbedTarget[] {
-  const out: EmbedTarget[] = [];
-  for (const capability of Object.keys(ALL) as Capability[]) {
-    for (const { meta } of ALL[capability]) {
-      if (meta.render !== 'embed') continue;
-      out.push({
-        capability,
-        id: meta.id,
-        vendor: meta.vendor,
-        license: meta.license,
-        embedUrl: meta.embedUrl,
-        configured: Boolean(meta.embedUrl),
-      });
-    }
-  }
-  return out;
-}
