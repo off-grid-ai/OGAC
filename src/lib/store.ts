@@ -9,6 +9,7 @@ import {
   auditEvents,
   commands,
   connectors,
+  customAgents,
   datasets,
   devices,
   enrollmentTokens,
@@ -926,4 +927,78 @@ export async function setToolEnabled(id: string, enabled: boolean): Promise<void
 
 export async function deleteTool(id: string): Promise<void> {
   await db.delete(tools).where(eq(tools.id, id));
+}
+
+// ─── User-authored agents ─────────────────────────────────────────────────────
+export interface CustomAgent {
+  id: string;
+  name: string;
+  role: string;
+  description: string;
+  systemPrompt: string;
+  model: string;
+  tools: string[];
+  grounded: boolean;
+  trigger: string;
+  enabled: boolean;
+}
+
+function toCustomAgent(r: typeof customAgents.$inferSelect): CustomAgent {
+  return {
+    id: r.id,
+    name: r.name,
+    role: r.role,
+    description: r.description,
+    systemPrompt: r.systemPrompt,
+    model: r.model,
+    tools: r.tools ?? [],
+    grounded: r.grounded,
+    trigger: r.trigger,
+    enabled: r.enabled,
+  };
+}
+
+export async function listCustomAgents(): Promise<CustomAgent[]> {
+  const rows = await db.select().from(customAgents).orderBy(desc(customAgents.createdAt));
+  return rows.map(toCustomAgent);
+}
+
+export async function getCustomAgent(id: string): Promise<CustomAgent | undefined> {
+  const [row] = await db.select().from(customAgents).where(eq(customAgents.id, id)).limit(1);
+  return row ? toCustomAgent(row) : undefined;
+}
+
+export async function createCustomAgent(input: {
+  name: string;
+  role?: string;
+  description?: string;
+  systemPrompt: string;
+  model?: string;
+  tools?: string[];
+  grounded?: boolean;
+  trigger?: string;
+}): Promise<CustomAgent> {
+  const [row] = await db
+    .insert(customAgents)
+    .values({
+      id: `agent_${randomUUID().slice(0, 8)}`,
+      name: input.name,
+      role: input.role || 'Custom',
+      description: input.description || '',
+      systemPrompt: input.systemPrompt,
+      model: input.model || '',
+      tools: input.tools ?? [],
+      grounded: input.grounded ?? true,
+      trigger: input.trigger || 'on-demand',
+    })
+    .returning();
+  return toCustomAgent(row);
+}
+
+export async function setCustomAgentEnabled(id: string, enabled: boolean): Promise<void> {
+  await db.update(customAgents).set({ enabled }).where(eq(customAgents.id, id));
+}
+
+export async function deleteCustomAgent(id: string): Promise<void> {
+  await db.delete(customAgents).where(eq(customAgents.id, id));
 }
