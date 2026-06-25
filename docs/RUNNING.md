@@ -37,6 +37,8 @@ Then point the console at it — copy `deploy/.env.example` → `../.env.local`,
 ```bash
 make data secrets observability     # lean: state + secrets + telemetry
 make policy identity                # just the control-plane governance tools
+make qa                             # Agent-QA sidecars (Evidently drift + Ragas metrics)
+make mdm                            # Fleet Control (FleetDM + MySQL + Redis)
 docker compose --profile guardrails --profile lineage up -d   # any combination
 ```
 
@@ -62,7 +64,8 @@ capability has a first-party default; the stack just adds scale/depth.
 | Marquez (api / web)     | 9000 / 3001 |     | Langfuse                 | 3030        |
 | Temporal (server / ui)  | 7233 / 8081 |     | Redis                    | 6379        |
 | OpenSearch (api / dash) | 9200 / 5601 |     | Unleash                  | 4242        |
-| Jaeger (trace UI)       | 16686       |     |                          |             |
+| Jaeger (trace UI)       | 16686       |     | Evidently (drift, `qa`)  | 8001        |
+| Ragas (evals, `qa`)     | 8002        |     | FleetDM (MDM, `mdm`)     | 8070        |
 
 All images permissive-licensed — see `LICENSES.md`. Production hardening (TLS, real secrets, pinned
 tags, backups) is in `OPERATIONS.md §9`.

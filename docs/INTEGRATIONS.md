@@ -272,3 +272,32 @@ env reference with every URL is `deploy/.env.example`; every service's config kn
 3. Permissive license only (MIT/Apache/BSD/ISC/MPL) — see `LICENSES.md`. Out-of-process
    integration keeps copyleft tools at arm's length (mere aggregation).
 4. For `render: 'embed'`, set `embedUrl` and wire the SSO'd iframe (Tier-3).
+
+## Capabilities (the full port surface)
+
+Every row is a capability port: a first-party default + OSS swap-ins via `OFFGRID_ADAPTER_<CAP>`,
+with fallback to the default. Deep config in `CATALOG.md`; behaviour in `AGENT_QA.md` /
+`FLEET_CONTROL.md`.
+
+| Capability (`OFFGRID_ADAPTER_*`) | Default | OSS swap-ins | Admin route |
+|---|---|---|---|
+| `INFERENCE` | gateway | — | (gateway) |
+| `RETRIEVAL` | lancedb | pgvector · qdrant | `/admin/retrieve` |
+| `GUARDRAILS` | checks | presidio | (in-path) |
+| `POLICY` | abac | opa | `/admin/abac/evaluate` |
+| `IDENTITY` | authjs | keycloak | (sign-in) |
+| `SECRETS` | env | openbao | — |
+| `OBSERVABILITY` | otel | signoz · langfuse | (in-path) |
+| `LINEAGE` | native | marquez | (in-path) |
+| `CACHING` | memory | redis | `/admin/cache` |
+| `SIEM` | audit | opensearch | (in-path) |
+| `FLAGS` | native | unleash | `/admin/flags` |
+| `EVALS` | golden | promptfoo · ragas | `/admin/evals/run` |
+| `DRIFT` | native (PSI) | evidently | `/admin/qa/drift` |
+| `PROVENANCE` | ed25519/HMAC | c2pa · sigstore | `/admin/provenance/*` |
+| `SANDBOX` | none (no-exec) | docker · e2b(paid) · firecracker | `/admin/sandbox/run` |
+| `MDM` | native registry | fleetdm | `/admin/mdm/devices` |
+| `BI` | — | superset · metabase(embed) | (embed) |
+
+Agent QA also exposes `/admin/qa/{score,status,sweep}`; the interaction pipeline (`agentrun.ts`)
+fires policy/guardrails/grounding/provenance in-path on every `/admin/agents/runs`.
