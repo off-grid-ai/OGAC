@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddGoldenCaseButton } from '@/components/brain/AddGoldenCaseButton';
 import { AddPromptButton } from '@/components/brain/AddPromptButton';
 import { AddToolButton } from '@/components/brain/AddToolButton';
 import { BrainSearch } from '@/components/brain/BrainSearch';
+import { GroundingVerifier } from '@/components/brain/GroundingVerifier';
 import { IngestMenu } from '@/components/brain/IngestMenu';
 import { RouterConsole } from '@/components/brain/RouterConsole';
 import { RunEvalButton } from '@/components/brain/RunEvalButton';
@@ -124,7 +126,9 @@ export default async function BrainPage() {
           {docs.map((d) => (
             <div key={d.id} className="rounded-md border border-border p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">{d.title}</span>
+                <Link href={`/brain/docs/${d.id}`} className="text-sm font-medium text-foreground hover:text-primary">
+                  {d.title}
+                </Link>
                 <Badge variant="secondary">{d.source}</Badge>
               </div>
               <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{d.text}</p>
@@ -158,7 +162,11 @@ export default async function BrainPage() {
               <TableBody>
                 {promptList.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium text-foreground">{p.name}</TableCell>
+                    <TableCell className="font-medium text-foreground">
+                      <Link href={`/brain/prompts/${p.id}`} className="hover:text-primary">
+                        {p.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{p.description || '—'}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       v{p.latestVersion}
@@ -236,6 +244,8 @@ export default async function BrainPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <GroundingVerifier />
     </div>
   );
 }
