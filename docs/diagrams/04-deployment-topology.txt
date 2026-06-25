@@ -17,6 +17,7 @@ AROUND THE CORE, dashed enclosures orbiting it, each a compose profile, each joi
 - "FLAGS": "UNLEASH :4242" — arrow "FLAGS"
 - "BI": "SUPERSET :8088" — arrow "EXPLORE DATA"
 - "AGENT QA": "EVIDENTLY :8001", "RAGAS :8002" — arrow "EVALS / DRIFT"
+- "FLEET CONTROL (MDM)": "FLEETDM :8070", "FLEET-MYSQL", "FLEET-REDIS" — arrow "DEVICE INVENTORY"
 Inside the CONSOLE crate, two small hand-lettered tags: "LANCEDB — ON-DISK VECTORS (NO CONTAINER)" and "PROVENANCE + SANDBOX — IN-PROCESS / DOCKER (NO CONTAINER)".
 
 A hand-lettered caption bar across the bottom: "EACH ENCLOSURE IS ONE COMPOSE PROFILE. RUN ONLY WHAT YOU LICENSE — make up · make policy · make guardrails · make llmops. THE THREE CORE CRATES ARE THE ONLY HARD REQUIREMENTS."

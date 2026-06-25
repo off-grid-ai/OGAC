@@ -46,6 +46,7 @@ export const openApiSpec = {
       description: 'Tamper-evidence — C2PA image credentials, Sigstore, ed25519 export manifests.',
     },
     { name: 'sandbox', description: 'Isolated execution of agent-authored code.' },
+    { name: 'mdm', description: 'Fleet Control — device management (first-party registry / FleetDM).' },
   ],
   paths: {
     '/api/v1/devices': {
@@ -860,6 +861,15 @@ export const openApiSpec = {
           '200': { description: 'Run result { engine, ok, stdout, stderr, exitCode, timedOut }.' },
           '403': { description: 'Refused — flag off or no-exec default.' },
         },
+      },
+    },
+    '/api/v1/admin/mdm/devices': {
+      get: {
+        tags: ['mdm'],
+        summary: 'Fleet Control device inventory',
+        description:
+          'Devices through the active MDM adapter (OFFGRID_ADAPTER_MDM): the first-party device registry by default, or FleetDM (osquery, MIT Fleet Free) when selected. FleetDM falls back to the first-party registry if unreachable.',
+        responses: { '200': { description: 'Device list { backend, data[] }.' } },
       },
     },
   },

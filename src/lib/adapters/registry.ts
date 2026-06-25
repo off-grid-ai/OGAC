@@ -5,6 +5,7 @@ import { FLAGS_PORTS } from './flags';
 import { heuristicGrounding, modelGrounding } from './grounding';
 import { gatewayInference, localInference } from './inference';
 import { LINEAGE_PORTS } from './lineage';
+import { MDM_PORTS } from './mdm';
 import { otelObservability, signozObservability } from './observability';
 import { PII_PORTS } from './pii';
 import { POLICY_PORTS } from './policy';
@@ -34,6 +35,7 @@ import type {
   GroundingPort,
   InferencePort,
   LineagePort,
+  MdmPort,
   ObservabilityPort,
   PiiPort,
   PolicyPort,
@@ -112,6 +114,10 @@ export function getSandbox(): SandboxPort {
   return pick('sandbox', SANDBOX_PORTS);
 }
 
+export function getMdm(): MdmPort {
+  return pick('mdm', MDM_PORTS);
+}
+
 export interface CapabilityBinding {
   capability: Capability;
   active: AdapterMeta;
@@ -147,6 +153,7 @@ const ALL: Record<Capability, RegEntry[]> = {
   sandbox: [...portEntries(SANDBOX_PORTS), ...SANDBOX],
   evals: portEntries(EVALS_PORTS),
   drift: portEntries(DRIFT_PORTS),
+  mdm: portEntries(MDM_PORTS),
 };
 
 // One row per capability — active adapter + swappable alternatives + live health (when probed).

@@ -315,7 +315,7 @@ export const STAGES: JourneyStage[] = [
     reality:
       'The platform consolidates. New agents ship in weeks, not months, because they inherit the same knowledge base, tools, and policy. An ops dashboard shows the fleet.',
     console:
-      'Capability ports + the Brain (versioned knowledge), shared tool registry, RBAC/ABAC, and Fleet/Analytics mean a new agent reuses everything that already passed production — and Agent QA watches the whole fleet, with Evidently drift + degradation detection flagging any agent that regresses.',
+      'Capability ports + the Brain (versioned knowledge), shared tool registry, RBAC/ABAC, and Fleet Control (FleetDM/osquery MDM over every AI-enabled device) mean a new agent reuses everything that already passed production — and Agent QA watches the whole fleet, with Evidently drift + degradation detection flagging any agent that regresses.',
   },
   {
     n: '4',

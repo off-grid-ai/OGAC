@@ -174,6 +174,23 @@ OSS swap-in, graceful fallback).
   Bundled Python sidecar. **When:** report-grade drift test suites. **Configure:**
   `OFFGRID_ADAPTER_DRIFT=evidently` + `OFFGRID_EVIDENTLY_URL`. `make qa`. Falls back to first-party PSI.
 
+## Fleet Control — device management (MDM)
+
+### Off Grid device registry · first-party · always on
+
+- **What/why:** the nodes enrolled in this console — provision, push policy, pull audit, kill-switch.
+  The zero-OSS default for Fleet Control. **Configure:** none. Endpoint: `GET /admin/mdm/devices`.
+
+### FleetDM · `:8070` · MIT (Fleet Free) · profile `mdm`
+
+- **What/why:** osquery-based, cross-platform MDM (macOS/Windows/Linux/iOS/Android) — device
+  inventory, policies, GitOps — reached over its REST API. The production swap-in for Fleet Control;
+  our "nodes" map to Fleet "hosts". **Fleet Free is MIT** (free OSS); **Fleet Premium is paid and
+  NOT required.**
+- **When:** real fleet-scale device management. **Configure:** `OFFGRID_ADAPTER_MDM=fleetdm` +
+  `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`. `make mdm`, then create a token with `fleetctl`
+  (see the compose comment). Falls back to the first-party registry if unreachable.
+
 ## Provenance & tamper-evidence
 
 Make answers, exports, and assets verifiable. All options below are free OSS — no fees, no API keys.
@@ -236,3 +253,4 @@ Make answers, exports, and assets verifiable. All options below are free OSS —
 | online scoring      | LLM-as-judge → Langfuse | —                                      | llmops                 |
 | provenance          | ed25519 manifest      | C2PA (images) · Sigstore                 | (in-process)           |
 | sandbox             | none (no-exec)        | Docker (free) · E2B paid · Firecracker   | (docker/host)          |
+| mdm (Fleet Control) | device registry       | FleetDM (osquery, MIT)                    | mdm                    |
