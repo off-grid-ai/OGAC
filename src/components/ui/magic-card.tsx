@@ -54,10 +54,12 @@ export function MagicCard(props: MagicCardProps) {
     children,
     className,
     gradientSize = 200,
-    gradientColor = '#262626',
-    gradientOpacity = 0.8,
-    gradientFrom = '#9E7AFF',
-    gradientTo = '#FE8BBB',
+    // Off Grid brand: a soft emerald spotlight + emerald border glow on hover (not the Magic UI
+    // default grey smudge / purple-pink border).
+    gradientColor = '#34d399',
+    gradientOpacity = 0.15,
+    gradientFrom = '#34d399',
+    gradientTo = '#059669',
     mode = 'gradient',
   } = props;
 
