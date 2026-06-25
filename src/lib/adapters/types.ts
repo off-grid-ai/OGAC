@@ -21,7 +21,8 @@ export type Capability =
   | 'bi'
   | 'sandbox'
   | 'evals'
-  | 'drift';
+  | 'drift'
+  | 'mdm';
 
 export type RenderMode = 'native' | 'embed' | 'headless';
 
@@ -238,6 +239,24 @@ export interface SandboxResult {
 export interface SandboxPort {
   meta: AdapterMeta;
   run(language: SandboxLanguage, code: string, timeoutMs?: number): Promise<SandboxResult>;
+  health(): Promise<boolean>;
+}
+
+// MDM / device management — the "Fleet Control" backend. First-party is the in-console device
+// registry (enrolled nodes); FleetDM (osquery-based) is the production swap-in, reached over its
+// REST API. Same normalized device shape, so Fleet Control is agnostic to which one answered.
+export interface MdmDevice {
+  id: string;
+  name: string;
+  os: string;
+  status: string;
+  lastSeen: string;
+  source: string;
+}
+
+export interface MdmPort {
+  meta: AdapterMeta;
+  listDevices(): Promise<MdmDevice[]>;
   health(): Promise<boolean>;
 }
 

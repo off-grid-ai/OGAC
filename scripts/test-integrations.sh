@@ -110,6 +110,12 @@ else
   [ "$STATUS" = 403 ] \
     && ok "Sandbox run gated by agent-code-exec flag (403 when off)" \
     || bad "Sandbox gate" "expected 403, status=$STATUS body=$(echo "$BODY" | head -c 120)"
+
+  # MDM / Fleet Control — device inventory through the active adapter (native or fleetdm).
+  api GET /api/v1/admin/mdm/devices
+  { [ "$STATUS" = 200 ] && echo "$BODY" | grep -q '"backend"'; } \
+    && ok "GET /admin/mdm/devices → inventory (backend: $(echo "$BODY" | grep -o '"backend":"[^"]*"'))" \
+    || bad "GET /admin/mdm/devices" "status=$STATUS body=$(echo "$BODY" | head -c 120)"
 fi
 
 # ── 2. OSS SERVICE APIs ─────────────────────────────────────────────────────────
@@ -187,6 +193,12 @@ fi
 # Ragas sidecar — health (a full eval needs a loaded gateway model; covered by /admin/evals/run).
 rgh="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$RAGAS_URL/health" 2>/dev/null)"
 [ "$rgh" = 200 ] && ok "Ragas sidecar GET /health → 200 (RAG-metrics backend)" || skip "Ragas sidecar" "got $rgh from $RAGAS_URL (make qa)"
+
+# FleetDM — MDM server liveness (the Fleet Control swap-in). /healthz is unauthenticated;
+# the hosts API needs Fleet setup + a token (OFFGRID_FLEET_TOKEN).
+FLEET_URL="${OFFGRID_FLEET_URL:-http://127.0.0.1:8070}"
+fv="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$FLEET_URL/healthz" 2>/dev/null)"
+[ "$fv" = 200 ] && ok "FleetDM GET /healthz → 200 (MDM backend reachable)" || skip "FleetDM" "got $fv from $FLEET_URL (make mdm)"
 
 # ── summary ──────────────────────────────────────────────────────────────────
 hdr "Result"

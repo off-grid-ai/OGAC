@@ -101,7 +101,7 @@ const VALUE = [
   {
     icon: Network,
     title: 'Fleet Control',
-    body: 'MDM for AI. Provision, govern, and observe every AI-enabled device from one console — push policy down, pull audit up, kill-switch on demand. Your workforce runs AI; you keep control.',
+    body: 'MDM for AI, on open source (FleetDM + osquery). Provision, govern, and observe every AI-enabled device from one console — push policy down, pull audit up, kill-switch on demand. Your workforce runs AI; you keep control.',
   },
   {
     icon: TrendingUp,

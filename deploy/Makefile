@@ -2,7 +2,7 @@
 COMPOSE = docker compose -f docker-compose.yml
 
 .PHONY: up full config ps logs down smoke verify test-integrations identity-setup \
-        data secrets observability guardrails policy identity lineage llmops agents ai qa
+        data secrets observability guardrails policy identity lineage llmops agents ai qa mdm
 
 full up:       ## Bring up the FULL 5-layer stack (everything)
 	$(COMPOSE) --profile all up -d
@@ -28,6 +28,8 @@ agents:        ## Temporal + UI (durable workflows)
 	$(COMPOSE) --profile agents up -d
 qa:            ## Agent-QA sidecars (Evidently drift + Ragas RAG metrics)
 	$(COMPOSE) --profile qa up -d --build
+mdm:           ## Fleet Control MDM (FleetDM + MySQL + Redis)
+	$(COMPOSE) --profile mdm up -d
 
 config:        ## Validate the compose file
 	$(COMPOSE) --profile all config -q && echo "compose OK"

@@ -409,6 +409,45 @@ services:
     ports: ['8088:8088']
     volumes: [superset:/app/superset_home]
 
+  # ── MDM / FLEET CONTROL (FleetDM: osquery-based cross-platform device management) ──────
+  # MIT-licensed Fleet Free. First run, create an admin + API token:
+  #   docker compose exec fleet fleetctl setup --email a@b.co --password '...' --org-name OffGrid
+  #   then `fleetctl login` + `fleetctl get api-token` → set OFFGRID_FLEET_TOKEN.
+  fleet-mysql:
+    image: mysql:8.0
+    profiles: [mdm, all]
+    environment:
+      MYSQL_ROOT_PASSWORD: fleet
+      MYSQL_DATABASE: fleet
+      MYSQL_USER: fleet
+      MYSQL_PASSWORD: fleet
+    volumes: [fleetmysql:/var/lib/mysql]
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-ufleet', '-pfleet']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  fleet-redis:
+    image: redis:7-alpine
+    profiles: [mdm, all]
+  fleet:
+    image: fleetdm/fleet:latest
+    profiles: [mdm, all]
+    depends_on:
+      fleet-mysql:
+        condition: service_healthy
+    command: sh -c "fleet prepare db --no-prompt && fleet serve"
+    environment:
+      FLEET_MYSQL_ADDRESS: fleet-mysql:3306
+      FLEET_MYSQL_DATABASE: fleet
+      FLEET_MYSQL_USERNAME: fleet
+      FLEET_MYSQL_PASSWORD: fleet
+      FLEET_REDIS_ADDRESS: fleet-redis:6379
+      FLEET_SERVER_ADDRESS: 0.0.0.0:8070
+      FLEET_SERVER_TLS: 'false'
+      FLEET_LOGGING_JSON: 'true'
+    ports: ['8070:8070']
+
 volumes:
   pgdata:
   seaweed:
@@ -424,3 +463,4 @@ volumes:
   opensearch:
   unleashdb:
   superset:
+  fleetmysql:

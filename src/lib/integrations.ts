@@ -77,4 +77,9 @@ export const INTEGRATIONS: IntegrationLayer[] = [
     blurb: 'The console’s own state and audit.',
     tools: ['PostgreSQL', 'Drizzle'],
   },
+  {
+    layer: 'Fleet Control (MDM)',
+    blurb: 'Manage the devices running AI — provision, policy, audit, kill-switch.',
+    tools: ['FleetDM', 'osquery'],
+  },
 ];
