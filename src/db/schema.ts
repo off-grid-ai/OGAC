@@ -228,6 +228,26 @@ export const routingRules = pgTable('routing_rules', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── User-authored agents (created from text in the console) ──────────────────
+// Custom agents declared by an operator in plain language. They carry no special powers: every
+// run flows through the SAME governed pipeline as the built-ins (policy gate → guardrails →
+// retrieval/routing → grounding → provenance), so an agent authored here inherits every
+// convention configured on the console. `systemPrompt` is the natural-language instruction that
+// steers composition; `model` ('' = gateway default + routing rules decide).
+export const customAgents = pgTable('custom_agents', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  role: text('role').notNull().default('Custom'),
+  description: text('description').notNull().default(''),
+  systemPrompt: text('system_prompt').notNull().default(''),
+  model: text('model').notNull().default(''),
+  tools: jsonb('tools').$type<string[]>().notNull().default([]),
+  grounded: boolean('grounded').notNull().default(true),
+  trigger: text('trigger').notNull().default('on-demand'),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Tool registry (router's `tool` source / MCP & HTTP invocations) ──────────
 export const tools = pgTable('tools', {
   id: text('id').primaryKey(),

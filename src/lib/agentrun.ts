@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
 import {
@@ -10,7 +10,7 @@ import {
   getSandbox,
   getSigning,
 } from '@/lib/adapters/registry';
-import { AGENTS } from '@/lib/agents';
+import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { emitSpan } from '@/lib/otel';
@@ -70,16 +70,24 @@ function extractText(data: unknown): string | null {
   return typeof text === 'string' && text.trim() ? text.trim() : null;
 }
 
-async function gatewayAnswer(query: string, context: string): Promise<string | null> {
+// Compose the answer. `system` carries the agent's natural-language instruction (built-ins use a
+// terse default); `model` lets a custom agent name a target, otherwise the gateway default applies
+// (and the model-routing rules at the gateway still decide where it actually runs).
+async function gatewayAnswer(
+  query: string,
+  context: string,
+  system: string,
+  model: string,
+): Promise<string | null> {
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: ANSWER_MODEL,
+        model,
         temperature: 0,
         messages: [
-          { role: 'system', content: 'Answer only from the provided sources, concisely.' },
+          { role: 'system', content: system },
           { role: 'user', content: `SOURCES:\n${context}\n\nQUESTION: ${query}` },
         ],
         chat_template_kwargs: { enable_thinking: false },
@@ -92,12 +100,24 @@ async function gatewayAnswer(query: string, context: string): Promise<string | n
   }
 }
 
-async function compose(query: string, hits: RetrievalHit[]): Promise<string> {
+const DEFAULT_SYSTEM = 'Answer only from the provided sources, concisely.';
+
+// Build the system prompt for a run. A user-authored agent's instruction steers the answer, but we
+// always append the grounding rule so a custom agent can't opt out of source-faithfulness.
+function systemFor(agent: AgentDef): string {
+  if (!agent.systemPrompt?.trim()) return DEFAULT_SYSTEM;
+  return `${agent.systemPrompt.trim()}\n\nGround every claim in the provided sources; if they don't cover the question, say so rather than inventing facts.`;
+}
+
+async function compose(query: string, hits: RetrievalHit[], agent: AgentDef): Promise<string> {
   const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
-  const cacheKey = `${query}\n${context}`;
+  const system = systemFor(agent);
+  const model = agent.model || ANSWER_MODEL;
+  // The system prompt + model are part of the cache key so different agents never collide.
+  const cacheKey = `${model}\n${system}\n${query}\n${context}`;
   const cached = await cacheLookup(cacheKey);
   if (cached.hit && cached.answer) return cached.answer;
-  const answer = await gatewayAnswer(query, context);
+  const answer = await gatewayAnswer(query, context, system, model);
   if (answer) {
     await cacheStore(cacheKey, answer);
     return answer;
@@ -135,20 +155,39 @@ async function persist(
   return toRun(row, v);
 }
 
+function rowToRun(r: typeof agentRuns.$inferSelect): AgentRun {
+  return toRun(r, {
+    agentId: r.agentId,
+    query: r.query,
+    answer: r.answer,
+    status: r.status,
+    steps: r.steps ?? [],
+    citations: r.citations ?? [],
+    checks: (r.checks ?? []) as CheckResult[],
+    provenance: r.provenance ?? null,
+  });
+}
+
 export async function listAgentRuns(limit = 15): Promise<AgentRun[]> {
   const rows = await db.select().from(agentRuns).orderBy(desc(agentRuns.startedAt)).limit(limit);
-  return rows.map((r) =>
-    toRun(r, {
-      agentId: r.agentId,
-      query: r.query,
-      answer: r.answer,
-      status: r.status,
-      steps: r.steps ?? [],
-      citations: r.citations ?? [],
-      checks: (r.checks ?? []) as CheckResult[],
-      provenance: r.provenance ?? null,
-    }),
-  );
+  return rows.map(rowToRun);
+}
+
+// Runs for one agent (its detail page + history).
+export async function listAgentRunsByAgent(agentId: string, limit = 50): Promise<AgentRun[]> {
+  const rows = await db
+    .select()
+    .from(agentRuns)
+    .where(eq(agentRuns.agentId, agentId))
+    .orderBy(desc(agentRuns.startedAt))
+    .limit(limit);
+  return rows.map(rowToRun);
+}
+
+// A single run by id (the trace deep-dive page).
+export async function getAgentRun(id: string): Promise<AgentRun | null> {
+  const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, id)).limit(1);
+  return row ? rowToRun(row) : null;
 }
 
 type Mark = (kind: string, label: string, detail: string, refs: string[], start: number) => void;
@@ -172,7 +211,7 @@ async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
 }
 
 export async function runAgent(agentId: string, query: string): Promise<AgentRun | null> {
-  const agent = AGENTS.find((a) => a.id === agentId);
+  const agent = await resolveAgent(agentId);
   if (!agent) return null;
   const runId = `run_${randomUUID().slice(0, 8)}`;
   const steps: RunStep[] = [];
@@ -225,7 +264,7 @@ export async function runAgent(agentId: string, query: string): Promise<AgentRun
 
   // 4. Answer — composed from the retrieved sources (cached).
   t = Date.now();
-  const answer = await compose(query, routed.hits);
+  const answer = await compose(query, routed.hits, agent);
   mark('answer', 'compose', answer.slice(0, 120), [], t);
 
   // 5. Ground — verify the answer against the sources → citations.

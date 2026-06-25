@@ -1,4 +1,4 @@
-import { listAudit } from '@/lib/store';
+import { type CustomAgent, getCustomAgent, listAudit, listCustomAgents } from '@/lib/store';
 
 // Pre-built agent use cases. These are the "democratized intelligence at the frontline" and
 // "SOPs from observed work" cases the product ships with — adoptable standalone, with or
@@ -15,6 +15,12 @@ export interface AgentDef {
   tools: string[];
   grounded: boolean;
   trigger: AgentTrigger;
+  // Set on user-authored agents created from text in the console. `systemPrompt` is the
+  // natural-language instruction that steers the answer; the rest of the pipeline (policy,
+  // guardrails, routing, grounding, provenance) is identical to the built-ins.
+  custom?: boolean;
+  systemPrompt?: string;
+  model?: string;
 }
 
 export const AGENTS: AgentDef[] = [
@@ -75,18 +81,56 @@ export const AGENTS: AgentDef[] = [
   },
 ];
 
+// Map a DB-stored custom agent to the same AgentDef shape the built-ins use, so the rest of the
+// app treats both identically. Planes are derived: a grounded agent needs the Brain.
+function toDef(c: CustomAgent): AgentDef {
+  const trigger = (
+    ['on-call', 'on-message', 'observed', 'scheduled', 'on-demand'] as AgentTrigger[]
+  ).includes(c.trigger as AgentTrigger)
+    ? (c.trigger as AgentTrigger)
+    : 'on-demand';
+  return {
+    id: c.id,
+    name: c.name,
+    role: c.role,
+    description: c.description,
+    planes: c.grounded ? ['brain'] : [],
+    tools: c.tools,
+    grounded: c.grounded,
+    trigger,
+    custom: true,
+    systemPrompt: c.systemPrompt,
+    model: c.model || undefined,
+  };
+}
+
+// The full catalog the console shows and runs: built-ins + every user-authored agent.
+export async function listAllAgents(): Promise<AgentDef[]> {
+  const custom = await listCustomAgents();
+  return [...AGENTS, ...custom.filter((c) => c.enabled).map(toDef)];
+}
+
+// Resolve a single agent by id — built-in first, then a user-authored one from the DB. Used by
+// the interaction pipeline so a custom agent runs through exactly the same governed path.
+export async function resolveAgent(id: string): Promise<AgentDef | undefined> {
+  const builtin = AGENTS.find((a) => a.id === id);
+  if (builtin) return builtin;
+  const custom = await getCustomAgent(id);
+  return custom && custom.enabled ? toDef(custom) : undefined;
+}
+
 export interface AgentActivity {
   totalRuns: number;
   groundedShare: number;
 }
 
 // Honest, derived activity: the audit store is the only real signal we have today, so we
-// report fleet-wide events and the share of agents that are retrieval-grounded.
+// report fleet-wide events and the share of agents (built-in + custom) that are grounded.
 export async function agentActivity(): Promise<AgentActivity> {
-  const audit = await listAudit({ limit: 5000 });
-  const grounded = AGENTS.filter((a) => a.grounded).length;
+  const [audit, all] = await Promise.all([listAudit({ limit: 5000 }), listAllAgents()]);
+  const grounded = all.filter((a) => a.grounded).length;
   return {
     totalRuns: audit.length,
-    groundedShare: Math.round((grounded / AGENTS.length) * 100),
+    groundedShare: all.length ? Math.round((grounded / all.length) * 100) : 0,
   };
 }
