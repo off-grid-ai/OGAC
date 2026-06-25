@@ -9,7 +9,7 @@ const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/
 
 // Marketing, docs, and auth surfaces that never require an SSO session.
 const PUBLIC_EXACT = ['/', '/docs', '/openapi.json'];
-const PUBLIC_PREFIX = ['/architecture', '/journey', '/handbook', '/signin', '/api/auth'];
+const PUBLIC_PREFIX = ['/architecture', '/journey', '/features', '/handbook', '/signin', '/api/auth'];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.includes(pathname)) return true;
