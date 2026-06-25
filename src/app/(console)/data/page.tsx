@@ -3,6 +3,7 @@ import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
 import { ErasureForm } from '@/components/data/ErasureForm';
 import { MaskingRuleToggle } from '@/components/data/MaskingRuleToggle';
+import { PiiScanner } from '@/components/data/PiiScanner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -181,6 +182,8 @@ export default async function DataPage() {
           </p>
         </CardContent>
       </Card>
+
+      <PiiScanner />
     </div>
   );
 }
