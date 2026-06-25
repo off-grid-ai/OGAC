@@ -195,6 +195,19 @@ export const agentRuns = pgTable('agent_runs', {
     jsonb('citations').$type<
       { ref: string; title: string; snippet: string; score: number; supported: boolean }[]
     >(),
+  // Guardrail/eval check results (pre + post) and the detached provenance signature over the
+  // answer — both produced in-path by the interaction pipeline.
+  checks:
+    jsonb('checks').$type<
+      { name: string; verdict: string; score?: number; ms?: number; detail?: string }[]
+    >(),
+  provenance:
+    jsonb('provenance').$type<{
+      signature: string;
+      algorithm: string;
+      publicKey: string | null;
+      signedAt: string;
+    }>(),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
