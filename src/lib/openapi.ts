@@ -813,6 +813,18 @@ export const openApiSpec = {
         responses: { '200': { description: 'QA summary (offline, drift, online).' } },
       },
     },
+    '/api/v1/admin/qa/sweep': {
+      post: {
+        tags: ['agent-qa'],
+        summary: 'Scheduled QA sweep — eval + drift → degradation verdict',
+        description:
+          'Run on a cadence (cron / CI). Runs an offline eval + drift analysis, emits a `qa.sweep` span (alert on degraded=true), and returns the verdict. 200 healthy, 503 degraded — so a monitor / CI gate can react to the status code.',
+        responses: {
+          '200': { description: 'Healthy sweep { degraded:false, eval, drift }.' },
+          '503': { description: 'Degraded sweep { degraded:true, reasons, eval, drift }.' },
+        },
+      },
+    },
     '/api/v1/admin/provenance/c2pa': {
       post: {
         tags: ['provenance'],

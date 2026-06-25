@@ -2,7 +2,14 @@ import { randomUUID } from 'crypto';
 import { desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
-import { getFlags, getGrounding, getLineage, getPolicy, getSigning } from '@/lib/adapters/registry';
+import {
+  getFlags,
+  getGrounding,
+  getLineage,
+  getPolicy,
+  getSandbox,
+  getSigning,
+} from '@/lib/adapters/registry';
 import { AGENTS } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
@@ -10,6 +17,7 @@ import { emitSpan } from '@/lib/otel';
 import { scoreInteraction } from '@/lib/qa/scoring';
 import { route } from '@/lib/retrieval/router';
 import type { RetrievalHit } from '@/lib/retrieval/types';
+import { listTools } from '@/lib/store';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the
 // platform's capabilities actually fire in-path, not just from admin endpoints:
@@ -143,6 +151,26 @@ export async function listAgentRuns(limit = 15): Promise<AgentRun[]> {
   );
 }
 
+type Mark = (kind: string, label: string, detail: string, refs: string[], start: number) => void;
+
+// Phase 3 — sandbox as an agent tool. If the routed tool is a `sandbox`-type tool and the
+// agent-code-exec flag is on, execute its script through the active sandbox (Docker by default;
+// the no-exec default refuses) and record a 'sandbox' step. Tool.endpoint holds the script.
+async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
+  const tool = (await listTools()).find((t) => `tool:${t.id}` === ref);
+  if (!tool || tool.type !== 'sandbox') return;
+  if (!(await getFlags().isEnabled('agent-code-exec', false))) {
+    mark('sandbox', 'gated', 'agent-code-exec flag off — execution skipped', [ref], Date.now());
+    return;
+  }
+  const t = Date.now();
+  const result = await getSandbox().run('python', tool.endpoint || 'print("ok")');
+  const detail = result.refused
+    ? result.refused
+    : `${result.engine}: exit ${result.exitCode} ${result.ok ? 'ok' : 'fail'}${result.timedOut ? ' (timeout)' : ''}`;
+  mark('sandbox', result.engine, detail, [ref], t);
+}
+
 export async function runAgent(agentId: string, query: string): Promise<AgentRun | null> {
   const agent = AGENTS.find((a) => a.id === agentId);
   if (!agent) return null;
@@ -190,7 +218,10 @@ export async function runAgent(agentId: string, query: string): Promise<AgentRun
   const routed = await route(query, 6);
   mark('retrieve', 'router', `intent ${routed.decision.intent.join(', ')}`, routed.hits.map((h) => h.ref), t);
   const toolHit = routed.hits.find((h) => h.sourceKind === 'tool');
-  if (toolHit) mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
+  if (toolHit) {
+    mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
+    await maybeRunSandboxTool(toolHit.ref, mark);
+  }
 
   // 4. Answer — composed from the retrieved sources (cached).
   t = Date.now();

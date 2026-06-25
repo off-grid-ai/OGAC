@@ -74,6 +74,23 @@ This is the endpoint a dashboard or monitor polls.
 
 ---
 
+## Scheduled sweep — `POST /api/v1/admin/qa/sweep`
+
+Run on a cadence (cron / CI / scheduler). One call runs an offline eval **+** the drift analysis,
+decides whether the agent fleet has **degraded** (eval score below `OFFGRID_QA_MIN_SCORE`, default
+70, or drift detected), and emits a `qa.sweep` OTLP span so the observability backend can **alert on
+`degraded=true`**. Returns **200 healthy / 503 degraded**, so a monitor or CI gate can react to the
+status code directly.
+
+## In the interaction pipeline (it fires automatically)
+
+QA isn't only manual endpoints — it's wired into the canonical agent-run pipeline (`agentrun.ts`):
+- **Guardrails** (PII + injection) run on every request's input and output.
+- **Online scoring** fires **after the response is flushed** (`next/server after()`), gated by the
+  `online-evals` flag + `OFFGRID_QA_SAMPLE_RATE` — so the LLM-judge call adds **zero latency**.
+- **Provenance**: every answer is signed (ed25519/HMAC) and the signature persisted on the run.
+- The **scheduled sweep** is the out-of-band complement that watches the whole fleet over time.
+
 ## What is live vs needs a service up
 
 - **Live by default, no extra service:** golden evals, native PSI drift/degradation.
