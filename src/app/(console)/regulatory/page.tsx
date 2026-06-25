@@ -1,5 +1,6 @@
 import { DownloadSimple as Download } from '@phosphor-icons/react/dist/ssr';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
+import { ProvenancePanel } from '@/components/provenance/ProvenancePanel';
 import { AddGovernanceButton } from '@/components/regulatory/AddGovernanceButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -173,6 +174,8 @@ export default async function RegulatoryPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ProvenancePanel />
     </div>
   );
 }
