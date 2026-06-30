@@ -18,9 +18,15 @@
       "directAccessGrantsEnabled": true,
       "secret": "offgrid-dev-keycloak-secret",
       "redirectUris": [
-        "http://onprem-console.getoffgridai.co/api/auth/callback/keycloak",
-        "http://127.0.0.1/api/auth/callback/keycloak",
-        "http://localhost:3000/api/auth/callback/keycloak"
+        "http://onprem-console.getoffgridai.co/*",
+        "http://127.0.0.1/*",
+        "http://127.0.0.1:3000/*",
+        "http://192.168.1.60:3000/*",
+        "http://offgrid-s1.local/*",
+        "http://offgrid-s1.local:3000/*",
+        "http://offgrid-s2.local:3000/*",
+        "http://0.0.0.0:3000/*",
+        "http://localhost:3000/*"
       ],
       "webOrigins": ["+"]
     }
