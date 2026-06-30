@@ -27,6 +27,11 @@ const TARGETS = [
   ['regulatory', 'regulatory'],
   ['integrations', 'integrations'],
   ['admin', 'admin'],
+  // deep agentic screens (seeded)
+  ['agents/sop-synth', 'agent-detail'],
+  ['agents/sop-synth/runs/run_d1', 'agent-trace'],
+  ['observability/evals/ev_1', 'eval-detail'],
+  ['brain/prompts/pr_02b767db', 'prompt-detail'],
 ];
 
 const browser = await chromium.launch();
