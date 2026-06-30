@@ -14,7 +14,8 @@ async function modelPlan(prompt: string, catalog: Catalog, ids: Set<string>): Pr
     'You wire an agentic workflow from a catalog of available building blocks. ' +
     'Each block has an id, a group (Connector|Data|Tool|Guardrail|Model|Agent), and a label. ' +
     'Given the user request, pick the blocks to use and the directed edges between them. ' +
-    'Order the flow: Connector/Data sources -> Guardrails -> Tool/Agent -> Model. ' +
+    'Start with one Input (trigger), then Connector/Data sources -> Guardrails -> Tool/Agent -> Model, ' +
+    'insert a Human (review) checkpoint before any irreversible Output, and end with an Output (sink). ' +
     'Respond with ONLY minified JSON: {"title":"","summary":"","nodeIds":[],"edges":[{"from":"","to":"","label":""}]}. ' +
     'Use ONLY ids that appear in the catalog.';
   const catalogText = catalog.blocks.map((b) => `${b.id} [${b.group}] ${b.label}`).join('\n');
@@ -59,11 +60,13 @@ async function plan(prompt: string, catalog: Catalog): Promise<Workflow> {
 function heuristic(prompt: string, blocks: Block[]): Workflow {
   const byGroup = (g: Block['group'], n: number) => blocks.filter((b) => b.group === g).slice(0, n);
   const chain = [
-    ...byGroup('Connector', 2),
+    ...byGroup('Input', 1),
+    ...byGroup('Connector', 1),
     ...byGroup('Data', 1),
-    ...byGroup('Guardrail', 2),
+    ...byGroup('Guardrail', 1),
     ...byGroup('Agent', 1),
-    ...byGroup('Model', 1),
+    ...byGroup('Human', 1),
+    ...byGroup('Output', 1),
   ];
   const edges = chain.slice(0, -1).map((b, i) => ({ from: b.id, to: chain[i + 1].id }));
   return { title: 'Suggested workflow', summary: prompt || 'Wired from available blocks', nodeIds: chain.map((b) => b.id), edges };
