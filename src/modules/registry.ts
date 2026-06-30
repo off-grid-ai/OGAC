@@ -7,6 +7,7 @@ export type ModuleId =
   | 'data'
   | 'brain'
   | 'agents'
+  | 'studio'
   | 'observability'
   | 'analytics'
   | 'finops'
@@ -69,6 +70,13 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Agents',
     description: 'Pre-built AI agent use cases.',
     route: '/agents',
+    service: 'agents',
+  },
+  {
+    id: 'studio',
+    label: 'Studio',
+    description: 'Build agents & workflows in plain language — wired to your connectors, data, tools, guardrails.',
+    route: '/studio',
     service: 'agents',
   },
   {
