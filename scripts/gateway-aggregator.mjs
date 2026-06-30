@@ -9,6 +9,7 @@
 import http from 'node:http';
 
 const PORT = Number(process.env.PORT || 8800);
+const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info URLs only
 // role map — one model per gateway (edit IPs via OFFGRID_POOL JSON if they change)
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
   { name: 'g1', host: '192.168.1.57', port: 7878, vision: false, model: 'qwen3.5-9b' },
@@ -34,13 +35,37 @@ function pick(model, image) {
 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
+// Fetch each gateway's own info JSON (modalities) and merge — so the console Gateway
+// page renders the full modality grid even though it's talking to the aggregator.
+async function poolInfo() {
+  const infos = await Promise.all(POOL.map(async (g) => {
+    try {
+      const r = await fetch(`http://${g.host}:${g.port}/`, { signal: AbortSignal.timeout(1500) });
+      return { g, info: r.ok ? await r.json() : null };
+    } catch { return { g, info: null }; }
+  }));
+  const modalities = {};
+  for (const { info } of infos) for (const [k, v] of Object.entries(info?.modalities || {}))
+    if (v === 'ready' || !modalities[k]) modalities[k] = v;
+  return {
+    name: 'Off Grid AI — gateway aggregator',
+    openai_compatible: true,
+    base_url: `http://${HOST_HINT}:${PORT}/v1`,
+    docs: `http://${HOST_HINT}:${PORT}/v1`,
+    mcp: `http://${HOST_HINT}:${PORT}/mcp`,
+    modalities: Object.keys(modalities).length ? modalities : { text: 'ready', vision_understanding: 'ready' },
+    image_models: [],
+    gateways: infos.map(({ g, info }) => ({ name: g.name, host: g.host, model: g.model, vision: g.vision, up: !!info })),
+  };
+}
+
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/health')
-    return json(res, 200, { name: 'Off Grid AI — gateway aggregator', openai_compatible: true, base_url: `http://0.0.0.0:${PORT}/v1`, routes: POOL });
+    return poolInfo().then((i) => json(res, 200, i)).catch(() => json(res, 200, { name: 'Off Grid AI — gateway aggregator', routes: POOL }));
   if (req.url === '/v1/models')
     return json(res, 200, { object: 'list', data: [
-      { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'] },
-      { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'] },
+      { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'qwen3.5-9b').map((g) => g.name) },
+      { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'gemma-4-e4b').map((g) => g.name) },
     ] });
 
   const chunks = [];
