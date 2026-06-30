@@ -1,8 +1,12 @@
 {
   "realm": "offgrid",
   "enabled": true,
-  "displayName": "Off Grid",
+  "displayName": "Off Grid Console",
   "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
   "clients": [
     {
       "clientId": "offgrid-console",
@@ -13,19 +17,47 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "secret": "offgrid-dev-keycloak-secret",
-      "redirectUris": ["http://localhost:3000/api/auth/callback/keycloak"],
-      "webOrigins": ["http://localhost:3000"]
+      "redirectUris": [
+        "http://onprem-console.getoffgridai.co/api/auth/callback/keycloak",
+        "http://127.0.0.1/api/auth/callback/keycloak",
+        "http://localhost:3000/api/auth/callback/keycloak"
+      ],
+      "webOrigins": ["+"]
     }
   ],
   "users": [
     {
-      "username": "advisor",
+      "username": "mohammed.ali@wednesday.is",
       "enabled": true,
-      "email": "advisor@offgrid.local",
+      "email": "mohammed.ali@wednesday.is",
       "emailVerified": true,
-      "firstName": "Field",
-      "lastName": "Advisor",
-      "credentials": [{ "type": "password", "value": "advisor-pw", "temporary": false }]
+      "firstName": "Mohammed",
+      "lastName": "Ali",
+      "credentials": [
+        { "type": "password", "value": "OffGrid-2026", "temporary": true }
+      ]
+    },
+    {
+      "username": "diksha.sharma@wednesday.is",
+      "enabled": true,
+      "email": "diksha.sharma@wednesday.is",
+      "emailVerified": true,
+      "firstName": "Diksha",
+      "lastName": "Sharma",
+      "credentials": [
+        { "type": "password", "value": "OffGrid-2026", "temporary": true }
+      ]
+    },
+    {
+      "username": "ali@wednesday.is",
+      "enabled": true,
+      "email": "ali@wednesday.is",
+      "emailVerified": true,
+      "firstName": "Ali",
+      "lastName": "",
+      "credentials": [
+        { "type": "password", "value": "OffGrid-2026", "temporary": true }
+      ]
     }
   ]
 }

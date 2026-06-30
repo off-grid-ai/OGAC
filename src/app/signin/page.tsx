@@ -55,7 +55,9 @@ export default function SignInPage() {
         <CardHeader className="items-center text-center">
           <Image src="/logo.png" alt="Off Grid" width={40} height={40} className="mb-2" priority />
           <CardTitle className="text-base">Off Grid Console</CardTitle>
-          <CardDescription>Sign in to govern your fleet.</CardDescription>
+          <CardDescription>
+            Sign in to your control plane — fleet, models, data, agents, and governance.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2.5">
           {active.map((p) => (
@@ -68,8 +70,8 @@ export default function SignInPage() {
           ))}
           {active.length === 0 ? (
             <p className="text-center text-xs text-muted-foreground">
-              No SSO providers configured. Add Google, Microsoft, or Keycloak credentials in
-              .env.local.
+              No sign-in method configured. Add Keycloak, Google, or Microsoft credentials to the
+              console environment.
             </p>
           ) : null}
           <p className="pt-2 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
