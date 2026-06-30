@@ -56,7 +56,7 @@ export default async function GatewayPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
             <CardTitle className="text-sm">{info.name}</CardTitle>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{info.base_url}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{`${GATEWAY_URL}/v1`}</p>
           </div>
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             <Plug className="size-3" />
