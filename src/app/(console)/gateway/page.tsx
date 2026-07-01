@@ -4,13 +4,10 @@ import {
   ProhibitInset as CircleSlash,
   Plug,
 } from '@phosphor-icons/react/dist/ssr';
-import { GatewayControl } from '@/components/gateway/GatewayControl';
-import { GatewayLogs } from '@/components/gateway/GatewayLogs';
-import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
+import { GatewayTabs } from '@/components/gateway/GatewayTabs';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -78,15 +75,9 @@ export default async function GatewayPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="traffic">Traffic</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="control">Control</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
+      <GatewayTabs
+        overview={
+          <>
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm">Modalities</CardTitle>
@@ -131,18 +122,9 @@ export default async function GatewayPage() {
               </CardContent>
             </Card>
           ) : null}
-        </TabsContent>
-
-        <TabsContent value="traffic" className="space-y-6">
-          <GatewayTraffic />
-        </TabsContent>
-        <TabsContent value="logs">
-          <GatewayLogs />
-        </TabsContent>
-        <TabsContent value="control">
-          <GatewayControl />
-        </TabsContent>
-      </Tabs>
+          </>
+        }
+      />
     </div>
   );
 }
