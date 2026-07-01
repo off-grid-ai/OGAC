@@ -1,6 +1,6 @@
 'use client';
 
-import { CaretDown, CaretUp, MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
+import { ArrowClockwise, CaretDown, CaretUp, MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { CallDetail, type Call } from '@/components/gateway/GatewayTraffic';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +63,8 @@ export function GatewayLogs() {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('ts');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [nonce, setNonce] = useState(0); // bump to force a refetch (manual or interval)
+  const [autoMs, setAutoMs] = useState(0); // 0 = off; else auto-refresh every autoMs
 
   // Debounce the search box (~400ms) so keystrokes don't hammer the endpoint.
   useEffect(() => {
@@ -113,7 +115,14 @@ export function GatewayLogs() {
     return () => {
       alive = false;
     };
-  }, [params]);
+  }, [params, nonce]);
+
+  // Auto-refresh: re-run the query every autoMs (off when 0).
+  useEffect(() => {
+    if (!autoMs) return undefined;
+    const id = setInterval(() => setNonce((n) => n + 1), autoMs);
+    return () => clearInterval(id);
+  }, [autoMs]);
 
   const sorted = useMemo(() => {
     const arr = [...hits];
@@ -222,6 +231,28 @@ export function GatewayLogs() {
               <span>
                 {total} match{total === 1 ? '' : 'es'}
                 {loading ? ' · loading…' : ''}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setNonce((n) => n + 1)}
+                  title="Refresh now"
+                  className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 hover:text-primary"
+                >
+                  <ArrowClockwise className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                <select
+                  value={autoMs}
+                  onChange={(e) => setAutoMs(Number(e.target.value))}
+                  title="Auto-refresh interval"
+                  className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px]"
+                >
+                  <option value={0}>auto: off</option>
+                  <option value={5000}>every 5s</option>
+                  <option value={15000}>every 15s</option>
+                  <option value={30000}>every 30s</option>
+                  <option value={60000}>every 1m</option>
+                </select>
               </span>
             </div>
             <Table>
