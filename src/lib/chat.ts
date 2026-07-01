@@ -6,6 +6,8 @@ import {
   chatMemory,
   chatMessages,
   chatPrefs,
+  chatProjectMembers,
+  chatProjectMemory,
   chatProjects,
   chatSettings,
   chatSkills,
@@ -51,6 +53,37 @@ export async function ensureChatSchema(): Promise<void> {
       allowed_roles jsonb NOT NULL DEFAULT '[]', icon text, enabled boolean NOT NULL DEFAULT true,
       created_by text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
   `);
+  // Assistant-builder fields on skills (added post-hoc for existing tables).
+  await db.execute(
+    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS conversation_starters jsonb NOT NULL DEFAULT '[]';`,
+  );
+  await db.execute(
+    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS capabilities jsonb NOT NULL DEFAULT '{}';`,
+  );
+  await db.execute(
+    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS actions_schema text NOT NULL DEFAULT '';`,
+  );
+  await db.execute(
+    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'org';`,
+  );
+  // Project sharing + per-project memory (added post-hoc for existing tables).
+  await db.execute(
+    sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'private';`,
+  );
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_project_members (
+      project_id text NOT NULL, user_id text NOT NULL,
+      can_edit boolean NOT NULL DEFAULT false, added_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (project_id, user_id));
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_project_memory (
+      id text PRIMARY KEY, project_id text NOT NULL, fact text NOT NULL,
+      source text NOT NULL DEFAULT 'chat', created_at timestamptz NOT NULL DEFAULT now());
+  `);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS chat_project_memory_idx ON chat_project_memory (project_id);`,
+  );
   // conversations can be bound to a skill (added post-hoc for existing tables)
   await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
   await db.execute(sql`
@@ -118,13 +151,18 @@ export async function memoryBlock(userId: string): Promise<string> {
 // ─── Org skills (RBAC-scoped reusable assistants) ─────────────────────────────
 // Visible to a user if the skill is enabled AND (no allowedRoles restriction OR the user's role
 // is listed). Admins see all.
-export async function listSkills(role: string): Promise<(typeof chatSkills.$inferSelect)[]> {
+export async function listSkills(
+  role: string,
+  userId?: string,
+): Promise<(typeof chatSkills.$inferSelect)[]> {
   await ensureChatSchema();
   const all = await db.select().from(chatSkills).orderBy(desc(chatSkills.createdAt));
   if (role === 'admin') return all;
-  return all.filter(
-    (s) => s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role)),
-  );
+  return all.filter((s) => {
+    // Private assistants are visible only to their creator.
+    if (s.visibility === 'private' && s.createdBy !== userId) return false;
+    return s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role));
+  });
 }
 
 export async function getSkill(id: string) {
@@ -133,6 +171,7 @@ export async function getSkill(id: string) {
   return s ?? null;
 }
 
+// eslint-disable-next-line complexity
 export async function createSkill(createdBy: string, s: Partial<typeof chatSkills.$inferInsert>) {
   await ensureChatSchema();
   const id = rid();
@@ -145,6 +184,10 @@ export async function createSkill(createdBy: string, s: Partial<typeof chatSkill
     projectId: s.projectId ?? null,
     allowedRoles: s.allowedRoles ?? [],
     icon: s.icon ?? null,
+    conversationStarters: s.conversationStarters ?? [],
+    capabilities: s.capabilities ?? {},
+    actionsSchema: s.actionsSchema ?? '',
+    visibility: s.visibility ?? 'org',
     createdBy,
   });
   return id;
@@ -319,6 +362,121 @@ export async function projectSystemPrompt(projectId: string | null): Promise<str
   if (!projectId) return '';
   const [p] = await db.select().from(chatProjects).where(eq(chatProjects.id, projectId));
   return p?.systemPrompt?.trim() ?? '';
+}
+
+// ─── Project sharing (visibility + members with view/edit) ────────────────────
+// A user's access to a project. Owners have full access; members get view or edit; admins may
+// manage any. Used to gate the detail page and mutations RBAC-aware.
+export type ProjectAccess = 'owner' | 'edit' | 'view' | null;
+export async function projectAccess(
+  userId: string,
+  projectId: string,
+  role = 'viewer',
+): Promise<ProjectAccess> {
+  await ensureChatSchema();
+  const [p] = await db.select().from(chatProjects).where(eq(chatProjects.id, projectId));
+  if (!p) return null;
+  if (p.userId === userId) return 'owner';
+  if (role === 'admin') return 'edit';
+  const [m] = await db
+    .select()
+    .from(chatProjectMembers)
+    .where(and(eq(chatProjectMembers.projectId, projectId), eq(chatProjectMembers.userId, userId)));
+  if (m) return m.canEdit ? 'edit' : 'view';
+  return null;
+}
+
+// Projects shared WITH a user (they're a member of, not the owner).
+export async function listSharedProjects(userId: string) {
+  await ensureChatSchema();
+  const memberships = await db
+    .select()
+    .from(chatProjectMembers)
+    .where(eq(chatProjectMembers.userId, userId));
+  const out: (typeof chatProjects.$inferSelect & { canEdit: boolean })[] = [];
+  for (const m of memberships) {
+    const [p] = await db.select().from(chatProjects).where(eq(chatProjects.id, m.projectId));
+    if (p) out.push({ ...p, canEdit: m.canEdit });
+  }
+  return out.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+}
+
+export async function listProjectMembers(projectId: string) {
+  await ensureChatSchema();
+  return db
+    .select()
+    .from(chatProjectMembers)
+    .where(eq(chatProjectMembers.projectId, projectId))
+    .orderBy(desc(chatProjectMembers.addedAt));
+}
+
+export async function addProjectMember(projectId: string, userId: string, canEdit = false) {
+  await ensureChatSchema();
+  const u = userId.trim().toLowerCase();
+  if (!u) return;
+  await db
+    .insert(chatProjectMembers)
+    .values({ projectId, userId: u, canEdit })
+    .onConflictDoUpdate({
+      target: [chatProjectMembers.projectId, chatProjectMembers.userId],
+      set: { canEdit },
+    });
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  await ensureChatSchema();
+  await db
+    .delete(chatProjectMembers)
+    .where(and(eq(chatProjectMembers.projectId, projectId), eq(chatProjectMembers.userId, userId)));
+}
+
+export async function setProjectVisibility(projectId: string, visibility: string) {
+  await ensureChatSchema();
+  await db
+    .update(chatProjects)
+    .set({ visibility: visibility === 'org' ? 'org' : 'private', updatedAt: new Date() })
+    .where(eq(chatProjects.id, projectId));
+}
+
+// ─── Per-project memory (project-scoped facts injected into that project's chats) ──
+export async function listProjectMemory(projectId: string) {
+  await ensureChatSchema();
+  return db
+    .select()
+    .from(chatProjectMemory)
+    .where(eq(chatProjectMemory.projectId, projectId))
+    .orderBy(desc(chatProjectMemory.createdAt));
+}
+
+export async function addProjectMemory(projectId: string, fact: string, source = 'chat') {
+  await ensureChatSchema();
+  const f = fact.trim().slice(0, 500);
+  if (!f) return;
+  const existing = await db
+    .select({ id: chatProjectMemory.id })
+    .from(chatProjectMemory)
+    .where(and(eq(chatProjectMemory.projectId, projectId), eq(chatProjectMemory.fact, f)));
+  if (existing.length) return;
+  await db.insert(chatProjectMemory).values({ id: rid(), projectId, fact: f, source });
+}
+
+export async function deleteProjectMemory(projectId: string, id: string) {
+  await ensureChatSchema();
+  await db
+    .delete(chatProjectMemory)
+    .where(and(eq(chatProjectMemory.id, id), eq(chatProjectMemory.projectId, projectId)));
+}
+
+// Format a project's memories as a system block injected into that project's chats.
+export async function projectMemoryBlock(projectId: string | null): Promise<string> {
+  if (!projectId) return '';
+  const rows = await listProjectMemory(projectId);
+  if (!rows.length) return '';
+  return (
+    '<project_memory>\nFacts remembered for this project from past conversations:\n' +
+    rows.map((r) => `- ${r.fact}`).join('\n') +
+    '\n</project_memory>'
+  );
 }
 
 // ─── Artifacts library (saved renderable outputs, promoted to a top-level surface) ──

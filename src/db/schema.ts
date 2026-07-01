@@ -282,8 +282,33 @@ export const chatProjects = pgTable('chat_projects', {
   description: text('description').notNull().default(''),
   systemPrompt: text('system_prompt').notNull().default(''),
   icon: text('icon'),
+  // Sharing scope: private (only the owner) | org (shared with members below). Additive.
+  visibility: text('visibility').notNull().default('private'), // private | org
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Project sharing — grant named users view/edit access to a project they don't own. RBAC-aware:
+// only the owner (or an admin) manages the member list. Additive to chat_projects.
+export const chatProjectMembers = pgTable(
+  'chat_project_members',
+  {
+    projectId: text('project_id').notNull(),
+    userId: text('user_id').notNull(), // member's email
+    canEdit: boolean('can_edit').notNull().default(false), // false = view only
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (m) => [primaryKey({ columns: [m.projectId, m.userId] })],
+);
+
+// Per-project memory — a project-scoped memory space (parallel to per-user chat_memory). Facts
+// captured while chatting under a project, injected into that project's future chats. Additive.
+export const chatProjectMemory = pgTable('chat_project_memory', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  fact: text('fact').notNull(),
+  source: text('source').notNull().default('chat'), // chat | manual
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const chatConversations = pgTable('chat_conversations', {
@@ -323,6 +348,19 @@ export const chatSkills = pgTable('chat_skills', {
   enabled: boolean('enabled').notNull().default(true),
   createdBy: text('created_by').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // ─── Assistant builder (GPT-parity) fields — all additive ───
+  // Clickable prompt suggestions shown when a fresh chat opens under this skill.
+  conversationStarters: jsonb('conversation_starters').$type<string[]>().notNull().default([]),
+  // Capability toggles the assistant may use (web browsing, tool-calling, code execution).
+  capabilities: jsonb('capabilities')
+    .$type<{ web?: boolean; tools?: boolean; code?: boolean }>()
+    .notNull()
+    .default({}),
+  // Optional OpenAPI schema (raw text) declaring an Action; a simple executor registers it as a
+  // callable tool for the assistant at chat time.
+  actionsSchema: text('actions_schema').notNull().default(''),
+  // Sharing scope: private (only the creator) | org (visible to allowedRoles / everyone).
+  visibility: text('visibility').notNull().default('org'), // private | org
 });
 
 // Per-user custom instructions (like ChatGPT's) — injected as the first system message.
