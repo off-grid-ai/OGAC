@@ -1,7 +1,7 @@
 // Persistence for the node↔console state — real Postgres via Drizzle. Same exported
 // signatures the routes/UI already use (now async). Schema lives in src/db/schema.ts.
 import { randomUUID } from 'crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   abacRules,
@@ -10,6 +10,7 @@ import {
   commands,
   connectors,
   customAgents,
+  customRoles,
   datasets,
   devices,
   enrollmentTokens,
@@ -17,6 +18,7 @@ import {
   governanceItems,
   ingestJobs,
   maskingRules,
+  orgSettings,
   promptVersions,
   prompts,
   policies,
@@ -28,6 +30,32 @@ import {
 import type { CheckResult } from '@/lib/checks';
 import { emitSpan } from '@/lib/otel';
 import { shipAudit } from '@/lib/siem';
+
+// Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
+// the deploy needs no migration step (matches the chat module's ensure* pattern). Memoized.
+let orgEnsure: Promise<void> | null = null;
+export async function ensureOrgSchema(): Promise<void> {
+  if (orgEnsure) return orgEnsure;
+  orgEnsure = (async (): Promise<void> => {
+    await db.execute(sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS policy text NOT NULL DEFAULT 'approval';`);
+    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS endpoint text NOT NULL DEFAULT '';`);
+    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`);
+    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`);
+    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS org_settings (
+        id text PRIMARY KEY DEFAULT 'org', system_prompt text NOT NULL DEFAULT '',
+        updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '');
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS custom_roles (
+        id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
+        based_on text NOT NULL DEFAULT 'viewer', capabilities jsonb NOT NULL DEFAULT '[]',
+        created_at timestamptz NOT NULL DEFAULT now());
+    `);
+  })();
+  return orgEnsure;
+}
 
 export type DeviceOS = 'macOS' | 'iOS' | 'Windows';
 export type DeviceStatus = 'online' | 'offline';
@@ -344,6 +372,10 @@ export interface Connector {
   type: string;
   status: string;
   lastSync: string | null;
+  endpoint: string;
+  auth: string;
+  description: string;
+  custom: boolean;
 }
 
 export interface IngestJob {
@@ -374,23 +406,48 @@ export interface Dataset {
 const SYNC_MIN = 100;
 const SYNC_RANGE = 5000;
 
-export async function listConnectors(): Promise<Connector[]> {
-  const rows = await db.select().from(connectors).orderBy(desc(connectors.createdAt));
-  return rows.map((r) => ({
+function toConnector(r: typeof connectors.$inferSelect): Connector {
+  return {
     id: r.id,
     name: r.name,
     type: r.type,
     status: r.status,
     lastSync: r.lastSync ? iso(r.lastSync) : null,
-  }));
+    endpoint: r.endpoint ?? '',
+    auth: r.auth ?? 'none',
+    description: r.description ?? '',
+    custom: r.custom ?? false,
+  };
 }
 
-export async function createConnector(name: string, type: string): Promise<Connector> {
+export async function listConnectors(): Promise<Connector[]> {
+  await ensureOrgSchema();
+  const rows = await db.select().from(connectors).orderBy(desc(connectors.createdAt));
+  return rows.map(toConnector);
+}
+
+export async function createConnector(input: {
+  name: string;
+  type: string;
+  endpoint?: string;
+  auth?: string;
+  description?: string;
+  custom?: boolean;
+}): Promise<Connector> {
+  await ensureOrgSchema();
   const [row] = await db
     .insert(connectors)
-    .values({ id: `con_${randomUUID().slice(0, 6)}`, name, type })
+    .values({
+      id: `con_${randomUUID().slice(0, 6)}`,
+      name: input.name,
+      type: input.type,
+      endpoint: input.endpoint ?? '',
+      auth: input.auth ?? 'none',
+      description: input.description ?? '',
+      custom: input.custom ?? false,
+    })
     .returning();
-  return { id: row.id, name: row.name, type: row.type, status: row.status, lastSync: null };
+  return toConnector(row);
 }
 
 export async function deleteConnector(id: string): Promise<void> {
@@ -880,6 +937,8 @@ export async function deleteApiKey(id: string): Promise<void> {
 }
 
 // ─── Tool registry (the router's `tool` source) ───────────────────────────────
+export type ToolPolicy = 'allow' | 'approval' | 'blocked';
+
 export interface Tool {
   id: string;
   name: string;
@@ -887,9 +946,11 @@ export interface Tool {
   endpoint: string;
   description: string;
   enabled: boolean;
+  policy: ToolPolicy;
 }
 
 export async function listTools(): Promise<Tool[]> {
+  await ensureOrgSchema();
   const rows = await db.select().from(tools).orderBy(desc(tools.createdAt));
   return rows.map((r) => ({
     id: r.id,
@@ -898,6 +959,7 @@ export async function listTools(): Promise<Tool[]> {
     endpoint: r.endpoint,
     description: r.description,
     enabled: r.enabled,
+    policy: (r.policy as ToolPolicy) ?? 'approval',
   }));
 }
 
@@ -906,10 +968,12 @@ export async function createTool(input: {
   type: string;
   endpoint: string;
   description: string;
+  policy?: ToolPolicy;
 }): Promise<Tool> {
+  await ensureOrgSchema();
   const [row] = await db
     .insert(tools)
-    .values({ id: `tool_${randomUUID().slice(0, 8)}`, ...input })
+    .values({ id: `tool_${randomUUID().slice(0, 8)}`, policy: input.policy ?? 'approval', ...input })
     .returning();
   return {
     id: row.id,
@@ -918,6 +982,7 @@ export async function createTool(input: {
     endpoint: row.endpoint,
     description: row.description,
     enabled: row.enabled,
+    policy: (row.policy as ToolPolicy) ?? 'approval',
   };
 }
 
@@ -925,8 +990,85 @@ export async function setToolEnabled(id: string, enabled: boolean): Promise<void
   await db.update(tools).set({ enabled }).where(eq(tools.id, id));
 }
 
+const TOOL_POLICIES: ToolPolicy[] = ['allow', 'approval', 'blocked'];
+export async function setToolPolicy(id: string, policy: ToolPolicy): Promise<void> {
+  await ensureOrgSchema();
+  if (!TOOL_POLICIES.includes(policy)) return;
+  await db.update(tools).set({ policy }).where(eq(tools.id, id));
+}
+
 export async function deleteTool(id: string): Promise<void> {
   await db.delete(tools).where(eq(tools.id, id));
+}
+
+// ─── Org-wide settings (singleton) ────────────────────────────────────────────
+export async function getOrgSystemPrompt(): Promise<string> {
+  await ensureOrgSchema();
+  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'org')).limit(1);
+  return row?.systemPrompt ?? '';
+}
+
+export async function setOrgSystemPrompt(text: string, updatedBy: string): Promise<void> {
+  await ensureOrgSchema();
+  await db
+    .insert(orgSettings)
+    .values({ id: 'org', systemPrompt: text, updatedBy })
+    .onConflictDoUpdate({
+      target: orgSettings.id,
+      set: { systemPrompt: text, updatedBy, updatedAt: new Date() },
+    });
+}
+
+// ─── Custom roles (RBAC/ABAC overlay) ─────────────────────────────────────────
+export interface CustomRole {
+  id: string;
+  name: string;
+  description: string;
+  basedOn: string;
+  capabilities: string[];
+}
+
+export async function listCustomRoles(): Promise<CustomRole[]> {
+  await ensureOrgSchema();
+  const rows = await db.select().from(customRoles).orderBy(desc(customRoles.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    basedOn: r.basedOn,
+    capabilities: r.capabilities ?? [],
+  }));
+}
+
+export async function createCustomRole(input: {
+  name: string;
+  description?: string;
+  basedOn?: string;
+  capabilities?: string[];
+}): Promise<CustomRole> {
+  await ensureOrgSchema();
+  const [row] = await db
+    .insert(customRoles)
+    .values({
+      id: `role_${randomUUID().slice(0, 8)}`,
+      name: input.name,
+      description: input.description ?? '',
+      basedOn: input.basedOn ?? 'viewer',
+      capabilities: input.capabilities ?? [],
+    })
+    .returning();
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    basedOn: row.basedOn,
+    capabilities: row.capabilities ?? [],
+  };
+}
+
+export async function deleteCustomRole(id: string): Promise<void> {
+  await ensureOrgSchema();
+  await db.delete(customRoles).where(eq(customRoles.id, id));
 }
 
 // ─── User-authored agents ─────────────────────────────────────────────────────
