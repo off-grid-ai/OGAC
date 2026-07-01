@@ -22,6 +22,7 @@ import {
 } from '@/lib/chat-governance';
 import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
+import { emitChatTrace } from '@/lib/chat-trace';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
 import { getOrgSystemPrompt } from '@/lib/store';
@@ -262,6 +263,9 @@ export async function POST(req: Request) {
   };
   if (effectiveModel) payload.model = effectiveModel;
 
+  // Observability: mark when the upstream request begins so the Langfuse generation observation
+  // records real latency once the completion finalizes.
+  const traceStart = Date.now();
   const upstream = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -347,6 +351,25 @@ export async function POST(req: Request) {
       // Temporary chats are never added to memory.
       if (!temporary && full && String(content).trim()) {
         void extractMemory(userId, String(content), full, effectiveModel);
+      }
+      // Observability: push a Langfuse trace for this chat turn so the Observability page has real
+      // data (plain chat previously emitted none). Fire-and-forget; skips temporary/incognito chats.
+      // On regenerate/edit `content` may be empty, so fall back to the driving user turn.
+      if (!temporary) {
+        const traceInput = String(content).trim()
+          ? String(content)
+          : ([...prior].reverse().find((m) => m.role === 'user')?.content ?? '');
+        emitChatTrace({
+          conversationId: convo.id,
+          userId,
+          model: effectiveModel,
+          input: traceInput,
+          output: full,
+          startTime: traceStart,
+          endTime: Date.now(),
+          promptTokens: estimateTokens(traceInput),
+          completionTokens: estimateTokens(full),
+        });
       }
       if (citations.length) send({ citations });
       send({ done: true });
