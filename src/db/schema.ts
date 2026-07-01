@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -444,8 +444,34 @@ export const chatArtifacts = pgTable('chat_artifacts', {
   language: text('language'), // python | node for runnable code
   title: text('title').notNull().default('Untitled artifact'),
   conversationId: text('conversation_id'),
+  // Publish/share (Wave 1): when published an artifact is readable at /artifacts/[id]/view.
+  // Org-scoped by default via orgId; published flips it to a stable read-only surface.
+  orgId: text('org_id'),
+  published: boolean('published').notNull().default(false),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  // Points at the current (latest) version row so the library shows head content.
+  currentVersion: integer('current_version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Chat artifact versions (Wave 1: history + revert) ────────────────────────
+// Every re-save of the same (user, conversation, title) appends a version here rather than
+// dropping as a dedupe. The parent chat_artifacts row tracks currentVersion; revert copies an
+// old version forward as a new head version.
+export const chatArtifactVersions = pgTable(
+  'chat_artifact_versions',
+  {
+    id: text('id').primaryKey(),
+    artifactId: text('artifact_id').notNull(),
+    version: integer('version').notNull(),
+    kind: text('kind').notNull(),
+    code: text('code').notNull().default(''),
+    language: text('language'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (v) => [index('chat_artifact_versions_idx').on(v.artifactId, v.version)],
+);
 
 // ─── Per-user chat preferences (Settings modal: capabilities, appearance) ─────
 // Append-only sibling of chat_settings so custom instructions stay untouched. `prefs` holds the
