@@ -93,6 +93,16 @@ function pick(model, image) {
 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
+// The prompt text (last user turn) for the traffic log — so you can see what went in.
+function promptText(body) {
+  const msgs = Array.isArray(body.messages) ? body.messages : [];
+  const lastUser = [...msgs].reverse().find((m) => m && m.role === 'user');
+  const c = lastUser?.content;
+  const text = typeof c === 'string' ? c
+    : Array.isArray(c) ? c.filter((p) => p && p.type === 'text' && p.text).map((p) => p.text).join('\n') : '';
+  return text.slice(0, 2000);
+}
+
 // Fetch each gateway's own info JSON (modalities) and merge — so the console Gateway
 // page renders the full modality grid even though it's talking to the aggregator.
 async function poolInfo() {
@@ -179,16 +189,32 @@ const server = http.createServer((req, res) => {
     const up = http.request(opts, (ur) => {
       res.writeHead(ur.statusCode || 502, { ...ur.headers, 'x-offgrid-gateway': target.name, 'x-offgrid-model': target.model });
       let bytes = 0; const buf = [];
-      ur.on('data', (c) => { bytes += c.length; res.write(c); if (!streaming) buf.push(c); });
+      // Buffer a bounded copy of the response so we can log the completion text (in + out).
+      ur.on('data', (c) => { bytes += c.length; res.write(c); if (buf.length < 500) buf.push(c); });
       ur.on('end', () => {
         res.end();
-        let tokens = 0;
-        if (!streaming) { try { tokens = JSON.parse(Buffer.concat(buf).toString())?.usage?.total_tokens || 0; } catch { /* non-json */ } }
-        record({ gateway: target.name, model: body.model || target.model, kind, status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens });
+        let tokens = 0; let output = '';
+        const rawResp = Buffer.concat(buf).toString();
+        try {
+          if (streaming) {
+            for (const line of rawResp.split('\n')) {
+              const t = line.trim();
+              if (!t.startsWith('data:')) continue;
+              const d = t.slice(5).trim();
+              if (d === '[DONE]') continue;
+              output += JSON.parse(d)?.choices?.[0]?.delta?.content || '';
+            }
+          } else {
+            const j = JSON.parse(rawResp);
+            tokens = j?.usage?.total_tokens || 0;
+            output = j?.choices?.[0]?.message?.content || '';
+          }
+        } catch { /* partial/non-json */ }
+        record({ gateway: target.name, model: body.model || target.model, kind, status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens, input: promptText(body), output: output.slice(0, 2000) });
       });
     });
     up.on('error', (e) => {
-      record({ gateway: target.name, model: body.model || target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0 });
+      record({ gateway: target.name, model: body.model || target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, input: promptText(body), output: `(error: ${e.message})` });
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
     up.setTimeout(120000, () => up.destroy(new Error('upstream timeout')));
