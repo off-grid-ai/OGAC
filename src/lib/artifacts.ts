@@ -12,6 +12,70 @@ export interface Artifact {
 const JSX_SIGNAL =
   /(<[A-Za-z][^>]*>|<\/[A-Za-z]|=>\s*\(?\s*<|React\.|useState|ReactDOM|export default function|className=)/;
 
+// Whether a kind renders live in the sandboxed iframe (vs. shown as source/markdown).
+export function isLiveKind(kind: string): boolean {
+  return kind === 'html' || kind === 'svg' || kind === 'react' || kind === 'mermaid';
+}
+
+// Build the iframe srcDoc for a live artifact. HTML passes through; SVG is centered on a dark
+// canvas; React (Babel + React/ReactDOM UMD) and Mermaid are bootstrapped with their libs loaded
+// inside the frame. `bridge` injects the window.offgrid.complete() proxy for AI-powered apps.
+// eslint-disable-next-line complexity
+export function buildSrcDoc(
+  a: { kind: string; code: string },
+  opts: { cdn?: string; bridge?: boolean } = {},
+): string {
+  const cdn = opts.cdn ?? 'https://cdn.jsdelivr.net';
+  const bridge = opts.bridge
+    ? `<script>window.offgrid={complete:function(prompt,options){return fetch('/api/v1/chat/artifacts/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({prompt:prompt},options||{}))}).then(function(r){return r.json()}).then(function(d){if(d.error)throw new Error(d.error);return d.text})};</script>`
+    : '';
+  if (a.kind === 'html') {
+    return bridge ? a.code.replace(/<head[^>]*>/i, (h) => h + bridge) || bridge + a.code : a.code;
+  }
+  if (a.kind === 'svg') {
+    return `<!doctype html><meta charset="utf-8">${bridge}<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${a.code}`;
+  }
+  if (a.kind === 'mermaid') {
+    return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#0a0a0a;color:#e5e5e5;font-family:Menlo,monospace">
+<pre class="mermaid" style="display:flex;justify-content:center;padding:16px">${escapeHtml(a.code)}</pre>
+${bridge}
+<script type="module">
+import mermaid from '${cdn}/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+</script></body>`;
+  }
+  // react
+  return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff">
+<div id="root"></div>
+${bridge}
+<script src="${cdn}/npm/react@18/umd/react.production.min.js"></script>
+<script src="${cdn}/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="${cdn}/npm/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" data-presets="react,typescript" data-type="module">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+${stripImportsExports(a.code)}
+const __C = typeof App !== 'undefined' ? App
+  : (typeof exports !== 'undefined' && exports.default) ? exports.default : null;
+ReactDOM.createRoot(document.getElementById('root')).render(
+  __C ? React.createElement(__C) : React.createElement('pre', { style: { padding: 16, color: '#b00' } },
+    'No default export or App component found.'));
+</script></body>`;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
+}
+
+// Strip ES module import/export syntax so the code runs in Babel's script scope. `export default
+// function App` → `function App`; bare `export default <expr>` → `exports.default = <expr>`.
+function stripImportsExports(code: string): string {
+  return code
+    .replace(/^\s*import\s+.*?;?\s*$/gm, '')
+    .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
+    .replace(/export\s+default\s+/g, 'window.exports = window.exports || {}; exports.default = ')
+    .replace(/^\s*export\s+(const|let|var|function|class)\s/gm, '$1 ');
+}
+
 // Best-effort human title for a saved artifact: an HTML <title>, a leading markdown/comment
 // heading, or a kind-based fallback. Keeps the library readable without asking the user.
 export function artifactTitle(a: Artifact): string {
