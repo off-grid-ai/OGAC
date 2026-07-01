@@ -7,5 +7,10 @@ export const dynamic = 'force-dynamic';
 export default async function ChatPage() {
   requireModule('chat');
   const session = await auth();
-  return <ChatWorkspace role={session?.user?.role ?? 'viewer'} />;
+  return (
+    <ChatWorkspace
+      role={session?.user?.role ?? 'viewer'}
+      userEmail={session?.user?.email ?? ''}
+    />
+  );
 }
