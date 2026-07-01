@@ -31,7 +31,7 @@ SSH + passwordless sudo. **Sleep is disabled** (`pmset disablesleep 1`) so lids 
 | **Console** | http://192.168.1.59 | The one IP. Also `http://onprem-console.getoffgridai.co` on fleet Macs (via /etc/hosts). |
 | **Metrics dashboard** | http://192.168.1.59:9100 | Live CPU/mem/disk/load per node. |
 | **Gateway (aggregator)** | http://192.168.1.59:8800/v1 | OpenAI-compatible; routes text→g1/g2, images→g2/g3. |
-| **Gateway traffic (live)** | http://192.168.1.59:8800/traffic | Live per-gateway calls, latency, tokens, errors. JSON at same path. |
+| **Gateway traffic (live)** | http://192.168.1.59/gateway | In the console — live per-gateway calls, latency, tokens, errors. Raw JSON at `:8800/traffic`. |
 | **Keycloak** | http://192.168.1.59:8080 | Realm `offgrid`. Admin: `admin` / `offgrid-dev`. |
 
 **Console login (Keycloak):** `mac@`, `mohammed.ali@`, `diksha.sharma@`, `ali@wednesday.is` — password `OffGrid-2026`. Locked to `@wednesday.is`. *Use a fresh/incognito window after any restart (stale session cookies).*
@@ -99,7 +99,8 @@ cd ~/offgrid/console/deploy && docker compose --profile data --profile identity 
 
 **Watch gateway traffic live** (which gateway served each call, latency, tokens):
 ```bash
-# browser: http://192.168.1.59:8800/traffic   — auto-refreshing dashboard
+# console: http://192.168.1.59/gateway   — live "Traffic by gateway" + "Recent calls"
+# raw feed: curl -s http://192.168.1.59:8800/traffic
 # terminal (per-request line log):
 ssh admin@offgrid-s1.local 'tail -f /tmp/offgrid-aggregator.log'
 ```
