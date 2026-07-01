@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChatCircleDots,
   FileText,
+  ShareNetwork,
   Trash,
   UploadSimple,
 } from '@phosphor-icons/react/dist/ssr';
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ShareDialog } from './ShareDialog';
 
 interface Doc {
   id: string;
@@ -37,13 +39,18 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [visibility, setVisibility] = useState('private');
+  const [access, setAccess] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const canManage = access === 'owner';
 
   const loadDocs = useCallback(async () => {
     const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
   }, [projectId]);
 
+  // eslint-disable-next-line complexity
   const load = useCallback(async () => {
     const [pr, cr] = await Promise.all([
       fetch('/api/v1/chat/projects'),
@@ -56,8 +63,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       if (found) {
         setName(found.name ?? '');
         setSystemPrompt(found.systemPrompt ?? '');
+        setVisibility(found.visibility ?? 'private');
       }
     }
+    const sr = await fetch(`/api/v1/chat/projects/${projectId}/share`);
+    if (sr.ok) setAccess((await sr.json()).access ?? null);
     if (cr.ok) {
       const all: Conversation[] = (await cr.json()).conversations ?? [];
       setChats(all.filter((c) => c.projectId === projectId));
@@ -120,12 +130,35 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           </Link>
           <h1 className="text-lg font-semibold">{loaded ? name || 'Project' : 'Loading…'}</h1>
         </div>
-        <Button asChild size="sm" variant="outline" className="gap-1.5">
-          <Link href={`/chat?project=${projectId}`}>
-            <ChatCircleDots className="size-4" /> New chat in project
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {canManage ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShareOpen(true)}
+            >
+              <ShareNetwork className="size-4" /> Share
+              <span className="text-[10px] text-muted-foreground">({visibility})</span>
+            </Button>
+          ) : null}
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
+            <Link href={`/chat?project=${projectId}`}>
+              <ChatCircleDots className="size-4" /> New chat in project
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {canManage ? (
+        <ShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          projectId={projectId}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+        />
+      ) : null}
 
       <Card className="shadow-sm">
         <CardHeader>
