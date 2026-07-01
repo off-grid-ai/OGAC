@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { listCollections, listDocuments } from '@/lib/org-knowledge';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 // their role allow-lists, and index documents; every user sees only the collections their role may
 // retrieve. Chat pulls from these permission-aware via the stream route's orgKnowledge flag.
 export default async function KnowledgePage() {
-  requireModule('knowledge');
+  await requireModuleForUser('knowledge');
   const session = await auth();
   const role = session?.user?.role ?? 'viewer';
   const isAdmin = role === 'admin';

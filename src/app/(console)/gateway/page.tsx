@@ -8,7 +8,7 @@ import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ async function fetchGateway(): Promise<GatewayInfo | null> {
 }
 
 export default async function GatewayPage() {
-  requireModule('gateway');
+  await requireModuleForUser('gateway');
   const info = await fetchGateway();
 
   if (!info) {

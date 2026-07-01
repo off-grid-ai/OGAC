@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { createGovernance, listGovernance } from '@/lib/store';
 
 const KINDS = [
@@ -12,11 +13,16 @@ const KINDS = [
   'impact_assessment',
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ object: 'list', data: await listGovernance() });
 }
 
+// eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!b || !b.title || !KINDS.includes(b.kind as string)) {
     return NextResponse.json({ error: 'title and a valid kind required' }, { status: 400 });

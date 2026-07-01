@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { getDevice, listAudit, pullPolicyForDevice } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -124,7 +124,7 @@ function ActivityCard({ audit }: { audit: Audit }) {
 }
 
 export default async function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('fleet');
+  await requireModuleForUser('fleet');
   const { id } = await params;
   const device = await getDevice(id);
   if (!device) notFound();

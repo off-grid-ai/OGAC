@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getPolicy } from '@/lib/adapters/registry';
+import { requireAdmin } from '@/lib/authz';
 
 // Evaluate an access decision through the policy port (first-party ABAC by default, OPA when
 // OFFGRID_ADAPTER_POLICY=opa). For testing/preview.
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = await req.json().catch(() => null);
   const role = (b?.role as string | undefined) ?? '*';
   const resource = (b?.resource as string | undefined) ?? '*';

@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { agentActivity, listAllAgents } from '@/lib/agents';
+import { requireAdmin } from '@/lib/authz';
 import { createCustomAgent } from '@/lib/store';
 
 const TRIGGERS = ['on-call', 'on-message', 'observed', 'scheduled', 'on-demand'];
 
 // The catalog (built-ins + user-authored) + derived fleet activity. Agents are adoptable
 // standalone; the `planes` each declares lets a tenant see what it needs provisioned.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({
     object: 'list',
     data: await listAllAgents(),
@@ -43,6 +46,8 @@ function parseBody(b: Record<string, unknown> | null) {
 // governed pipeline (policy → guardrails → routing → grounding → provenance) as the built-ins, so
 // it inherits every convention configured on the console.
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const input = parseBody(b);
   if (!input) {

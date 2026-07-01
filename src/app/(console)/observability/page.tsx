@@ -23,7 +23,7 @@ import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
 import { safeListTraces } from '@/lib/langfuse';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { scoringConfigured } from '@/lib/qa/scoring';
 
 export const dynamic = 'force-dynamic';
@@ -172,7 +172,7 @@ function RunTracesTable({ runs }: { runs: Trace[] }) {
 }
 
 export default async function ObservabilityPage() {
-  requireModule('observability');
+  await requireModuleForUser('observability');
   const [evals, drift, runs, onlineEnabled, traces] = await Promise.all([
     listEvalRuns(20),
     getDrift().analyze(),

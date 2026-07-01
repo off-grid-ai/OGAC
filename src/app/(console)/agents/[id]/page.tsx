@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -73,7 +73,7 @@ function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] 
 }
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('agents');
+  await requireModuleForUser('agents');
   const { id } = await params;
   const agent = await resolveAgent(id);
   if (!agent) notFound();

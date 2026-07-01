@@ -1,11 +1,11 @@
 import { StudioCanvas } from '@/components/studio/StudioCanvas';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { introspect } from '@/lib/studio';
 
 export const dynamic = 'force-dynamic';
 
 export default async function StudioPage() {
-  requireModule('studio');
+  await requireModuleForUser('studio');
   const catalog = await introspect();
   const order: (keyof typeof catalog.counts)[] = ['Connector', 'Data', 'Tool', 'Guardrail', 'Model', 'Agent'];
   return (

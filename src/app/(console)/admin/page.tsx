@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import {
   getOrgSystemPrompt,
   listAbacRules,
@@ -44,7 +44,7 @@ function labelOf(id: string): string {
 }
 
 export default async function AdminPage() {
-  requireModule('admin');
+  await requireModuleForUser('admin');
   const [tenants, rules, bindings, flags, orgPrompt, customRoles] = await Promise.all([
     listTenants(),
     listAbacRules(),

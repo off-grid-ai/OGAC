@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { addDocument, listDocuments } from '@/lib/brain';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ object: 'list', data: await listDocuments() });
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const body = await req.json().catch(() => null);
   const title = body?.title as string | undefined;
   const text = body?.text as string | undefined;

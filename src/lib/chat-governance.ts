@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { abacRules, apiKeys, auditEvents } from '@/db/schema';
+import { effectiveBaseRole } from '@/lib/module-access';
 
 // Chat governance — write an audit row per chat completion (so Analytics/FinOps/Regulatory count
 // chat usage), enforce which models/skills/connectors a role may use via abacRules, and attribute
@@ -18,12 +19,17 @@ export async function isDenied(
   value: string,
 ): Promise<boolean> {
   if (role === 'admin' || !value) return false;
+  // Custom roles inherit their based_on role's ABAC rules. Match a deny rule targeting either the
+  // custom role name itself or its resolved built-in base role. A base of 'admin' is never denied.
+  const base = await effectiveBaseRole(role);
+  if (base === 'admin') return false;
+  const roleTargets = Array.from(new Set([role, base]));
   const rows = await db
     .select({ effect: abacRules.effect })
     .from(abacRules)
     .where(
       and(
-        eq(abacRules.role, role),
+        inArray(abacRules.role, roleTargets),
         eq(abacRules.resource, resource),
         eq(abacRules.value, value),
         eq(abacRules.effect, 'deny'),

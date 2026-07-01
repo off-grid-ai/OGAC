@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { createConnector, listConnectors } from '@/lib/store';
 
 const AUTHS = ['none', 'api-key', 'oauth'];
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ object: 'list', data: await listConnectors() });
 }
 
 // eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const name = body?.name as string | undefined;
   const type = body?.type as string | undefined;
