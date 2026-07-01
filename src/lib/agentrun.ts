@@ -73,25 +73,52 @@ function extractText(data: unknown): string | null {
 // Compose the answer. `system` carries the agent's natural-language instruction (built-ins use a
 // terse default); `model` lets a custom agent name a target, otherwise the gateway default applies
 // (and the model-routing rules at the gateway still decide where it actually runs).
+// Agent runs are the ASYNC inference path — when the Temporal queue is enabled
+// (OFFGRID_QUEUE_ENABLED=1) they are ENQUEUED and drained at the worker's
+// controlled rate, so a burst of agent runs can't overwhelm the nodes (there is
+// no autoscale). Otherwise they hit the gateway directly. Dynamic import keeps
+// @temporalio off the default path entirely.
+const QUEUE_ENABLED = process.env.OFFGRID_QUEUE_ENABLED === '1';
+
+// eslint-disable-next-line complexity
 async function gatewayAnswer(
   query: string,
   context: string,
   system: string,
   model: string,
 ): Promise<string | null> {
+  const body = {
+    model,
+    temperature: 0,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: `SOURCES:\n${context}\n\nQUESTION: ${query}` },
+    ],
+    chat_template_kwargs: { enable_thinking: false },
+  };
+
+  if (QUEUE_ENABLED) {
+    try {
+      const { enqueueInference, getResult } = await import('@offgrid/gateway/queue');
+      const cfg = {
+        temporalAddress: process.env.OFFGRID_TEMPORAL_ADDRESS ?? '127.0.0.1:7233',
+        namespace: process.env.OFFGRID_TEMPORAL_NAMESPACE ?? 'default',
+        taskQueue: process.env.OFFGRID_QUEUE_TASK_QUEUE ?? 'offgrid-inference',
+        gatewayUrl: GATEWAY_URL,
+      };
+      const id = await enqueueInference({ body }, cfg);
+      const res = await getResult(id, cfg);
+      return res.status === 200 ? extractText(res.body) : null;
+    } catch {
+      /* queue unavailable — fall through to a direct call */
+    }
+  }
+
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: `SOURCES:\n${context}\n\nQUESTION: ${query}` },
-        ],
-        chat_template_kwargs: { enable_thinking: false },
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
     return res.ok ? extractText(await res.json()) : null;
