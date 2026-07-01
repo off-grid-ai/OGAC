@@ -347,6 +347,19 @@ export async function updateProject(
     .where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
 }
 
+// Update a project's fields without the owner filter — the caller must have already been checked
+// for edit access (owner, member-editor, or admin). Used by the access-aware PATCH route.
+export async function updateProjectFields(
+  id: string,
+  patch: { name?: string; description?: string; systemPrompt?: string },
+) {
+  await ensureChatSchema();
+  await db
+    .update(chatProjects)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(chatProjects.id, id));
+}
+
 export async function deleteProject(userId: string, id: string) {
   await ensureChatSchema();
   await db.delete(chatProjects).where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
