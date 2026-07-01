@@ -155,6 +155,10 @@ function MessageBubble({
 export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<
+    { fn: string; toolName: string; input: string }[]
+  >([]);
+  const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -303,6 +307,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   // eslint-disable-next-line complexity
   async function streamAssistant(body: Record<string, unknown>) {
     setStreaming(true);
+    setLastSendBody(body);
     const ac = new AbortController();
     abortRef.current = ac;
     try {
@@ -327,6 +332,18 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
           if (!chunk.startsWith('data:')) continue;
           const evt = JSON.parse(chunk.slice(5).trim());
           if (evt.error) toast.error(evt.error);
+          if (evt.approvalRequest) {
+            setPendingApprovals(evt.approvalRequest);
+            // drop the empty assistant placeholder while awaiting approval
+            setMessages((prev) => {
+              const next = [...prev];
+              if (next[next.length - 1]?.role === 'assistant' && !next[next.length - 1].content) {
+                next.pop();
+              }
+              return next;
+            });
+            continue;
+          }
           setMessages((prev) => {
             const next = [...prev];
             const last = next[next.length - 1];
@@ -371,6 +388,17 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
       { role: 'assistant', content: '', reasoning: '' },
     ]);
     await streamAssistant({ conversationId: convId, content: text, model, images: sentImages });
+  }
+
+  async function resolveApprovals(approve: boolean) {
+    const pend = pendingApprovals;
+    setPendingApprovals([]);
+    if (!approve || !lastSendBody) {
+      if (!approve) toast.info('Tool calls denied');
+      return;
+    }
+    setMessages((prev) => [...prev, { role: 'assistant', content: '', reasoning: '' }]);
+    await streamAssistant({ ...lastSendBody, approvals: pend.map((p) => p.fn), regenerate: true });
   }
 
   async function regenerate() {
@@ -565,6 +593,32 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
             ))}
           </div>
         </div>
+
+        {/* Tool approval gate */}
+        {pendingApprovals.length ? (
+          <div className="shrink-0 border-t border-border bg-amber-500/10 px-4 py-3">
+            <div className="mx-auto max-w-3xl space-y-2">
+              <p className="text-xs font-medium text-foreground">
+                The assistant wants to run {pendingApprovals.length} tool
+                {pendingApprovals.length > 1 ? 's' : ''} that may change data. Approve?
+              </p>
+              {pendingApprovals.map((p, k) => (
+                <div key={k} className="rounded border border-border bg-card p-2 text-xs">
+                  <div className="font-medium">{p.toolName}</div>
+                  <div className="truncate text-muted-foreground">{p.input}</div>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => resolveApprovals(true)}>
+                  Approve &amp; run
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => resolveApprovals(false)}>
+                  Deny
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Composer */}
         <div className="shrink-0 border-t border-border p-3">

@@ -10,6 +10,7 @@ import {
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import { resolveTools } from '@/lib/chat-tools';
 import { type Citation, retrieve } from '@/lib/rag';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     model = '',
     images = [],
     regenerate = false,
+    approvals = [],
   } = await req.json().catch(() => ({}));
   const convo = conversationId ? await getConversation(userId, conversationId) : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
@@ -52,7 +54,12 @@ export async function POST(req: Request) {
 
   // Build the OpenAI-style message array: custom instructions → project prompt → knowledge →
   // history → new user turn (+ images).
-  const messages: { role: string; content: string | ContentPart[] }[] = [];
+  const messages: {
+    role: string;
+    content: string | ContentPart[];
+    tool_call_id?: string;
+    tool_calls?: unknown;
+  }[] = [];
   const ci = await getCustomInstructions(userId);
   if (ci.trim()) messages.push({ role: 'system', content: ci });
   const sys = await projectSystemPrompt(convo.projectId ?? null);
@@ -106,6 +113,27 @@ export async function POST(req: Request) {
     });
   }
 
+  const effectiveModel = model || skillModel;
+
+  // Org connectors (tool-calling): let the model decide whether to call a permitted tool. Mutating
+  // tools require human approval — if any is pending, stop and ask the UI to approve before running.
+  const role = session?.user?.role ?? 'viewer';
+  try {
+    const resolved = await resolveTools(role, messages, effectiveModel, approvals);
+    if (resolved?.pending?.length) {
+      const body = `data: ${JSON.stringify({ approvalRequest: resolved.pending })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`;
+      return new Response(body, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' },
+      });
+    }
+    if (resolved?.messages?.length) {
+      for (const m of resolved.messages) messages.push(m as (typeof messages)[number]);
+    }
+  } catch {
+    /* tool layer optional — chat still answers without it */
+  }
+
   const payload: Record<string, unknown> = {
     messages,
     max_tokens: 2048,
@@ -113,7 +141,6 @@ export async function POST(req: Request) {
     stream: true,
     chat_template_kwargs: { enable_thinking: false },
   };
-  const effectiveModel = model || skillModel;
   if (effectiveModel) payload.model = effectiveModel;
 
   const upstream = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
