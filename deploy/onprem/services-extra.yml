@@ -1,0 +1,34 @@
+# Off Grid on-prem — EXTRA services (node A / S1 127.0.0.1): real metrics, object store, drift.
+# Adds the value-add services that were previously defined-but-off:
+#   VictoriaMetrics (real metrics TSDB) · SeaweedFS (S3-compatible object store) · Evidently (drift)
+#   deploy:  docker compose -f services-extra.yml up -d --build
+name: offgrid-services-extra
+
+services:
+  # ── real metrics TSDB (queryable; replaces the barebones SSH-poll dashboard) ──
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.106.1
+    restart: unless-stopped
+    command: ['-storageDataPath=/vmdata', '-httpListenAddr=:8428', '-retentionPeriod=3']
+    ports: ['8428:8428']
+    volumes: [vmdata:/vmdata]
+
+  # ── S3-compatible object store (file/artifact storage) ──
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.80
+    restart: unless-stopped
+    command: 'server -dir=/data -s3 -s3.port=8333'
+    ports: ['8333:8333', '9333:9333']
+    volumes: [seaweed:/data]
+
+  # ── drift detection sidecar (Evidently) — the console's OSS drift swap-in ──
+  evidently:
+    build: ../sidecars/drift
+    restart: unless-stopped
+    environment:
+      OFFGRID_GATEWAY_URL: http://127.0.0.1:8800
+    ports: ['8001:8001']
+
+volumes:
+  vmdata:
+  seaweed:
