@@ -11,6 +11,12 @@ import {
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import {
+  estimateTokens,
+  isDenied,
+  projectBudget,
+  writeChatAudit,
+} from '@/lib/chat-governance';
 import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
 import { type Citation, retrieve } from '@/lib/rag';
@@ -118,10 +124,25 @@ export async function POST(req: Request) {
   }
 
   const effectiveModel = model || skillModel;
+  const role = session?.user?.role ?? 'viewer';
+
+  // Governance: RBAC gate the model + skill (abacRules deny), and enforce the project's budget.
+  const deny = (msg: string) =>
+    new Response(`data: ${JSON.stringify({ error: msg })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' },
+    });
+  if (effectiveModel && (await isDenied(role, 'chat.model', effectiveModel))) {
+    return deny(`model ${effectiveModel} is not permitted for your role`);
+  }
+  if (convo.skillId && (await isDenied(role, 'chat.skill', convo.skillId))) {
+    return deny('this skill is not permitted for your role');
+  }
+  const budget = await projectBudget(ragProjectId);
+  if (!budget.ok) return deny('project budget exhausted for this month');
 
   // Org connectors (tool-calling): let the model decide whether to call a permitted tool. Mutating
   // tools require human approval — if any is pending, stop and ask the UI to approve before running.
-  const role = session?.user?.role ?? 'viewer';
   try {
     const resolved = await resolveTools(role, messages, effectiveModel, approvals);
     if (resolved?.pending?.length) {
@@ -213,6 +234,15 @@ export async function POST(req: Request) {
       } catch {
         /* best-effort persistence */
       }
+      // Governance: audit this completion so Analytics/FinOps/Regulatory count chat usage, billed
+      // to the project's virtual key when one exists.
+      void writeChatAudit({
+        userId,
+        model: effectiveModel,
+        tokens: estimateTokens(String(content)) + estimateTokens(full),
+        outcome: full ? 'ok' : 'error',
+        keyId: budget.keyId,
+      });
       // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
       if (full && String(content).trim()) {
         void extractMemory(userId, String(content), full, effectiveModel);
