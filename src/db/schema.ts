@@ -307,6 +307,27 @@ export const chatMessages = pgTable('chat_messages', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Knowledgebase for a project — documents + embedded chunks (RAG). Mirrors desktop rag_documents
+// / rag_chunks; embeddings via the gateway's /v1/embeddings (384-dim), retrieved at chat time.
+export const chatDocuments = pgTable('chat_documents', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  kind: text('kind').notNull().default('text'),
+  size: integer('size').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const chatChunks = pgTable('chat_chunks', {
+  id: text('id').primaryKey(),
+  docId: text('doc_id').notNull(),
+  projectId: text('project_id').notNull(),
+  content: text('content').notNull(),
+  position: integer('position').notNull().default(0),
+  embedding: jsonb('embedding').$type<number[]>(),
+});
+
 export const accounts = pgTable(
   'account',
   {
