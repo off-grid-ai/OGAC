@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { markdownToPdf } from '@/lib/pdf';
 import { buildManifest } from '@/lib/provenance';
 import { generateReport } from '@/lib/reports';
@@ -23,6 +24,8 @@ async function renderBytes(format: string, body: string, base: string) {
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const report = await generateReport(id);
   if (!report) return NextResponse.json({ error: 'unknown report' }, { status: 404 });
