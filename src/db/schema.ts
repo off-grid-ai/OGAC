@@ -363,6 +363,37 @@ export const chatChunks = pgTable('chat_chunks', {
   embedding: jsonb('embedding').$type<number[]>(),
 });
 
+// ─── Organization-wide knowledge base — admin-curated shared corpus, indexed once via the
+// gateway's embeddings, retrieved permission-aware (a user only sees collections their role
+// permits). Parallel to the per-project chat RAG tables above. See lib/org-knowledge.ts.
+export const orgKnowledgeCollections = pgTable('org_knowledge_collections', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  // allowedRoles empty = every authenticated user may retrieve; otherwise role must be listed.
+  allowedRoles: jsonb('allowed_roles').$type<string[]>().notNull().default([]),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const orgKnowledgeDocs = pgTable('org_knowledge_docs', {
+  id: text('id').primaryKey(),
+  collectionId: text('collection_id').notNull(),
+  name: text('name').notNull(),
+  kind: text('kind').notNull().default('text'),
+  size: integer('size').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const orgKnowledgeChunks = pgTable('org_knowledge_chunks', {
+  id: text('id').primaryKey(),
+  docId: text('doc_id').notNull(),
+  collectionId: text('collection_id').notNull(),
+  content: text('content').notNull(),
+  position: integer('position').notNull().default(0),
+  embedding: jsonb('embedding').$type<number[]>(),
+});
+
 export const accounts = pgTable(
   'account',
   {
