@@ -8,6 +8,7 @@ import {
   getSkill,
   listMessages,
   memoryBlock,
+  projectMemoryBlock,
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
@@ -76,6 +77,9 @@ export async function POST(req: Request) {
   if (mem) messages.push({ role: 'system', content: mem });
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
+  // Per-project memory: inject facts scoped to this conversation's project (additive to user memory).
+  const projMem = await projectMemoryBlock(convo.projectId ?? null);
+  if (projMem) messages.push({ role: 'system', content: projMem });
   // Org skill bound to this conversation: inject its instructions, default its model, and use its
   // knowledge project for RAG when the conversation has none of its own.
   let skillModel = '';
