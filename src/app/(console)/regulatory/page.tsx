@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { computeCompliance } from '@/lib/compliance';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { listGovernance } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ const GOV_STATUS: Record<string, string> = {
 };
 
 export default async function RegulatoryPage() {
-  requireModule('regulatory');
+  await requireModuleForUser('regulatory');
   const [c, governance] = await Promise.all([computeCompliance(), listGovernance()]);
 
   return (

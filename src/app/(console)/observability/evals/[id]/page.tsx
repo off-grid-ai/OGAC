@@ -13,12 +13,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getEvalRun } from '@/lib/evals';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EvalRunPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('observability');
+  await requireModuleForUser('observability');
   const { id } = await params;
   const run = await getEvalRun(id);
   if (!run) notFound();

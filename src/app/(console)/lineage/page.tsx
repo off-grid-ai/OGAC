@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getLineage } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { fetchLineageGraph } from '@/lib/marquez';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LineagePage() {
-  requireModule('lineage');
+  await requireModuleForUser('lineage');
   const [runs, graph] = await Promise.all([listAgentRuns(25), fetchLineageGraph()]);
   const engine = getLineage().meta;
   const withSources = runs.filter((r) => r.citations.length > 0);

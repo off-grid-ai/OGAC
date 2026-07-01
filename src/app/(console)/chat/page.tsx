@@ -1,11 +1,11 @@
 import { auth } from '@/auth';
 import { ChatWorkspace } from '@/components/chat/ChatWorkspace';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ChatPage() {
-  requireModule('chat');
+  await requireModuleForUser('chat');
   const session = await auth();
   return (
     <ChatWorkspace

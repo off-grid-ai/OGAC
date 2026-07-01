@@ -13,13 +13,13 @@ import {
 import { EmbedGuard } from '@/components/control/EmbedGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { supersetBase } from '@/lib/superset';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage() {
-  requireModule('analytics');
+  await requireModuleForUser('analytics');
   const a = await computeAnalytics();
 
   const stats = [

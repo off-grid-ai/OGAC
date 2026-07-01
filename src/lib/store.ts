@@ -1060,6 +1060,23 @@ export async function listCustomRoles(): Promise<CustomRole[]> {
   }));
 }
 
+// Resolve a custom role by its name (the value carried in a user's session role). Returns null for
+// built-in roles / unknown names. Used by the runtime permission resolver (lib/roles).
+export async function getCustomRoleByName(name: string): Promise<CustomRole | null> {
+  if (!name) return null;
+  await ensureOrgSchema();
+  const rows = await db.select().from(customRoles).where(eq(customRoles.name, name)).limit(1);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    basedOn: r.basedOn,
+    capabilities: r.capabilities ?? [],
+  };
+}
+
 export async function createCustomRole(input: {
   name: string;
   description?: string;

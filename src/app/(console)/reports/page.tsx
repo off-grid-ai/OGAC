@@ -1,13 +1,13 @@
 import { DownloadSimple as Download, FileText } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { REPORTS } from '@/lib/reports';
 
 export const dynamic = 'force-dynamic';
 
-export default function ReportsPage() {
-  requireModule('reports');
+export default async function ReportsPage() {
+  await requireModuleForUser('reports');
 
   return (
     <div className="space-y-6">
