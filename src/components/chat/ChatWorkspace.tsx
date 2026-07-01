@@ -165,9 +165,17 @@ function MessageBubble({
 }
 
 // eslint-disable-next-line complexity
-export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
+export function ChatWorkspace({
+  role = 'viewer',
+  userEmail = '',
+}: {
+  role?: string;
+  userEmail?: string;
+}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  // Conversation starters surfaced when a fresh chat is opened under an assistant/skill.
+  const [activeStarters, setActiveStarters] = useState<string[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<
     { fn: string; toolName: string; input: string }[]
   >([]);
@@ -229,11 +237,13 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   async function openConversation(id: string) {
     setActiveId(id);
     setArtifact(null);
+    setActiveStarters([]);
     const r = await fetch(`/api/v1/chat/conversations/${id}`);
     if (r.ok) setMessages((await r.json()).messages ?? []);
   }
 
   async function newChat() {
+    setActiveStarters([]);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -246,7 +256,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
     await refreshConversations();
   }
 
-  async function startSkillChat(skillId: string) {
+  async function startSkillChat(skillId: string, starters: string[] = []) {
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -257,6 +267,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
     setActiveProjectId(null);
     setMessages([]);
     setActiveId(id);
+    setActiveStarters(starters);
     await refreshConversations();
   }
 
@@ -450,6 +461,18 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
       { role: 'assistant', content: '', reasoning: '' },
     ]);
     await streamAssistant({ conversationId: convId, content: text, model, images: sentImages });
+  }
+
+  // Send a conversation starter immediately (clears the starter chips).
+  async function sendStarter(text: string) {
+    if (streaming || !text.trim() || !activeId) return;
+    setActiveStarters([]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '', reasoning: '' },
+    ]);
+    await streamAssistant({ conversationId: activeId, content: text, model, images: [] });
   }
 
   async function resolveApprovals(approve: boolean) {
@@ -648,6 +671,19 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
                     ? 'Chats here use this project’s instructions and knowledge.'
                     : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
                 </p>
+                {activeStarters.length ? (
+                  <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
+                    {activeStarters.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => sendStarter(s)}
+                        className="rounded-lg border border-border p-3 text-left text-xs text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {messages.map((m, i) => (
@@ -782,6 +818,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
         open={skillsOpen}
         onOpenChange={setSkillsOpen}
         role={role}
+        userEmail={userEmail}
         projects={projects}
         models={models}
         onPick={startSkillChat}
