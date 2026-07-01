@@ -14,8 +14,8 @@ const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info U
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
   { name: 'g1',  host: '192.168.1.57', port: 7878, vision: true,  model: 'qwythos-9b' },
   { name: 'g2',  host: '192.168.1.58', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g3',  host: '192.168.1.32', port: 7878, vision: true,  model: 'gemma-4-e4b' },
-  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'gemma-4-e4b' },
+  { name: 'g3',  host: '192.168.1.32', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'qwythos-9b' },
   { name: 'g5',  host: '192.168.1.65', port: 7878, vision: true,  model: 'qwen3.5-9b' },
   { name: 'g6',  host: '192.168.1.66', port: 7878, vision: true,  model: 'qwen3.5-9b' },
   { name: 'g7',  host: '192.168.1.62', port: 7878, vision: true,  model: 'qwythos-9b' },
