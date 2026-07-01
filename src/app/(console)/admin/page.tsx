@@ -1,8 +1,10 @@
 import { AbacTester } from '@/components/admin/AbacTester';
 import { AddAbacRuleButton } from '@/components/admin/AddAbacRuleButton';
+import { AddCustomRoleButton } from '@/components/admin/AddCustomRoleButton';
 import { AddTenantButton } from '@/components/admin/AddTenantButton';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { FlagToggle } from '@/components/admin/FlagToggle';
+import { OrgInstructionsEditor } from '@/components/admin/OrgInstructionsEditor';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,7 +17,13 @@ import {
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModule } from '@/lib/modules';
-import { listAbacRules, listFlags, listTenants } from '@/lib/store';
+import {
+  getOrgSystemPrompt,
+  listAbacRules,
+  listCustomRoles,
+  listFlags,
+  listTenants,
+} from '@/lib/store';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -37,16 +45,89 @@ function labelOf(id: string): string {
 
 export default async function AdminPage() {
   requireModule('admin');
-  const [tenants, rules, bindings, flags] = await Promise.all([
+  const [tenants, rules, bindings, flags, orgPrompt, customRoles] = await Promise.all([
     listTenants(),
     listAbacRules(),
     listBindings(true),
     listFlags(),
+    getOrgSystemPrompt(),
+    listCustomRoles(),
   ]);
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
 
   return (
     <div className="space-y-6">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Org-wide instructions</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The organization system prompt — injected into every chat as the highest-precedence
+            system block, ahead of each user&apos;s own custom instructions.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <OrgInstructionsEditor initial={orgPrompt} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="text-sm">Custom roles</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Roles layered on the built-in RBAC/ABAC — each inherits a base role and grants module
+              access. SCIM group sync maps onto these (stub).
+            </p>
+          </div>
+          <AddCustomRoleButton modules={sellable} />
+        </CardHeader>
+        <CardContent>
+          {customRoles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No custom roles yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Inherits</TableHead>
+                  <TableHead>Module access</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customRoles.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium text-foreground">{r.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{r.basedOn}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {r.capabilities.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">none</span>
+                        ) : (
+                          r.capabilities.map((id) => (
+                            <Badge
+                              key={id}
+                              variant="secondary"
+                              className="bg-primary/10 text-primary"
+                            >
+                              {labelOf(id)}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DeleteRowButton url={`/api/v1/admin/roles/${r.id}`} label={r.name} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm">Integrations · adapters</CardTitle>
