@@ -36,6 +36,18 @@ const LOG = [];        // last N proxied requests (newest last)
 const LOG_MAX = 300;
 const STATS = {};      // per-gateway { requests, errors, totalMs, tokens }
 const startedAt = Date.now();
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL || 'http://127.0.0.1:9200';
+const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX || 'offgrid-gateway';
+// Durable, SIEM-searchable gateway log: fire-and-forget index each call into OpenSearch.
+function shipToOpenSearch(e) {
+  try {
+    fetch(`${OS_URL}/${OS_INDEX}/_doc`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ '@timestamp': new Date(e.ts).toISOString(), source: 'gateway-aggregator', ...e }),
+    }).catch(() => {});
+  } catch { /* never block a request on logging */ }
+}
 function record(e) {
   e.ts = Date.now();
   LOG.push(e);
@@ -46,6 +58,7 @@ function record(e) {
   s.totalMs += e.ms;
   if (e.tokens) s.tokens += e.tokens;
   console.log(`[req] ${new Date(e.ts).toISOString()} ${e.gateway} ${e.model} ${e.kind} ${e.status} ${e.ms}ms ${e.bytes}b${e.tokens ? ` tok=${e.tokens}` : ''}`);
+  shipToOpenSearch(e);
 }
 function trafficJSON() {
   return {
