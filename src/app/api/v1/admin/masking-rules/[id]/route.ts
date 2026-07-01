@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { setMaskingRuleEnabled } from '@/lib/store';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (typeof body?.enabled !== 'boolean') {

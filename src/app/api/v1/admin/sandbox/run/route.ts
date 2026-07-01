@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlags, getSandbox } from '@/lib/adapters/registry';
+import { requireAdmin } from '@/lib/authz';
 
 // Execute agent-authored code in the active sandbox (OFFGRID_ADAPTER_SANDBOX: none default | docker).
 // Double-gated: the `agent-code-exec` feature flag must be ON (default OFF), and the no-exec default
@@ -10,7 +11,10 @@ interface Body {
   timeoutMs?: unknown;
 }
 
+// eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const enabled = await getFlags().isEnabled('agent-code-exec', false);
   if (!enabled) {
     return NextResponse.json(

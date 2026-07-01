@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getGrounding } from '@/lib/adapters/registry';
 import type { GroundingSource } from '@/lib/adapters/types';
+import { requireAdmin } from '@/lib/authz';
 
 // Standalone grounding: verify an answer against caller-supplied sources. No Brain, no store —
 // a customer can verify their OWN RAG stack's answers through this endpoint alone.
@@ -23,6 +24,8 @@ function parseSources(raw: unknown): GroundingSource[] | null {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Body | null;
   const sources = parseSources(b?.sources);
   if (!b || typeof b.answer !== 'string' || !b.answer.trim() || !sources || sources.length === 0) {
