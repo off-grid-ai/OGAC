@@ -224,7 +224,9 @@ export async function retrieve(
     .where(inArray(orgKnowledgeChunks.collectionId, allowedIds));
   if (!rows.length) return { context: '', citations: [] };
 
-  const [qVec] = await embed(query);
+  const qVecs = await embed(query);
+  const qVec = qVecs[0];
+  if (!qVec) return { context: '', citations: [] }; // embedding unavailable → no retrieval, no crash
   const docIds = [...new Set(rows.map((r) => r.docId))];
   const docNames = new Map<string, string>();
   for (const d of await db
