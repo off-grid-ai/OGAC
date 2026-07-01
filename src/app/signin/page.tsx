@@ -5,6 +5,10 @@ import { devLoginEnabled, googleEnabled, keycloakEnabled, microsoftEnabled } fro
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+// Provider availability is read from env at request time — must not be baked in at build
+// (a build without the SSO env would freeze this to "no method configured").
+export const dynamic = 'force-dynamic';
+
 async function withGoogle(): Promise<void> {
   'use server';
   await signIn('google', { redirectTo: '/fleet' });
