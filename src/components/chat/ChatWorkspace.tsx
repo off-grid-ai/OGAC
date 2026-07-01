@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { type Artifact, parseArtifact } from '@/lib/artifacts';
+import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
@@ -225,6 +225,27 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  // Save-on-open: opening an artifact both shows it in the side panel and persists it to the
+  // library (versioned server-side by conversation + title). Fire-and-forget; the panel opens
+  // regardless of whether the save succeeds.
+  const openArtifact = useCallback(
+    (a: Artifact) => {
+      setArtifact(a);
+      void fetch('/api/v1/chat/artifacts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: a.kind,
+          code: a.code,
+          language: a.language ?? null,
+          title: artifactTitle(a),
+          conversationId: activeId ?? null,
+        }),
+      }).catch(() => {});
+    },
+    [activeId],
+  );
 
   async function openConversation(id: string) {
     setActiveId(id);
@@ -654,7 +675,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
               <MessageBubble
                 key={m.id ?? i}
                 message={m}
-                onOpenArtifact={setArtifact}
+                onOpenArtifact={openArtifact}
                 onCopy={copy}
                 onRegenerate={regenerate}
                 onSpeak={speak}
