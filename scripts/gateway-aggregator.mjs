@@ -1,9 +1,9 @@
 // Off Grid gateway aggregator — one OpenAI-compatible endpoint that routes across the
 // gateway pool by model + modality. Dependency-free (Node http). Runs on S1 as a service.
 //
-//   text request            -> round-robin the text gateways (g1, g2)
-//   request with an image    -> a vision gateway (qwen-vision g2, or gemma g3 if named)
-//   model names "gemma…"     -> g3   |   model names "qwen…" + image -> g2
+//   text request            -> round-robin the text gateways (g1 Gemma 12B, g2 Qwen 9B)
+//   request with an image    -> a vision gateway (g2 Qwen, or g3 Gemma E4B if named)
+//   model names "gemma…" text -> g1 (Gemma 12B)  |  "qwen…" -> g2  |  image+gemma -> g3
 //
 // Adds `x-offgrid-gateway` to responses so you can see where each call went.
 import http from 'node:http';
@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT || 8800);
 const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info URLs only
 // role map — one model per gateway (edit IPs via OFFGRID_POOL JSON if they change)
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
-  { name: 'g1', host: '192.168.1.57', port: 7878, vision: false, model: 'qwen3.5-9b' },
+  { name: 'g1', host: '192.168.1.57', port: 7878, vision: false, model: 'gemma-4-12b' },
   { name: 'g2', host: '192.168.1.58', port: 7878, vision: true, model: 'qwen3.5-9b' },
   { name: 'g3', host: '192.168.1.32', port: 7878, vision: true, model: 'gemma-4-e4b' },
 ]));
@@ -25,11 +25,12 @@ const hasImage = (b) => {
 };
 function pick(model, image) {
   const m = (model || '').toLowerCase();
-  if (m.includes('gemma')) return POOL.find((g) => g.name === 'g3');
   if (image) {
-    if (m.includes('gemma')) return POOL.find((g) => g.name === 'g3');
-    return POOL.find((g) => g.vision); // g2: qwen text+vision (default vision node)
+    if (m.includes('gemma')) return POOL.find((g) => g.name === 'g3'); // Gemma E4B vision
+    return POOL.find((g) => g.vision); // g2: Qwen text+vision (default vision node)
   }
+  if (m.includes('gemma')) return POOL.find((g) => g.name === 'g1'); // Gemma 12B text
+  if (m.includes('qwen')) return POOL.find((g) => g.name === 'g2');
   return TEXT[rr++ % TEXT.length]; // text: round-robin g1/g2
 }
 
@@ -64,6 +65,7 @@ const server = http.createServer((req, res) => {
     return poolInfo().then((i) => json(res, 200, i)).catch(() => json(res, 200, { name: 'Off Grid AI — gateway aggregator', routes: POOL }));
   if (req.url === '/v1/models')
     return json(res, 200, { object: 'list', data: [
+      { id: 'gemma-4-12b', object: 'model', owned_by: 'offgrid', capabilities: ['text'], gateways: POOL.filter((g) => g.model === 'gemma-4-12b').map((g) => g.name) },
       { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'qwen3.5-9b').map((g) => g.name) },
       { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'gemma-4-e4b').map((g) => g.name) },
     ] });

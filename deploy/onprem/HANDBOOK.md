@@ -15,7 +15,7 @@ those survive IP changes; the IPs below are current but can shift on a network c
 |---|---|---|---|
 | **offgrid-s1** | 127.0.0.1 | **Server / control plane** | Caddy edge (:80), Postgres (:5432), Keycloak (:8080), aggregator (:8800), metrics (:9100), Console (:3000) |
 | **offgrid-s2** | 192.168.1.60 | Server (console standby) | Console (:3000) — shares S1's Postgres |
-| **offgrid-g1** | 192.168.1.57 | Gateway · inference | Gemma 4 12B *(migrating from Qwen 3.5 9B)* — text/general |
+| **offgrid-g1** | 192.168.1.57 | Gateway · inference | Gemma 4 12B — text / general / coding |
 | **offgrid-g2** | 192.168.1.58 | Gateway · inference | Qwen 3.5 9B — **text + vision** (mmproj) |
 | **offgrid-g3** | 192.168.1.32 | Gateway · inference | Gemma 4 E4B — **vision** |
 
