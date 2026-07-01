@@ -78,6 +78,7 @@ function stripImportsExports(code: string): string {
 
 // Best-effort human title for a saved artifact: an HTML <title>, a leading markdown/comment
 // heading, or a kind-based fallback. Keeps the library readable without asking the user.
+// eslint-disable-next-line complexity
 export function artifactTitle(a: Artifact): string {
   const title = a.code.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
   if (title) return title.slice(0, 80);
