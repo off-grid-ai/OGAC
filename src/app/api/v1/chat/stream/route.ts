@@ -1,13 +1,14 @@
 import { auth } from '@/auth';
 import {
   addMessage,
+  branchUserMessage,
   deriveTitle,
-  dropLastAssistant,
   getConversation,
   getCustomInstructions,
   getSkill,
   listMessages,
   memoryBlock,
+  prepareRegenerate,
   projectMemoryBlock,
   projectSystemPrompt,
   renameConversation,
@@ -48,6 +49,8 @@ export async function POST(req: Request) {
     model = '',
     images = [],
     regenerate = false,
+    // Edit & branch: re-run from an edited prior user message, forking a new branch.
+    editMessageId = null,
     approvals = [],
     orgKnowledge = false,
     // Incognito / temporary chat: no DB writes, no memory. The client owns the transcript and
@@ -66,8 +69,16 @@ export async function POST(req: Request) {
       : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
 
-  // Regenerate: drop the last assistant turn and re-answer the existing last user turn.
-  if (regenerate && !temporary) await dropLastAssistant(convo.id);
+  // Edit & branch: fork a new user turn from an edited prior message (persisted, becomes active).
+  // The new user message is the parent of the assistant answer we're about to generate.
+  let assistantParentId: string | null = null;
+  if (!temporary && editMessageId && content.trim()) {
+    assistantParentId = await branchUserMessage(convo.id, String(editMessageId), String(content));
+    if (!assistantParentId) return new Response('message not found', { status: 404 });
+  } else if (!temporary && regenerate) {
+    // Regenerate: branch a fresh answer under the same user turn (old answer kept as a sibling).
+    assistantParentId = await prepareRegenerate(convo.id);
+  }
 
   // Temporary chats carry their own history from the client (never touch the DB).
   const prior: { role: string; content: string }[] = temporary
@@ -75,9 +86,9 @@ export async function POST(req: Request) {
         role: h.role,
         content: h.content,
       }))
-    : await listMessages(convo.id);
+    : (await listMessages(convo.id)).map((m) => ({ role: m.role, content: m.content }));
   // First user turn → title the conversation from it (like the desktop does).
-  if (!temporary && !regenerate && prior.length === 0 && content.trim()) {
+  if (!temporary && !regenerate && !editMessageId && prior.length === 0 && content.trim()) {
     await renameConversation(userId, convo.id, deriveTitle(content));
   }
 
@@ -149,8 +160,9 @@ export async function POST(req: Request) {
     if (m.role === 'system') continue;
     messages.push({ role: m.role, content: m.content });
   }
-  // On regenerate the last user turn is already in `prior`; only add a new turn otherwise.
-  if (!regenerate) {
+  // On regenerate/edit the driving user turn is already in `prior` (edit persisted it as the new
+  // branch); only add + persist a brand-new turn otherwise.
+  if (!regenerate && !editMessageId) {
     const userContent: ContentPart[] = [{ type: 'text', text: String(content) }];
     for (const url of Array.isArray(images) ? images : []) {
       if (typeof url === 'string' && url.startsWith('data:')) {
@@ -277,6 +289,9 @@ export async function POST(req: Request) {
             content: full,
             reasoning: reasoning || null,
             citations: citations.length ? citations : null,
+            // On regenerate/edit, attach under the driving user turn so the old answer stays as a
+            // sibling branch; otherwise default to the active leaf (the just-added user turn).
+            ...(assistantParentId ? { parentId: assistantParentId } : {}),
           });
         } catch {
           /* best-effort persistence */

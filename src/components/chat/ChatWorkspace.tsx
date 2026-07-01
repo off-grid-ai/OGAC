@@ -2,6 +2,9 @@
 
 import {
   ArrowsClockwise,
+  CaretLeft,
+  CaretRight,
+  Check,
   Copy,
   FolderSimplePlus,
   GearSix,
@@ -11,6 +14,7 @@ import {
   MagnifyingGlass,
   Microphone,
   PaperPlaneRight,
+  PencilSimple,
   Plus,
   Quotes,
   SlidersHorizontal,
@@ -51,6 +55,9 @@ interface Message {
   reasoning?: string | null;
   images?: string[] | null;
   citations?: Citation[] | null;
+  // Edit & branch: position among sibling versions of this turn (‹ 2/3 ›).
+  branchIndex?: number;
+  branchCount?: number;
 }
 interface ModelInfo {
   id: string;
@@ -70,6 +77,30 @@ function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifa
   );
 }
 
+// Branch navigation ‹ 2/3 › shown on turns that have sibling versions (edited/regenerated).
+function BranchNav({
+  m,
+  onNav,
+}: {
+  m: Message;
+  onNav: (delta: number) => void;
+}) {
+  if (!m.branchCount || m.branchCount < 2) return null;
+  return (
+    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+      <button onClick={() => onNav(-1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+        <CaretLeft className="size-3" />
+      </button>
+      <span className="tabular-nums">
+        {(m.branchIndex ?? 0) + 1}/{m.branchCount}
+      </span>
+      <button onClick={() => onNav(1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+        <CaretRight className="size-3" />
+      </button>
+    </div>
+  );
+}
+
 // eslint-disable-next-line complexity
 function MessageBubble({
   message: m,
@@ -77,18 +108,56 @@ function MessageBubble({
   onCopy,
   onRegenerate,
   onSpeak,
+  onEdit,
+  onNavBranch,
   canRegenerate,
+  canEdit,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
   onCopy: (text: string) => void;
   onRegenerate: () => void;
   onSpeak: (text: string) => void;
+  onEdit: (id: string, content: string) => void;
+  onNavBranch: (id: string, delta: number) => void;
   canRegenerate: boolean;
+  canEdit: boolean;
 }) {
   const isAssistant = m.role === 'assistant';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.content);
+  if (!isAssistant && editing) {
+    return (
+      <div className="flex justify-end">
+        <div className="w-[90%] rounded-lg border border-primary/40 bg-primary/5 p-2">
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.min(8, draft.split('\n').length + 1)}
+            className="w-full resize-none bg-transparent text-sm outline-none"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setDraft(m.content); }}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const t = draft.trim();
+                setEditing(false);
+                if (t && m.id) onEdit(m.id, t);
+              }}
+            >
+              <Check className="mr-1 size-3.5" /> Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className={cn('group flex', m.role === 'user' && 'justify-end')}>
+    <div className={cn('group flex', m.role === 'user' && 'flex-col items-end')}>
       <div
         className={cn(
           'max-w-[90%] rounded-lg px-3.5 py-2.5',
@@ -161,6 +230,18 @@ function MessageBubble({
           <p className="whitespace-pre-wrap text-sm">{m.content}</p>
         )}
       </div>
+      {/* Branch navigation ‹ 2/3 › on turns with sibling versions. */}
+      {m.id ? <BranchNav m={m} onNav={(d) => onNavBranch(m.id!, d)} /> : null}
+      {/* Edit affordance on user turns (creates a new branch). */}
+      {!isAssistant && canEdit && m.id ? (
+        <button
+          onClick={() => { setDraft(m.content); setEditing(true); }}
+          className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          title="Edit message"
+        >
+          <PencilSimple className="size-3" /> Edit
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -539,8 +620,49 @@ export function ChatWorkspace({
     await streamAssistant({ ...lastSendBody, approvals: pend.map((p) => p.fn), regenerate: true });
   }
 
-  async function regenerate() {
+  // Edit a prior user message → server forks a new branch and re-answers from it. Persisted chats
+  // only (temporary chats have no message ids). We reload the active-path transcript, then stream.
+  async function editMessage(id: string, newContent: string) {
+    if (streaming || !activeId || temporary) return;
+    setActiveStarters([]);
+    setMessages((prev) => {
+      const i = prev.findIndex((m) => m.id === id);
+      const trimmed = i >= 0 ? prev.slice(0, i) : prev;
+      return [
+        ...trimmed,
+        { role: 'user', content: newContent },
+        { role: 'assistant', content: '', reasoning: '' },
+      ];
+    });
+    await streamAssistant({
+      conversationId: activeId,
+      editMessageId: id,
+      content: newContent,
+      model,
+    });
+    await reloadActive(activeId);
+  }
+
+  // Reload the persisted active-path transcript (ids + branch metadata) after a branching edit or
+  // regenerate so ‹ n/m › controls appear immediately.
+  async function reloadActive(id: string) {
+    const r = await fetch(`/api/v1/chat/conversations/${id}`);
+    if (r.ok) setMessages((await r.json()).messages ?? []);
+  }
+
+  // Switch among sibling versions of an edited/regenerated turn; reload the resulting active path.
+  async function navBranch(id: string, delta: number) {
     if (streaming || !activeId) return;
+    const r = await fetch(`/api/v1/chat/conversations/${activeId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ branchMessageId: id, branchDelta: delta }),
+    });
+    if (r.ok) setMessages((await r.json()).messages ?? []);
+  }
+
+  async function regenerate() {
+    if (streaming || (!activeId && !temporary)) return;
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (!lastUser) return;
     setMessages((prev) => {
@@ -549,12 +671,24 @@ export function ChatWorkspace({
       next.push({ role: 'assistant', content: '', reasoning: '' });
       return next;
     });
+    if (temporary) {
+      const history = messages.filter((m) => m !== messages[messages.length - 1]);
+      await streamAssistant({
+        temporary: true,
+        history: history.map((m) => ({ role: m.role, content: m.content })),
+        content: lastUser.content,
+        model,
+        regenerate: true,
+      });
+      return;
+    }
     await streamAssistant({
       conversationId: activeId,
       content: lastUser.content,
       model,
       regenerate: true,
     });
+    if (activeId) await reloadActive(activeId);
   }
 
   return (
@@ -759,7 +893,10 @@ export function ChatWorkspace({
                 onCopy={copy}
                 onRegenerate={regenerate}
                 onSpeak={speak}
+                onEdit={editMessage}
+                onNavBranch={navBranch}
                 canRegenerate={!streaming && i === messages.length - 1}
+                canEdit={!streaming && !temporary}
               />
             ))}
           </div>
