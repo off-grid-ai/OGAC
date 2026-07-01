@@ -7,9 +7,10 @@ import { chatChunks, chatDocuments } from '@/db/schema';
 
 const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
-let ensured = false;
+let ensurePromise: Promise<void> | null = null;
 async function ensureRagSchema(): Promise<void> {
-  if (ensured) return;
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = (async (): Promise<void> => {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_documents (
       id text PRIMARY KEY, project_id text NOT NULL, user_id text NOT NULL, name text NOT NULL,
@@ -22,7 +23,11 @@ async function ensureRagSchema(): Promise<void> {
       position integer NOT NULL DEFAULT 0, embedding jsonb);
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_chunks_proj_idx ON chat_chunks (project_id);`);
-  ensured = true;
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
+  return ensurePromise;
 }
 
 // Chunk text ~600 tokens with 120 overlap (desktop defaults; ~4 chars/token).

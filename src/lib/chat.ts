@@ -18,9 +18,10 @@ import {
 // console, backed by the on-prem gateway for inference. Tables are created idempotently on first
 // use so the module deploys over SSH with no migration step.
 
-let ensured = false;
+let ensurePromise: Promise<void> | null = null;
 export async function ensureChatSchema(): Promise<void> {
-  if (ensured) return;
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = (async (): Promise<void> => {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_projects (
       id text PRIMARY KEY, user_id text NOT NULL, name text NOT NULL,
@@ -128,7 +129,11 @@ export async function ensureChatSchema(): Promise<void> {
       user_id text PRIMARY KEY, prefs jsonb NOT NULL DEFAULT '{}',
       updated_at timestamptz NOT NULL DEFAULT now());
   `);
-  ensured = true;
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
+  return ensurePromise;
 }
 
 // ─── Per-user cross-conversation memory ───────────────────────────────────────
