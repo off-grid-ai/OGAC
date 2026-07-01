@@ -107,7 +107,7 @@ function healthFor(name) {
 
 // Cheap periodic probe: 1-token generation per LIVE gateway, bounded to PROBE_TIMEOUT.
 // Fire-and-forget, staggered, never on the request path — so it catches jams with no traffic.
-const PROBE_TIMEOUT = Number(process.env.OFFGRID_HEALTH_PROBE_TIMEOUT_MS || 8000);
+const PROBE_TIMEOUT = Number(process.env.OFFGRID_HEALTH_PROBE_TIMEOUT_MS || 45000);
 const PROBE_EVERY = Number(process.env.OFFGRID_HEALTH_PROBE_MS || 60000);
 const PROBE_ENABLED = process.env.OFFGRID_HEALTH_PROBE !== '0';
 async function probeGateway(g) {
