@@ -4,6 +4,7 @@ import { ConnectorActions } from '@/components/data/ConnectorActions';
 import { ErasureForm } from '@/components/data/ErasureForm';
 import { MaskingRuleToggle } from '@/components/data/MaskingRuleToggle';
 import { PiiScanner } from '@/components/data/PiiScanner';
+import { ReindexQdrantButton } from '@/components/data/ReindexQdrantButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { listDocuments } from '@/lib/brain';
 import { requireModule } from '@/lib/modules';
+import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
 import { listConnectors, listDatasets, listIngestJobs, listMaskingRules } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -34,11 +37,13 @@ const CLASSIFICATION: Record<string, string> = {
 
 export default async function DataPage() {
   requireModule('data');
-  const [connectors, jobs, rules, datasets] = await Promise.all([
+  const [connectors, jobs, rules, datasets, brainDocs, qCount] = await Promise.all([
     listConnectors(),
     listIngestJobs(),
     listMaskingRules(),
     listDatasets(),
+    listDocuments(),
+    qdrantCount(),
   ]);
 
   return (
@@ -180,6 +185,23 @@ export default async function DataPage() {
           <p className="text-xs text-muted-foreground">
             Right-to-erasure propagates across the lake, KB, vector index, memory, and audit.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Vector index (Qdrant)</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Push the Brain&apos;s documents into Qdrant so switching the retrieval backend
+            (OFFGRID_ADAPTER_RETRIEVAL=qdrant) lands on a populated store, not an empty one.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ReindexQdrantButton
+            collection={qdrantCollectionName()}
+            qdrantCount={qCount}
+            sourceDocs={brainDocs.length}
+          />
         </CardContent>
       </Card>
 

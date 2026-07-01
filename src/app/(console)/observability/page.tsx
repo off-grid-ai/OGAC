@@ -7,6 +7,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
+import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import {
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
+import { safeListTraces } from '@/lib/langfuse';
 import { requireModule } from '@/lib/modules';
 import { scoringConfigured } from '@/lib/qa/scoring';
 
@@ -171,11 +173,12 @@ function RunTracesTable({ runs }: { runs: Trace[] }) {
 
 export default async function ObservabilityPage() {
   requireModule('observability');
-  const [evals, drift, runs, onlineEnabled] = await Promise.all([
+  const [evals, drift, runs, onlineEnabled, traces] = await Promise.all([
     listEvalRuns(20),
     getDrift().analyze(),
     listAgentRuns(15),
     getFlags().isEnabled('online-evals', true),
+    safeListTraces(30),
   ]);
 
   const latest = evals[0];
@@ -290,6 +293,23 @@ export default async function ObservabilityPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Langfuse traces</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            LLM traces read back from Langfuse&apos;s public API — expand a trace for its span
+            waterfall. Spans are pushed via the OTLP observability seam.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LangfuseTraces
+            configured={traces.configured}
+            traces={traces.traces}
+            error={traces.error}
+          />
+        </CardContent>
+      </Card>
 
       <EvalRunsCard evals={evals} />
 

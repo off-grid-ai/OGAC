@@ -38,7 +38,61 @@ async function baoGet(key: string): Promise<string | undefined> {
   }
 }
 
-export const openBaoSecrets: SecretsPort = {
+function baoHeaders(): Record<string, string> {
+  return { 'X-Vault-Token': BAO_TOKEN, 'content-type': 'application/json' };
+}
+
+// Write a KV v2 secret: POST <url>/v1/<mount>/data/<key> with { data: { value } }.
+async function baoSet(key: string, value: string): Promise<void> {
+  if (!BAO_URL) throw new Error('OpenBao not configured (OFFGRID_OPENBAO_URL unset)');
+  const res = await fetch(`${BAO_URL}/v1/${BAO_MOUNT}/data/${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: baoHeaders(),
+    body: JSON.stringify({ data: { value } }),
+    signal: AbortSignal.timeout(4000),
+  });
+  if (!res.ok) throw new Error(`OpenBao write ${res.status}`);
+}
+
+// Soft-delete latest version: DELETE <url>/v1/<mount>/data/<key>.
+async function baoRemove(key: string): Promise<void> {
+  if (!BAO_URL) throw new Error('OpenBao not configured');
+  const res = await fetch(`${BAO_URL}/v1/${BAO_MOUNT}/data/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+    headers: baoHeaders(),
+    signal: AbortSignal.timeout(4000),
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`OpenBao delete ${res.status}`);
+}
+
+// Enumerate keys: LIST <url>/v1/<mount>/metadata (KV v2 metadata path).
+async function baoList(): Promise<string[]> {
+  if (!BAO_URL) return [];
+  try {
+    const res = await fetch(`${BAO_URL}/v1/${BAO_MOUNT}/metadata?list=true`, {
+      headers: baoHeaders(),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const keys = json?.data?.keys;
+    return Array.isArray(keys) ? (keys as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function baoHealth(): Promise<boolean> {
+  if (!BAO_URL) return false;
+  try {
+    const res = await fetch(`${BAO_URL}/v1/sys/health`, { signal: AbortSignal.timeout(2500) });
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+export const openBaoSecrets: SecretsPort & { health(): Promise<boolean> } = {
   meta: {
     id: 'openbao',
     capability: 'secrets',
@@ -46,10 +100,19 @@ export const openBaoSecrets: SecretsPort = {
     license: 'MPL-2.0',
     render: 'embed',
     embedUrl: BAO_URL,
-    description: 'KMS-backed secrets (KV v2). Admin surfaced as an SSO embed.',
+    description: 'KMS-backed secrets (KV v2). Read/write via API; admin surfaced as an SSO embed.',
   },
+  writable: true,
   get: baoGet,
   async has(key) {
     return (await baoGet(key)) !== undefined;
   },
+  set: baoSet,
+  remove: baoRemove,
+  list: baoList,
+  health: baoHealth,
 };
+
+export function openBaoConfigured(): boolean {
+  return Boolean(BAO_URL);
+}

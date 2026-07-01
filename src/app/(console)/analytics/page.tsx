@@ -10,9 +10,11 @@ import {
   LatencyChart,
   ModelTokensChart,
 } from '@/components/analytics/AnalyticsCharts';
+import { EmbedGuard } from '@/components/control/EmbedGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModule } from '@/lib/modules';
+import { supersetBase } from '@/lib/superset';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +114,19 @@ export default async function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Superset dashboards</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Native BI over the governed data. Framed when reachable; otherwise opens in a new tab.
+            Guest-token embedding is available at /api/v1/admin/superset-token for the embedded SDK.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <EmbedGuard url={supersetBase()} title="Superset" height={720} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
