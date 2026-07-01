@@ -45,6 +45,14 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const canManage = access === 'owner';
 
+  // Knowledge capacity — approximate tokens from document bytes (~4 chars/token, desktop default).
+  // Under the full-context threshold the whole corpus fits in the window; above it, chat falls back
+  // to RAG retrieval (mirrors Claude's "project knowledge" behavior).
+  const FULL_CONTEXT_TOKENS = 100_000;
+  const usedTokens = Math.round(docs.reduce((sum, d) => sum + (d.size ?? 0), 0) / 4);
+  const pct = Math.min(100, Math.round((usedTokens / FULL_CONTEXT_TOKENS) * 100));
+  const retrievalMode = usedTokens <= FULL_CONTEXT_TOKENS ? 'full-context' : 'RAG';
+
   const loadDocs = useCallback(async () => {
     const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
@@ -217,7 +225,34 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
             {busy ? 'Embedding…' : 'Add files'}
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                ~{usedTokens.toLocaleString()} / {FULL_CONTEXT_TOKENS.toLocaleString()} tokens
+              </span>
+              <span
+                className={
+                  retrievalMode === 'full-context'
+                    ? 'rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'
+                    : 'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600'
+                }
+                title={
+                  retrievalMode === 'full-context'
+                    ? 'The whole knowledge base fits in context each turn.'
+                    : 'Knowledge base exceeds the window; chats retrieve relevant chunks (RAG).'
+                }
+              >
+                retrieval: {retrievalMode}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={pct >= 100 ? 'h-full bg-amber-500' : 'h-full bg-primary'}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
           <div className="space-y-1 rounded-md border border-border p-1.5">
             {docs.length === 0 ? (
               <p className="px-1 py-3 text-center text-xs text-muted-foreground">
