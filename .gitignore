@@ -21,3 +21,4 @@ npm-debug.log*
 
 # LanceDB (Brain vector store)
 /.lancedb/
+.claude/worktrees/
