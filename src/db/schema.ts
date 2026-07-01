@@ -290,6 +290,7 @@ export const chatConversations = pgTable('chat_conversations', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
   projectId: text('project_id'), // null = ad-hoc chat
+  skillId: text('skill_id'), // optional org skill bound to this conversation
   title: text('title').notNull().default('New chat'),
   model: text('model').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -304,6 +305,23 @@ export const chatMessages = pgTable('chat_messages', {
   reasoning: text('reasoning'), // model thinking, kept separate from content
   images: jsonb('images').$type<string[]>(), // data: URIs sent with a user turn
   citations: jsonb('citations').$type<{ name: string; position: number; score: number }[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Org skills — reusable assistants (instructions + model + optional knowledge project), published
+// org-wide and RBAC-scoped per role (allowedRoles empty = everyone). Invoked in chat via a picker;
+// the skill's system prompt is injected for that conversation. Admin-managed.
+export const chatSkills = pgTable('chat_skills', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  systemPrompt: text('system_prompt').notNull().default(''),
+  model: text('model').notNull().default(''),
+  projectId: text('project_id'), // optional knowledgebase to ground the skill
+  allowedRoles: jsonb('allowed_roles').$type<string[]>().notNull().default([]),
+  icon: text('icon'),
+  enabled: boolean('enabled').notNull().default(true),
+  createdBy: text('created_by').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
