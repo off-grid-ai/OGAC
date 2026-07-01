@@ -60,13 +60,92 @@ function record(e) {
   console.log(`[req] ${new Date(e.ts).toISOString()} ${e.gateway} ${e.model} ${e.kind} ${e.status} ${e.ms}ms ${e.bytes}b${e.tokens ? ` tok=${e.tokens}` : ''}`);
   shipToOpenSearch(e);
 }
+// --- TRUE inference health (not just "process answers /health") ---
+// A gateway is only 'up' if it is reachable AND its recent inference behaviour looks healthy.
+// A jammed gateway (KV-cache exhausted) still answers /health but times out or errors on
+// generation, so process-reachability alone lies. We fold three cheap signals together:
+//   1. reachability of the HTTP process (from the last probe / recent traffic),
+//   2. recent error rate over the rolling LOG,
+//   3. recent average latency (jams show up as very slow or timing-out generations),
+// plus an optional bounded 1-token probe that catches jams even with zero live traffic.
+const HEALTH_WINDOW_MS = Number(process.env.OFFGRID_HEALTH_WINDOW_MS || 120000); // recent = last 2 min
+const SLOW_MS = Number(process.env.OFFGRID_HEALTH_SLOW_MS || 30000);             // avg > 30s ⇒ degraded
+const JAM_MS = Number(process.env.OFFGRID_HEALTH_JAM_MS || 90000);              // avg > 90s ⇒ jammed/down
+const DEGRADED_ERR_RATE = Number(process.env.OFFGRID_HEALTH_ERR_RATE || 0.25);   // ≥25% recent errors ⇒ degraded
+const DOWN_ERR_RATE = Number(process.env.OFFGRID_HEALTH_DOWN_ERR_RATE || 0.6);   // ≥60% recent errors ⇒ down
+
+// Latest probe result per gateway: { reachable, genOk, genMs, ts }.
+const PROBE = {};
+
+// eslint-disable-next-line complexity
+function healthFor(name) {
+  const now = Date.now();
+  const recent = LOG.filter((e) => e.gateway === name && now - e.ts <= HEALTH_WINDOW_MS);
+  const p = PROBE[name];
+  const probeFresh = p && now - p.ts <= HEALTH_WINDOW_MS;
+
+  // Process unreachable (probe says so, and no successful recent traffic contradicts it) ⇒ down.
+  if (probeFresh && !p.reachable && !recent.some((e) => e.status && e.status < 400)) return 'down';
+
+  const errs = recent.filter((e) => !e.status || e.status >= 400).length;
+  const errRate = recent.length ? errs / recent.length : 0;
+  const avgMs = recent.length ? recent.reduce((a, e) => a + (e.ms || 0), 0) / recent.length : 0;
+
+  // Probe reached the process but a bounded 1-token generation failed or crawled ⇒ jammed.
+  if (probeFresh && p.reachable && p.genOk === false) return 'down';
+  if (probeFresh && p.reachable && p.genMs != null && p.genMs >= SLOW_MS) return 'degraded';
+
+  // Live-traffic signals (only meaningful with samples in the window).
+  if (recent.length >= 2) {
+    if (errRate >= DOWN_ERR_RATE || avgMs >= JAM_MS) return 'down';
+    if (errRate >= DEGRADED_ERR_RATE || avgMs >= SLOW_MS) return 'degraded';
+  }
+  if (probeFresh && p.reachable) return 'up';
+  if (recent.some((e) => e.status && e.status < 400)) return 'up';
+  return probeFresh ? 'up' : 'unknown'; // no probe yet + no traffic ⇒ genuinely unknown
+}
+
+// Cheap periodic probe: 1-token generation per LIVE gateway, bounded to PROBE_TIMEOUT.
+// Fire-and-forget, staggered, never on the request path — so it catches jams with no traffic.
+const PROBE_TIMEOUT = Number(process.env.OFFGRID_HEALTH_PROBE_TIMEOUT_MS || 8000);
+const PROBE_EVERY = Number(process.env.OFFGRID_HEALTH_PROBE_MS || 60000);
+const PROBE_ENABLED = process.env.OFFGRID_HEALTH_PROBE !== '0';
+async function probeGateway(g) {
+  const started = Date.now();
+  try {
+    // Reachability first (mirrors the old process check).
+    const h = await fetch(`http://${g.host}:${g.port}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null);
+    const reachable = !!(h && h.ok);
+    if (!reachable) { PROBE[g.name] = { reachable: false, genOk: null, genMs: null, ts: Date.now() }; return; }
+    // Bounded 1-token generation — this is what a jammed KV-cache fails/stalls on.
+    const genStart = Date.now();
+    const r = await fetch(`http://${g.host}:${g.port}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: g.model, max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT),
+    }).catch(() => null);
+    const genMs = Date.now() - genStart;
+    PROBE[g.name] = { reachable: true, genOk: !!(r && r.ok), genMs, ts: Date.now() };
+  } catch {
+    PROBE[g.name] = { reachable: false, genOk: false, genMs: Date.now() - started, ts: Date.now() };
+  }
+}
+function startProbing() {
+  if (!PROBE_ENABLED) return;
+  let i = 0;
+  const stagger = Math.max(500, Math.floor(PROBE_EVERY / Math.max(1, LIVE.length)));
+  // One gateway per stagger tick, cycling — spreads load, keeps each cheap and non-blocking.
+  setInterval(() => { const g = LIVE[i++ % LIVE.length]; if (g) probeGateway(g); }, stagger).unref();
+}
+
 function trafficJSON() {
   return {
     since: new Date(startedAt).toISOString(),
     pool: POOL.map((g) => ({ name: g.name, model: g.model, vision: g.vision })),
     stats: POOL.map((g) => {
       const s = STATS[g.name] || { requests: 0, errors: 0, totalMs: 0, tokens: 0 };
-      return { gateway: g.name, model: g.model, ...s, avgMs: s.requests ? Math.round(s.totalMs / s.requests) : 0 };
+      return { gateway: g.name, model: g.model, ...s, avgMs: s.requests ? Math.round(s.totalMs / s.requests) : 0, health: healthFor(g.name) };
     }),
     recent: LOG.slice().reverse(),
   };
@@ -109,8 +188,10 @@ async function poolInfo() {
   const infos = await Promise.all(POOL.map(async (g) => {
     try {
       const r = await fetch(`http://${g.host}:${g.port}/`, { signal: AbortSignal.timeout(1500) });
+      // Seed reachability if we've never probed this gateway, so health isn't 'unknown' on cold start.
+      if (!PROBE[g.name]) PROBE[g.name] = { reachable: r.ok, genOk: null, genMs: null, ts: Date.now() };
       return { g, info: r.ok ? await r.json() : null };
-    } catch { return { g, info: null }; }
+    } catch { if (!PROBE[g.name]) PROBE[g.name] = { reachable: false, genOk: null, genMs: null, ts: Date.now() }; return { g, info: null }; }
   }));
   const modalities = {};
   for (const { info } of infos) for (const [k, v] of Object.entries(info?.modalities || {}))
@@ -123,7 +204,7 @@ async function poolInfo() {
     mcp: `http://${HOST_HINT}:${PORT}/mcp`,
     modalities: Object.keys(modalities).length ? modalities : { text: 'ready', vision_understanding: 'ready' },
     image_models: [],
-    gateways: infos.map(({ g, info }) => ({ name: g.name, host: g.host, model: g.model, vision: g.vision, up: !!info })),
+    gateways: infos.map(({ g, info }) => ({ name: g.name, host: g.host, model: g.model, vision: g.vision, up: !!info, health: healthFor(g.name) })),
   };
 }
 
@@ -265,3 +346,4 @@ const server = http.createServer((req, res) => {
   });
 });
 server.listen(PORT, '0.0.0.0', () => console.log(`[aggregator] routing on 0.0.0.0:${PORT} across`, POOL.map((g) => `${g.name}:${g.model}${g.vision ? '+vision' : ''}`).join(', ')));
+startProbing();

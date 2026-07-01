@@ -25,11 +25,17 @@ const REMOTE =
   '"$(scutil --get LocalHostName)" "$(sysctl -n hw.memsize)" "$(sysctl -n hw.ncpu)" ' +
   '"$(sysctl -n vm.loadavg)" "$(echo "$TOP"|grep "CPU usage")" "$(echo "$TOP"|grep PhysMem)" ' +
   '"$(df -k / | tail -1)" "$(cat ~/.offgrid/models/active-model.json 2>/dev/null|tr -d "\\n")" "$(uptime)" ' +
-  '"$(curl -sf -o /dev/null -w \'%{http_code}\' http://localhost:7878/health 2>/dev/null || echo 0)"';
+  '"$(curl -sf -o /dev/null -w \'%{http_code}\' http://localhost:7878/health 2>/dev/null || echo 0)" ' +
+  // TRUE inference health: a jammed gateway (KV-cache exhausted) still answers /health but its
+  // generation stalls/errors. Bounded 1-token gen probe (max 8s) — GEN=<http_code>:<seconds>.
+  '"$(M=$(cat ~/.offgrid/models/active-model.json 2>/dev/null|sed -n \'s/.*"id":"\\([^"]*\\)".*/\\1/p\'); ' +
+  'S=$(date +%s); C=$(curl -s -m 8 -o /dev/null -w \'%{http_code}\' -H \'content-type: application/json\' ' +
+  '-d "{\\"model\\":\\"$M\\",\\"max_tokens\\":1,\\"messages\\":[{\\"role\\":\\"user\\",\\"content\\":\\"ok\\"}]}" ' +
+  'http://localhost:7878/v1/chat/completions 2>/dev/null || echo 0); echo "$C:$(( $(date +%s) - S ))")"';
 
 function sh(name) {
   return new Promise((res) => {
-    execFile('ssh', [...SSH, `admin@${name}.local`, REMOTE], { timeout: 9000 }, (err, out) => res(err ? null : out));
+    execFile('ssh', [...SSH, `admin@${name}.local`, REMOTE], { timeout: 20000 }, (err, out) => res(err ? null : out));
   });
 }
 const g = (s, re, d = '') => (s.match(re)?.[1] ?? d);
@@ -53,7 +59,22 @@ async function collect(node) {
   const gwCode = g(out, /GW=(\d+)/);
   const gwUp = gwCode === '200';
   const isGateway = node.role.toLowerCase().startsWith('gateway');
-  return { ...node, up: true, gwUp, isGateway, cpu, usedGB: Math.round(usedGB * 10) / 10, totalGB: Math.round(totalGB), memPct: totalGB ? Math.round((usedGB / totalGB) * 100) : 0, cores, load1, loadPct: Math.min(100, Math.round((load1 / cores) * 100)), disk, model, uptime: up };
+  // Inference health from the bounded gen probe: GEN=<http_code>:<seconds>.
+  //   up       = process answers AND 1-token gen returned 200 quickly
+  //   degraded = process answers but gen failed (non-200/timed out) or crawled (jammed KV-cache)
+  //   down     = process itself not answering /health
+  const genCode = g(out, /GEN=(\d+):/);
+  const genSecs = Number(g(out, /GEN=\d+:(\d+)/)) || 0;
+  const genOk = genCode === '200';
+  const SLOW_SECS = Number(process.env.OFFGRID_GEN_SLOW_SECS || 6);
+  let infer = 'n/a';
+  if (isGateway) {
+    if (!gwUp) infer = 'down';
+    else if (!genOk || genSecs >= 8) infer = 'degraded'; // gen failed or hit the 8s ceiling ⇒ jammed
+    else if (genSecs >= SLOW_SECS) infer = 'degraded';
+    else infer = 'up';
+  }
+  return { ...node, up: true, gwUp, isGateway, infer, genSecs, cpu, usedGB: Math.round(usedGB * 10) / 10, totalGB: Math.round(totalGB), memPct: totalGB ? Math.round((usedGB / totalGB) * 100) : 0, cores, load1, loadPct: Math.min(100, Math.round((load1 / cores) * 100)), disk, model, uptime: up };
 }
 
 const BOOK = `
@@ -162,9 +183,15 @@ async function tick(){
   ts.textContent='updated '+new Date().toLocaleTimeString();
   grid.innerHTML=d.map(n=>{
     if(!n.up) return '<div class="card down"><div class="top"><span class="nm"><span class="dot off"></span>'+n.name+'</span></div><div class="role">'+n.role+'</div><p style="color:#dc2626;font-size:12px">unreachable</p></div>';
-    const gwWarn = n.isGateway && !n.gwUp;
-    const dotCls = gwWarn ? 'dot warn' : 'dot';
-    const gwBanner = gwWarn ? '<div style="color:#d97706;font-size:11px;margin-bottom:8px;padding:4px 7px;background:rgba(217,119,6,.08);border-radius:6px;border:1px solid rgba(217,119,6,.25)">⚠ gateway process down (:7878)</div>' : '';
+    const procDown = n.isGateway && !n.gwUp;
+    const jammed = n.isGateway && n.gwUp && n.infer === 'degraded';
+    const gwWarn = procDown || jammed;
+    const dotCls = procDown ? 'dot off' : jammed ? 'dot warn' : 'dot';
+    const gwBanner = procDown
+      ? '<div style="color:#dc2626;font-size:11px;margin-bottom:8px;padding:4px 7px;background:rgba(220,38,38,.08);border-radius:6px;border:1px solid rgba(220,38,38,.25)">✕ gateway process down (:7878)</div>'
+      : jammed
+        ? '<div style="color:#d97706;font-size:11px;margin-bottom:8px;padding:4px 7px;background:rgba(217,119,6,.08);border-radius:6px;border:1px solid rgba(217,119,6,.25)">⚠ inference degraded — answers /health but 1-token gen '+(n.genSecs>=8?'timed out':'took '+n.genSecs+'s')+' (jammed?)</div>'
+        : '';
     return '<div class="card'+(gwWarn?' warn':'')+'"><div class="top"><span class="nm"><span class="'+dotCls+'"></span>'+n.name+'</span><span style="color:#9ca3af;font-size:11px">'+n.cores+' cores</span></div>'+
       '<div class="role">'+n.role+'</div>'+gwBanner+'<div class="model">'+n.model+'</div>'+
       bar('CPU',n.cpu,n.cpu,'%')+bar('Memory',n.usedGB+' / '+n.totalGB+' GB',n.memPct,'')+
