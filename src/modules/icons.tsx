@@ -6,7 +6,9 @@ import {
   Brain,
   Buildings as Building2,
   Coins,
+  Cube,
   Database,
+  FolderOpen,
   Graph,
   Microscope,
   Devices as MonitorSmartphone,
@@ -21,6 +23,8 @@ import { type ModuleId } from './registry';
 
 export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   chat: ChatIcon,
+  projects: FolderOpen,
+  artifacts: Cube,
   fleet: MonitorSmartphone,
   gateway: Network,
   control: ShieldCheck,
