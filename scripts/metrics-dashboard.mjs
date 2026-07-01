@@ -21,10 +21,11 @@ const NODES = JSON.parse(process.env.OFFGRID_NODES || JSON.stringify([
 const SSH = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'];
 const REMOTE =
   'TOP=$(top -l1 -n0 2>/dev/null); ' +
-  'printf "H=%s\\nT=%s\\nC=%s\\nL=%s\\nCPU=%s\\nPM=%s\\nDF=%s\\nM=%s\\nUP=%s\\n" ' +
+  'printf "H=%s\\nT=%s\\nC=%s\\nL=%s\\nCPU=%s\\nPM=%s\\nDF=%s\\nM=%s\\nUP=%s\\nGW=%s\\n" ' +
   '"$(scutil --get LocalHostName)" "$(sysctl -n hw.memsize)" "$(sysctl -n hw.ncpu)" ' +
   '"$(sysctl -n vm.loadavg)" "$(echo "$TOP"|grep "CPU usage")" "$(echo "$TOP"|grep PhysMem)" ' +
-  '"$(df -k / | tail -1)" "$(cat ~/.offgrid/models/active-model.json 2>/dev/null|tr -d "\\n")" "$(uptime)"';
+  '"$(df -k / | tail -1)" "$(cat ~/.offgrid/models/active-model.json 2>/dev/null|tr -d "\\n")" "$(uptime)" ' +
+  '"$(curl -sf -o /dev/null -w \'%{http_code}\' http://localhost:7878/health 2>/dev/null || echo 0)"';
 
 function sh(name) {
   return new Promise((res) => {
@@ -49,7 +50,10 @@ async function collect(node) {
   const disk = dfp ? Number(dfp[1]) : 0;
   const model = g(out, /"primary":"([^"]+)"/) || g(out, /M=.*?"id":"([^"]+)"/) || 'â€”';
   const up = g(out, /UP=.*?up\s+([^,]+(?:,\s*\d+:\d+)?)/).replace(/\s+\d+ user.*/, '').trim();
-  return { ...node, up: true, cpu, usedGB: Math.round(usedGB * 10) / 10, totalGB: Math.round(totalGB), memPct: totalGB ? Math.round((usedGB / totalGB) * 100) : 0, cores, load1, loadPct: Math.min(100, Math.round((load1 / cores) * 100)), disk, model, uptime: up };
+  const gwCode = g(out, /GW=(\d+)/);
+  const gwUp = gwCode === '200';
+  const isGateway = node.role.toLowerCase().startsWith('gateway');
+  return { ...node, up: true, gwUp, isGateway, cpu, usedGB: Math.round(usedGB * 10) / 10, totalGB: Math.round(totalGB), memPct: totalGB ? Math.round((usedGB / totalGB) * 100) : 0, cores, load1, loadPct: Math.min(100, Math.round((load1 / cores) * 100)), disk, model, uptime: up };
 }
 
 const BOOK = `
@@ -113,7 +117,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Off Grid â
 <style>
 :root{--accent:#059669;--mono:'Menlo','SF Mono',ui-monospace,monospace;--border:#e6e8eb;--muted:#6b7280}
 *{box-sizing:border-box}body{margin:0;background:#fff;color:#0a0a0a;font-family:var(--mono);font-size:14px}
-.wrap{max-width:1200px;margin:0 auto;padding:26px 22px}
+.wrap{max-width:100%;margin:0;padding:26px 22px}
 .hd{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}
 .hd h1{font-size:20px;margin:0;font-weight:700}.hd .sub{color:var(--muted);font-size:12px;letter-spacing:.06em}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px}
@@ -124,7 +128,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Off Grid â
 .card.down{opacity:.55}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
 .nm{font-weight:700;font-size:15px}.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px}
-.dot.off{background:#dc2626}
+.dot.off{background:#dc2626}.dot.warn{background:#d97706}
 .role{color:var(--muted);font-size:11px;margin-bottom:12px}
 .model{display:inline-block;font-size:11px;background:rgba(5,150,105,.08);color:var(--accent);border:1px solid rgba(5,150,105,.25);border-radius:6px;padding:2px 7px;margin-bottom:12px}
 .met{margin:9px 0}
@@ -158,8 +162,11 @@ async function tick(){
   ts.textContent='updated '+new Date().toLocaleTimeString();
   grid.innerHTML=d.map(n=>{
     if(!n.up) return '<div class="card down"><div class="top"><span class="nm"><span class="dot off"></span>'+n.name+'</span></div><div class="role">'+n.role+'</div><p style="color:#dc2626;font-size:12px">unreachable</p></div>';
-    return '<div class="card"><div class="top"><span class="nm"><span class="dot"></span>'+n.name+'</span><span style="color:#9ca3af;font-size:11px">'+n.cores+' cores</span></div>'+
-      '<div class="role">'+n.role+'</div><div class="model">'+n.model+'</div>'+
+    const gwWarn = n.isGateway && !n.gwUp;
+    const dotCls = gwWarn ? 'dot warn' : 'dot';
+    const gwBanner = gwWarn ? '<div style="color:#d97706;font-size:11px;margin-bottom:8px;padding:4px 7px;background:rgba(217,119,6,.08);border-radius:6px;border:1px solid rgba(217,119,6,.25)">âš  gateway process down (:7878)</div>' : '';
+    return '<div class="card'+(gwWarn?' warn':'')+'"><div class="top"><span class="nm"><span class="'+dotCls+'"></span>'+n.name+'</span><span style="color:#9ca3af;font-size:11px">'+n.cores+' cores</span></div>'+
+      '<div class="role">'+n.role+'</div>'+gwBanner+'<div class="model">'+n.model+'</div>'+
       bar('CPU',n.cpu,n.cpu,'%')+bar('Memory',n.usedGB+' / '+n.totalGB+' GB',n.memPct,'')+
       bar('Load (1m)',n.load1,n.loadPct,'')+bar('Disk',n.disk,n.disk,'%')+
       '<div class="foot"><span>up '+n.uptime+'</span></div></div>';
