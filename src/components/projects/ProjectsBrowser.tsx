@@ -17,12 +17,17 @@ interface ProjectRow {
 
 export function ProjectsBrowser() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [shared, setShared] = useState<(ProjectRow & { canEdit: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await fetch('/api/v1/chat/projects');
+    const [r, sr] = await Promise.all([
+      fetch('/api/v1/chat/projects'),
+      fetch('/api/v1/chat/projects/shared'),
+    ]);
     if (r.ok) setProjects((await r.json()).projects ?? []);
+    if (sr.ok) setShared((await sr.json()).projects ?? []);
     setLoading(false);
   }, []);
 
@@ -106,6 +111,37 @@ export function ProjectsBrowser() {
           ))}
         </div>
       )}
+
+      {shared.length ? (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Shared with me</h2>
+            <p className="text-xs text-muted-foreground">
+              Projects other people gave you access to.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {shared.map((p) => (
+              <Card key={p.id} className="shadow-sm transition-colors hover:border-primary/50">
+                <CardContent className="p-4">
+                  <Link href={`/projects/${p.id}`} className="block space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="size-4 text-primary" />
+                      <span className="truncate text-sm font-medium">{p.name}</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {p.canEdit ? 'edit' : 'view'}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 min-h-[2rem] text-xs text-muted-foreground">
+                      {p.systemPrompt || p.description || 'No instructions set.'}
+                    </p>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
