@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatConversations, chatMessages, chatProjects } from '@/db/schema';
+import { chatConversations, chatMessages, chatProjects, chatSettings } from '@/db/schema';
 
 // Chat workspace server logic — ports Off Grid AI Desktop's project/thread/message store to the
 // console, backed by the on-prem gateway for inference. Tables are created idempotently on first
@@ -30,7 +30,43 @@ export async function ensureChatSchema(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS chat_messages_conv_idx ON chat_messages (conversation_id, created_at);`,
   );
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_settings (
+      user_id text PRIMARY KEY, custom_instructions text NOT NULL DEFAULT '',
+      updated_at timestamptz NOT NULL DEFAULT now());
+  `);
   ensured = true;
+}
+
+export async function getCustomInstructions(userId: string): Promise<string> {
+  await ensureChatSchema();
+  const [s] = await db.select().from(chatSettings).where(eq(chatSettings.userId, userId));
+  return s?.customInstructions ?? '';
+}
+
+export async function setCustomInstructions(userId: string, text: string): Promise<void> {
+  await ensureChatSchema();
+  await db
+    .insert(chatSettings)
+    .values({ userId, customInstructions: text })
+    .onConflictDoUpdate({
+      target: chatSettings.userId,
+      set: { customInstructions: text, updatedAt: new Date() },
+    });
+}
+
+// Drop the last assistant message of a conversation (used by "regenerate").
+export async function dropLastAssistant(conversationId: string): Promise<void> {
+  await ensureChatSchema();
+  const rows = await db
+    .select({ id: chatMessages.id, role: chatMessages.role })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(1);
+  if (rows[0]?.role === 'assistant') {
+    await db.delete(chatMessages).where(eq(chatMessages.id, rows[0].id));
+  }
 }
 
 const rid = () => crypto.randomUUID();
