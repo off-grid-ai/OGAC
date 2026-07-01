@@ -6,6 +6,7 @@ import {
   FolderSimplePlus,
   GearSix,
   Brain,
+  Ghost,
   ImageSquare,
   MagnifyingGlass,
   Microphone,
@@ -186,6 +187,9 @@ export function ChatWorkspace({
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
+  // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
+  const [temporary, setTemporary] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -255,7 +259,20 @@ export function ChatWorkspace({
     [activeId],
   );
 
+  // Enter/leave incognito. Entering clears the thread into an ephemeral session; leaving drops it.
+  function toggleTemporary() {
+    setTemporary((prev) => {
+      const next = !prev;
+      setActiveId(null);
+      setMessages([]);
+      setActiveStarters([]);
+      setArtifact(null);
+      return next;
+    });
+  }
+
   async function openConversation(id: string) {
+    setTemporary(false);
     setActiveId(id);
     setArtifact(null);
     setActiveStarters([]);
@@ -264,6 +281,7 @@ export function ChatWorkspace({
   }
 
   async function newChat() {
+    setTemporary(false);
     setActiveStarters([]);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
@@ -462,6 +480,20 @@ export function ChatWorkspace({
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
+    if (temporary) {
+      const sentImages = images;
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
+      setInput('');
+      setImages([]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: text, images: sentImages.length ? sentImages : null },
+        { role: 'assistant', content: '', reasoning: '' },
+      ]);
+      await streamAssistant({ temporary: true, history, content: text, model, images: sentImages });
+      return;
+    }
     let convId = activeId;
     if (!convId) {
       const r = await fetch('/api/v1/chat/conversations', {
@@ -646,10 +678,20 @@ export function ChatWorkspace({
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <Sparkle className="size-4 text-primary" />
-            {activeProject ? activeProject.name : 'Chat'}
+            {temporary ? <Ghost className="size-4 text-primary" /> : <Sparkle className="size-4 text-primary" />}
+            {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTemporary}
+              className={cn(
+                'hover:text-foreground',
+                temporary ? 'text-primary' : 'text-muted-foreground',
+              )}
+              title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
+            >
+              <Ghost className="size-4" />
+            </button>
             <button
               onClick={() => setMemoryOpen(true)}
               className="text-muted-foreground hover:text-foreground"
@@ -685,12 +727,14 @@ export function ChatWorkspace({
             {messages.length === 0 ? (
               <div className="pt-24 text-center text-sm text-muted-foreground">
                 <p className="text-base text-foreground">
-                  {activeProject ? activeProject.name : 'Your own private AI'}
+                  {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Your own private AI'}
                 </p>
                 <p className="mt-1">
-                  {activeProject
-                    ? 'Chats here use this project’s instructions and knowledge.'
-                    : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
+                  {temporary
+                    ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
+                    : activeProject
+                      ? 'Chats here use this project’s instructions and knowledge.'
+                      : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
                 </p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
