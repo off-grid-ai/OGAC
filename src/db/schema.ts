@@ -307,6 +307,13 @@ export const chatMessages = pgTable('chat_messages', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Per-user custom instructions (like ChatGPT's) — injected as the first system message.
+export const chatSettings = pgTable('chat_settings', {
+  userId: text('user_id').primaryKey(),
+  customInstructions: text('custom_instructions').notNull().default(''),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Knowledgebase for a project — documents + embedded chunks (RAG). Mirrors desktop rag_documents
 // / rag_chunks; embeddings via the gateway's /v1/embeddings (384-dim), retrieved at chat time.
 export const chatDocuments = pgTable('chat_documents', {

@@ -2,7 +2,9 @@ import { auth } from '@/auth';
 import {
   addMessage,
   deriveTitle,
+  dropLastAssistant,
   getConversation,
+  getCustomInstructions,
   listMessages,
   projectSystemPrompt,
   renameConversation,
@@ -28,18 +30,30 @@ export async function POST(req: Request) {
   const userId = session?.user?.email;
   if (!userId) return new Response('unauthorized', { status: 401 });
 
-  const { conversationId, content = '', model = '', images = [] } = await req.json().catch(() => ({}));
+  const {
+    conversationId,
+    content = '',
+    model = '',
+    images = [],
+    regenerate = false,
+  } = await req.json().catch(() => ({}));
   const convo = conversationId ? await getConversation(userId, conversationId) : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
 
+  // Regenerate: drop the last assistant turn and re-answer the existing last user turn.
+  if (regenerate) await dropLastAssistant(convo.id);
+
   const prior = await listMessages(convo.id);
   // First user turn → title the conversation from it (like the desktop does).
-  if (prior.length === 0 && content.trim()) {
+  if (!regenerate && prior.length === 0 && content.trim()) {
     await renameConversation(userId, convo.id, deriveTitle(content));
   }
 
-  // Build the OpenAI-style message array: system → history → new user turn (+ images).
+  // Build the OpenAI-style message array: custom instructions → project prompt → knowledge →
+  // history → new user turn (+ images).
   const messages: { role: string; content: string | ContentPart[] }[] = [];
+  const ci = await getCustomInstructions(userId);
+  if (ci.trim()) messages.push({ role: 'system', content: ci });
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
   // Project chats retrieve from the knowledgebase and cite (desktop RAG behavior).
@@ -55,24 +69,29 @@ export async function POST(req: Request) {
       /* knowledgebase optional — chat still answers without it */
     }
   }
-  for (const m of prior) {
+  // Cap history to the most recent turns so we don't overflow the model context (and, on this
+  // hardware, don't pay for prefill of a huge transcript every turn). OpenWebUI-style trim.
+  const MAX_HISTORY = 24;
+  for (const m of prior.slice(-MAX_HISTORY)) {
     if (m.role === 'system') continue;
     messages.push({ role: m.role, content: m.content });
   }
-  const userContent: ContentPart[] = [{ type: 'text', text: String(content) }];
-  for (const url of Array.isArray(images) ? images : []) {
-    if (typeof url === 'string' && url.startsWith('data:')) {
-      userContent.push({ type: 'image_url', image_url: { url } });
+  // On regenerate the last user turn is already in `prior`; only add a new turn otherwise.
+  if (!regenerate) {
+    const userContent: ContentPart[] = [{ type: 'text', text: String(content) }];
+    for (const url of Array.isArray(images) ? images : []) {
+      if (typeof url === 'string' && url.startsWith('data:')) {
+        userContent.push({ type: 'image_url', image_url: { url } });
+      }
     }
+    messages.push({ role: 'user', content: userContent.length > 1 ? userContent : String(content) });
+    await addMessage({
+      conversationId: convo.id,
+      role: 'user',
+      content: String(content),
+      images: userContent.length > 1 ? images : null,
+    });
   }
-  messages.push({ role: 'user', content: userContent.length > 1 ? userContent : String(content) });
-
-  await addMessage({
-    conversationId: convo.id,
-    role: 'user',
-    content: String(content),
-    images: userContent.length > 1 ? images : null,
-  });
 
   const payload: Record<string, unknown> = {
     messages,

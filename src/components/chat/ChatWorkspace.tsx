@@ -1,12 +1,16 @@
 'use client';
 
 import {
+  ArrowsClockwise,
+  Copy,
   FolderSimplePlus,
   GearSix,
   ImageSquare,
+  MagnifyingGlass,
   PaperPlaneRight,
   Plus,
   Quotes,
+  SlidersHorizontal,
   Sparkle,
   Stop,
   Trash,
@@ -20,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
 import { type Project, ProjectDialog } from './ProjectDialog';
+import { SettingsDialog } from './SettingsDialog';
 
 interface Conversation {
   id: string;
@@ -63,12 +68,19 @@ function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifa
 function MessageBubble({
   message: m,
   onOpenArtifact,
+  onCopy,
+  onRegenerate,
+  canRegenerate,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
+  onCopy: (text: string) => void;
+  onRegenerate: () => void;
+  canRegenerate: boolean;
 }) {
+  const isAssistant = m.role === 'assistant';
   return (
-    <div className={cn('flex', m.role === 'user' && 'justify-end')}>
+    <div className={cn('group flex', m.role === 'user' && 'justify-end')}>
       <div
         className={cn(
           'max-w-[90%] rounded-lg px-3.5 py-2.5',
@@ -89,7 +101,7 @@ function MessageBubble({
             ))}
           </div>
         ) : null}
-        {m.role === 'assistant' ? (
+        {isAssistant ? (
           m.content ? (
             <>
               <Markdown>{m.content}</Markdown>
@@ -108,6 +120,24 @@ function MessageBubble({
                   ))}
                 </div>
               ) : null}
+              <div className="mt-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  onClick={() => onCopy(m.content)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Copy"
+                >
+                  <Copy className="size-3.5" />
+                </button>
+                {canRegenerate ? (
+                  <button
+                    onClick={onRegenerate}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title="Regenerate"
+                  >
+                    <ArrowsClockwise className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
             </>
           ) : (
             <span className="inline-block h-4 w-2 animate-pulse bg-primary" />
@@ -134,14 +164,19 @@ export function ChatWorkspace() {
   const [streaming, setStreaming] = useState(false);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [dialogProject, setDialogProject] = useState<Project | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const activeModel = models.find((m) => m.id === model);
-  const visibleConversations = conversations.filter((c) =>
-    activeProjectId ? c.projectId === activeProjectId : !c.projectId,
-  );
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const visibleConversations = conversations
+    .filter((c) => (activeProjectId ? c.projectId === activeProjectId : !c.projectId))
+    .filter((c) => c.title.toLowerCase().includes(search.toLowerCase()));
 
   const refreshConversations = useCallback(async () => {
     const r = await fetch('/api/v1/chat/conversations');
@@ -214,6 +249,18 @@ export function ChatWorkspace() {
     await refreshConversations();
   }
 
+  async function commitRename(id: string) {
+    const title = renameValue.trim();
+    setRenamingId(null);
+    if (!title) return;
+    await fetch(`/api/v1/chat/conversations/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    await refreshConversations();
+  }
+
   async function attachImage(files: FileList | null) {
     if (!files) return;
     for (const f of Array.from(files)) {
@@ -231,29 +278,14 @@ export function ChatWorkspace() {
     setStreaming(false);
   }
 
+  function copy(text: string) {
+    void navigator.clipboard.writeText(text);
+    toast.success('Copied');
+  }
+
+  // Shared SSE loop — updates the trailing assistant placeholder. Caller adds the placeholder.
   // eslint-disable-next-line complexity
-  async function send() {
-    const text = input.trim();
-    if (!text || streaming) return;
-    let convId = activeId;
-    if (!convId) {
-      const r = await fetch('/api/v1/chat/conversations', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId: activeProjectId }),
-      });
-      if (!r.ok) return;
-      convId = (await r.json()).id;
-      setActiveId(convId);
-    }
-    const sentImages = images;
-    setInput('');
-    setImages([]);
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: text, images: sentImages.length ? sentImages : null },
-      { role: 'assistant', content: '', reasoning: '' },
-    ]);
+  async function streamAssistant(body: Record<string, unknown>) {
     setStreaming(true);
     const ac = new AbortController();
     abortRef.current = ac;
@@ -261,7 +293,7 @@ export function ChatWorkspace() {
       const r = await fetch('/api/v1/chat/stream', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId: convId, content: text, model, images: sentImages }),
+        body: JSON.stringify(body),
         signal: ac.signal,
       });
       if (!r.ok || !r.body) throw new Error('stream failed');
@@ -300,7 +332,48 @@ export function ChatWorkspace() {
     }
   }
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
+  async function send() {
+    const text = input.trim();
+    if (!text || streaming) return;
+    let convId = activeId;
+    if (!convId) {
+      const r = await fetch('/api/v1/chat/conversations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId: activeProjectId }),
+      });
+      if (!r.ok) return;
+      convId = (await r.json()).id;
+      setActiveId(convId);
+    }
+    const sentImages = images;
+    setInput('');
+    setImages([]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: text, images: sentImages.length ? sentImages : null },
+      { role: 'assistant', content: '', reasoning: '' },
+    ]);
+    await streamAssistant({ conversationId: convId, content: text, model, images: sentImages });
+  }
+
+  async function regenerate() {
+    if (streaming || !activeId) return;
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUser) return;
+    setMessages((prev) => {
+      const next = [...prev];
+      if (next[next.length - 1]?.role === 'assistant') next.pop();
+      next.push({ role: 'assistant', content: '', reasoning: '' });
+      return next;
+    });
+    await streamAssistant({
+      conversationId: activeId,
+      content: lastUser.content,
+      model,
+      regenerate: true,
+    });
+  }
 
   return (
     <div className="-m-6 flex h-full">
@@ -351,29 +424,59 @@ export function ChatWorkspace() {
               </button>
             ))}
           </div>
+          <div className="relative pt-1">
+            <MagnifyingGlass className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats"
+              className="w-full rounded-md border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none"
+            />
+          </div>
         </div>
 
-        <div className="mt-1 border-t border-border px-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          <span className="px-1.5">{activeProject ? activeProject.name : 'Chats'}</span>
-        </div>
-        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
           {visibleConversations.map((c) => (
-            <button
+            <div
               key={c.id}
               onClick={() => openConversation(c.id)}
               className={cn(
-                'group flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors',
+                'group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors',
                 activeId === c.id
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
-              <span className="flex-1 truncate">{c.title}</span>
+              {renamingId === c.id ? (
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={() => commitRename(c.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename(c.id);
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 rounded border border-border bg-background px-1 text-sm outline-none"
+                />
+              ) : (
+                <span
+                  className="flex-1 truncate"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setRenamingId(c.id);
+                    setRenameValue(c.title);
+                  }}
+                >
+                  {c.title}
+                </span>
+              )}
               <Trash
                 onClick={(e) => removeConversation(c.id, e)}
                 className="size-3.5 shrink-0 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
               />
-            </button>
+            </div>
           ))}
           {visibleConversations.length === 0 ? (
             <p className="px-2.5 py-6 text-center text-xs text-muted-foreground">No chats yet.</p>
@@ -388,19 +491,28 @@ export function ChatWorkspace() {
             <Sparkle className="size-4 text-primary" />
             {activeProject ? activeProject.name : 'Chat'}
           </div>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
-          >
-            {models.length === 0 ? <option value="">no models</option> : null}
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id}
-                {m.vision ? ' (vision)' : ''}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Custom instructions"
+            >
+              <SlidersHorizontal className="size-4" />
+            </button>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
+            >
+              {models.length === 0 ? <option value="">no models</option> : null}
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id}
+                  {m.vision ? ' (vision)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -418,7 +530,14 @@ export function ChatWorkspace() {
               </div>
             ) : null}
             {messages.map((m, i) => (
-              <MessageBubble key={m.id ?? i} message={m} onOpenArtifact={setArtifact} />
+              <MessageBubble
+                key={m.id ?? i}
+                message={m}
+                onOpenArtifact={setArtifact}
+                onCopy={copy}
+                onRegenerate={regenerate}
+                canRegenerate={!streaming && i === messages.length - 1}
+              />
             ))}
           </div>
         </div>
@@ -499,6 +618,7 @@ export function ChatWorkspace() {
         onOpenChange={(o) => !o && setDialogProject(null)}
         onSaved={refreshProjects}
       />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }
