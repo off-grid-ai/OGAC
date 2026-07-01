@@ -18,6 +18,7 @@ export type ModuleId =
   | 'lineage'
   | 'regulatory'
   | 'integrations'
+  | 'knowledge'
   | 'admin';
 
 export interface ModuleDef {
@@ -156,6 +157,14 @@ export const MODULES: readonly ModuleDef[] = [
     route: '/integrations',
     service: 'integrations',
     internal: true,
+  },
+  {
+    id: 'knowledge',
+    label: 'Knowledge',
+    description:
+      'Ask Your Org, on-prem: an admin-curated shared knowledge base, indexed once and retrieved permission-aware with citations in chat.',
+    route: '/knowledge',
+    service: 'gateway',
   },
   {
     id: 'admin',
