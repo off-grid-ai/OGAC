@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const session = await auth();
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const { projectId = null } = await req.json().catch(() => ({}));
-  const id = await createConversation(userId, projectId);
+  const { projectId = null, skillId = null } = await req.json().catch(() => ({}));
+  const id = await createConversation(userId, projectId, skillId);
   return NextResponse.json({ id });
 }
