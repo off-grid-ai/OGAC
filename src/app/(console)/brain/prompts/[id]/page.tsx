@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { listPromptVersions, listPrompts } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PromptDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('brain');
+  await requireModuleForUser('brain');
   const { id } = await params;
   const [prompts, versions] = await Promise.all([listPrompts(), listPromptVersions(id)]);
   const prompt = prompts.find((p) => p.id === id);

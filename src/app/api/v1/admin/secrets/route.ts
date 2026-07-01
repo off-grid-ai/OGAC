@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
+import { requireAdmin } from '@/lib/authz';
 
 // OpenBao secrets management. Stores connector/tool credentials and virtual-key secrets in
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only
 // key names — so the panel lists what's stored without leaking material.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   if (!openBaoConfigured() || !openBaoSecrets.list) {
     return NextResponse.json({ configured: false, keys: [] });
   }
@@ -12,7 +15,10 @@ export async function GET() {
   return NextResponse.json({ configured: true, keys });
 }
 
+// eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as { key?: unknown; value?: unknown } | null;
   if (!b || typeof b.key !== 'string' || typeof b.value !== 'string' || !b.key.trim()) {
     return NextResponse.json({ error: 'key and value (strings) required' }, { status: 400 });
@@ -29,6 +35,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const key = new URL(req.url).searchParams.get('key');
   if (!key) return NextResponse.json({ error: 'key query param required' }, { status: 400 });
   if (!openBaoConfigured() || !openBaoSecrets.remove) {

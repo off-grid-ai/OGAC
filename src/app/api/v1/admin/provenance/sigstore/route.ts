@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { type Bundle } from 'sigstore';
+import { requireAdmin } from '@/lib/authz';
 import { sigstoreSign, sigstoreSigningConfigured, sigstoreVerify } from '@/lib/sigstore';
 
 // Sigstore keyless signing / verification for artifacts & exports.
 //   POST { action: 'sign',   payload, identityToken? }  → { bundle }   (needs an OIDC token)
 //   POST { action: 'verify', bundle, payload? }         → { valid, error? }
 //   GET                                                  → { signingConfigured }
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ signingConfigured: sigstoreSigningConfigured() });
 }
 
@@ -31,6 +34,8 @@ async function doVerify(b: Body): Promise<NextResponse> {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Body | null;
   if (!b) return NextResponse.json({ error: 'body required' }, { status: 400 });
   try {

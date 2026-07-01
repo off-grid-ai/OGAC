@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
 import { listConnectors, listDatasets, listIngestJobs, listMaskingRules } from '@/lib/store';
 
@@ -36,7 +36,7 @@ const CLASSIFICATION: Record<string, string> = {
 };
 
 export default async function DataPage() {
-  requireModule('data');
+  await requireModuleForUser('data');
   const [connectors, jobs, rules, datasets, brainDocs, qCount] = await Promise.all([
     listConnectors(),
     listIngestJobs(),

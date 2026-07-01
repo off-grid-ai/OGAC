@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { computeFinOps } from '@/lib/finops';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +33,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default async function FinOpsPage() {
-  requireModule('finops');
+  await requireModuleForUser('finops');
   const f = await computeFinOps();
 
   return (

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { type Block, type Catalog, type Workflow, introspect } from '@/lib/studio';
 
 export const dynamic = 'force-dynamic';
@@ -73,6 +74,8 @@ function heuristic(prompt: string, blocks: Block[]): Workflow {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { prompt = '' } = await req.json().catch(() => ({ prompt: '' }));
   const catalog = await introspect();
   const workflow = await plan(String(prompt), catalog);
