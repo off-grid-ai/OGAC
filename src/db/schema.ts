@@ -271,6 +271,42 @@ export const users = pgTable('user', {
   role: text('role').notNull().default('viewer'),
 });
 
+// ─── Chat workspace (end-user "your own ChatGPT" — ports desktop projects/threads/messages) ──
+// Mirrors Off Grid AI Desktop's RAG store: a project is a container with a system prompt; a
+// conversation is a thread; messages carry role/content (+ optional images as data URIs and
+// reasoning). Backed by the on-prem gateways for inference — zero per-seat AI cost.
+export const chatProjects = pgTable('chat_projects', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  systemPrompt: text('system_prompt').notNull().default(''),
+  icon: text('icon'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const chatConversations = pgTable('chat_conversations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  projectId: text('project_id'), // null = ad-hoc chat
+  title: text('title').notNull().default('New chat'),
+  model: text('model').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const chatMessages = pgTable('chat_messages', {
+  id: text('id').primaryKey(),
+  conversationId: text('conversation_id').notNull(),
+  role: text('role').notNull(), // user | assistant | system
+  content: text('content').notNull().default(''),
+  reasoning: text('reasoning'), // model thinking, kept separate from content
+  images: jsonb('images').$type<string[]>(), // data: URIs sent with a user turn
+  citations: jsonb('citations').$type<{ name: string; position: number; score: number }[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const accounts = pgTable(
   'account',
   {
