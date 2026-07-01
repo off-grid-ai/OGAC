@@ -4,6 +4,7 @@ import {
   ProhibitInset as CircleSlash,
   Plug,
 } from '@phosphor-icons/react/dist/ssr';
+import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,6 +119,8 @@ export default async function GatewayPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <GatewayTraffic />
     </div>
   );
 }

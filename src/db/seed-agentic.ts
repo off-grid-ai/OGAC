@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import 'dotenv/config';
 import { agentRuns, evalRuns } from './schema';
 import { db } from './index';
