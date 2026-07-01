@@ -22,6 +22,7 @@ import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
+import { getOrgSystemPrompt } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -71,6 +72,14 @@ export async function POST(req: Request) {
     tool_call_id?: string;
     tool_calls?: unknown;
   }[] = [];
+  // Org-wide instructions: an admin-set system prompt injected into EVERY chat as the
+  // highest-precedence system block, BEFORE per-user custom instructions. Best-effort.
+  try {
+    const orgPrompt = await getOrgSystemPrompt();
+    if (orgPrompt.trim()) messages.push({ role: 'system', content: orgPrompt });
+  } catch {
+    /* org settings optional — chat still answers without them */
+  }
   const ci = await getCustomInstructions(userId);
   if (ci.trim()) messages.push({ role: 'system', content: ci });
   const mem = await memoryBlock(userId);
@@ -176,6 +185,12 @@ export async function POST(req: Request) {
     }
     if (resolved?.messages?.length) {
       for (const m of resolved.messages) messages.push(m as (typeof messages)[number]);
+    }
+    // Inline citations: when a connector actually returned data, attach it as a source citation
+    // (same shape as project-RAG citations: name + position + score) so the answer cites its tools.
+    for (const a of resolved?.activity ?? []) {
+      if (a.status !== 'executed') continue;
+      citations.push({ name: a.ref || a.tool, position: citations.length + 1, score: 1 });
     }
   } catch {
     /* tool layer optional — chat still answers without it */
