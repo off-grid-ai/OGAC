@@ -1,0 +1,105 @@
+import { auth } from '@/auth';
+import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
+import { ManageCollection } from '@/components/knowledge/ManageCollection';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { requireModule } from '@/lib/modules';
+import { listCollections, listDocuments } from '@/lib/org-knowledge';
+
+export const dynamic = 'force-dynamic';
+
+// Organization-wide knowledge base — the on-prem "Ask Your Org". Admins curate collections, set
+// their role allow-lists, and index documents; every user sees only the collections their role may
+// retrieve. Chat pulls from these permission-aware via the stream route's orgKnowledge flag.
+export default async function KnowledgePage() {
+  requireModule('knowledge');
+  const session = await auth();
+  const role = session?.user?.role ?? 'viewer';
+  const isAdmin = role === 'admin';
+
+  const collections = await listCollections(role);
+  const docCounts = await Promise.all(collections.map((c) => listDocuments(c.id)));
+
+  return (
+    <div className="space-y-6">
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Organization Knowledge</CardTitle>
+            <CardDescription>
+              An admin-curated shared corpus, indexed on-prem via the gateway and retrieved
+              permission-aware with citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.
+            </CardDescription>
+          </div>
+          {isAdmin && <CreateCollectionButton />}
+        </CardHeader>
+        <CardContent>
+          {collections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {isAdmin
+                ? 'No collections yet. Create one to start curating the org knowledge base.'
+                : 'No knowledge collections are available to your role yet.'}
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Collection</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>Documents</TableHead>
+                  {isAdmin && <TableHead className="text-right">Manage</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {collections.map((c, i) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <div className="font-medium">{c.name}</div>
+                      {c.description && (
+                        <div className="text-xs text-muted-foreground">{c.description}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {c.allowedRoles.length === 0 ? (
+                        <Badge variant="secondary">Everyone</Badge>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {c.allowedRoles.map((r) => (
+                            <Badge key={r} variant="outline">
+                              {r}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{docCounts[i].length}</TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <ManageCollection
+                          collection={{ id: c.id, name: c.name }}
+                          documents={docCounts[i].map((d) => ({
+                            id: d.id,
+                            name: d.name,
+                            size: d.size,
+                          }))}
+                        />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

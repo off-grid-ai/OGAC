@@ -3,6 +3,7 @@ import {
   ChartBar as BarChart3,
   ChatCircleDots as ChatIcon,
   Robot as Bot,
+  BookOpenText,
   Brain,
   Buildings as Building2,
   Coins,
@@ -39,5 +40,6 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   lineage: TreeStructure,
   regulatory: Scale,
   integrations: Vault,
+  knowledge: BookOpenText,
   admin: Building2,
 };
