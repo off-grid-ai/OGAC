@@ -11,9 +11,10 @@ import { orgKnowledgeChunks, orgKnowledgeCollections, orgKnowledgeDocs } from '@
 
 const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
-let ensured = false;
+let ensurePromise: Promise<void> | null = null;
 async function ensureSchema(): Promise<void> {
-  if (ensured) return;
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = (async (): Promise<void> => {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS org_knowledge_collections (
       id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
@@ -37,7 +38,11 @@ async function ensureSchema(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS org_knowledge_docs_col_idx ON org_knowledge_docs (collection_id);`,
   );
-  ensured = true;
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
+  return ensurePromise;
 }
 
 // Chunk text ~600 words with 120 overlap (desktop/rag.ts defaults; ~4 chars/token).
