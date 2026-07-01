@@ -356,6 +356,26 @@ export async function listUsers(): Promise<ConsoleUser[]> {
     .from(users);
 }
 
+// SCIM provisioning: create (or upsert by email) a console user. Idempotent on email so a repeated
+// SCIM POST is safe. Returns the row in ConsoleUser shape.
+export async function createConsoleUser(input: {
+  email: string;
+  name?: string | null;
+  role?: string;
+}): Promise<ConsoleUser> {
+  const [existing] = await db
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+    .from(users)
+    .where(eq(users.email, input.email))
+    .limit(1);
+  if (existing) return existing;
+  const [row] = await db
+    .insert(users)
+    .values({ email: input.email, name: input.name ?? null, role: input.role ?? 'viewer' })
+    .returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+  return row;
+}
+
 export async function setUserRole(id: string, role: string): Promise<ConsoleUser | null> {
   const [row] = await db
     .update(users)
