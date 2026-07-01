@@ -400,3 +400,27 @@ export const verificationTokens = pgTable(
   },
   (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
 );
+
+// ─── Chat artifacts library (ChatGPT/Claude "Artifacts" surface) ──────────────
+// Append-only: saved artifacts detected in chat replies, promoted to a top-level library so a
+// user can revisit generated HTML/SVG/React/code/text without scrolling the thread. Client saves
+// on open via /api/v1/chat/artifacts.
+export const chatArtifacts = pgTable('chat_artifacts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  kind: text('kind').notNull(), // html | svg | mermaid | react | text | code
+  code: text('code').notNull().default(''),
+  language: text('language'), // python | node for runnable code
+  title: text('title').notNull().default('Untitled artifact'),
+  conversationId: text('conversation_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Per-user chat preferences (Settings modal: capabilities, appearance) ─────
+// Append-only sibling of chat_settings so custom instructions stay untouched. `prefs` holds the
+// Capabilities/Appearance toggles (memory, code execution, search, theme) as free-form JSON.
+export const chatPrefs = pgTable('chat_prefs', {
+  userId: text('user_id').primaryKey(),
+  prefs: jsonb('prefs').$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

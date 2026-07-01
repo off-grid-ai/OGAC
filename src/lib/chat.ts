@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
+  chatArtifacts,
   chatConversations,
   chatMemory,
   chatMessages,
+  chatPrefs,
   chatProjects,
   chatSettings,
   chatSkills,
@@ -57,6 +59,20 @@ export async function ensureChatSchema(): Promise<void> {
       source text NOT NULL DEFAULT 'chat', created_at timestamptz NOT NULL DEFAULT now());
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_memory_user_idx ON chat_memory (user_id);`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_artifacts (
+      id text PRIMARY KEY, user_id text NOT NULL, kind text NOT NULL,
+      code text NOT NULL DEFAULT '', language text, title text NOT NULL DEFAULT 'Untitled artifact',
+      conversation_id text, created_at timestamptz NOT NULL DEFAULT now());
+  `);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS chat_artifacts_user_idx ON chat_artifacts (user_id, created_at);`,
+  );
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_prefs (
+      user_id text PRIMARY KEY, prefs jsonb NOT NULL DEFAULT '{}',
+      updated_at timestamptz NOT NULL DEFAULT now());
+  `);
   ensured = true;
 }
 
@@ -303,6 +319,92 @@ export async function projectSystemPrompt(projectId: string | null): Promise<str
   if (!projectId) return '';
   const [p] = await db.select().from(chatProjects).where(eq(chatProjects.id, projectId));
   return p?.systemPrompt?.trim() ?? '';
+}
+
+// ─── Artifacts library (saved renderable outputs, promoted to a top-level surface) ──
+export async function listArtifacts(userId: string) {
+  await ensureChatSchema();
+  return db
+    .select()
+    .from(chatArtifacts)
+    .where(eq(chatArtifacts.userId, userId))
+    .orderBy(desc(chatArtifacts.createdAt));
+}
+
+export async function saveArtifact(
+  userId: string,
+  a: { kind: string; code: string; language?: string | null; title?: string; conversationId?: string | null },
+) {
+  await ensureChatSchema();
+  const code = String(a.code ?? '');
+  // De-dupe: if the same user already saved an identical (kind, code), return it instead of piling up.
+  const [dup] = await db
+    .select({ id: chatArtifacts.id })
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.userId, userId), eq(chatArtifacts.kind, a.kind), eq(chatArtifacts.code, code)))
+    .limit(1);
+  if (dup) return dup.id;
+  const id = rid();
+  await db.insert(chatArtifacts).values({
+    id,
+    userId,
+    kind: a.kind,
+    code,
+    language: a.language ?? null,
+    title: (a.title ?? 'Untitled artifact').slice(0, 200),
+    conversationId: a.conversationId ?? null,
+  });
+  return id;
+}
+
+export async function deleteArtifact(userId: string, id: string) {
+  await ensureChatSchema();
+  await db.delete(chatArtifacts).where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)));
+}
+
+// ─── Per-user preferences (Settings modal capabilities/appearance) ────────────
+export async function getPrefs(userId: string): Promise<Record<string, unknown>> {
+  await ensureChatSchema();
+  const [p] = await db.select().from(chatPrefs).where(eq(chatPrefs.userId, userId));
+  return p?.prefs ?? {};
+}
+
+export async function setPrefs(userId: string, prefs: Record<string, unknown>): Promise<void> {
+  await ensureChatSchema();
+  await db
+    .insert(chatPrefs)
+    .values({ userId, prefs })
+    .onConflictDoUpdate({ target: chatPrefs.userId, set: { prefs, updatedAt: new Date() } });
+}
+
+// ─── Data & privacy: bulk export / delete of the user's chats ─────────────────
+export async function deleteAllConversations(userId: string): Promise<void> {
+  await ensureChatSchema();
+  const rows = await db
+    .select({ id: chatConversations.id })
+    .from(chatConversations)
+    .where(eq(chatConversations.userId, userId));
+  for (const r of rows) {
+    await db.delete(chatMessages).where(eq(chatMessages.conversationId, r.id));
+  }
+  await db.delete(chatConversations).where(eq(chatConversations.userId, userId));
+}
+
+export async function exportUserData(userId: string) {
+  await ensureChatSchema();
+  const conversations = await listConversations(userId);
+  const withMessages = await Promise.all(
+    conversations.map(async (c) => ({ ...c, messages: await listMessages(c.id) })),
+  );
+  return {
+    exportedAt: new Date().toISOString(),
+    user: userId,
+    customInstructions: await getCustomInstructions(userId),
+    prefs: await getPrefs(userId),
+    memory: await listMemory(userId),
+    projects: await listProjects(userId),
+    conversations: withMessages,
+  };
 }
 
 // Derive a short title from the first user turn (like the desktop does on first message).
