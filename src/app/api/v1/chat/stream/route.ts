@@ -5,6 +5,7 @@ import {
   dropLastAssistant,
   getConversation,
   getCustomInstructions,
+  getSkill,
   listMessages,
   projectSystemPrompt,
   renameConversation,
@@ -56,11 +57,23 @@ export async function POST(req: Request) {
   if (ci.trim()) messages.push({ role: 'system', content: ci });
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
+  // Org skill bound to this conversation: inject its instructions, default its model, and use its
+  // knowledge project for RAG when the conversation has none of its own.
+  let skillModel = '';
+  let ragProjectId = convo.projectId ?? null;
+  if (convo.skillId) {
+    const skill = await getSkill(convo.skillId);
+    if (skill && skill.enabled) {
+      if (skill.systemPrompt.trim()) messages.push({ role: 'system', content: skill.systemPrompt });
+      skillModel = skill.model ?? '';
+      if (!ragProjectId && skill.projectId) ragProjectId = skill.projectId;
+    }
+  }
   // Project chats retrieve from the knowledgebase and cite (desktop RAG behavior).
   let citations: Citation[] = [];
-  if (convo.projectId) {
+  if (ragProjectId) {
     try {
-      const r = await retrieve(convo.projectId, String(content));
+      const r = await retrieve(ragProjectId, String(content));
       if (r.context) {
         messages.push({ role: 'system', content: r.context });
         citations = r.citations;
@@ -100,7 +113,8 @@ export async function POST(req: Request) {
     stream: true,
     chat_template_kwargs: { enable_thinking: false },
   };
-  if (model) payload.model = model;
+  const effectiveModel = model || skillModel;
+  if (effectiveModel) payload.model = effectiveModel;
 
   const upstream = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',

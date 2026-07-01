@@ -25,6 +25,7 @@ import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
 import { type Project, ProjectDialog } from './ProjectDialog';
 import { SettingsDialog } from './SettingsDialog';
+import { SkillsDialog } from './SkillsDialog';
 
 interface Conversation {
   id: string;
@@ -151,8 +152,9 @@ function MessageBubble({
 }
 
 // eslint-disable-next-line complexity
-export function ChatWorkspace() {
+export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [skillsOpen, setSkillsOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -219,6 +221,20 @@ export function ChatWorkspace() {
     });
     if (!r.ok) return;
     const { id } = await r.json();
+    setMessages([]);
+    setActiveId(id);
+    await refreshConversations();
+  }
+
+  async function startSkillChat(skillId: string) {
+    const r = await fetch('/api/v1/chat/conversations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ skillId }),
+    });
+    if (!r.ok) return;
+    const { id } = await r.json();
+    setActiveProjectId(null);
     setMessages([]);
     setActiveId(id);
     await refreshConversations();
@@ -382,6 +398,14 @@ export function ChatWorkspace() {
         <div className="space-y-2 p-2">
           <Button onClick={newChat} className="w-full justify-start gap-2" size="sm">
             <Plus className="size-4" /> New chat
+          </Button>
+          <Button
+            onClick={() => setSkillsOpen(true)}
+            variant="outline"
+            className="w-full justify-start gap-2"
+            size="sm"
+          >
+            <Sparkle className="size-4" /> Skills
           </Button>
           <div className="flex items-center justify-between px-1 pt-1">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -619,6 +643,14 @@ export function ChatWorkspace() {
         onSaved={refreshProjects}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SkillsDialog
+        open={skillsOpen}
+        onOpenChange={setSkillsOpen}
+        role={role}
+        projects={projects}
+        models={models}
+        onPick={startSkillChat}
+      />
     </div>
   );
 }
