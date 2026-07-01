@@ -60,6 +60,12 @@ export interface SecretsPort {
   meta: AdapterMeta;
   get(key: string): Promise<string | undefined>;
   has(key: string): Promise<boolean>;
+  // Optional write/enumerate surface — implemented by KMS adapters (OpenBao). The env adapter is
+  // read-only, so a caller must feature-detect (writable === true) before relying on these.
+  writable?: boolean;
+  set?(key: string, value: string): Promise<void>;
+  remove?(key: string): Promise<void>;
+  list?(): Promise<string[]>;
 }
 
 // Grounding / attribution — verify a generated answer against its cited sources. Standalone:
