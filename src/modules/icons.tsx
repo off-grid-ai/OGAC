@@ -1,6 +1,7 @@
 import { type Icon as LucideIcon } from '@phosphor-icons/react';
 import {
   ChartBar as BarChart3,
+  ChatCircleDots as ChatIcon,
   Robot as Bot,
   Brain,
   Buildings as Building2,
@@ -19,6 +20,7 @@ import {
 import { type ModuleId } from './registry';
 
 export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
+  chat: ChatIcon,
   fleet: MonitorSmartphone,
   gateway: Network,
   control: ShieldCheck,
