@@ -52,6 +52,51 @@ export async function qdrantAdd(title: string, source: string, text: string): Pr
   return { id, title, source, text };
 }
 
+// Bulk reindex — push a set of already-materialized Brain docs into the Qdrant collection so that
+// switching OFFGRID_ADAPTER_RETRIEVAL=qdrant lands on a populated store instead of an empty one.
+// Docs are passed in (not imported from brain.ts) to avoid an import cycle: brain.ts imports this.
+// Embeddings are recomputed through the inference port; the doc id is preserved so re-runs upsert
+// rather than duplicate. Returns the number of points written.
+export async function qdrantReindex(
+  docs: ReadonlyArray<{ id: string; title: string; source: string; text: string }>,
+): Promise<number> {
+  await ensureCollection();
+  if (docs.length === 0) return 0;
+  const BATCH = 32;
+  let written = 0;
+  for (let i = 0; i < docs.length; i += BATCH) {
+    const slice = docs.slice(i, i + BATCH);
+    const points = await Promise.all(
+      slice.map(async (d) => ({
+        id: d.id,
+        vector: await embed(`${d.title}\n${d.text}`),
+        payload: { title: d.title, source: d.source, text: d.text },
+      })),
+    );
+    const res = await qfetch(`/collections/${COLLECTION}/points`, 'PUT', { points });
+    if (!res.ok) throw new Error(`Qdrant upsert ${res.status}`);
+    written += points.length;
+  }
+  return written;
+}
+
+// Point count in the collection — for the admin panel's "N docs indexed" readout.
+export async function qdrantCount(): Promise<number | null> {
+  try {
+    await ensureCollection();
+    const res = await qfetch(`/collections/${COLLECTION}/points/count`, 'POST', { exact: true });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: { count?: number } };
+    return data.result?.count ?? 0;
+  } catch {
+    return null;
+  }
+}
+
+export function qdrantCollectionName(): string {
+  return COLLECTION;
+}
+
 interface ScrollPoint {
   id: string;
   payload: { title: string; source: string; text: string };
