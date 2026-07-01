@@ -271,7 +271,7 @@ export function ChatWorkspace({
   // Conversation starters surfaced when a fresh chat is opened under an assistant/skill.
   const [activeStarters, setActiveStarters] = useState<string[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<
-    { fn: string; toolName: string; input: string }[]
+    { fn: string; toolName: string; input: string; token?: string }[]
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
   const [memoryOpen, setMemoryOpen] = useState(false);
@@ -746,7 +746,13 @@ export function ChatWorkspace({
       return;
     }
     setMessages((prev) => [...prev, { role: 'assistant', content: '', reasoning: '' }]);
-    await streamAssistant({ ...lastSendBody, approvals: pend.map((p) => p.fn), regenerate: true });
+    // Echo back the server-minted signed token for each call — the server re-verifies the HMAC
+    // against the exact tool call before executing, so a bare function name is not enough.
+    await streamAssistant({
+      ...lastSendBody,
+      approvals: pend.map((p) => ({ fn: p.fn, token: p.token })),
+      regenerate: true,
+    });
   }
 
   // Edit a prior user message → server forks a new branch and re-answers from it. Persisted chats
