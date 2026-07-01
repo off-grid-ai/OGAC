@@ -4,10 +4,13 @@ import {
   ProhibitInset as CircleSlash,
   Plug,
 } from '@phosphor-icons/react/dist/ssr';
+import { GatewayControl } from '@/components/gateway/GatewayControl';
+import { GatewayLogs } from '@/components/gateway/GatewayLogs';
 import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -75,52 +78,71 @@ export default async function GatewayPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Modalities</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-          {modalities.map(([name, status]) => {
-            const ready = status === 'ready';
-            return (
-              <div
-                key={name}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-              >
-                <span className="text-sm text-foreground">{name.replace(/_/g, ' ')}</span>
-                {ready ? (
-                  <span className="flex items-center gap-1 text-xs text-primary">
-                    <CircleCheck className="size-3.5" />
-                    ready
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <CircleSlash className="size-3.5" />
-                    {status}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="traffic">Traffic</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="control">Control</TabsTrigger>
+        </TabsList>
 
-      {info.image_models?.length ? (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Image models</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-1.5">
-            {info.image_models.map((m) => (
-              <Badge key={m} variant="secondary" className="font-mono">
-                {m}
-              </Badge>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+        <TabsContent value="overview" className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Modalities</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              {modalities.map(([name, status]) => {
+                const ready = status === 'ready';
+                return (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                  >
+                    <span className="text-sm text-foreground">{name.replace(/_/g, ' ')}</span>
+                    {ready ? (
+                      <span className="flex items-center gap-1 text-xs text-primary">
+                        <CircleCheck className="size-3.5" />
+                        ready
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <CircleSlash className="size-3.5" />
+                        {status}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
 
-      <GatewayTraffic />
+          {info.image_models?.length ? (
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Image models</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-1.5">
+                {info.image_models.map((m) => (
+                  <Badge key={m} variant="secondary" className="font-mono">
+                    {m}
+                  </Badge>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="traffic" className="space-y-6">
+          <GatewayTraffic />
+        </TabsContent>
+        <TabsContent value="logs">
+          <GatewayLogs />
+        </TabsContent>
+        <TabsContent value="control">
+          <GatewayControl />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
