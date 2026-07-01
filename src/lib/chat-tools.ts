@@ -108,6 +108,7 @@ export async function executeTool(tool: ChatTool, input: string): Promise<string
         }),
         signal: AbortSignal.timeout(30000),
       });
+      if (!r.ok) return `tool error: HTTP ${r.status}`;
       const j = await r.json().catch(() => null);
       const content = j?.result?.content;
       if (Array.isArray(content)) return content.map((c: { text?: string }) => c.text ?? '').join('\n');
@@ -120,6 +121,7 @@ export async function executeTool(tool: ChatTool, input: string): Promise<string
       body: JSON.stringify({ input }),
       signal: AbortSignal.timeout(30000),
     });
+    if (!r.ok) return `tool error: HTTP ${r.status}`;
     const text = await r.text();
     return text.slice(0, 4000);
   } catch (e) {
