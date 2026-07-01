@@ -153,6 +153,27 @@ const server = http.createServer((req, res) => {
     const kind = image ? 'image' : 'text';
     const started = Date.now();
     const streaming = body.stream === true;
+    // Request-side context for the observability record (A + D above).
+    const caller = String(req.headers['user-agent'] || '').slice(0, 80);
+    const corrId = String(req.headers['x-offgrid-run'] || req.headers['x-request-id'] || '');
+    const params = {
+      temperature: body.temperature,
+      maxTokens: body.max_tokens,
+      topP: body.top_p,
+      thinking: body?.chat_template_kwargs?.enable_thinking !== false,
+      toolsOffered: Array.isArray(body.tools) ? body.tools.length : 0,
+    };
+    const msgs = Array.isArray(body.messages)
+      ? body.messages.map((m) => ({
+          role: m.role,
+          text: (typeof m.content === 'string'
+            ? m.content
+            : Array.isArray(m.content)
+              ? m.content.filter((p) => p && p.type === 'text' && p.text).map((p) => p.text).join('\n')
+              : ''
+          ).slice(0, 600),
+        }))
+      : [];
     // Gemma 4 (and others) reject system messages not at position 0 — clients
     // like Claude Code intersperse them mid-conversation. Consolidate to front.
     // Handle both string content and multipart array content [{type:"text",text:"..."}].
@@ -193,7 +214,9 @@ const server = http.createServer((req, res) => {
       ur.on('data', (c) => { bytes += c.length; res.write(c); if (buf.length < 500) buf.push(c); });
       ur.on('end', () => {
         res.end();
-        let tokens = 0; let output = '';
+        let tokens = 0; let promptTokens = 0; let completionTokens = 0;
+        let output = ''; let reasoning = ''; let finish = ''; let tps = 0;
+        let toolCalls = [];
         const rawResp = Buffer.concat(buf).toString();
         try {
           if (streaming) {
@@ -202,19 +225,39 @@ const server = http.createServer((req, res) => {
               if (!t.startsWith('data:')) continue;
               const d = t.slice(5).trim();
               if (d === '[DONE]') continue;
-              output += JSON.parse(d)?.choices?.[0]?.delta?.content || '';
+              const ch = JSON.parse(d)?.choices?.[0];
+              output += ch?.delta?.content || '';
+              reasoning += ch?.delta?.reasoning_content || '';
+              if (ch?.finish_reason) finish = ch.finish_reason;
+              const tc = ch?.delta?.tool_calls;
+              if (Array.isArray(tc)) for (const c of tc) if (c?.function?.name) toolCalls.push({ name: c.function.name, args: (c.function.arguments || '').slice(0, 400) });
             }
           } else {
             const j = JSON.parse(rawResp);
+            const ch = j?.choices?.[0];
             tokens = j?.usage?.total_tokens || 0;
-            output = j?.choices?.[0]?.message?.content || '';
+            promptTokens = j?.usage?.prompt_tokens || 0;
+            completionTokens = j?.usage?.completion_tokens || 0;
+            finish = ch?.message?.finish_reason || ch?.finish_reason || '';
+            tps = j?.timings?.predicted_per_second ? Math.round(j.timings.predicted_per_second) : 0;
+            output = ch?.message?.content || '';
+            reasoning = ch?.message?.reasoning_content || '';
+            const tc = ch?.message?.tool_calls;
+            if (Array.isArray(tc)) toolCalls = tc.map((c) => ({ name: c?.function?.name || '', args: (c?.function?.arguments || '').slice(0, 400) }));
           }
         } catch { /* partial/non-json */ }
-        record({ gateway: target.name, model: body.model || target.model, kind, status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens, input: promptText(body), output: output.slice(0, 2000) });
+        const elapsed = Date.now() - started;
+        if (!tps && completionTokens && elapsed > 0) tps = Math.round((completionTokens / elapsed) * 1000);
+        record({
+          gateway: target.name, model: body.model || target.model, modelServed: target.model, kind,
+          status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens, promptTokens, completionTokens,
+          tps, finish, toolCalls, reasoning: reasoning.slice(0, 2000), caller, corrId, params, msgs,
+          input: promptText(body), output: output.slice(0, 2000),
+        });
       });
     });
     up.on('error', (e) => {
-      record({ gateway: target.name, model: body.model || target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, input: promptText(body), output: `(error: ${e.message})` });
+      record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, input: promptText(body), output: `(error: ${e.message})` });
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
     up.setTimeout(120000, () => up.destroy(new Error('upstream timeout')));
