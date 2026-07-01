@@ -50,16 +50,34 @@ export async function POST(req: Request) {
     regenerate = false,
     approvals = [],
     orgKnowledge = false,
+    // Incognito / temporary chat: no DB writes, no memory. The client owns the transcript and
+    // sends prior turns inline via `history`; nothing here is persisted.
+    temporary = false,
+    history = [],
+    // Slash skill invoked inline for this turn only — its system prompt is applied for the turn.
+    skillId: turnSkillId = null,
   } = await req.json().catch(() => ({}));
-  const convo = conversationId ? await getConversation(userId, conversationId) : null;
+  // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
+  // pipeline (system prompt, budget, tools) works unchanged. projectId/skillId stay null.
+  const convo = temporary
+    ? { id: '', userId, projectId: null, skillId: null }
+    : conversationId
+      ? await getConversation(userId, conversationId)
+      : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
 
   // Regenerate: drop the last assistant turn and re-answer the existing last user turn.
-  if (regenerate) await dropLastAssistant(convo.id);
+  if (regenerate && !temporary) await dropLastAssistant(convo.id);
 
-  const prior = await listMessages(convo.id);
+  // Temporary chats carry their own history from the client (never touch the DB).
+  const prior: { role: string; content: string }[] = temporary
+    ? (Array.isArray(history) ? history : []).map((h: { role: string; content: string }) => ({
+        role: h.role,
+        content: h.content,
+      }))
+    : await listMessages(convo.id);
   // First user turn → title the conversation from it (like the desktop does).
-  if (!regenerate && prior.length === 0 && content.trim()) {
+  if (!temporary && !regenerate && prior.length === 0 && content.trim()) {
     await renameConversation(userId, convo.id, deriveTitle(content));
   }
 
@@ -84,8 +102,11 @@ export async function POST(req: Request) {
   // knowledge project for RAG when the conversation has none of its own.
   let skillModel = '';
   let ragProjectId = convo.projectId ?? null;
-  if (convo.skillId) {
-    const skill = await getSkill(convo.skillId);
+  // A slash-invoked skill applies for this turn only; a conversation-bound skill applies for the
+  // whole thread. Turn skill takes precedence when both are present.
+  const activeSkillId = turnSkillId ?? convo.skillId;
+  if (activeSkillId) {
+    const skill = await getSkill(activeSkillId);
     if (skill && skill.enabled) {
       if (skill.systemPrompt.trim()) messages.push({ role: 'system', content: skill.systemPrompt });
       skillModel = skill.model ?? '';
@@ -137,12 +158,14 @@ export async function POST(req: Request) {
       }
     }
     messages.push({ role: 'user', content: userContent.length > 1 ? userContent : String(content) });
-    await addMessage({
-      conversationId: convo.id,
-      role: 'user',
-      content: String(content),
-      images: userContent.length > 1 ? images : null,
-    });
+    if (!temporary) {
+      await addMessage({
+        conversationId: convo.id,
+        role: 'user',
+        content: String(content),
+        images: userContent.length > 1 ? images : null,
+      });
+    }
   }
 
   const effectiveModel = model || skillModel;
@@ -157,7 +180,7 @@ export async function POST(req: Request) {
   if (effectiveModel && (await isDenied(role, 'chat.model', effectiveModel))) {
     return deny(`model ${effectiveModel} is not permitted for your role`);
   }
-  if (convo.skillId && (await isDenied(role, 'chat.skill', convo.skillId))) {
+  if (activeSkillId && (await isDenied(role, 'chat.skill', activeSkillId))) {
     return deny('this skill is not permitted for your role');
   }
   const budget = await projectBudget(ragProjectId);
@@ -244,17 +267,20 @@ export async function POST(req: Request) {
       } catch (e) {
         send({ error: (e as Error).message });
       }
-      // Persist the assistant answer, then tell the client we're done.
-      try {
-        await addMessage({
-          conversationId: convo.id,
-          role: 'assistant',
-          content: full,
-          reasoning: reasoning || null,
-          citations: citations.length ? citations : null,
-        });
-      } catch {
-        /* best-effort persistence */
+      // Persist the assistant answer, then tell the client we're done. Temporary chats skip all
+      // persistence — the transcript lives only in the client for the session.
+      if (!temporary) {
+        try {
+          await addMessage({
+            conversationId: convo.id,
+            role: 'assistant',
+            content: full,
+            reasoning: reasoning || null,
+            citations: citations.length ? citations : null,
+          });
+        } catch {
+          /* best-effort persistence */
+        }
       }
       // Governance: audit this completion so Analytics/FinOps/Regulatory count chat usage, billed
       // to the project's virtual key when one exists.
@@ -266,7 +292,8 @@ export async function POST(req: Request) {
         keyId: budget.keyId,
       });
       // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
-      if (full && String(content).trim()) {
+      // Temporary chats are never added to memory.
+      if (!temporary && full && String(content).trim()) {
         void extractMemory(userId, String(content), full, effectiveModel);
       }
       if (citations.length) send({ citations });
