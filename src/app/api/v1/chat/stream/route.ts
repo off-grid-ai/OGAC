@@ -1,17 +1,19 @@
 import { auth } from '@/auth';
 import {
   addMessage,
+  branchUserMessage,
   deriveTitle,
-  dropLastAssistant,
   getConversation,
   getCustomInstructions,
   getSkill,
   listMessages,
   memoryBlock,
+  prepareRegenerate,
   projectMemoryBlock,
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import { attachmentBlock } from '@/lib/chat-attach';
 import {
   estimateTokens,
   isDenied,
@@ -48,18 +50,51 @@ export async function POST(req: Request) {
     model = '',
     images = [],
     regenerate = false,
+    // Edit & branch: re-run from an edited prior user message, forking a new branch.
+    editMessageId = null,
     approvals = [],
     orgKnowledge = false,
+    // Tools menu: extended thinking toggle. Off by default (desktop parity, saves prefill).
+    thinking = false,
+    // Incognito / temporary chat: no DB writes, no memory. The client owns the transcript and
+    // sends prior turns inline via `history`; nothing here is persisted.
+    temporary = false,
+    history = [],
+    // Slash skill invoked inline for this turn only — its system prompt is applied for the turn.
+    skillId: turnSkillId = null,
+    // Ad-hoc file attachments already extracted to text by /api/v1/chat/attach — injected as a
+    // system context block for this turn only (not persisted, not embedded).
+    attachments = [],
   } = await req.json().catch(() => ({}));
-  const convo = conversationId ? await getConversation(userId, conversationId) : null;
+  // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
+  // pipeline (system prompt, budget, tools) works unchanged. projectId/skillId stay null.
+  const convo = temporary
+    ? { id: '', userId, projectId: null, skillId: null }
+    : conversationId
+      ? await getConversation(userId, conversationId)
+      : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
 
-  // Regenerate: drop the last assistant turn and re-answer the existing last user turn.
-  if (regenerate) await dropLastAssistant(convo.id);
+  // Edit & branch: fork a new user turn from an edited prior message (persisted, becomes active).
+  // The new user message is the parent of the assistant answer we're about to generate.
+  let assistantParentId: string | null = null;
+  if (!temporary && editMessageId && content.trim()) {
+    assistantParentId = await branchUserMessage(convo.id, String(editMessageId), String(content));
+    if (!assistantParentId) return new Response('message not found', { status: 404 });
+  } else if (!temporary && regenerate) {
+    // Regenerate: branch a fresh answer under the same user turn (old answer kept as a sibling).
+    assistantParentId = await prepareRegenerate(convo.id);
+  }
 
-  const prior = await listMessages(convo.id);
+  // Temporary chats carry their own history from the client (never touch the DB).
+  const prior: { role: string; content: string }[] = temporary
+    ? (Array.isArray(history) ? history : []).map((h: { role: string; content: string }) => ({
+        role: h.role,
+        content: h.content,
+      }))
+    : (await listMessages(convo.id)).map((m) => ({ role: m.role, content: m.content }));
   // First user turn → title the conversation from it (like the desktop does).
-  if (!regenerate && prior.length === 0 && content.trim()) {
+  if (!temporary && !regenerate && !editMessageId && prior.length === 0 && content.trim()) {
     await renameConversation(userId, convo.id, deriveTitle(content));
   }
 
@@ -80,12 +115,28 @@ export async function POST(req: Request) {
   // Per-project memory: inject facts scoped to this conversation's project (additive to user memory).
   const projMem = await projectMemoryBlock(convo.projectId ?? null);
   if (projMem) messages.push({ role: 'system', content: projMem });
+  // Attached files (ad-hoc chat): inject the extracted text as a system context block for this turn.
+  if (Array.isArray(attachments) && attachments.length) {
+    const block = attachmentBlock(
+      attachments
+        .filter((a: unknown) => a && typeof (a as { text?: unknown }).text === 'string')
+        .map((a: { name?: string; text: string }) => ({
+          name: String(a.name ?? 'file'),
+          text: a.text,
+          truncated: false,
+        })),
+    );
+    if (block) messages.push({ role: 'system', content: block });
+  }
   // Org skill bound to this conversation: inject its instructions, default its model, and use its
   // knowledge project for RAG when the conversation has none of its own.
   let skillModel = '';
   let ragProjectId = convo.projectId ?? null;
-  if (convo.skillId) {
-    const skill = await getSkill(convo.skillId);
+  // A slash-invoked skill applies for this turn only; a conversation-bound skill applies for the
+  // whole thread. Turn skill takes precedence when both are present.
+  const activeSkillId = turnSkillId ?? convo.skillId;
+  if (activeSkillId) {
+    const skill = await getSkill(activeSkillId);
     if (skill && skill.enabled) {
       if (skill.systemPrompt.trim()) messages.push({ role: 'system', content: skill.systemPrompt });
       skillModel = skill.model ?? '';
@@ -128,8 +179,9 @@ export async function POST(req: Request) {
     if (m.role === 'system') continue;
     messages.push({ role: m.role, content: m.content });
   }
-  // On regenerate the last user turn is already in `prior`; only add a new turn otherwise.
-  if (!regenerate) {
+  // On regenerate/edit the driving user turn is already in `prior` (edit persisted it as the new
+  // branch); only add + persist a brand-new turn otherwise.
+  if (!regenerate && !editMessageId) {
     const userContent: ContentPart[] = [{ type: 'text', text: String(content) }];
     for (const url of Array.isArray(images) ? images : []) {
       if (typeof url === 'string' && url.startsWith('data:')) {
@@ -137,12 +189,14 @@ export async function POST(req: Request) {
       }
     }
     messages.push({ role: 'user', content: userContent.length > 1 ? userContent : String(content) });
-    await addMessage({
-      conversationId: convo.id,
-      role: 'user',
-      content: String(content),
-      images: userContent.length > 1 ? images : null,
-    });
+    if (!temporary) {
+      await addMessage({
+        conversationId: convo.id,
+        role: 'user',
+        content: String(content),
+        images: userContent.length > 1 ? images : null,
+      });
+    }
   }
 
   const effectiveModel = model || skillModel;
@@ -157,7 +211,7 @@ export async function POST(req: Request) {
   if (effectiveModel && (await isDenied(role, 'chat.model', effectiveModel))) {
     return deny(`model ${effectiveModel} is not permitted for your role`);
   }
-  if (convo.skillId && (await isDenied(role, 'chat.skill', convo.skillId))) {
+  if (activeSkillId && (await isDenied(role, 'chat.skill', activeSkillId))) {
     return deny('this skill is not permitted for your role');
   }
   const budget = await projectBudget(ragProjectId);
@@ -186,7 +240,7 @@ export async function POST(req: Request) {
     max_tokens: 2048,
     temperature: 0.7,
     stream: true,
-    chat_template_kwargs: { enable_thinking: false },
+    chat_template_kwargs: { enable_thinking: Boolean(thinking) },
   };
   if (effectiveModel) payload.model = effectiveModel;
 
@@ -244,17 +298,23 @@ export async function POST(req: Request) {
       } catch (e) {
         send({ error: (e as Error).message });
       }
-      // Persist the assistant answer, then tell the client we're done.
-      try {
-        await addMessage({
-          conversationId: convo.id,
-          role: 'assistant',
-          content: full,
-          reasoning: reasoning || null,
-          citations: citations.length ? citations : null,
-        });
-      } catch {
-        /* best-effort persistence */
+      // Persist the assistant answer, then tell the client we're done. Temporary chats skip all
+      // persistence — the transcript lives only in the client for the session.
+      if (!temporary) {
+        try {
+          await addMessage({
+            conversationId: convo.id,
+            role: 'assistant',
+            content: full,
+            reasoning: reasoning || null,
+            citations: citations.length ? citations : null,
+            // On regenerate/edit, attach under the driving user turn so the old answer stays as a
+            // sibling branch; otherwise default to the active leaf (the just-added user turn).
+            ...(assistantParentId ? { parentId: assistantParentId } : {}),
+          });
+        } catch {
+          /* best-effort persistence */
+        }
       }
       // Governance: audit this completion so Analytics/FinOps/Regulatory count chat usage, billed
       // to the project's virtual key when one exists.
@@ -266,7 +326,8 @@ export async function POST(req: Request) {
         keyId: budget.keyId,
       });
       // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
-      if (full && String(content).trim()) {
+      // Temporary chats are never added to memory.
+      if (!temporary && full && String(content).trim()) {
         void extractMemory(userId, String(content), full, effectiveModel);
       }
       if (citations.length) send({ citations });

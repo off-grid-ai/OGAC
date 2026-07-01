@@ -2,14 +2,23 @@
 
 import {
   ArrowsClockwise,
+  CaretLeft,
+  CaretRight,
+  Check,
   Copy,
+  FileText,
   FolderSimplePlus,
   GearSix,
   Brain,
+  Ghost,
+  Globe,
   ImageSquare,
+  Lightning,
+  Paperclip,
   MagnifyingGlass,
   Microphone,
   PaperPlaneRight,
+  PencilSimple,
   Plus,
   Quotes,
   SlidersHorizontal,
@@ -22,6 +31,14 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
@@ -50,6 +67,9 @@ interface Message {
   reasoning?: string | null;
   images?: string[] | null;
   citations?: Citation[] | null;
+  // Edit & branch: position among sibling versions of this turn (‹ 2/3 ›).
+  branchIndex?: number;
+  branchCount?: number;
 }
 interface ModelInfo {
   id: string;
@@ -69,6 +89,30 @@ function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifa
   );
 }
 
+// Branch navigation ‹ 2/3 › shown on turns that have sibling versions (edited/regenerated).
+function BranchNav({
+  m,
+  onNav,
+}: {
+  m: Message;
+  onNav: (delta: number) => void;
+}) {
+  if (!m.branchCount || m.branchCount < 2) return null;
+  return (
+    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+      <button onClick={() => onNav(-1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+        <CaretLeft className="size-3" />
+      </button>
+      <span className="tabular-nums">
+        {(m.branchIndex ?? 0) + 1}/{m.branchCount}
+      </span>
+      <button onClick={() => onNav(1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+        <CaretRight className="size-3" />
+      </button>
+    </div>
+  );
+}
+
 // eslint-disable-next-line complexity
 function MessageBubble({
   message: m,
@@ -76,18 +120,56 @@ function MessageBubble({
   onCopy,
   onRegenerate,
   onSpeak,
+  onEdit,
+  onNavBranch,
   canRegenerate,
+  canEdit,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
   onCopy: (text: string) => void;
   onRegenerate: () => void;
   onSpeak: (text: string) => void;
+  onEdit: (id: string, content: string) => void;
+  onNavBranch: (id: string, delta: number) => void;
   canRegenerate: boolean;
+  canEdit: boolean;
 }) {
   const isAssistant = m.role === 'assistant';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.content);
+  if (!isAssistant && editing) {
+    return (
+      <div className="flex justify-end">
+        <div className="w-[90%] rounded-lg border border-primary/40 bg-primary/5 p-2">
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.min(8, draft.split('\n').length + 1)}
+            className="w-full resize-none bg-transparent text-sm outline-none"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setDraft(m.content); }}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const t = draft.trim();
+                setEditing(false);
+                if (t && m.id) onEdit(m.id, t);
+              }}
+            >
+              <Check className="mr-1 size-3.5" /> Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className={cn('group flex', m.role === 'user' && 'justify-end')}>
+    <div className={cn('group flex', m.role === 'user' && 'flex-col items-end')}>
       <div
         className={cn(
           'max-w-[90%] rounded-lg px-3.5 py-2.5',
@@ -160,6 +242,18 @@ function MessageBubble({
           <p className="whitespace-pre-wrap text-sm">{m.content}</p>
         )}
       </div>
+      {/* Branch navigation ‹ 2/3 › on turns with sibling versions. */}
+      {m.id ? <BranchNav m={m} onNav={(d) => onNavBranch(m.id!, d)} /> : null}
+      {/* Edit affordance on user turns (creates a new branch). */}
+      {!isAssistant && canEdit && m.id ? (
+        <button
+          onClick={() => { setDraft(m.content); setEditing(true); }}
+          className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          title="Edit message"
+        >
+          <PencilSimple className="size-3" /> Edit
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -186,9 +280,26 @@ export function ChatWorkspace({
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
+  // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
+  const [temporary, setTemporary] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  // Ad-hoc file attachments (txt/md/csv/pdf) extracted server-side; injected as context for the
+  // next turn only. Chips show in the composer.
+  const [files, setFiles] = useState<{ name: string; text: string; chars: number }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  // Tools menu toggles (per-session): extended thinking + org-knowledge ("search your org") search.
+  const [thinking, setThinking] = useState(false);
+  const [orgKnowledge, setOrgKnowledge] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  // Slash styles: RBAC-permitted skills invocable inline via /name. `turnSkill` applies for the
+  // next turn only (its system prompt), shown as a chip in the composer.
+  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>([]);
+  const [turnSkill, setTurnSkill] = useState<{ id: string; name: string } | null>(null);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -201,8 +312,17 @@ export function ChatWorkspace({
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
 
   const activeModel = models.find((m) => m.id === model);
+  // A leading /token (no space yet, no skill already picked) opens the slash-styles picker.
+  const slashMatch = !turnSkill ? /^\/([\w-]*)$/.exec(input) : null;
+  const slashQuery = slashMatch?.[1]?.toLowerCase() ?? '';
+  const slashMatches = slashMatch
+    ? skillList
+        .filter((s) => s.name.toLowerCase().replace(/\s+/g, '-').includes(slashQuery))
+        .slice(0, 6)
+    : [];
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const visibleConversations = conversations
     .filter((c) => (activeProjectId ? c.projectId === activeProjectId : !c.projectId))
@@ -228,11 +348,55 @@ export function ChatWorkspace({
         if (list[0]) setModel(list[0].id);
       }
     })();
+    // Slash-styles autocomplete source — RBAC-scoped by the skills API.
+    void (async () => {
+      const r = await fetch('/api/v1/chat/skills');
+      if (r.ok) setSkillList((await r.json()).skills ?? []);
+    })();
   }, [refreshConversations, refreshProjects]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  useEffect(() => {
+    setSlashOpen(slashMatches.length > 0);
+    setSlashIndex(0);
+  }, [slashMatches.length, input]);
+
+  // Pick a slash-style skill: tag the turn with it and clear the /query from the composer.
+  function pickSkill(s: { id: string; name: string }) {
+    setTurnSkill({ id: s.id, name: s.name });
+    setInput('');
+    setSlashOpen(false);
+  }
+
+  // Composer keydown: drive the slash picker (arrows/enter/tab/escape) when open, else send.
+  // eslint-disable-next-line complexity
+  function onComposerKey(e: React.KeyboardEvent) {
+    if (slashOpen && slashMatches.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        return setSlashIndex((i) => (i + 1) % slashMatches.length);
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        return setSlashIndex((i) => (i - 1 + slashMatches.length) % slashMatches.length);
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        return pickSkill(slashMatches[slashIndex]);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return setSlashOpen(false);
+      }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  }
 
   // Save-on-open: opening an artifact both shows it in the side panel and persists it to the
   // library (versioned server-side by conversation + title). Fire-and-forget; the panel opens
@@ -255,7 +419,20 @@ export function ChatWorkspace({
     [activeId],
   );
 
+  // Enter/leave incognito. Entering clears the thread into an ephemeral session; leaving drops it.
+  function toggleTemporary() {
+    setTemporary((prev) => {
+      const next = !prev;
+      setActiveId(null);
+      setMessages([]);
+      setActiveStarters([]);
+      setArtifact(null);
+      return next;
+    });
+  }
+
   async function openConversation(id: string) {
+    setTemporary(false);
     setActiveId(id);
     setArtifact(null);
     setActiveStarters([]);
@@ -264,6 +441,7 @@ export function ChatWorkspace({
   }
 
   async function newChat() {
+    setTemporary(false);
     setActiveStarters([]);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
@@ -341,6 +519,28 @@ export function ChatWorkspace({
     }
   }
 
+  // Attach text/markdown/csv/pdf: extract text server-side, keep it client-side as a chip until the
+  // next send injects it as context.
+  async function attachFiles(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(fileList)) {
+        const fd = new FormData();
+        fd.append('file', f);
+        const r = await fetch('/api/v1/chat/attach', { method: 'POST', body: fd });
+        if (!r.ok) {
+          toast.error((await r.json().catch(() => ({})))?.error ?? `Could not read ${f.name}`);
+          continue;
+        }
+        const { name, text, chars } = await r.json();
+        setFiles((prev) => [...prev, { name, text, chars }]);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function stop() {
     abortRef.current?.abort();
     setStreaming(false);
@@ -399,7 +599,14 @@ export function ChatWorkspace({
 
   // Shared SSE loop — updates the trailing assistant placeholder. Caller adds the placeholder.
   // eslint-disable-next-line complexity
-  async function streamAssistant(body: Record<string, unknown>) {
+  async function streamAssistant(rawBody: Record<string, unknown>) {
+    // Fold in the Tools-menu session toggles (thinking / org-knowledge search) unless the caller
+    // already set them (e.g. approval replays reuse lastSendBody verbatim).
+    const body: Record<string, unknown> = {
+      thinking,
+      orgKnowledge,
+      ...rawBody,
+    };
     setStreaming(true);
     setLastSendBody(body);
     const ac = new AbortController();
@@ -462,6 +669,32 @@ export function ChatWorkspace({
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    const sentFiles = files.map((f) => ({ name: f.name, text: f.text }));
+    const sentSkill = turnSkill?.id ?? null;
+    // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
+    if (temporary) {
+      const sentImages = images;
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
+      setInput('');
+      setImages([]);
+      setFiles([]);
+      setTurnSkill(null);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: text, images: sentImages.length ? sentImages : null },
+        { role: 'assistant', content: '', reasoning: '' },
+      ]);
+      await streamAssistant({
+        temporary: true,
+        history,
+        content: text,
+        model,
+        images: sentImages,
+        attachments: sentFiles,
+        skillId: sentSkill,
+      });
+      return;
+    }
     let convId = activeId;
     if (!convId) {
       const r = await fetch('/api/v1/chat/conversations', {
@@ -476,12 +709,21 @@ export function ChatWorkspace({
     const sentImages = images;
     setInput('');
     setImages([]);
+    setFiles([]);
+    setTurnSkill(null);
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: text, images: sentImages.length ? sentImages : null },
       { role: 'assistant', content: '', reasoning: '' },
     ]);
-    await streamAssistant({ conversationId: convId, content: text, model, images: sentImages });
+    await streamAssistant({
+      conversationId: convId,
+      content: text,
+      model,
+      images: sentImages,
+      attachments: sentFiles,
+      skillId: sentSkill,
+    });
   }
 
   // Send a conversation starter immediately (clears the starter chips).
@@ -507,8 +749,49 @@ export function ChatWorkspace({
     await streamAssistant({ ...lastSendBody, approvals: pend.map((p) => p.fn), regenerate: true });
   }
 
-  async function regenerate() {
+  // Edit a prior user message → server forks a new branch and re-answers from it. Persisted chats
+  // only (temporary chats have no message ids). We reload the active-path transcript, then stream.
+  async function editMessage(id: string, newContent: string) {
+    if (streaming || !activeId || temporary) return;
+    setActiveStarters([]);
+    setMessages((prev) => {
+      const i = prev.findIndex((m) => m.id === id);
+      const trimmed = i >= 0 ? prev.slice(0, i) : prev;
+      return [
+        ...trimmed,
+        { role: 'user', content: newContent },
+        { role: 'assistant', content: '', reasoning: '' },
+      ];
+    });
+    await streamAssistant({
+      conversationId: activeId,
+      editMessageId: id,
+      content: newContent,
+      model,
+    });
+    await reloadActive(activeId);
+  }
+
+  // Reload the persisted active-path transcript (ids + branch metadata) after a branching edit or
+  // regenerate so ‹ n/m › controls appear immediately.
+  async function reloadActive(id: string) {
+    const r = await fetch(`/api/v1/chat/conversations/${id}`);
+    if (r.ok) setMessages((await r.json()).messages ?? []);
+  }
+
+  // Switch among sibling versions of an edited/regenerated turn; reload the resulting active path.
+  async function navBranch(id: string, delta: number) {
     if (streaming || !activeId) return;
+    const r = await fetch(`/api/v1/chat/conversations/${activeId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ branchMessageId: id, branchDelta: delta }),
+    });
+    if (r.ok) setMessages((await r.json()).messages ?? []);
+  }
+
+  async function regenerate() {
+    if (streaming || (!activeId && !temporary)) return;
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (!lastUser) return;
     setMessages((prev) => {
@@ -517,12 +800,24 @@ export function ChatWorkspace({
       next.push({ role: 'assistant', content: '', reasoning: '' });
       return next;
     });
+    if (temporary) {
+      const history = messages.filter((m) => m !== messages[messages.length - 1]);
+      await streamAssistant({
+        temporary: true,
+        history: history.map((m) => ({ role: m.role, content: m.content })),
+        content: lastUser.content,
+        model,
+        regenerate: true,
+      });
+      return;
+    }
     await streamAssistant({
       conversationId: activeId,
       content: lastUser.content,
       model,
       regenerate: true,
     });
+    if (activeId) await reloadActive(activeId);
   }
 
   return (
@@ -646,10 +941,20 @@ export function ChatWorkspace({
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <Sparkle className="size-4 text-primary" />
-            {activeProject ? activeProject.name : 'Chat'}
+            {temporary ? <Ghost className="size-4 text-primary" /> : <Sparkle className="size-4 text-primary" />}
+            {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTemporary}
+              className={cn(
+                'hover:text-foreground',
+                temporary ? 'text-primary' : 'text-muted-foreground',
+              )}
+              title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
+            >
+              <Ghost className="size-4" />
+            </button>
             <button
               onClick={() => setMemoryOpen(true)}
               className="text-muted-foreground hover:text-foreground"
@@ -685,12 +990,14 @@ export function ChatWorkspace({
             {messages.length === 0 ? (
               <div className="pt-24 text-center text-sm text-muted-foreground">
                 <p className="text-base text-foreground">
-                  {activeProject ? activeProject.name : 'Your own private AI'}
+                  {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Your own private AI'}
                 </p>
                 <p className="mt-1">
-                  {activeProject
-                    ? 'Chats here use this project’s instructions and knowledge.'
-                    : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
+                  {temporary
+                    ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
+                    : activeProject
+                      ? 'Chats here use this project’s instructions and knowledge.'
+                      : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
                 </p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
@@ -715,7 +1022,10 @@ export function ChatWorkspace({
                 onCopy={copy}
                 onRegenerate={regenerate}
                 onSpeak={speak}
+                onEdit={editMessage}
+                onNavBranch={navBranch}
                 canRegenerate={!streaming && i === messages.length - 1}
+                canEdit={!streaming && !temporary}
               />
             ))}
           </div>
@@ -766,26 +1076,129 @@ export function ChatWorkspace({
                 ))}
               </div>
             ) : null}
-            <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
-              {activeModel?.vision ? (
-                <>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    hidden
-                    onChange={(e) => attachImage(e.target.files)}
-                  />
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    className="p-1.5 text-muted-foreground hover:text-foreground"
-                    title="Attach image"
+            {files.length ? (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {files.map((f, k) => (
+                  <div
+                    key={k}
+                    className="flex items-center gap-1.5 rounded border border-border bg-muted px-2 py-1 text-xs"
                   >
-                    <ImageSquare className="size-5" />
+                    <FileText className="size-3.5 text-muted-foreground" />
+                    <span className="max-w-[160px] truncate">{f.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {(f.chars / 1000).toFixed(1)}k
+                    </span>
+                    <button
+                      onClick={() => setFiles((p) => p.filter((_, j) => j !== k))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {turnSkill ? (
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-primary">
+                  <Sparkle className="size-3.5" />
+                  {turnSkill.name}
+                  <button onClick={() => setTurnSkill(null)} className="hover:text-destructive">
+                    <X className="size-3" />
                   </button>
-                </>
-              ) : null}
+                </span>
+                <span className="text-[10px] text-muted-foreground">applied to your next message</span>
+              </div>
+            ) : null}
+            {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
+            {slashOpen ? (
+              <div className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                {slashMatches.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onMouseEnter={() => setSlashIndex(i)}
+                    onClick={() => pickSkill(s)}
+                    className={cn(
+                      'flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left',
+                      i === slashIndex ? 'bg-primary/10' : 'hover:bg-muted',
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm text-foreground">
+                      <Sparkle className="size-3.5 text-primary" />/{s.name.replace(/\s+/g, '-')}
+                    </span>
+                    {s.description ? (
+                      <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <input
+              ref={docRef}
+              type="file"
+              accept=".txt,.md,.markdown,.csv,.tsv,.log,.json,.pdf,text/plain,text/markdown,text/csv,application/pdf"
+              multiple
+              hidden
+              onChange={(e) => {
+                void attachFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => attachImage(e.target.files)}
+            />
+            <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
+              {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
+              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      'p-1.5 hover:text-foreground',
+                      thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
+                    )}
+                    title="Tools"
+                  >
+                    <Plus className="size-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem
+                    onSelect={() => docRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <Paperclip className="mr-2 size-4" /> Attach file
+                  </DropdownMenuItem>
+                  {activeModel?.vision ? (
+                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                      <ImageSquare className="mr-2 size-4" /> Attach image
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={orgKnowledge}
+                    onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Globe className="mr-2 size-4" /> Search org knowledge
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={thinking}
+                    onCheckedChange={(v) => setThinking(Boolean(v))}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Lightning className="mr-2 size-4" /> Extended thinking
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
+                    <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 onClick={toggleRecording}
                 className={cn(
@@ -799,14 +1212,9 @@ export function ChatWorkspace({
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
+                onKeyDown={onComposerKey}
                 rows={1}
-                placeholder="Message the model…"
+                placeholder="Message the model…  (type / for skills)"
                 className="max-h-40 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none"
               />
               {streaming ? (

@@ -43,6 +43,11 @@ export async function ensureChatSchema(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS chat_messages_conv_idx ON chat_messages (conversation_id, created_at);`,
   );
+  // Edit & branch (Wave 2): parent-pointer tree columns (added post-hoc for existing tables).
+  await db.execute(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_id text;`);
+  await db.execute(
+    sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;`,
+  );
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_settings (
       user_id text PRIMARY KEY, custom_instructions text NOT NULL DEFAULT '',
@@ -261,6 +266,18 @@ export async function dropLastAssistant(conversationId: string): Promise<void> {
   }
 }
 
+// Prepare a regenerate: the shown path ends in an assistant turn; branch a new answer under the
+// same user parent (keeping the old answer as a sibling). Returns that parent user-message id, or
+// null if there's no assistant to regenerate. addMessage(parentId) then attaches the new answer.
+export async function prepareRegenerate(conversationId: string): Promise<string | null> {
+  await ensureChatSchema();
+  const path = await listMessages(conversationId);
+  const last = path[path.length - 1];
+  if (!last || last.role !== 'assistant') return null;
+  await deactivateSiblings(conversationId, last.parentId ?? '');
+  return last.parentId ?? null;
+}
+
 const rid = () => crypto.randomUUID();
 
 export async function listConversations(userId: string) {
@@ -294,13 +311,54 @@ export async function getConversation(userId: string, id: string) {
   return c ?? null;
 }
 
-export async function listMessages(conversationId: string) {
-  await ensureChatSchema();
+// All rows for a conversation (every branch), oldest first. Used to compute the active path and
+// per-turn branch counts.
+async function allMessages(conversationId: string) {
   return db
     .select()
     .from(chatMessages)
     .where(eq(chatMessages.conversationId, conversationId))
     .orderBy(asc(chatMessages.createdAt));
+}
+
+// The shown transcript: walk the parent-pointer tree from the root, picking the active child at
+// each step. Each returned message carries branch metadata (index/count among its siblings) so the
+// UI can render ‹ 2/3 › navigation on turns that were edited/regenerated.
+export type ThreadMessage = typeof chatMessages.$inferSelect & {
+  branchIndex: number;
+  branchCount: number;
+};
+// eslint-disable-next-line complexity
+export async function listMessages(conversationId: string): Promise<ThreadMessage[]> {
+  await ensureChatSchema();
+  const rows = await allMessages(conversationId);
+  if (!rows.length) return [];
+  // Group children by parent (null parent = roots). Preserve creation order within a group.
+  const byParent = new Map<string, (typeof rows)[number][]>();
+  for (const r of rows) {
+    const key = r.parentId ?? '';
+    const arr = byParent.get(key) ?? [];
+    arr.push(r);
+    byParent.set(key, arr);
+  }
+  const out: ThreadMessage[] = [];
+  let parentKey = '';
+  for (;;) {
+    const siblings = byParent.get(parentKey);
+    if (!siblings || !siblings.length) break;
+    const idx = Math.max(0, siblings.findIndex((s) => s.active));
+    const chosen = siblings[idx] ?? siblings[siblings.length - 1];
+    out.push({ ...chosen, branchIndex: idx, branchCount: siblings.length });
+    parentKey = chosen.id;
+  }
+  return out;
+}
+
+// The id of the current active leaf (deepest message on the shown path) — the parent for the next
+// appended message. Null for an empty conversation.
+export async function activeLeafId(conversationId: string): Promise<string | null> {
+  const path = await listMessages(conversationId);
+  return path.length ? path[path.length - 1].id : null;
 }
 
 export async function addMessage(m: {
@@ -310,9 +368,13 @@ export async function addMessage(m: {
   reasoning?: string | null;
   images?: string[] | null;
   citations?: { name: string; position: number; score: number }[] | null;
+  parentId?: string | null;
 }) {
   await ensureChatSchema();
   const id = rid();
+  // Default the parent to the current active leaf so appended turns extend the shown branch.
+  const parentId =
+    m.parentId !== undefined ? m.parentId : await activeLeafId(m.conversationId);
   await db.insert(chatMessages).values({
     id,
     conversationId: m.conversationId,
@@ -321,12 +383,79 @@ export async function addMessage(m: {
     reasoning: m.reasoning ?? null,
     images: m.images ?? null,
     citations: m.citations ?? null,
+    parentId: parentId ?? null,
+    active: true,
   });
   await db
     .update(chatConversations)
     .set({ updatedAt: new Date() })
     .where(eq(chatConversations.id, m.conversationId));
   return id;
+}
+
+// Edit a prior user message → create a new sibling branch under the same parent and make it the
+// active path. The old branch is preserved (its messages stay in the DB, just deactivated at the
+// fork). Returns the new user message id so the stream route can re-answer from it.
+export async function branchUserMessage(
+  conversationId: string,
+  messageId: string,
+  newContent: string,
+): Promise<string | null> {
+  await ensureChatSchema();
+  const [orig] = await db
+    .select()
+    .from(chatMessages)
+    .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, conversationId)));
+  if (!orig || orig.role !== 'user') return null;
+  // Deactivate every sibling under the same parent so the new branch becomes the shown path.
+  const parentKey = orig.parentId ?? '';
+  await deactivateSiblings(conversationId, parentKey);
+  const id = rid();
+  await db.insert(chatMessages).values({
+    id,
+    conversationId,
+    role: 'user',
+    content: newContent,
+    images: orig.images ?? null,
+    parentId: orig.parentId ?? null,
+    active: true,
+  });
+  await db
+    .update(chatConversations)
+    .set({ updatedAt: new Date() })
+    .where(eq(chatConversations.id, conversationId));
+  return id;
+}
+
+// Switch which sibling of a given message is active (branch navigation ‹ 2/3 ›). `messageId` is
+// any current-path message; `delta` moves +1/-1 among its siblings.
+export async function switchBranch(
+  conversationId: string,
+  messageId: string,
+  delta: number,
+): Promise<boolean> {
+  await ensureChatSchema();
+  const rows = await allMessages(conversationId);
+  const target = rows.find((r) => r.id === messageId);
+  if (!target) return false;
+  const parentKey = target.parentId ?? '';
+  const siblings = rows.filter((r) => (r.parentId ?? '') === parentKey);
+  if (siblings.length < 2) return false;
+  const cur = siblings.findIndex((s) => s.id === messageId);
+  const next = (cur + delta + siblings.length) % siblings.length;
+  await deactivateSiblings(conversationId, parentKey);
+  await db.update(chatMessages).set({ active: true }).where(eq(chatMessages.id, siblings[next].id));
+  return true;
+}
+
+async function deactivateSiblings(conversationId: string, parentKey: string) {
+  const cond = parentKey
+    ? and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.parentId, parentKey))
+    : and(
+        eq(chatMessages.conversationId, conversationId),
+        sql`${chatMessages.parentId} IS NULL`,
+      );
+  await db.update(chatMessages).set({ active: false }).where(cond);
 }
 
 export async function renameConversation(userId: string, id: string, title: string) {
