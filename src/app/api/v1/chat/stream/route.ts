@@ -54,6 +54,8 @@ export async function POST(req: Request) {
     editMessageId = null,
     approvals = [],
     orgKnowledge = false,
+    // Tools menu: extended thinking toggle. Off by default (desktop parity, saves prefill).
+    thinking = false,
     // Incognito / temporary chat: no DB writes, no memory. The client owns the transcript and
     // sends prior turns inline via `history`; nothing here is persisted.
     temporary = false,
@@ -238,7 +240,7 @@ export async function POST(req: Request) {
     max_tokens: 2048,
     temperature: 0.7,
     stream: true,
-    chat_template_kwargs: { enable_thinking: false },
+    chat_template_kwargs: { enable_thinking: Boolean(thinking) },
   };
   if (effectiveModel) payload.model = effectiveModel;
 

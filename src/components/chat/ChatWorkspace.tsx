@@ -11,7 +11,9 @@ import {
   GearSix,
   Brain,
   Ghost,
+  Globe,
   ImageSquare,
+  Lightning,
   Paperclip,
   MagnifyingGlass,
   Microphone,
@@ -29,6 +31,14 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
@@ -280,6 +290,10 @@ export function ChatWorkspace({
   // next turn only. Chips show in the composer.
   const [files, setFiles] = useState<{ name: string; text: string; chars: number }[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Tools menu toggles (per-session): extended thinking + org-knowledge ("search your org") search.
+  const [thinking, setThinking] = useState(false);
+  const [orgKnowledge, setOrgKnowledge] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -527,7 +541,14 @@ export function ChatWorkspace({
 
   // Shared SSE loop — updates the trailing assistant placeholder. Caller adds the placeholder.
   // eslint-disable-next-line complexity
-  async function streamAssistant(body: Record<string, unknown>) {
+  async function streamAssistant(rawBody: Record<string, unknown>) {
+    // Fold in the Tools-menu session toggles (thinking / org-knowledge search) unless the caller
+    // already set them (e.g. approval replays reuse lastSendBody verbatim).
+    const body: Record<string, unknown> = {
+      thinking,
+      orgKnowledge,
+      ...rawBody,
+    };
     setStreaming(true);
     setLastSendBody(body);
     const ac = new AbortController();
@@ -1025,34 +1046,61 @@ export function ChatWorkspace({
                 e.target.value = '';
               }}
             />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => attachImage(e.target.files)}
+            />
             <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
-              <button
-                onClick={() => docRef.current?.click()}
-                disabled={uploading}
-                className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                title="Attach file (txt, md, csv, pdf)"
-              >
-                <Paperclip className="size-5" />
-              </button>
-              {activeModel?.vision ? (
-                <>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    hidden
-                    onChange={(e) => attachImage(e.target.files)}
-                  />
+              {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
+              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                <DropdownMenuTrigger asChild>
                   <button
-                    onClick={() => fileRef.current?.click()}
-                    className="p-1.5 text-muted-foreground hover:text-foreground"
-                    title="Attach image"
+                    className={cn(
+                      'p-1.5 hover:text-foreground',
+                      thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
+                    )}
+                    title="Tools"
                   >
-                    <ImageSquare className="size-5" />
+                    <Plus className="size-5" />
                   </button>
-                </>
-              ) : null}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem
+                    onSelect={() => docRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <Paperclip className="mr-2 size-4" /> Attach file
+                  </DropdownMenuItem>
+                  {activeModel?.vision ? (
+                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                      <ImageSquare className="mr-2 size-4" /> Attach image
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={orgKnowledge}
+                    onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Globe className="mr-2 size-4" /> Search org knowledge
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={thinking}
+                    onCheckedChange={(v) => setThinking(Boolean(v))}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Lightning className="mr-2 size-4" /> Extended thinking
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
+                    <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 onClick={toggleRecording}
                 className={cn(
