@@ -29,6 +29,11 @@ interface Conversation {
   projectId: string | null;
   updatedAt: string;
 }
+interface MemoryRow {
+  id: string;
+  fact: string;
+  source: string;
+}
 
 // eslint-disable-next-line complexity
 export function ProjectDetail({ projectId }: { projectId: string }) {
@@ -42,8 +47,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [visibility, setVisibility] = useState('private');
   const [access, setAccess] = useState<string | null>(null);
+  const [memory, setMemory] = useState<MemoryRow[]>([]);
+  const [newFact, setNewFact] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const canManage = access === 'owner';
+  const canEdit = access === 'owner' || access === 'edit';
 
   // Knowledge capacity — approximate tokens from document bytes (~4 chars/token, desktop default).
   // Under the full-context threshold the whole corpus fits in the window; above it, chat falls back
@@ -57,6 +65,28 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
   }, [projectId]);
+
+  const loadMemory = useCallback(async () => {
+    const r = await fetch(`/api/v1/chat/projects/${projectId}/memory`);
+    if (r.ok) setMemory((await r.json()).memory ?? []);
+  }, [projectId]);
+
+  async function addFact() {
+    const f = newFact.trim();
+    if (!f) return;
+    setNewFact('');
+    await fetch(`/api/v1/chat/projects/${projectId}/memory`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ fact: f }),
+    });
+    await loadMemory();
+  }
+
+  async function removeFact(memId: string) {
+    await fetch(`/api/v1/chat/projects/${projectId}/memory?memId=${memId}`, { method: 'DELETE' });
+    await loadMemory();
+  }
 
   // eslint-disable-next-line complexity
   const load = useCallback(async () => {
@@ -81,8 +111,9 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       setChats(all.filter((c) => c.projectId === projectId));
     }
     await loadDocs();
+    await loadMemory();
     setLoaded(true);
-  }, [projectId, loadDocs]);
+  }, [projectId, loadDocs, loadMemory]);
 
   useEffect(() => {
     void load();
@@ -270,6 +301,53 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
                     onClick={() => removeDoc(d.id)}
                     className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
                   />
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Project memory ({memory.length})</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Facts remembered for this project and injected into its chats. Captured automatically or
+            added here.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {canEdit ? (
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={newFact}
+                placeholder="Add a fact the project should remember…"
+                onChange={(e) => setNewFact(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addFact()}
+              />
+              <Button size="sm" className="shrink-0" onClick={addFact}>
+                Add
+              </Button>
+            </div>
+          ) : null}
+          <div className="space-y-1 rounded-md border border-border p-1.5">
+            {memory.length === 0 ? (
+              <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+                No project memory yet.
+              </p>
+            ) : (
+              memory.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
+                >
+                  <span className="flex-1">{m.fact}</span>
+                  {canEdit ? (
+                    <Trash
+                      onClick={() => removeFact(m.id)}
+                      className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
+                    />
+                  ) : null}
                 </div>
               ))
             )}
