@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+type Health = 'up' | 'degraded' | 'down' | 'unknown';
 interface Stat {
   gateway: string;
   model: string;
@@ -20,7 +21,17 @@ interface Stat {
   errors: number;
   avgMs: number;
   tokens: number;
+  health?: Health;
 }
+
+// TRUE inference health: up = generating fine, degraded = jammed/slow/erroring (KV-cache
+// exhaustion still answers /health), down = unreachable. Green / amber / red.
+const HEALTH_META: Record<Health, { label: string; dot: string; text: string }> = {
+  up: { label: 'up', dot: 'bg-primary', text: 'text-primary' },
+  degraded: { label: 'degraded', dot: 'bg-amber-500', text: 'text-amber-600' },
+  down: { label: 'down', dot: 'bg-destructive', text: 'text-destructive' },
+  unknown: { label: 'unknown', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
+};
 interface Call {
   ts: number;
   gateway: string;
@@ -162,12 +173,18 @@ export function GatewayTraffic() {
           </span>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-          {stats.map((s) => (
+          {stats.map((s) => {
+            const h = HEALTH_META[s.health ?? 'unknown'];
+            return (
             <div key={s.gateway} className="rounded-md border border-border px-3 py-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-primary">{s.gateway}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">{s.model}</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                  <span className={`inline-block size-2 rounded-full ${h.dot}`} />
+                  {s.gateway}
+                </span>
+                <span className={`font-mono text-[10px] font-medium uppercase ${h.text}`}>{h.label}</span>
               </div>
+              <div className="mt-0.5 text-right font-mono text-[11px] text-muted-foreground">{s.model}</div>
               <dl className="mt-2 space-y-0.5 text-xs text-muted-foreground">
                 <div className="flex justify-between">
                   <dt>requests</dt>
@@ -187,7 +204,8 @@ export function GatewayTraffic() {
                 </div>
               </dl>
             </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
