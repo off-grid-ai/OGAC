@@ -3,7 +3,7 @@
 import { Play, X } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { Artifact } from '@/lib/artifacts';
+import { type Artifact, buildSrcDoc, isLiveKind } from '@/lib/artifacts';
 import { Markdown } from './Markdown';
 
 interface RunResult {
@@ -21,14 +21,14 @@ interface RunResult {
 // Run button that executes it in the console sandbox adapter and shows stdout/stderr inline.
 // eslint-disable-next-line complexity
 export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClose: () => void }) {
-  const live = artifact.kind === 'html' || artifact.kind === 'svg';
+  // Live kinds render in the sandboxed iframe: html/svg inline, react (Babel+UMD) and mermaid via
+  // CDN libs loaded inside the frame. The AI bridge (window.offgrid.complete) is enabled so
+  // generated apps can call the local model through the console proxy.
+  const live = isLiveKind(artifact.kind);
   const runnable = artifact.kind === 'code';
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
-  const srcDoc =
-    artifact.kind === 'svg'
-      ? `<!doctype html><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${artifact.code}`
-      : artifact.code;
+  const srcDoc = buildSrcDoc(artifact, { bridge: true });
 
   async function run() {
     setRunning(true);
