@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   chatArtifacts,
+  chatArtifactVersions,
   chatConversations,
   chatMemory,
   chatMessages,
@@ -67,6 +68,27 @@ export async function ensureChatSchema(): Promise<void> {
   `);
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS chat_artifacts_user_idx ON chat_artifacts (user_id, created_at);`,
+  );
+  // Wave 1 additive columns: versioning head pointer + publish/share + org scope.
+  await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS org_id text;`);
+  await db.execute(
+    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false;`,
+  );
+  await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published_at timestamptz;`);
+  await db.execute(
+    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS current_version integer NOT NULL DEFAULT 1;`,
+  );
+  await db.execute(
+    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`,
+  );
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_artifact_versions (
+      id text PRIMARY KEY, artifact_id text NOT NULL, version integer NOT NULL,
+      kind text NOT NULL, code text NOT NULL DEFAULT '', language text,
+      created_at timestamptz NOT NULL DEFAULT now());
+  `);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS chat_artifact_versions_idx ON chat_artifact_versions (artifact_id, version);`,
   );
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_prefs (
@@ -328,22 +350,66 @@ export async function listArtifacts(userId: string) {
     .select()
     .from(chatArtifacts)
     .where(eq(chatArtifacts.userId, userId))
-    .orderBy(desc(chatArtifacts.createdAt));
+    .orderBy(desc(chatArtifacts.updatedAt));
 }
 
+// Save-on-open. Versioned by (user, conversation, title): re-saving the same logical artifact
+// appends a new version and advances the head; identical code to the current head is a no-op so
+// simply opening the same artifact twice doesn't inflate history.
+// eslint-disable-next-line complexity
 export async function saveArtifact(
   userId: string,
-  a: { kind: string; code: string; language?: string | null; title?: string; conversationId?: string | null },
+  a: {
+    kind: string;
+    code: string;
+    language?: string | null;
+    title?: string;
+    conversationId?: string | null;
+    orgId?: string | null;
+  },
 ) {
   await ensureChatSchema();
   const code = String(a.code ?? '');
-  // De-dupe: if the same user already saved an identical (kind, code), return it instead of piling up.
-  const [dup] = await db
-    .select({ id: chatArtifacts.id })
+  const title = (a.title ?? 'Untitled artifact').slice(0, 200);
+  const [existing] = await db
+    .select()
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.userId, userId), eq(chatArtifacts.kind, a.kind), eq(chatArtifacts.code, code)))
+    .where(
+      and(
+        eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.title, title),
+        a.conversationId
+          ? eq(chatArtifacts.conversationId, a.conversationId)
+          : sql`${chatArtifacts.conversationId} IS NULL`,
+      ),
+    )
     .limit(1);
-  if (dup) return dup.id;
+
+  if (existing) {
+    // Identical head → no-op (opening an unchanged artifact again).
+    if (existing.code === code && existing.kind === a.kind) return existing.id;
+    const next = (existing.currentVersion ?? 1) + 1;
+    await db.insert(chatArtifactVersions).values({
+      id: rid(),
+      artifactId: existing.id,
+      version: next,
+      kind: a.kind,
+      code,
+      language: a.language ?? null,
+    });
+    await db
+      .update(chatArtifacts)
+      .set({
+        kind: a.kind,
+        code,
+        language: a.language ?? null,
+        currentVersion: next,
+        updatedAt: new Date(),
+      })
+      .where(eq(chatArtifacts.id, existing.id));
+    return existing.id;
+  }
+
   const id = rid();
   await db.insert(chatArtifacts).values({
     id,
@@ -351,15 +417,112 @@ export async function saveArtifact(
     kind: a.kind,
     code,
     language: a.language ?? null,
-    title: (a.title ?? 'Untitled artifact').slice(0, 200),
+    title,
     conversationId: a.conversationId ?? null,
+    orgId: a.orgId ?? null,
+    currentVersion: 1,
+  });
+  await db.insert(chatArtifactVersions).values({
+    id: rid(),
+    artifactId: id,
+    version: 1,
+    kind: a.kind,
+    code,
+    language: a.language ?? null,
   });
   return id;
 }
 
 export async function deleteArtifact(userId: string, id: string) {
   await ensureChatSchema();
-  await db.delete(chatArtifacts).where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)));
+  const [owned] = await db
+    .select({ id: chatArtifacts.id })
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .limit(1);
+  if (!owned) return;
+  await db.delete(chatArtifactVersions).where(eq(chatArtifactVersions.artifactId, id));
+  await db.delete(chatArtifacts).where(eq(chatArtifacts.id, id));
+}
+
+// Full version history for an owned artifact (newest first).
+export async function listArtifactVersions(userId: string, id: string) {
+  await ensureChatSchema();
+  const [owned] = await db
+    .select({ id: chatArtifacts.id })
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .limit(1);
+  if (!owned) return null;
+  return db
+    .select()
+    .from(chatArtifactVersions)
+    .where(eq(chatArtifactVersions.artifactId, id))
+    .orderBy(desc(chatArtifactVersions.version));
+}
+
+// Revert: copy an existing version's content forward as a new head version.
+export async function revertArtifact(userId: string, id: string, version: number) {
+  await ensureChatSchema();
+  const [art] = await db
+    .select()
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .limit(1);
+  if (!art) return null;
+  const [target] = await db
+    .select()
+    .from(chatArtifactVersions)
+    .where(and(eq(chatArtifactVersions.artifactId, id), eq(chatArtifactVersions.version, version)))
+    .limit(1);
+  if (!target) return null;
+  const next = (art.currentVersion ?? 1) + 1;
+  await db.insert(chatArtifactVersions).values({
+    id: rid(),
+    artifactId: id,
+    version: next,
+    kind: target.kind,
+    code: target.code,
+    language: target.language,
+  });
+  await db
+    .update(chatArtifacts)
+    .set({
+      kind: target.kind,
+      code: target.code,
+      language: target.language,
+      currentVersion: next,
+      updatedAt: new Date(),
+    })
+    .where(eq(chatArtifacts.id, id));
+  return next;
+}
+
+// Toggle publish state. Published artifacts render at the read-only /artifacts/[id]/view route.
+export async function setArtifactPublished(userId: string, id: string, published: boolean) {
+  await ensureChatSchema();
+  const [owned] = await db
+    .select({ id: chatArtifacts.id })
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .limit(1);
+  if (!owned) return false;
+  await db
+    .update(chatArtifacts)
+    .set({ published, publishedAt: published ? new Date() : null, updatedAt: new Date() })
+    .where(eq(chatArtifacts.id, id));
+  return true;
+}
+
+// Public read for the share/embed route: only returns published artifacts (no auth).
+export async function getPublishedArtifact(id: string) {
+  await ensureChatSchema();
+  const [a] = await db
+    .select()
+    .from(chatArtifacts)
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.published, true)))
+    .limit(1);
+  return a ?? null;
 }
 
 // ─── Per-user preferences (Settings modal capabilities/appearance) ────────────
