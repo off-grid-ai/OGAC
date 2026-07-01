@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-type Health = 'up' | 'degraded' | 'down' | 'unknown';
+export type Health = 'up' | 'degraded' | 'down' | 'unknown';
 interface Stat {
   gateway: string;
   model: string;
@@ -22,17 +22,20 @@ interface Stat {
   avgMs: number;
   tokens: number;
   health?: Health;
+  inflight?: number;
+  queued?: number;
+  peakInflight?: number;
 }
 
 // TRUE inference health: up = generating fine, degraded = jammed/slow/erroring (KV-cache
 // exhaustion still answers /health), down = unreachable. Green / amber / red.
-const HEALTH_META: Record<Health, { label: string; dot: string; text: string }> = {
+export const HEALTH_META: Record<Health, { label: string; dot: string; text: string }> = {
   up: { label: 'up', dot: 'bg-primary', text: 'text-primary' },
   degraded: { label: 'degraded', dot: 'bg-amber-500', text: 'text-amber-600' },
   down: { label: 'down', dot: 'bg-destructive', text: 'text-destructive' },
   unknown: { label: 'unknown', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
 };
-interface Call {
+export interface Call {
   ts: number;
   gateway: string;
   model: string;
@@ -44,8 +47,10 @@ interface Call {
   promptTokens?: number;
   completionTokens?: number;
   tps?: number;
+  ttfb?: number;
+  writeBlocked?: number;
   finish?: string;
-  bytes: number;
+  bytes?: number;
   caller?: string;
   corrId?: string;
   input?: string;
@@ -74,7 +79,7 @@ function Chip({ label, value }: { label: string; value: string | number }) {
 
 // The expanded detail for one gateway call: metadata + tool calls + prompt/completion + reasoning.
 // eslint-disable-next-line complexity
-function CallDetail({ c }: { c: Call }) {
+export function CallDetail({ c }: { c: Call }) {
   const p = c.params ?? {};
   return (
     <div className="space-y-2 py-1">
@@ -202,6 +207,22 @@ export function GatewayTraffic() {
                   <dt>tokens</dt>
                   <dd className="text-foreground">{s.tokens}</dd>
                 </div>
+                {s.inflight !== undefined ? (
+                  <>
+                    <div className="mt-1 flex justify-between border-t border-border pt-1">
+                      <dt>in-flight</dt>
+                      <dd className={s.inflight ? 'text-primary' : 'text-foreground'}>{s.inflight}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>queued</dt>
+                      <dd className={s.queued ? 'text-amber-600' : 'text-foreground'}>{s.queued ?? 0}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>peak</dt>
+                      <dd className="text-foreground">{s.peakInflight ?? 0}</dd>
+                    </div>
+                  </>
+                ) : null}
               </dl>
             </div>
             );
