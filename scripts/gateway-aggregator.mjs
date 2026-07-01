@@ -88,74 +88,12 @@ async function poolInfo() {
   };
 }
 
-const TRAFFIC_HTML = `<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Off Grid — Gateway Traffic</title>
-<style>
-  :root{--bg:#000;--fg:#e5e7eb;--dim:#6b7280;--acc:#34D399;--line:#1f2937;--err:#f87171}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 Menlo,ui-monospace,monospace;padding:20px}
-  h1{font-size:15px;font-weight:600;margin:0 0 2px;letter-spacing:.02em}
-  h1 .acc{color:var(--acc)}
-  .sub{color:var(--dim);font-size:11px;margin-bottom:18px}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:20px}
-  .card{border:1px solid var(--line);padding:12px 14px}
-  .card .g{color:var(--acc);font-weight:600}
-  .card .m{color:var(--dim);font-size:11px;margin-bottom:8px}
-  .card .row{display:flex;justify-content:space-between}
-  .card .row span:first-child{color:var(--dim)}
-  .card .err{color:var(--err)}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{text-align:left;color:var(--dim);font-weight:500;border-bottom:1px solid var(--line);padding:6px 8px;position:sticky;top:0;background:var(--bg)}
-  td{padding:5px 8px;border-bottom:1px solid #0d1117;white-space:nowrap}
-  .gw{color:var(--acc)}
-  .bad{color:var(--err)}
-  .wrap{overflow-x:auto;border:1px solid var(--line)}
-  .pill{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:2px;color:var(--dim);font-size:11px}
-  .live{color:var(--acc);font-size:11px}
-</style></head><body>
-<h1>Off Grid <span class="acc">// gateway traffic</span></h1>
-<div class="sub">every call the console makes flows through the :8800 aggregator · <span class="live">● live</span> <span id="since"></span></div>
-<div class="cards" id="cards"></div>
-<div class="wrap"><table>
-  <thead><tr><th>time</th><th>gateway</th><th>model</th><th>kind</th><th>status</th><th>latency</th><th>tokens</th><th>bytes</th></tr></thead>
-  <tbody id="rows"></tbody>
-</table></div>
-<script>
-const fmtT = (iso) => new Date(iso).toLocaleTimeString();
-async function tick(){
-  try{
-    const d = await (await fetch('/traffic')).json();
-    document.getElementById('since').textContent = 'since ' + fmtT(d.since);
-    document.getElementById('cards').innerHTML = d.stats.map(s => \`
-      <div class="card"><div class="g">\${s.gateway}</div><div class="m">\${s.model}</div>
-        <div class="row"><span>requests</span><span>\${s.requests}</span></div>
-        <div class="row"><span>errors</span><span class="\${s.errors?'err':''}">\${s.errors}</span></div>
-        <div class="row"><span>avg latency</span><span>\${s.avgMs} ms</span></div>
-        <div class="row"><span>tokens</span><span>\${s.tokens}</span></div>
-      </div>\`).join('');
-    document.getElementById('rows').innerHTML = d.recent.length ? d.recent.map(r => \`
-      <tr><td>\${fmtT(r.ts?new Date(r.ts).toISOString():d.since)}</td>
-        <td class="gw">\${r.gateway}</td><td>\${r.model||''}</td><td>\${r.kind}</td>
-        <td class="\${(!r.status||r.status>=400)?'bad':''}">\${r.status}</td>
-        <td>\${r.ms} ms</td><td>\${r.tokens||''}</td><td>\${r.bytes}</td></tr>\`).join('')
-      : '<tr><td colspan="8" style="color:var(--dim);padding:14px">no traffic yet — make a call through http://127.0.0.1:8800/v1</td></tr>';
-  }catch(e){ document.getElementById('since').textContent = '(aggregator unreachable)'; }
-}
-tick(); setInterval(tick, 2000);
-</script>
-</body></html>`;
-
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/health')
     return poolInfo().then((i) => json(res, 200, i)).catch(() => json(res, 200, { name: 'Off Grid AI — gateway aggregator', routes: POOL }));
   if (req.url === '/traffic' || req.url === '/traffic.json') {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     return res.end(JSON.stringify(trafficJSON()));
-  }
-  if (req.url === '/traffic/live' || req.url === '/live') {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    return res.end(TRAFFIC_HTML);
   }
   if (req.url === '/v1/models')
     return json(res, 200, { object: 'list', data: [
