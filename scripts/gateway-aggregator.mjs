@@ -15,11 +15,11 @@ const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
   { name: 'g1',  host: '192.168.1.57', port: 7878, vision: true,  model: 'qwythos-9b' },
   { name: 'g2',  host: '192.168.1.58', port: 7878, vision: true,  model: 'qwen3.5-9b' },
   { name: 'g3',  host: '192.168.1.32', port: 7878, vision: true,  model: 'gemma-4-e4b' },
-  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'gemma-4-e4b', enabled: false },
-  { name: 'g5',  host: '192.168.1.65', port: 7878, vision: true,  model: 'qwen3.5-9b', enabled: false },
-  { name: 'g6',  host: '192.168.1.66', port: 7878, vision: false, model: 'qwen3-coder' , enabled: false },
-  { name: 'g7',  host: '192.168.1.62', port: 7878, vision: false, model: 'qwen3-coder' , enabled: false },
-  { name: 'g8',  host: '192.168.1.64', port: 7878, vision: true,  model: 'qwythos-9b' , enabled: false },
+  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'gemma-4-e4b' },
+  { name: 'g5',  host: '192.168.1.65', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g6',  host: '192.168.1.66', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g7',  host: '192.168.1.62', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g8',  host: '192.168.1.64', port: 7878, vision: true,  model: 'qwythos-9b' },
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
@@ -164,8 +164,7 @@ function pick(model, image) {
     return rrPick(LIVE.filter((g) => g.vision)); // any vision node
   }
   if (m.includes('gemma'))   return rrPick(byModel('gemma'));
-  if (m.includes('coder') || (m.includes('qwen') && m.includes('coder'))) return rrPick(byModel('qwen3-coder'));
-  if (m.includes('qwen'))    return rrPick(byModel('qwen3.5'));
+if (m.includes('qwen'))    return rrPick(byModel('qwen3.5'));
   if (m.includes('qwythos')) return rrPick(byModel('qwythos'));
   return rrPick(LIVE); // unspecified: round-robin everything
 }

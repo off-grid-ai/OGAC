@@ -13,9 +13,7 @@ const NODES = JSON.parse(process.env.OFFGRID_NODES || JSON.stringify([
   { name: 'offgrid-g3', role: 'Gateway · gemma-4-e4b (vision)' },
   { name: 'offgrid-g4', role: 'Gateway · gemma-4-e4b (vision)' },
   { name: 'offgrid-g5', role: 'Gateway · qwen3.5-9b (vision)' },
-  { name: 'offgrid-g6', role: 'Gateway · qwen3-coder-30b' },
-  { name: 'offgrid-g7', role: 'Gateway · qwen3-coder-30b' },
-  { name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
+{ name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
 ]));
 
 const SSH = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'];
