@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type AgentRun, getAgentRun } from '@/lib/agentrun';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,7 +134,7 @@ export default async function RunTracePage({
 }: {
   params: Promise<{ id: string; runId: string }>;
 }) {
-  requireModule('agents');
+  await requireModuleForUser('agents');
   const { id, runId } = await params;
   const run = await getAgentRun(runId);
   if (!run) notFound();

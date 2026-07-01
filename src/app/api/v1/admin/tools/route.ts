@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { createTool, listTools } from '@/lib/store';
 
 const TYPES = ['http', 'mcp'];
@@ -8,11 +9,15 @@ function valid(b: Record<string, unknown> | null): boolean {
   return typeof b.name === 'string' && Boolean(b.name) && TYPES.includes(b.type as string);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ object: 'list', data: await listTools() });
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!valid(b)) {
     return NextResponse.json({ error: 'name and type (http|mcp) required' }, { status: 400 });

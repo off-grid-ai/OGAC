@@ -1,12 +1,15 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getAgentRuntime } from '@/lib/adapters/agentruntime';
+import { requireAdmin } from '@/lib/authz';
 
 // Agent-runtime status + durable-submission probe. GET reports the active runtime (sync default,
 // or Temporal when OFFGRID_ADAPTER_AGENTRUNTIME=temporal + a submission bridge is configured).
 // POST performs a best-effort durable submission dry-run; if the runtime can't accept it, the
 // response says so and the synchronous in-process path (runAgent) remains the real executor.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const rt = getAgentRuntime();
   return NextResponse.json({
     active: rt.meta.id,
@@ -17,6 +20,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as { agentId?: string; query?: string } | null;
   const rt = getAgentRuntime();
   const handle = await rt.submit({

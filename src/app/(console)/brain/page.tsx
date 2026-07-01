@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { listDatasets, listPrompts, listTools } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ const TOOL_TYPE: Record<string, string> = {
 };
 
 export default async function BrainPage() {
-  requireModule('brain');
+  await requireModuleForUser('brain');
   const [docs, cases, runs, datasets, tools, promptList] = await Promise.all([
     listDocuments(),
     listGoldenCases(),

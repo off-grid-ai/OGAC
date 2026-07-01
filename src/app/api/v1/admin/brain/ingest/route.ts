@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { ingestDatabase, ingestFile, ingestImage, ingestText } from '@/lib/ingest';
 
 // Ingest a source into the Brain. Body is discriminated by `kind`:
@@ -35,6 +36,8 @@ function dispatch(b: Body) {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Body | null;
   if (!b || typeof b.kind !== 'string') return bad('kind required');
   const result = await dispatch(b);
