@@ -6,11 +6,13 @@ import {
   CaretRight,
   Check,
   Copy,
+  FileText,
   FolderSimplePlus,
   GearSix,
   Brain,
   Ghost,
   ImageSquare,
+  Paperclip,
   MagnifyingGlass,
   Microphone,
   PaperPlaneRight,
@@ -274,6 +276,10 @@ export function ChatWorkspace({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  // Ad-hoc file attachments (txt/md/csv/pdf) extracted server-side; injected as context for the
+  // next turn only. Chips show in the composer.
+  const [files, setFiles] = useState<{ name: string; text: string; chars: number }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -286,6 +292,7 @@ export function ChatWorkspace({
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
 
   const activeModel = models.find((m) => m.id === model);
   const activeProject = projects.find((p) => p.id === activeProjectId);
@@ -440,6 +447,28 @@ export function ChatWorkspace({
     }
   }
 
+  // Attach text/markdown/csv/pdf: extract text server-side, keep it client-side as a chip until the
+  // next send injects it as context.
+  async function attachFiles(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(fileList)) {
+        const fd = new FormData();
+        fd.append('file', f);
+        const r = await fetch('/api/v1/chat/attach', { method: 'POST', body: fd });
+        if (!r.ok) {
+          toast.error((await r.json().catch(() => ({})))?.error ?? `Could not read ${f.name}`);
+          continue;
+        }
+        const { name, text, chars } = await r.json();
+        setFiles((prev) => [...prev, { name, text, chars }]);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function stop() {
     abortRef.current?.abort();
     setStreaming(false);
@@ -561,18 +590,27 @@ export function ChatWorkspace({
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    const sentFiles = files.map((f) => ({ name: f.name, text: f.text }));
     // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
     if (temporary) {
       const sentImages = images;
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
       setInput('');
       setImages([]);
+      setFiles([]);
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: text, images: sentImages.length ? sentImages : null },
         { role: 'assistant', content: '', reasoning: '' },
       ]);
-      await streamAssistant({ temporary: true, history, content: text, model, images: sentImages });
+      await streamAssistant({
+        temporary: true,
+        history,
+        content: text,
+        model,
+        images: sentImages,
+        attachments: sentFiles,
+      });
       return;
     }
     let convId = activeId;
@@ -589,12 +627,19 @@ export function ChatWorkspace({
     const sentImages = images;
     setInput('');
     setImages([]);
+    setFiles([]);
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: text, images: sentImages.length ? sentImages : null },
       { role: 'assistant', content: '', reasoning: '' },
     ]);
-    await streamAssistant({ conversationId: convId, content: text, model, images: sentImages });
+    await streamAssistant({
+      conversationId: convId,
+      content: text,
+      model,
+      images: sentImages,
+      attachments: sentFiles,
+    });
   }
 
   // Send a conversation starter immediately (clears the starter chips).
@@ -947,7 +992,48 @@ export function ChatWorkspace({
                 ))}
               </div>
             ) : null}
+            {files.length ? (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {files.map((f, k) => (
+                  <div
+                    key={k}
+                    className="flex items-center gap-1.5 rounded border border-border bg-muted px-2 py-1 text-xs"
+                  >
+                    <FileText className="size-3.5 text-muted-foreground" />
+                    <span className="max-w-[160px] truncate">{f.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {(f.chars / 1000).toFixed(1)}k
+                    </span>
+                    <button
+                      onClick={() => setFiles((p) => p.filter((_, j) => j !== k))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <input
+              ref={docRef}
+              type="file"
+              accept=".txt,.md,.markdown,.csv,.tsv,.log,.json,.pdf,text/plain,text/markdown,text/csv,application/pdf"
+              multiple
+              hidden
+              onChange={(e) => {
+                void attachFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
             <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
+              <button
+                onClick={() => docRef.current?.click()}
+                disabled={uploading}
+                className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                title="Attach file (txt, md, csv, pdf)"
+              >
+                <Paperclip className="size-5" />
+              </button>
               {activeModel?.vision ? (
                 <>
                   <input
