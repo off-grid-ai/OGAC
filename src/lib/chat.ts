@@ -1,6 +1,12 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatConversations, chatMessages, chatProjects, chatSettings } from '@/db/schema';
+import {
+  chatConversations,
+  chatMessages,
+  chatProjects,
+  chatSettings,
+  chatSkills,
+} from '@/db/schema';
 
 // Chat workspace server logic — ports Off Grid AI Desktop's project/thread/message store to the
 // console, backed by the on-prem gateway for inference. Tables are created idempotently on first
@@ -35,7 +41,61 @@ export async function ensureChatSchema(): Promise<void> {
       user_id text PRIMARY KEY, custom_instructions text NOT NULL DEFAULT '',
       updated_at timestamptz NOT NULL DEFAULT now());
   `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_skills (
+      id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
+      system_prompt text NOT NULL DEFAULT '', model text NOT NULL DEFAULT '', project_id text,
+      allowed_roles jsonb NOT NULL DEFAULT '[]', icon text, enabled boolean NOT NULL DEFAULT true,
+      created_by text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
+  `);
+  // conversations can be bound to a skill (added post-hoc for existing tables)
+  await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
   ensured = true;
+}
+
+// ─── Org skills (RBAC-scoped reusable assistants) ─────────────────────────────
+// Visible to a user if the skill is enabled AND (no allowedRoles restriction OR the user's role
+// is listed). Admins see all.
+export async function listSkills(role: string): Promise<(typeof chatSkills.$inferSelect)[]> {
+  await ensureChatSchema();
+  const all = await db.select().from(chatSkills).orderBy(desc(chatSkills.createdAt));
+  if (role === 'admin') return all;
+  return all.filter(
+    (s) => s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role)),
+  );
+}
+
+export async function getSkill(id: string) {
+  await ensureChatSchema();
+  const [s] = await db.select().from(chatSkills).where(eq(chatSkills.id, id));
+  return s ?? null;
+}
+
+export async function createSkill(createdBy: string, s: Partial<typeof chatSkills.$inferInsert>) {
+  await ensureChatSchema();
+  const id = rid();
+  await db.insert(chatSkills).values({
+    id,
+    name: (s.name ?? 'New skill').slice(0, 120),
+    description: s.description ?? '',
+    systemPrompt: s.systemPrompt ?? '',
+    model: s.model ?? '',
+    projectId: s.projectId ?? null,
+    allowedRoles: s.allowedRoles ?? [],
+    icon: s.icon ?? null,
+    createdBy,
+  });
+  return id;
+}
+
+export async function updateSkill(id: string, patch: Partial<typeof chatSkills.$inferInsert>) {
+  await ensureChatSchema();
+  await db.update(chatSkills).set(patch).where(eq(chatSkills.id, id));
+}
+
+export async function deleteSkill(id: string) {
+  await ensureChatSchema();
+  await db.delete(chatSkills).where(eq(chatSkills.id, id));
 }
 
 export async function getCustomInstructions(userId: string): Promise<string> {
@@ -80,10 +140,16 @@ export async function listConversations(userId: string) {
     .orderBy(desc(chatConversations.updatedAt));
 }
 
-export async function createConversation(userId: string, projectId?: string | null) {
+export async function createConversation(
+  userId: string,
+  projectId?: string | null,
+  skillId?: string | null,
+) {
   await ensureChatSchema();
   const id = rid();
-  await db.insert(chatConversations).values({ id, userId, projectId: projectId ?? null });
+  await db
+    .insert(chatConversations)
+    .values({ id, userId, projectId: projectId ?? null, skillId: skillId ?? null });
   return id;
 }
 
