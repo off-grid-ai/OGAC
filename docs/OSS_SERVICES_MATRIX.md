@@ -139,6 +139,51 @@ Postgres-backed** — Temporal is not authoritative yet. **🔴 scaffold only.**
 
 ---
 
+---
+
+## Full container inventory (why OrbStack shows ~25+)
+
+The 14 rows above are *logical* services. Several spin up multiple containers (their own DB, worker,
+cache, UI), which is why OrbStack shows far more. Here's every container the compose defines:
+
+| Logical service | Containers it runs | On fleet? |
+|---|---|---|
+| Postgres | `postgres` | ✅ S1 |
+| Keycloak | `keycloak` | ✅ S1 |
+| OPA | `opa` | ✅ S1 |
+| OpenBao | `openbao` | ✅ S1 |
+| Qdrant | `qdrant` | ✅ S1 |
+| OpenSearch | `opensearch`, `opensearch-dashboards` | ✅ S1 (2) |
+| Marquez | `marquez`, `marquez-db`, `marquez-web` | ✅ S1 (3) |
+| Temporal | `temporal`, `temporal-db`, `temporal-ui` | ✅ S1 (3) |
+| Langfuse | `langfuse`, `langfuse-worker`, `langfuse-db`, `langfuse-clickhouse`, `langfuse-minio`, `langfuse-redis` | ✅ S2 (6) |
+| Superset | `superset` | ✅ S2 |
+| FleetDM | `fleet`, `fleet-mysql`, `fleet-redis` | ✅ S2 (3) |
+| Presidio | `presidio-analyzer`, `presidio-anonymizer` | ✅ S2 (2) |
+| Unleash | `unleash`, `unleash-db` | ✅ S2 (2) |
+| Redis (cache) | `redis` | ✅ S2 |
+| Caddy edge | `caddy` (run **native**, not a container) | ✅ S1 |
+
+That's **~29 containers** across the two service nodes → the "25-ish" you saw in OrbStack.
+
+## Defined in compose but NOT deployed on the fleet (opt-in profiles)
+
+These are in `deploy/docker-compose.yml` but intentionally off (not needed for the current console
+feature set, or superseded). Enable by adding their profile and a service node:
+
+| Service | Purpose | Why off / how to enable | Console use |
+|---|---|---|---|
+| **SeaweedFS** | S3-compatible object store for docs/artifacts | Artifacts + KB use Postgres/MinIO today; enable `--profile data` if you need blob storage | ⚪ none |
+| **VictoriaMetrics** | Metrics time-series store | Metrics come from the native `:9100` dashboard; enable `--profile observability` for real TSDB | ⚪ none |
+| **VictoriaLogs** | Log store (full-text) | OpenSearch covers log search; redundant for now | ⚪ none |
+| **OTel Collector** | OTLP fan-out (metrics/logs/traces) | Console pushes traces straight to Langfuse's OTLP endpoint; collector unneeded | ⚪ none |
+| **Jaeger** | Distributed-trace UI | Langfuse is the trace UI; Jaeger is the generic alternative | ⚪ none |
+| **Evidently** | Drift-detection sidecar | Console uses native PSI drift; enable `--profile qa` to swap | ⚪ built-in default used |
+| **Ragas** | RAG-eval sidecar | Console uses golden-set evals; enable `--profile qa` to swap | ⚪ built-in default used |
+
+So: **14 logical services (~29 containers) running**, **7 more defined-but-off**. Total surface in
+the compose ≈ 36 service definitions.
+
 ## The honest bottom line
 - **Governance + observability + knowledge are genuinely wired both ways** now: OPA, Presidio,
   Redis, Unleash run in-path; OpenSearch/Langfuse/Marquez both write *and* read back into console
