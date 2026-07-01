@@ -96,11 +96,13 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify(trafficJSON()));
   }
   if (req.url === '/v1/models')
-    return json(res, 200, { object: 'list', data: [
-      { id: 'gemma-4-12b', object: 'model', owned_by: 'offgrid', capabilities: ['text'], gateways: POOL.filter((g) => g.model === 'gemma-4-12b').map((g) => g.name) },
-      { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'qwen3.5-9b').map((g) => g.name) },
-      { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'gemma-4-e4b').map((g) => g.name) },
-    ] });
+    return json(res, 200, {
+      object: 'list', data: [
+        { id: 'gemma-4-12b', object: 'model', owned_by: 'offgrid', capabilities: ['text'], gateways: POOL.filter((g) => g.model === 'gemma-4-12b').map((g) => g.name) },
+        { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'qwen3.5-9b').map((g) => g.name) },
+        { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'gemma-4-e4b').map((g) => g.name) },
+      ]
+    });
 
   const chunks = [];
   req.on('data', (c) => chunks.push(c));
@@ -112,8 +114,39 @@ const server = http.createServer((req, res) => {
     const kind = image ? 'image' : 'text';
     const started = Date.now();
     const streaming = body.stream === true;
-    const opts = { host: target.host, port: target.port, method: req.method, path: req.url,
-      headers: { ...req.headers, host: `${target.host}:${target.port}` } };
+    // Gemma 4 (and others) reject system messages not at position 0 — clients
+    // like Claude Code intersperse them mid-conversation. Consolidate to front.
+    // Handle both string content and multipart array content [{type:"text",text:"..."}].
+    let forwarded = raw;
+    if (Array.isArray(body.messages)) {
+      const sysTexts = []; const rest = [];
+      let needsFix = false;
+      let seenNonSystem = false;
+      for (const m of body.messages) {
+        if (m.role === 'system') {
+          if (seenNonSystem) needsFix = true; // system after non-system = bad
+          let text = '';
+          if (typeof m.content === 'string') text = m.content;
+          else if (Array.isArray(m.content)) text = m.content.filter(p => p && p.type === 'text' && p.text).map(p => p.text).join('\n');
+          if (text.trim()) sysTexts.push(text.trim());
+        } else {
+          seenNonSystem = true;
+          rest.push(m);
+        }
+      }
+      if (needsFix && sysTexts.length > 0) {
+        body.messages = [{ role: 'system', content: sysTexts.join('\n\n') }, ...rest];
+        forwarded = Buffer.from(JSON.stringify(body));
+      } else if (needsFix) {
+        // System messages exist mid-conversation but have no extractable text — just remove them
+        body.messages = rest;
+        forwarded = Buffer.from(JSON.stringify(body));
+      }
+    }
+    const opts = {
+      host: target.host, port: target.port, method: req.method, path: req.url,
+      headers: { ...req.headers, host: `${target.host}:${target.port}`, 'content-length': forwarded.length }
+    };
     const up = http.request(opts, (ur) => {
       res.writeHead(ur.statusCode || 502, { ...ur.headers, 'x-offgrid-gateway': target.name, 'x-offgrid-model': target.model });
       let bytes = 0; const buf = [];
@@ -130,7 +163,7 @@ const server = http.createServer((req, res) => {
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
     up.setTimeout(120000, () => up.destroy(new Error('upstream timeout')));
-    up.end(raw);
+    up.end(forwarded);
   });
 });
 server.listen(PORT, '0.0.0.0', () => console.log(`[aggregator] routing on 0.0.0.0:${PORT} across`, POOL.map((g) => `${g.name}:${g.model}${g.vision ? '+vision' : ''}`).join(', ')));
