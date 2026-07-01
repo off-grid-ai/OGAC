@@ -1,6 +1,7 @@
 import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { orgKnowledgeChunks, orgKnowledgeCollections, orgKnowledgeDocs } from '@/db/schema';
+import { effectiveBaseRole } from '@/lib/module-access';
 
 // Organization-wide knowledge base — the on-prem answer to "Ask Your Org" / "Company Knowledge".
 // An admin-curated shared corpus, indexed once via the gateway's /v1/embeddings (384-dim MiniLM),
@@ -85,22 +86,31 @@ function cosine(a: number[], b: number[]): number {
 const rid = () => crypto.randomUUID();
 
 // A role may retrieve from a collection when it is unrestricted (no allowedRoles) or explicitly
-// listed. Admins see everything, matching the console's other RBAC-scoped resources.
-function roleMayAccess(role: string, allowedRoles: string[] | null | undefined): boolean {
-  if (role === 'admin') return true;
-  return !allowedRoles?.length || allowedRoles.includes(role);
+// listed for any of its identities (its own name or, for a custom role, its inherited base role).
+// Admins see everything, matching the console's other RBAC-scoped resources.
+function roleMayAccess(identities: string[], allowedRoles: string[] | null | undefined): boolean {
+  if (identities.includes('admin')) return true;
+  return !allowedRoles?.length || allowedRoles.some((r) => identities.includes(r));
 }
 
 export type OrgCollection = typeof orgKnowledgeCollections.$inferSelect;
 
+// The identities a role is granted under: its own name plus, for a custom role, its based_on role.
+async function roleIdentities(role: string): Promise<string[]> {
+  const base = await effectiveBaseRole(role);
+  return Array.from(new Set([role, base]));
+}
+
 // List collections visible to a role. Admins see all; others see only permitted collections.
+// Custom roles inherit their based_on role's allow-list grants.
 export async function listCollections(role: string): Promise<OrgCollection[]> {
   await ensureSchema();
+  const identities = await roleIdentities(role);
   const rows = await db
     .select()
     .from(orgKnowledgeCollections)
     .orderBy(desc(orgKnowledgeCollections.createdAt));
-  return rows.filter((c) => roleMayAccess(role, c.allowedRoles));
+  return rows.filter((c) => roleMayAccess(identities, c.allowedRoles));
 }
 
 // Admin-only: create a curated collection with an optional role allow-list.

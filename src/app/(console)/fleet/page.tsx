@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getMdm } from '@/lib/adapters/registry';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { getOrgPolicy, listAudit, listDevices } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,7 @@ interface Stat {
 }
 
 export default async function FleetPage() {
-  requireModule('fleet');
+  await requireModuleForUser('fleet');
   const [devices, policy, audit] = await Promise.all([
     listDevices(),
     getOrgPolicy(),

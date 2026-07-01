@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default async function AgentRunsPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('agents');
+  await requireModuleForUser('agents');
   const { id } = await params;
   const agent = await resolveAgent(id);
   if (!agent) notFound();

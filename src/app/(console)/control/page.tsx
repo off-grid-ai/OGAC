@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { siemConfigured } from '@/lib/siem';
 import {
   getOrgPolicy,
@@ -44,7 +44,7 @@ const CHECK_VARIANT: Record<string, string> = {
 };
 
 export default async function ControlPage() {
-  requireModule('control');
+  await requireModuleForUser('control');
   const [policy, history, users, events, routes] = await Promise.all([
     getOrgPolicy(),
     listPolicyHistory(),
