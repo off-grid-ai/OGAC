@@ -1,0 +1,205 @@
+# Off Grid on-prem OSS services — NODE B (offgrid-g5 / 192.168.1.65).
+# Self-contained group: LLM tracing (Langfuse) + BI (Superset) + MDM (FleetDM) + PII (Presidio)
+# + feature flags (Unleash) + response cache (Redis). Each service and its DB co-located; the
+# console (native on S1) reaches these via 192.168.1.65:<published port>.
+#
+#   deploy:  docker compose -f services-node-b.yml up -d
+#   one-time after up:  docker compose -f services-node-b.yml exec superset superset init
+name: offgrid-services-b
+
+services:
+  # ── LLM tracing / observability (Langfuse v3 — web + worker + clickhouse + minio + redis + pg) ──
+  langfuse-db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes: [langfusedb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U langfuse']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+      - clickhouselogs:/var/log/clickhouse-server
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    restart: unless-stopped
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes: [langfuseminio:/data]
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--maxmemory-policy', 'noeviction']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.30.0
+    restart: on-failure
+    depends_on:
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-minio: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      SALT: offgrid-dev-salt
+      ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      TELEMETRY_ENABLED: 'false'
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: '6379'
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  langfuse:
+    image: langfuse/langfuse:3.30.0
+    restart: on-failure
+    depends_on:
+      langfuse-worker: { condition: service_started }
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-minio: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: http://192.168.1.65:3030
+      NEXTAUTH_SECRET: offgrid-dev-secret
+      LANGFUSE_INIT_ORG_ID: offgrid
+      LANGFUSE_INIT_PROJECT_ID: console
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-offgrid-console
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-offgrid-console
+      LANGFUSE_INIT_USER_EMAIL: dev@offgrid.local
+      LANGFUSE_INIT_USER_PASSWORD: offgrid-dev-pw
+      LANGFUSE_INIT_USER_NAME: Off Grid Dev
+    ports: ['3030:3000']
+
+  # ── PII detection / redaction ──
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:2.2.356
+    restart: unless-stopped
+    ports: ['5002:3000']
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:2.2.356
+    restart: unless-stopped
+    ports: ['5001:3000']
+
+  # ── feature flags ──
+  unleash-db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: unleash
+      POSTGRES_PASSWORD: unleash
+      POSTGRES_DB: unleash
+    volumes: [unleashdb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U unleash']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  unleash:
+    image: unleashorg/unleash-server:6.6
+    restart: on-failure
+    depends_on:
+      unleash-db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://unleash:unleash@unleash-db:5432/unleash
+      DATABASE_SSL: 'false'
+    ports: ['4242:4242']
+
+  # ── response cache ──
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['6379:6379']
+
+  # ── BI / data exploration ──
+  superset:
+    image: apache/superset:4.1.1
+    restart: unless-stopped
+    environment:
+      SUPERSET_SECRET_KEY: offgrid-dev-superset-secret
+    ports: ['8088:8088']
+    volumes: [superset:/app/superset_home]
+
+  # ── MDM / device management (osquery-based) ──
+  fleet-mysql:
+    image: mysql:8.0.40
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: fleet
+      MYSQL_DATABASE: fleet
+      MYSQL_USER: fleet
+      MYSQL_PASSWORD: fleet
+    volumes: [fleetmysql:/var/lib/mysql]
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-ufleet', '-pfleet']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  fleet-redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+  fleet:
+    image: fleetdm/fleet:v4.87.0
+    restart: on-failure
+    depends_on:
+      fleet-mysql: { condition: service_healthy }
+    command: sh -c "fleet prepare db --no-prompt && fleet serve"
+    environment:
+      FLEET_MYSQL_ADDRESS: fleet-mysql:3306
+      FLEET_MYSQL_DATABASE: fleet
+      FLEET_MYSQL_USERNAME: fleet
+      FLEET_MYSQL_PASSWORD: fleet
+      FLEET_REDIS_ADDRESS: fleet-redis:6379
+      FLEET_SERVER_ADDRESS: 0.0.0.0:8070
+      FLEET_SERVER_TLS: 'false'
+      FLEET_LOGGING_JSON: 'true'
+    ports: ['8070:8070']
+
+volumes:
+  langfusedb:
+  clickhouse:
+  clickhouselogs:
+  langfuseminio:
+  unleashdb:
+  superset:
+  fleetmysql:
