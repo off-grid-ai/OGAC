@@ -87,7 +87,7 @@ export function SkillsDialog({
   role: string;
   projects: ProjectLite[];
   models: ModelLite[];
-  onPick: (skillId: string) => void;
+  onPick: (skillId: string, starters: string[]) => void;
   userEmail?: string;
 }) {
   const isAdmin = role === 'admin';
@@ -354,7 +354,7 @@ export function SkillsDialog({
                   <button
                     className="min-w-0 flex-1 text-left"
                     onClick={() => {
-                      onPick(s.id);
+                      onPick(s.id, s.conversationStarters);
                       onOpenChange(false);
                     }}
                   >
