@@ -38,6 +38,38 @@ function NodeCard({ node, onDone }: { node: Node; onDone: () => Promise<void> })
   const [selected, setSelected] = useState(activeText);
   const [pullId, setPullId] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [cfg, setCfg] = useState<Record<string, unknown> | null>(null);
+  const [cfgSupported, setCfgSupported] = useState<boolean | null>(null);
+
+  // Configure = read/write the node's runtime LLM settings via the gateway
+  // (POST action:'settings'). getSettings returns { supported, settings }.
+  const callSettings = async (settings?: Record<string, unknown>) => {
+    const r = await fetch(`/api/v1/gateway/nodes/${encodeURIComponent(node.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings ? { action: 'settings', settings } : { action: 'settings' }),
+    });
+    return r.json().catch(() => ({}));
+  };
+  const openConfig = async () => {
+    const next = !cfgOpen;
+    setCfgOpen(next);
+    if (!next || cfg || cfgSupported === false) return;
+    const d = await callSettings();
+    setCfgSupported(!!d?.supported);
+    setCfg((d?.settings ?? null) as Record<string, unknown> | null);
+  };
+  const saveConfig = async (patch: Record<string, unknown>) => {
+    setPending('settings');
+    try {
+      const d = await callSettings(patch);
+      if (d?.data?.settings) setCfg(d.data.settings);
+      await onDone();
+    } finally {
+      setPending(null);
+    }
+  };
 
   const post = async (key: string, body: { action: Action; id?: string; kind?: string }) => {
     setPending(key);
@@ -148,6 +180,85 @@ function NodeCard({ node, onDone }: { node: Node; onDone: () => Promise<void> })
           ))}
         </div>
       ) : null}
+
+      <div className="mt-2 border-t border-border pt-2">
+        <button
+          type="button"
+          onClick={openConfig}
+          className="text-[11px] text-muted-foreground hover:text-primary"
+        >
+          {cfgOpen ? '▾' : '▸'} Configure
+        </button>
+        {cfgOpen ? (
+          cfgSupported === false ? (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Configure unavailable — this node needs a Desktop update (no /v1/settings yet).
+            </p>
+          ) : cfg ? (
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[11px]">
+              <label className="flex items-center justify-between gap-1 text-muted-foreground">
+                mode
+                <select
+                  className={selectCls + ' h-7 w-24'}
+                  value={String(cfg.performanceMode ?? 'balanced')}
+                  onChange={(e) => setCfg({ ...cfg, performanceMode: e.target.value })}
+                >
+                  <option value="conservative">conservative</option>
+                  <option value="balanced">balanced</option>
+                  <option value="extreme">extreme</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-1 text-muted-foreground">
+                ctx
+                <Input
+                  type="number"
+                  className="h-7 w-24 font-mono text-[11px]"
+                  value={String(cfg.ctxSize ?? '')}
+                  onChange={(e) => setCfg({ ...cfg, ctxSize: Number(e.target.value) })}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-1 text-muted-foreground">
+                gpu layers
+                <Input
+                  type="number"
+                  className="h-7 w-24 font-mono text-[11px]"
+                  value={String(cfg.gpuLayers ?? '')}
+                  onChange={(e) => setCfg({ ...cfg, gpuLayers: Number(e.target.value) })}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-1 text-muted-foreground">
+                temp
+                <Input
+                  type="number"
+                  step="0.1"
+                  className="h-7 w-24 font-mono text-[11px]"
+                  value={String(cfg.temperature ?? '')}
+                  onChange={(e) => setCfg({ ...cfg, temperature: Number(e.target.value) })}
+                />
+              </label>
+              <div className="col-span-2 flex justify-end">
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={pending === 'settings'}
+                  onClick={() =>
+                    saveConfig({
+                      performanceMode: cfg.performanceMode,
+                      ctxSize: cfg.ctxSize,
+                      gpuLayers: cfg.gpuLayers,
+                      temperature: cfg.temperature,
+                    })
+                  }
+                >
+                  {pending === 'settings' ? 'saving… (respawns)' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-[10px] text-muted-foreground">loading…</p>
+          )
+        ) : null}
+      </div>
     </div>
   );
 }
