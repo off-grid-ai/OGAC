@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { deleteConversation, getConversation, listMessages, renameConversation } from '@/lib/chat';
+import {
+  deleteConversation,
+  getConversation,
+  listMessages,
+  renameConversation,
+  switchBranch,
+} from '@/lib/chat';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +25,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
-  const { title } = await req.json().catch(() => ({}));
+  // Ownership check (both actions mutate a conversation the caller must own).
+  if (!(await getConversation(userId, id))) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
+  const { title, branchMessageId, branchDelta } = await req.json().catch(() => ({}));
+  // Branch navigation ‹ 2/3 ›: move among sibling versions of an edited/regenerated turn.
+  if (typeof branchMessageId === 'string' && typeof branchDelta === 'number') {
+    const ok = await switchBranch(id, branchMessageId, branchDelta);
+    return NextResponse.json({ ok, messages: await listMessages(id) });
+  }
   if (typeof title === 'string') await renameConversation(userId, id, title);
   return NextResponse.json({ ok: true });
 }
