@@ -1,9 +1,12 @@
 'use client';
 
 import {
+  FolderSimplePlus,
+  GearSix,
   ImageSquare,
   PaperPlaneRight,
   Plus,
+  Quotes,
   Sparkle,
   Stop,
   Trash,
@@ -16,12 +19,19 @@ import { type Artifact, parseArtifact } from '@/lib/artifacts';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
+import { type Project, ProjectDialog } from './ProjectDialog';
 
 interface Conversation {
   id: string;
   title: string;
   model: string;
+  projectId: string | null;
   updatedAt: string;
+}
+interface Citation {
+  name: string;
+  position: number;
+  score: number;
 }
 interface Message {
   id?: string;
@@ -29,6 +39,7 @@ interface Message {
   content: string;
   reasoning?: string | null;
   images?: string[] | null;
+  citations?: Citation[] | null;
 }
 interface ModelInfo {
   id: string;
@@ -48,6 +59,7 @@ function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifa
   );
 }
 
+// eslint-disable-next-line complexity
 function MessageBubble({
   message: m,
   onOpenArtifact,
@@ -82,6 +94,20 @@ function MessageBubble({
             <>
               <Markdown>{m.content}</Markdown>
               <ArtifactChip content={m.content} onOpen={onOpenArtifact} />
+              {m.citations?.length ? (
+                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border pt-2">
+                  {m.citations.map((c, k) => (
+                    <span
+                      key={k}
+                      className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                      title={`relevance ${(c.score * 100).toFixed(0)}%`}
+                    >
+                      <Quotes className="size-3" />
+                      {c.name} · part {c.position + 1}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <span className="inline-block h-4 w-2 animate-pulse bg-primary" />
@@ -97,6 +123,8 @@ function MessageBubble({
 // eslint-disable-next-line complexity
 export function ChatWorkspace() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -105,19 +133,28 @@ export function ChatWorkspace() {
   const [model, setModel] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
+  const [dialogProject, setDialogProject] = useState<Project | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const activeModel = models.find((m) => m.id === model);
+  const visibleConversations = conversations.filter((c) =>
+    activeProjectId ? c.projectId === activeProjectId : !c.projectId,
+  );
 
   const refreshConversations = useCallback(async () => {
     const r = await fetch('/api/v1/chat/conversations');
     if (r.ok) setConversations((await r.json()).conversations ?? []);
   }, []);
+  const refreshProjects = useCallback(async () => {
+    const r = await fetch('/api/v1/chat/projects');
+    if (r.ok) setProjects((await r.json()).projects ?? []);
+  }, []);
 
   useEffect(() => {
     void refreshConversations();
+    void refreshProjects();
     void (async () => {
       const r = await fetch('/api/v1/chat/models');
       if (r.ok) {
@@ -126,7 +163,7 @@ export function ChatWorkspace() {
         if (list[0]) setModel(list[0].id);
       }
     })();
-  }, [refreshConversations]);
+  }, [refreshConversations, refreshProjects]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -140,12 +177,31 @@ export function ChatWorkspace() {
   }
 
   async function newChat() {
-    const r = await fetch('/api/v1/chat/conversations', { method: 'POST' });
+    const r = await fetch('/api/v1/chat/conversations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ projectId: activeProjectId }),
+    });
     if (!r.ok) return;
     const { id } = await r.json();
     setMessages([]);
     setActiveId(id);
     await refreshConversations();
+  }
+
+  async function newProject() {
+    const name = window.prompt('Project name');
+    if (!name) return;
+    const r = await fetch('/api/v1/chat/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) return;
+    const { id } = await r.json();
+    await refreshProjects();
+    setActiveProjectId(id);
+    setDialogProject({ id, name, systemPrompt: '' });
   }
 
   async function removeConversation(id: string, e: React.MouseEvent) {
@@ -181,7 +237,11 @@ export function ChatWorkspace() {
     if (!text || streaming) return;
     let convId = activeId;
     if (!convId) {
-      const r = await fetch('/api/v1/chat/conversations', { method: 'POST' });
+      const r = await fetch('/api/v1/chat/conversations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId: activeProjectId }),
+      });
       if (!r.ok) return;
       convId = (await r.json()).id;
       setActiveId(convId);
@@ -225,6 +285,7 @@ export function ChatWorkspace() {
             if (last?.role === 'assistant') {
               if (evt.content) last.content += evt.content;
               if (evt.reasoning) last.reasoning = (last.reasoning ?? '') + evt.reasoning;
+              if (evt.citations) last.citations = evt.citations;
             }
             return next;
           });
@@ -239,17 +300,64 @@ export function ChatWorkspace() {
     }
   }
 
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+
   return (
     <div className="-m-6 flex h-full">
-      {/* Conversation rail */}
+      {/* Rail: projects + conversations */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
-        <div className="p-2">
+        <div className="space-y-2 p-2">
           <Button onClick={newChat} className="w-full justify-start gap-2" size="sm">
             <Plus className="size-4" /> New chat
           </Button>
+          <div className="flex items-center justify-between px-1 pt-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Projects
+            </span>
+            <FolderSimplePlus
+              onClick={newProject}
+              className="size-4 cursor-pointer text-muted-foreground hover:text-foreground"
+            />
+          </div>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => setActiveProjectId(null)}
+              className={cn(
+                'w-full rounded-md px-2.5 py-1.5 text-left text-sm',
+                !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted',
+              )}
+            >
+              All chats
+            </button>
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setActiveProjectId(p.id)}
+                className={cn(
+                  'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm',
+                  activeProjectId === p.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <span className="flex-1 truncate">{p.name}</span>
+                <GearSix
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDialogProject(p);
+                  }}
+                  className="size-3.5 shrink-0 opacity-0 hover:text-foreground group-hover:opacity-100"
+                />
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-          {conversations.map((c) => (
+
+        <div className="mt-1 border-t border-border px-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="px-1.5">{activeProject ? activeProject.name : 'Chats'}</span>
+        </div>
+        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+          {visibleConversations.map((c) => (
             <button
               key={c.id}
               onClick={() => openConversation(c.id)}
@@ -267,7 +375,7 @@ export function ChatWorkspace() {
               />
             </button>
           ))}
-          {conversations.length === 0 ? (
+          {visibleConversations.length === 0 ? (
             <p className="px-2.5 py-6 text-center text-xs text-muted-foreground">No chats yet.</p>
           ) : null}
         </div>
@@ -277,7 +385,8 @@ export function ChatWorkspace() {
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <Sparkle className="size-4 text-primary" /> Chat
+            <Sparkle className="size-4 text-primary" />
+            {activeProject ? activeProject.name : 'Chat'}
           </div>
           <select
             value={model}
@@ -298,8 +407,14 @@ export function ChatWorkspace() {
           <div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
             {messages.length === 0 ? (
               <div className="pt-24 text-center text-sm text-muted-foreground">
-                <p className="text-base text-foreground">Your own private AI</p>
-                <p className="mt-1">Answered on-prem by the Off Grid gateways. Ask anything.</p>
+                <p className="text-base text-foreground">
+                  {activeProject ? activeProject.name : 'Your own private AI'}
+                </p>
+                <p className="mt-1">
+                  {activeProject
+                    ? 'Chats here use this project’s instructions and knowledge.'
+                    : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
+                </p>
               </div>
             ) : null}
             {messages.map((m, i) => (
@@ -378,6 +493,12 @@ export function ChatWorkspace() {
       </section>
 
       {artifact ? <ArtifactView artifact={artifact} onClose={() => setArtifact(null)} /> : null}
+      <ProjectDialog
+        project={dialogProject}
+        open={!!dialogProject}
+        onOpenChange={(o) => !o && setDialogProject(null)}
+        onSaved={refreshProjects}
+      />
     </div>
   );
 }
