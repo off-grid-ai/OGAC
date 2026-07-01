@@ -10,8 +10,8 @@ const NODES = JSON.parse(process.env.OFFGRID_NODES || JSON.stringify([
   { name: 'offgrid-s2', role: 'Server · console (standby)' },
   { name: 'offgrid-g1', role: 'Gateway · qwythos-9b (vision)' },
   { name: 'offgrid-g2', role: 'Gateway · qwen3.5-9b (vision)' },
-  { name: 'offgrid-g3', role: 'Gateway · gemma-4-e4b (vision)' },
-  { name: 'offgrid-g4', role: 'Gateway · gemma-4-e4b (vision)' },
+  { name: 'offgrid-g3', role: 'Gateway · qwythos-9b (vision)' },
+  { name: 'offgrid-g4', role: 'Gateway · qwythos-9b (vision)' },
   { name: 'offgrid-g5', role: 'Gateway · qwen3.5-9b (vision)' },
 { name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
 ]));
