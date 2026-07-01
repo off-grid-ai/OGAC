@@ -25,13 +25,24 @@ interface Call {
   ts: number;
   gateway: string;
   model: string;
+  modelServed?: string;
   kind: string;
   status: number;
   ms: number;
   tokens: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  tps?: number;
+  finish?: string;
   bytes: number;
+  caller?: string;
+  corrId?: string;
   input?: string;
   output?: string;
+  reasoning?: string;
+  toolCalls?: { name: string; args: string }[];
+  params?: { temperature?: number; maxTokens?: number; topP?: number; thinking?: boolean; toolsOffered?: number };
+  msgs?: { role: string; text: string }[];
 }
 interface Traffic {
   available: boolean;
@@ -41,6 +52,74 @@ interface Traffic {
 }
 
 const time = (ts: number) => new Date(ts).toLocaleTimeString();
+
+function Chip({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
+      {label} <span className="font-mono text-foreground">{value}</span>
+    </span>
+  );
+}
+
+// The expanded detail for one gateway call: metadata + tool calls + prompt/completion + reasoning.
+// eslint-disable-next-line complexity
+function CallDetail({ c }: { c: Call }) {
+  const p = c.params ?? {};
+  return (
+    <div className="space-y-2 py-1">
+      <div className="flex flex-wrap gap-1.5">
+        <Chip label="served" value={c.modelServed ?? c.model} />
+        <Chip label="tokens" value={`${c.promptTokens ?? '?'} → ${c.completionTokens ?? '?'}`} />
+        {c.tps ? <Chip label="tok/s" value={c.tps} /> : null}
+        {c.finish ? <Chip label="finish" value={c.finish} /> : null}
+        {p.temperature != null ? <Chip label="temp" value={p.temperature} /> : null}
+        {p.maxTokens != null ? <Chip label="max" value={p.maxTokens} /> : null}
+        <Chip label="thinking" value={p.thinking ? 'on' : 'off'} />
+        {p.toolsOffered ? <Chip label="tools offered" value={p.toolsOffered} /> : null}
+        {c.caller ? <Chip label="caller" value={c.caller} /> : null}
+        {c.corrId ? <Chip label="run" value={c.corrId.slice(0, 12)} /> : null}
+      </div>
+      {c.toolCalls?.length ? (
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Tool calls
+          </div>
+          {c.toolCalls.map((t, k) => (
+            <div key={k} className="rounded border border-border bg-background px-2 py-1 font-mono text-[11px]">
+              <span className="text-primary">{t.name}</span>({t.args})
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="grid gap-2 md:grid-cols-2">
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Prompt in {c.msgs?.length ? `(${c.msgs.length} turns)` : ''}
+          </div>
+          <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+            {c.input || '(none captured)'}
+          </pre>
+        </div>
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Completion out
+          </div>
+          <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+            {c.output || '(none captured)'}
+          </pre>
+        </div>
+      </div>
+      {c.reasoning ? (
+        <details className="text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer">Reasoning</summary>
+          <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono">
+            {c.reasoning}
+          </pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}
 
 // Live gateway traffic — polls the aggregator feed (via /api/v1/gateway/traffic) every 3s and
 // shows per-gateway counters plus the most recent calls: which node served each request, its
@@ -165,24 +244,7 @@ export function GatewayTraffic() {
                       {open ? (
                         <TableRow>
                           <TableCell colSpan={7} className="bg-muted/40">
-                            <div className="grid gap-2 py-1 md:grid-cols-2">
-                              <div>
-                                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  Prompt in
-                                </div>
-                                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
-                                  {c.input || '(none captured)'}
-                                </pre>
-                              </div>
-                              <div>
-                                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  Completion out
-                                </div>
-                                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
-                                  {c.output || '(none captured)'}
-                                </pre>
-                              </div>
-                            </div>
+                            <CallDetail c={c} />
                           </TableCell>
                         </TableRow>
                       ) : null}
