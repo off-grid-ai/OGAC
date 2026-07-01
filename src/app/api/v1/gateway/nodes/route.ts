@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { clusterModels, type GatewayNode } from '@offgrid/gateway';
+import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +50,8 @@ export async function GET() {
         };
       }),
     );
+    // eslint-disable-next-line no-console
+    console.error('[nodes-debug]', JSON.stringify(nodes.map((n) => ({ name: n.name, reachable: n.reachable, installed: n.installed }))));
     return NextResponse.json({ available: true, nodes });
   } catch {
     return NextResponse.json({ available: false, nodes: [] }, { status: 200 });
