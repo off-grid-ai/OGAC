@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server';
-import { deleteTool, setToolEnabled } from '@/lib/store';
+import { deleteTool, setToolEnabled, setToolPolicy, type ToolPolicy } from '@/lib/store';
+
+const POLICIES = ['allow', 'approval', 'blocked'];
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const b = (await req.json().catch(() => null)) as { enabled?: unknown } | null;
-  if (!b || typeof b.enabled !== 'boolean') {
-    return NextResponse.json({ error: 'enabled (boolean) required' }, { status: 400 });
+  const b = (await req.json().catch(() => null)) as { enabled?: unknown; policy?: unknown } | null;
+  if (b && typeof b.policy === 'string' && POLICIES.includes(b.policy)) {
+    await setToolPolicy(id, b.policy as ToolPolicy);
+    return NextResponse.json({ ok: true });
   }
-  await setToolEnabled(id, b.enabled);
-  return NextResponse.json({ ok: true });
+  if (b && typeof b.enabled === 'boolean') {
+    await setToolEnabled(id, b.enabled);
+    return NextResponse.json({ ok: true });
+  }
+  return NextResponse.json(
+    { error: 'enabled (boolean) or policy (allow|approval|blocked) required' },
+    { status: 400 },
+  );
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

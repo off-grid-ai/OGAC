@@ -14,8 +14,13 @@ async function ensureToolCols(): Promise<void> {
   if (ensured) return;
   await db.execute(sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS allowed_roles jsonb NOT NULL DEFAULT '[]';`);
   await db.execute(sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS mutating boolean NOT NULL DEFAULT false;`);
+  await db.execute(sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS policy text NOT NULL DEFAULT 'approval';`);
   ensured = true;
 }
+
+// Per-connector action policy: 'allow' runs immediately, 'approval' routes through the human gate,
+// 'blocked' refuses execution. 'approval' is the safe default (also applied to legacy mutating tools).
+export type ToolPolicy = 'allow' | 'approval' | 'blocked';
 
 export interface ChatTool {
   id: string;
@@ -24,6 +29,7 @@ export interface ChatTool {
   endpoint: string;
   description: string;
   mutating: boolean;
+  policy: ToolPolicy;
 }
 
 // Enabled tools the given role may use (empty allowedRoles = everyone; admin sees all).
@@ -32,7 +38,8 @@ export async function listPermittedTools(role: string): Promise<ChatTool[]> {
   const rows = await db.execute(sql`
     SELECT id, name, type, endpoint, description, enabled,
            COALESCE(allowed_roles, '[]'::jsonb) AS allowed_roles,
-           COALESCE(mutating, false) AS mutating
+           COALESCE(mutating, false) AS mutating,
+           COALESCE(policy, 'approval') AS policy
     FROM tools`);
   const list = (rows as unknown as { rows?: Record<string, unknown>[] }).rows ?? (rows as unknown as Record<string, unknown>[]);
   return (list as Record<string, unknown>[])
@@ -49,6 +56,9 @@ export async function listPermittedTools(role: string): Promise<ChatTool[]> {
       endpoint: String(t.endpoint ?? ''),
       description: String(t.description ?? ''),
       mutating: Boolean(t.mutating),
+      policy: (['allow', 'approval', 'blocked'].includes(String(t.policy))
+        ? String(t.policy)
+        : 'approval') as ToolPolicy,
     }));
 }
 
@@ -164,7 +174,7 @@ export interface ToolResolution {
   // a pending mutating call needing human approval (client re-submits with approvals)
   pending?: { fn: string; toolName: string; input: string }[];
   // tool activity to surface in the UI transcript
-  activity: { tool: string; input: string; output?: string; status: string }[];
+  activity: { tool: string; input: string; output?: string; status: string; ref?: string }[];
 }
 
 // Run the tool-decision pass and execute permitted tools. Mutating tools are executed only when the
@@ -191,14 +201,31 @@ export async function resolveTools(
     const tool = findToolByFnName(permitted, call.function.name);
     if (!tool) continue;
     const input = parseInput(call.function.arguments);
-    if (tool.mutating && !approvals.includes(call.function.name)) {
+    // Blocked → refuse: never execute, feed a refusal back so the model answers without the tool.
+    if (tool.policy === 'blocked') {
+      const msg = `blocked by policy: the ${tool.name} connector is not permitted to run`;
+      out.messages.push({ role: 'tool', tool_call_id: call.id, content: msg });
+      out.activity.push({ tool: tool.name, input, output: msg, status: 'blocked' });
+      continue;
+    }
+    // Needs approval — either explicit 'approval' policy or a legacy mutating tool. Gate unless the
+    // caller already supplied an approval for this call. 'allow' runs immediately.
+    const needsApproval = tool.policy === 'approval' || (tool.policy !== 'allow' && tool.mutating);
+    if (needsApproval && !approvals.includes(call.function.name)) {
       out.pending!.push({ fn: call.function.name, toolName: tool.name, input });
       out.activity.push({ tool: tool.name, input, status: 'awaiting-approval' });
       continue;
     }
     const output = await executeTool(tool, input);
     out.messages.push({ role: 'tool', tool_call_id: call.id, content: output });
-    out.activity.push({ tool: tool.name, input, output, status: 'executed' });
+    out.activity.push({
+      tool: tool.name,
+      input,
+      output,
+      status: 'executed',
+      // Citation surface: name + endpoint ref so the stream route can attach source citations.
+      ref: tool.endpoint || tool.name,
+    });
   }
   if (out.pending!.length) return { ...out, messages: [] };
   return out;

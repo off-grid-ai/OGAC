@@ -69,6 +69,12 @@ export const connectors = pgTable('connectors', {
   type: text('type').notNull(),
   status: text('status').notNull().default('connected'),
   lastSync: timestamp('last_sync', { withTimezone: true }),
+  // ─── Custom-connector fields (additive) — populated when an admin registers a connector via the
+  // Integrations directory. `endpoint` is the MCP server URL or HTTP endpoint; `auth` is the scheme.
+  endpoint: text('endpoint').notNull().default(''),
+  auth: text('auth').notNull().default('none'), // none | api-key | oauth
+  description: text('description').notNull().default(''),
+  custom: boolean('custom').notNull().default(false), // admin-registered vs seeded/built-in
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -256,6 +262,29 @@ export const tools = pgTable('tools', {
   endpoint: text('endpoint').notNull().default(''),
   description: text('description').notNull().default(''), // when-to-use, for intent matching
   enabled: boolean('enabled').notNull().default(true),
+  // Per-connector action policy — 'allow' (run immediately) | 'approval' (human gate) | 'blocked'
+  // (refuse). Enforced in chat-tools.ts execution; admin-editable in the connector directory.
+  policy: text('policy').notNull().default('approval'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Org-wide settings — single-row store (id='org') for the highest-precedence system prompt
+// injected into EVERY chat (before per-user custom instructions), plus other org-scoped toggles.
+export const orgSettings = pgTable('org_settings', {
+  id: text('id').primaryKey().default('org'), // singleton row
+  systemPrompt: text('system_prompt').notNull().default(''),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text('updated_by').notNull().default(''),
+});
+
+// ─── Custom roles — operator-defined roles layered on the built-in RBAC/ABAC. `capabilities` is
+// the set of granted module ids the role may access; `basedOn` names a built-in role it inherits.
+export const customRoles = pgTable('custom_roles', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  basedOn: text('based_on').notNull().default('viewer'), // inherits a built-in role's baseline
+  capabilities: jsonb('capabilities').$type<string[]>().notNull().default([]), // granted module ids
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
