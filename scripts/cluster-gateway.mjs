@@ -14,6 +14,11 @@
 import { createClusterGateway } from '@offgrid/gateway';
 import { policiesFromEnv } from '@offgrid/policy';
 
+// Fleet default: ship every call to the on-prem OpenSearch (durable, searchable
+// gateway logs) unless overridden. Without this the observability sink is off and
+// the console's Logs explorer has nothing to query.
+process.env.OFFGRID_OPENSEARCH_URL ??= 'http://127.0.0.1:9200';
+
 // The on-prem fleet pool. Override with OFFGRID_POOL (JSON) without editing code.
 const POOL = [
   { name: 'g1', host: '192.168.1.57', port: 7878, vision: true, model: 'qwythos-9b' },
