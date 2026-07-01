@@ -229,7 +229,10 @@ export async function POST(req: Request) {
   // Org connectors (tool-calling): let the model decide whether to call a permitted tool. Mutating
   // tools require human approval — if any is pending, stop and ask the UI to approve before running.
   try {
-    const resolved = await resolveTools(role, messages, effectiveModel, approvals);
+    const resolved = await resolveTools(role, messages, effectiveModel, approvals, {
+      conversationId: convo.id,
+      userEmail: userId,
+    });
     if (resolved?.pending?.length) {
       const body = `data: ${JSON.stringify({ approvalRequest: resolved.pending })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`;
       return new Response(body, {
