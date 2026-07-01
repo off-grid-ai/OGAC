@@ -12,6 +12,17 @@ export interface Artifact {
 const JSX_SIGNAL =
   /(<[A-Za-z][^>]*>|<\/[A-Za-z]|=>\s*\(?\s*<|React\.|useState|ReactDOM|export default function|className=)/;
 
+// Best-effort human title for a saved artifact: an HTML <title>, a leading markdown/comment
+// heading, or a kind-based fallback. Keeps the library readable without asking the user.
+export function artifactTitle(a: Artifact): string {
+  const title = a.code.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+  if (title) return title.slice(0, 80);
+  const heading = a.code.match(/^\s*(?:\/\/|#|<!--)?\s*#{0,3}\s*([A-Za-z][^\n]{2,60})/)?.[1]?.trim();
+  if (heading && /[a-z]/i.test(heading)) return heading.slice(0, 80);
+  const label = a.kind === 'code' ? (a.language ?? 'code') : a.kind;
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)} artifact`;
+}
+
 export function parseArtifact(content: string): Artifact | null {
   // 1. React: combine all jsx/tsx/react fenced blocks into one scope.
   const reactBlocks = [...content.matchAll(/```(?:jsx|tsx|react)\s*\n([\s\S]*?)```/gi)].map((b) =>
