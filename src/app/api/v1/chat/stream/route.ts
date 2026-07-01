@@ -13,6 +13,7 @@ import {
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import { attachmentBlock } from '@/lib/chat-attach';
 import {
   estimateTokens,
   isDenied,
@@ -59,6 +60,9 @@ export async function POST(req: Request) {
     history = [],
     // Slash skill invoked inline for this turn only — its system prompt is applied for the turn.
     skillId: turnSkillId = null,
+    // Ad-hoc file attachments already extracted to text by /api/v1/chat/attach — injected as a
+    // system context block for this turn only (not persisted, not embedded).
+    attachments = [],
   } = await req.json().catch(() => ({}));
   // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
   // pipeline (system prompt, budget, tools) works unchanged. projectId/skillId stay null.
@@ -109,6 +113,19 @@ export async function POST(req: Request) {
   // Per-project memory: inject facts scoped to this conversation's project (additive to user memory).
   const projMem = await projectMemoryBlock(convo.projectId ?? null);
   if (projMem) messages.push({ role: 'system', content: projMem });
+  // Attached files (ad-hoc chat): inject the extracted text as a system context block for this turn.
+  if (Array.isArray(attachments) && attachments.length) {
+    const block = attachmentBlock(
+      attachments
+        .filter((a: unknown) => a && typeof (a as { text?: unknown }).text === 'string')
+        .map((a: { name?: string; text: string }) => ({
+          name: String(a.name ?? 'file'),
+          text: a.text,
+          truncated: false,
+        })),
+    );
+    if (block) messages.push({ role: 'system', content: block });
+  }
   // Org skill bound to this conversation: inject its instructions, default its model, and use its
   // knowledge project for RAG when the conversation has none of its own.
   let skillModel = '';
