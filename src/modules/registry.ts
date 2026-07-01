@@ -1,6 +1,7 @@
 // The module registry — the heart of modularity. Each capability is API-first and
 // independently adoptable; a deployment enables only the modules it bought (see lib/modules).
 export type ModuleId =
+  | 'chat'
   | 'fleet'
   | 'gateway'
   | 'control'
@@ -29,6 +30,14 @@ export interface ModuleDef {
 }
 
 export const MODULES: readonly ModuleDef[] = [
+  {
+    id: 'chat',
+    label: 'Chat',
+    description:
+      'Your own ChatGPT — chat, projects, and knowledge, answered by the on-prem gateways. No per-seat cost.',
+    route: '/chat',
+    service: 'gateway',
+  },
   {
     id: 'fleet',
     label: 'Fleet',
