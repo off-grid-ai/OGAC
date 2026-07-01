@@ -6,7 +6,7 @@ import { SandboxRunner } from '@/components/agents/SandboxRunner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { agentActivity, listAllAgents } from '@/lib/agents';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ function planeLabel(id: string): string {
 }
 
 export default async function AgentsPage() {
-  requireModule('agents');
+  await requireModuleForUser('agents');
   const [agents, activity] = await Promise.all([listAllAgents(), agentActivity()]);
   const customCount = agents.filter((a) => a.custom).length;
 

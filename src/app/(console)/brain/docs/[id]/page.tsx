@@ -4,12 +4,12 @@ import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDocument, searchDocuments } from '@/lib/brain';
-import { requireModule } from '@/lib/modules';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DocInspectorPage({ params }: { params: Promise<{ id: string }> }) {
-  requireModule('brain');
+  await requireModuleForUser('brain');
   const { id } = await params;
   const doc = await getDocument(id);
   if (!doc) notFound();
