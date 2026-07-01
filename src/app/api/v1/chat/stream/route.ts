@@ -19,6 +19,7 @@ import {
 } from '@/lib/chat-governance';
 import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
+import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     images = [],
     regenerate = false,
     approvals = [],
+    orgKnowledge = false,
   } = await req.json().catch(() => ({}));
   const convo = conversationId ? await getConversation(userId, conversationId) : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
@@ -97,6 +99,22 @@ export async function POST(req: Request) {
       }
     } catch {
       /* knowledgebase optional — chat still answers without it */
+    }
+  }
+  // Org-wide knowledge base ("Ask Your Org"): when the client opts in, retrieve permission-aware
+  // chunks scoped to the session role and inject them as a system block + citations, mirroring the
+  // project RAG branch above. Retrieval only ever returns collections the role may access.
+  if (orgKnowledge) {
+    try {
+      const r = await retrieveOrgKnowledge(String(content), session?.user?.role ?? 'viewer');
+      if (r.context) {
+        messages.push({ role: 'system', content: r.context });
+        citations = citations.concat(
+          r.citations.map((c) => ({ name: c.name, position: c.position, score: c.score })),
+        );
+      }
+    } catch {
+      /* org knowledge optional — chat still answers without it */
     }
   }
   // Cap history to the most recent turns so we don't overflow the model context (and, on this
