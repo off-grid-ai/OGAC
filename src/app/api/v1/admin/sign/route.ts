@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSigning } from '@/lib/adapters/registry';
+import { requireAdmin } from '@/lib/authz';
 
 // Sign a payload (answer + citations, an export, …) → tamper-evident signature, through the
 // provenance signing port (HMAC default; OFFGRID_ADAPTER_PROVENANCE=ed25519 for public-key
 // signatures). With `signature` present, verifies instead. C2PA/Sigstore are the external upgrades.
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as {
     payload?: unknown;
     signature?: string;
@@ -28,7 +31,9 @@ export async function POST(req: Request) {
 
 // Expose the verification public key (asymmetric adapters only) so a third party can verify our
 // signatures without any shared secret — the whole point of public-key provenance.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const signer = getSigning();
   return NextResponse.json({ algorithm: signer.algorithm, publicKey: signer.publicKey() });
 }

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { buildWaterfall, langfuseReadConfigured, listObservations } from '@/lib/langfuse';
 
 // One trace's span waterfall — GET /api/public/observations?traceId=... via the read client.
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   if (!langfuseReadConfigured()) {
     return NextResponse.json({ configured: false, spans: [] });

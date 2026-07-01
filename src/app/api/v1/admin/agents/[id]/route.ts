@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { deleteCustomAgent, getCustomAgent, setCustomAgentEnabled } from '@/lib/store';
 
 // PATCH { enabled } → toggle a user-authored agent. DELETE → remove it. Built-in agents are not
 // stored in the DB, so these only affect custom agents (404 otherwise).
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   if (!(await getCustomAgent(id))) return NextResponse.json({ error: 'not found' }, { status: 404 });
   const b = (await req.json().catch(() => null)) as { enabled?: unknown } | null;
@@ -14,7 +17,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   if (!(await getCustomAgent(id))) return NextResponse.json({ error: 'not found' }, { status: 404 });
   await deleteCustomAgent(id);

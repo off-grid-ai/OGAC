@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getFlags } from '@/lib/adapters/registry';
+import { requireAdmin } from '@/lib/authz';
 import { type Interaction, scoreInteraction, scoringConfigured } from '@/lib/qa/scoring';
 
 // Online eval — judge one production interaction (LLM-as-judge via the gateway) and push the
 // quality + faithfulness scores to Langfuse, where they trend over time. Gated by the
 // `online-evals` feature flag (checked through the flags port, so Unleash governs it when active).
+// eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const enabled = await getFlags().isEnabled('online-evals', true);
   if (!enabled) {
     return NextResponse.json({ error: 'online evals disabled (flag: online-evals)' }, { status: 403 });

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { createAbacRule, listAbacRules } from '@/lib/store';
 
 const OPS = ['eq', 'neq', 'in'];
@@ -12,11 +13,15 @@ function validRule(b: Record<string, unknown> | null): boolean {
   return Boolean(attribute) && Boolean(value) && opOk && efOk;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ object: 'list', data: await listAbacRules() });
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!validRule(b)) {
     return NextResponse.json(

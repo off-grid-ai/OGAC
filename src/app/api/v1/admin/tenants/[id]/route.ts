@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { deleteTenant, setTenantModules } from '@/lib/store';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!Array.isArray(body?.enabledModules)) {
@@ -14,7 +17,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return NextResponse.json(t);
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   await deleteTenant(id);
   return NextResponse.json({ deleted: true });

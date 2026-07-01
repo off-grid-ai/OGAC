@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { c2paRead, c2paSign, c2paSupported } from '@/lib/c2pa';
 
 // C2PA Content Credentials for images. POST { image (base64), mimeType, action?: 'sign'|'verify' }.
@@ -34,6 +35,8 @@ async function handle(b: Body): Promise<NextResponse> {
 }
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Body | null;
   if (!b || typeof b.image !== 'string' || typeof b.mimeType !== 'string') {
     return badRequest('image (base64) + mimeType required');

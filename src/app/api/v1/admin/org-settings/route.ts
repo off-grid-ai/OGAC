@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { requireAdmin } from '@/lib/authz';
 import { getOrgSystemPrompt, setOrgSystemPrompt } from '@/lib/store';
 
 // Org-wide system prompt — the highest-precedence instruction injected into every chat.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   return NextResponse.json({ systemPrompt: await getOrgSystemPrompt() });
 }
 
 export async function PUT(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
   const session = await auth();
   if (session?.user?.role !== 'admin') {
     return NextResponse.json({ error: 'admin only' }, { status: 403 });
