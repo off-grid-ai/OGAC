@@ -294,6 +294,12 @@ export function ChatWorkspace({
   const [thinking, setThinking] = useState(false);
   const [orgKnowledge, setOrgKnowledge] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  // Slash styles: RBAC-permitted skills invocable inline via /name. `turnSkill` applies for the
+  // next turn only (its system prompt), shown as a chip in the composer.
+  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>([]);
+  const [turnSkill, setTurnSkill] = useState<{ id: string; name: string } | null>(null);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -309,6 +315,14 @@ export function ChatWorkspace({
   const docRef = useRef<HTMLInputElement>(null);
 
   const activeModel = models.find((m) => m.id === model);
+  // A leading /token (no space yet, no skill already picked) opens the slash-styles picker.
+  const slashMatch = !turnSkill ? /^\/([\w-]*)$/.exec(input) : null;
+  const slashQuery = slashMatch?.[1]?.toLowerCase() ?? '';
+  const slashMatches = slashMatch
+    ? skillList
+        .filter((s) => s.name.toLowerCase().replace(/\s+/g, '-').includes(slashQuery))
+        .slice(0, 6)
+    : [];
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const visibleConversations = conversations
     .filter((c) => (activeProjectId ? c.projectId === activeProjectId : !c.projectId))
@@ -334,11 +348,55 @@ export function ChatWorkspace({
         if (list[0]) setModel(list[0].id);
       }
     })();
+    // Slash-styles autocomplete source — RBAC-scoped by the skills API.
+    void (async () => {
+      const r = await fetch('/api/v1/chat/skills');
+      if (r.ok) setSkillList((await r.json()).skills ?? []);
+    })();
   }, [refreshConversations, refreshProjects]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  useEffect(() => {
+    setSlashOpen(slashMatches.length > 0);
+    setSlashIndex(0);
+  }, [slashMatches.length, input]);
+
+  // Pick a slash-style skill: tag the turn with it and clear the /query from the composer.
+  function pickSkill(s: { id: string; name: string }) {
+    setTurnSkill({ id: s.id, name: s.name });
+    setInput('');
+    setSlashOpen(false);
+  }
+
+  // Composer keydown: drive the slash picker (arrows/enter/tab/escape) when open, else send.
+  // eslint-disable-next-line complexity
+  function onComposerKey(e: React.KeyboardEvent) {
+    if (slashOpen && slashMatches.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        return setSlashIndex((i) => (i + 1) % slashMatches.length);
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        return setSlashIndex((i) => (i - 1 + slashMatches.length) % slashMatches.length);
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        return pickSkill(slashMatches[slashIndex]);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return setSlashOpen(false);
+      }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  }
 
   // Save-on-open: opening an artifact both shows it in the side panel and persists it to the
   // library (versioned server-side by conversation + title). Fire-and-forget; the panel opens
@@ -612,6 +670,7 @@ export function ChatWorkspace({
     const text = input.trim();
     if (!text || streaming) return;
     const sentFiles = files.map((f) => ({ name: f.name, text: f.text }));
+    const sentSkill = turnSkill?.id ?? null;
     // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
     if (temporary) {
       const sentImages = images;
@@ -619,6 +678,7 @@ export function ChatWorkspace({
       setInput('');
       setImages([]);
       setFiles([]);
+      setTurnSkill(null);
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: text, images: sentImages.length ? sentImages : null },
@@ -631,6 +691,7 @@ export function ChatWorkspace({
         model,
         images: sentImages,
         attachments: sentFiles,
+        skillId: sentSkill,
       });
       return;
     }
@@ -649,6 +710,7 @@ export function ChatWorkspace({
     setInput('');
     setImages([]);
     setFiles([]);
+    setTurnSkill(null);
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: text, images: sentImages.length ? sentImages : null },
@@ -660,6 +722,7 @@ export function ChatWorkspace({
       model,
       images: sentImages,
       attachments: sentFiles,
+      skillId: sentSkill,
     });
   }
 
@@ -1035,6 +1098,41 @@ export function ChatWorkspace({
                 ))}
               </div>
             ) : null}
+            {turnSkill ? (
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-primary">
+                  <Sparkle className="size-3.5" />
+                  {turnSkill.name}
+                  <button onClick={() => setTurnSkill(null)} className="hover:text-destructive">
+                    <X className="size-3" />
+                  </button>
+                </span>
+                <span className="text-[10px] text-muted-foreground">applied to your next message</span>
+              </div>
+            ) : null}
+            {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
+            {slashOpen ? (
+              <div className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                {slashMatches.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onMouseEnter={() => setSlashIndex(i)}
+                    onClick={() => pickSkill(s)}
+                    className={cn(
+                      'flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left',
+                      i === slashIndex ? 'bg-primary/10' : 'hover:bg-muted',
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm text-foreground">
+                      <Sparkle className="size-3.5 text-primary" />/{s.name.replace(/\s+/g, '-')}
+                    </span>
+                    {s.description ? (
+                      <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <input
               ref={docRef}
               type="file"
@@ -1114,14 +1212,9 @@ export function ChatWorkspace({
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
+                onKeyDown={onComposerKey}
                 rows={1}
-                placeholder="Message the model…"
+                placeholder="Message the model…  (type / for skills)"
                 className="max-h-40 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none"
               />
               {streaming ? (
