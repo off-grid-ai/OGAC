@@ -7,6 +7,7 @@ import {
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import { type Citation, retrieve } from '@/lib/rag';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -41,6 +42,19 @@ export async function POST(req: Request) {
   const messages: { role: string; content: string | ContentPart[] }[] = [];
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
+  // Project chats retrieve from the knowledgebase and cite (desktop RAG behavior).
+  let citations: Citation[] = [];
+  if (convo.projectId) {
+    try {
+      const r = await retrieve(convo.projectId, String(content));
+      if (r.context) {
+        messages.push({ role: 'system', content: r.context });
+        citations = r.citations;
+      }
+    } catch {
+      /* knowledgebase optional — chat still answers without it */
+    }
+  }
   for (const m of prior) {
     if (m.role === 'system') continue;
     messages.push({ role: m.role, content: m.content });
@@ -130,10 +144,12 @@ export async function POST(req: Request) {
           role: 'assistant',
           content: full,
           reasoning: reasoning || null,
+          citations: citations.length ? citations : null,
         });
       } catch {
         /* best-effort persistence */
       }
+      if (citations.length) send({ citations });
       send({ done: true });
       controller.close();
     },

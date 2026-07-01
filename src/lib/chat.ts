@@ -111,6 +111,45 @@ export async function deleteConversation(userId: string, id: string) {
   await db.delete(chatMessages).where(eq(chatMessages.conversationId, id));
 }
 
+// ─── Projects (containers with a system prompt; group conversations) ──────────
+export async function listProjects(userId: string) {
+  await ensureChatSchema();
+  return db
+    .select()
+    .from(chatProjects)
+    .where(eq(chatProjects.userId, userId))
+    .orderBy(desc(chatProjects.updatedAt));
+}
+
+export async function createProject(userId: string, name: string, systemPrompt = '') {
+  await ensureChatSchema();
+  const id = rid();
+  await db.insert(chatProjects).values({ id, userId, name: name.slice(0, 120), systemPrompt });
+  return id;
+}
+
+export async function updateProject(
+  userId: string,
+  id: string,
+  patch: { name?: string; description?: string; systemPrompt?: string },
+) {
+  await ensureChatSchema();
+  await db
+    .update(chatProjects)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
+}
+
+export async function deleteProject(userId: string, id: string) {
+  await ensureChatSchema();
+  await db.delete(chatProjects).where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
+  // Detach its conversations (keep the chats, just un-project them).
+  await db
+    .update(chatConversations)
+    .set({ projectId: null })
+    .where(and(eq(chatConversations.projectId, id), eq(chatConversations.userId, userId)));
+}
+
 // A conversation's project system prompt (empty for ad-hoc chats).
 export async function projectSystemPrompt(projectId: string | null): Promise<string> {
   if (!projectId) return '';
