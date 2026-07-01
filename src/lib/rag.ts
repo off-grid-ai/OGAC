@@ -149,7 +149,9 @@ export async function retrieve(
     .where(eq(chatChunks.projectId, projectId));
   if (!rows.length) return { context: '', citations: [] };
 
-  const [qVec] = await embed(query);
+  const qVecs = await embed(query);
+  const qVec = qVecs[0];
+  if (!qVec) return { context: '', citations: [] }; // embedding unavailable → no retrieval, no crash
   const docNames = new Map<string, string>();
   for (const d of await db
     .select({ id: chatDocuments.id, name: chatDocuments.name })

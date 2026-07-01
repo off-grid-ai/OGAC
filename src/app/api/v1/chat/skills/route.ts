@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createSkill, listSkills } from '@/lib/chat';
+import { createSkill, listSkills, projectAccess } from '@/lib/chat';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +24,11 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const visibility = isAdmin ? (body.visibility === 'private' ? 'private' : 'org') : 'private';
   const cap = body.capabilities ?? {};
+  // Can't bind an assistant to a project the creator can't access.
+  if (body.projectId) {
+    const access = await projectAccess(session.user.email, body.projectId, session.user.role ?? 'viewer');
+    if (!access) return NextResponse.json({ error: 'forbidden: no access to that project' }, { status: 403 });
+  }
   const id = await createSkill(session.user.email, {
     name: body.name,
     description: body.description,
