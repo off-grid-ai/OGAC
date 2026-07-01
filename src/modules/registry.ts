@@ -2,6 +2,8 @@
 // independently adoptable; a deployment enables only the modules it bought (see lib/modules).
 export type ModuleId =
   | 'chat'
+  | 'projects'
+  | 'artifacts'
   | 'fleet'
   | 'gateway'
   | 'control'
@@ -36,6 +38,22 @@ export const MODULES: readonly ModuleDef[] = [
     description:
       'Your own ChatGPT — chat, projects, and knowledge, answered by the on-prem gateways. No per-seat cost.',
     route: '/chat',
+    service: 'gateway',
+  },
+  {
+    id: 'projects',
+    label: 'Projects',
+    description:
+      'Group chats under shared instructions and a knowledgebase — a dedicated workspace per topic (ChatGPT/Claude Projects parity).',
+    route: '/projects',
+    service: 'gateway',
+  },
+  {
+    id: 'artifacts',
+    label: 'Artifacts',
+    description:
+      'A library of generated outputs — HTML, SVG, React, diagrams, and code saved from your chats and reopenable anytime.',
+    route: '/artifacts',
     service: 'gateway',
   },
   {
