@@ -330,6 +330,12 @@ export const chatMessages = pgTable('chat_messages', {
   reasoning: text('reasoning'), // model thinking, kept separate from content
   images: jsonb('images').$type<string[]>(), // data: URIs sent with a user turn
   citations: jsonb('citations').$type<{ name: string; position: number; score: number }[]>(),
+  // ─── Edit & branch (Wave 2) — a parent-pointer tree over messages ───
+  // parentId points at the message this one follows (null = a root turn). Editing a user turn
+  // inserts a sibling under the same parent; `active` marks which sibling is on the shown path.
+  // The linear transcript is the walk from roots choosing the active child at each step.
+  parentId: text('parent_id'),
+  active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
