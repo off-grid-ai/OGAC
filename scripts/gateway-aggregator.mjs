@@ -214,6 +214,20 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     return res.end(JSON.stringify(trafficJSON()));
   }
+  if (req.url === '/nodes') {
+    return Promise.all(POOL.map(async (g) => {
+      const h = healthFor(g.name);
+      let installedModels = [];
+      try {
+        const r = await fetch(`http://${g.host}:${g.port}/v1/models`, { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+          const d = await r.json();
+          installedModels = (d.data || []).map((m) => ({ id: m.id.split('/').pop(), meta: m.meta }));
+        }
+      } catch { /* unreachable */ }
+      return { name: g.name, host: g.host, port: g.port, model: g.model, vision: g.vision, health: h, installedModels };
+    })).then((nodes) => json(res, 200, { nodes }));
+  }
   if (req.url === '/v1/models') {
     const models = [...new Set(POOL.map((g) => g.model))].map((id) => {
       const nodes = POOL.filter((g) => g.model === id);
