@@ -1,34 +1,71 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { deleteSkill, updateSkill } from '@/lib/chat';
+import { deleteSkill, getSkill, updateSkill } from '@/lib/chat';
 
 export const dynamic = 'force-dynamic';
 
-// Admin-only skill mutations. Edit any field (instructions/model/roles/knowledge project) or delete.
+// A caller may mutate a skill if they're an admin (org-wide assistants) or the creator of a
+// private one. Non-admins can never publish org-wide (visibility is pinned to 'private').
+async function canMutate(id: string, email: string, role: string) {
+  if (role === 'admin') return true;
+  const s = await getSkill(id);
+  return Boolean(s && s.visibility === 'private' && s.createdBy === email);
+}
+
+// Edit assistant fields: instructions/model/roles/knowledge project + builder fields
+// (conversation starters, capability toggles, Actions schema, visibility).
 // eslint-disable-next-line complexity
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (session.user.role !== 'admin')
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
+  const role = session.user.role ?? 'viewer';
+  if (!(await canMutate(id, email, role)))
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
-  for (const k of ['name', 'description', 'systemPrompt', 'model', 'icon', 'enabled'] as const) {
+  for (const k of [
+    'name',
+    'description',
+    'systemPrompt',
+    'model',
+    'icon',
+    'enabled',
+    'actionsSchema',
+  ] as const) {
     if (body[k] !== undefined) patch[k] = body[k];
   }
   if (body.projectId !== undefined) patch.projectId = body.projectId ?? null;
   if (Array.isArray(body.allowedRoles)) patch.allowedRoles = body.allowedRoles;
+  if (Array.isArray(body.conversationStarters)) {
+    patch.conversationStarters = body.conversationStarters.filter(
+      (s: unknown) => typeof s === 'string' && s.trim(),
+    );
+  }
+  if (body.capabilities && typeof body.capabilities === 'object') {
+    patch.capabilities = {
+      web: Boolean(body.capabilities.web),
+      tools: Boolean(body.capabilities.tools),
+      code: Boolean(body.capabilities.code),
+    };
+  }
+  // Only admins may promote an assistant to org-wide visibility.
+  if (body.visibility !== undefined) {
+    patch.visibility = role === 'admin' && body.visibility === 'org' ? 'org' : 'private';
+  }
   await updateSkill(id, patch);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (session.user.role !== 'admin')
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
+  const role = session.user.role ?? 'viewer';
+  if (!(await canMutate(id, email, role)))
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   await deleteSkill(id);
   return NextResponse.json({ ok: true });
 }
