@@ -8,9 +8,14 @@ const PORT = Number(process.env.PORT || 9100);
 const NODES = JSON.parse(process.env.OFFGRID_NODES || JSON.stringify([
   { name: 'offgrid-s1', role: 'Server · edge/db/keycloak/aggregator/metrics' },
   { name: 'offgrid-s2', role: 'Server · console (standby)' },
-  { name: 'offgrid-g1', role: 'Gateway · inference' },
-  { name: 'offgrid-g2', role: 'Gateway · inference' },
-  { name: 'offgrid-g3', role: 'Gateway · inference' },
+  { name: 'offgrid-g1', role: 'Gateway · qwythos-9b (vision)' },
+  { name: 'offgrid-g2', role: 'Gateway · qwen3.5-9b (vision)' },
+  { name: 'offgrid-g3', role: 'Gateway · gemma-4-e4b (vision)' },
+  { name: 'offgrid-g4', role: 'Gateway · gemma-4-e4b (vision)' },
+  { name: 'offgrid-g5', role: 'Gateway · qwen3.5-9b (vision)' },
+  { name: 'offgrid-g6', role: 'Gateway · qwen3-coder-30b' },
+  { name: 'offgrid-g7', role: 'Gateway · qwen3-coder-30b' },
+  { name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
 ]));
 
 const SSH = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'];
@@ -53,9 +58,14 @@ const BOOK = `
 <table><tr><th>Node</th><th>IP</th><th>Role</th><th>Runs</th></tr>
 <tr><td><b>offgrid-s1</b></td><td>127.0.0.1</td><td>Server / control plane</td><td>Caddy edge :80 · Postgres :5432 · Keycloak :8080 · aggregator :8800 · metrics :9100 · Console :3000</td></tr>
 <tr><td><b>offgrid-s2</b></td><td>192.168.1.60</td><td>Console (standby)</td><td>Console :3000 (shares S1 Postgres)</td></tr>
-<tr><td><b>offgrid-g1</b></td><td>192.168.1.57</td><td>Gateway · inference</td><td>Gemma 4 12B — text/general</td></tr>
+<tr><td><b>offgrid-g1</b></td><td>192.168.1.57</td><td>Gateway · inference</td><td>Qwythos 9B — text + vision</td></tr>
 <tr><td><b>offgrid-g2</b></td><td>192.168.1.58</td><td>Gateway · inference</td><td>Qwen 3.5 9B — text + vision</td></tr>
-<tr><td><b>offgrid-g3</b></td><td>192.168.1.32</td><td>Gateway · inference</td><td>Gemma 4 E4B — vision</td></tr></table>
+<tr><td><b>offgrid-g3</b></td><td>192.168.1.32</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision</td></tr>
+<tr><td><b>offgrid-g4</b></td><td>192.168.1.63</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision (redundancy)</td></tr>
+<tr><td><b>offgrid-g5</b></td><td>192.168.1.65</td><td>Gateway · inference</td><td>Qwen 3.5 9B — text + vision (redundancy)</td></tr>
+<tr><td><b>offgrid-g6</b></td><td>192.168.1.66</td><td>Gateway · inference</td><td>Qwen3-Coder 30B IQ3_XXS — text/coding</td></tr>
+<tr><td><b>offgrid-g7</b></td><td>192.168.1.62</td><td>Gateway · inference</td><td>Qwen3-Coder 30B IQ3_XXS — text/coding (redundancy)</td></tr>
+<tr><td><b>offgrid-g8</b></td><td>192.168.1.64</td><td>Gateway · inference</td><td>Qwythos 9B — text + vision (redundancy)</td></tr></table>
 <p>All nodes: user <code>admin</code>, sleep disabled (lids can stay closed). LAN-only — nothing exposed to the internet.</p>
 
 <h2>2 · URLS & ACCESS</h2>
@@ -81,7 +91,7 @@ const BOOK = `
 
 curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1/signin        # console 200
 curl -s http://127.0.0.1:8800/v1/models                                  # models
-for ip in 57 58 32; do curl -s -o /dev/null -w "g.$ip %{http_code}\\n" http://192.168.1.$ip:7878/health; done</pre>
+for ip in 57 58 32 63 65 66 62 64; do curl -s -o /dev/null -w "g.$ip %{http_code}\\n" http://192.168.1.$ip:7878/health; done</pre>
 
 <h2>5 · FIX IT</h2>
 <pre># bring everything back to known-good (resolves IPs by name, restarts all):
