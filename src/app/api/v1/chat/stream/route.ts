@@ -7,9 +7,11 @@ import {
   getCustomInstructions,
   getSkill,
   listMessages,
+  memoryBlock,
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
+import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
 import { type Citation, retrieve } from '@/lib/rag';
 
@@ -62,6 +64,8 @@ export async function POST(req: Request) {
   }[] = [];
   const ci = await getCustomInstructions(userId);
   if (ci.trim()) messages.push({ role: 'system', content: ci });
+  const mem = await memoryBlock(userId);
+  if (mem) messages.push({ role: 'system', content: mem });
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
   // Org skill bound to this conversation: inject its instructions, default its model, and use its
@@ -208,6 +212,10 @@ export async function POST(req: Request) {
         });
       } catch {
         /* best-effort persistence */
+      }
+      // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
+      if (full && String(content).trim()) {
+        void extractMemory(userId, String(content), full, effectiveModel);
       }
       if (citations.length) send({ citations });
       send({ done: true });

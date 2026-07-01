@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   chatConversations,
+  chatMemory,
   chatMessages,
   chatProjects,
   chatSettings,
@@ -50,7 +51,52 @@ export async function ensureChatSchema(): Promise<void> {
   `);
   // conversations can be bound to a skill (added post-hoc for existing tables)
   await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_memory (
+      id text PRIMARY KEY, user_id text NOT NULL, fact text NOT NULL,
+      source text NOT NULL DEFAULT 'chat', created_at timestamptz NOT NULL DEFAULT now());
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_memory_user_idx ON chat_memory (user_id);`);
   ensured = true;
+}
+
+// ─── Per-user cross-conversation memory ───────────────────────────────────────
+export async function listMemory(userId: string) {
+  await ensureChatSchema();
+  return db
+    .select()
+    .from(chatMemory)
+    .where(eq(chatMemory.userId, userId))
+    .orderBy(desc(chatMemory.createdAt));
+}
+
+export async function addMemory(userId: string, fact: string, source = 'chat') {
+  await ensureChatSchema();
+  const f = fact.trim().slice(0, 500);
+  if (!f) return;
+  // Skip near-duplicates (exact match) so memory doesn't bloat.
+  const existing = await db
+    .select({ id: chatMemory.id })
+    .from(chatMemory)
+    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.fact, f)));
+  if (existing.length) return;
+  await db.insert(chatMemory).values({ id: rid(), userId, fact: f, source });
+}
+
+export async function deleteMemory(userId: string, id: string) {
+  await ensureChatSchema();
+  await db.delete(chatMemory).where(and(eq(chatMemory.id, id), eq(chatMemory.userId, userId)));
+}
+
+// Format the user's memories as a system block injected into every chat.
+export async function memoryBlock(userId: string): Promise<string> {
+  const rows = await listMemory(userId);
+  if (!rows.length) return '';
+  return (
+    '<user_memory>\nRelevant facts remembered about this user from past conversations:\n' +
+    rows.map((r) => `- ${r.fact}`).join('\n') +
+    '\n</user_memory>'
+  );
 }
 
 // ─── Org skills (RBAC-scoped reusable assistants) ─────────────────────────────

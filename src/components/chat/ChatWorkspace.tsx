@@ -5,13 +5,16 @@ import {
   Copy,
   FolderSimplePlus,
   GearSix,
+  Brain,
   ImageSquare,
   MagnifyingGlass,
+  Microphone,
   PaperPlaneRight,
   Plus,
   Quotes,
   SlidersHorizontal,
   Sparkle,
+  SpeakerHigh,
   Stop,
   Trash,
   X,
@@ -23,6 +26,7 @@ import { type Artifact, parseArtifact } from '@/lib/artifacts';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
+import { MemoryDialog } from './MemoryDialog';
 import { type Project, ProjectDialog } from './ProjectDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { SkillsDialog } from './SkillsDialog';
@@ -71,12 +75,14 @@ function MessageBubble({
   onOpenArtifact,
   onCopy,
   onRegenerate,
+  onSpeak,
   canRegenerate,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
   onCopy: (text: string) => void;
   onRegenerate: () => void;
+  onSpeak: (text: string) => void;
   canRegenerate: boolean;
 }) {
   const isAssistant = m.role === 'assistant';
@@ -129,6 +135,13 @@ function MessageBubble({
                 >
                   <Copy className="size-3.5" />
                 </button>
+                <button
+                  onClick={() => onSpeak(m.content)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Play"
+                >
+                  <SpeakerHigh className="size-3.5" />
+                </button>
                 {canRegenerate ? (
                   <button
                     onClick={onRegenerate}
@@ -159,6 +172,9 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
     { fn: string; toolName: string; input: string }[]
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -301,6 +317,52 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
   function copy(text: string) {
     void navigator.clipboard.writeText(text);
     toast.success('Copied');
+  }
+
+  // Voice input — record a clip, POST to the gateway transcription endpoint, drop text in composer.
+  async function toggleRecording() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const fd = new FormData();
+        fd.append('file', blob, 'audio.webm');
+        const r = await fetch('/api/v1/chat/transcribe', { method: 'POST', body: fd });
+        if (!r.ok) return toast.error('Transcription unavailable');
+        const { text } = await r.json();
+        if (text) setInput((prev) => (prev ? `${prev} ${text}` : text));
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch {
+      toast.error('Microphone unavailable');
+    }
+  }
+
+  // TTS — play an answer through the gateway speech endpoint.
+  async function speak(text: string) {
+    try {
+      const r = await fetch('/api/v1/chat/speech', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ input: text }),
+      });
+      if (!r.ok) return toast.error('Speech unavailable');
+      const url = URL.createObjectURL(await r.blob());
+      void new Audio(url).play();
+    } catch {
+      toast.error('Speech failed');
+    }
   }
 
   // Shared SSE loop — updates the trailing assistant placeholder. Caller adds the placeholder.
@@ -545,6 +607,13 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setMemoryOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Memory"
+            >
+              <Brain className="size-4" />
+            </button>
+            <button
               onClick={() => setSettingsOpen(true)}
               className="text-muted-foreground hover:text-foreground"
               title="Custom instructions"
@@ -588,6 +657,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
                 onOpenArtifact={setArtifact}
                 onCopy={copy}
                 onRegenerate={regenerate}
+                onSpeak={speak}
                 canRegenerate={!streaming && i === messages.length - 1}
               />
             ))}
@@ -659,6 +729,16 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
                   </button>
                 </>
               ) : null}
+              <button
+                onClick={toggleRecording}
+                className={cn(
+                  'p-1.5 hover:text-foreground',
+                  recording ? 'animate-pulse text-destructive' : 'text-muted-foreground',
+                )}
+                title={recording ? 'Stop recording' : 'Dictate'}
+              >
+                <Microphone className="size-5" />
+              </button>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -697,6 +777,7 @@ export function ChatWorkspace({ role = 'viewer' }: { role?: string }) {
         onSaved={refreshProjects}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} />
       <SkillsDialog
         open={skillsOpen}
         onOpenChange={setSkillsOpen}
