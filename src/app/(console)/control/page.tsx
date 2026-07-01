@@ -1,8 +1,10 @@
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddRoutingRuleButton } from '@/components/control/AddRoutingRuleButton';
+import { AuditSearch } from '@/components/control/AuditSearch';
 import { PolicyEditor } from '@/components/control/PolicyEditor';
 import { RoutingRuleToggle } from '@/components/control/RoutingRuleToggle';
 import { RoutingTester } from '@/components/control/RoutingTester';
+import { SecretsPanel } from '@/components/control/SecretsPanel';
 import { UsersTable } from '@/components/control/UsersTable';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireModule } from '@/lib/modules';
+import { siemConfigured } from '@/lib/siem';
 import {
   getOrgPolicy,
   listAudit,
@@ -48,6 +52,8 @@ export default async function ControlPage() {
     listAudit({ limit: 25 }),
     listRoutingRules(),
   ]);
+  const baoReady = openBaoConfigured();
+  const secretKeys = baoReady && openBaoSecrets.list ? await openBaoSecrets.list() : [];
 
   return (
     <div className="space-y-6">
@@ -162,6 +168,32 @@ export default async function ControlPage() {
         </CardHeader>
         <CardContent>
           <UsersTable users={users} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Secrets vault (OpenBao)</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Connector/tool credentials and virtual-key secrets stored in OpenBao KV v2 via the
+            secrets adapter. Values are write-only from here — only key names are listed back.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <SecretsPanel configured={baoReady} initialKeys={secretKeys} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Audit search (SIEM)</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Full-text + filtered search over the audit stream shipped to OpenSearch — beyond the
+            recent slice below.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <AuditSearch configured={siemConfigured()} />
         </CardContent>
       </Card>
 
