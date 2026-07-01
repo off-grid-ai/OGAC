@@ -15,9 +15,13 @@ those survive IP changes; the IPs below are current but can shift on a network c
 |---|---|---|---|
 | **offgrid-s1** | 127.0.0.1 | **Server / control plane** | Caddy edge (:80), Postgres (:5432), Keycloak (:8080), aggregator (:8800), metrics (:9100), Console (:3000) |
 | **offgrid-s2** | 192.168.1.60 | Server (console standby) | Console (:3000) — shares S1's Postgres |
-| **offgrid-g1** | 192.168.1.57 | Gateway · inference | Gemma 4 12B — text / general / coding |
-| **offgrid-g2** | 192.168.1.58 | Gateway · inference | Qwen 3.5 9B — **text + vision** (mmproj) |
-| **offgrid-g3** | 192.168.1.32 | Gateway · inference | Gemma 4 E4B — **vision** |
+| **offgrid-g1** | 192.168.1.57 | Gateway · inference | Qwythos 9B — text + vision (mmproj) |
+| **offgrid-g2** | 192.168.1.58 | Gateway · inference | Qwen 3.5 9B — text + vision (mmproj) |
+| **offgrid-g3** | 192.168.1.32 | Gateway · inference | Gemma 4 E4B — text + vision (mmproj) |
+| **offgrid-g4** | 192.168.1.63 | Gateway · inference | Gemma 4 E4B — text + vision · redundancy for g3 |
+| **offgrid-g5** | 192.168.1.65 | Gateway · inference | Qwen 3.5 9B — text + vision · redundancy for g2 |
+| **offgrid-g6** | 192.168.1.66 | Gateway · inference | Qwen3-Coder 30B IQ3_XXS — text / coding |
+| **offgrid-g7** | 192.168.1.62 | Gateway · inference | Qwen3-Coder 30B IQ3_XXS — text / coding · redundancy for g6 |
 
 All nodes: user `admin`, password `1234` (LAN-only; change before any exposure), key-based
 SSH + passwordless sudo. **Sleep is disabled** (`pmset disablesleep 1`) so lids can stay closed.

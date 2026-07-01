@@ -12,12 +12,23 @@ const PORT = Number(process.env.PORT || 8800);
 const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info URLs only
 // role map — one model per gateway (edit IPs via OFFGRID_POOL JSON if they change)
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
-  { name: 'g1', host: '192.168.1.57', port: 7878, vision: false, model: 'gemma-4-12b' },
-  { name: 'g2', host: '192.168.1.58', port: 7878, vision: true, model: 'qwen3.5-9b' },
-  { name: 'g3', host: '192.168.1.32', port: 7878, vision: true, model: 'gemma-4-e4b' },
+  { name: 'g1',  host: '192.168.1.57', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g2',  host: '192.168.1.58', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g3',  host: '192.168.1.32', port: 7878, vision: true,  model: 'gemma-4-e4b' },
+  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'gemma-4-e4b' },
+  { name: 'g5',  host: '192.168.1.65', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g6',  host: '192.168.1.66', port: 7878, vision: false, model: 'qwen3-coder' },
+  { name: 'g7',  host: '192.168.1.62', port: 7878, vision: false, model: 'qwen3-coder' },
+  { name: 'g8',  host: '192.168.1.64', port: 7878, vision: true,  model: 'qwythos-9b' },
 ]));
-const TEXT = POOL.filter((g) => ['g1', 'g2'].includes(g.name));
-let rr = 0;
+
+// per-model round-robin counters
+const rr = {};
+function rrPick(nodes) {
+  const k = nodes.map((g) => g.name).join(',');
+  rr[k] = ((rr[k] || 0) + 1) % nodes.length;
+  return nodes[rr[k]];
+}
 
 // --- traffic monitoring: rolling log of recent calls + per-gateway counters ---
 const LOG = [];        // last N proxied requests (newest last)
@@ -53,13 +64,17 @@ const hasImage = (b) => {
 };
 function pick(model, image) {
   const m = (model || '').toLowerCase();
+  const byModel = (tag) => POOL.filter((g) => g.model.includes(tag));
   if (image) {
-    if (m.includes('gemma')) return POOL.find((g) => g.name === 'g3'); // Gemma E4B vision
-    return POOL.find((g) => g.vision); // g2: Qwen text+vision (default vision node)
+    if (m.includes('gemma')) return rrPick(POOL.filter((g) => g.model.includes('gemma') && g.vision));
+    if (m.includes('qwen'))  return rrPick(POOL.filter((g) => g.model.includes('qwen')  && g.vision));
+    return rrPick(POOL.filter((g) => g.vision)); // any vision node
   }
-  if (m.includes('gemma')) return POOL.find((g) => g.name === 'g1'); // Gemma 12B text
-  if (m.includes('qwen')) return POOL.find((g) => g.name === 'g2');
-  return TEXT[rr++ % TEXT.length]; // text: round-robin g1/g2
+  if (m.includes('gemma'))   return rrPick(byModel('gemma'));
+  if (m.includes('coder') || (m.includes('qwen') && m.includes('coder'))) return rrPick(byModel('qwen3-coder'));
+  if (m.includes('qwen'))    return rrPick(byModel('qwen3.5'));
+  if (m.includes('qwythos')) return rrPick(byModel('qwythos'));
+  return rrPick(POOL); // unspecified: round-robin everything
 }
 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
@@ -95,14 +110,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     return res.end(JSON.stringify(trafficJSON()));
   }
-  if (req.url === '/v1/models')
-    return json(res, 200, {
-      object: 'list', data: [
-        { id: 'gemma-4-12b', object: 'model', owned_by: 'offgrid', capabilities: ['text'], gateways: POOL.filter((g) => g.model === 'gemma-4-12b').map((g) => g.name) },
-        { id: 'qwen3.5-9b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'qwen3.5-9b').map((g) => g.name) },
-        { id: 'gemma-4-e4b', object: 'model', owned_by: 'offgrid', capabilities: ['text', 'vision'], gateways: POOL.filter((g) => g.model === 'gemma-4-e4b').map((g) => g.name) },
-      ]
+  if (req.url === '/v1/models') {
+    const models = [...new Set(POOL.map((g) => g.model))].map((id) => {
+      const nodes = POOL.filter((g) => g.model === id);
+      const vision = nodes.some((g) => g.vision);
+      return { id, object: 'model', owned_by: 'offgrid', capabilities: vision ? ['text', 'vision'] : ['text'], gateways: nodes.map((g) => g.name) };
     });
+    return json(res, 200, { object: 'list', data: models });
+  }
 
   const chunks = [];
   req.on('data', (c) => chunks.push(c));
