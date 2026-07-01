@@ -1,7 +1,7 @@
 'use client';
 
 import { Pulse } from '@phosphor-icons/react/dist/ssr';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -30,6 +30,8 @@ interface Call {
   ms: number;
   tokens: number;
   bytes: number;
+  input?: string;
+  output?: string;
 }
 interface Traffic {
   available: boolean;
@@ -45,6 +47,7 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString();
 // latency, tokens, and status. Hidden entirely when the gateway has no traffic feed.
 export function GatewayTraffic() {
   const [data, setData] = useState<Traffic | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -128,31 +131,64 @@ export function GatewayTraffic() {
             </TableHeader>
             <TableBody>
               {recent.length ? (
-                recent.map((c, i) => (
-                  <TableRow key={`${c.ts}-${i}`}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {time(c.ts)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-primary/10 font-mono text-primary">
-                        {c.gateway}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{c.model}</TableCell>
-                    <TableCell className="text-xs">{c.kind}</TableCell>
-                    <TableCell
-                      className={`font-mono text-xs ${
-                        !c.status || c.status >= 400 ? 'text-destructive' : 'text-foreground'
-                      }`}
-                    >
-                      {c.status}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">{c.ms} ms</TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {c.tokens || '—'}
-                    </TableCell>
-                  </TableRow>
-                ))
+                recent.map((c, i) => {
+                  const key = `${c.ts}-${c.gateway}-${i}`;
+                  const open = openKey === key;
+                  return (
+                    <Fragment key={key}>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() => setOpenKey(open ? null : key)}
+                        title="Click to see prompt + completion"
+                      >
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {open ? '▾ ' : '▸ '}
+                          {time(c.ts)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-primary/10 font-mono text-primary">
+                            {c.gateway}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{c.model}</TableCell>
+                        <TableCell className="text-xs">{c.kind}</TableCell>
+                        <TableCell
+                          className={`font-mono text-xs ${
+                            !c.status || c.status >= 400 ? 'text-destructive' : 'text-foreground'
+                          }`}
+                        >
+                          {c.status}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">{c.ms} ms</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{c.tokens || '—'}</TableCell>
+                      </TableRow>
+                      {open ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="bg-muted/40">
+                            <div className="grid gap-2 py-1 md:grid-cols-2">
+                              <div>
+                                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Prompt in
+                                </div>
+                                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+                                  {c.input || '(none captured)'}
+                                </pre>
+                              </div>
+                              <div>
+                                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Completion out
+                                </div>
+                                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+                                  {c.output || '(none captured)'}
+                                </pre>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} className="py-6 text-center text-xs text-muted-foreground">
