@@ -31,6 +31,7 @@ SSH + passwordless sudo. **Sleep is disabled** (`pmset disablesleep 1`) so lids 
 | **Console** | http://127.0.0.1 | The one IP. Also `http://onprem-console.getoffgridai.co` on fleet Macs (via /etc/hosts). |
 | **Metrics dashboard** | http://127.0.0.1:9100 | Live CPU/mem/disk/load per node. |
 | **Gateway (aggregator)** | http://127.0.0.1:8800/v1 | OpenAI-compatible; routes text→g1/g2, images→g2/g3. |
+| **Gateway traffic (live)** | http://127.0.0.1:8800/traffic | Live per-gateway calls, latency, tokens, errors. JSON at same path. |
 | **Keycloak** | http://127.0.0.1:8080 | Realm `offgrid`. Admin: `admin` / `offgrid-dev`. |
 
 **Console login (Keycloak):** `mac@`, `mohammed.ali@`, `diksha.sharma@`, `ali@wednesday.is` — password `OffGrid-2026`. Locked to `@wednesday.is`. *Use a fresh/incognito window after any restart (stale session cookies).*
@@ -95,6 +96,13 @@ cd ~/offgrid/console/deploy && docker compose --profile data --profile identity 
 ```
 
 **Logs:** `/tmp/offgrid-edge.log`, `/tmp/offgrid-aggregator.log`, `/tmp/offgrid-metrics.log`, `~/offgrid/console/deploy/console.log`, `~/gateway.log` (on gateways).
+
+**Watch gateway traffic live** (which gateway served each call, latency, tokens):
+```bash
+# browser: http://127.0.0.1:8800/traffic   — auto-refreshing dashboard
+# terminal (per-request line log):
+ssh admin@offgrid-s1.local 'tail -f /tmp/offgrid-aggregator.log'
+```
 
 **After a network change** (IPs shifted): `./recover.sh` re-resolves every node by mDNS name and regenerates the edge config, `/etc/hosts`, and console `.env` for the new IPs.
 
