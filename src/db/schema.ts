@@ -332,6 +332,16 @@ export const chatSettings = pgTable('chat_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Per-user cross-conversation memory — salient facts extracted from chats, injected into the
+// system prompt of future chats (like ChatGPT memory). User-manageable (view/delete). Additive.
+export const chatMemory = pgTable('chat_memory', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  fact: text('fact').notNull(),
+  source: text('source').notNull().default('chat'), // chat | manual
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Knowledgebase for a project — documents + embedded chunks (RAG). Mirrors desktop rag_documents
 // / rag_chunks; embeddings via the gateway's /v1/embeddings (384-dim), retrieved at chat time.
 export const chatDocuments = pgTable('chat_documents', {

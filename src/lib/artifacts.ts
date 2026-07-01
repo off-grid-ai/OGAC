@@ -2,10 +2,11 @@
 // renderable artifact (html / svg / mermaid / react / markdown) out of a model reply so the
 // chat can show it side-by-side. Detection only; rendering happens in the client canvas.
 
-export type ArtifactKind = 'html' | 'svg' | 'mermaid' | 'react' | 'text';
+export type ArtifactKind = 'html' | 'svg' | 'mermaid' | 'react' | 'text' | 'code';
 export interface Artifact {
   kind: ArtifactKind;
   code: string;
+  language?: 'python' | 'node'; // set for runnable `code` artifacts
 }
 
 const JSX_SIGNAL =
@@ -33,6 +34,11 @@ export function parseArtifact(content: string): Artifact | null {
   // 4. Bare <svg>…</svg> with no fence.
   const svg = content.match(/<svg[\s\S]*<\/svg>/i);
   if (svg) return { kind: 'svg', code: svg[0] };
+
+  // 5. Runnable code: a python or node/js block (that isn't React) → executable via the sandbox.
+  const py = content.match(/```(?:python|py)\s*\n([\s\S]*?)```/i);
+  if (py) return { kind: 'code', code: py[1].trim(), language: 'python' };
+  if (jsBlocks.length) return { kind: 'code', code: jsBlocks.join('\n\n'), language: 'node' };
 
   return null;
 }

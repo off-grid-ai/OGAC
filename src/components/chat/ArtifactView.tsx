@@ -1,28 +1,68 @@
 'use client';
 
-import { X } from '@phosphor-icons/react/dist/ssr';
+import { Play, X } from '@phosphor-icons/react/dist/ssr';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import type { Artifact } from '@/lib/artifacts';
 import { Markdown } from './Markdown';
 
+interface RunResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+  refused?: string;
+  engine: string;
+}
+
 // Side panel that renders a detected artifact. HTML/SVG run live in a sandboxed iframe
-// (no same-origin, no top navigation); text renders as markdown. React/mermaid preview is a
-// Phase-4 add — for now their source is shown so nothing is lost.
+// (no same-origin, no top navigation); text renders as markdown; runnable code (python/node) gets a
+// Run button that executes it in the console sandbox adapter and shows stdout/stderr inline.
+// eslint-disable-next-line complexity
 export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClose: () => void }) {
   const live = artifact.kind === 'html' || artifact.kind === 'svg';
+  const runnable = artifact.kind === 'code';
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<RunResult | null>(null);
   const srcDoc =
     artifact.kind === 'svg'
       ? `<!doctype html><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${artifact.code}`
       : artifact.code;
+
+  async function run() {
+    setRunning(true);
+    setResult(null);
+    try {
+      const r = await fetch('/api/v1/chat/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ language: artifact.language ?? 'python', code: artifact.code }),
+      });
+      const d = await r.json();
+      setResult(d.result ?? null);
+    } finally {
+      setRunning(false);
+    }
+  }
 
   return (
     <div className="flex h-full w-[45%] min-w-[360px] flex-col border-l border-border bg-card">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
         <span className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
           Artifact · {artifact.kind}
+          {artifact.language ? ` · ${artifact.language}` : ''}
         </span>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="size-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {runnable ? (
+            <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={run} disabled={running}>
+              <Play className="size-3.5" /> {running ? 'Running…' : 'Run'}
+            </Button>
+          ) : null}
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto">
         {live ? (
@@ -41,6 +81,30 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
             {artifact.code}
           </pre>
         )}
+        {result ? (
+          <div className="mx-4 mb-4 space-y-1.5">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Output · {result.engine}
+              {result.timedOut ? ' · timed out' : ''}
+              {result.exitCode !== null ? ` · exit ${result.exitCode}` : ''}
+            </div>
+            {result.refused ? (
+              <pre className="overflow-x-auto rounded-md border border-amber-500/40 bg-amber-500/10 p-2 font-mono text-xs text-foreground">
+                {result.refused}
+              </pre>
+            ) : null}
+            {result.stdout ? (
+              <pre className="overflow-x-auto rounded-md border border-border bg-background p-2 font-mono text-xs">
+                {result.stdout}
+              </pre>
+            ) : null}
+            {result.stderr ? (
+              <pre className="overflow-x-auto rounded-md border border-destructive/40 bg-destructive/10 p-2 font-mono text-xs">
+                {result.stderr}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
