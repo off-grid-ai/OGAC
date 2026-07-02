@@ -1,9 +1,21 @@
 'use client';
 
-import { Prohibit, ShieldCheck, Gauge, GlobeSimple } from '@phosphor-icons/react/dist/ssr';
-import { useEffect, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowsDownUp,
+  Funnel,
+  Gauge,
+  GlobeSimple,
+  MagnifyingGlass,
+  Prohibit,
+  ShieldCheck,
+  X,
+} from '@phosphor-icons/react/dist/ssr';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -34,21 +46,47 @@ interface Snapshot {
   recent: EdgeEvent[];
 }
 
-function Stat({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof ShieldCheck }) {
-  return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-1">
-        <Icon className="size-4 text-primary" />
-        <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">{label}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-2xl font-semibold text-foreground">{value}</CardContent>
-    </Card>
-  );
+// Group identical (ip, host, method, uri, kind) within a 10-second bucket
+interface GroupedEvent {
+  key: string;
+  ts: string;
+  status: number;
+  kind: 'waf' | 'rate-limit';
+  ip: string;
+  host: string;
+  method: string;
+  uri: string;
+  count: number;
 }
 
-// eslint-disable-next-line complexity
+function groupEvents(events: EdgeEvent[]): GroupedEvent[] {
+  const map = new Map<string, GroupedEvent>();
+  for (const e of events) {
+    // bucket by 10-second windows
+    const bucket = Math.floor(new Date(e.ts).getTime() / 10_000);
+    const key = `${bucket}|${e.kind}|${e.ip}|${e.host}|${e.method}|${e.uri}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      map.set(key, { key, ...e, count: 1 });
+    }
+  }
+  return [...map.values()];
+}
+
+type SortField = 'ts' | 'count' | 'ip' | 'host';
+type SortDir = 'asc' | 'desc';
+type KindFilter = 'all' | 'waf' | 'rate-limit';
+
+const KIND_LABELS: Record<KindFilter, string> = { all: 'All', waf: 'WAF', 'rate-limit': '429' };
+
 export function EdgePanel() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [search, setSearch] = useState('');
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all');
+  const [sortField, setSortField] = useState<SortField>('ts');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
     let alive = true;
@@ -65,8 +103,52 @@ export function EdgePanel() {
 
   const p = snap?.policy;
 
+  const grouped = useMemo(() => groupEvents(snap?.recent ?? []), [snap]);
+
+  const filtered = useMemo(() => {
+    let rows = grouped;
+    if (kindFilter !== 'all') rows = rows.filter((e) => e.kind === kindFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter(
+        (e) =>
+          e.ip.includes(q) ||
+          e.host.toLowerCase().includes(q) ||
+          e.uri.toLowerCase().includes(q) ||
+          e.method.toLowerCase().includes(q),
+      );
+    }
+    rows = [...rows].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'ts') cmp = new Date(a.ts).getTime() - new Date(b.ts).getTime();
+      else if (sortField === 'count') cmp = a.count - b.count;
+      else if (sortField === 'ip') cmp = a.ip.localeCompare(b.ip);
+      else if (sortField === 'host') cmp = a.host.localeCompare(b.host);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [grouped, kindFilter, search, sortField, sortDir]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('desc'); }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowsDownUp className="size-3 opacity-30" />;
+    return sortDir === 'desc'
+      ? <ArrowDown className="size-3 text-primary" />
+      : <ArrowUp className="size-3 text-primary" />;
+  };
+
+  const totalBlocked = snap?.summary.total ?? 0;
+  const uniqueIps = snap?.summary.uniqueIps ?? 0;
+  const wafBlocks = snap?.summary.waf ?? 0;
+  const rateLimited = snap?.summary.rateLimited ?? 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* ── Header ── */}
       <div>
         <h1 className="text-lg font-semibold text-foreground">Gateway</h1>
         <p className="text-sm text-muted-foreground">
@@ -74,95 +156,197 @@ export function EdgePanel() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Blocks (recent)" value={snap?.summary.total ?? '—'} icon={Prohibit} />
-        <Stat label="WAF blocks" value={snap?.summary.waf ?? '—'} icon={ShieldCheck} />
-        <Stat label="Rate-limited" value={snap?.summary.rateLimited ?? '—'} icon={Gauge} />
-        <Stat label="Unique IPs" value={snap?.summary.uniqueIps ?? '—'} icon={GlobeSimple} />
-      </div>
+      {/* ── Unified status bar ── */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+        {/* Stats inline */}
+        <div className="flex items-center gap-1.5">
+          <Prohibit className="size-3.5 text-destructive" />
+          <span className="font-semibold text-foreground">{totalBlocked}</span>
+          <span className="text-muted-foreground">blocks</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="size-3.5 text-primary" />
+          <span className="font-semibold text-foreground">{wafBlocks}</span>
+          <span className="text-muted-foreground">WAF</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Gauge className="size-3.5 text-amber-500" />
+          <span className="font-semibold text-foreground">{rateLimited}</span>
+          <span className="text-muted-foreground">rate-limited</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <GlobeSimple className="size-3.5 text-muted-foreground" />
+          <span className="font-semibold text-foreground">{uniqueIps}</span>
+          <span className="text-muted-foreground">unique IPs</span>
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Gauge className="size-4 text-primary" /> Rate limit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            {p?.rateLimit ? (
-              <p>
-                <span className="font-mono text-foreground">{p.rateLimit.events}</span> requests /{' '}
-                <span className="font-mono text-foreground">{p.rateLimit.window}</span> per client IP
-                <span className="text-muted-foreground"> · zone {p.rateLimit.zone}</span>
-              </p>
-            ) : (
-              <p className="text-muted-foreground">No rate limit configured.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <ShieldCheck className="size-4 text-primary" /> WAF{' '}
-              <Badge variant={p?.wafEnabled ? 'default' : 'outline'} className="text-[10px]">
-                {p?.wafEnabled ? 'on' : 'off'}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-1">
-            {p?.wafRules.length
-              ? p.wafRules.map((r) => (
-                  <Badge key={r} variant="secondary" className="text-[10px]">{r}</Badge>
-                ))
-              : <span className="text-sm text-muted-foreground">No rules.</span>}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Recent blocks</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {snap && snap.recent.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">No blocked requests. The edge is quiet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Client IP</TableHead>
-                    <TableHead>Host</TableHead>
-                    <TableHead>Request</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(snap?.recent ?? []).slice(0, 100).map((e, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={e.kind === 'waf' ? 'destructive' : 'outline'} className="text-[10px]">
-                          {e.kind === 'waf' ? `WAF ${e.status}` : `429`}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{e.ip}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{e.host}</TableCell>
-                      <TableCell className="max-w-[24rem] truncate font-mono text-xs text-muted-foreground">
-                        {e.method} {e.uri}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {/* Rate limit policy */}
+          {p?.rateLimit && (
+            <span className="flex items-center gap-1">
+              <Gauge className="size-3" />
+              <span className="font-mono text-foreground">{p.rateLimit.events}</span>
+              {' req / '}
+              <span className="font-mono text-foreground">{p.rateLimit.window}</span>
+              {' · '}zone {p.rateLimit.zone}
+            </span>
           )}
-        </CardContent>
-      </Card>
+          {/* WAF status */}
+          <span className="flex items-center gap-1.5">
+            <ShieldCheck className="size-3" />
+            WAF
+            <Badge variant={p?.wafEnabled ? 'default' : 'outline'} className="text-[10px] px-1 py-0">
+              {p?.wafEnabled ? 'on' : 'off'}
+            </Badge>
+            {p?.wafRules.map((r) => (
+              <Badge key={r} variant="secondary" className="text-[10px] px-1 py-0">{r}</Badge>
+            ))}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Blocks table ── */}
+      <div className="rounded-lg border border-border bg-card shadow-sm">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+          <span className="mr-1 text-sm font-medium text-foreground">Recent blocks</span>
+
+          {/* Kind filter */}
+          <div className="flex items-center rounded-md border border-border bg-muted/40 p-0.5">
+            {(['all', 'waf', 'rate-limit'] as KindFilter[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setKindFilter(k)}
+                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                  kindFilter === k
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {KIND_LABELS[k]}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px]">
+            <MagnifyingGlass className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Filter by IP, host, path…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-7 pl-7 text-xs"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter pill */}
+          {(kindFilter !== 'all' || search) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={() => { setKindFilter('all'); setSearch(''); }}
+            >
+              <Funnel className="size-3" /> Clear
+            </Button>
+          )}
+
+          <span className="ml-auto font-mono text-xs text-muted-foreground">
+            {filtered.length} group{filtered.length !== 1 ? 's' : ''}
+            {grouped.length !== (snap?.recent ?? []).length && (
+              <span> · {(snap?.recent ?? []).length} raw</span>
+            )}
+          </span>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          {!snap ? (
+            <p className="py-12 text-center text-xs text-muted-foreground">Loading…</p>
+          ) : filtered.length === 0 ? (
+            <p className="py-12 text-center text-xs text-muted-foreground">
+              {grouped.length === 0 ? 'No blocked requests. The edge is quiet.' : 'No results match your filter.'}
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead
+                    className="cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort('ts')}
+                  >
+                    <span className="flex items-center gap-1">When <SortIcon field="ts" /></span>
+                  </TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('ip')}
+                  >
+                    <span className="flex items-center gap-1">Client IP <SortIcon field="ip" /></span>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('host')}
+                  >
+                    <span className="flex items-center gap-1">Host <SortIcon field="host" /></span>
+                  </TableHead>
+                  <TableHead>Request</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none text-right"
+                    onClick={() => toggleSort('count')}
+                  >
+                    <span className="flex items-center justify-end gap-1">Count <SortIcon field="count" /></span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((e) => (
+                  <TableRow key={e.key} className={e.count >= 10 ? 'bg-destructive/5' : undefined}>
+                    <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                      {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={e.kind === 'waf' ? 'destructive' : 'outline'}
+                        className="text-[10px]"
+                      >
+                        {e.kind === 'waf' ? `WAF ${e.status}` : '429'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{e.ip}</TableCell>
+                    <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">
+                      {e.host}
+                    </TableCell>
+                    <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">
+                      {e.method} {e.uri}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {e.count > 1 ? (
+                        <Badge
+                          variant={e.count >= 50 ? 'destructive' : e.count >= 10 ? 'outline' : 'secondary'}
+                          className="text-[10px] font-mono"
+                        >
+                          ×{e.count}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">1</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
