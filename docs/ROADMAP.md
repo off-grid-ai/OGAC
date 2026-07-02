@@ -496,6 +496,14 @@ A non-technical user with no prior AI experience can:
 - Regenerate-with-different-model, streaming token counter, stop/continue.
 - Keyboard shortcuts (⌘↵ send, ↑ to edit last, esc to stop).
 
+**Error handling (currently poor)**
+- Surface gateway/stream errors **inline in the message** (not a silent empty bubble or a toast that vanishes) — with the actual reason (gateway offline, 401, rate-limited, timeout, model unavailable).
+- **Retry affordance on every failed turn** — one click to re-run the failed generation.
+- Distinguish transient (retryable: timeout, 502) from terminal (401/403/400) errors and message accordingly.
+- Preserve the user's input on failure (never lose the prompt).
+- Mid-stream failure keeps partial output + shows "generation interrupted — retry?".
+- Attachment/upload errors reported per-file with a reason.
+
 ### Definition of done
 The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste + inline image thumbnails + a per-conversation image gallery; in-place artifact editing with live re-render and version revert. A user coming from ChatGPT/Claude finds nothing obviously missing.
 
