@@ -17,14 +17,17 @@ import {
   Scales as Scale,
   Scroll as ScrollText,
   ShieldCheck,
+  SquaresFour,
   TextAlignLeft,
   TreeStructure,
+  UsersThree,
   Vault,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
 export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   chat: ChatIcon,
+  services: SquaresFour,
   projects: FolderOpen,
   artifacts: Cube,
   prompts: TextAlignLeft,
@@ -43,5 +46,6 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   regulatory: Scale,
   integrations: Vault,
   knowledge: BookOpenText,
+  access: UsersThree,
   admin: Building2,
 };
