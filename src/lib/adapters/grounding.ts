@@ -4,7 +4,7 @@ import type { ClaimVerdict, GroundingPort, GroundingResult, GroundingSource } fr
 // its cited sources, independent of any retrieval store or the Brain. The model-backed adapter
 // runs entirely through OUR gateway (the one gateway) — no separate model dependency. If the
 // gateway is unreachable it degrades to the lexical adapter so verification still returns.
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const GROUNDING_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 const MAX_CLAIMS = 12;
 
@@ -86,7 +86,7 @@ function extractVerdicts(data: unknown): GwVerdict[] {
 async function gatewayVerify(claims: string[], sources: GroundingSource[]): Promise<GwVerdict[]> {
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({
       model: GROUNDING_MODEL,
       temperature: 0,
@@ -134,7 +134,7 @@ export const modelGrounding: GroundingPort = {
   },
   async health() {
     try {
-      const res = await fetch(`${GATEWAY_URL}/v1/models`, { signal: AbortSignal.timeout(2000) });
+      const res = await fetch(`${GATEWAY_URL}/v1/models`, { headers: gatewayHeaders(), signal: AbortSignal.timeout(2000) });
       return res.ok;
     } catch {
       return false;

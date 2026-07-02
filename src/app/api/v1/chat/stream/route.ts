@@ -30,7 +30,7 @@ import { getOrgSystemPrompt } from '@/lib/store';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const enc = new TextEncoder();
 
 type ContentPart =
@@ -270,7 +270,7 @@ export async function POST(req: Request) {
     method: 'POST',
     // x-offgrid-user attributes gateway spend to the real signed-in user (captured into the
     // gateway's OpenSearch log as `caller`) rather than the console's user-agent.
-    headers: { 'content-type': 'application/json', 'x-offgrid-user': userId },
+    headers: gatewayHeaders({ 'content-type': 'application/json', 'x-offgrid-user': userId }),
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(290000),
   }).catch(() => null);

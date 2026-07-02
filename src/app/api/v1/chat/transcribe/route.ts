@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
-
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // Speech-to-text — forwards recorded audio to the gateway's OpenAI-style transcription endpoint
 // (modality 'transcription':'ready'). The client puts the returned text into the composer.
@@ -19,6 +18,7 @@ export async function POST(req: Request) {
   out.append('file', file as Blob, 'audio.webm');
   const r = await fetch(`${GATEWAY_URL}/v1/audio/transcriptions`, {
     method: 'POST',
+    headers: gatewayHeaders(),
     body: out,
     signal: AbortSignal.timeout(110000),
   }).catch(() => null);

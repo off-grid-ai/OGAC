@@ -40,26 +40,24 @@ function HealthDot({ h }: { h: ServiceHealth | undefined }) {
   );
 }
 
-function ServiceRow({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }) {
+function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }) {
   return (
-    <div className="flex items-center gap-4 border-b border-border py-3 last:border-0">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{s.label}</span>
-          <Badge variant="outline" className="px-1 py-0 text-[10px] uppercase">{AUTH_LABEL[s.auth]}</Badge>
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{s.description}</p>
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">{s.label}</span>
+        <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px] uppercase">{AUTH_LABEL[s.auth]}</Badge>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
         <a
           href={s.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-primary"
+          className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
         >
           {s.url.replace(/^https?:\/\//, '').split('/')[0]}
-          <ArrowSquareOut className="size-3" />
+          <ArrowSquareOut className="size-3 shrink-0" />
         </a>
       </div>
     </div>
@@ -125,9 +123,9 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
                 </span>
               )}
             </div>
-            <div className="px-4">
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.map((s) => (
-                <ServiceRow key={s.id} s={s} h={health[s.id]} />
+                <ServiceCard key={s.id} s={s} h={health[s.id]} />
               ))}
             </div>
           </div>

@@ -12,7 +12,7 @@ import type { EvalRunResult, EvalsPort } from './types';
 // sidecar against OUR gateway; each falls back to golden if its tool is unavailable, so selecting
 // one is never a hard dependency.
 const execFileAsync = promisify(execFile);
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const EVAL_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
 const RAGAS_URL = process.env.OFFGRID_RAGAS_URL;
 const PROMPTFOO_BIN = process.env.OFFGRID_PROMPTFOO_BIN ?? 'promptfoo';
@@ -140,7 +140,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({
       model: EVAL_MODEL,
       temperature: 0,
@@ -179,7 +179,7 @@ async function runRagas(): Promise<EvalRunResult> {
   const dataset = await buildDataset();
   const res = await fetch(`${RAGAS_URL}/evaluate`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, dataset }),
     signal: AbortSignal.timeout(180_000),
   });

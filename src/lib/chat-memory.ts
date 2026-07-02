@@ -5,7 +5,7 @@ import { addMemory } from '@/lib/chat';
 // fire-and-forget; failures never affect the chat. Mirrors the desktop's memory-distill approach
 // (enable_thinking:false + a strict "one fact per line, or NONE" instruction).
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 const EXTRACT_PROMPT =
   'You extract durable facts about the USER worth remembering across future conversations ' +
@@ -33,7 +33,7 @@ export async function extractMemory(
     if (model) payload.model = model;
     const r = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: gatewayHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(30000),
     });

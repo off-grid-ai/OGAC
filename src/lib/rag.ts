@@ -5,7 +5,7 @@ import { chatChunks, chatDocuments } from '@/db/schema';
 // Knowledgebase / RAG — ports Off Grid AI Desktop's chunk→embed→retrieve pipeline to the console,
 // using the on-prem gateway's /v1/embeddings (384-dim MiniLM) instead of an in-process model.
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 let ensurePromise: Promise<void> | null = null;
 async function ensureRagSchema(): Promise<void> {
@@ -47,7 +47,7 @@ function chunkText(text: string, chunkSize = 600, overlap = 120): string[] {
 async function embed(input: string | string[]): Promise<number[][]> {
   const r = await fetch(`${GATEWAY_URL}/v1/embeddings`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ input }),
     signal: AbortSignal.timeout(60000),
   });
