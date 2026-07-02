@@ -47,13 +47,13 @@ function realIp(r: RawLine['request']): string {
 async function parsePolicy(): Promise<EdgePolicy> {
   let text = '';
   try { text = await readFile(CADDYFILE, 'utf8'); } catch { /* no file */ }
-  const events = text.match(/events\s+(\d+)/);
+  // The limit is passed to the (edge) snippet at the call site: `import edge <zone> <events>`.
+  const imp = text.match(/import\s+edge\s+(\S+)\s+(\d+)/);
   const window = text.match(/window\s+(\S+)/);
-  const zone = text.match(/zone\s+(\S+)\s*\{/);
   const wafRules = [...text.matchAll(/msg:'([^']+)'/g)].map((m) => m[1]);
   const hosts = [...text.matchAll(/https?:\/\/([a-z0-9.-]+\.getoffgridai\.co)/g)].map((m) => m[1]);
   return {
-    rateLimit: events ? { events: Number(events[1]), window: window?.[1] ?? '1m', zone: zone?.[1] ?? 'gateway' } : null,
+    rateLimit: imp ? { events: Number(imp[2]), window: window?.[1] ?? '1m', zone: imp[1] } : null,
     wafEnabled: /SecRuleEngine\s+On/i.test(text),
     wafRules,
     hosts: [...new Set(hosts)],
