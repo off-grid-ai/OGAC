@@ -521,6 +521,20 @@ export const verificationTokens = pgTable(
   (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
 );
 
+// ─── Gateway runtime config (admin-editable env vars, persisted + pushed live) ─
+// Each row is one env-var-equivalent setting. `secret` rows have their value
+// masked in GET responses. `liveReload` marks settings the gateway can apply
+// without a restart (via POST /config). Others take effect on next gateway start.
+export const gatewayConfig = pgTable('gateway_config', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull().default(''),
+  description: text('description').notNull().default(''),
+  secret: boolean('secret').notNull().default(false),
+  liveReload: boolean('live_reload').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text('updated_by').notNull().default(''),
+});
+
 // ─── Gateway client tokens (enterprise token passthrough + IP mapping) ────────
 // Written by the console's /api/gateway/tokens sync route, which reads the
 // in-memory TokenStore from the running gateway. One row per distinct token
