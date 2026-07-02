@@ -4,9 +4,22 @@ Upload files, retrieve them, and toggle public/private. Files are stored **on-pr
 (local disk on the server; metadata in Postgres) — nothing leaves your infrastructure.
 
 - **Base URL:** `https://onprem-console.getoffgridai.co`
-- **Auth (write/list/manage):** `Authorization: Bearer <API_KEY>` — currently the console
-  admin token (`OFFGRID_ADMIN_TOKEN`). A console login session (cookie) also works.
+- **Auth (write/list/manage):** the unified **key flow** — a Keycloak **service-account
+  JWT** as `Authorization: Bearer <jwt>` (the same key model as the gateway). A console
+  login session (cookie) also works for humans.
 - **Public reads:** no auth. Private reads: require the Bearer key (else `404`).
+
+### Getting a key (service account)
+Keycloak issues machine keys — we don't run a custom key store. Create a service-account
+client (Console → **Access → Machine Clients**, or reuse an existing one), then exchange
+its `client_id`/`client_secret` for a short-lived JWT:
+```bash
+API_KEY=$(curl -s https://<keycloak>/realms/offgrid/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=<your-client> -d client_secret=<secret> \
+  | jq -r .access_token)
+```
+Re-mint when it expires (~5 min). To manage files owned by others / act as admin, give
+the service account the `admin` realm role in Keycloak; otherwise it manages its own.
 
 > Private files return **404** (not 403) to callers without access, so their existence
 > isn't revealed.
@@ -99,8 +112,11 @@ curl -X DELETE -H "Authorization: Bearer $API_KEY" \
 
 ## Notes / limits
 - Storage: server local disk (`OFFGRID_FILES_DIR`) + Postgres metadata. Fully on-prem.
+- Auth is the **one key flow** used across Off Grid: Keycloak service-account JWTs,
+  validated through a single `IdentityVerifier` seam (`src/lib/auth/token-verifier.ts`)
+  shared by the Files API, the admin API, and the gateway. Add a new IdP by implementing
+  that interface — no endpoint changes.
+- `OFFGRID_ADMIN_TOKEN` still works as an explicit **break-glass** static token if set
+  (bootstrap/CI), but the canonical path is a Keycloak-issued key.
 - The edge WAF + rate limit currently front the **gateway** host, not the console; say
   the word and I'll extend them to file endpoints too.
-- The write key is the console admin token today — rotate `OFFGRID_ADMIN_TOKEN` for a
-  strong value, or ask me to accept Keycloak service-account JWTs here too (same model
-  as the gateway) so keys are Keycloak-issued.
