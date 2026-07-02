@@ -5,6 +5,7 @@ import { ErasureForm } from '@/components/data/ErasureForm';
 import { MaskingRuleToggle } from '@/components/data/MaskingRuleToggle';
 import { PiiScanner } from '@/components/data/PiiScanner';
 import { ReindexQdrantButton } from '@/components/data/ReindexQdrantButton';
+import { VectorDBInspector } from '@/components/data/VectorDBInspector';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -204,6 +205,8 @@ export default async function DataPage() {
           />
         </CardContent>
       </Card>
+
+      <VectorDBInspector urlHint={process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333'} />
 
       <PiiScanner />
     </div>
