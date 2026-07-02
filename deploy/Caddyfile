@@ -3,27 +3,17 @@
 	admin off
 }
 
-# Keycloak-gated UIs (via oauth2-proxy forward_auth). arg0 = upstream.
+# Owned-login gate: forward_auth to the console session check; unauthenticated
+# users are redirected to OUR /signin (not a hosted IdP page). arg0 = upstream.
 (gated) {
-	handle /oauth2/* {
-		reverse_proxy 127.0.0.1:4180 {
-			header_up X-Forwarded-Host {host}
-			header_up X-Forwarded-Proto https
+	forward_auth 127.0.0.1:3000 {
+		uri /api/auth/verify
+		@denied status 401 403
+		handle_response @denied {
+			redir https://onprem-console.getoffgridai.co/signin?callbackUrl=https://{host}{uri}
 		}
 	}
-	handle {
-		forward_auth 127.0.0.1:4180 {
-			uri /oauth2/auth
-			header_up X-Forwarded-Host {host}
-			header_up X-Forwarded-Proto https
-			copy_headers X-Auth-Request-User X-Auth-Request-Email
-			@denied status 401 403
-			handle_response @denied {
-				redir https://{host}/oauth2/start?rd=https://{host}{uri}
-			}
-		}
-		reverse_proxy {args[0]}
-	}
+	reverse_proxy {args[0]}
 }
 
 http://console-status.getoffgridai.co {
@@ -36,7 +26,6 @@ http://gungnir.getoffgridai.co {
 	import gated 192.168.1.60:7799
 }
 
-# ungated (self-auth / API-key) — direct proxy
 http://onprem-console.getoffgridai.co, http://127.0.0.1 {
 	reverse_proxy 127.0.0.1:3000
 }

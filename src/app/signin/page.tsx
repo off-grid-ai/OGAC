@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import { devLoginEnabled, googleEnabled, microsoftEnabled, passwordEnabled } from '@/auth.config';
+import { PasswordField } from '@/components/auth/PasswordField';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -72,7 +73,7 @@ export default async function SignInPage({
           {passwordEnabled ? (
             <form action={withPassword} className="space-y-2.5">
               <Input name="username" type="text" placeholder="Email" autoComplete="username" required className="font-mono text-sm" />
-              <Input name="password" type="password" placeholder="Password" autoComplete="current-password" required className="font-mono text-sm" />
+              <PasswordField />
               <Button type="submit" className="w-full">Sign in</Button>
             </form>
           ) : null}
