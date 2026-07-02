@@ -66,9 +66,24 @@ http://onprem-console.getoffgridai.co, http://127.0.0.1 {
 	reverse_proxy 127.0.0.1:3000
 }
 
-# Gateway now flows THROUGH Caddy so the edge (WAF + rate limit) protects it.
-# The aggregator still enforces auth (Keycloak JWT / API key) behind this.
-http://gateway.getoffgridai.co {
-	import edge gateway 120
+# AI Gateway (LLM) — OpenAI-compatible aggregator on :8800, behind the edge. Auth
+# (Keycloak JWT / API key) is still enforced by the aggregator. Moved here from
+# gateway.* so that name is free for the general network gateway below.
+http://ai.getoffgridai.co {
+	import edge ai 120
 	reverse_proxy 127.0.0.1:8800
+}
+
+# Network / API gateway — the general public HTTP gateway fronting the console's API
+# (file storage, etc.) with the edge policy. Only /api/* is proxied; anything else
+# gets a plain banner so the console UI isn't served from this host.
+http://gateway.getoffgridai.co {
+	import edge apigw 300
+	@api path /api/*
+	handle @api {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		respond "Off Grid — network gateway" 200
+	}
 }
