@@ -2,7 +2,7 @@
   "name": "@offgrid/console",
   "version": "0.0.0",
   "private": true,
-  "description": "Off Grid Console — the org-side UI for the common control plane (modular, API-first).",
+  "description": "Off Grid Console \u2014 the org-side UI for the common control plane (modular, API-first).",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -21,7 +21,11 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
     "@lancedb/lancedb": "^0.30.0",
+    "@offgrid/analytics": "file:../shared/packages/analytics",
+    "@offgrid/finops": "file:../shared/packages/finops",
     "@offgrid/gateway": "file:../gateway",
+    "@offgrid/policy": "file:../shared/packages/policy",
+    "@offgrid/vectordb": "file:../shared/packages/vectordb",
     "@phosphor-icons/react": "^2.1.10",
     "@scalar/nextjs-api-reference": "^0.11.5",
     "@xyflow/react": "^12.11.1",
