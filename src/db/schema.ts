@@ -626,3 +626,17 @@ export const chatPrefs = pgTable('chat_prefs', {
   prefs: jsonb('prefs').$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Studio templates (saved workflows) ───────────────────────────────────────
+export const studioTemplates = pgTable('studio_templates', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull(),
+  title: text('title').notNull(),
+  summary: text('summary').notNull().default(''),
+  prompt: text('prompt').notNull(),
+  workflow: jsonb('workflow').notNull(),
+  visibility: text('visibility').notNull().default('private'), // 'private' | 'org'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
