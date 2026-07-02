@@ -286,6 +286,7 @@ export function ChatWorkspace({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
   // Ad-hoc file attachments (txt/md/csv/pdf) extracted server-side; injected as context for the
   // next turn only. Chips show in the composer.
   const [files, setFiles] = useState<{ name: string; text: string; chars: number }[]>([]);
@@ -522,6 +523,16 @@ export function ChatWorkspace({
       });
       setImages((prev) => [...prev, dataUri]);
     }
+  }
+
+  // Route dropped/pasted files: images → inline attachments, everything else → text extraction.
+  function ingestFiles(list: FileList | File[]) {
+    const toFileList = (fs: File[]) => { const dt = new DataTransfer(); fs.forEach((f) => dt.items.add(f)); return dt.files; };
+    const arr = Array.from(list);
+    const imgs = arr.filter((f) => f.type.startsWith('image/'));
+    const rest = arr.filter((f) => !f.type.startsWith('image/'));
+    if (imgs.length) void attachImage(toFileList(imgs));
+    if (rest.length) void attachFiles(toFileList(rest));
   }
 
   // Attach text/markdown/csv/pdf: extract text server-side, keep it client-side as a chip until the
@@ -1079,7 +1090,21 @@ export function ChatWorkspace({
         ) : null}
 
         {/* Composer */}
-        <div className="shrink-0 border-t border-border p-3">
+        <div
+          className={`relative shrink-0 border-t border-border p-3 ${dragging ? 'bg-primary/5' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true); }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
+          onPaste={(e) => {
+            const imgs = Array.from(e.clipboardData.items).filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter((f): f is File => !!f);
+            if (imgs.length) { e.preventDefault(); ingestFiles(imgs); }
+          }}
+        >
+          {dragging && (
+            <div className="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/80 text-sm font-medium text-primary">
+              Drop images or files to attach
+            </div>
+          )}
           <div className="mx-auto max-w-3xl">
             {images.length ? (
               <div className="mb-2 flex flex-wrap gap-2">
