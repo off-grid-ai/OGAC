@@ -17,6 +17,7 @@ export const dynamic = 'force-dynamic';
 // not to /fleet. Only same-suite targets are honored (relative path, or an https URL
 // on *.getoffgridai.co) — anything else falls back to /fleet, so the param can't be
 // used as an open redirect.
+// eslint-disable-next-line complexity
 function safeCallback(raw: FormDataEntryValue | null): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
   if (!v) return '/fleet';

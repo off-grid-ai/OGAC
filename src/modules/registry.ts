@@ -2,6 +2,7 @@
 // independently adoptable; a deployment enables only the modules it bought (see lib/modules).
 export type ModuleId =
   | 'chat'
+  | 'services'
   | 'projects'
   | 'artifacts'
   | 'prompts'
@@ -20,6 +21,7 @@ export type ModuleId =
   | 'regulatory'
   | 'integrations'
   | 'knowledge'
+  | 'access'
   | 'admin';
 
 export interface ModuleDef {
@@ -41,6 +43,15 @@ export const MODULES: readonly ModuleDef[] = [
       'Your own ChatGPT — chat, projects, and knowledge, answered by the on-prem gateways. No per-seat cost.',
     route: '/chat',
     service: 'gateway',
+  },
+  {
+    id: 'services',
+    label: 'Services',
+    description:
+      'The directory of every Off Grid surface — console, gateway, and product subdomains — with live health. One login covers them all.',
+    route: '/services',
+    service: 'console',
+    internal: true,
   },
   {
     id: 'projects',
@@ -174,6 +185,14 @@ export const MODULES: readonly ModuleDef[] = [
       'Ask Your Org, on-prem: an admin-curated shared knowledge base, indexed once and retrieved permission-aware with citations in chat.',
     route: '/knowledge',
     service: 'gateway',
+  },
+  {
+    id: 'access',
+    label: 'Access',
+    description: 'Manage users, roles, and machine clients via Keycloak.',
+    route: '/access',
+    service: 'keycloak',
+    internal: true,
   },
   {
     id: 'admin',
