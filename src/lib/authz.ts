@@ -1,33 +1,49 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { getTokenVerifier } from '@/lib/auth/token-verifier';
 
-// Shared authorization gates for API route handlers. Middleware already blocks unauthenticated
-// requests to the console/admin surface, but these helpers add explicit, defense-in-depth checks at
-// the top of each handler so a middleware misconfiguration can't silently expose an admin route.
+// Shared authorization gates for API route handlers. There is ONE key flow: a machine
+// presents a Keycloak service-account JWT as `Authorization: Bearer <jwt>` and it is
+// validated through the IdentityVerifier seam — the same abstraction the gateway uses.
+// Humans authenticate with a console session (cookie). A static break-glass token
+// (OFFGRID_ADMIN_TOKEN) is honored ONLY if explicitly set, for bootstrap/CI.
 //
 // Usage:
-//   const gate = await requireAdmin();
-//   if (gate instanceof Response) return gate;
-//   // gate is the authorized session from here on
+//   const gate = await requireUser(req);
+//   if (gate instanceof Response) return gate;   // gate is the authorized session
 
 export interface AuthzSession {
   user: { email?: string | null; name?: string | null; role?: string };
 }
 
-// Service-account bearer: automation/CI authenticates with `Authorization: Bearer $OFFGRID_ADMIN_TOKEN`
-// instead of an SSO session (mirrors the middleware check). Off by default (env unset). When it
-// matches we synthesize a synthetic admin session so handler code downstream is uniform.
-function serviceAdmin(req?: Request): AuthzSession | null {
-  const token = process.env.OFFGRID_ADMIN_TOKEN;
-  if (!token || !req) return null;
-  if (req.headers.get('authorization') !== `Bearer ${token}`) return null;
+function bearer(req?: Request): string {
+  const h = req?.headers.get('authorization') ?? '';
+  return h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+}
+
+// Break-glass: a static token, only when OFFGRID_ADMIN_TOKEN is set. Synthesizes an
+// admin session so downstream handler code stays uniform. Prefer the key flow below.
+function breakGlass(token: string): AuthzSession | null {
+  const t = process.env.OFFGRID_ADMIN_TOKEN;
+  if (!t || token !== t) return null;
   return { user: { email: 'service@offgrid.local', name: 'Service Account', role: 'admin' } };
 }
 
-// Any authenticated console user. Returns the session or a 401 Response.
+// The canonical key flow: verify a Keycloak service-account (or user) JWT via the seam.
+async function fromToken(token: string): Promise<AuthzSession | null> {
+  if (!token) return null;
+  const verifier = getTokenVerifier();
+  if (!verifier) return null;
+  const p = await verifier.verify(token);
+  if (!p) return null;
+  return { user: { email: p.email ?? p.clientId ?? p.subject, name: p.clientId ?? p.email ?? 'Service', role: p.role } };
+}
+
+// Any authenticated principal (session, service-account JWT, or break-glass token).
 export async function requireUser(req?: Request): Promise<AuthzSession | NextResponse> {
-  const svc = serviceAdmin(req);
-  if (svc) return svc;
+  const token = bearer(req);
+  const viaToken = (await fromToken(token)) ?? breakGlass(token);
+  if (viaToken) return viaToken;
   const session = (await auth()) as AuthzSession | null;
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -35,7 +51,7 @@ export async function requireUser(req?: Request): Promise<AuthzSession | NextRes
   return session;
 }
 
-// Admin-only surface. Returns the session or a 403 Response for non-admins (401 when unauthenticated).
+// Admin-only surface. 403 for non-admins, 401 when unauthenticated.
 export async function requireAdmin(req?: Request): Promise<AuthzSession | NextResponse> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
