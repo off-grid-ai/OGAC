@@ -103,18 +103,23 @@ export const authConfig = {
         const all = [...realmRoles, ...resourceRoles];
         // Also accept a top-level `role` claim if set in Keycloak's token mapper.
         const direct = typeof kc['role'] === 'string' ? kc['role'] : null;
-        let resolved = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
-        // Founder/bootstrap escape hatch: emails in OFFGRID_ADMIN_EMAILS are always admin.
-        // Solves the chicken-and-egg where role management is itself admin-gated.
-        const adminEmails = (process.env.OFFGRID_ADMIN_EMAILS ?? '')
-          .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-        const email = typeof kc['email'] === 'string' ? kc['email'].toLowerCase() : '';
-        if (email && adminEmails.includes(email)) resolved = 'admin';
-        token.role = resolved;
+        token.role = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
       } else if (user) {
         // Non-Keycloak sign-in (dev credentials, Google, Microsoft): use DB role.
         token.role = (user as { role?: string }).role ?? 'viewer';
       }
+      // Founder/bootstrap escape hatch — applies to EVERY provider and every token
+      // refresh: any email in OFFGRID_ADMIN_EMAILS is always admin. Solves the
+      // chicken-and-egg where role management is itself admin-gated. Uses token.email
+      // (NextAuth-populated) plus the raw profile email, so it works regardless of
+      // which login path set the role above.
+      const adminEmails = (process.env.OFFGRID_ADMIN_EMAILS ?? '')
+        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+      const profileEmail = profile && typeof (profile as Record<string, unknown>)['email'] === 'string'
+        ? ((profile as Record<string, unknown>)['email'] as string)
+        : '';
+      const email = (profileEmail || (typeof token.email === 'string' ? token.email : '') || '').toLowerCase();
+      if (email && adminEmails.includes(email)) token.role = 'admin';
       return token;
     },
     session({ session, token }) {
