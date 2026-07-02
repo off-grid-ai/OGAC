@@ -25,7 +25,7 @@ import { listTools } from '@/lib/store';
 //   → provenance-sign → persist → lineage (best-effort) → [async, sampled] online QA score.
 // Safety checks run on every request; the LLM-as-judge score runs out-of-band (see scoreRun) so it
 // never adds latency to the response.
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const ANSWER_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 
 export interface RunStep {
@@ -120,10 +120,10 @@ async function gatewayAnswer(
       method: 'POST',
       // x-offgrid-user attributes the agent run's gateway spend to the invoking user (captured
       // as `caller` in the gateway's OpenSearch log) for per-user FinOps.
-      headers: {
+      headers: gatewayHeaders({
         'content-type': 'application/json',
         ...(caller ? { 'x-offgrid-user': caller } : {}),
-      },
+      }),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });

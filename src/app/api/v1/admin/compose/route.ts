@@ -4,7 +4,7 @@ import { type Block, type Catalog, type Workflow, introspect } from '@/lib/studi
 
 export const dynamic = 'force-dynamic';
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 // Ask the local gateway to wire a workflow from the available blocks. Falls back to a
 // deterministic pipeline if the model is unavailable or returns junk — the canvas always
@@ -24,7 +24,7 @@ async function modelPlan(prompt: string, catalog: Catalog, ids: Set<string>): Pr
   try {
     const r = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: gatewayHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         messages: [
           { role: 'system', content: sys },

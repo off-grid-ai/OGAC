@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 // The judge runs through OUR gateway (no external model); scores are written via Langfuse's
 // ingestion API as a trace + numeric scores. Best-effort: a Langfuse outage never throws to the
 // caller, it just returns posted:false.
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const JUDGE_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
 const LANGFUSE_URL = process.env.OFFGRID_LANGFUSE_URL;
 const LANGFUSE_AUTH = process.env.OFFGRID_LANGFUSE_AUTH; // base64("public-key:secret-key")
@@ -52,7 +52,7 @@ function clamp01(v: unknown): number {
 async function judge(i: Interaction): Promise<JudgeVerdict> {
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({
       model: JUDGE_MODEL,
       temperature: 0,
