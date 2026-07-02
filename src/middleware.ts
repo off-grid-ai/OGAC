@@ -7,6 +7,11 @@ const { auth } = NextAuth(authConfig);
 // Node endpoints authenticate with device/enrollment tokens, not user SSO — left public here.
 const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/;
 
+// GET of a single file is allowed through unauthenticated — the handler serves it only
+// if the file is public and returns 404 for private ones. Upload/list/patch/delete
+// (POST/GET-list/PATCH/DELETE) are NOT here and still require auth.
+const FILE_GET = /^\/api\/v1\/files\/[^/]+$/;
+
 // Marketing, docs, and auth surfaces that never require an SSO session.
 const PUBLIC_EXACT = ['/', '/docs', '/openapi.json'];
 const PUBLIC_PREFIX = [
@@ -37,6 +42,7 @@ function hasAdminToken(req: { headers: Headers; nextUrl: { pathname: string } })
 // User/admin surface (console UI + admin/audit APIs) requires an SSO session (or a service token).
 export default auth((req) => {
   if (isPublic(req.nextUrl.pathname)) return NextResponse.next();
+  if (req.method === 'GET' && FILE_GET.test(req.nextUrl.pathname)) return NextResponse.next();
   if (hasAdminToken(req)) return NextResponse.next();
   if (!req.auth) {
     // Preserve where the user was headed so signin returns them there (not always
