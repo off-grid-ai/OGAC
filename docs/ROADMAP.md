@@ -465,6 +465,42 @@ A non-technical user with no prior AI experience can:
 
 ---
 
+## Phase 4.6 — Chat feature parity (ChatGPT/Claude-grade UX)
+**Goal:** the chat surface is currently thin. Bring it to parity with ChatGPT/Claude so it's a product people actually prefer, not a toy over the gateway.
+
+**Context:** the chat works (streams from the gateway) but is missing table-stakes interaction features. Users notice immediately.
+
+**Timeline:** 3–4 weeks, parallel to Phase 4. **Depends on:** gateway API-key wiring (done) + storage module (done, for the image gallery).
+
+### Gaps to close (all confirmed missing today)
+
+**Message actions**
+- **Retry** — regenerate the last assistant turn (same or different model).
+- **Stop** — cancel an in-flight stream mid-generation (abort the upstream fetch, keep partial text).
+- **Edit** — edit a previous user message in place and re-run from that point (fork the conversation).
+- Copy, thumbs up/down (feeds Observability), branch/fork a conversation.
+
+**Attachments & images**
+- **Drag-and-drop images/files** onto the composer (not there today).
+- **Image gallery** — view all images attached in a conversation in a lightbox/grid; click a thumbnail to expand. Reuse the Storage module's viewer.
+- Paste-from-clipboard image support.
+- Show attached-image thumbnails inline in the message, not just filenames.
+
+**Artifacts**
+- **Edit artifact in place** — an inline editor for generated HTML/SVG/React/code artifacts, with live re-render (today artifacts are read-only after generation).
+- Version history + revert on an artifact (schema already supports `chat_artifact_versions`).
+- "Ask AI to change this" on a selected region of an artifact.
+
+**Composer & session**
+- Slash-command palette polish, model picker with capabilities, per-message model badge.
+- Regenerate-with-different-model, streaming token counter, stop/continue.
+- Keyboard shortcuts (⌘↵ send, ↑ to edit last, esc to stop).
+
+### Definition of done
+The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste + inline image thumbnails + a per-conversation image gallery; in-place artifact editing with live re-render and version revert. A user coming from ChatGPT/Claude finds nothing obviously missing.
+
+---
+
 ## Phase 5 — Unified API gateway (`console-api.getoffgridai.co`)
 **Goal:** every service's API is discoverable and callable through one surface. Makes the platform buildable-on without touching the console UI.
 **Timeline:** 3–4 weeks (largely config and codegen). Parallelisable with Phase 4.
