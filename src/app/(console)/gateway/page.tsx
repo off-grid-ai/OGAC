@@ -4,6 +4,7 @@ import {
   ProhibitInset as CircleSlash,
   Plug,
 } from '@phosphor-icons/react/dist/ssr';
+import { GatewayNodesCard } from '@/components/gateway/GatewayNodesCard';
 import { GatewayTabs } from '@/components/gateway/GatewayTabs';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
@@ -118,43 +119,7 @@ export default async function GatewayPage() {
             </CardContent>
           </Card>
 
-          {info.gateways?.length ? (
-            <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm">Nodes</CardTitle>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {info.gateways.filter((g) => g.health === 'up').length}/{info.gateways.length} up
-                </span>
-              </CardHeader>
-              <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {info.gateways.map((g) => {
-                  const up = g.health === 'up';
-                  return (
-                    <div
-                      key={g.name}
-                      className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-foreground">{g.name}</span>
-                          {g.vision ? (
-                            <Badge variant="secondary" className="px-1 py-0 text-[10px]">vision</Badge>
-                          ) : null}
-                        </div>
-                        <p className="truncate font-mono text-[11px] text-muted-foreground">
-                          {g.model} · {g.host}
-                        </p>
-                      </div>
-                      <span className="flex shrink-0 items-center gap-1 text-xs">
-                        <span className={`size-2 rounded-full ${up ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                        <span className={up ? 'text-primary' : 'text-red-500'}>{g.health ?? (g.up ? 'up' : 'down')}</span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ) : null}
+          {info.gateways?.length ? <GatewayNodesCard initial={info.gateways} /> : null}
 
           {info.image_models?.length ? (
             <Card className="shadow-sm">
