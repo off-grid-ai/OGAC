@@ -22,18 +22,31 @@ export const keycloakEnabled = Boolean(
 );
 // Dev-only login so the console is browsable without OAuth. NEVER on in production.
 export const devLoginEnabled = env.AUTH_DEV_LOGIN === 'true' && env.NODE_ENV !== 'production';
+// Console-owned username/password login — authenticates through the identity seam
+// (Keycloak ROPC today) so the console renders its OWN form, no redirect to a hosted
+// IdP page. Available whenever the identity backend (Keycloak) is configured.
+export const passwordEnabled = keycloakEnabled;
 
 const providers: Provider[] = [];
 if (googleEnabled) providers.push(Google);
 if (microsoftEnabled) {
   providers.push(MicrosoftEntraID({ issuer: env.AUTH_MICROSOFT_ENTRA_ID_ISSUER }));
 }
-if (keycloakEnabled) {
+// NOTE: the Keycloak OIDC provider is intentionally NOT registered — it would send
+// users to Keycloak's hosted login page (and leak the internal issuer URL). We own
+// the login UI and authenticate against Keycloak server-side via the `password`
+// (ROPC) provider below. `Keycloak` import kept for the swap-back option only.
+void Keycloak;
+if (passwordEnabled) {
   providers.push(
-    Keycloak({
-      clientId: env.AUTH_KEYCLOAK_ID,
-      clientSecret: env.AUTH_KEYCLOAK_SECRET,
-      issuer: env.AUTH_KEYCLOAK_ISSUER,
+    Credentials({
+      id: 'password',
+      name: 'Off Grid',
+      credentials: { username: { label: 'Email' }, password: { label: 'Password', type: 'password' } },
+      authorize: async (creds) => {
+        const { authenticatePassword } = await import('@/lib/auth/identity');
+        return authenticatePassword(String(creds?.username ?? ''), String(creds?.password ?? ''));
+      },
     }),
   );
 }
@@ -59,8 +72,25 @@ export const authConfig = {
   providers,
   pages: { signIn: '/signin' },
   callbacks: {
-    jwt({ token, user }) {
-      if (user) token.role = (user as { role?: string }).role ?? 'viewer';
+    // eslint-disable-next-line complexity
+    jwt({ token, user, account, profile }) {
+      // Keycloak: roles come in the token as realm_access.roles or a custom `role` claim.
+      // We map the first recognised app role (admin > editor > viewer) to our internal role.
+      if (account?.provider === 'keycloak' && profile) {
+        const kc = profile as Record<string, unknown>;
+        const realmRoles: string[] = (kc['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
+        const resourceRoles: string[] = Object.values(
+          (kc['resource_access'] as Record<string, { roles?: string[] }> | undefined) ?? {}
+        ).flatMap((r) => r.roles ?? []);
+        const all = [...realmRoles, ...resourceRoles];
+        // Also accept a top-level `role` claim if set in Keycloak's token mapper.
+        const direct = typeof kc['role'] === 'string' ? kc['role'] : null;
+        const resolved = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
+        token.role = resolved;
+      } else if (user) {
+        // Non-Keycloak sign-in (dev credentials, Google, Microsoft): use DB role.
+        token.role = (user as { role?: string }).role ?? 'viewer';
+      }
       return token;
     },
     session({ session, token }) {
