@@ -38,7 +38,13 @@ function hasAdminToken(req: { headers: Headers; nextUrl: { pathname: string } })
 export default auth((req) => {
   if (isPublic(req.nextUrl.pathname)) return NextResponse.next();
   if (hasAdminToken(req)) return NextResponse.next();
-  if (!req.auth) return NextResponse.redirect(new URL('/signin', req.nextUrl.origin));
+  if (!req.auth) {
+    // Preserve where the user was headed so signin returns them there (not always
+    // /fleet). Same-origin relative path — signin's safeCallback re-validates it.
+    const signin = new URL('/signin', req.nextUrl.origin);
+    signin.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.redirect(signin);
+  }
   return NextResponse.next();
 });
 
