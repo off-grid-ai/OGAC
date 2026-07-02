@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
+import { createCustomRole, getCustomRoleByName } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
     name?: string;
     description?: string;
     serviceAccountsEnabled?: boolean;
+    // Scope (ABAC/RBAC): pick an existing custom role AND/OR tick services to grant.
+    roleName?: string;
+    modules?: string[];
   } | null;
 
   if (!body?.clientId) {
@@ -50,9 +54,34 @@ export async function POST(req: Request) {
 
     // Generate initial secret
     const secret = await kc.regenerateClientSecret(id);
-    const client = await kc.getClient(id);
 
-    return NextResponse.json({ configured: true, client, secret }, { status: 201 });
+    // ── Scope the token (RBAC/ABAC) ────────────────────────────────────────────
+    // Resolve the target role name: an ad-hoc svc-<clientId> role from ticked
+    // services (modules), else an existing custom role. Ensure a console-side
+    // custom role (name → module grants) + a matching Keycloak realm role, and
+    // assign it to the client's service account so its JWT carries the scope.
+    let scopedRole: string | null = null;
+    if (body.modules?.length) {
+      scopedRole = `svc-${body.clientId}`;
+      if (!(await getCustomRoleByName(scopedRole))) {
+        await createCustomRole({
+          name: scopedRole,
+          description: `Service scope for ${body.clientId}`,
+          basedOn: 'viewer',
+          capabilities: body.modules,
+        });
+      }
+    } else if (body.roleName) {
+      scopedRole = body.roleName;
+    }
+    if (scopedRole && body.serviceAccountsEnabled) {
+      const role = await kc.ensureRealmRole(scopedRole, `Off Grid scope: ${scopedRole}`);
+      const saUser = await kc.getServiceAccountUser(id);
+      if (saUser?.id) await kc.assignRoles(saUser.id, [role]);
+    }
+
+    const client = await kc.getClient(id);
+    return NextResponse.json({ configured: true, client, secret, scopedRole }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

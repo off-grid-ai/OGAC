@@ -24,7 +24,8 @@ export type ModuleId =
   | 'knowledge'
   | 'access'
   | 'admin'
-  | 'storage';
+  | 'storage'
+  | 'config';
 
 export interface ModuleDef {
   id: ModuleId;
@@ -219,5 +220,13 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
     route: '/storage',
     service: 'files',
+  },
+  {
+    id: 'config',
+    label: 'Configuration',
+    description: 'The single place to see and edit every environment setting — gateway, services, auth, adapters — with secrets masked. Applied on restart.',
+    route: '/config',
+    service: 'console',
+    internal: true,
   },
 ];
