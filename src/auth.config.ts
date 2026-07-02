@@ -71,6 +71,23 @@ export const authConfig = {
   trustHost: true,
   providers,
   pages: { signIn: '/signin' },
+  // Share the session across *.getoffgridai.co so every owned UI (console-status,
+  // console-landing, gungnir) can be gated behind the ONE console login via a
+  // Caddy forward_auth check. Domain is env-driven (AUTH_COOKIE_DOMAIN).
+  cookies: env.AUTH_COOKIE_DOMAIN
+    ? {
+        sessionToken: {
+          name: env.NODE_ENV === 'production' ? '__Secure-authjs.session-token' : 'authjs.session-token',
+          options: {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            secure: env.NODE_ENV === 'production',
+            domain: env.AUTH_COOKIE_DOMAIN,
+          },
+        },
+      }
+    : undefined,
   callbacks: {
     // eslint-disable-next-line complexity
     jwt({ token, user, account, profile }) {
