@@ -640,3 +640,22 @@ export const studioTemplates = pgTable('studio_templates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Config audit (global config service — who changed which env key when) ─────
+export const configAudit = pgTable('config_audit', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull(),
+  actor: text('actor').notNull(),
+  // Old/new values are redacted for secrets before insert (never store raw secrets here).
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Config settings (global config service — admin overrides, materialized to env on restart) ──
+export const configSettings = pgTable('config_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedBy: text('updated_by').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

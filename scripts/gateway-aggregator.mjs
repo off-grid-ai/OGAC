@@ -13,9 +13,88 @@
 // client → client_credentials → JWT) — we don't run our own key store. If neither is
 // configured the endpoint is open (LAN-only dev default).
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { verifierFromEnv } from './lib/keycloak-verify.mjs';
 
 const API_KEY = process.env.OFFGRID_GATEWAY_API_KEY || '';
+
+// ── Client-token store (Mode B: bring-your-own provider key + forward-proxy) ────
+// Records the (client IP, provider token, inferred meta) triple for every request
+// that carries a client's OWN provider credential — NOT our gateway API key. The
+// console polls /tokens and persists this into Postgres (gateway_client_tokens).
+const TOKENS = new Map(); // fingerprint -> { fingerprint, preview, kind, inferred, ips, uses, firstSeen, lastSeen }
+const TOKENS_CAP = 500;
+
+function inferProvider(token) {
+  if (token.startsWith('sk-ant-')) return { provider: 'anthropic', tokenType: 'api-key' };
+  if (token.startsWith('sk-proj-')) return { provider: 'openai', tokenType: 'project-key' };
+  if (token.startsWith('sk-')) return { provider: 'openai', tokenType: 'api-key' };
+  if (token.startsWith('AIza')) return { provider: 'google', tokenType: 'api-key' };
+  if (token.startsWith('gsk_')) return { provider: 'groq', tokenType: 'api-key' };
+  if (token.startsWith('xai-')) return { provider: 'xai', tokenType: 'api-key' };
+  if (token.startsWith('r8_')) return { provider: 'replicate', tokenType: 'api-key' };
+  const parts = token.split('.');
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8'));
+      return { provider: 'jwt', tokenType: 'jwt', jwt: { header: {}, payload } };
+    } catch { /* not a JWT */ }
+  }
+  return { tokenType: 'opaque' };
+}
+
+function clientIp(req) {
+  return String(
+    req.headers['cf-connecting-ip'] ||
+    String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    'unknown',
+  ).replace(/^::ffff:/, '');
+}
+
+// Pull the client's OWN provider token (never our gateway key) from the request.
+function extractClientToken(req) {
+  const provKey = req.headers['x-provider-key'];
+  if (provKey) return { token: String(provKey), kind: 'x-api-key' };
+  const auth = String(req.headers['authorization'] || '');
+  if (auth.startsWith('Bearer ')) {
+    const t = auth.slice(7).trim();
+    if (t && t !== API_KEY) return { token: t, kind: 'bearer' };
+  }
+  const xk = String(req.headers['x-api-key'] || '');
+  if (xk && xk !== API_KEY) return { token: xk, kind: 'x-api-key' };
+  return null;
+}
+
+function captureToken(req) {
+  const found = extractClientToken(req);
+  if (!found) return;
+  const { token, kind } = found;
+  const fingerprint = crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
+  const ip = clientIp(req);
+  const now = Date.now();
+  let e = TOKENS.get(fingerprint);
+  if (!e) {
+    e = {
+      fingerprint,
+      preview: `${token.slice(0, 6)}…${token.slice(-4)}`,
+      kind,
+      inferred: inferProvider(token),
+      ips: {},
+      uses: 0,
+      firstSeen: now,
+      lastSeen: now,
+    };
+    TOKENS.set(fingerprint, e);
+    if (TOKENS.size > TOKENS_CAP) {
+      const oldest = [...TOKENS.entries()].sort((a, b) => a[1].lastSeen - b[1].lastSeen)[0];
+      if (oldest) TOKENS.delete(oldest[0]);
+    }
+  }
+  e.uses++;
+  e.lastSeen = now;
+  e.ips[ip] = (e.ips[ip] || 0) + 1;
+}
 const kc = verifierFromEnv();
 const AUTH_ON = Boolean(API_KEY || kc);
 
@@ -262,6 +341,10 @@ async function handle(req, res, chunks) {
       return { name: g.name, host: g.host, port: g.port, model: g.model, vision: g.vision, health: h, installedModels };
     })).then((nodes) => json(res, 200, { nodes }));
   }
+  if (req.url === '/tokens') {
+    // Snapshot of the client-token store for the console to persist (ip/token/meta records).
+    return json(res, 200, [...TOKENS.values()]);
+  }
   if (req.url === '/v1/models') {
     const models = [...new Set(POOL.map((g) => g.model))].map((id) => {
       const nodes = POOL.filter((g) => g.model === id);
@@ -272,6 +355,8 @@ async function handle(req, res, chunks) {
   }
 
   {
+    // Record the client's (ip, provider token, meta) on every proxied AI request.
+    captureToken(req);
     const raw = Buffer.concat(chunks);
     let body = {}; try { body = JSON.parse(raw.toString() || '{}'); } catch { /* not json */ }
     const image = hasImage(body);
