@@ -52,7 +52,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'provit',
     label: 'Provit',
     description: 'Prove It — visual QA: repos, features, behaviors, test recordings.',
-    url: process.env.OFFGRID_PROVIT_URL ?? 'https://gungnir.getoffgridai.co',
+    url: process.env.OFFGRID_PROVIT_URL ?? 'https://provit.getoffgridai.co',
     auth: 'session',
     kind: 'product',
   },
