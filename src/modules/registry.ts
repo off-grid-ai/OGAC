@@ -23,7 +23,8 @@ export type ModuleId =
   | 'integrations'
   | 'knowledge'
   | 'access'
-  | 'admin';
+  | 'admin'
+  | 'storage';
 
 export interface ModuleDef {
   id: ModuleId;
@@ -211,5 +212,12 @@ export const MODULES: readonly ModuleDef[] = [
     route: '/admin',
     service: 'admin',
     internal: true,
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    description: 'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
+    route: '/storage',
+    service: 'files',
   },
 ];
