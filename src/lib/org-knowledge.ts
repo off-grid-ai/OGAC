@@ -10,7 +10,7 @@ import { effectiveBaseRole } from '@/lib/module-access';
 // <knowledge_base> output format — but org-scoped and RBAC-gated. Tables are ensured idempotently
 // so it deploys over SSH with no migration step (mirrors lib/chat.ts).
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 let ensurePromise: Promise<void> | null = null;
 async function ensureSchema(): Promise<void> {
@@ -62,7 +62,7 @@ function chunkText(text: string, chunkSize = 600, overlap = 120): string[] {
 async function embed(input: string | string[]): Promise<number[][]> {
   const r = await fetch(`${GATEWAY_URL}/v1/embeddings`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ input }),
     signal: AbortSignal.timeout(60000),
   });

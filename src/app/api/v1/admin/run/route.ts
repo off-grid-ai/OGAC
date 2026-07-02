@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
-
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // Minimal run endpoint for the Studio "run as app" preview: send the end-user input through
 // the gateway (the governed pipeline) and return the answer. Text path is real; richer
@@ -16,7 +15,7 @@ export async function POST(req: Request) {
   try {
     const r = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: gatewayHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         messages: [
           ...(system ? [{ role: 'system', content: String(system) }] : []),

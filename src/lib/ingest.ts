@@ -7,7 +7,7 @@ import { listDatasets } from '@/lib/store';
 // provenance-tagged document. Files/text are stored directly; images are captioned via the
 // gateway (multimodal) then indexed; a database row becomes a textual record. Everything funnels
 // through addDocument() so chunking/embedding/storage stays in one place.
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const VISION_MODEL = process.env.OFFGRID_VISION_MODEL ?? 'gemma-local';
 
 // Record source→document lineage through the lineage port (no-op by default, Marquez when
@@ -31,7 +31,7 @@ async function captionImage(dataUrl: string): Promise<string> {
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: gatewayHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         model: VISION_MODEL,
         messages: [

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // AI bridge for artifact apps. The sandboxed artifact iframe exposes window.offgrid.complete()
 // which POSTs here; we proxy a single completion to the on-prem gateway and return the text.
@@ -39,7 +38,7 @@ export async function POST(req: Request) {
   try {
     const r = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: gatewayHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(50000),
     });

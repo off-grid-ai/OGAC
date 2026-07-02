@@ -1,9 +1,8 @@
 import { auth } from '@/auth';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
-
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // Text-to-speech — forwards to the gateway's OpenAI-style speech endpoint (modality
 // 'speech':'ready') and streams the audio back for inline playback of an answer.
@@ -15,7 +14,7 @@ export async function POST(req: Request) {
   if (!String(input).trim()) return new Response('no input', { status: 400 });
   const r = await fetch(`${GATEWAY_URL}/v1/audio/speech`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ model: 'tts', input: String(input).slice(0, 4000), voice }),
     signal: AbortSignal.timeout(110000),
   }).catch(() => null);

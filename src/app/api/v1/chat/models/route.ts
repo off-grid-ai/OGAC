@@ -4,7 +4,7 @@ import { isDenied } from '@/lib/chat-governance';
 
 export const dynamic = 'force-dynamic';
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 // The models the chat model-picker offers — proxied from the gateway/aggregator so the browser
 // never hits it directly. Falls back to a single default if the gateway doesn't enumerate.
@@ -15,6 +15,7 @@ export async function GET() {
   try {
     const r = await fetch(`${GATEWAY_URL}/v1/models`, {
       cache: 'no-store',
+      headers: gatewayHeaders(),
       signal: AbortSignal.timeout(2500),
     });
     if (!r.ok) throw new Error(String(r.status));
