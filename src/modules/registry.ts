@@ -4,6 +4,7 @@ export type ModuleId =
   | 'chat'
   | 'projects'
   | 'artifacts'
+  | 'prompts'
   | 'fleet'
   | 'gateway'
   | 'control'
@@ -55,6 +56,14 @@ export const MODULES: readonly ModuleDef[] = [
     description:
       'A library of generated outputs — HTML, SVG, React, diagrams, and code saved from your chats and reopenable anytime.',
     route: '/artifacts',
+    service: 'gateway',
+  },
+  {
+    id: 'prompts',
+    label: 'Prompts',
+    description:
+      'A library of reusable prompts — save, tag, and organize prompt texts, plus a Common Prompts view mined from what the org actually asks.',
+    route: '/prompts',
     service: 'gateway',
   },
   {

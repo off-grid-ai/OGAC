@@ -398,6 +398,22 @@ export const chatSkills = pgTable('chat_skills', {
   visibility: text('visibility').notNull().default('org'), // private | org
 });
 
+// Prompt library — a personal/org library of reusable prompt texts (distinct from skills, which are
+// assistants). Org-visible prompts are shared with everyone; private prompts only with the owner.
+// Variables are the {{placeholder}} tokens extracted from the content for templating.
+export const promptLibrary = pgTable('prompt_library', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default('Untitled prompt'),
+  content: text('content').notNull().default(''),
+  tags: jsonb('tags').$type<string[]>().notNull().default([]),
+  variables: jsonb('variables').$type<string[]>().notNull().default([]),
+  owner: text('owner').notNull().default(''),
+  visibility: text('visibility').notNull().default('private'), // private | org
+  uses: integer('uses').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Per-user custom instructions (like ChatGPT's) — injected as the first system message.
 export const chatSettings = pgTable('chat_settings', {
   userId: text('user_id').primaryKey(),
@@ -504,6 +520,48 @@ export const verificationTokens = pgTable(
   },
   (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
 );
+
+// ─── Gateway client tokens (enterprise token passthrough + IP mapping) ────────
+// Written by the console's /api/gateway/tokens sync route, which reads the
+// in-memory TokenStore from the running gateway. One row per distinct token
+// (stored as a non-reversible fingerprint — the raw value is never persisted).
+// `ips` tracks every source IP that used the token with per-IP use counts.
+// `meta` is a free-form operator-controlled blob: routing overrides, labels,
+// tenant attribution, rate-limit tiers, or any other annotations.
+// `routingOverrides` is the structured part of meta the gateway actually acts on:
+// when a request arrives from a source IP listed here, the gateway substitutes
+// the mapped target IP/node before routing. Conditions are defined per-entry and
+// evaluated by the client-auth policy's routing hook (conditions TBD by operator).
+export const gatewayClientTokens = pgTable('gateway_client_tokens', {
+  // FNV-1a fingerprint of the raw token (hex, 8 chars) — deterministic dedup key.
+  fingerprint: text('fingerprint').primaryKey(),
+  // Short display preview, e.g. "sk-ant-…abc4". Never the full value.
+  preview: text('preview').notNull(),
+  kind: text('kind').notNull().default('bearer'), // bearer | x-api-key
+  // Best-effort inferred provider/type from token shape (Anthropic, OpenAI, JWT, …).
+  inferred: jsonb('inferred').$type<{
+    provider?: string;
+    tokenType?: string;
+    jwt?: { header: Record<string, unknown>; payload: Record<string, unknown> };
+    notes?: string;
+  }>().notNull().default({}),
+  // Map of { [ip]: useCount } — all distinct source IPs seen with this token.
+  ips: jsonb('ips').$type<Record<string, number>>().notNull().default({}),
+  // Operator-defined routing overrides: when a request arrives from `sourceIp`,
+  // route it as if it came from `targetIp` (or target a specific named node).
+  // The exact match/condition logic is supplied later; the shape is fixed here.
+  routingOverrides: jsonb('routing_overrides').$type<{
+    sourceIp: string;
+    targetIp?: string;
+    targetNode?: string;
+    note?: string;
+  }[]>().notNull().default([]),
+  // Free-form operator metadata: tenant id, labels, rate-limit tier, etc.
+  meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
+  uses: integer('uses').notNull().default(0),
+  firstSeen: timestamp('first_seen', { withTimezone: true }).notNull().defaultNow(),
+  lastSeen: timestamp('last_seen', { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ─── Chat artifacts library (ChatGPT/Claude "Artifacts" surface) ──────────────
 // Append-only: saved artifacts detected in chat replies, promoted to a top-level library so a
