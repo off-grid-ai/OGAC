@@ -61,8 +61,12 @@ http://console-status.getoffgridai.co {
 http://console-landing.getoffgridai.co {
 	import gated 127.0.0.1:3100
 }
-http://gungnir.getoffgridai.co {
+# Provit (Prove It — visual QA). Formerly gungnir.* — the old name 301-redirects here.
+http://provit.getoffgridai.co {
 	import gated 192.168.1.60:7799
+}
+http://gungnir.getoffgridai.co {
+	redir https://provit.getoffgridai.co{uri} permanent
 }
 
 http://onprem-console.getoffgridai.co, http://127.0.0.1 {
