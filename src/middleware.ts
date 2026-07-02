@@ -30,23 +30,28 @@ function isPublic(pathname: string): boolean {
   return NODE_API.test(pathname);
 }
 
-// Service-account bearer for the admin API — automation / CI / integration tests authenticate
-// with `Authorization: Bearer $OFFGRID_ADMIN_TOKEN` instead of an interactive SSO session. Only
-// active for /api/* routes and only when the token env is set (off by default).
-function hasAdminToken(req: { headers: Headers; nextUrl: { pathname: string } }): boolean {
-  const token = process.env.OFFGRID_ADMIN_TOKEN;
-  if (!token || !req.nextUrl.pathname.startsWith('/api/')) return false;
-  return req.headers.get('authorization') === `Bearer ${token}`;
+// Machine key flow: any /api/* request carrying `Authorization: Bearer <token>` is let
+// through here and AUTHENTICATED IN THE HANDLER via the IdentityVerifier seam (authz.ts).
+// The middleware runs in the Edge runtime where node:crypto (JWKS verification) isn't
+// available, so it can't verify the JWT itself — it only distinguishes "browser needing
+// a login redirect" from "API client presenting a key". Every /api handler still gates
+// with requireUser/requireAdmin, so an unverifiable token yields a 401 downstream.
+function isApiBearer(req: { headers: Headers; nextUrl: { pathname: string } }): boolean {
+  if (!req.nextUrl.pathname.startsWith('/api/')) return false;
+  return (req.headers.get('authorization') ?? '').startsWith('Bearer ');
 }
 
 // User/admin surface (console UI + admin/audit APIs) requires an SSO session (or a service token).
 export default auth((req) => {
   if (isPublic(req.nextUrl.pathname)) return NextResponse.next();
   if (req.method === 'GET' && FILE_GET.test(req.nextUrl.pathname)) return NextResponse.next();
-  if (hasAdminToken(req)) return NextResponse.next();
+  if (isApiBearer(req)) return NextResponse.next();
   if (!req.auth) {
-    // Preserve where the user was headed so signin returns them there (not always
-    // /fleet). Same-origin relative path — signin's safeCallback re-validates it.
+    // API clients get a clean 401 (not an HTML login redirect); browsers get sent to
+    // /signin with a callbackUrl so they return to where they were headed.
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
     const signin = new URL('/signin', req.nextUrl.origin);
     signin.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search);
     return NextResponse.redirect(signin);
