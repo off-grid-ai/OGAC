@@ -1,0 +1,14 @@
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /Users/admin/.cloudflared/00000000-0000-0000-0000-000000000000.json
+ingress:
+  - hostname: onprem-console.getoffgridai.co
+    service: http://127.0.0.1:3000
+  - hostname: gateway.getoffgridai.co
+    service: http://127.0.0.1:8800
+  - hostname: console-status.getoffgridai.co
+    service: http://127.0.0.1:80
+  - hostname: console-landing.getoffgridai.co
+    service: http://127.0.0.1:80
+  - hostname: gungnir.getoffgridai.co
+    service: http://127.0.0.1:80
+  - service: http_status:404
