@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
+import { requireUser } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 // triggers/sinks (file/email/whatsapp) are stubbed in the UI.
 // eslint-disable-next-line complexity
 export async function POST(req: Request) {
-  const gate = await requireAdmin(req);
+  const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
   const { input = '', system = '' } = await req.json().catch(() => ({ input: '' }));
   try {
