@@ -397,6 +397,74 @@ S = 1–3 days · M = 1–2 weeks · L = 3–4 weeks · XS = hours
 
 ---
 
+## Phase 4.5 — AI Studio (non-technical builder)
+**Goal:** non-technical users — ops, analysts, domain experts — can build AI workflows without knowing routing, policy pipelines, or any technical terminology. They describe what they want in plain language; Studio wires it.
+
+**Context:** the Studio module (`/studio`) exists in the module registry and renders a placeholder. The real builder has never been built out. This phase defines and delivers it properly.
+
+**Timeline:** 4–6 weeks, parallel to late Phase 4 (shares the agents/gateway infra).
+**Depends on:** Phase 4 (models must be reachable + agent runner must work), Phase 3 (org-scoped saves).
+
+### What non-technical means here
+
+Studio must work for someone who:
+- Does not know what a system prompt is
+- Does not know what a temperature or top-k is
+- Cannot distinguish between a RAG pipeline and a chat completion
+- Has a business goal ("summarise every support ticket and tag it"), not a technical one
+
+This is ChatGPT Custom GPTs + Zapier for AI, on-prem, org-scoped.
+
+### The builder (what to build)
+
+**Step 1 — Goal capture (plain language)**
+A conversational onboarding: "What do you want this assistant to do?" Studio infers the system prompt, relevant tools, and data sources from the description. No form fields, no jargon.
+
+**Step 2 — Skills (what it can do)**
+Drag-and-drop skill tiles, not code. Built-in skills: search org knowledge, search the web, run code, send Slack messages, write to a doc. Custom skills via HTTP (URL + auth + schema — but described in plain English: "call our CRM at this URL when someone asks about a client").
+
+**Step 3 — Data (what it knows)**
+Connect a knowledge collection (from the Knowledge module — no jargon: "Upload files your assistant should know about"). No embedding config, no chunking strategy exposed to the user.
+
+**Step 4 — Try it**
+Inline test chat with the agent before publishing. One-click save → deploys as a `/chat` conversation template accessible to the org.
+
+**Step 5 — Share**
+Publish to the org (all users can find and chat with it), a team, or keep private. Generates a direct link.
+
+### What's hidden from the builder
+All of the following are handled automatically and never exposed in the Studio UI:
+- Model selection (Studio picks the best available model from the gateway for the task)
+- Temperature / sampling params
+- Token limits
+- Embedding model / chunk size
+- Temporal workflow config
+- API keys / auth tokens for skills (entered once by an admin in Integrations)
+
+### Technical substrate
+Studio agents are `AgentRun` records with a saved `StudioTemplate` config (stored in Postgres, org-scoped). The template resolves to a system prompt + skill list + knowledge collection ID at run time. No new agent runtime — same Temporal worker, different input.
+
+### Surfaces to build
+| Surface | What |
+|---|---|
+| `/studio` page | Template gallery — browse, duplicate, launch |
+| Studio builder | 4-step flow (Goal → Skills → Data → Try/Publish) |
+| `StudioTemplate` schema | Postgres table, org-scoped, versioned |
+| `/api/v1/studio/*` routes | CRUD for templates, publish/unpublish |
+| Template runner | Resolve template → AgentRun input at chat time |
+
+### Definition of done
+A non-technical user with no prior AI experience can:
+1. Open Studio
+2. Describe their workflow in plain English
+3. Connect a knowledge base (upload PDFs)
+4. Test the assistant inline
+5. Publish it for their team
+
+...without ever seeing: temperature, top-k, chunk size, embedding model, system prompt (unless they click "Advanced"), or any routing config.
+
+---
+
 ## Phase 5 — Unified API gateway (`console-api.getoffgridai.co`)
 **Goal:** every service's API is discoverable and callable through one surface. Makes the platform buildable-on without touching the console UI.
 **Timeline:** 3–4 weeks (largely config and codegen). Parallelisable with Phase 4.
