@@ -257,6 +257,22 @@ export class KeycloakAdminClient {
     if (!res.ok) throw await parseKcError(res);
   }
 
+  // The service-account user backing a client (client_credentials). Realm roles
+  // assigned to this user become the roles in the client's access token.
+  async getServiceAccountUser(internalClientId: string): Promise<KcUser | null> {
+    return this.fetchNullable<KcUser>(`/clients/${internalClientId}/service-account-user`);
+  }
+
+  // Ensure a realm role exists (idempotent) and return it with its id.
+  async ensureRealmRole(name: string, description?: string): Promise<KcRole> {
+    const existing = (await this.listRealmRoles()).find((r) => r.name === name);
+    if (existing) return existing;
+    await this.createRealmRole(name, description);
+    const created = (await this.listRealmRoles()).find((r) => r.name === name);
+    if (!created) throw new Error(`realm role ${name} created but not found`);
+    return created;
+  }
+
   async getClientSecret(id: string): Promise<string> {
     const data = await this.fetchJson<{ value: string }>(`/clients/${id}/client-secret`);
     return data.value;

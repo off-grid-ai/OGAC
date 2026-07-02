@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { MODULES } from '@/modules/registry';
 import {
   Table,
   TableBody,
@@ -45,7 +46,22 @@ function AddClientForm({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [serviceAccount, setServiceAccount] = useState(true);
+  const [roleName, setRoleName] = useState('');
+  const [modules, setModules] = useState<string[]>([]);
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await fetch('/api/v1/admin/roles');
+        if (r.ok) setCustomRoles(((await r.json()) as { roles?: { id: string; name: string }[] }).roles ?? []);
+      } catch { /* roles optional */ }
+    })();
+  }, []);
+
+  const toggleModule = (id: string) =>
+    setModules((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
 
   const submit = async () => {
     if (!clientId.trim()) {
@@ -62,6 +78,8 @@ function AddClientForm({
           name: name.trim() || undefined,
           description: description.trim() || undefined,
           serviceAccountsEnabled: serviceAccount,
+          roleName: roleName || undefined,
+          modules: modules.length ? modules : undefined,
         }),
       });
       const data = (await res.json()) as { secret?: string; error?: string };
@@ -106,6 +124,52 @@ function AddClientForm({
         />
         Enable service account (client_credentials grant)
       </label>
+
+      {/* ── Scope (RBAC/ABAC): pick a role AND/OR tick services this token may access ── */}
+      {serviceAccount && (
+        <div className="space-y-2 rounded-md border border-border bg-background/60 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Scope — what this token can access
+          </p>
+          {customRoles.length > 0 && (
+            <label className="block text-xs text-muted-foreground">
+              Custom role
+              <select
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+              >
+                <option value="">— none (use services below) —</option>
+                {customRoles.map((r) => (
+                  <option key={r.id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Or grant specific services:</p>
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+              {MODULES.filter((m) => !m.internal).map((m) => (
+                <label key={m.id} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={modules.includes(m.id)}
+                    onChange={() => toggleModule(m.id)}
+                    className="accent-primary"
+                    disabled={!!roleName}
+                  />
+                  {m.label}
+                </label>
+              ))}
+            </div>
+            {roleName && <p className="mt-1 text-[10px] text-muted-foreground">Using the custom role above — clear it to pick services.</p>}
+            {!roleName && !modules.length && (
+              <p className="mt-1 text-[10px] text-amber-600">No scope selected → token defaults to viewer (read-only).</p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <Button size="sm" onClick={submit} disabled={saving}>
           {saving ? 'Creating…' : 'Create client'}

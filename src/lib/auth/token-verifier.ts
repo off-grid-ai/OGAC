@@ -17,8 +17,9 @@ export interface Principal {
   email?: string;
   /** OAuth client id for service accounts (`azp`). */
   clientId?: string;
-  /** App role resolved from the token's realm/client roles. */
-  role: 'admin' | 'editor' | 'viewer';
+  /** App role resolved from the token's realm/client roles. Built-in (admin/editor/
+   *  viewer) or a custom/scoped role name that module-access resolves to module grants. */
+  role: string;
   /** Whether this is a machine (service account) or a person. */
   kind: 'service' | 'user';
 }
@@ -45,6 +46,12 @@ function jwkToKey(k: JWK): crypto.KeyObject {
   throw new Error(`unsupported JWK: ${k.kty}`);
 }
 
+// Roles Keycloak assigns to every account that aren't app scopes — ignored when
+// looking for a custom/scoped role name.
+const KC_DEFAULT_ROLES = new Set([
+  'offline_access', 'uma_authorization', 'default-roles-offgrid',
+]);
+
 function roleFrom(claims: Record<string, unknown>): Principal['role'] {
   const realm = (claims['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
   const resource = Object.values((claims['resource_access'] as Record<string, { roles?: string[] }> | undefined) ?? {})
@@ -52,17 +59,32 @@ function roleFrom(claims: Record<string, unknown>): Principal['role'] {
   const all = [...realm, ...resource, typeof claims['role'] === 'string' ? (claims['role'] as string) : ''];
   if (all.includes('admin')) return 'admin';
   if (all.includes('editor')) return 'editor';
-  return 'viewer';
+  // A scoped/custom role (e.g. a service token limited to specific modules) — pass its
+  // name through so module-access resolves it to the granted module set. Prefer an
+  // explicit svc-* scope role, else the first non-default realm role.
+  const scoped = realm.find((r) => r.startsWith('svc-') && !KC_DEFAULT_ROLES.has(r))
+    ?? realm.find((r) => r !== 'viewer' && !KC_DEFAULT_ROLES.has(r));
+  return scoped ?? 'viewer';
 }
 
 class KeycloakVerifier implements IdentityVerifier {
   readonly id = 'keycloak';
   private readonly issuer: string;
+  // Keycloak stamps `iss` from the request host, so the SAME realm yields different
+  // `iss` values depending on how it's reached (127.0.0.1 vs LAN vs public). Since the
+  // signing keys are identical, we accept any issuer for this realm from the configured
+  // set. Set OFFGRID_KEYCLOAK_ISSUERS (comma-separated) to add hosts (e.g. the LAN IP a
+  // service account mints its token from). JWKS is always fetched from the primary issuer.
+  private readonly acceptedIssuers: Set<string>;
   private cache: { keys: Map<string, crypto.KeyObject>; at: number } | null = null;
   private fetching: Promise<{ keys: Map<string, crypto.KeyObject>; at: number }> | null = null;
 
   constructor(url: string, realm: string, private readonly clientId?: string) {
     this.issuer = `${url}/realms/${realm}`;
+    const extra = (process.env.OFFGRID_KEYCLOAK_ISSUERS ?? '')
+      .split(',').map((s) => s.trim()).filter(Boolean)
+      .map((u) => (u.includes('/realms/') ? u : `${u.replace(/\/$/, '')}/realms/${realm}`));
+    this.acceptedIssuers = new Set([this.issuer, ...extra]);
   }
 
   private async keys(kid?: string): Promise<Map<string, crypto.KeyObject>> {
@@ -94,7 +116,7 @@ class KeycloakVerifier implements IdentityVerifier {
 
       const now = Math.floor(Date.now() / 1000);
       if (typeof c['exp'] === 'number' && c['exp'] < now) return null;
-      if (c['iss'] !== this.issuer) return null;
+      if (typeof c['iss'] !== 'string' || !this.acceptedIssuers.has(c['iss'])) return null;
       if (this.clientId) {
         const aud = Array.isArray(c['aud']) ? (c['aud'] as string[]) : [String(c['aud'] ?? '')];
         if (!aud.includes(this.clientId) && c['azp'] !== this.clientId) return null;
