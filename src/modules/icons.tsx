@@ -23,6 +23,7 @@ import {
   TreeStructure,
   UsersThree,
   Vault,
+  HardDrive,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -50,4 +51,5 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   knowledge: BookOpenText,
   access: UsersThree,
   admin: Building2,
+  storage: HardDrive,
 };
