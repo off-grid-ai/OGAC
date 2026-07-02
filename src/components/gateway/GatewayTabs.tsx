@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { GatewayControl } from '@/components/gateway/GatewayControl';
 import { GatewayLogs } from '@/components/gateway/GatewayLogs';
-import { GatewaySettings } from '@/components/gateway/GatewaySettings';
+import { ConfigManager } from '@/components/config/ConfigManager';
 import { GatewayTokens } from '@/components/gateway/GatewayTokens';
 import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,7 +54,7 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
         <GatewayTokens />
       </TabsContent>
       <TabsContent value="settings" className="space-y-4">
-        <GatewaySettings />
+        <ConfigManager only={['AI Gateway']} />
       </TabsContent>
     </Tabs>
   );
