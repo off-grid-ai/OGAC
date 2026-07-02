@@ -4,8 +4,8 @@ import { listFiles, saveFile } from '@/lib/files';
 
 export const dynamic = 'force-dynamic';
 
-// Public base for the returned URL. Defaults to the on-prem console hostname.
-const PUBLIC_BASE = process.env.OFFGRID_PUBLIC_BASE || 'https://onprem-console.getoffgridai.co';
+// Public base for the returned URL — the network gateway (WAF + rate limit front the API).
+const PUBLIC_BASE = process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co';
 
 function urlFor(id: string): string {
   return `${PUBLIC_BASE}/api/v1/files/${id}`;

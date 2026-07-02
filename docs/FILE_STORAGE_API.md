@@ -3,7 +3,7 @@
 Upload files, retrieve them, and toggle public/private. Files are stored **on-prem**
 (local disk on the server; metadata in Postgres) — nothing leaves your infrastructure.
 
-- **Base URL:** `https://onprem-console.getoffgridai.co`
+- **Base URL:** `https://gateway.getoffgridai.co`
 - **Auth (write/list/manage):** the unified **key flow** — a Keycloak **service-account
   JWT** as `Authorization: Bearer <jwt>` (the same key model as the gateway). A console
   login session (cookie) also works for humans.
@@ -32,7 +32,7 @@ Query: `?visibility=public|private` (default `private`). Two body styles:
 
 **Raw bytes** (set the filename + type via headers):
 ```bash
-curl -X POST "https://onprem-console.getoffgridai.co/api/v1/files?visibility=private" \
+curl -X POST "https://gateway.getoffgridai.co/api/v1/files?visibility=private" \
   -H "Authorization: Bearer $API_KEY" \
   -H "X-Filename: report.pdf" \
   -H "Content-Type: application/pdf" \
@@ -41,7 +41,7 @@ curl -X POST "https://onprem-console.getoffgridai.co/api/v1/files?visibility=pri
 
 **Multipart form** (field name `file`):
 ```bash
-curl -X POST "https://onprem-console.getoffgridai.co/api/v1/files?visibility=public" \
+curl -X POST "https://gateway.getoffgridai.co/api/v1/files?visibility=public" \
   -H "Authorization: Bearer $API_KEY" \
   -F "file=@photo.jpg"
 ```
@@ -56,7 +56,7 @@ curl -X POST "https://onprem-console.getoffgridai.co/api/v1/files?visibility=pub
   "visibility": "private",
   "owner": "you@company.com",
   "createdAt": "2026-07-02T…Z",
-  "url": "https://onprem-console.getoffgridai.co/api/v1/files/26d64a9b-…"
+  "url": "https://gateway.getoffgridai.co/api/v1/files/26d64a9b-…"
 }
 ```
 
@@ -68,9 +68,9 @@ Returns the raw bytes with the original `Content-Type` and filename.
 
 ```bash
 # public
-curl https://onprem-console.getoffgridai.co/api/v1/files/$ID -o out.pdf
+curl https://gateway.getoffgridai.co/api/v1/files/$ID -o out.pdf
 # private
-curl -H "Authorization: Bearer $API_KEY" https://onprem-console.getoffgridai.co/api/v1/files/$ID -o out.pdf
+curl -H "Authorization: Bearer $API_KEY" https://gateway.getoffgridai.co/api/v1/files/$ID -o out.pdf
 ```
 
 Metadata only (JSON, no bytes): `GET /api/v1/files/{id}?meta=1`.
@@ -78,7 +78,7 @@ Metadata only (JSON, no bytes): `GET /api/v1/files/{id}?meta=1`.
 ## Make public / private — `PATCH /api/v1/files/{id}`
 
 ```bash
-curl -X PATCH https://onprem-console.getoffgridai.co/api/v1/files/$ID \
+curl -X PATCH https://gateway.getoffgridai.co/api/v1/files/$ID \
   -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
   -d '{"visibility":"public"}'      # or "private"
 ```
@@ -87,7 +87,7 @@ Returns the updated metadata. Owner or admin only.
 ## List your files — `GET /api/v1/files`
 
 ```bash
-curl -H "Authorization: Bearer $API_KEY" https://onprem-console.getoffgridai.co/api/v1/files
+curl -H "Authorization: Bearer $API_KEY" https://gateway.getoffgridai.co/api/v1/files
 # → { "files": [ { id, name, mime, size, visibility, url, … }, … ] }
 ```
 
@@ -95,7 +95,7 @@ curl -H "Authorization: Bearer $API_KEY" https://onprem-console.getoffgridai.co/
 
 ```bash
 curl -X DELETE -H "Authorization: Bearer $API_KEY" \
-  https://onprem-console.getoffgridai.co/api/v1/files/$ID
+  https://gateway.getoffgridai.co/api/v1/files/$ID
 # → { "deleted": true }
 ```
 
@@ -118,5 +118,6 @@ curl -X DELETE -H "Authorization: Bearer $API_KEY" \
   that interface — no endpoint changes.
 - `OFFGRID_ADMIN_TOKEN` still works as an explicit **break-glass** static token if set
   (bootstrap/CI), but the canonical path is a Keycloak-issued key.
-- The edge WAF + rate limit currently front the **gateway** host, not the console; say
-  the word and I'll extend them to file endpoints too.
+- Served through the **network gateway** (`gateway.getoffgridai.co`), so file requests
+  get the edge WAF + rate limit. The console host (`onprem-console.getoffgridai.co`)
+  also serves the same API directly if you prefer.
