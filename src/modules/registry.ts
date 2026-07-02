@@ -87,17 +87,17 @@ export const MODULES: readonly ModuleDef[] = [
   },
   {
     id: 'gateway',
-    label: 'Gateway',
+    label: 'AI Gateway',
     description:
-      'Model routing (local + leashed cloud), providers, OpenAI-compatible endpoint, cache.',
+      'The LLM gateway — model routing (local + leashed cloud), providers, OpenAI-compatible endpoint, cache.',
     route: '/gateway',
     service: 'gateway',
   },
   {
     id: 'edge',
-    label: 'Edge',
+    label: 'Gateway',
     description:
-      'The WAF + rate limiter at the internet edge (Caddy) — live policy and blocked traffic, in one place.',
+      'The network gateway — the public HTTP edge (Caddy reverse proxy) fronting all published services, with WAF + rate limiting. Live policy and blocked traffic in one place.',
     route: '/edge',
     service: 'edge',
     internal: true,

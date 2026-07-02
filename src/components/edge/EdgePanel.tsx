@@ -68,9 +68,9 @@ export function EdgePanel() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-foreground">Edge</h1>
+        <h1 className="text-lg font-semibold text-foreground">Gateway</h1>
         <p className="text-sm text-muted-foreground">
-          WAF, rate limiting, and blocked traffic at the Caddy edge — the one place the internet meets your fleet.
+          The network gateway — the public HTTP edge (reverse proxy, WAF, rate limiting) where the internet meets your fleet. Distinct from the AI Gateway, which routes LLM traffic.
         </p>
       </div>
 

@@ -16,7 +16,7 @@ export interface ServiceEntry {
   /** How it's protected — shown as a badge. */
   auth: 'session' | 'api-key' | 'public';
   /** Grouping for the UI. */
-  kind: 'console' | 'product' | 'api' | 'site';
+  kind: 'console' | 'product' | 'api' | 'site' | 'gateway';
 }
 
 const DEFAULT_SERVICES: ServiceEntry[] = [
@@ -32,11 +32,20 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'gateway',
     label: 'AI Gateway',
-    description: 'The multinode LLM gateway — OpenAI-compatible, load-balanced across the fleet.',
+    description: 'The multinode LLM gateway — OpenAI-compatible, load-balanced across the fleet. Keycloak-issued keys.',
     url: 'https://gateway.getoffgridai.co',
     healthPath: '/healthz',
     auth: 'api-key',
     kind: 'api',
+  },
+  {
+    id: 'edge-gateway',
+    label: 'Gateway',
+    description: 'The network gateway — public HTTP edge (reverse proxy, WAF, rate limiting) fronting every published service.',
+    url: 'https://gateway.getoffgridai.co',
+    healthPath: '/healthz',
+    auth: 'public',
+    kind: 'gateway',
   },
   {
     id: 'status',
