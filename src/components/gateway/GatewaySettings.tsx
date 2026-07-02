@@ -156,6 +156,7 @@ function SettingsGroup({
 export function GatewaySettings() {
   const [data, setData] = useState<ConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<'forbidden' | 'unauthorized' | string | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [lastResult, setLastResult] = useState<SaveResult | null>(null);
@@ -163,9 +164,18 @@ export function GatewaySettings() {
 
   const load = async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const r = await fetch('/api/v1/gateway/config');
-      setData((await r.json()) as ConfigResponse);
+      const body = (await r.json().catch(() => ({}))) as ConfigResponse & { error?: string };
+      if (!r.ok) {
+        setApiError(body.error ?? `HTTP ${r.status}`);
+        setData(null);
+        return;
+      }
+      setData(body);
+    } catch {
+      setApiError('unreachable');
     } finally {
       setLoading(false);
     }
@@ -206,8 +216,30 @@ export function GatewaySettings() {
 
   return (
     <div className="space-y-4">
-      {/* Status banner */}
-      {!loading && data && !data.available && (
+      {/* Permission / API error — distinct from "gateway offline" */}
+      {!loading && apiError && (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <Warning size={13} className="mt-0.5 shrink-0" />
+          <div>
+            {apiError === 'forbidden' ? (
+              <>
+                <span className="font-medium">Admin access required.</span> Gateway settings are admin-only.
+                Your account doesn&apos;t have the <code className="rounded bg-muted px-1">admin</code> role —
+                assign it to your user in Keycloak (realm roles), then sign out and back in.
+              </>
+            ) : apiError === 'unauthorized' ? (
+              <><span className="font-medium">Session expired.</span> Sign in again to view gateway settings.</>
+            ) : apiError === 'unreachable' ? (
+              <><span className="font-medium">Couldn&apos;t reach the console API.</span> Check your connection and retry.</>
+            ) : (
+              <><span className="font-medium">Failed to load settings:</span> {apiError}</>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Status banner — only a true offline state (loaded, but gateway not answering) */}
+      {!loading && !apiError && data && !data.available && (
         <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
           <Warning size={13} />
           Gateway is offline — showing last saved values. Changes will be applied on next start.
