@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:8800';
+const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // ── GET /api/v1/gateway/config ────────────────────────────────────────────────
 // Returns the schema + live values from the running gateway merged with any

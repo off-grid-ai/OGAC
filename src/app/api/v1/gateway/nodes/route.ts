@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // node :7878 APIs directly: the gateway runs where it can reach the LAN nodes,
 // whereas the console (a macOS user LaunchAgent) is blocked from LAN peers by
 // Local Network privacy. So the gateway fronts model management; we forward.
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:8800';
+const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 export async function GET() {
   try {

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 // Per-node control actions (activate/unload/pull/delete/settings) — proxied to the
 // cluster gateway's /nodes/[name] endpoint, which speaks the node :7878 mgmt API.
 // (The console can't reach LAN nodes directly under macOS Local Network privacy.)
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:8800';
+const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
