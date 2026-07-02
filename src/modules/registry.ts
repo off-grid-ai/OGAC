@@ -8,6 +8,7 @@ export type ModuleId =
   | 'prompts'
   | 'fleet'
   | 'gateway'
+  | 'edge'
   | 'control'
   | 'data'
   | 'brain'
@@ -91,6 +92,15 @@ export const MODULES: readonly ModuleDef[] = [
       'Model routing (local + leashed cloud), providers, OpenAI-compatible endpoint, cache.',
     route: '/gateway',
     service: 'gateway',
+  },
+  {
+    id: 'edge',
+    label: 'Edge',
+    description:
+      'The WAF + rate limiter at the internet edge (Caddy) — live policy and blocked traffic, in one place.',
+    route: '/edge',
+    service: 'edge',
+    internal: true,
   },
   {
     id: 'control',
