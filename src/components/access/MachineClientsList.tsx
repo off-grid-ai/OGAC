@@ -293,18 +293,24 @@ function ExpandedClient({ client }: { client: KcClient }) {
 export function MachineClientsList() {
   const [clients, setClients] = useState<KcClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newSecret, setNewSecret] = useState<{ clientId: string; secret: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const res = await fetch('/api/v1/admin/access/clients');
-      const data = (await res.json()) as { clients?: KcClient[] };
+      const data = (await res.json()) as { clients?: KcClient[]; error?: string };
+      if (!res.ok) {
+        setApiError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
       setClients(data.clients ?? []);
     } catch {
-      toast.error('Failed to load clients.');
+      setApiError('Failed to reach the access API.');
     } finally {
       setLoading(false);
     }
@@ -357,6 +363,17 @@ export function MachineClientsList() {
             secret={newSecret.secret}
             onDismiss={() => setNewSecret(null)}
           />
+        )}
+
+        {apiError && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+            <span className="font-medium">Keycloak error:</span> {apiError}
+            {apiError === 'forbidden' && (
+              <span className="ml-1 text-muted-foreground">
+                — the service account needs <code className="rounded bg-muted px-1">view-clients</code> under realm-management in Keycloak.
+              </span>
+            )}
+          </div>
         )}
 
         {loading ? (
