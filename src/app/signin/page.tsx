@@ -12,42 +12,65 @@ import { Input } from '@/components/ui/input';
 // Provider availability is read from env at request time (not baked at build).
 export const dynamic = 'force-dynamic';
 
+// Where to land after a successful sign-in. The Caddy gate forwards the originally
+// requested URL as `callbackUrl` so a user gated out of console-status returns THERE,
+// not to /fleet. Only same-suite targets are honored (relative path, or an https URL
+// on *.getoffgridai.co) — anything else falls back to /fleet, so the param can't be
+// used as an open redirect.
+function safeCallback(raw: FormDataEntryValue | null): string {
+  const v = typeof raw === 'string' ? raw.trim() : '';
+  if (!v) return '/fleet';
+  if (v.startsWith('/') && !v.startsWith('//')) return v; // relative, same-origin
+  try {
+    const u = new URL(v);
+    if (u.protocol === 'https:' && (u.hostname === 'getoffgridai.co' || u.hostname.endsWith('.getoffgridai.co'))) {
+      return u.toString();
+    }
+  } catch {
+    /* not a URL — fall through */
+  }
+  return '/fleet';
+}
+
 // Owned login: the console authenticates username/password through the identity seam
 // (Keycloak ROPC server-side) — the browser never leaves the console, no hosted IdP
 // page, no internal IP leak. SSO buttons appear only when explicitly configured.
 async function withPassword(formData: FormData): Promise<void> {
   'use server';
+  const redirectTo = safeCallback(formData.get('callbackUrl'));
   try {
     await signIn('password', {
       username: String(formData.get('username') ?? ''),
       password: String(formData.get('password') ?? ''),
-      redirectTo: '/fleet',
+      redirectTo,
     });
   } catch (e) {
-    if (e instanceof AuthError) redirect('/signin?error=1');
+    if (e instanceof AuthError) {
+      redirect(`/signin?error=1&callbackUrl=${encodeURIComponent(String(formData.get('callbackUrl') ?? ''))}`);
+    }
     throw e; // success path throws NEXT_REDIRECT — must propagate
   }
 }
-async function withGoogle(): Promise<void> {
+async function withGoogle(formData: FormData): Promise<void> {
   'use server';
-  await signIn('google', { redirectTo: '/fleet' });
+  await signIn('google', { redirectTo: safeCallback(formData.get('callbackUrl')) });
 }
-async function withMicrosoft(): Promise<void> {
+async function withMicrosoft(formData: FormData): Promise<void> {
   'use server';
-  await signIn('microsoft-entra-id', { redirectTo: '/fleet' });
+  await signIn('microsoft-entra-id', { redirectTo: safeCallback(formData.get('callbackUrl')) });
 }
-async function withDev(): Promise<void> {
+async function withDev(formData: FormData): Promise<void> {
   'use server';
-  await signIn('dev', { redirectTo: '/fleet' });
+  await signIn('dev', { redirectTo: safeCallback(formData.get('callbackUrl')) });
 }
 
 // eslint-disable-next-line complexity
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; callbackUrl?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, callbackUrl } = await searchParams;
   const sso = [
     { enabled: googleEnabled, action: withGoogle, label: 'Continue with Google' },
     { enabled: microsoftEnabled, action: withMicrosoft, label: 'Continue with Microsoft' },
@@ -72,6 +95,7 @@ export default async function SignInPage({
 
           {passwordEnabled ? (
             <form action={withPassword} className="space-y-2.5">
+              {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
               <Input name="username" type="text" placeholder="Email" autoComplete="username" required className="font-mono text-sm" />
               <PasswordField />
               <Button type="submit" className="w-full">Sign in</Button>
@@ -87,6 +111,7 @@ export default async function SignInPage({
               ) : null}
               {sso.map((p) => (
                 <form key={p.label} action={p.action}>
+                  {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
                   <Button type="submit" variant="outline" className="w-full">{p.label}</Button>
                 </form>
               ))}
@@ -95,6 +120,7 @@ export default async function SignInPage({
 
           {devLoginEnabled ? (
             <form action={withDev}>
+              {callbackUrl ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
               <Button type="submit" variant="ghost" className="w-full text-muted-foreground">
                 <TerminalSquare className="size-4" />
                 Dev sign-in (admin)
