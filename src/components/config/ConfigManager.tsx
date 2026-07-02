@@ -225,7 +225,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
         groups.map((group) => (
           <div key={group} className="space-y-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.filter((e) => e.group === group).map((entry) => (
                 <div
                   key={entry.key}
