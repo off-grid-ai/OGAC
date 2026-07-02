@@ -87,7 +87,7 @@ function Field({
   );
 }
 
-export function ConfigManager() {
+export function ConfigManager({ only }: { only?: string[] } = {}) {
   const [entries, setEntries] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -163,10 +163,13 @@ export function ConfigManager() {
   };
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return entries;
-    const q = search.toLowerCase();
-    return entries.filter((e) => e.key.toLowerCase().includes(q) || e.label.toLowerCase().includes(q) || e.group.toLowerCase().includes(q));
-  }, [entries, search]);
+    let base = only?.length ? entries.filter((e) => only.includes(e.group)) : entries;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      base = base.filter((e) => e.key.toLowerCase().includes(q) || e.label.toLowerCase().includes(q) || e.group.toLowerCase().includes(q));
+    }
+    return base;
+  }, [entries, search, only]);
 
   const groups = useMemo(() => [...new Set(filtered.map((e) => e.group))], [filtered]);
 
