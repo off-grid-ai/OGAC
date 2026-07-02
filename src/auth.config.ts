@@ -71,23 +71,24 @@ export const authConfig = {
   trustHost: true,
   providers,
   pages: { signIn: '/signin' },
-  // Share the session across *.getoffgridai.co so every owned UI (console-status,
-  // console-landing, gungnir) can be gated behind the ONE console login via a
-  // Caddy forward_auth check. Domain is env-driven (AUTH_COOKIE_DOMAIN).
-  cookies: env.AUTH_COOKIE_DOMAIN
-    ? {
-        sessionToken: {
-          name: env.NODE_ENV === 'production' ? '__Secure-authjs.session-token' : 'authjs.session-token',
-          options: {
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/',
-            secure: env.NODE_ENV === 'production',
-            domain: env.AUTH_COOKIE_DOMAIN,
-          },
-        },
-      }
-    : undefined,
+  // Session cookie. The NAME is FIXED (not conditional) so the Node auth handler
+  // that SETS it and the Edge middleware that READS it always agree — a name that
+  // depended on an env var that resolves differently across runtimes caused a
+  // sign-in loop. A custom name also sidesteps any stale `authjs`-named cookie left
+  // over from a secret rotation. `domain` is added only when AUTH_COOKIE_DOMAIN is
+  // set, so ONE login is shared across *.getoffgridai.co for the Caddy gate.
+  cookies: {
+    sessionToken: {
+      name: env.NODE_ENV === 'production' ? '__Secure-offgrid.session' : 'offgrid.session',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: env.NODE_ENV === 'production',
+        ...(env.AUTH_COOKIE_DOMAIN ? { domain: env.AUTH_COOKIE_DOMAIN } : {}),
+      },
+    },
+  },
   callbacks: {
     // eslint-disable-next-line complexity
     jwt({ token, user, account, profile }) {
