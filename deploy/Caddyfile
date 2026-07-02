@@ -1,6 +1,9 @@
 {
 	auto_https off
 	admin off
+	# Custom modules: WAF runs first, rate-limit just before the proxy.
+	order coraza_waf first
+	order rate_limit before reverse_proxy
 }
 
 # Owned-login gate: forward_auth to the console session check; unauthenticated
@@ -16,6 +19,39 @@
 	reverse_proxy {args[0]}
 }
 
+# Edge policy in ONE place: JSON access log (console reads it for blocks), a
+# Coraza WAF with core protections, and a per-IP rate limit. args: 0=zone 1=events/min.
+(edge) {
+	log {
+		output file /Users/admin/offgrid/console/deploy/edge-access.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+		format json
+	}
+	coraza_waf {
+		directives `
+			SecRuleEngine On
+			SecRequestBodyAccess On
+			SecResponseBodyAccess Off
+			SecRule REQUEST_URI "@rx (?i)(\.\./|\.\.\\|/etc/passwd|/proc/self/|/bin/sh)" "id:1001,phase:1,deny,status:403,log,msg:'Path traversal'"
+			SecRule ARGS|REQUEST_URI "@rx (?i)(union(\s|/\*.*\*/)+select|\bselect\b.+\bfrom\b|insert\s+into\s|drop\s+table|'\s+or\s+'1'\s*=\s*'1)" "id:1002,phase:2,deny,status:403,log,msg:'SQL injection'"
+			SecRule ARGS|REQUEST_HEADERS:User-Agent|REQUEST_URI "@rx (?i)(<script|onerror\s*=|javascript:|onload\s*=|document\.cookie)" "id:1003,phase:2,deny,status:403,log,msg:'XSS'"
+			SecRule REQUEST_HEADERS:User-Agent "@rx (?i)(sqlmap|nikto|nmap|masscan|acunetix|nessus|dirbuster|fimap|whatweb|zgrab)" "id:1004,phase:1,deny,status:403,log,msg:'Scanner user-agent'"
+		`
+	}
+	rate_limit {
+		# Behind the Cloudflare tunnel every request's remote host is 127.0.0.1, so
+		# key on the real client IP Cloudflare forwards. Empty (direct LAN) = one
+		# shared bucket, which is fine since the LAN is trusted.
+		zone {args[0]} {
+			key {http.request.header.Cf-Connecting-Ip}
+			events {args[1]}
+			window 1m
+		}
+	}
+}
+
 http://console-status.getoffgridai.co {
 	import gated 127.0.0.1:9100
 }
@@ -29,6 +65,10 @@ http://gungnir.getoffgridai.co {
 http://onprem-console.getoffgridai.co, http://127.0.0.1 {
 	reverse_proxy 127.0.0.1:3000
 }
+
+# Gateway now flows THROUGH Caddy so the edge (WAF + rate limit) protects it.
+# The aggregator still enforces auth (Keycloak JWT / API key) behind this.
 http://gateway.getoffgridai.co {
+	import edge gateway 120
 	reverse_proxy 127.0.0.1:8800
 }
