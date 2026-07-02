@@ -2,6 +2,7 @@ import { Plugs, PlugsConnected } from '@phosphor-icons/react/dist/ssr';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddConnectorButton } from '@/components/integrations/AddConnectorButton';
 import { CachePanel } from '@/components/integrations/CachePanel';
+import { GatewayIntegrations } from '@/components/integrations/GatewayIntegrations';
 import { ToolPolicySelect } from '@/components/integrations/ToolPolicySelect';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -146,6 +147,8 @@ export default async function IntegrationsPage() {
       </Card>
 
       <CachePanel />
+
+      <GatewayIntegrations />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {bindings.map((b) => {
