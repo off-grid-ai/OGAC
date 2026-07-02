@@ -27,6 +27,7 @@ async function fetchGateway(): Promise<GatewayInfo | null> {
   try {
     const res = await fetch(`${GATEWAY_URL}/`, {
       cache: 'no-store',
+      headers: { 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' },
       signal: AbortSignal.timeout(1500),
     });
     if (!res.ok) return null;

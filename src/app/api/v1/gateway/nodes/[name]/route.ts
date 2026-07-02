@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
     const r = await fetch(`${GATEWAY_URL}/nodes/${encodeURIComponent(name)}`, {
       method: 'POST',
       cache: 'no-store',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' },
       body,
       signal: AbortSignal.timeout(120000),
     });
