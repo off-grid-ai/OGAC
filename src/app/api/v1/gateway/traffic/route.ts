@@ -12,6 +12,7 @@ export async function GET() {
   try {
     const r = await fetch(`${GATEWAY_URL}/traffic`, {
       cache: 'no-store',
+      headers: { 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' },
       signal: AbortSignal.timeout(2500),
     });
     if (!r.ok) return NextResponse.json({ available: false }, { status: 200 });

@@ -11,7 +11,7 @@ const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:8800';
 
 export async function GET() {
   try {
-    const r = await fetch(`${GATEWAY_URL}/nodes`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    const r = await fetch(`${GATEWAY_URL}/nodes`, { cache: 'no-store', headers: { 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' }, signal: AbortSignal.timeout(15000) });
     if (!r.ok) return NextResponse.json({ available: false, nodes: [] }, { status: 200 });
     return NextResponse.json(await r.json());
   } catch {
