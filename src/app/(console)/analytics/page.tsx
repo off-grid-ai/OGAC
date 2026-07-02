@@ -11,6 +11,7 @@ import {
   ModelTokensChart,
 } from '@/components/analytics/AnalyticsCharts';
 import { EmbedGuard } from '@/components/control/EmbedGuard';
+import { GatewayUsage } from '@/components/gateway/GatewayUsage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -114,6 +115,8 @@ export default async function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <GatewayUsage />
 
       <Card className="shadow-sm">
         <CardHeader>
