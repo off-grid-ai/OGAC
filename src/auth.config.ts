@@ -103,7 +103,13 @@ export const authConfig = {
         const all = [...realmRoles, ...resourceRoles];
         // Also accept a top-level `role` claim if set in Keycloak's token mapper.
         const direct = typeof kc['role'] === 'string' ? kc['role'] : null;
-        const resolved = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
+        let resolved = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
+        // Founder/bootstrap escape hatch: emails in OFFGRID_ADMIN_EMAILS are always admin.
+        // Solves the chicken-and-egg where role management is itself admin-gated.
+        const adminEmails = (process.env.OFFGRID_ADMIN_EMAILS ?? '')
+          .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+        const email = typeof kc['email'] === 'string' ? kc['email'].toLowerCase() : '';
+        if (email && adminEmails.includes(email)) resolved = 'admin';
         token.role = resolved;
       } else if (user) {
         // Non-Keycloak sign-in (dev credentials, Google, Microsoft): use DB role.
