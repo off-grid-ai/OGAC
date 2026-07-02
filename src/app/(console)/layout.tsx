@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { auth } from '@/auth';
+import { GlobalSearch } from '@/components/GlobalSearch';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { Toaster } from '@/components/ui/sonner';
@@ -16,6 +17,7 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
           <main className="flex-1 overflow-y-auto p-6">{children}</main>
         </div>
       </div>
+      <GlobalSearch />
       <Toaster />
     </TooltipProvider>
   );
