@@ -471,7 +471,7 @@ async function handle(req, res, chunks) {
       record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, input: promptText(body), output: `(error: ${e.message})` });
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
-    up.setTimeout(120000, () => up.destroy(new Error('upstream timeout')));
+    up.setTimeout(Number(process.env.OFFGRID_GATEWAY_UPSTREAM_TIMEOUT_MS || 300000), () => up.destroy(new Error('upstream timeout')));
     up.end(forwarded);
   }
 }
