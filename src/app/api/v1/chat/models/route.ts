@@ -31,6 +31,10 @@ export async function GET() {
     }
     return NextResponse.json({ models });
   } catch {
-    return NextResponse.json({ models: [] });
+    return NextResponse.json({
+      models: [],
+      error: 'gateway_unreachable',
+      gatewayUrl: GATEWAY_URL,
+    });
   }
 }

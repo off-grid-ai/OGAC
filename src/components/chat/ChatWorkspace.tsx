@@ -302,6 +302,7 @@ export function ChatWorkspace({
   const [slashIndex, setSlashIndex] = useState(0);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
+  const [gatewayError, setGatewayError] = useState<{ url: string } | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [dialogProject, setDialogProject] = useState<Project | null>(null);
@@ -343,9 +344,13 @@ export function ChatWorkspace({
     void (async () => {
       const r = await fetch('/api/v1/chat/models');
       if (r.ok) {
-        const list: ModelInfo[] = (await r.json()).models ?? [];
+        const body = await r.json() as { models?: ModelInfo[]; error?: string; gatewayUrl?: string };
+        const list: ModelInfo[] = body.models ?? [];
         setModels(list);
         if (list[0]) setModel(list[0].id);
+        if (body.error === 'gateway_unreachable' && body.gatewayUrl) {
+          setGatewayError({ url: body.gatewayUrl });
+        }
       }
     })();
     // Slash-styles autocomplete source — RBAC-scoped by the skills API.
@@ -975,19 +980,29 @@ export function ChatWorkspace({
             >
               <SlidersHorizontal className="size-4" />
             </button>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
-            >
-              {models.length === 0 ? <option value="">no models</option> : null}
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id}
-                  {m.vision ? ' (vision)' : ''}
-                </option>
-              ))}
-            </select>
+            {gatewayError ? (
+              <a
+                href="/gateway"
+                title={`AI Gateway unreachable at ${gatewayError.url} — set OFFGRID_GATEWAY_URL`}
+                className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
+              >
+                <span>⚠ gateway offline</span>
+              </a>
+            ) : (
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
+              >
+                {models.length === 0 ? <option value="">no models</option> : null}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id}
+                    {m.vision ? ' (vision)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
