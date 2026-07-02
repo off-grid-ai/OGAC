@@ -1,11 +1,13 @@
 import { StudioCanvas } from '@/components/studio/StudioCanvas';
 import { requireModuleForUser } from '@/lib/module-access';
+import { auth } from '@/auth';
 import { introspect } from '@/lib/studio';
 
 export const dynamic = 'force-dynamic';
 
 export default async function StudioPage() {
   await requireModuleForUser('studio');
+  const session = await auth();
   const catalog = await introspect();
   const order: (keyof typeof catalog.counts)[] = ['Connector', 'Data', 'Tool', 'Guardrail', 'Model', 'Agent'];
   return (
@@ -13,8 +15,7 @@ export default async function StudioPage() {
       <div>
         <h1 className="text-lg font-semibold">Studio</h1>
         <p className="text-sm text-muted-foreground">
-          Describe what you want in plain language. The platform introspects your connectors, data
-          sources, tools, guardrails, and agents — and wires the workflow.
+          Describe what you want in plain language. No technical knowledge needed.
         </p>
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           {order
@@ -24,7 +25,7 @@ export default async function StudioPage() {
           available
         </p>
       </div>
-      <StudioCanvas catalog={catalog} />
+      <StudioCanvas catalog={catalog} userId={session?.user?.email ?? undefined} />
     </div>
   );
 }
