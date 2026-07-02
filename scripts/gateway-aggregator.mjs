@@ -6,7 +6,30 @@
 //   model names "gemma…" text -> g1 (Gemma 12B)  |  "qwen…" -> g2  |  image+gemma -> g3
 //
 // Adds `x-offgrid-gateway` to responses so you can see where each call went.
+//
+// Auth (safe to expose via the tunnel): every route except /healthz requires either
+// the static key (OFFGRID_GATEWAY_API_KEY, as Bearer or x-api-key) OR a valid Keycloak
+// JWT (OFFGRID_KEYCLOAK_URL + _REALM). Keys are ISSUED by Keycloak (a service-account
+// client → client_credentials → JWT) — we don't run our own key store. If neither is
+// configured the endpoint is open (LAN-only dev default).
 import http from 'node:http';
+import { verifierFromEnv } from './lib/keycloak-verify.mjs';
+
+const API_KEY = process.env.OFFGRID_GATEWAY_API_KEY || '';
+const kc = verifierFromEnv();
+const AUTH_ON = Boolean(API_KEY || kc);
+
+// Returns true if the request may proceed. /healthz is always open (liveness probe).
+async function authOK(req, url) {
+  if (url === '/healthz') return true;
+  if (!AUTH_ON) return true; // no gate configured → open (LAN)
+  const hdr = String(req.headers['authorization'] || '');
+  const bearer = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : '';
+  const xKey = String(req.headers['x-api-key'] || '');
+  if (API_KEY && (xKey === API_KEY || bearer === API_KEY)) return true;
+  if (kc && bearer) { try { await kc.verify(bearer); return true; } catch { /* fall through */ } }
+  return false;
+}
 
 const PORT = Number(process.env.PORT || 8800);
 const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info URLs only
@@ -208,6 +231,17 @@ async function poolInfo() {
 }
 
 const server = http.createServer((req, res) => {
+  // Buffer the body first so the async auth check can't race the request stream.
+  const _chunks = [];
+  req.on('data', (c) => _chunks.push(c));
+  req.on('end', () => void handle(req, res, _chunks));
+});
+
+async function handle(req, res, chunks) {
+  if (req.url !== '/healthz' && !(await authOK(req, req.url))) {
+    return json(res, 401, { error: { message: 'invalid or missing API key', type: 'unauthorized' } });
+  }
+  if (req.url === '/healthz') return json(res, 200, { ok: true });
   if (req.url === '/' || req.url === '/health')
     return poolInfo().then((i) => json(res, 200, i)).catch(() => json(res, 200, { name: 'Off Grid AI — gateway aggregator', routes: POOL }));
   if (req.url === '/traffic' || req.url === '/traffic.json') {
@@ -237,9 +271,7 @@ const server = http.createServer((req, res) => {
     return json(res, 200, { object: 'list', data: models });
   }
 
-  const chunks = [];
-  req.on('data', (c) => chunks.push(c));
-  req.on('end', () => {
+  {
     const raw = Buffer.concat(chunks);
     let body = {}; try { body = JSON.parse(raw.toString() || '{}'); } catch { /* not json */ }
     const image = hasImage(body);
@@ -356,7 +388,7 @@ const server = http.createServer((req, res) => {
     });
     up.setTimeout(120000, () => up.destroy(new Error('upstream timeout')));
     up.end(forwarded);
-  });
-});
+  }
+}
 server.listen(PORT, '0.0.0.0', () => console.log(`[aggregator] routing on 0.0.0.0:${PORT} across`, POOL.map((g) => `${g.name}:${g.model}${g.vision ? '+vision' : ''}`).join(', ')));
 startProbing();
