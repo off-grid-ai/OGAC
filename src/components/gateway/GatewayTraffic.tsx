@@ -59,6 +59,9 @@ export interface Call {
   toolCalls?: { name: string; args: string }[];
   params?: { temperature?: number; maxTokens?: number; topP?: number; thinking?: boolean; toolsOffered?: number };
   msgs?: { role: string; text: string }[];
+  /** Present when the gateway is in raw header mode (OFFGRID_RAW_HEADERS=true). */
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
 }
 interface Traffic {
   available: boolean;
@@ -131,6 +134,32 @@ export function CallDetail({ c }: { c: Call }) {
           <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono">
             {c.reasoning}
           </pre>
+        </details>
+      ) : null}
+      {(c.requestHeaders || c.responseHeaders) ? (
+        <details className="text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">
+            Raw headers
+            <span className="ml-1.5 rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">raw mode</span>
+          </summary>
+          <div className="mt-1 grid gap-2 md:grid-cols-2">
+            {c.requestHeaders ? (
+              <div>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide">Request</div>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+                  {Object.entries(c.requestHeaders).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                </pre>
+              </div>
+            ) : null}
+            {c.responseHeaders ? (
+              <div>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide">Response</div>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-border bg-background p-2 font-mono text-[11px]">
+                  {Object.entries(c.responseHeaders).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                </pre>
+              </div>
+            ) : null}
+          </div>
         </details>
       ) : null}
     </div>
