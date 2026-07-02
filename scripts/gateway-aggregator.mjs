@@ -186,24 +186,34 @@ function healthFor(name) {
   const p = PROBE[name];
   const probeFresh = p && now - p.ts <= HEALTH_WINDOW_MS;
 
+  const recentSuccess = recent.some((e) => e.status && e.status < 400);
+
   // Process unreachable (probe says so, and no successful recent traffic contradicts it) ⇒ down.
-  if (probeFresh && !p.reachable && !recent.some((e) => e.status && e.status < 400)) return 'down';
+  if (probeFresh && !p.reachable && !recentSuccess) return 'down';
 
   const errs = recent.filter((e) => !e.status || e.status >= 400).length;
   const errRate = recent.length ? errs / recent.length : 0;
   const avgMs = recent.length ? recent.reduce((a, e) => a + (e.ms || 0), 0) / recent.length : 0;
 
-  // Probe reached the process but a bounded 1-token generation failed or crawled ⇒ jammed.
-  if (probeFresh && p.reachable && p.genOk === false) return 'down';
-  if (probeFresh && p.reachable && p.genMs != null && p.genMs >= SLOW_MS) return 'degraded';
+  // Real successful traffic is the ground truth — a node completing real requests is UP,
+  // even if it's busy enough that the synthetic 1-token probe timed out. Errors still count.
+  if (recentSuccess && errRate < DEGRADED_ERR_RATE) return 'up';
 
-  // Live-traffic signals (only meaningful with samples in the window).
+  // Live-traffic error/latency signals (only meaningful with samples in the window).
   if (recent.length >= 2) {
     if (errRate >= DOWN_ERR_RATE || avgMs >= JAM_MS) return 'down';
     if (errRate >= DEGRADED_ERR_RATE || avgMs >= SLOW_MS) return 'degraded';
   }
+
+  // Synthetic-probe signals only apply to an IDLE node (no recent traffic to compete with).
+  // A failed gen probe on a busy node means "busy", not "down" — don't penalise it.
+  if (probeFresh && p.reachable && !recent.length) {
+    if (p.genOk === false) return 'down';           // idle + can't generate 1 token ⇒ jammed
+    if (p.genMs != null && p.genMs >= SLOW_MS) return 'degraded';
+  }
+
   if (probeFresh && p.reachable) return 'up';
-  if (recent.some((e) => e.status && e.status < 400)) return 'up';
+  if (recentSuccess) return 'up';
   return probeFresh ? 'up' : 'unknown'; // no probe yet + no traffic ⇒ genuinely unknown
 }
 
@@ -219,6 +229,11 @@ async function probeGateway(g) {
     const h = await fetch(`http://${g.host}:${g.port}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null);
     const reachable = !!(h && h.ok);
     if (!reachable) { PROBE[g.name] = { reachable: false, genOk: null, genMs: null, ts: Date.now() }; return; }
+    // If the node is busy serving real requests, DON'T fire a synthetic gen probe — it would
+    // queue behind live traffic and falsely time out. Reachable + real traffic = health handles it.
+    const now = Date.now();
+    const busy = LOG.some((e) => e.gateway === g.name && now - e.ts <= HEALTH_WINDOW_MS);
+    if (busy) { PROBE[g.name] = { reachable: true, genOk: null, genMs: null, ts: Date.now() }; return; }
     // Bounded 1-token generation — this is what a jammed KV-cache fails/stalls on.
     const genStart = Date.now();
     const r = await fetch(`http://${g.host}:${g.port}/v1/chat/completions`, {
