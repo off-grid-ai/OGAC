@@ -177,16 +177,18 @@ This change requires: a layout-level nav that reads the current module context, 
 
 > Full detail in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-| Phase | Goal | Key milestone |
-|---|---|---|
-| **0 — Foundation** | Fix 6 known bugs, freeze versions, kill dead containers | All bugs fixed, `npm ci` reproducible |
-| **1 — Nav refactor** | Two-level AWS-style nav, global search | Service-scoped left nav, header search working |
-| **2 — Prove It** | Provit integrated as a first-class module | Repos/runs/journeys/ledger visible in console |
-| **3 — Multi-tenancy** | N orgs, fully isolated, from one deployment | Two orgs co-exist, RLS verified |
-| **4 — Module spine** | `defineOffgrid()` — gateway is the composition root | Add a module = add one config line |
-| **5 — Soul** | Event→embedding→retrieval — the platform works for you | `context_hints` in node policy-pull |
-| **6 — Unified API** | `console-api.getoffgridai.co` — all 14 services behind one OpenAPI catalog | Swagger UI live with all specs |
-| **7 — SDK + flywheel** | Third parties build modules; managed hosting ships | `@offgrid/sdk` on npm |
+| Phase | Goal | Key milestone | Depends on |
+|---|---|---|---|
+| **0 — Foundation** | Fix 6 known bugs, freeze versions, kill dead containers | All bugs fixed, `npm ci` reproducible | — |
+| **1 — Nav refactor** | Two-level AWS-style nav, global search | Service-scoped left nav, header search working | P0 |
+| **2 — Prove It** | Provit integrated as a first-class module | Repos/runs/journeys/ledger visible in console | P1 |
+| **3 — Multi-tenancy** | N orgs, fully isolated, from one deployment | Two orgs co-exist, RLS verified | P2 |
+| **3A — Hardening & Scale** | HA, independent scaling, backup, DR | Single node failure < 5min RTO; nightly backup restorable | P3 (parallel w/ P4) |
+| **4 — OSS parity** | Close every read-back gap — no service is a write-only sink | All 10 services two-way in the UI | P3 |
+| **5 — Unified API** | `console-api.getoffgridai.co` — all specs behind one catalog | Swagger UI live, console spec generated | P3 (parallel w/ P4) |
+| **6 — Module spine** | `defineOffgrid()` — gateway is the composition root | Add a module = add one config line | P4 |
+| **7 — SDK + flywheel** | Third parties build modules; managed hosting ships | `@offgrid/sdk` on npm | P6 |
+| **8 — Soul** | Intelligence layer — platform works for you, not just at you | `context_hints` in node policy-pull | desktop/mobile capture built |
 
 ---
 
