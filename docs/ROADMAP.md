@@ -187,16 +187,261 @@ Once multi-tenancy is working:
 
 ---
 
-## Phase 4 — The module spine (`defineOffgrid`)
-**Goal:** the gateway becomes a true composition root. Add a capability = add one config line. The console is the gateway with a fuller config.
+## Phase 3A — Hardening & Scale
+**Goal:** every service scales independently, survives node failure, recovers from disaster. This is the infrastructure prerequisite for managed hosting and for selling the platform to orgs with uptime SLAs.
+**Timeline:** 6–8 weeks. Runs in parallel with Phase 4 (different skill set — infra vs. UI/API).
+**Depends on:** Phase 3 (multi-tenancy schema must be stable before designing backup strategies around it).
+
+### The problem with the current setup
+
+Today the stack is split manually across two nodes: S1 holds the heavy stateful services (Postgres, Keycloak, OpenSearch, Qdrant, Marquez, Temporal, OPA, OpenBao), S2 holds the worker/analytics tier (Langfuse, Superset, FleetDM, Presidio, Unleash, Redis). This is a static partition — if S1 goes down, auth, the database, and search all go with it. There are no replica sets, no automated failover, no backup schedule, no documented recovery procedure.
+
+### Track 1 — Container orchestration (independent scaling)
+
+Move from bare `docker-compose` to an orchestrator that can schedule, scale, and restart containers independently per service. The right choice for an on-prem two-node fleet is **Nomad** (HashiCorp, AGPL) or **k3s** (lightweight Kubernetes). Both support:
+- Per-job resource limits and scaling policies
+- Health-check-driven restarts
+- Cross-node scheduling (a service doesn't have to live on a fixed node)
+- Rolling deploys with zero downtime
+
+**Recommended: Nomad.** Simpler operational model than k3s for a two-node fleet; native HCL job specs are easier to read than Kubernetes YAML; integrates natively with OpenBao (Vault protocol) for secret injection; already in the HashiStack alongside what we run.
+
+Migration path: each `docker-compose` service becomes a Nomad job spec. The compose files stay as the dev/local reference; Nomad is the production scheduler. No code changes — all services are already containerised.
+
+Per-service scaling policy (steady state):
+
+| Service | Scaling model | Min replicas | Notes |
+|---|---|---|---|
+| Postgres | Active-passive (Patroni) | 2 | Primary + standby; auto-failover via etcd |
+| Keycloak | Active-active | 2 | Infinispan distributed cache; both nodes serve login |
+| OpenSearch | Clustered | 3 (1 primary + 2 replica) | Already supports clustering; enable shard replication |
+| Qdrant | Distributed | 2 | Qdrant supports sharding + replication natively |
+| Redis | Sentinel | 3 (1 primary + 2 sentinel) | Sentinel handles failover; Cluster if write throughput demands it |
+| OPA | Stateless, horizontal | 2 | No shared state; round-robin behind Caddy |
+| Presidio | Stateless, horizontal | 2 | Analyzer and anonymizer scale independently |
+| Langfuse | Stateless workers | 2 | Worker pool; Langfuse DB is separate Postgres |
+| Unleash | Stateless, horizontal | 2 | Unleash DB is separate Postgres |
+| Gateway cluster | Active-active | 3 | Already has a cluster router; add a third node |
+| Console (Next.js) | Stateless, horizontal | 2 | Already behind Caddy LB; add second instance |
+| Marquez | Stateless API | 2 | Marquez DB is separate Postgres |
+| Superset | Stateless | 2 | Celery worker pool for async queries |
+| FleetDM | Active-passive | 2 | FleetDM supports multi-node with shared MySQL |
+| OpenBao | HA with Raft | 3 | OpenBao built-in Raft consensus; 3-node quorum |
+| Temporal | Clustered | 3 | Temporal supports multi-node cluster with Cassandra or Postgres backend |
+| Caddy edge | Active-active | 2 | Two edge nodes; Cloudflare tunnel load balances between them |
+
+### Track 2 — High availability
+
+HA means no single point of failure for any service in the critical path. Critical path = Postgres, Keycloak, the gateway, Caddy.
+
+**Postgres HA — Patroni + streaming replication**
+- Primary on S1, standby on S2 (or a third node)
+- Patroni manages leader election via etcd (etcd is a 3-node cluster itself)
+- PgBouncer in front of both nodes for connection pooling
+- Automatic failover: if primary dies, Patroni promotes the standby within ~30 seconds
+- The console's `DATABASE_URL` points to PgBouncer, not directly to Postgres
+
+**Keycloak HA — Infinispan cluster**
+- Both Keycloak nodes share distributed session cache via Infinispan
+- Both nodes are active — Caddy round-robins between them
+- One node dying doesn't log users out (sessions survive in the other node's cache)
+
+**Gateway HA — already built**
+- The cluster router already handles multinode routing and health-based admission
+- Add a third gateway node so the cluster survives one node failure with two remaining
+- Caddy health checks remove a dead node within one check interval (~5s)
+
+**OpenBao HA — Raft consensus**
+- OpenBao (Vault fork) has native Raft: 3 nodes form a quorum
+- Leader handles writes; followers serve reads
+- Auto-promotion if the leader dies; quorum maintained as long as 2 of 3 are up
+
+### Track 3 — Backup & recovery
+
+**What needs backing up:**
+
+| Data | Where it lives | Backup method | Schedule | Retention |
+|---|---|---|---|---|
+| Postgres (all tables) | S1 Postgres | `pg_dump` + WAL archiving to SeaweedFS | Continuous WAL + daily full dump | 30 days |
+| OpenSearch indices | S1 OpenSearch | Snapshot API → SeaweedFS S3 endpoint | Daily | 14 days |
+| Qdrant collections | S1 Qdrant | Snapshot API | Daily | 14 days |
+| OpenBao KV | S1 OpenBao | `bao kv get` export + Raft snapshot | Daily | 30 days |
+| Langfuse data | S2 Langfuse Postgres | `pg_dump` | Daily | 14 days |
+| Provit recordings | S2 SeaweedFS | SeaweedFS replication to offsite bucket | Continuous | 90 days |
+| Keycloak realm | S1 Keycloak | Realm export via admin API | Daily | 30 days |
+
+**Backup storage:** activate SeaweedFS with erasure coding across both nodes. Add an offsite bucket (Cloudflare R2 or Backblaze B2) as the secondary destination for all backups. SeaweedFS already supports S3-compatible replication.
+
+**Backup schedule job:** a Nomad periodic job runs the full backup sequence nightly, validates checksums, pushes to the offsite bucket, and writes a backup manifest row to Postgres. The console's Control module gets a Backups tab that reads the manifest — operators can see last successful backup per service and trigger manual restores.
+
+### Track 4 — Disaster recovery
+
+**RTO/RPO targets:**
+
+| Scenario | Target RTO | Target RPO |
+|---|---|---|
+| Single node (S1 or S2) failure | < 5 minutes | 0 (HA replica takes over) |
+| Both nodes lost (hardware failure) | < 2 hours | < 24 hours (last daily backup) |
+| Data corruption (Postgres) | < 1 hour | Point-in-time via WAL archiving |
+| Full DR (new hardware) | < 4 hours | Last daily backup |
+
+**DR runbook structure** (to be written as `docs/RUNBOOKS.md` entries):
+1. Node failure → Nomad auto-reschedules containers to surviving node; Patroni promotes Postgres standby
+2. Postgres corruption → restore from WAL archive to point-in-time; replay
+3. Full site loss → provision new hardware, run `deploy/scripts/restore.sh` which pulls latest backup manifest from offsite bucket and restores each service in dependency order
+4. Keycloak loss → restore realm export; users re-auth (sessions are lost, JWTs are short-lived)
+
+**Restore verification:** monthly automated drill — spin up a fresh environment, restore from the previous night's backup, run the Provit test suite against it. Pass/fail reported to the Control audit log.
+
+### Track 5 — Observability for the infrastructure
+
+You can't have HA without knowing when things are failing. Currently there are no resource limits on containers and no infrastructure alerting.
+
+- **Resource limits:** add CPU/memory limits to every Nomad job spec. Prevents one runaway service from starving the node.
+- **VictoriaMetrics** (currently off) → turn it on as the metrics TSDB. Every service emits Prometheus metrics; VictoriaMetrics scrapes them. Dashboards in Grafana or natively.
+- **Alerting:** VictoriaMetrics alerting rules for: Postgres replication lag > 30s, OpenBao leader unreachable, gateway node count < 2, disk usage > 80%, backup job failed.
+- **Uptime endpoint:** `GET /api/v1/health` on the console already exists; add a synthetic monitor from Cloudflare Workers that pages if it's unreachable.
+
+**Definition of done:** any single service or node can be killed and the platform continues serving within the RTO targets above. Last night's backup is restorable in under the stated RTO. The Control module shows backup status and infrastructure health. VictoriaMetrics alerting is firing on at least one synthetic failure in a drill.
+
+---
+
+## Phase 4 — OSS feature parity
+**Goal:** for every OSS service already running, close the gap between what it exposes and what the console actually uses. No new services. No new architecture. Just leverage what we're paying to run.
+**Timeline:** 6–8 weeks. Parallelisable across services — each service is an independent track.
+**Depends on:** Phase 3 (org-scoped queries on all new read-back views).
+
+### The principle
+
+The research found a consistent pattern: services are wired as **write-only sinks** — the console ships data to them, but never reads back or surfaces their capabilities in the UI. Phase 4 closes every one of those gaps, working through the services in priority order.
+
+### Priority 1 — Read-back paths (high value, API already exists)
+
+These services have rich APIs and the console calls them zero times on the read path. Each becomes a proper two-way integration.
+
+**OpenSearch** — currently write-only (`_bulk` audit ingest). Add:
+- Full-text audit search UI (the `_search` API with filters by user/action/date) in the Control module
+- Aggregations: top users by request count, error rate over time, model usage breakdown
+- Alert rule management — wire OpenSearch Watchers to the Control guardrails UI
+
+**Langfuse** — currently write-only (OTLP spans + scores pushed). Add:
+- Native trace waterfall in the Observability module (reading `/api/public/traces` + `/observations`) — the embedded iframe is blocked by X-Frame-Options; replace it with a first-party component that reads the Langfuse API directly
+- Per-trace cost rollup fed into FinOps (Langfuse has a cost API — wire it to the budget system)
+- Score distribution chart (the LLM-as-judge scores are written but never visualised)
+
+**Marquez** — currently emit-only (OpenLineage POST). Add:
+- Read the Marquez job→dataset graph directly (`/api/v1/namespaces/{ns}/jobs/{job}/lineage`) and render it as the Lineage view's primary source (not the audit-reconstructed fallback)
+- Dataset catalog: list all datasets Marquez knows about, with their upstream/downstream jobs
+
+**OpenBao** — currently scaffold only (`getSecrets()` has zero call sites). Add:
+- Real KV read/write/list wired to the Secrets panel in Control (the UI exists; the calls don't)
+- Secret rotation UI — list KV keys with last-updated timestamps, trigger rotation
+- Lease expiry alerts
+
+### Priority 2 — Admin operations (moderate value, one-time setup unblocks them)
+
+**Presidio** — `/analyze` is used; `/anonymize` is never called. Add:
+- Replace the in-console regex string-replace with actual Presidio `/anonymize` ML redaction
+- Custom recognizer management UI — add/remove entity types via the Presidio API
+- Per-request entity breakdown in the audit log (what PII types were found, not just a boolean)
+
+**FleetDM** — read-only host list only. Add:
+- Policy management: create/edit/delete FleetDM policies from the Fleet module (not just view)
+- Live query UI: run an osquery query across the fleet, see results in real time
+- Software inventory per device: what's installed, what has known CVEs (FleetDM exposes this)
+- MDM enrollment status column in the device table
+
+**Superset** — health-ping only; embed blocked. Add:
+- Replace the iframe embed with the Superset guest-token SDK (solves X-Frame-Options)
+- Provision one default dashboard via the Superset API (`/api/v1/chart` + `/api/v1/dataset`) seeded from the console's gateway analytics data
+- SQL Lab passthrough: link from the Analytics module to Superset SQL Lab for ad-hoc queries
+
+**Unleash** — flag lookups only; strategies and segments unused. Add:
+- Flag management UI in the Admin module: create/edit/delete flags, set gradual rollout %, assign segments
+- A/B variant editor: define variants per flag, see variant distribution in Analytics
+
+### Priority 3 — Activate swaps (low effort, high signal)
+
+**Qdrant** — built, not default. Switch `OFFGRID_ADAPTER_RETRIEVAL=qdrant` in the deployment. Wire `@offgrid/rag` (the shared package) to replace the in-console `src/lib/rag.ts` — this also fixes the OOM bug from Phase 0.
+
+**Presidio anonymizer** — the `/anonymize` endpoint is already running on S2. The switch from regex to ML redaction is one adapter change once the UI work above is done.
+
+**Temporal** — the adapter scaffold exists. Wire it properly: add `@temporalio/client` binding, define `AgentRunWorkflow`, deploy a worker alongside the cluster gateway. Switch `OFFGRID_QUEUE_ENABLED=1`. This makes agent runs durable across restarts.
+
+### Priority 4 — Wire idle shared packages
+
+Four `@offgrid/*` packages are complete and unused. Wire them now, not in a future architecture phase:
+- `@offgrid/rag` → replaces `src/lib/rag.ts` (fixes OOM, uses Qdrant properly)
+- `@offgrid/pipeline` → ETL primitives for the Data module connectors
+- `@offgrid/ui` → shared React components (reduces duplication with mobile web later)
+- `@offgrid/memory` → **not yet** — this depends on desktop/mobile capture, which isn't built. Leave it for Phase 7.
+
+### Per-service gap table
+
+| Service | Today | Phase 4 adds | Effort |
+|---|---|---|---|
+| OpenSearch | write-only `_bulk` | full-text search UI, aggregations, alert rules | M |
+| Langfuse | write-only OTLP | first-party trace waterfall, cost→FinOps, score charts | M |
+| Marquez | emit-only | read lineage graph from Marquez API directly | S |
+| OpenBao | scaffold (zero call sites) | real KV read/write/list, rotation UI | S |
+| Presidio | `/analyze` only | `/anonymize` wired, custom recognizers UI, per-request breakdown | S |
+| FleetDM | host list only | policy CRUD, live query UI, software inventory, MDM status | M |
+| Superset | health-ping only | guest-token SDK embed, default dashboard provisioned, SQL Lab link | M |
+| Unleash | flag lookups only | flag management UI, A/B variants, gradual rollout editor | S |
+| Qdrant | built, not default | flip default, wire `@offgrid/rag` | XS |
+| Temporal | scaffold | `@temporalio/client` binding, worker, durable agent runs | L |
+
+S = 1–3 days · M = 1–2 weeks · L = 3–4 weeks · XS = hours
+
+**Definition of done:** every OSS service is two-way — the console reads back from it, not just writes to it. No service is a write-only sink. The gap table above is fully green.
+
+---
+
+## Phase 5 — Unified API gateway (`console-api.getoffgridai.co`)
+**Goal:** every service's API is discoverable and callable through one surface. Makes the platform buildable-on without touching the console UI.
+**Timeline:** 3–4 weeks (largely config and codegen). Parallelisable with Phase 4.
+**Depends on:** Phase 3 (auth must be org-scoped before public exposure).
+
+### Six things needed
+
+1. **Cloudflare tunnel ingress rule** — add `console-api.getoffgridai.co` to `deploy/onprem/cloudflared-tunnel.yml`
+2. **DNS record** — CNAME to the tunnel
+3. **Caddy site block** — new vhost: `/specs/*` proxies to each service's native OpenAPI endpoint; `/v1/*` to the gateway; `/api/*` to the Next.js console
+4. **CORS headers** — on all API routes for cross-origin browser access
+5. **Console OpenAPI spec** — generate from the 140+ routes via `next-swagger-doc` or `zod-openapi`
+6. **Auth alignment** — bearer token (gateway machine client) accepted on all API routes alongside session cookies
+
+### The catalog
+
+9 of 14 services already publish native OpenAPI specs. A single Swagger UI shell with a service dropdown loads each spec via the Caddy proxy (solves CORS). Services without a machine-readable spec get hand-authored YAML stubs.
+
+| Service | Spec URL | Notes |
+|---|---|---|
+| Console | `/specs/console` | Generated — biggest gap |
+| OpenBao | `/specs/openbao` | Native at `/v1/sys/internal/specs/openapi` |
+| Qdrant | `/specs/qdrant` | Native at `/openapi/openapi-3.1.0.json` |
+| Marquez | `/specs/marquez` | Native at `/api/v1/openapi` |
+| Langfuse | `/specs/langfuse` | Native at `/api/public/openapi.json` |
+| Superset | `/specs/superset` | Native at `/api/v1/openapi.json` |
+| FleetDM | `/specs/fleetdm` | Native at `/api/openapi.json` |
+| Presidio | `/specs/presidio-*` | Native on both analyzer + anonymizer |
+| Unleash | `/specs/unleash` | Native at `/api/swagger.json` |
+| Keycloak | `/specs/keycloak` | Hand-authored (Keycloak has no machine spec) |
+| OPA | `/specs/opa` | Hand-authored |
+| Temporal | `/specs/temporal` | gRPC-only; hand-authored REST bridge spec |
+
+**Definition of done:** `https://console-api.getoffgridai.co/docs` loads Swagger UI with all specs selectable. Every console API route documented. Machine client bearer token works on all routes.
+
+---
+
+## Phase 6 — Module spine (`defineOffgrid`)
+**Goal:** the gateway becomes a true composition root. Add a capability = one config line. The console is the gateway with a fuller config. Enables the SDK in Phase 7.
 **Timeline:** 8–10 weeks.
-**Depends on:** Phase 3. The module system must be org-aware from the start.
+**Depends on:** Phase 4 (feature parity must be real before abstracting it) + Phase 5 (the API catalog is what the module manifest routes expose).
 
-### What this means
+### What changes
 
-Today: the gateway and console are two separate apps. The console is a Next.js app that calls the gateway over HTTP.
-
-Target: `offgrid.config.ts` is the only thing that differs between a standalone gateway and the full console.
+Today the gateway and console are two separate apps connected by HTTP. Target: one host, one config file.
 
 ```ts
 export default defineOffgrid({
@@ -217,118 +462,61 @@ Each module is a factory returning a manifest:
 ```ts
 interface ModuleManifest {
   id: string
-  nav: NavItem[]                    // what appears in the left nav
-  routes: RouteDefinition[]         // the API + UI routes this module contributes
-  settingsPanel?: ReactComponent    // appears in the module's Settings sub-page
-  gatewayHooks?: {
-    sinks?: ObservabilitySink[]     // what this module writes to (OpenSearch, Langfuse...)
-    policies?: Policy[]             // what policies this module injects into the pipeline
-  }
-  requires?: Permission[]           // what the auth provider must grant for this module
+  nav: NavItem[]
+  routes: RouteDefinition[]
+  settingsPanel?: ReactComponent
+  gatewayHooks?: { sinks?: ObservabilitySink[]; policies?: Policy[] }
+  requires?: Permission[]
 }
 ```
 
-The host (gateway/console) reads the config, registers all manifests, mounts nav/routes/settings automatically, wires sinks/policies into the engine, enforces `requires` via the auth provider.
+The host reads the config, mounts everything automatically. Add/remove a module = add/remove one line.
 
-### Packages to wire in
-
-With the module spine in place, wire the 4 idle shared packages:
-- `@offgrid/rag` → replaces the in-console `src/lib/rag.ts` (fixes the OOM issue from Phase 0)
-- `@offgrid/memory` → feeds the Soul pipeline (Phase 5)
-- `@offgrid/pipeline` → ETL primitives for the Data module
-- `@offgrid/ui` → shared React components across console + mobile web
-
-**Definition of done:** `defineOffgrid()` exists and is the single source of module registration. Adding a test module by adding one config line works. The console and standalone gateway use the same host code.
+**Definition of done:** `defineOffgrid()` is the single source of module registration. Adding a new module by config line works end-to-end. Console and standalone gateway run the same host code.
 
 ---
 
-## Phase 5 — The intelligence layer (The Soul)
-**Goal:** the platform works on your behalf, not just for you. Context flows in, synthesis flows out, nodes get smarter over time.
-**Timeline:** 8–10 weeks (parallelisable with Phase 4).
-**Depends on:** Phase 3 (org-scoped embeddings), Qdrant active.
+## Phase 7 — Developer SDK + flywheel
+**Goal:** third parties build modules. Managed hosting ships.
+**Timeline:** ongoing from Phase 6.
+**Depends on:** Phase 6 (module spine must exist before it can be an SDK).
 
-### The pipeline
+- `@offgrid/sdk` on npm — `defineOffgrid()`, manifest types, sink/policy interfaces, auth seam
+- `npx @offgrid/sdk create-module` scaffold
+- Community module registry at `console-api.getoffgridai.co/modules`
+- `organizations.plan_tier` gates Pro modules at the host level
+
+---
+
+## Phase 8 — The Soul (intelligence layer)
+**Goal:** the platform works on your behalf. Context flows in from all sources, synthesis flows out, nodes get smarter over time.
+**Timeline:** after Phase 6. **Explicitly after desktop/mobile capture is built.**
+**Depends on:** `@offgrid/memory` (which depends on desktop/mobile capture — not built yet), Qdrant as default (Phase 4), org-scoped embeddings (Phase 3).
+
+### Why this comes last
+
+The Soul's value comes from feeding it rich event data from all surfaces: desktop captures, mobile sessions, agent runs, Provit test results. Without desktop/mobile capture (`@offgrid/capture`, `@offgrid/memory`), the Soul has partial signal. Build it when the full signal is available.
+
+### The pipeline (when ready)
 
 ```
-Event sources                Enrichment              Store          Retrieval
-─────────────────            ──────────────          ──────         ──────────────────
-agentRuns (Postgres)  ──►    LLM summary             Qdrant         RRF router
-audit log             ──►    (gateway /v1/chat)  ──► event_intel ──► existing sources
-Langfuse traces       ──►    + embed                 collection     + new source
-Marquez lineage       ──►    (/v1/embeddings)                      ──► context_hints
-Provit run results ─►                                               in policy-pull
+Event sources (all surfaces)     Enrichment          Store           Retrieval
+────────────────────────────     ──────────────      ──────          ──────────
+agentRuns (Postgres)        ──►  LLM summary         Qdrant          RRF router
+audit log                   ──►  /v1/chat        ──► event_intel ──► + new source
+Langfuse traces             ──►  + embed             per org     ──► context_hints
+Marquez lineage             ──►  /v1/embeddings                      in policy-pull
+Provit run results          ──►
+Desktop captures (mobile)   ──►  ← blocked on @offgrid/memory
 ```
 
-- A scheduled job (Temporal workflow or a cron-hit route) reads the last N events across all four sources
-- Calls the local gateway (`/v1/chat`) to summarise — one call per batch, not per event
-- Embeds the summary via `/v1/embeddings` (384-dim MiniLM, already wired)
-- Upserts into a new Qdrant collection `event_intelligence` namespaced by org
-- A new `RetrievalSource` plugs into the existing RRF router automatically
-- `GET /api/v1/devices/policy` response gains `context_hints: string[]` — the top-K retrieved summaries for that node
+No new containers needed. The pipeline is a scheduled job (Temporal, already wired by Phase 4) reading across all sources per org, summarising, embedding, upserting to Qdrant.
 
-Provit run results are especially valuable here: a failed test run is a signal that something is wrong. The Soul surfaces "tests failed in this repo 3 times this week, likely related to the gateway config change on Tuesday" without anyone asking.
-
-No new containers. Switch `OFFGRID_ADAPTER_RETRIEVAL=qdrant` to make Qdrant the default (it's deployed and has a full client).
-
-**Definition of done:** events are embedded on a schedule, retrieved at query time, `context_hints` appear in node policy-pull responses. The Observability module has a Soul dashboard showing what was summarised and when.
+**Definition of done:** events embedded on a schedule, retrieved at query time, `context_hints` in node policy-pull responses. Observability module has a Soul activity view.
 
 ---
 
-## Phase 6 — Unified API gateway (`console-api.getoffgridai.co`)
-**Goal:** every service's API is discoverable and accessible through one surface.
-**Timeline:** 3–4 weeks (largely config and codegen).
-**Depends on:** Phase 3 (auth must be org-scoped before exposing publicly).
-
-### Six things needed
-
-1. **Cloudflare tunnel ingress rule** — add `console-api.getoffgridai.co` to `deploy/onprem/cloudflared-tunnel.yml`
-2. **DNS record** — A/CNAME pointing to the tunnel
-3. **Caddy site block** — new vhost in the edge compose, routing `/specs/*` to each service's native OpenAPI endpoint, `/v1/*` to the gateway, `/api/*` to the Next.js console
-4. **CORS headers** — on all API routes for cross-origin browser access
-5. **Console OpenAPI spec** — generate from the 140+ routes via `next-swagger-doc` or `zod-openapi`
-6. **Auth alignment** — bearer token (gateway machine client) accepted on all API routes, not just session cookie
-
-### The catalog
-
-9 of 14 services already publish native OpenAPI specs. A single Swagger UI shell with a service picker loads each via the Caddy proxy path (solves CORS). Services without a spec get hand-authored YAML stubs.
-
-| Service | Spec URL via gateway |
-|---|---|
-| Console | `/specs/console` (generated) |
-| OpenBao | `/specs/openbao` |
-| Qdrant | `/specs/qdrant` |
-| Marquez | `/specs/marquez` |
-| Langfuse | `/specs/langfuse` |
-| Superset | `/specs/superset` |
-| FleetDM | `/specs/fleetdm` |
-| Presidio | `/specs/presidio-analyzer`, `/specs/presidio-anonymizer` |
-| Unleash | `/specs/unleash` |
-
-**Definition of done:** `https://console-api.getoffgridai.co/docs` loads the Swagger UI with all service specs selectable. Every console API route is documented. A machine client token authenticates against any route.
-
----
-
-## Phase 7 — Developer surface + the flywheel
-**Goal:** third parties build on the platform. The module SDK ships. The OSS community extends Off Grid.
-**Timeline:** ongoing.
-**Depends on:** Phase 4 (module spine must be real before it can be an SDK).
-
-### What ships
-
-- `@offgrid/sdk` — the module SDK as an npm package. Includes `defineOffgrid()`, the module manifest types, the `ObservabilitySink` and `Policy` interfaces, and the auth provider seam.
-- Module scaffold CLI: `npx @offgrid/sdk create-module my-module` — generates the module structure
-- Module registry on `console-api.getoffgridai.co/modules` — lists community modules
-- The `Pro` flag per module — `organizations.plan_tier` gates Pro modules at the host level. The module itself doesn't know about billing.
-
-### The flywheel
-
-Each new module makes the platform more useful → more orgs adopt it → more events flow through the Soul → the intelligence layer gets richer → the platform surfaces better insights → more orgs adopt it.
-
-The open-core model is the engine: the module SDK and interfaces are AGPL (anyone can build a module), but the maintained connector library (Salesforce, HubSpot, Slack, Gmail, ...) is Pro — because maintaining connectors against live APIs is the treadmill most orgs don't want to own.
-
----
-
-## Critical path summary
+## Critical path
 
 ```
 Phase 0 (bugs + versions)
@@ -337,18 +525,37 @@ Phase 0 (bugs + versions)
             │
             └─► Phase 2 (Prove It)
                     │
-                    └─► Phase 3 (multi-tenancy)   ← ── ── ── ── ──┐
-                            │                                       │
-                            ├─► Phase 4 (defineOffgrid spine)       │
-                            │       │                               │
-                            │       └─► Phase 7 (SDK + flywheel)   │
-                            │                                       │
-                            ├─► Phase 5 (Soul / intelligence)       │
-                            │                                       │
-                            └─► Phase 6 (unified API gateway) ── ──┘
+                    └─► Phase 3 (multi-tenancy)
+                            │
+                            ├─► Phase 3A (hardening & scale) ─────────────────┐
+                            │       infra track, parallel to P4/P5             │
+                            │       · Nomad orchestration                      │
+                            │       · HA (Patroni, Raft, Sentinel)             │
+                            │       · Backup + DR runbooks                     │
+                            │       · VictoriaMetrics alerting          ───────┘
+                            │
+                            ├─► Phase 4 (OSS parity) ──────────────────────────┐
+                            │       UI/API track                                │
+                            │       · OpenSearch read-back                      │
+                            │       · Langfuse first-party trace view           │
+                            │       · Marquez lineage graph                     │
+                            │       · OpenBao real KV UI                        │
+                            │       · FleetDM policy + live query               │
+                            │       · Superset guest-token embed                │
+                            │       · Unleash flag management                   │
+                            │       · Temporal wired                     ───────┤
+                            │               │                                   │
+                            │               └─► Phase 6 (module spine)          │
+                            │                       │                           │
+                            │                       └─► Phase 7 (SDK/flywheel)  │
+                            │                                                   │
+                            ├─► Phase 5 (unified API) ─ parallel w/ P4/3A ─────┘
+                            │
+                            └─► Phase 8 (Soul) ── blocked on desktop/mobile capture
 ```
 
-Phases 4, 5, and 6 are parallelisable once Phase 3 is done. Phase 7 is continuous from Phase 4 onward.
+**Parallel after Phase 3:** Phases 3A, 4, and 5 run simultaneously — different skill sets (infra vs. UI/API vs. config/codegen), no shared blockers.
+**Sequential:** Phase 6 needs Phase 4 (abstract real integrations, not aspirational ones). Phase 7 needs Phase 6. Phase 8 needs `@offgrid/memory` which needs desktop/mobile capture — do not start early.
 
 ---
 
