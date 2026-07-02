@@ -17,6 +17,7 @@ import {
   Scales as Scale,
   Scroll as ScrollText,
   ShieldCheck,
+  TextAlignLeft,
   TreeStructure,
   Vault,
 } from '@phosphor-icons/react/dist/ssr';
@@ -26,6 +27,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   chat: ChatIcon,
   projects: FolderOpen,
   artifacts: Cube,
+  prompts: TextAlignLeft,
   fleet: MonitorSmartphone,
   gateway: Network,
   control: ShieldCheck,
