@@ -21,6 +21,7 @@
 
 # Edge policy in ONE place: JSON access log (console reads it for blocks), a
 # Coraza WAF with core protections, and a per-IP rate limit. args: 0=zone 1=events/min.
+# Health check probes (/healthz) bypass the rate limiter so monitors are never throttled.
 (edge) {
 	log {
 		output file /Users/admin/offgrid/console/deploy/edge-access.log {
@@ -40,7 +41,9 @@
 			SecRule REQUEST_HEADERS:User-Agent "@rx (?i)(sqlmap|nikto|nmap|masscan|acunetix|nessus|dirbuster|fimap|whatweb|zgrab)" "id:1004,phase:1,deny,status:403,log,msg:'Scanner user-agent'"
 		`
 	}
-	rate_limit {
+	# Rate-limit all traffic EXCEPT /healthz probes — monitors must never be throttled.
+	@rateable not path /healthz
+	rate_limit @rateable {
 		# Behind the Cloudflare tunnel every request's remote host is 127.0.0.1, so
 		# key on the real client IP Cloudflare forwards. Empty (direct LAN) = one
 		# shared bucket, which is fine since the LAN is trusted.
