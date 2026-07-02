@@ -86,6 +86,7 @@ async function gatewayAnswer(
   context: string,
   system: string,
   model: string,
+  caller?: string,
 ): Promise<string | null> {
   const body = {
     model,
@@ -117,7 +118,12 @@ async function gatewayAnswer(
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // x-offgrid-user attributes the agent run's gateway spend to the invoking user (captured
+      // as `caller` in the gateway's OpenSearch log) for per-user FinOps.
+      headers: {
+        'content-type': 'application/json',
+        ...(caller ? { 'x-offgrid-user': caller } : {}),
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
@@ -136,7 +142,12 @@ function systemFor(agent: AgentDef): string {
   return `${agent.systemPrompt.trim()}\n\nGround every claim in the provided sources; if they don't cover the question, say so rather than inventing facts.`;
 }
 
-async function compose(query: string, hits: RetrievalHit[], agent: AgentDef): Promise<string> {
+async function compose(
+  query: string,
+  hits: RetrievalHit[],
+  agent: AgentDef,
+  caller?: string,
+): Promise<string> {
   const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
   const system = systemFor(agent);
   const model = agent.model || ANSWER_MODEL;
@@ -144,7 +155,7 @@ async function compose(query: string, hits: RetrievalHit[], agent: AgentDef): Pr
   const cacheKey = `${model}\n${system}\n${query}\n${context}`;
   const cached = await cacheLookup(cacheKey);
   if (cached.hit && cached.answer) return cached.answer;
-  const answer = await gatewayAnswer(query, context, system, model);
+  const answer = await gatewayAnswer(query, context, system, model, caller);
   if (answer) {
     await cacheStore(cacheKey, answer);
     return answer;
@@ -237,7 +248,11 @@ async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
   mark('sandbox', result.engine, detail, [ref], t);
 }
 
-export async function runAgent(agentId: string, query: string): Promise<AgentRun | null> {
+export async function runAgent(
+  agentId: string,
+  query: string,
+  caller?: string,
+): Promise<AgentRun | null> {
   const agent = await resolveAgent(agentId);
   if (!agent) return null;
   const runId = `run_${randomUUID().slice(0, 8)}`;
@@ -291,7 +306,7 @@ export async function runAgent(agentId: string, query: string): Promise<AgentRun
 
   // 4. Answer — composed from the retrieved sources (cached).
   t = Date.now();
-  const answer = await compose(query, routed.hits, agent);
+  const answer = await compose(query, routed.hits, agent, caller);
   mark('answer', 'compose', answer.slice(0, 120), [], t);
 
   // 5. Ground — verify the answer against the sources → citations.

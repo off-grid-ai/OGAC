@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!b || typeof b.agentId !== 'string' || typeof b.query !== 'string' || !b.query.trim()) {
     return NextResponse.json({ error: 'agentId and query required' }, { status: 400 });
   }
-  const run = await runAgent(b.agentId, b.query);
+  const run = await runAgent(b.agentId, b.query, gate.user.email ?? undefined);
   if (!run) return NextResponse.json({ error: 'unknown agent' }, { status: 404 });
   after(() => scoreRun(run));
   return NextResponse.json(run, { status: 201 });

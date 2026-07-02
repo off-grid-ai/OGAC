@@ -1,6 +1,7 @@
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { IssueKeyButton } from '@/components/finops/IssueKeyButton';
 import { KeyToggle } from '@/components/finops/KeyToggle';
+import { TokenBudgets } from '@/components/finops/TokenBudgets';
 import { GatewayCost } from '@/components/gateway/GatewayCost';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -164,6 +165,8 @@ export default async function FinOpsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <TokenBudgets />
 
       <GatewayCost />
     </div>

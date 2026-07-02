@@ -268,7 +268,9 @@ export async function POST(req: Request) {
   const traceStart = Date.now();
   const upstream = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    // x-offgrid-user attributes gateway spend to the real signed-in user (captured into the
+    // gateway's OpenSearch log as `caller`) rather than the console's user-agent.
+    headers: { 'content-type': 'application/json', 'x-offgrid-user': userId },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(290000),
   }).catch(() => null);
