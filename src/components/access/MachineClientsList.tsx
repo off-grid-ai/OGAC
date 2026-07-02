@@ -15,14 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MODULES } from '@/modules/registry';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 interface KcClient {
   id: string;
@@ -442,82 +434,62 @@ export function MachineClientsList() {
 
         {loading ? (
           <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+        ) : clients.length === 0 ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            No clients yet — create one to authenticate machines and services.
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Service account</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clients.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
-                      No clients yet — create one to authenticate machines and services.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  clients.map((c) => {
-                    const isOpen = expandedId === c.id;
-                    return (
-                      <>
-                        <TableRow
-                          key={c.id}
-                          className="cursor-pointer"
-                          onClick={() => setExpandedId(isOpen ? null : c.id)}
-                        >
-                          <TableCell className="font-mono text-xs">
-                            {isOpen ? '▾ ' : '▸ '}
-                            {c.clientId}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {c.name || '—'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={c.enabled ? 'default' : 'destructive'} className="text-xs">
-                              {c.enabled ? 'enabled' : 'disabled'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {c.serviceAccountsEnabled ? (
-                              <Badge variant="secondary" className="text-xs">yes</Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">no</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void deleteClient(c);
-                              }}
-                              title="Delete client"
-                            >
-                              <Trash className="size-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        {isOpen && (
-                          <TableRow key={`${c.id}-expanded`}>
-                            <TableCell colSpan={5} className="bg-muted/30">
-                              <ExpandedClient client={c} />
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {clients.map((c) => {
+                const isOpen = expandedId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setExpandedId(isOpen ? null : c.id)}
+                    className={`flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors ${
+                      isOpen ? 'border-primary bg-primary/5' : 'border-border bg-background hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="truncate font-mono text-xs font-medium text-foreground">{c.clientId}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        title="Delete client"
+                        onClick={(e) => { e.stopPropagation(); void deleteClient(c); }}
+                      >
+                        <Trash className="size-3.5" />
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] text-muted-foreground">{c.name || '—'}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      <Badge variant={c.enabled ? 'default' : 'destructive'} className="px-1 py-0 text-[10px]">
+                        {c.enabled ? 'enabled' : 'disabled'}
+                      </Badge>
+                      {c.serviceAccountsEnabled && (
+                        <Badge variant="secondary" className="px-1 py-0 text-[10px]">service account</Badge>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {/* Expanded detail — full width below the grid */}
+            {(() => {
+              const c = clients.find((x) => x.id === expandedId);
+              if (!c) return null;
+              return (
+                <div className="rounded-lg border border-primary/30 bg-muted/30 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="font-mono text-sm font-medium text-foreground">{c.clientId}</span>
+                    <Button size="sm" variant="ghost" onClick={() => setExpandedId(null)}>Close</Button>
+                  </div>
+                  <ExpandedClient client={c} />
+                </div>
+              );
+            })()}
           </div>
         )}
       </CardContent>
