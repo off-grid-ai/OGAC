@@ -1,4 +1,5 @@
-import { type ApiKey, type AuditEvent, listApiKeys, listAudit } from '@/lib/store';
+import { gatewayEvents } from '@/lib/analytics';
+import { type ApiKey, type AuditEvent, listApiKeys } from '@/lib/store';
 
 // FinOps: metering + cost + usage analytics, computed from the audit/traffic log (the source of
 // truth) priced per model. Spend rolls up by model, by virtual key, and by subject (person /
@@ -98,7 +99,8 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
 }
 
 export async function computeFinOps(): Promise<FinOps> {
-  const [events, keys] = await Promise.all([listAudit({ limit: 5000 }), listApiKeys()]);
+  // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit.
+  const [events, keys] = await Promise.all([gatewayEvents(), listApiKeys()]);
   const keyById = new Map(keys.map((k) => [k.id, k]));
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
   const localReq = events.filter((e) => priceFor(e.model) === 0).length;

@@ -7,7 +7,7 @@ import { type AuditEvent } from '@/lib/store';
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
-async function gatewayEvents(): Promise<AuditEvent[]> {
+export async function gatewayEvents(): Promise<AuditEvent[]> {
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
