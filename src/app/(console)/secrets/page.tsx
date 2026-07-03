@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 // endpoints via readSecretsView(); this page never touches a KV data path.
 export default async function SecretsPage() {
   // Re-gated at wiring; reuses the 'control' module for now.
-  await requireModuleForUser('control');
+  await requireModuleForUser('secrets');
   const { data: view, error } = await readSecretsView();
 
   const sealed = view.sealed === true;
