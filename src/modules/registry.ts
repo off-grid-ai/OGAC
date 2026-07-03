@@ -33,6 +33,11 @@ export type ModuleId =
   | 'siem'
   | 'drift'
   | 'backups'
+  | 'retrieval'
+  | 'provenance'
+  | 'secrets'
+  | 'guardrails'
+  | 'sandbox'
   | 'config';
 
 export interface ModuleDef {
@@ -292,6 +297,46 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Backup & DR status — latest dump, age, size, retention window, and off-box replication.',
     route: '/backups',
     service: 'console',
+    internal: true,
+  },
+  {
+    id: 'retrieval',
+    label: 'Retrieval',
+    description: 'Vector store (Qdrant) — collections, vector counts, and health for the retrieval backend.',
+    route: '/retrieval',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'provenance',
+    label: 'Provenance',
+    description: 'Signed provenance (Sigstore) — verify and browse cryptographically signed answers/artifacts.',
+    route: '/provenance',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'secrets',
+    label: 'Secrets',
+    description: 'Secrets management (OpenBao) — seal status, mounts, and secret lifecycle. Values never displayed.',
+    route: '/secrets',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'guardrails',
+    label: 'Guardrails',
+    description: 'Input/output policy — PII detection (Presidio + regex floor), injection, grounding. Engine + rules.',
+    route: '/guardrails',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'sandbox',
+    label: 'Sandbox',
+    description: 'Code-execution sandboxing (E2B/Firecracker) — backend status and recent execution runs.',
+    route: '/sandbox',
+    service: 'control',
     internal: true,
   },
   {

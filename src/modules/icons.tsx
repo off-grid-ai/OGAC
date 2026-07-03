@@ -32,6 +32,7 @@ import {
   Flask,
   Waveform,
   Archive,
+  SealCheck,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -68,5 +69,10 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   siem: ShieldWarning,
   drift: Waveform,
   backups: Archive,
+  retrieval: Database,
+  provenance: SealCheck,
+  secrets: Vault,
+  guardrails: ShieldCheck,
+  sandbox: Cube,
   config: Sliders,
 };

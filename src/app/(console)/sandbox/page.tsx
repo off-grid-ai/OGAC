@@ -45,7 +45,7 @@ export default async function SandboxPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireModuleForUser('control');
+  await requireModuleForUser('sandbox');
   const { status: statusParam } = await searchParams;
   const filter: 'all' | ExecStatus = isExecStatus(statusParam) ? statusParam : 'all';
 

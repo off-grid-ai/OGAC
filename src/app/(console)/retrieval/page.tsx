@@ -23,7 +23,7 @@ const STATUS_CLASS: Record<CollectionStatus, string> = {
 };
 
 export default async function RetrievalPage() {
-  await requireModuleForUser('control');
+  await requireModuleForUser('retrieval');
   const { data, error } = await readRetrieval();
   const view = data!;
 

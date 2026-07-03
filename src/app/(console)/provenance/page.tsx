@@ -15,7 +15,7 @@ import { readProvenanceView } from '@/lib/provenance-view';
 export const dynamic = 'force-dynamic';
 
 export default async function ProvenancePage() {
-  await requireModuleForUser('control');
+  await requireModuleForUser('provenance');
   const view = await readProvenanceView(50);
 
   const stats = [
