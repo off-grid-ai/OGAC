@@ -1,4 +1,6 @@
 import { Scales } from '@phosphor-icons/react/dist/ssr';
+import { Suspense } from 'react';
+import { PolicyRulesManager } from '@/components/policy/PolicyRulesManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,16 +12,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPolicyRules } from '@/lib/policy-rules';
 import { readDecisions, readPolicyStatus } from '@/lib/policy-view';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-// Policy (OPA) decisions read-back. Server component: reads the active policy set + OPA reachability
-// and the normalized recent decisions through the pure view. Gated on the `control` module (policy /
-// guardrails / audit live there). No client state — nav is URL/history only.
+// Policy management + decisions read-back. Server component: reads the active policy set + OPA
+// reachability, the console-owned policy rules, and the normalized recent decisions through the pure
+// views. The rules table (add/edit/delete + push-to-OPA) is a client child; its nav lives in the URL.
 export default async function PolicyPage() {
   await requireModuleForUser('policy');
-  const [status, decisions] = await Promise.all([readPolicyStatus(), readDecisions()]);
+  const orgId = await currentOrgId();
+  const [status, decisions, rules] = await Promise.all([
+    readPolicyStatus(),
+    readDecisions(),
+    listPolicyRules(orgId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -89,15 +98,25 @@ export default async function PolicyPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Policy rules</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading rules…</p>}>
+            <PolicyRulesManager rules={rules} />
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Recent decisions</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {decisions.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
-              No decision-log records. Configure <span className="font-mono">
-                OFFGRID_OPA_DECISION_LOG_URL
-              </span>{' '}
-              to stream OPA decisions here.
+              No decision-log records. Configure{' '}
+              <span className="font-mono">OFFGRID_OPA_DECISION_LOG_URL</span> to stream OPA
+              decisions here.
             </p>
           ) : (
             <Table>
