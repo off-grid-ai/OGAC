@@ -598,7 +598,12 @@ export const chatArtifacts = pgTable('chat_artifacts', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
   kind: text('kind').notNull(), // html | svg | mermaid | react | text | code
-  code: text('code').notNull().default(''),
+  // Body lives in SeaweedFS (the single file-storage layer) at codeKey; codeHash is the sha256
+  // used for save-dedupe without fetching bytes. `code` is legacy: kept nullable as a read
+  // fallback for rows written before the migration; new writes leave it empty.
+  code: text('code').default(''),
+  codeKey: text('code_key'),
+  codeHash: text('code_hash'),
   language: text('language'), // python | node for runnable code
   title: text('title').notNull().default('Untitled artifact'),
   conversationId: text('conversation_id'),
@@ -624,7 +629,10 @@ export const chatArtifactVersions = pgTable(
     artifactId: text('artifact_id').notNull(),
     version: integer('version').notNull(),
     kind: text('kind').notNull(),
-    code: text('code').notNull().default(''),
+    // Body in SeaweedFS at codeKey (codeHash = sha256); `code` legacy read-fallback, see above.
+    code: text('code').default(''),
+    codeKey: text('code_key'),
+    codeHash: text('code_hash'),
     language: text('language'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

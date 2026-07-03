@@ -56,6 +56,23 @@ function safeName(name: string): string {
   return (name || 'file').replace(/[/\\]+/g, '_').slice(0, 200);
 }
 
+// Low-level object put/get at a caller-chosen key — for content the console addresses by a
+// deterministic path (e.g. artifact bodies at artifacts/<id>/v<n>), as opposed to saveFile's
+// random-keyed uploads. Same single bucket; SeaweedFS remains the only file-storage layer.
+export async function putObject(key: string, body: Buffer | string, contentType = 'application/octet-stream'): Promise<void> {
+  await ensureFileSchema();
+  const bytes = typeof body === 'string' ? Buffer.from(body) : body;
+  const path = key.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`${base}/${path}`, { method: 'PUT', headers: { 'content-type': contentType }, body: new Uint8Array(bytes) });
+  if (!res.ok) throw new Error(`seaweedfs put ${res.status}`);
+}
+export async function getObjectText(key: string): Promise<string | null> {
+  const path = key.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`${base}/${path}`);
+  if (!res.ok) return null;
+  return res.text();
+}
+
 export async function saveFile(o: {
   name: string;
   mime: string;
