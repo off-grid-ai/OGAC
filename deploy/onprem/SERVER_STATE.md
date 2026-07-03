@@ -116,14 +116,39 @@ g4 `.89`, g5 `.90`, g6 `.88`, g7 `.91`, g8 `.87`. All config now uses hostnames/
 > If a machine won't join: `networksetup -setairportnetwork en0 "Airtel_Wednesday" "Wednesdaysol@25"`.
 > `_2` uses the same password. S1's en0 is Wi-Fi (macOS 15 misreports "not associated").
 
-## HA plan — repurpose 2 GWs → servers (decided; awaiting OrbStack first-run)
+## Network stability — learnings (2026-07-04, after a router reboot)
 
-The fleet has 8 GW nodes; dropping the 2 least-useful for HA (leaves 6 for inference):
-- **g8 `192.168.1.64` → S3** (Postgres streaming replica / Patroni standby) — g8 never had a confirmed model.
-- **g6 `192.168.1.66` → S4** (OpenBao Raft 3rd node + Redis Sentinel) — g6 was persistently down/jammed.
-HA triangle: S1 `.59` primary + S3 `.64` replica + S4 `.66` quorum/secrets. **Blocked only on the
-OrbStack GUI first-run on .64 and .66 (needs a human on-site to click Continue);** everything after
-(Patroni, replication, Raft, Sentinel, failover test) is drivable over the tunnel.
+A router/AP reboot (~23:29 on 2026-07-03) re-DHCP'd the whole fleet again (S1 `.85`→`.59`; nodes
+got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Confirmed **not a hack**
+(clean login/process/port/persistence sweep; only extra launchd is your `AdGuardHome`). Learnings:
+- **`Airtel_Wednesday` and `_2` are two SSIDs on the SAME `192.168.1.0/24`** (same router), not
+  separate subnets. A probe node hopped `_1`→`_2` and stayed on `192.168.1.x`.
+- **Root cause of the recurring drift:** `Airtel_Wednesday_2` was the **top preferred network** on
+  every machine, so on any reconnect macOS re-joined `_2` first. **Fixed:** promoted
+  `Airtel_Wednesday` to preferred index 0 on all 8 reachable machines (S1 + g1–g7) via
+  `networksetup -removepreferredwirelessnetwork` + `-addpreferredwirelessnetworkatindex … 0 WPA2 …`.
+  NOTE: `networksetup` needs **no sudo** for this (works as `admin`); g7's `networksetup` **crashes
+  (SIGABRT)** — corrupt wifi prefs, needs a reboot/on-site.
+- **`Airtel_Wednesday` (fast SSID) intermittently stops broadcasting** — after this reboot every node
+  reported "Could not find network Airtel_Wednesday" and ran on `_2`. Reorder is dormant until it returns.
+- **S2 and g8 went offline** and did NOT rejoin (powered off / wifi off). Proven unreachable by
+  scanning the live subnet from *inside* it (probe node) — not on `_2`, not anywhere. **Cannot be
+  revived remotely** (no network path to run `networksetup` on them); needs physical/console access.
+  The g8 loss killed an in-flight model download. Only ~11 live hosts on the whole `/24` (fleet + router).
+
+## HA plan — repurpose 2 GWs → servers (6 GW + 2 servers)
+
+The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decided target:
+**6 GW + 2 servers** (S1 + one repurposed node as the aux/S2-replacement).
+- Candidate repurpose nodes: the **image nodes g3/g4** (image-gen not yet working) are the least-critical.
+- **CORRECTION (2026-07-04): OrbStack initializes HEADLESSLY — no GUI "Continue" click needed.** The
+  earlier "blocked on on-site GUI first-run" assumption was WRONG. `open -a OrbStack` over SSH (a
+  console session exists) boots the VM in a few minutes (watch `~/.orbstack/log/*.log` for vmgr
+  startup phases); the docker CLI appears at `~/.orbstack/bin/docker` once the VM is up. So the aux
+  Docker tier (Langfuse/Unleash/Superset/Fleet/Presidio/Redis via `services-node-b.yml`) CAN be
+  stood up on a node **remotely**. g4/g5 already have `OrbStack.app` installed (g1/g2 don't).
+- **Do NOT cram the heavy aux tier onto S1** — S1 is the sole tunnel-anchored control plane; OOMing it
+  loses everything. Provit (lightweight Node, no Docker) is the exception and belongs on S1.
 
 ## Multi-tenancy (Phase 3 — in progress)
 
