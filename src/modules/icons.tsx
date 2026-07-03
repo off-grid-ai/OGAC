@@ -24,6 +24,7 @@ import {
   UsersThree,
   Vault,
   HardDrive,
+  Eye,
   Sliders,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
@@ -53,5 +54,6 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   access: UsersThree,
   admin: Building2,
   storage: HardDrive,
+  provit: Eye,
   config: Sliders,
 };

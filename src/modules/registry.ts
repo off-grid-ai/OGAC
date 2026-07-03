@@ -25,6 +25,7 @@ export type ModuleId =
   | 'access'
   | 'admin'
   | 'storage'
+  | 'provit'
   | 'config';
 
 export interface ModuleDef {
@@ -220,6 +221,14 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
     route: '/storage',
     service: 'files',
+  },
+  {
+    id: 'provit',
+    label: 'Provit',
+    description:
+      'Visual QA — catch visual regressions and review UI changes. Runs on-prem at its own subdomain, surfaced here with live status and its showcase.',
+    route: '/provit',
+    service: 'provit',
   },
   {
     id: 'config',
