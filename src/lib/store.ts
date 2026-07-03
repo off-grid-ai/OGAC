@@ -591,8 +591,8 @@ export async function listIngestJobs(limit = 20): Promise<IngestJob[]> {
   }));
 }
 
-export async function listMaskingRules(): Promise<MaskingRule[]> {
-  const rows = await db.select().from(maskingRules).orderBy(desc(maskingRules.createdAt));
+export async function listMaskingRules(orgId: string = DEFAULT_ORG): Promise<MaskingRule[]> {
+  const rows = await db.select().from(maskingRules).where(eq(maskingRules.orgId, orgId)).orderBy(desc(maskingRules.createdAt));
   return rows.map((r) => ({ id: r.id, kind: r.kind, action: r.action, enabled: r.enabled }));
 }
 
@@ -760,8 +760,8 @@ function toRoutingRule(r: typeof routingRules.$inferSelect): RoutingRule {
   };
 }
 
-export async function listRoutingRules(): Promise<RoutingRule[]> {
-  const rows = await db.select().from(routingRules).orderBy(routingRules.priority);
+export async function listRoutingRules(orgId: string = DEFAULT_ORG): Promise<RoutingRule[]> {
+  const rows = await db.select().from(routingRules).where(eq(routingRules.orgId, orgId)).orderBy(routingRules.priority);
   return rows.map(toRoutingRule);
 }
 
@@ -954,8 +954,8 @@ function toGovernance(r: typeof governanceItems.$inferSelect): GovernanceItem {
   };
 }
 
-export async function listGovernance(): Promise<GovernanceItem[]> {
-  const rows = await db.select().from(governanceItems).orderBy(governanceItems.kind);
+export async function listGovernance(orgId: string = DEFAULT_ORG): Promise<GovernanceItem[]> {
+  const rows = await db.select().from(governanceItems).where(eq(governanceItems.orgId, orgId)).orderBy(governanceItems.kind);
   return rows.map(toGovernance);
 }
 
