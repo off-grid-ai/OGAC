@@ -1,19 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { listFiles, saveFile } from '@/lib/files';
+import { listFiles, publicUrlFor, saveFile } from '@/lib/files';
 
 export const dynamic = 'force-dynamic';
 
-// Public URL = the gateway's SeaweedFS path (serves the `media` bucket directly, read-only to
-// the internet). SeaweedFS is the single storage backend, so a file's URL points straight at
-// it — any key (flat console uploads or nested keys pushed to the bucket) is reachable.
-const PUBLIC_BASE = process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co';
-const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
-
-function urlFor(id: string): string {
-  const key = id.split('/').map(encodeURIComponent).join('/'); // preserve slashes in nested keys
-  return `${PUBLIC_BASE}/files/${BUCKET}/${key}`;
-}
+const urlFor = publicUrlFor;
 
 // POST /api/v1/files — upload. Accepts either multipart/form-data (field "file") or a
 // raw body with X-Filename / Content-Type headers. Visibility via ?visibility=public|private

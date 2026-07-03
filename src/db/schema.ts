@@ -479,6 +479,11 @@ export const orgKnowledgeDocs = pgTable('org_knowledge_docs', {
   name: text('name').notNull(),
   kind: text('kind').notNull().default('text'),
   size: integer('size').notNull().default(0),
+  // The original uploaded file lives in SeaweedFS (the single file-storage layer); these hold
+  // the reference so the user can view/download exactly what they uploaded. Null for docs added
+  // as raw text (no source file). fileUrl points at the gateway's SeaweedFS path.
+  fileUrl: text('file_url'),
+  mime: text('mime'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
