@@ -90,6 +90,16 @@ export const authConfig = {
     },
   },
   callbacks: {
+    // Allow post-login redirects back to any *.getoffgridai.co surface (provit, status, landing)
+    // — the gated services sign in via the console, so their callbackUrl is a sibling subdomain.
+    // NextAuth's default rejects cross-origin callbacks, which stranded users on the console.
+    redirect({ url, baseUrl }) {
+      try {
+        const u = new URL(url, baseUrl);
+        if (u.origin === baseUrl || /(^|\.)getoffgridai\.co$/i.test(u.hostname)) return u.toString();
+      } catch { /* fall through */ }
+      return baseUrl;
+    },
     // eslint-disable-next-line complexity
     jwt({ token, user, account, profile }) {
       // Keycloak: roles come in the token as realm_access.roles or a custom `role` claim.
