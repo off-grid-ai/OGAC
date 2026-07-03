@@ -454,6 +454,12 @@ async function seedPrompts(): Promise<void> {
 }
 
 async function seed(): Promise<void> {
+  // Demo/synthetic seed is OFF by default — a real deployment shows real or empty data, never
+  // fabricated rows. Opt in explicitly with OFFGRID_SEED_DEMO=1 for a demo environment.
+  if (process.env.OFFGRID_SEED_DEMO !== '1') {
+    process.stdout.write('seed: synthetic demo seed skipped (set OFFGRID_SEED_DEMO=1 to enable)\n');
+    return;
+  }
   await seedUsers();
   await seedFlags();
   await seedPrompts();
