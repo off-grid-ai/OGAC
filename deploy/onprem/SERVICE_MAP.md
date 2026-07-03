@@ -14,6 +14,11 @@ you add a node, a subdomain, or a service.
 | `console-landing.getoffgridai.co` | Landing page | `127.0.0.1:3100` | Keycloak session |
 | `gungnir.getoffgridai.co` | **Provit** (Prove It — visual QA) | `192.168.1.60:7799` | Keycloak session |
 
+> **Provit runs on S2 (`192.168.1.60`)** as a node process under launchd `co.getoffgridai.provit`
+> (`/Users/admin/provit`, `src/ui/server.ts`, log `server.log`). If provit.* 502s, it's usually
+> the process **crash-looping** — fix: `ssh admin@192.168.1.60` then
+> `sudo launchctl kickstart -k system/co.getoffgridai.provit`. (S1 can SSH to S2.)
+
 > Note the DNS name is still `gungnir.*`; the product is **Provit**. Rename the
 > subdomain to `provit.getoffgridai.co` when convenient and set `OFFGRID_PROVIT_URL`.
 
