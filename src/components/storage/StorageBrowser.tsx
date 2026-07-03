@@ -11,7 +11,8 @@ import {
   FileAudio,
   FileCode,
   FilePdf,
-  HardDrive,
+  Folder,
+  CaretLeft,
   Trash,
   UploadSimple,
   X,
@@ -253,10 +254,42 @@ function applyFilter(files: FileMeta[], filter: Filter): FileMeta[] {
   }
 }
 
+// First-level navigation: a folder tile (name + count + a preview of the first image/video in
+// it). Clicking opens the folder to reveal its files. Keeps the top level to folders only.
+function FolderCard({ name, files, onOpen }: { name: string; files: FileMeta[]; onOpen: () => void }) {
+  const preview = files.find((f) => f.mime.startsWith('image/')) ?? files.find((f) => f.mime.startsWith('video/'));
+  const [failed, setFailed] = useState(false);
+  const label = name.split('/').pop() || name;
+  return (
+    <Card className="group cursor-pointer shadow-sm transition-shadow hover:shadow-md" onClick={onOpen}>
+      <div className="flex h-32 items-center justify-center overflow-hidden rounded-t-lg border-b border-border bg-muted/30">
+        {preview && !failed ? (
+          preview.mime.startsWith('image/') ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview.url} alt={label} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+          ) : (
+            <video src={preview.url} muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+          )
+        ) : (
+          <Folder className="size-10 text-muted-foreground/50" weight="fill" />
+        )}
+      </div>
+      <CardContent className="flex items-center justify-between gap-2 p-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Folder className="size-4 shrink-0 text-primary" />
+          <p className="truncate font-mono text-sm text-foreground" title={name}>{label}</p>
+        </div>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">{files.length}</span>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function StorageBrowser() {
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
+  const [openFolder, setOpenFolder] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
@@ -300,6 +333,8 @@ export function StorageBrowser() {
   };
 
   const visible = applyFilter(files, filter);
+  const folders = groupByFolder(visible);
+  const current = openFolder ? folders.find(([f]) => f === openFolder) : null;
 
   return (
     <div className="space-y-6">
@@ -332,7 +367,7 @@ export function StorageBrowser() {
         ))}
       </div>
 
-      {/* Grid */}
+      {/* Grid: top level shows FOLDERS only; opening one reveals its files. */}
       {loading ? (
         <p className="py-12 text-center text-xs text-muted-foreground">Loading…</p>
       ) : visible.length === 0 ? (
@@ -342,21 +377,32 @@ export function StorageBrowser() {
             {files.length === 0 ? 'No files yet — upload something above.' : 'No files match this filter.'}
           </p>
         </div>
+      ) : openFolder && current ? (
+        // Inside a folder: breadcrumb back + this folder's files.
+        <div className="space-y-3">
+          <button
+            onClick={() => setOpenFolder(null)}
+            className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <CaretLeft className="size-3.5" />
+            All folders
+          </button>
+          <div className="flex items-center gap-2">
+            <Folder className="size-4 text-primary" weight="fill" />
+            <h3 className="font-mono text-sm font-medium text-foreground">{openFolder}</h3>
+            <span className="font-mono text-xs text-muted-foreground">{current[1].length}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {current[1].map((f) => (
+              <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} />
+            ))}
+          </div>
+        </div>
       ) : (
-        <div className="space-y-8">
-          {groupByFolder(visible).map(([folder, group]) => (
-            <div key={folder} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <HardDrive className="size-4 text-muted-foreground" />
-                <h3 className="font-mono text-sm font-medium text-foreground">{folder}</h3>
-                <span className="font-mono text-xs text-muted-foreground">{group.length}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {group.map((f) => (
-                  <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} />
-                ))}
-              </div>
-            </div>
+        // Top level: folders only.
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {folders.map(([folder, group]) => (
+            <FolderCard key={folder} name={folder} files={group} onOpen={() => setOpenFolder(folder)} />
           ))}
         </div>
       )}
