@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
+import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
 import { readSecretsView } from '@/lib/secrets-view';
 
 // OpenBao secrets management. Stores connector/tool credentials and virtual-key secrets in
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only
-// key names + a STATUS model (reachable/sealed/version/mounts) — so callers see what's stored and
-// the store's health without any secret material ever leaving OpenBao.
+// key NAMES (normalized) plus a STATUS model (reachable/sealed/version/mounts) — so callers see
+// what's stored and the store's health without any secret material ever leaving OpenBao.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   if (!openBaoConfigured() || !openBaoSecrets.list) {
     return NextResponse.json({ configured: false, keys: [], status, error });
   }
-  const keys = await openBaoSecrets.list();
+  const keys = normalizeKeyList(await openBaoSecrets.list());
   return NextResponse.json({ configured: true, keys, status, error });
 }
 
@@ -24,15 +25,20 @@ export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as { key?: unknown; value?: unknown } | null;
-  if (!b || typeof b.key !== 'string' || typeof b.value !== 'string' || !b.key.trim()) {
-    return NextResponse.json({ error: 'key and value (strings) required' }, { status: 400 });
+  // Value must be a non-empty string, but is NEVER validated for content, echoed, logged, or
+  // returned — only forwarded to the adapter's set().
+  if (!b || typeof b.value !== 'string' || b.value.length === 0) {
+    return NextResponse.json({ error: 'value (non-empty string) required' }, { status: 400 });
   }
+  const v = validateKeyPath(b.key);
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
   if (!openBaoConfigured() || !openBaoSecrets.set) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
   try {
-    await openBaoSecrets.set(b.key.trim(), b.value);
-    return NextResponse.json({ ok: true, key: b.key.trim() }, { status: 201 });
+    await openBaoSecrets.set(v.key, b.value);
+    // Echo only the KEY name back — never the value.
+    return NextResponse.json({ ok: true, key: v.key }, { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }
@@ -41,14 +47,14 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const key = new URL(req.url).searchParams.get('key');
-  if (!key) return NextResponse.json({ error: 'key query param required' }, { status: 400 });
+  const v = validateKeyPath(new URL(req.url).searchParams.get('key'));
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
   if (!openBaoConfigured() || !openBaoSecrets.remove) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
   try {
-    await openBaoSecrets.remove(key);
-    return NextResponse.json({ ok: true });
+    await openBaoSecrets.remove(v.key);
+    return NextResponse.json({ ok: true, key: v.key });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }
