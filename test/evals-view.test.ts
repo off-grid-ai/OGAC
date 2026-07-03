@@ -77,6 +77,23 @@ test('normalizeEvals: empty / nullish input yields a safe zeroed model', () => {
   }
 });
 
+test('normalizeEvals: per-engine runs split into distinct suites (persisted engine)', () => {
+  // Runs now carry the engine that produced them (golden persists in-process; promptfoo/ragas are
+  // recorded via recordEvalRun), so a mixed set must roll up into one suite per engine.
+  const v = normalizeEvals({
+    runs: [
+      { id: 'g', engine: 'golden', total: 4, passed: 4, startedAt: '2026-07-01T00:00:00Z' },
+      { id: 'p', engine: 'promptfoo', total: 4, passed: 2, startedAt: '2026-07-02T00:00:00Z' },
+      { id: 'r', engine: 'ragas', total: 4, passed: 3, startedAt: '2026-07-03T00:00:00Z' },
+    ],
+  });
+  assert.deepEqual(
+    v.suites.map((s) => s.engine).sort(),
+    ['golden', 'promptfoo', 'ragas'],
+  );
+  assert.equal(v.suites.find((s) => s.engine === 'ragas')!.passRate, 75);
+});
+
 test('normalizeEvals: malformed records degrade safely (no negative/over-100)', () => {
   const v = normalizeEvals({
     runs: [
