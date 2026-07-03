@@ -236,6 +236,28 @@ export async function getAgentRun(id: string): Promise<AgentRun | null> {
   return row ? rowToRun(row) : null;
 }
 
+// Delete a run record. Returns true if a row was removed. Management action (D): purge a run
+// from the durable-execution history.
+export async function deleteAgentRun(id: string): Promise<boolean> {
+  const removed = await db
+    .delete(agentRuns)
+    .where(eq(agentRuns.id, id))
+    .returning({ id: agentRuns.id });
+  return removed.length > 0;
+}
+
+// Cancel an in-flight run (one held at pending_review) → terminal status 'cancelled', answer
+// withheld. Returns the updated run, or null if the run doesn't exist. The caller (route) enforces
+// the state-machine via lib/agent-run-actions before invoking this.
+export async function cancelAgentRun(id: string): Promise<AgentRun | null> {
+  const [row] = await db
+    .update(agentRuns)
+    .set({ status: 'cancelled', answer: '' })
+    .where(eq(agentRuns.id, id))
+    .returning();
+  return row ? rowToRun(row) : null;
+}
+
 type Mark = (kind: string, label: string, detail: string, refs: string[], start: number) => void;
 
 // Phase 3 — sandbox as an agent tool. If the routed tool is a `sandbox`-type tool and the
