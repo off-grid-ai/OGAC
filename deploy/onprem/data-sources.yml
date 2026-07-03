@@ -1,0 +1,58 @@
+# Off Grid — REAL enterprise data sources (for connectors / Studio, replacing synthetic data).
+# Runs on S1's existing OrbStack (the daemon is already initialised there — no GUI first-run
+# needed). Snowflake/Databricks aren't self-hostable, so the warehouse is MinIO + DuckDB and the
+# CRM is a mock REST API — real, connectable stand-ins, labeled honestly in the connector UI.
+#
+#   deploy (from S1, or over the tunnel):
+#     /Users/admin/.orbstack/bin/docker compose -f data-sources.yml up -d
+#   seed core-banking:
+#     ./seed-corebank.sh   (idempotent; see below)
+name: offgrid-data-sources
+
+services:
+  # ── Core Banking (relational OLTP) — customers, policies, claims, transactions ──
+  corebank:
+    image: postgres:16-alpine
+    container_name: offgrid-ds-corebank
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: corebank
+      POSTGRES_PASSWORD: corebank
+      POSTGRES_DB: corebank
+    ports: ['5433:5432']
+    volumes:
+      - corebank:/var/lib/postgresql/data
+      - ./seed-corebank.sql:/docker-entrypoint-initdb.d/01-seed.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U corebank']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ── Warehouse object store (S3-compatible) — the "Snowflake/Databricks" stand-in ──
+  # Query with DuckDB's httpfs/parquet over these buckets, or point Trino at it later.
+  minio:
+    image: minio/minio:RELEASE.2025-04-08T15-41-24Z
+    container_name: offgrid-ds-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9011"
+    environment:
+      MINIO_ROOT_USER: offgrid
+      MINIO_ROOT_PASSWORD: offgrid-warehouse
+    ports: ['9010:9000', '9011:9011']
+    volumes: [minio:/data]
+
+  # ── CRM (mock Salesforce-style REST API) ──
+  # Static JSON-server over a realistic accounts/opportunities/contacts dataset.
+  crm:
+    image: clue/json-server
+    container_name: offgrid-ds-crm
+    restart: unless-stopped
+    command: ['--host', '0.0.0.0', '/data/crm.json']
+    ports: ['8090:80']
+    volumes:
+      - ./crm.json:/data/crm.json:ro
+
+volumes:
+  corebank:
+  minio:

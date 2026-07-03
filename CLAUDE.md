@@ -1,6 +1,21 @@
 # Off Grid Console — developer guide
 
-Next.js 15 app. The AI gateway runs separately on `127.0.0.1:7878` (not in this repo).
+Next.js 15 app. The AI gateway runs separately (aggregator at `127.0.0.1:8800` on-prem).
+
+## Systems of record — READ THESE (don't keep infra knowledge in your head)
+
+Every out-of-code change to the on-prem deployment MUST be captured in one of these, in the
+same commit that makes the change — otherwise it's lost when the session ends:
+
+- **`deploy/onprem/SERVER_STATE.md`** — server env vars, DB tables created directly, Docker containers, DNS, launchd services. The imperative-change ledger.
+- **`deploy/onprem/SERVICE_MAP.md`** — subdomains → services, node → model, aggregator auth.
+- **`deploy/DEPLOY.md`** — deploy runbook (rsync-only; git is broken on the server; tunnel-deploy when LAN is down).
+- **`deploy/onprem/cloudflared-tunnel.yml`** — tunnel ingress (keep in sync with the live `~/.cloudflared/config.yml` on S1).
+- **`deploy/onprem/data-sources.yml`** + `seed-corebank.sql` — real enterprise data-source containers.
+- **`deploy/onprem/dns-records.sh`** — replay Cloudflare DNS records.
+- **`docs/ROADMAP.md`** — phases + milestones. **`docs/ENGINEERING.md`** — SOLID / ports-and-adapters rules.
+
+If you change server env, DNS, a container, Keycloak, or a launchd job: update SERVER_STATE.md.
 
 ## Dev
 
