@@ -91,6 +91,7 @@ export const ingestJobs = pgTable('ingest_jobs', {
 
 export const maskingRules = pgTable('masking_rules', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   kind: text('kind').notNull(),
   action: text('action').notNull(),
   enabled: boolean('enabled').notNull().default(true),
@@ -178,6 +179,7 @@ export const promptVersions = pgTable('prompt_versions', {
 // records (AI-use policy, ethics board, RACI, training, vendor, insurance, tabletop drills).
 export const governanceItems = pgTable('governance_items', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   kind: text('kind').notNull(), // policy | ethics_review | raci | training | vendor | insurance | drill | impact_assessment
   title: text('title').notNull(),
   owner: text('owner').notNull().default(''),
@@ -226,6 +228,7 @@ export const agentRuns = pgTable('agent_runs', {
 // policy bundle the node pulls, so the gateway enforces it as the chokepoint.
 export const routingRules = pgTable('routing_rules', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   priority: integer('priority').notNull().default(100),
   attribute: text('attribute').notNull(), // data_class | task | cost | region | …
