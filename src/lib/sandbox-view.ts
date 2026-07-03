@@ -130,6 +130,84 @@ export function normalizeSandbox(
   };
 }
 
+// ─── Run-Code request + result (pure) ───────────────────────────────────────────
+// The Run Code panel POSTs to /api/v1/admin/sandbox/run. buildRunRequest validates+normalizes the
+// user's input into the exact body that route accepts (language: 'python'|'node', code, timeoutMs);
+// normalizeRunResult maps a raw SandboxResult into the display model the panel renders. Both are
+// pure and import-free so they're unit-testable without any live backend.
+
+export type RunLanguage = 'python' | 'node';
+
+// Hard cap enforced by the run route (Math.min(timeoutMs, 30_000)); we mirror it as the default so
+// the client sends the max allowed window.
+export const RUN_TIMEOUT_MS = 30_000;
+
+export interface RunRequest {
+  language: RunLanguage;
+  code: string;
+  timeoutMs: number;
+}
+
+export type BuildRunResult =
+  | { ok: true; request: RunRequest }
+  | { ok: false; error: string };
+
+/**
+ * Validate + normalize a run request. Rejects unknown languages and empty/whitespace-only code
+ * (mirroring the route's 400s) so the UI can surface the error without a round-trip. Pure — no I/O.
+ */
+export function buildRunRequest(language: unknown, code: unknown): BuildRunResult {
+  if (language !== 'python' && language !== 'node') {
+    return { ok: false, error: "language must be 'python' or 'node'" };
+  }
+  if (typeof code !== 'string' || !code.trim()) {
+    return { ok: false, error: 'code is required' };
+  }
+  return { ok: true, request: { language, code, timeoutMs: RUN_TIMEOUT_MS } };
+}
+
+export type RunOutcome = 'ok' | 'failed' | 'timeout' | 'refused';
+
+export interface RunResultView {
+  outcome: RunOutcome;
+  engine: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+  refused: string; // human message when the run was declined (no-exec default); '' otherwise
+}
+
+/**
+ * Map a raw run result (a SandboxResult, possibly with an { error } from a non-2xx response) into
+ * the panel display model. Pure and total — tolerates missing/garbage fields, never throws.
+ * Outcome precedence mirrors classifyRun: refused → timeout → failed → ok.
+ */
+export function normalizeRunResult(raw: unknown): RunResultView {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const refused = typeof r.refused === 'string' && r.refused.trim() ? r.refused : '';
+  // A non-2xx JSON body from the route carries { error }; surface it as stderr so it's visible.
+  const errText = typeof r.error === 'string' ? r.error : '';
+  const timedOut = r.timedOut === true;
+  const ok = r.ok === true;
+
+  let outcome: RunOutcome;
+  if (refused) outcome = 'refused';
+  else if (timedOut) outcome = 'timeout';
+  else if (ok) outcome = 'ok';
+  else outcome = 'failed';
+
+  return {
+    outcome,
+    engine: str(r.engine, 'unknown'),
+    stdout: str(r.stdout),
+    stderr: str(r.stderr) || errText,
+    exitCode: intOrNull(r.exitCode),
+    timedOut,
+    refused,
+  };
+}
+
 // ─── Thin best-effort reader (the ONLY I/O seam) ────────────────────────────────
 // Minimal structural contract for the sandbox adapter — just what the reader needs, so this file
 // stays import-free and the reader can be handed any conforming port (real or a test double).

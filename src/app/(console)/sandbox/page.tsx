@@ -1,5 +1,7 @@
 import { Cube } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import { RunCodePanel } from '@/components/sandbox/RunCodePanel';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getSandbox } from '@/lib/adapters/registry';
+import { getFlags, getSandbox } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import {
   type ExecStatus,
@@ -40,6 +42,9 @@ function isExecStatus(v: string | undefined): v is ExecStatus {
   return v === 'ok' || v === 'failed' || v === 'timeout' || v === 'refused';
 }
 
+// Backend ids that actually execute code (mirrors the sandbox GET route). Anything else refuses.
+const EXEC_CAPABLE_BACKENDS = new Set(['docker', 'firecracker', 'e2b']);
+
 export default async function SandboxPage({
   searchParams,
 }: {
@@ -52,6 +57,10 @@ export default async function SandboxPage({
   const { data, error } = await readSandboxStatus(getSandbox());
   const view: SandboxView = normalizeSandbox(data, []);
   const runs = filter === 'all' ? view.runs : view.runs.filter((r) => r.status === filter);
+
+  // Double gate for the Run Code panel: flag ON + exec-capable backend. Surfaced honestly.
+  const execEnabled = await getFlags().isEnabled('agent-code-exec', false);
+  const execCapable = EXEC_CAPABLE_BACKENDS.has(view.backend);
 
   return (
     <div className="space-y-6">
@@ -107,6 +116,14 @@ export default async function SandboxPage({
           ) : null}
         </CardContent>
       </Card>
+
+      <Suspense fallback={null}>
+        <RunCodePanel
+          execEnabled={execEnabled}
+          execCapable={execCapable}
+          backend={view.backend}
+        />
+      </Suspense>
 
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
