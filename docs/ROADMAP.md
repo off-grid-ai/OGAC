@@ -143,6 +143,18 @@ All Provit tables get `org_id` from day one (see Phase 3). Provit's machine clie
 
 **Definition of done:** Provit pushes repos, runs, sessions, recordings to the console. The Prove It module shows all four views with live data. Recordings play back in the journey viewer. SeaweedFS stores all binary assets.
 
+### D. Provit as the console's own E2E screenshot tester (TODO — evaluated, not built)
+
+Use Provit to run full end-to-end **screenshot functional tests of the console itself** (sign in → navigate modules → act → assert + screenshot each step → surface results). Evaluated 2026-07 (read-only); Provit is ~70% there — it already has a Playwright driver (`adapters/capture.mjs`), a VLM oracle that judges a plain-English expectation against a screenshot (`src/core/oracle.ts`), a dashboard (`:7799`), and the console file-upload path (`showcase.ts` → `/api/v1/files`). **These changes live in the Provit repo, not the console.** Additive, low-risk, ~days for a working proof:
+
+1. **Web `observe`/assert step + `replayJourneyWeb.ts`** (mirror the proven iOS `src/ios/replayJourney.ts`): screenshot at checkpoints, call `oracle.judge`. *#1 gap — without it you get a recording, no pass/fail.* [M]
+2. **Keycloak login handling**: save a Playwright `storageState` from a one-time sign-in, reuse it; creds from env (`PROVIT_CONSOLE_USER/PASS`). [M]
+3. **A `web` config block** in `ProvitConfig` (`baseUrl`, viewport, headless, storageStatePath). [S]
+4. **Emit `timeline.jsonl` from the web capture** so the existing dashboard/judge/replay work for web unchanged. [M]
+5. Later: `--headless` + CI hook; DOM self-heal; author console journeys (`journeys/console/*.json`); surface runs via `/api/v1/files` gallery → Observability.
+
+Sequence 1→2→3→4. Console flows authored as journey JSON (`launch web → signin → click/type → observe "X visible"`). Full eval in the session record.
+
 ---
 
 ## Phase 3 — Multi-tenancy
