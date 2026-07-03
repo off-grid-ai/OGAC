@@ -24,6 +24,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_REDIS_URL` | `redis://offgrid-s2.local:6379` | Was `127.0.0.1` (no Redis on S1 → Integrations showed "unreachable"). Redis runs on S2. |
 | `OFFGRID_SUPERSET_URL` | `http://offgrid-s2.local:8088` | Was UNSET → Bi/Superset unhittable. Superset runs on S2 `:8088`. |
 | `OFFGRID_FLEET_URL` | `http://offgrid-s2.local:8070` | Was `127.0.0.1:8070` (closed on S1). FleetDM runs on S2 `:8070`. |
+| `OFFGRID_LANGFUSE_OTLP_URL` | `http://offgrid-s2.local:3030/api/public/otel` | **Was UNSET → nothing pushed spans → Langfuse read-back showed 0 traces / "fetch failed".** otel.ts appends `/v1/traces` + Basic auth (`OFFGRID_LANGFUSE_AUTH`). Verified: authed push → 207, trace reads back. |
 
 > **Reachability note (2026-07-03):** all S2 services (Langfuse, Unleash, Superset, Redis, Fleet,
 > Presidio) are Up and reachable from S1 **by hostname** `offgrid-s2.local`. The Integrations
