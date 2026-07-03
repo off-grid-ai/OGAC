@@ -195,6 +195,7 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
   const [phase, setPhase] = useState<'idle' | 'running' | 'approve' | 'done'>('idle');
   const [output, setOutput] = useState('');
   const [governed, setGoverned] = useState<string | null>(null);
+  const [steps, setSteps] = useState<{ kind: string; label: string; detail: string }[]>([]);
 
   const trigger = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Input');
   const human   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Human');
@@ -259,6 +260,7 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
     setPhase('running');
     setOutput('');
     setGoverned(null);
+    setSteps([]);
     try {
       const r = await fetch('/api/v1/admin/run', {
         method: 'POST',
@@ -271,9 +273,10 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
           system: agent ? `You are the ${agent.label}. ${wf?.summary ?? ''}` : '',
         }),
       });
-      const d = await r.json() as { output: string; governed?: boolean; status?: string; error?: string };
+      const d = await r.json() as { output: string; governed?: boolean; status?: string; error?: string; steps?: { kind: string; label: string; detail: string }[] };
       setOutput(d.output || d.error || '(no output)');
       if (d.governed) setGoverned(d.status ?? 'ok');
+      setSteps(d.steps ?? []);
     } catch {
       setOutput('(run failed — gateway unavailable)');
     }
@@ -455,6 +458,21 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
                   )}
                 </p>
                 <p className="whitespace-pre-wrap text-sm">{output}</p>
+                {steps.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Governance trace ({steps.length} steps)
+                    </summary>
+                    <ol className="mt-1 space-y-0.5 border-l border-border pl-3">
+                      {steps.map((s, i) => (
+                        <li key={i} className="text-[11px] text-muted-foreground">
+                          <span className="font-mono text-foreground">{s.kind}</span>
+                          {s.label ? ` · ${s.label}` : ''}{s.detail ? ` — ${s.detail}` : ''}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
               </div>
             )}
           </div>
