@@ -21,6 +21,15 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_LANGFUSE_URL` | `http://192.168.1.60:3030` | Was 127.0.0.1 (wrong host) |
 | `OFFGRID_UNLEASH_URL` | `http://192.168.1.60:4242` | Was 127.0.0.1 (wrong host) |
 | `OFFGRID_ADMIN_TOKEN` | `offgrid-local-dev` | ⚠️ still the dev default — rotate for prod |
+| `OFFGRID_REDIS_URL` | `redis://offgrid-s2.local:6379` | Was `127.0.0.1` (no Redis on S1 → Integrations showed "unreachable"). Redis runs on S2. |
+| `OFFGRID_SUPERSET_URL` | `http://offgrid-s2.local:8088` | Was UNSET → Bi/Superset unhittable. Superset runs on S2 `:8088`. |
+| `OFFGRID_FLEET_URL` | `http://offgrid-s2.local:8070` | Was `127.0.0.1:8070` (closed on S1). FleetDM runs on S2 `:8070`. |
+
+> **Reachability note (2026-07-03):** all S2 services (Langfuse, Unleash, Superset, Redis, Fleet,
+> Presidio) are Up and reachable from S1 **by hostname** `offgrid-s2.local`. The Integrations
+> "unreachable" alarms were stale/mispointed env (post-migration the old `192.168.1.60` IP and
+> `127.0.0.1` were wrong) — NOT undeployed services. Qdrant `:6333` + Evidently `:8001` genuinely
+> run on S1 (`127.0.0.1` correct). Always use hostnames, never IPs (DHCP reassigns).
 
 After editing `.env.local`, restart the console (see DEPLOY.md).
 
