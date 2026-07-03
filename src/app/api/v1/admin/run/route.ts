@@ -15,19 +15,20 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const { input = '', system = '', agentId: rawAgentId } = await req.json().catch(() => ({ input: '' }));
+  const { input = '', system = '', agentId: rawAgentId, requireReview = false } = await req.json().catch(() => ({ input: '' }));
   const caller = gate.user.email ?? undefined;
 
   // Governed path — resolve the composed Agent block (id may arrive as "agent:foo").
   const agentId = typeof rawAgentId === 'string' ? rawAgentId.replace(/^agent:/, '') : '';
   if (agentId) {
     try {
-      const run = await runAgent(agentId, String(input), caller);
+      const run = await runAgent(agentId, String(input), caller, !!requireReview);
       if (!run) return NextResponse.json({ output: '', error: `unknown agent "${agentId}"` }, { status: 404 });
       return NextResponse.json({
         output: run.answer,
         governed: true,
-        status: run.status,               // ok | blocked | denied
+        runId: run.id,                    // for the human-review approve/reject endpoint
+        status: run.status,               // done | pending_review | blocked | denied
         steps: run.steps,                 // policy / guard / retrieve / answer / ground / sign …
         checks: run.checks,               // guardrail verdicts
         citations: run.citations,
