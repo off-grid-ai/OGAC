@@ -194,6 +194,7 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
   const [runInput, setRunInput] = useState('');
   const [phase, setPhase] = useState<'idle' | 'running' | 'approve' | 'done'>('idle');
   const [output, setOutput] = useState('');
+  const [governed, setGoverned] = useState<string | null>(null);
 
   const trigger = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Input');
   const human   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Human');
@@ -257,17 +258,22 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
   async function runApp() {
     setPhase('running');
     setOutput('');
+    setGoverned(null);
     try {
       const r = await fetch('/api/v1/admin/run', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           input: runInput || prompt,
+          // Pass the composed Agent block so the run goes through the governed pipeline
+          // (ABAC + guardrails + grounding + Temporal), not a bare model call.
+          agentId: agent?.id,
           system: agent ? `You are the ${agent.label}. ${wf?.summary ?? ''}` : '',
         }),
       });
-      const { output: out } = await r.json() as { output: string };
-      setOutput(out || '(no output)');
+      const d = await r.json() as { output: string; governed?: boolean; status?: string; error?: string };
+      setOutput(d.output || d.error || '(no output)');
+      if (d.governed) setGoverned(d.status ?? 'ok');
     } catch {
       setOutput('(run failed — gateway unavailable)');
     }
@@ -438,8 +444,15 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
 
             {output && (phase === 'approve' || phase === 'done') && (
               <div className="rounded-md border border-border bg-muted/40 p-3">
-                <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <p className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
                   Result{phase === 'done' && sink ? ` → ${sink.label}` : ' (pending approval)'}
+                  {governed && (
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] normal-case ${
+                      governed === 'ok' ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {governed === 'ok' ? '✓ governed — policy + guardrails passed' : `⚠ ${governed} by governance`}
+                    </span>
+                  )}
                 </p>
                 <p className="whitespace-pre-wrap text-sm">{output}</p>
               </div>
