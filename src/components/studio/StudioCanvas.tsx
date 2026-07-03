@@ -77,6 +77,8 @@ interface SavedTemplate {
   visibility: string;
   ownerId: string;
   createdAt: string;
+  slug?: string | null;
+  published?: boolean;
 }
 
 // ── Gallery ───────────────────────────────────────────────────────────────────
@@ -170,6 +172,18 @@ function Gallery({
               <Badge variant="outline" className="gap-1 px-1 py-0 text-[10px]">
                 <Globe className="size-2.5" /> shared
               </Badge>
+            )}
+            {t.published && t.slug && (
+              <a
+                href={`/app/${t.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary hover:bg-primary/20"
+                title={`/app/${t.slug}`}
+              >
+                <Sparkle className="size-2.5" /> live app ↗
+              </a>
             )}
           </div>
         </div>
