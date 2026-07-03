@@ -252,6 +252,7 @@ export async function runAgent(
   agentId: string,
   query: string,
   caller?: string,
+  requireReview = false,
 ): Promise<AgentRun | null> {
   const agent = await resolveAgent(agentId);
   if (!agent) return null;
@@ -336,8 +337,11 @@ export async function runAgent(
   };
   mark('sign', signing.algorithm, 'answer signed', [], t);
 
+  // Human-in-the-loop (S4): when the workflow has a Human block, the answer is HELD server-side
+  // as pending_review (persisted, not delivered) until an approver releases it via the approve
+  // endpoint. This is a real governance checkpoint, not a client toggle.
   const run = await persist(runId, {
-    agentId, query, answer, status: 'done', steps, citations,
+    agentId, query, answer, status: requireReview ? 'pending_review' : 'done', steps, citations,
     checks: [...preChecks, ...postChecks], provenance,
   });
 
