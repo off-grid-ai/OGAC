@@ -24,7 +24,21 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_REDIS_URL` | `redis://offgrid-s2.local:6379` | Was `127.0.0.1` (no Redis on S1 → Integrations showed "unreachable"). Redis runs on S2. |
 | `OFFGRID_SUPERSET_URL` | `http://offgrid-s2.local:8088` | Was UNSET → Bi/Superset unhittable. Superset runs on S2 `:8088`. |
 | `OFFGRID_FLEET_URL` | `http://offgrid-s2.local:8070` | Was `127.0.0.1:8070` (closed on S1). FleetDM runs on S2 `:8070`. |
-| `OFFGRID_LANGFUSE_OTLP_URL` | `http://offgrid-s2.local:3030/api/public/otel` | **Was UNSET → nothing pushed spans → Langfuse read-back showed 0 traces / "fetch failed".** otel.ts appends `/v1/traces` + Basic auth (`OFFGRID_LANGFUSE_AUTH`). Verified: authed push → 207, trace reads back. |
+| `OFFGRID_LANGFUSE_OTLP_URL` | `http://127.0.0.1:8931/api/public/otel` | otel.ts appends `/v1/traces` + Basic auth (`OFFGRID_LANGFUSE_AUTH`). Via the localhost Caddy proxy (see below). |
+| `OFFGRID_LANGFUSE_URL` | `http://127.0.0.1:8931` | Langfuse read-back, via the localhost Caddy proxy. |
+| `OFFGRID_UNLEASH_URL` | `http://127.0.0.1:8932` | via localhost Caddy proxy → S2. |
+| `OFFGRID_SUPERSET_URL` | `http://127.0.0.1:8933` | via localhost Caddy proxy → S2. |
+| `OFFGRID_FLEET_URL` | `http://127.0.0.1:8934` | via localhost Caddy proxy → S2. |
+
+> **⚠️ Console can't egress to the LAN (root cause of every S2 "unreachable"/Langfuse "fetch
+> failed"):** the `next-server` process gets `EHOSTUNREACH` connecting to any `192.168.1.x` host,
+> while `curl` and short-lived `node` from the SAME box reach S2 fine, and localhost always works.
+> This is macOS 15 (Darwin 25) **Local Network privacy** blocking the SSH-launched daemon; there's
+> no GUI to grant it. **Fix (in `deploy/Caddyfile`):** Caddy (launchd, not blocked — it already
+> proxies provit→S2) fronts each S2 HTTP service on a loopback port; the console's `OFFGRID_*_URL`
+> point at `127.0.0.1:893x`. Map: 8931→langfuse:3030, 8932→unleash:4242, 8933→superset:8088,
+> 8934→fleet:8070. Redis (`:6379`, non-HTTP) can't be Caddy-proxied → the cache adapter falls back
+> to in-memory by design (non-fatal); add a TCP forward if a shared cache is actually needed.
 
 > **Reachability note (2026-07-03):** all S2 services (Langfuse, Unleash, Superset, Redis, Fleet,
 > Presidio) are Up and reachable from S1 **by hostname** `offgrid-s2.local`. The Integrations

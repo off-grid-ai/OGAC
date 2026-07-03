@@ -11,6 +11,7 @@ import {
   FileAudio,
   FileCode,
   FilePdf,
+  HardDrive,
   Trash,
   UploadSimple,
   X,
@@ -58,27 +59,27 @@ function FileCard({
   onToggleVisibility: (id: string, current: 'public' | 'private') => void;
 }) {
   const isImage = file.mime.startsWith('image/');
-  const [preview, setPreview] = useState(false);
+  const isVideo = file.mime.startsWith('video/');
+  const [failed, setFailed] = useState(false);
 
   return (
     <Card className="group relative shadow-sm transition-shadow hover:shadow-md">
-      {/* Thumbnail or icon */}
-      <div
+      {/* Thumbnail: render the real media from the gateway (SeaweedFS) so it previews inline. */}
+      <a
+        href={file.url}
+        target="_blank"
+        rel="noopener noreferrer"
         className="flex h-40 cursor-pointer items-center justify-center overflow-hidden rounded-t-lg border-b border-border bg-muted/30"
-        onClick={() => setPreview((p) => !p)}
       >
-        {isImage && preview ? (
+        {isImage && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={`/api/v1/files/${file.id}`} alt={file.name} className="h-full w-full object-contain" />
+          <img src={file.url} alt={file.name} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+        ) : isVideo && !failed ? (
+          <video src={file.url} muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full w-full object-cover" />
         ) : (
           <FileIcon mime={file.mime} className="size-12 text-muted-foreground/50" />
         )}
-        {isImage && !preview && (
-          <span className="absolute bottom-2 right-2 rounded bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-            preview
-          </span>
-        )}
-      </div>
+      </a>
 
       <CardContent className="space-y-2 p-3">
         <div className="flex items-start justify-between gap-2">
@@ -127,7 +128,7 @@ function FileCard({
             size="icon"
             className="h-7 w-7"
             title="Open in new tab"
-            onClick={() => window.open(`/api/v1/files/${file.id}`, '_blank')}
+            onClick={() => window.open(file.url, '_blank')}
           >
             <ArrowSquareOut className="size-3.5" />
           </Button>
@@ -224,6 +225,22 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'public', label: 'Public' },
   { id: 'private', label: 'Private' },
 ];
+
+// The bucket is one namespace; the full key prefix (everything but the filename) is the folder,
+// so each PR/run gets its own group — e.g. provit/pr25-frames/frame-0063.png → "provit/pr25-frames".
+// Flat uploads with no prefix group under "media".
+function folderOf(id: string): string {
+  const slash = id.lastIndexOf('/');
+  return slash === -1 ? 'media' : id.slice(0, slash);
+}
+function groupByFolder(files: FileMeta[]): [string, FileMeta[]][] {
+  const map = new Map<string, FileMeta[]>();
+  for (const f of files) {
+    const k = folderOf(f.id);
+    (map.get(k) ?? map.set(k, []).get(k)!).push(f);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 function applyFilter(files: FileMeta[], filter: Filter): FileMeta[] {
   switch (filter) {
@@ -326,9 +343,20 @@ export function StorageBrowser() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((f) => (
-            <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} />
+        <div className="space-y-8">
+          {groupByFolder(visible).map(([folder, group]) => (
+            <div key={folder} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <HardDrive className="size-4 text-muted-foreground" />
+                <h3 className="font-mono text-sm font-medium text-foreground">{folder}</h3>
+                <span className="font-mono text-xs text-muted-foreground">{group.length}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {group.map((f) => (
+                  <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
