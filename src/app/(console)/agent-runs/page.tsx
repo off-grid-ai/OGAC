@@ -17,7 +17,7 @@ export default async function AgentRunsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireModuleForUser('agents');
+  await requireModuleForUser('agent-runs');
   const { status } = await searchParams;
   const { summary, runs } = await getRecentRunsView(25, await currentOrgId());
   const active = status && summary.statusCounts[status] ? status : undefined;
