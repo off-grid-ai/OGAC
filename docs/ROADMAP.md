@@ -486,6 +486,16 @@ Beyond compose+run, Studio must be a complete builder. Sequenced sub-milestones:
 - **S5 — Report cycles.** Scheduled runs that produce citation-backed reports (reuse the Reports module) on a cadence, delivered to the chosen sink.
 - **S6 — Real connectors + data.** Studio's data blocks bind to live enterprise sources (see Phase 4.7). No synthetic catalog.
 
+### S8 — Cloud model routing + BYO provider tokens (FinOps-attributed)
+
+When launching/deploying a Studio app, the builder must let you route to a **cloud model**
+(OpenAI/Anthropic/etc.), not just local — and supply the **provider API token** required. Flow:
+- Studio app config gets a model picker that includes cloud models (from the gateway's leashed-cloud routing) + a field to provide the provider key (stored as a secret via the config service / OpenBao, never in the workflow JSON).
+- The gateway's routing rules already model local↔cloud; wire the app's chosen model + key through `runAgent` → gateway so the deployed app can call the cloud model.
+- **The FinOps layer attributes that cloud spend** — the gateway logs the call (model, tokens, caller `app:<slug>`) to the OpenSearch index that FinOps already reads, so cloud cost per app/user shows up in FinOps automatically (the `(ip, token, meta)` token store + cost pricing already exist).
+
+**Definition of done:** deploy an app that uses a cloud model with your own provider key; the call routes through the governed gateway; FinOps shows the attributed cloud cost per app.
+
 ### S7 — World-class builder (Bolt.new / Lovable parity)
 
 The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lovable, and the open forks like bolt.diy / OpenHands). Concretely:
