@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/authz';
 import { addGoldenCase, listGoldenCases } from '@/lib/evals';
 import { validateGoldenCase } from '@/lib/evals-golden';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
