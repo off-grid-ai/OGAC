@@ -26,11 +26,22 @@ export interface EdgePolicy {
   hosts: string[];
 }
 
+export interface TrafficRow {
+  ts: string;
+  status: number;
+  ip: string;
+  host: string;
+  method: string;
+  uri: string;
+}
+
 export interface EdgeSnapshot {
   configured: boolean;
   policy: EdgePolicy;
   summary: { total: number; waf: number; rateLimited: number; uniqueIps: number };
   recent: EdgeEvent[];
+  // All recent requests (allowed + blocked) so the page has data even when nothing is blocked.
+  traffic: { total: number; allowed: number; blocked: number; recent: TrafficRow[] };
 }
 
 interface RawLine {
@@ -84,8 +95,35 @@ async function parseLog(limit = 200): Promise<EdgeEvent[]> {
   return events;
 }
 
+// All recent requests (any status), newest first — for the traffic view.
+async function parseTraffic(limit = 100): Promise<{ total: number; allowed: number; blocked: number; recent: TrafficRow[] }> {
+  let text = '';
+  try { text = await readFile(LOG_PATH, 'utf8'); } catch { return { total: 0, allowed: 0, blocked: 0, recent: [] }; }
+  const lines = text.split('\n').filter(Boolean);
+  let total = 0, blocked = 0;
+  const recent: TrafficRow[] = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    let o: RawLine;
+    try { o = JSON.parse(lines[i]); } catch { continue; }
+    if (typeof o.status !== 'number') continue;
+    total++;
+    if (o.status === 403 || o.status === 429) blocked++;
+    if (recent.length < limit) {
+      recent.push({
+        ts: o.ts ? new Date(o.ts * 1000).toISOString() : '',
+        status: o.status,
+        ip: realIp(o.request),
+        host: o.request?.host ?? '',
+        method: o.request?.method ?? '',
+        uri: o.request?.uri ?? '',
+      });
+    }
+  }
+  return { total, allowed: total - blocked, blocked, recent };
+}
+
 export async function getEdgeSnapshot(): Promise<EdgeSnapshot> {
-  const [policy, recent] = await Promise.all([parsePolicy(), parseLog()]);
+  const [policy, recent, traffic] = await Promise.all([parsePolicy(), parseLog(), parseTraffic()]);
   const waf = recent.filter((e) => e.kind === 'waf').length;
   const rateLimited = recent.filter((e) => e.kind === 'rate-limit').length;
   const uniqueIps = new Set(recent.map((e) => e.ip)).size;
@@ -94,5 +132,6 @@ export async function getEdgeSnapshot(): Promise<EdgeSnapshot> {
     policy,
     summary: { total: recent.length, waf, rateLimited, uniqueIps },
     recent,
+    traffic,
   };
 }
