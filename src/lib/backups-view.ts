@@ -123,3 +123,30 @@ export function formatAge(ageMs: number | null): string {
   if (ageMs < DAY_MS) return `${Math.round(ageMs / HOUR_MS)}h ago`;
   return `${Math.round(ageMs / DAY_MS)}d ago`;
 }
+
+// ── Management-action pure logic (no I/O; the reader/route wrap these) ───────────────────────────
+
+// A backup dir name is EXACTLY one path segment — a bare directory name, never a path. This is the
+// path-safety guard for destructive actions: reject anything that could escape the backups root.
+// Rejects: empty, "." / "..", names containing a path separator, absolute paths, null bytes, and
+// leading dots (hidden / dot-traversal). Accepts the timestamp form the script writes
+// ("YYYYMMDD-HHMMSS") and any plain alphanumeric segment with dashes/underscores/dots inside.
+export function isSafeBackupName(name: unknown): name is string {
+  if (typeof name !== 'string') return false;
+  if (name.length === 0 || name.length > 255) return false;
+  if (name === '.' || name === '..') return false;
+  if (name.startsWith('.')) return false; // no hidden dirs / no leading-dot traversal
+  if (name.includes('/') || name.includes('\\')) return false; // no path separators
+  if (name.includes('\0')) return false; // no null bytes
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name); // safe filename charset only
+}
+
+// Given the rows built by buildBackupsView, select which backups fall OUTSIDE the retention window
+// and are therefore prunable. Pure: the route feeds it the view's rows. Entries with a known
+// timestamp older than the cutoff are prunable; unknown-timestamp entries are NEVER auto-pruned
+// (we can't prove their age — they require an explicit, named delete instead).
+export function selectPrunable(rows: readonly BackupRow[]): BackupRow[] {
+  return (Array.isArray(rows) ? rows : []).filter(
+    (r) => r.timestampMs !== null && r.withinRetention === false,
+  );
+}
