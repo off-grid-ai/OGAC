@@ -93,7 +93,7 @@ export default async function GatewayPage() {
             <CardHeader>
               <CardTitle className="text-sm">Modalities</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+            <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-4">
               {modalities.map(([name, status]) => {
                 const ready = status === 'ready';
                 return (
