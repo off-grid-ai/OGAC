@@ -1,33 +1,18 @@
+import { regexScan } from './pii-regex';
 import { GUARDRAIL_ENTRIES } from './services';
-import type { PiiPort, PiiResult } from './types';
+import type { PiiPort } from './types';
 
-// PII detection behind the guardrails port. The first-party regex scan is the always-on default;
-// Presidio is a behavior swap-in (OFFGRID_ADAPTER_GUARDRAILS=presidio) that performs the real
+// PII detection behind the guardrails port. The first-party regex scan (regexScan, isolated in
+// pii-regex.ts so it's unit-testable with no mocks) is the always-on default; Presidio is a
+// behavior swap-in (OFFGRID_ADAPTER_GUARDRAILS=presidio) that performs the real
 // detection/anonymization over HTTP — with a graceful fall back to the regex if it's unreachable,
 // so turning Presidio on can never harden into a hard dependency.
 const env = process.env;
-
-const EMAIL = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g;
-const PHONE = /\b\+?\d[\d ()-]{7,}\d\b/g;
 
 function metaOf(id: string) {
   const entry = GUARDRAIL_ENTRIES.find((e) => e.meta.id === id);
   if (!entry) throw new Error(`guardrails adapter meta '${id}' missing`);
   return entry.meta;
-}
-
-function regexScan(text: string): PiiResult {
-  const entities: string[] = [];
-  let redacted = text;
-  if (EMAIL.test(text)) {
-    entities.push('EMAIL_ADDRESS');
-    redacted = redacted.replace(EMAIL, '[EMAIL]');
-  }
-  if (PHONE.test(text)) {
-    entities.push('PHONE_NUMBER');
-    redacted = redacted.replace(PHONE, '[PHONE]');
-  }
-  return { hits: entities.length > 0, entities, redacted, engine: 'regex' };
 }
 
 export const regexPii: PiiPort = {
