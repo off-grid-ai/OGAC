@@ -16,7 +16,7 @@
     "smoke:api": "node scripts/smoke.mjs --api",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "test": "node --test"
+    "test": "node --test --experimental-strip-types test/**/*.test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

@@ -2,6 +2,12 @@
 
 Next.js 15 app. The AI gateway runs separately (aggregator at `127.0.0.1:8800` on-prem).
 
+## Engineering standards (non-negotiable)
+
+- **SOLID + clear abstraction layers.** Isolate pure policy/logic from I/O (see `src/lib/tenancy-policy.ts` — a zero-import, unit-testable rule — vs `tenancy.ts`, its session/claims adapters). Business logic in `src/lib`, thin route handlers, swappable backends behind `src/lib/adapters`. Full rules: `docs/ENGINEERING.md`.
+- **Write unit AND integration tests.** Tests live in `test/`, run with `npm test` (`node --test`, type-stripped). Unit-test the pure logic; integration-test the real wiring.
+- **Use mocks very sparingly** — prefer exercising real functionality (real functions, real DB/services where feasible) so tests don't hide underlying behavior. If you're mocking a lot, the code probably needs a cleaner seam instead.
+
 ## Systems of record — READ THESE (don't keep infra knowledge in your head)
 
 Every out-of-code change to the on-prem deployment MUST be captured in one of these, in the
