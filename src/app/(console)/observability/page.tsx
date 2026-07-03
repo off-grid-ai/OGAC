@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
+import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,6 +25,7 @@ import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
 import { safeListTraces } from '@/lib/langfuse';
 import { requireModuleForUser } from '@/lib/module-access';
+import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { currentOrgId } from '@/lib/tenancy';
 import { scoringConfigured } from '@/lib/qa/scoring';
 
@@ -187,6 +189,14 @@ export default async function ObservabilityPage() {
   const trend = [...evals].reverse().map((r, i) => ({ label: `#${i + 1}`, score: r.score }));
   const online = scoringConfigured();
 
+  // Live alert evaluation against the operator's console-owned threshold rules. Drift score is the
+  // PSI metric (0..1-ish population stability index); eval pass-rate is the latest score as a fraction.
+  const psi = drift.metrics.find((m) => m.name === 'score_psi')?.value ?? null;
+  const alerts = await evaluateThresholdAlerts({
+    driftScore: psi,
+    evalPassRate: latest ? latest.score / 100 : null,
+  }).catch(() => []);
+
   const stats = [
     {
       label: 'Latest eval score',
@@ -220,6 +230,20 @@ export default async function ObservabilityPage() {
           Quality drift detected — {drift.note ?? 'eval scores are diverging from baseline.'}
         </div>
       ) : null}
+
+      {alerts.map((a) => (
+        <div
+          key={`${a.metric}-${a.rule.op}-${a.rule.value}`}
+          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+            a.severity === 'critical'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
+          }`}
+        >
+          <AlertTriangle className="size-4" />
+          Threshold breached — {a.message}
+        </div>
+      ))}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
@@ -295,6 +319,8 @@ export default async function ObservabilityPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ThresholdManager />
 
       <Card className="shadow-sm">
         <CardHeader>
