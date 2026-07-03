@@ -425,6 +425,11 @@ export function ChatWorkspace({
         return setSlashOpen(false);
       }
     }
+    // Esc stops an in-flight generation (when the slash picker isn't open).
+    if (e.key === 'Escape' && streaming) {
+      e.preventDefault();
+      return stop();
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void send();
