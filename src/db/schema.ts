@@ -636,7 +636,10 @@ export const studioTemplates = pgTable('studio_templates', {
   summary: text('summary').notNull().default(''),
   prompt: text('prompt').notNull(),
   workflow: jsonb('workflow').notNull(),
-  visibility: text('visibility').notNull().default('private'), // 'private' | 'org'
+  visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+  // Deployed-app slug (S2): when published, the app is served at /app/<slug>.
+  slug: text('slug'),
+  published: boolean('published').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
