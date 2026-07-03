@@ -38,6 +38,7 @@ export const auditEvents = pgTable('audit_events', {
 // ─── FinOps: virtual keys (token issuance) — scoped to a user or project, with a budget ───
 export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   prefix: text('prefix').notNull(), // display token prefix, e.g. ogk_ab12…
   subjectType: text('subject_type').notNull().default('user'), // user | project
