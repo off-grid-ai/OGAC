@@ -215,6 +215,25 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
   const [governed, setGoverned] = useState<string | null>(null);
   const [steps, setSteps] = useState<{ kind: string; label: string; detail: string }[]>([]);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+
+  async function reviewRun(decision: 'approve' | 'reject') {
+    if (!runId) { setPhase('done'); return; }
+    try {
+      const r = await fetch(`/api/v1/admin/agents/runs/${runId}/review`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      if (r.ok) {
+        toast.success(decision === 'approve' ? 'Approved — released.' : 'Rejected — withheld.');
+        setPhase('done');
+        if (decision === 'reject') setOutput('(withheld by reviewer)');
+      } else {
+        toast.error('Review action failed.');
+      }
+    } catch { toast.error('Review action failed.'); }
+  }
 
   const trigger = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Input');
   const human   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Human');
@@ -295,13 +314,16 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
           // Pass the composed Agent block so the run goes through the governed pipeline
           // (ABAC + guardrails + grounding + Temporal), not a bare model call.
           agentId: agent?.id,
+          // Human block → the answer is HELD server-side as pending_review until approved.
+          requireReview: !!human,
           system: agent ? `You are the ${agent.label}. ${wf?.summary ?? ''}` : '',
         }),
       });
-      const d = await r.json() as { output: string; governed?: boolean; status?: string; error?: string; steps?: { kind: string; label: string; detail: string }[] };
+      const d = await r.json() as { output: string; governed?: boolean; status?: string; runId?: string; error?: string; steps?: { kind: string; label: string; detail: string }[] };
       setOutput(d.output || d.error || '(no output)');
       if (d.governed) setGoverned(d.status ?? 'ok');
       setSteps(d.steps ?? []);
+      setRunId(d.runId ?? null);
     } catch {
       setOutput('(run failed — gateway unavailable)');
     }
@@ -473,11 +495,12 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
               <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
                 <p className="text-sm font-medium text-amber-800">⏸ {human?.label ?? 'Human review'} required</p>
                 <p className="mt-1 text-xs text-amber-700">
-                  The result is held for a human before reaching {sink?.label ?? 'the output'}.
+                  The answer is <strong>held server-side</strong> (pending_review, run <code className="font-mono">{runId?.slice(0, 12)}</code>) until approved — it hasn&apos;t reached {sink?.label ?? 'the output'} yet.
                 </p>
-                <Button size="sm" className="mt-2" onClick={() => setPhase('done')}>
-                  Approve &amp; deliver
-                </Button>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" onClick={() => void reviewRun('approve')}>Approve &amp; deliver</Button>
+                  <Button size="sm" variant="outline" onClick={() => void reviewRun('reject')}>Reject</Button>
+                </div>
               </div>
             )}
 
