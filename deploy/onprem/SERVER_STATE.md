@@ -16,7 +16,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_GATEWAY_URL` | `http://127.0.0.1:8800` | Point console at the aggregator (was dead localhost:7878) |
 | `OFFGRID_GATEWAY_API_KEY` | *(matches aggregator plist)* | `/v1/*` auth — see `co.getoffgridai.aggregator` plist |
 | `OFFGRID_ADMIN_EMAILS` | `mac@example.com` | Founder admin override (Keycloak role is chicken-and-egg) |
-| `OFFGRID_KEYCLOAK_ISSUERS` | `http://127.0.0.1:8080,https://auth.getoffgridai.co` | Accept LAN + public Keycloak issuers |
+| `OFFGRID_KEYCLOAK_ISSUERS` | `http://127.0.0.1:8080,https://auth.getoffgridai.co,http://auth.getoffgridai.co` | Accept LAN + public Keycloak issuers. **Added `http://auth.getoffgridai.co`**: Keycloak behind the tunnel stamps `iss` with scheme `http` (tunnel forwards to :8080 over http), so public-issuer service tokens were 401'ing until this host was accepted. |
 | `AUTH_COOKIE_DOMAIN` | `.getoffgridai.co` | Cross-subdomain SSO (provit/status/landing share the session) |
 | `OFFGRID_LANGFUSE_URL` | `http://192.168.1.60:3030` | Was 127.0.0.1 (wrong host) |
 | `OFFGRID_UNLEASH_URL` | `http://192.168.1.60:4242` | Was 127.0.0.1 (wrong host) |
@@ -124,3 +124,29 @@ sudo pw during the Homebrew/PG install.
 - `co.getoffgridai.aggregator` — gateway aggregator (`scripts/gateway-aggregator.mjs`, holds `OFFGRID_GATEWAY_API_KEY` + upstream timeout). Restart: `sudo launchctl kickstart -k system/co.getoffgridai.aggregator`.
 - `co.getoffgridai.metrics` — metrics.
 - Console + cloudflared run as backgrounded processes (not launchd) — see DEPLOY.md.
+
+## Public file store (SeaweedFS, internet-exposed via the gateway)
+
+The SeaweedFS S3 store on S1 (`127.0.0.1:8333`, container `offgrid-services-extra-seaweedfs-1`)
+is reachable from the internet at **`gateway.getoffgridai.co/files/*`**. Routing is in the
+committed `deploy/Caddyfile` (a `handle_path /files/*` block in the `gateway.*` site):
+- **GET/HEAD are public** (no auth) — media is world-readable.
+- **Writes (PUT/POST/DELETE/PATCH) require a Keycloak bearer** — Caddy `forward_auth` calls the
+  console `/api/auth/verify-write` (route in git), which runs `requireUser` (Keycloak JWT via
+  the IdentityVerifier seam). SeaweedFS itself stays bound to localhost, so the gate can't be
+  bypassed; the console's own anonymous localhost writes are unaffected.
+- Cloudflare caps request bodies at ~100 MB — larger uploads need S3 multipart.
+
+### Keycloak client `offgrid-uploader` (realm `offgrid`) — created this session
+Confidential client, **service accounts enabled**, standard/direct-grant flows OFF. Exists only
+to mint `client_credentials` tokens for authenticated file-store writes (no admin/realm roles —
+minimal scope; the file-store write gate only needs *any* valid principal). Secret lives in
+Keycloak (regenerate via the admin API / admin console if leaked). Replay if the realm is rebuilt:
+```bash
+# admin token from offgrid-console-admin, then:
+curl -X POST $KC/admin/realms/offgrid/clients -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
+  -d '{"clientId":"offgrid-uploader","enabled":true,"publicClient":false,"standardFlowEnabled":false,"directAccessGrantsEnabled":false,"serviceAccountsEnabled":true}'
+# then read GET /admin/realms/offgrid/clients/{id}/client-secret
+```
+Usage: mint at `https://auth.getoffgridai.co/realms/offgrid/protocol/openid-connect/token`
+(grant_type=client_credentials), send as `Authorization: Bearer` to `gateway.getoffgridai.co/files/*`.

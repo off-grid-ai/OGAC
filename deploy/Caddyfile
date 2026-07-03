@@ -90,6 +90,17 @@ http://gateway.getoffgridai.co {
 	handle @api {
 		reverse_proxy 127.0.0.1:3000
 	}
+	# Public file store (SeaweedFS S3 on localhost:8333). Reads (GET/HEAD) are public so
+	# media is world-readable; writes (PUT/POST/DELETE/PATCH) are gated by forward_auth to
+	# the console, which requires a valid Keycloak bearer (see /api/auth/verify-write).
+	# handle_path strips the /files prefix, so /files/<bucket>/<key> → S3 /<bucket>/<key>.
+	handle_path /files/* {
+		@writes method PUT POST DELETE PATCH
+		forward_auth @writes 127.0.0.1:3000 {
+			uri /api/auth/verify-write
+		}
+		reverse_proxy 127.0.0.1:8333
+	}
 	handle {
 		respond "Off Grid — network gateway" 200
 	}
