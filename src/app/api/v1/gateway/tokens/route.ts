@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { gatewayClientTokens } from '@/db/schema';
+import { requireAdmin } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,10 @@ const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 // live in-memory token store from the running gateway. The gateway's /tokens
 // endpoint returns the TokenStore snapshot; we upsert it into the DB on each
 // fetch so the DB is always up-to-date.
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+
   // Fetch live token snapshot from gateway
   let live: GatewayTokenSnapshot[] = [];
   try {
@@ -62,6 +66,9 @@ export async function GET() {
 // ── PATCH /api/v1/gateway/tokens/:fingerprint ─────────────────────────────────
 // Update meta and/or routingOverrides for a token entry.
 export async function PATCH(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+
   const body = (await req.json()) as {
     fingerprint: string;
     meta?: Record<string, unknown>;
