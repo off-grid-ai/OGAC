@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 import { siemConfigured } from '@/lib/siem';
 import {
   getOrgPolicy,
@@ -45,12 +46,13 @@ const CHECK_VARIANT: Record<string, string> = {
 
 export default async function ControlPage() {
   await requireModuleForUser('control');
+  const org = await currentOrgId();
   const [policy, history, users, events, routes] = await Promise.all([
     getOrgPolicy(),
     listPolicyHistory(),
     listUsers(),
     listAudit({ limit: 25 }),
-    listRoutingRules(),
+    listRoutingRules(org),
   ]);
   const baoReady = openBaoConfigured();
   const secretKeys = baoReady && openBaoSecrets.list ? await openBaoSecrets.list() : [];
