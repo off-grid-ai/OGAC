@@ -77,6 +77,22 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
 
+## HA plan — repurpose 2 GWs → servers (decided; awaiting OrbStack first-run)
+
+The fleet has 8 GW nodes; dropping the 2 least-useful for HA (leaves 6 for inference):
+- **g8 `192.168.1.64` → S3** (Postgres streaming replica / Patroni standby) — g8 never had a confirmed model.
+- **g6 `192.168.1.66` → S4** (OpenBao Raft 3rd node + Redis Sentinel) — g6 was persistently down/jammed.
+HA triangle: S1 `.59` primary + S3 `.64` replica + S4 `.66` quorum/secrets. **Blocked only on the
+OrbStack GUI first-run on .64 and .66 (needs a human on-site to click Continue);** everything after
+(Patroni, replication, Raft, Sentinel, failover test) is drivable over the tunnel.
+
+## Multi-tenancy (Phase 3 — in progress)
+
+org_id on 18 tenant tables (default 'default'). Connectors scoped end-to-end (list filters,
+create sets) — **isolation proven on the real DB**: org-a/org-b rows never cross; default unaffected.
+Pattern to roll across the other scoped tables. RLS backstop pending a non-superuser DB role
+(app connects as superuser `offgrid`, which bypasses RLS).
+
 ## Backups (Phase 3A — done)
 
 `deploy/onprem/backup.sh` dumps console Postgres (52 tables) + corebank (PG) + policyadmin
