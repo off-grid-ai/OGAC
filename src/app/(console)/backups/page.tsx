@@ -8,7 +8,7 @@ import { requireModuleForUser } from '@/lib/module-access';
 export const dynamic = 'force-dynamic';
 
 export default async function BackupsPage() {
-  await requireModuleForUser('admin');
+  await requireModuleForUser('backups');
   const { view, error } = await readBackupsView();
   const { config, latest } = view;
 

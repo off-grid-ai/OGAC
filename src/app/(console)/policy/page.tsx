@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 // and the normalized recent decisions through the pure view. Gated on the `control` module (policy /
 // guardrails / audit live there). No client state — nav is URL/history only.
 export default async function PolicyPage() {
-  await requireModuleForUser('control');
+  await requireModuleForUser('policy');
   const [status, decisions] = await Promise.all([readPolicyStatus(), readDecisions()]);
 
   return (

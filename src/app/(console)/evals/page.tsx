@@ -23,7 +23,7 @@ export default async function EvalsPage({
 }: {
   searchParams: Promise<{ suite?: string }>;
 }) {
-  await requireModuleForUser('control');
+  await requireModuleForUser('evals');
   const { suite } = await searchParams;
   const view = await readEvalsView();
 

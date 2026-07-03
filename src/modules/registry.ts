@@ -27,6 +27,12 @@ export type ModuleId =
   | 'storage'
   | 'provit'
   | 'api-docs'
+  | 'agent-runs'
+  | 'policy'
+  | 'evals'
+  | 'siem'
+  | 'drift'
+  | 'backups'
   | 'config';
 
 export interface ModuleDef {
@@ -237,6 +243,54 @@ export const MODULES: readonly ModuleDef[] = [
     description:
       'A curated catalog of the console’s public API surface — every endpoint grouped by area with method, auth level, and a live “try it” for safe GETs. The contract, browsable.',
     route: '/api-docs',
+    service: 'console',
+    internal: true,
+  },
+  {
+    id: 'agent-runs',
+    label: 'Agent Runs',
+    description: 'Durable-execution history — every agent/workflow run, its pipeline timeline, and outcome. Recorded on-prem.',
+    route: '/agent-runs',
+    service: 'agents',
+    internal: true,
+  },
+  {
+    id: 'policy',
+    label: 'Policy',
+    description: 'Policy-as-code (OPA) — the active policy set plus recent allow/deny decisions read back from the engine.',
+    route: '/policy',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'evals',
+    label: 'Evals',
+    description: 'Golden sets and quality gates — pass-rates and recent eval/red-team runs by suite.',
+    route: '/evals',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'siem',
+    label: 'Security Events',
+    description: 'Security/audit event stream from OpenSearch — outcomes, top actors, and blocked/denied activity.',
+    route: '/siem',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'drift',
+    label: 'Drift',
+    description: 'Model/data drift monitoring (Evidently) — per-feature drift status and scores.',
+    route: '/drift',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'backups',
+    label: 'Backups',
+    description: 'Backup & DR status — latest dump, age, size, retention window, and off-box replication.',
+    route: '/backups',
     service: 'console',
     internal: true,
   },

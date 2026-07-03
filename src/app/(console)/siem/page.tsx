@@ -13,7 +13,7 @@ export default async function SiemPage({
 }: {
   searchParams: Promise<{ outcome?: string }>;
 }) {
-  await requireModuleForUser('control');
+  await requireModuleForUser('siem');
   const { outcome } = await searchParams;
   const { configured, data, error } = await readSiemView();
   const view = filterByOutcome(data, outcome);

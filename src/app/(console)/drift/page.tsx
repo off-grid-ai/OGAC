@@ -25,7 +25,7 @@ function fmtScore(score: number | null): string {
 }
 
 export default async function DriftPage() {
-  await requireModuleForUser('control');
+  await requireModuleForUser('drift');
   const { data, error } = await readDriftView();
 
   return (
