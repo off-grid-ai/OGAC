@@ -3,6 +3,8 @@
 // through Marquez's REST API so the Lineage page can show the *server-sourced* job→dataset graph,
 // not just a reconstruction from the local audit trail.
 //   OFFGRID_MARQUEZ_URL — e.g. http://127.0.0.1:9000
+import { type LineageView, normalizeLineage } from './lineage-view';
+
 const BASE = process.env.OFFGRID_MARQUEZ_URL;
 
 export function marquezConfigured(): boolean {
@@ -95,5 +97,36 @@ export async function fetchLineageGraph(): Promise<LineageGraph> {
       edges: [],
       error: (e as Error).message,
     };
+  }
+}
+
+// Thin best-effort reader → normalized display model. Reads all namespaces plus the chosen
+// namespace's jobs & datasets, then hands the raw JSON to the pure normalizer. Never throws:
+// returns { data, error } so the read-back page can render reachability without try/catch.
+export async function readLineageView(): Promise<{
+  configured: boolean;
+  data: LineageView;
+  error: string | null;
+}> {
+  const empty = normalizeLineage(null);
+  if (!BASE) return { configured: false, data: empty, error: null };
+  try {
+    const namespaces = await listNamespaces();
+    const ns = chooseNamespace(namespaces);
+    if (!ns) return { configured: true, data: normalizeLineage({ namespaces }), error: null };
+    const enc = encodeURIComponent(ns);
+    const [jobsRes, dsRes] = await Promise.all([
+      mqGet<{ jobs?: MarquezJob[] }>(`/api/v1/namespaces/${enc}/jobs?limit=100`),
+      mqGet<{ datasets?: MarquezDataset[] }>(`/api/v1/namespaces/${enc}/datasets?limit=100`),
+    ]);
+    const data = normalizeLineage({
+      namespaces,
+      namespace: ns,
+      jobs: jobsRes.jobs ?? [],
+      datasets: dsRes.datasets ?? [],
+    });
+    return { configured: true, data, error: null };
+  } catch (e) {
+    return { configured: true, data: empty, error: (e as Error).message };
   }
 }
