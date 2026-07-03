@@ -77,6 +77,13 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
 
+## Backups (Phase 3A — done)
+
+`deploy/onprem/backup.sh` dumps console Postgres (52 tables) + corebank (PG) + policyadmin
+(MySQL) to `/Users/admin/offgrid/backups/<ts>/` (gzipped, 14-day retention). Verified working.
+TODO: schedule via launchd `co.getoffgridai.backup` (daily 02:00); MSSQL logical dump; push to
+MinIO for off-box copies. Restore commands in the script footer.
+
 ## launchd services on S1 (root)
 
 - `co.getoffgridai.edge` — Caddy (`deploy/Caddyfile`). Restart: `sudo launchctl kickstart -k system/co.getoffgridai.edge`.
