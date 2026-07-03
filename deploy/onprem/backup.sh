@@ -33,6 +33,19 @@ echo "  [ok] console_console"
 # Keep the last 14 dumps; prune older.
 ls -1dt "${BACKUP_DIR:-/Users/admin/offgrid/backups}"/*/ 2>/dev/null | tail -n +15 | xargs -I{} rm -rf {} 2>/dev/null || true
 
+# Off-box DR copy → a second physical node (.66) so a dump survives S1 disk loss. Best-effort;
+# never fails the backup if the peer is unreachable. Set OFFSITE_HOST='' to disable.
+OFFSITE_HOST="${OFFSITE_HOST:-admin@192.168.1.66}"
+OFFSITE_DIR="${OFFSITE_DIR:-/Users/admin/offgrid/backups-from-s1}"
+if [ -n "$OFFSITE_HOST" ]; then
+  ssh -o BatchMode=yes "$OFFSITE_HOST" "mkdir -p $OFFSITE_DIR" 2>/dev/null \
+    && rsync -az "$OUT/" "$OFFSITE_HOST:$OFFSITE_DIR/$TS/" 2>/dev/null \
+    && echo "  [ok] off-box copy → $OFFSITE_HOST:$OFFSITE_DIR/$TS" \
+    || echo "  [warn] off-box copy to $OFFSITE_HOST failed (peer down?) — local dump still good"
+  # Prune off-box copies too (keep 14).
+  ssh -o BatchMode=yes "$OFFSITE_HOST" "ls -1dt $OFFSITE_DIR/*/ 2>/dev/null | tail -n +15 | xargs -I{} rm -rf {}" 2>/dev/null || true
+fi
+
 echo "==> done. $(du -sh "$OUT" | cut -f1) in $OUT"
 
 # ── Schedule (launchd, daily 02:00) ────────────────────────────────────────────
