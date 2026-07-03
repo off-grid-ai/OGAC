@@ -2,6 +2,7 @@
 
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface Turn { role: 'user' | 'assistant'; text: string; governed?: boolean }
 
@@ -71,6 +72,17 @@ export function DeployedApp({ slug }: { slug: string }) {
           <PaperPlaneRight className="size-4" />
         </button>
       </div>
+      {/* Webhook trigger — this app is callable programmatically (S3, sync trigger) */}
+      <details className="mt-2 text-[11px] text-muted-foreground">
+        <summary className="cursor-pointer hover:text-foreground">Call this app via API (webhook)</summary>
+        <pre
+          className="mt-1 cursor-copy overflow-x-auto rounded border border-border bg-muted/40 p-2 font-mono"
+          onClick={() => {
+            const cmd = `curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`;
+            void navigator.clipboard.writeText(cmd).then(() => toast.success('Copied'));
+          }}
+        >{`curl -X POST /api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`}</pre>
+      </details>
     </div>
   );
 }
