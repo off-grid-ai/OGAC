@@ -1,18 +1,22 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
+import { readSecretsView } from '@/lib/secrets-view';
 
 // OpenBao secrets management. Stores connector/tool credentials and virtual-key secrets in
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only
-// key names — so the panel lists what's stored without leaking material.
+// key names + a STATUS model (reachable/sealed/version/mounts) — so callers see what's stored and
+// the store's health without any secret material ever leaving OpenBao.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
+  // Read-only STATUS/METADATA model (sys endpoints only — never a secret value).
+  const { data: status, error } = await readSecretsView();
   if (!openBaoConfigured() || !openBaoSecrets.list) {
-    return NextResponse.json({ configured: false, keys: [] });
+    return NextResponse.json({ configured: false, keys: [], status, error });
   }
   const keys = await openBaoSecrets.list();
-  return NextResponse.json({ configured: true, keys });
+  return NextResponse.json({ configured: true, keys, status, error });
 }
 
 // eslint-disable-next-line complexity
