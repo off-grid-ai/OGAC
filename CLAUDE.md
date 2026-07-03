@@ -7,6 +7,7 @@ Next.js 15 app. The AI gateway runs separately (aggregator at `127.0.0.1:8800` o
 - **SOLID + clear abstraction layers.** Isolate pure policy/logic from I/O (see `src/lib/tenancy-policy.ts` — a zero-import, unit-testable rule — vs `tenancy.ts`, its session/claims adapters). Business logic in `src/lib`, thin route handlers, swappable backends behind `src/lib/adapters`. Full rules: `docs/ENGINEERING.md`.
 - **Write unit AND integration tests.** Tests live in `test/`, run with `npm test` (`node --test`, type-stripped). Unit-test the pure logic; integration-test the real wiring.
 - **Use mocks very sparingly** — prefer exercising real functionality (real functions, real DB/services where feasible) so tests don't hide underlying behavior. If you're mocking a lot, the code probably needs a cleaner seam instead.
+- **Navigation must live in the URL / history stack.** Every screen change or in-page navigation (opening a folder, a tab, a detail view, a modal that's a "place") MUST push a corresponding history entry — drive it from the route/`searchParams` (`useRouter`/`useSearchParams`), not local `useState`. This keeps the browser Back button coherent (Back steps out of a folder/tab, doesn't dump you off the page) and makes views deep-linkable/shareable. Client-only state for a navigational position is a bug.
 
 ## Systems of record — READ THESE (don't keep infra knowledge in your head)
 
