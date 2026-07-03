@@ -427,18 +427,30 @@ export interface Dataset {
 // Returns null for non-DB connectors or unreachable endpoints (caller records 0, never fakes).
 async function realRecordCount(type: string, endpoint: string): Promise<number | null> {
   const t = type.toLowerCase();
-  const isPg = (t.includes('postgres') || t === 'database') && endpoint.startsWith('postgres');
-  if (!isPg) return null;
-  const { Pool } = await import('pg');
-  const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
-  try {
-    const r = await pool.query('SELECT COALESCE(SUM(n_live_tup),0)::bigint AS n FROM pg_stat_user_tables');
-    return Number(r.rows[0]?.n ?? 0);
-  } catch {
-    return null;
-  } finally {
-    await pool.end().catch(() => undefined);
+  // Postgres: sum live rows across user tables.
+  if ((t.includes('postgres') || t === 'database') && endpoint.startsWith('postgres')) {
+    const { Pool } = await import('pg');
+    const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
+    try {
+      const r = await pool.query('SELECT COALESCE(SUM(n_live_tup),0)::bigint AS n FROM pg_stat_user_tables');
+      return Number(r.rows[0]?.n ?? 0);
+    } catch { return null; } finally { await pool.end().catch(() => undefined); }
   }
+  // REST/HTTP (e.g. CRM): GET the endpoint and count records. Supports a top-level array,
+  // or an object of arrays (json-server style: {accounts:[…], contacts:[…]}) → sum of lengths.
+  if ((t.includes('rest') || t.includes('http') || t.includes('api') || t.includes('crm')) && /^https?:/.test(endpoint)) {
+    try {
+      const r = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) return null;
+      const body = await r.json();
+      if (Array.isArray(body)) return body.length;
+      if (body && typeof body === 'object') {
+        return Object.values(body).reduce<number>((sum, v) => sum + (Array.isArray(v) ? v.length : 0), 0);
+      }
+      return 0;
+    } catch { return null; }
+  }
+  return null;
 }
 
 function toConnector(r: typeof connectors.$inferSelect): Connector {
