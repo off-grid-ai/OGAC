@@ -1,4 +1,44 @@
-import { type AuditEvent, listAudit } from '@/lib/store';
+import { type AuditEvent } from '@/lib/store';
+
+// Analytics now reads REAL gateway traffic from OpenSearch (index offgrid-gateway — the same
+// durable sink the gateway usage/logs views use), NOT the seeded Postgres audit table. Empty or
+// unreachable → real zeros, never synthetic. Each gateway record is mapped to the AuditEvent
+// shape so the existing rollups (byModel/series/percentiles/drift) work unchanged.
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
+const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
+
+async function gatewayEvents(): Promise<AuditEvent[]> {
+  try {
+    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ size: 5000, sort: [{ '@timestamp': 'desc' }], query: { match_all: {} } }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) return [];
+    const data = await r.json();
+    const hits: { _id?: string; _source?: Record<string, unknown> }[] = data?.hits?.hits ?? [];
+    return hits.map((h, i) => {
+      const s = h._source ?? {};
+      const status = Number(s.status ?? 200);
+      return {
+        id: h._id ?? String(i),
+        deviceId: String(s.caller ?? s.gateway ?? ''),
+        ts: String(s['@timestamp'] ?? new Date(Number(s.ts ?? Date.now())).toISOString()),
+        model: String(s.model ?? 'unknown'),
+        tokens: Number(s.tokens ?? 0),
+        leftDevice: false,
+        tool: null,
+        outcome: status >= 400 ? 'blocked' : 'ok',
+        latencyMs: Number(s.ms ?? 0),
+        keyId: null,
+      } satisfies AuditEvent;
+    });
+  } catch {
+    return [];
+  }
+}
 
 export interface ModelStat {
   model: string;
@@ -83,7 +123,7 @@ function series(events: AuditEvent[]): DayPoint[] {
 }
 
 export async function computeAnalytics(): Promise<Analytics> {
-  const events = await listAudit({ limit: 5000 });
+  const events = await gatewayEvents();
   const now = Date.now();
   const recent = events.filter((e) => now - new Date(e.ts).getTime() < RECENT_MS);
   const baseline = events.filter((e) => now - new Date(e.ts).getTime() >= RECENT_MS);
