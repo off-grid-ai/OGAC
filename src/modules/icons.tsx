@@ -27,6 +27,11 @@ import {
   Eye,
   Sliders,
   Code,
+  ClockCounterClockwise,
+  Gavel,
+  Flask,
+  Waveform,
+  Archive,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -57,5 +62,11 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   storage: HardDrive,
   provit: Eye,
   'api-docs': Code,
+  'agent-runs': ClockCounterClockwise,
+  policy: Gavel,
+  evals: Flask,
+  siem: ShieldWarning,
+  drift: Waveform,
+  backups: Archive,
   config: Sliders,
 };
