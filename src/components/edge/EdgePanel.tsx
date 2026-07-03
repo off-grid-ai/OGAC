@@ -34,6 +34,14 @@ interface EdgeEvent {
   method: string;
   uri: string;
 }
+interface TrafficRow {
+  ts: string;
+  status: number;
+  ip: string;
+  host: string;
+  method: string;
+  uri: string;
+}
 interface Snapshot {
   configured: boolean;
   policy: {
@@ -44,6 +52,7 @@ interface Snapshot {
   };
   summary: { total: number; waf: number; rateLimited: number; uniqueIps: number };
   recent: EdgeEvent[];
+  traffic?: { total: number; allowed: number; blocked: number; recent: TrafficRow[] };
 }
 
 // Group identical (ip, host, method, uri, kind) within a 10-second bucket
@@ -179,6 +188,13 @@ export function EdgePanel() {
           <span className="font-semibold text-foreground">{uniqueIps}</span>
           <span className="text-muted-foreground">unique IPs</span>
         </div>
+        {snap?.traffic ? (
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-foreground">{snap.traffic.total}</span>
+            <span className="text-muted-foreground">requests</span>
+            <span className="text-emerald-600 dark:text-emerald-400">· {snap.traffic.allowed} allowed</span>
+          </div>
+        ) : null}
 
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {/* Rate limit policy */}
@@ -272,9 +288,43 @@ export function EdgePanel() {
           {!snap ? (
             <p className="py-12 text-center text-xs text-muted-foreground">Loading…</p>
           ) : filtered.length === 0 ? (
-            <p className="py-12 text-center text-xs text-muted-foreground">
-              {grouped.length === 0 ? 'No blocked requests. The edge is quiet.' : 'No results match your filter.'}
-            </p>
+            grouped.length === 0 && snap.traffic?.recent.length ? (
+              <div>
+                <p className="px-4 py-2 text-xs text-muted-foreground">
+                  No blocked requests — the edge is quiet. Showing recent allowed traffic:
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Client IP</TableHead>
+                      <TableHead>Host</TableHead>
+                      <TableHead>Request</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {snap.traffic.recent.map((e, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                          {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={e.status >= 400 ? 'destructive' : 'secondary'} className="text-[10px]">{e.status}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{e.ip}</TableCell>
+                        <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">{e.host}</TableCell>
+                        <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">{e.method} {e.uri}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="py-12 text-center text-xs text-muted-foreground">
+                {grouped.length === 0 ? 'No requests logged yet. The edge is quiet.' : 'No results match your filter.'}
+              </p>
+            )
           ) : (
             <Table>
               <TableHeader>
