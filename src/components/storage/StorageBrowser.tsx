@@ -13,6 +13,7 @@ import {
   FilePdf,
   Folder,
   CaretLeft,
+  CaretRight,
   Trash,
   UploadSimple,
   X,
@@ -254,32 +255,21 @@ function applyFilter(files: FileMeta[], filter: Filter): FileMeta[] {
   }
 }
 
-// First-level navigation: a folder tile (name + count + a preview of the first image/video in
-// it). Clicking opens the folder to reveal its files. Keeps the top level to folders only.
+// First-level navigation: a compact folder tile (icon + name + file count) — no preview, so it
+// stays a fixed small size. Clicking opens the folder to reveal its files. Top level = folders only.
 function FolderCard({ name, files, onOpen }: { name: string; files: FileMeta[]; onOpen: () => void }) {
-  const preview = files.find((f) => f.mime.startsWith('image/')) ?? files.find((f) => f.mime.startsWith('video/'));
-  const [failed, setFailed] = useState(false);
   const label = name.split('/').pop() || name;
   return (
-    <Card className="group cursor-pointer shadow-sm transition-shadow hover:shadow-md" onClick={onOpen}>
-      <div className="flex h-32 items-center justify-center overflow-hidden rounded-t-lg border-b border-border bg-muted/30">
-        {preview && !failed ? (
-          preview.mime.startsWith('image/') ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview.url} alt={label} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-cover" />
-          ) : (
-            <video src={preview.url} muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full w-full object-cover" />
-          )
-        ) : (
-          <Folder className="size-10 text-muted-foreground/50" weight="fill" />
-        )}
-      </div>
-      <CardContent className="flex items-center justify-between gap-2 p-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <Folder className="size-4 shrink-0 text-primary" />
-          <p className="truncate font-mono text-sm text-foreground" title={name}>{label}</p>
+    <Card className="cursor-pointer shadow-sm transition-shadow hover:shadow-md" onClick={onOpen}>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Folder className="size-5" weight="fill" />
         </div>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground">{files.length}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-sm text-foreground" title={name}>{label}</p>
+          <p className="font-mono text-xs text-muted-foreground">{files.length} file{files.length !== 1 ? 's' : ''}</p>
+        </div>
+        <CaretRight className="size-4 shrink-0 text-muted-foreground" />
       </CardContent>
     </Card>
   );
@@ -400,7 +390,7 @@ export function StorageBrowser() {
         </div>
       ) : (
         // Top level: folders only.
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {folders.map(([folder, group]) => (
             <FolderCard key={folder} name={folder} files={group} onOpen={() => setOpenFolder(folder)} />
           ))}
