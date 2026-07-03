@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/authz';
 import { deleteGoldenCase, updateGoldenCase } from '@/lib/evals';
 import { validateGoldenCase } from '@/lib/evals-golden';
 
+export const dynamic = 'force-dynamic';
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;

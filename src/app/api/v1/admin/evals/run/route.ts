@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/authz';
 import { recordEvalRun } from '@/lib/evals';
 import { resolveRunEngine } from '@/lib/evals-golden';
 
+export const dynamic = 'force-dynamic';
+
 // Run an offline eval over the golden set and persist it so it appears in the pass-rate rollup.
 // Body `{ engine }` picks the evaluator (golden | promptfoo | ragas); omitted → the env-selected
 // default adapter. Each OSS adapter falls back to golden if its tool/sidecar is unavailable, so a
