@@ -12,6 +12,31 @@ A developer or an org admin sits down at the console and sees every AI service t
 
 ---
 
+## Cross-cutting mandate — every integration is a full management surface (not a dashboard)
+
+**This applies to ALL integration modules** (evals, policy, guardrails, security events, drift,
+lineage, provenance, sandbox, secrets, retrieval/vector store, backups, agent runs, gateway,
+data sources, prompts, connectors — every OSS integration we surface). The console is how operators
+**run and maintain their systems**, so each module is judged against this **definition of done**, on
+top of its phase-specific goal:
+
+1. **Full CRUD on every entity** the module owns — **create, read, update, delete** — with real
+   forms (validation), edit flows, and delete-with-confirmation. A list/aggregate view is the *R*
+   only; it is **the bare minimum, not a finished feature.**
+2. **Actions that manage the underlying system**, not just display it: run an eval / edit golden
+   cases, push & reload an OPA policy, edit masking/PII rules, run & schedule a backup, re-run or
+   cancel an agent run, create/delete a vector collection, write/rotate a secret (status-safe),
+   toggle a guardrail, etc.
+3. **Write paths behind them** — POST/PATCH/DELETE routes for console-owned entities (in the DB),
+   or pushed through the external service's API for external entities — with proper error handling.
+4. Same SOLID discipline (pure rules in `src/lib`, thin routes, unit + integration tests, sparing
+   mocks) — but the deliverable is an **end-to-end usable management console**, not a viewer.
+
+The read-only surfaces built so far (Phase 4 read-back) are the **groundwork (the R)**; each must be
+deepened to full CRUD + actions before its module counts as done. Codified in `CLAUDE.md`.
+
+---
+
 ## Phase 0 — Fix the foundation
 **Goal:** stop the bleeding. Nothing compounds on broken primitives.
 **Timeline:** 1–2 weeks. Do this before touching anything else.
@@ -405,7 +430,12 @@ Four `@offgrid/*` packages are complete and unused. Wire them now, not in a futu
 
 S = 1–3 days · M = 1–2 weeks · L = 3–4 weeks · XS = hours
 
-**Definition of done:** every OSS service is two-way — the console reads back from it, not just writes to it. No service is a write-only sink. The gap table above is fully green.
+**Definition of done:** every OSS service is a **full management surface**, per the cross-cutting mandate at the top of this doc — the console reads back from it AND lets operators create/update/delete its entities and trigger its actions (not just view). No service is a write-only sink, and no module is a read-only dashboard. The gap table above is fully green.
+
+> **Status (2026-07-04):** the read-back layer (the *R*) is built for evals, policy, guardrails,
+> security events, drift, lineage, provenance, sandbox, secrets, retrieval, backups, agent runs
+> (parallel-agent build). **Remaining for each: the C/U/D + actions** — forms, edit/delete, and the
+> manage-the-system operations. Until that lands, these modules are groundwork, not done.
 
 ---
 
