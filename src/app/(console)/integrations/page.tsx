@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 import { listConnectors, listTools } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -39,10 +40,11 @@ const CON_STATUS: Record<string, string> = {
 
 export default async function IntegrationsPage() {
   await requireModuleForUser('integrations');
+  const org = await currentOrgId();
   const [bindings, connectors, tools] = await Promise.all([
     listBindings(true),
-    listConnectors(),
-    listTools(),
+    listConnectors(org),
+    listTools(org),
   ]);
 
   return (

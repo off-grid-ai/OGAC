@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createApiKey, listApiKeys } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const TYPES = ['user', 'project'];
 
@@ -12,7 +13,7 @@ function valid(b: Record<string, unknown> | null): boolean {
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listApiKeys() });
+  return NextResponse.json({ object: 'list', data: await listApiKeys(await currentOrgId()) });
 }
 
 // Issue a virtual key. The secret token is returned ONCE here and never stored in cleartext.

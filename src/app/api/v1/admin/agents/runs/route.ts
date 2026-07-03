@@ -1,12 +1,13 @@
 import { after, NextResponse } from 'next/server';
 import { listAgentRuns, runAgent, scoreRun } from '@/lib/agentrun';
+import { currentOrgId } from '@/lib/tenancy';
 import { requireAdmin } from '@/lib/authz';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listAgentRuns() });
+  return NextResponse.json({ object: 'list', data: await listAgentRuns(15, await currentOrgId()) });
 }
 
 // POST { agentId, query } → execute an agent through the full interaction pipeline and record a

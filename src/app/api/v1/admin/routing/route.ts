@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createRoutingRule, listRoutingRules } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const OPS = ['eq', 'neq', 'in'];
 const ACTIONS = ['local', 'cloud', 'block'];
@@ -15,7 +16,7 @@ function valid(b: Record<string, unknown> | null): boolean {
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listRoutingRules() });
+  return NextResponse.json({ object: 'list', data: await listRoutingRules(await currentOrgId()) });
 }
 
 export async function POST(req: Request) {

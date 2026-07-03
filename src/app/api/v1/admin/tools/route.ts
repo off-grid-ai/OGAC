@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createTool, listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const TYPES = ['http', 'mcp'];
 
@@ -12,7 +13,7 @@ function valid(b: Record<string, unknown> | null): boolean {
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listTools() });
+  return NextResponse.json({ object: 'list', data: await listTools(await currentOrgId()) });
 }
 
 export async function POST(req: Request) {

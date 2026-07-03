@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
 import { listConnectors, listDatasets, listIngestJobs, listMaskingRules } from '@/lib/store';
 
@@ -38,11 +39,12 @@ const CLASSIFICATION: Record<string, string> = {
 
 export default async function DataPage() {
   await requireModuleForUser('data');
+  const org = await currentOrgId();
   const [connectors, jobs, rules, datasets, brainDocs, qCount] = await Promise.all([
-    listConnectors(),
+    listConnectors(org),
     listIngestJobs(),
-    listMaskingRules(),
-    listDatasets(),
+    listMaskingRules(org),
+    listDatasets(org),
     listDocuments(),
     qdrantCount(),
   ]);

@@ -6,12 +6,14 @@ import { getLineage } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { fetchLineageGraph } from '@/lib/marquez';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LineagePage() {
   await requireModuleForUser('lineage');
-  const [runs, graph] = await Promise.all([listAgentRuns(25), fetchLineageGraph()]);
+  const org = await currentOrgId();
+  const [runs, graph] = await Promise.all([listAgentRuns(25, org), fetchLineageGraph()]);
   const engine = getLineage().meta;
   const withSources = runs.filter((r) => r.citations.length > 0);
 

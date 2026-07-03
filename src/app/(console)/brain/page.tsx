@@ -22,6 +22,7 @@ import {
 import { listDocuments } from '@/lib/brain';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 import { listDatasets, listPrompts, listTools } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -33,12 +34,13 @@ const TOOL_TYPE: Record<string, string> = {
 
 export default async function BrainPage() {
   await requireModuleForUser('brain');
+  const org = await currentOrgId();
   const [docs, cases, runs, datasets, tools, promptList] = await Promise.all([
     listDocuments(),
     listGoldenCases(),
     listEvalRuns(1),
-    listDatasets(),
-    listTools(),
+    listDatasets(org),
+    listTools(org),
     listPrompts(),
   ]);
   const latest = runs[0];

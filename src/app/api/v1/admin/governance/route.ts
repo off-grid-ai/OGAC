@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createGovernance, listGovernance } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const KINDS = [
   'policy',
@@ -16,7 +17,7 @@ const KINDS = [
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listGovernance() });
+  return NextResponse.json({ object: 'list', data: await listGovernance(await currentOrgId()) });
 }
 
 // eslint-disable-next-line complexity

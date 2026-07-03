@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createConnector, listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const AUTHS = ['none', 'api-key', 'oauth'];
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listConnectors() });
+  return NextResponse.json({ object: 'list', data: await listConnectors(await currentOrgId()) });
 }
 
 // eslint-disable-next-line complexity
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
       auth,
       description: (body?.description as string | undefined) ?? '',
       custom: true,
+      orgId: await currentOrgId(),
     }),
     { status: 201 },
   );

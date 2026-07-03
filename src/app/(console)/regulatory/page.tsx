@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { computeCompliance } from '@/lib/compliance';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 import { listGovernance } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,8 @@ const GOV_STATUS: Record<string, string> = {
 
 export default async function RegulatoryPage() {
   await requireModuleForUser('regulatory');
-  const [c, governance] = await Promise.all([computeCompliance(), listGovernance()]);
+  const org = await currentOrgId();
+  const [c, governance] = await Promise.all([computeCompliance(), listGovernance(org)]);
 
   return (
     <div className="space-y-6">
