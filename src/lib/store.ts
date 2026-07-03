@@ -423,8 +423,23 @@ export interface Dataset {
   updatedAt: string;
 }
 
-const SYNC_MIN = 100;
-const SYNC_RANGE = 5000;
+// Real record count for a database connector — connects to its endpoint and sums live rows.
+// Returns null for non-DB connectors or unreachable endpoints (caller records 0, never fakes).
+async function realRecordCount(type: string, endpoint: string): Promise<number | null> {
+  const t = type.toLowerCase();
+  const isPg = (t.includes('postgres') || t === 'database') && endpoint.startsWith('postgres');
+  if (!isPg) return null;
+  const { Pool } = await import('pg');
+  const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
+  try {
+    const r = await pool.query('SELECT COALESCE(SUM(n_live_tup),0)::bigint AS n FROM pg_stat_user_tables');
+    return Number(r.rows[0]?.n ?? 0);
+  } catch {
+    return null;
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
 
 function toConnector(r: typeof connectors.$inferSelect): Connector {
   return {
@@ -478,10 +493,13 @@ export async function deleteConnector(id: string): Promise<void> {
 export async function syncConnector(id: string): Promise<IngestJob | null> {
   const [con] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
   if (!con) return null;
-  const records = SYNC_MIN + Math.floor(Math.random() * SYNC_RANGE);
+  // Real count from the source; null (unreachable/non-DB) records 0 and marks the connector
+  // in error rather than fabricating a number.
+  const real = await realRecordCount(con.type, con.endpoint ?? '');
+  const records = real ?? 0;
   await db
     .update(connectors)
-    .set({ lastSync: new Date(), status: 'connected' })
+    .set({ lastSync: new Date(), status: real === null ? 'error' : 'connected' })
     .where(eq(connectors.id, id));
   const [job] = await db
     .insert(ingestJobs)
