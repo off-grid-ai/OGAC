@@ -56,21 +56,21 @@
 }
 
 http://console-status.getoffgridai.co {
-	import gated 192.168.1.59:9100
+	import gated 127.0.0.1:9100
 }
 http://console-landing.getoffgridai.co {
-	import gated 192.168.1.59:3100
+	import gated 127.0.0.1:3100
 }
 # Provit (Prove It — visual QA). Formerly gungnir.* — the old name 301-redirects here.
 http://provit.getoffgridai.co {
-	import gated 192.168.1.60:7799
+	import gated offgrid-s2.local:7799
 }
 http://gungnir.getoffgridai.co {
 	redir https://provit.getoffgridai.co{uri} permanent
 }
 
 http://onprem-console.getoffgridai.co, http://192.168.1.59 {
-	reverse_proxy 192.168.1.59:3000
+	reverse_proxy 127.0.0.1:3000
 }
 
 # AI Gateway (LLM) — OpenAI-compatible aggregator on :8800, behind the edge. Auth
@@ -78,7 +78,7 @@ http://onprem-console.getoffgridai.co, http://192.168.1.59 {
 # gateway.* so that name is free for the general network gateway below.
 http://ai.getoffgridai.co {
 	import edge ai 120
-	reverse_proxy 192.168.1.59:8800
+	reverse_proxy 127.0.0.1:8800
 }
 
 # Network / API gateway — the general public HTTP gateway fronting the console's API
@@ -88,7 +88,7 @@ http://gateway.getoffgridai.co {
 	import edge apigw 300
 	@api path /api/*
 	handle @api {
-		reverse_proxy 192.168.1.59:3000
+		reverse_proxy 127.0.0.1:3000
 	}
 	handle {
 		respond "Off Grid — network gateway" 200
