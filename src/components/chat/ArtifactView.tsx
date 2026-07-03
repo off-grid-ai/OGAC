@@ -1,8 +1,10 @@
 'use client';
 
-import { ArrowCounterClockwise, Code, Eye, Play, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowCounterClockwise, Code, Eye, Play, Sparkle, X } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { type Artifact, buildSrcDoc, isLiveKind } from '@/lib/artifacts';
 import { Markdown } from './Markdown';
 
@@ -31,7 +33,32 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
   // In-place editing: local code edits re-render the preview live. Reset restores the original.
   const [code, setCode] = useState(artifact.code);
   const [editing, setEditing] = useState(false);
+  // S7 refine loop: plain-language change requests re-generate the artifact and re-render.
+  const [refineInput, setRefineInput] = useState('');
+  const [refining, setRefining] = useState(false);
   const dirty = code !== artifact.code;
+
+  async function refine() {
+    const instruction = refineInput.trim();
+    if (!instruction || refining) return;
+    setRefining(true);
+    try {
+      const r = await fetch('/api/v1/chat/artifacts/refine', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code, instruction, kind: artifact.kind, language: artifact.language }),
+      });
+      const d = (await r.json()) as { code?: string; error?: string };
+      if (!r.ok || !d.code) { toast.error(d.error ?? 'Refine failed.'); return; }
+      setCode(d.code);
+      setRefineInput('');
+      toast.success('Updated.');
+    } catch {
+      toast.error('Refine failed — gateway unreachable.');
+    } finally {
+      setRefining(false);
+    }
+  }
   const current: Artifact = { ...artifact, code };
   const srcDoc = buildSrcDoc(current, { bridge: true });
 
@@ -125,6 +152,22 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
             ) : null}
           </div>
         ) : null}
+      </div>
+
+      {/* S7 refine bar — describe a change, the app re-generates + re-renders */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2">
+        <Sparkle className="size-4 shrink-0 text-primary" />
+        <Input
+          value={refineInput}
+          onChange={(e) => setRefineInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void refine(); }}
+          placeholder={refining ? 'Updating…' : 'Ask AI to change this — e.g. “add a dark mode toggle”'}
+          disabled={refining}
+          className="h-8 text-xs"
+        />
+        <Button size="sm" className="h-8 shrink-0" onClick={refine} disabled={refining || !refineInput.trim()}>
+          {refining ? '…' : 'Update'}
+        </Button>
       </div>
     </div>
   );
