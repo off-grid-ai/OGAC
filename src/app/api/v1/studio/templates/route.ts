@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const rows = await db
     .select()
     .from(studioTemplates)
-    .where(or(eq(studioTemplates.ownerId, gate.user.email ?? ""), eq(studioTemplates.visibility, 'org')))
+    .where(or(eq(studioTemplates.ownerId, gate.user.email ?? ''), eq(studioTemplates.visibility, 'org'), eq(studioTemplates.published, true)))
     .orderBy(desc(studioTemplates.updatedAt))
     .limit(50);
   return NextResponse.json({ templates: rows });
