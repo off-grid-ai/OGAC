@@ -122,6 +122,7 @@ function MessageBubble({
   onSpeak,
   onEdit,
   onNavBranch,
+  onViewImage,
   canRegenerate,
   canEdit,
 }: {
@@ -132,6 +133,7 @@ function MessageBubble({
   onSpeak: (text: string) => void;
   onEdit: (id: string, content: string) => void;
   onNavBranch: (id: string, delta: number) => void;
+  onViewImage: (src: string) => void;
   canRegenerate: boolean;
   canEdit: boolean;
 }) {
@@ -186,7 +188,13 @@ function MessageBubble({
           <div className="mb-2 flex flex-wrap gap-2">
             {m.images.map((src, k) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={k} src={src} alt="" className="max-h-40 rounded border border-border" />
+              <img
+                key={k}
+                src={src}
+                alt=""
+                onClick={() => onViewImage(src)}
+                className="max-h-40 cursor-zoom-in rounded border border-border transition-opacity hover:opacity-90"
+              />
             ))}
           </div>
         ) : null}
@@ -287,6 +295,13 @@ export function ChatWorkspace({
   const [input, setInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  useEffect(() => {
+    if (!lightbox) return;
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [lightbox]);
   // Ad-hoc file attachments (txt/md/csv/pdf) extracted server-side; injected as context for the
   // next turn only. Chips show in the composer.
   const [files, setFiles] = useState<{ name: string; text: string; chars: number }[]>([]);
@@ -1056,6 +1071,7 @@ export function ChatWorkspace({
                 onSpeak={speak}
                 onEdit={editMessage}
                 onNavBranch={navBranch}
+                onViewImage={setLightbox}
                 canRegenerate={!streaming && i === messages.length - 1}
                 canEdit={!streaming && !temporary}
               />
@@ -1298,6 +1314,23 @@ export function ChatWorkspace({
         models={models}
         onPick={startSkillChat}
       />
+
+      {/* Image lightbox — click a message image to view it full-size */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-8"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={() => setLightbox(null)}
+          >
+            <X className="size-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="" className="max-h-full max-w-full rounded object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }
