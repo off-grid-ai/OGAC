@@ -1,0 +1,1 @@
+ALTER TABLE "agent_runs" ADD COLUMN "org_id" text DEFAULT 'default' NOT NULL;
