@@ -38,7 +38,9 @@ async function fetchGateway(): Promise<GatewayInfo | null> {
     const res = await fetch(`${GATEWAY_URL}/`, {
       cache: 'no-store',
       headers: { 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' },
-      signal: AbortSignal.timeout(1500),
+      // Generous: the aggregator's `/` fans out to probe every node, so it can take >1.5s
+      // when some nodes are slow/down. Too-tight a timeout falsely shows "no gateway".
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
     return (await res.json()) as GatewayInfo;
