@@ -65,6 +65,29 @@ It also syncs `gateway/dist` + `gateway/package.json`, because `src/lib/agentrun
 dynamically imports `@offgrid/gateway/queue` — a subpath export that only exists in
 the current gateway build.
 
+### 3. The console (next-server) cannot egress to the LAN — use localhost Caddy proxies
+
+The `next-server` process on S1 gets **`EHOSTUNREACH` connecting to any `192.168.1.x`
+host**, while `curl` and short-lived `node` from the SAME box reach S2 fine, and
+`127.0.0.1` always works. Cause: **macOS 15 (Darwin 25) Local Network privacy** blocks
+the SSH-launched daemon and there's no GUI prompt to grant it. Symptom: every S2-backed
+integration (Langfuse, Unleash, Superset, Fleet) shows "unreachable" / "fetch failed"
+even though the services are Up and the URLs are correct.
+
+**Do NOT** point `OFFGRID_*_URL` at `offgrid-s2.local` / a LAN IP directly — it will fail
+from the console. Instead route through **Caddy** (a launchd service, *not* blocked — it
+already proxies `provit`→S2): each S2 HTTP service is fronted on a loopback port in
+`deploy/Caddyfile`, and the console env points at `127.0.0.1`:
+
+```
+8931 → offgrid-s2.local:3030 (Langfuse)   8933 → :8088 (Superset)
+8932 → :4242 (Unleash)                     8934 → :8070 (FleetDM)
+```
+
+Debugging tip that would have saved hours: when a call fails opaquely ("fetch failed"),
+**surface `err.cause.code` first** — it said `EHOSTUNREACH … Local(192.168.1.85)→(.84)`
+and pinpointed this instantly. Full record in `deploy/onprem/SERVER_STATE.md`.
+
 ---
 
 ## Manual steps (what push.sh automates)
