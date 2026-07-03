@@ -34,10 +34,15 @@ DDL for each is in `src/db/schema.ts`; the create statements used are in git his
 ## Docker containers (S1 OrbStack — daemon already initialised, no GUI first-run)
 
 Data sources — replay with `docker compose -f data-sources.yml up -d` (docker at
-`/Users/admin/.orbstack/bin/docker`):
-- `offgrid-ds-corebank` — Postgres `:5433`, real data (2.4k customers / 3.8k policies / 1.45k claims / 9.2k txns), seeded by `seed-corebank.sql`.
-- `offgrid-ds-minio` — S3 warehouse `:9010` (console `:9011`). *(defined; bring up when wiring the warehouse connector)*
-- `offgrid-ds-crm` — mock CRM REST `:8090`. *(defined; needs `crm.json`)*
+`/Users/admin/.orbstack/bin/docker`). Full enterprise stack:
+- `offgrid-ds-corebank` — Postgres `:5433`, real data (2.4k customers / 3.8k policies / 1.45k claims / 9.2k txns), seeded by `seed-corebank.sql`. **UP.**
+- `offgrid-ds-policyadmin` — MySQL `:3307`, agents/branches/commissions, seeded by `seed-policyadmin.sql`.
+- `offgrid-ds-erp` — MSSQL (Azure SQL Edge, ARM) `:1433`, SA pw `Offgrid!Erp2026`.
+- `offgrid-ds-kafka` — Redpanda (Kafka) `:19092`, admin `:9644`.
+- `offgrid-ds-minio` — S3 warehouse `:9010` (console `:9011`).
+- `offgrid-ds-crm` — mock CRM REST `:8090` (json-server over `crm.json`).
+
+> S1's Docker Hub link is flaky — image pulls may need retries; `compose up -d` resumes. Re-run until all six are Up.
 
 ## Registered connectors (rows in console DB `connectors`)
 
