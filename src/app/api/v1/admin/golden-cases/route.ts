@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { addGoldenCase, listGoldenCases } from '@/lib/evals';
+import { validateGoldenCase } from '@/lib/evals-golden';
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
@@ -12,10 +13,7 @@ export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const body = await req.json().catch(() => null);
-  const query = body?.query as string | undefined;
-  const expected = body?.expected as string | undefined;
-  if (!query || !expected) {
-    return NextResponse.json({ error: 'query and expected are required' }, { status: 400 });
-  }
-  return NextResponse.json(await addGoldenCase(query, expected), { status: 201 });
+  const v = validateGoldenCase(body);
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  return NextResponse.json(await addGoldenCase(v.value), { status: 201 });
 }
