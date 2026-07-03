@@ -1,6 +1,13 @@
+import { sql } from 'drizzle-orm';
+import { db } from '@/db';
 import { computeAnalytics } from '@/lib/analytics';
 import { type Compliance, buildExport, computeCompliance } from '@/lib/compliance';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
+import {
+  type NormalizedTemplate,
+  type ReportSection,
+  slugifyTemplateName,
+} from '@/lib/reports-template';
 import {
   type GovernanceItem,
   getOrgPolicy,
@@ -345,5 +352,216 @@ export async function generateReport(
   if (id === 'eval-report') return { filename: 'offgrid-eval-report.md', body: await evalReport() };
   if (id === 'inventory') return { filename: 'offgrid-inventory.md', body: await inventory() };
   if (id in REGULATORS) return regulatorPack(id);
+  // Fall through to operator-authored custom templates stored in the DB.
+  const custom = await getReportTemplate(id);
+  if (custom && custom.kind === 'custom') return generateCustomReport(custom);
   return null;
+}
+
+// ── Report templates: console-owned CRUD ──────────────────────────────────────────────────────
+// Operators manage report templates from the console. The table is created idempotently on first
+// use (mirrors ensureFileSchema / the chat module's ensure pattern) so the module deploys over SSH
+// with no migration step. The nine hardcoded REPORTS are seeded as `builtin` rows on first ensure
+// so they show up in the same managed list; `custom` rows are fully operator-authored and are
+// rendered by composing the same live section renderers used above.
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  kind: 'builtin' | 'custom';
+  sections: ReportSection[];
+  frameworks: string[];
+  schedule: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  kind: string;
+  sections: unknown;
+  frameworks: unknown;
+  schedule: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+function rowToTemplate(r: TemplateRow): ReportTemplate {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    source: r.source,
+    kind: r.kind === 'custom' ? 'custom' : 'builtin',
+    sections: (Array.isArray(r.sections) ? r.sections : []) as ReportSection[],
+    frameworks: Array.isArray(r.frameworks) ? (r.frameworks as string[]) : [],
+    schedule: r.schedule || 'none',
+    createdAt: new Date(r.created_at).toISOString(),
+    updatedAt: new Date(r.updated_at).toISOString(),
+  };
+}
+
+let ensurePromise: Promise<void> | null = null;
+export async function ensureReportSchema(): Promise<void> {
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = (async (): Promise<void> => {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS report_templates (
+        id text PRIMARY KEY,
+        name text NOT NULL DEFAULT 'Untitled report',
+        description text NOT NULL DEFAULT '',
+        source text NOT NULL DEFAULT 'Regulatory plane',
+        kind text NOT NULL DEFAULT 'custom',
+        sections jsonb NOT NULL DEFAULT '[]',
+        frameworks jsonb NOT NULL DEFAULT '[]',
+        schedule text NOT NULL DEFAULT 'none',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now());
+    `);
+    // Seed the built-in catalog on first ensure so it's part of the same managed list. ON CONFLICT
+    // DO NOTHING keeps operator edits to the description/etc. intact across restarts.
+    for (const r of REPORTS) {
+      await db.execute(sql`
+        INSERT INTO report_templates (id, name, description, source, kind)
+        VALUES (${r.id}, ${r.name}, ${r.description}, ${r.source}, 'builtin')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    }
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
+  return ensurePromise;
+}
+
+const REPORT_TABLE = sql.identifier('report_templates');
+
+export async function listReportTemplates(): Promise<ReportTemplate[]> {
+  await ensureReportSchema();
+  const res = await db.execute(
+    sql`SELECT * FROM ${REPORT_TABLE} ORDER BY kind ASC, name ASC`,
+  );
+  return (res.rows as unknown as TemplateRow[]).map(rowToTemplate);
+}
+
+export async function getReportTemplate(id: string): Promise<ReportTemplate | null> {
+  await ensureReportSchema();
+  const res = await db.execute(sql`SELECT * FROM ${REPORT_TABLE} WHERE id = ${id} LIMIT 1`);
+  const row = (res.rows as unknown as TemplateRow[])[0];
+  return row ? rowToTemplate(row) : null;
+}
+
+// Create a custom template. Returns the new id (a name-derived slug, deduped with a short suffix).
+export async function createReportTemplate(t: NormalizedTemplate): Promise<string> {
+  await ensureReportSchema();
+  const slug = slugifyTemplateName(t.name);
+  const exists = await getReportTemplate(slug);
+  const id = exists ? `${slug}-${crypto.randomUUID().slice(0, 6)}` : slug;
+  await db.execute(sql`
+    INSERT INTO ${REPORT_TABLE} (id, name, description, source, kind, sections, frameworks, schedule)
+    VALUES (${id}, ${t.name}, ${t.description}, ${t.source}, 'custom',
+            ${JSON.stringify(t.sections)}::jsonb, ${JSON.stringify(t.frameworks)}::jsonb, ${t.schedule});
+  `);
+  return id;
+}
+
+// Patch a template. Built-in rows accept description/source/schedule edits only — their generation
+// (sections) is code-defined, so name/sections changes to them are ignored.
+export async function updateReportTemplate(
+  id: string,
+  patch: Partial<NormalizedTemplate>,
+): Promise<ReportTemplate | null> {
+  const existing = await getReportTemplate(id);
+  if (!existing) return null;
+  const isCustom = existing.kind === 'custom';
+  const next = {
+    name: isCustom && patch.name !== undefined ? patch.name : existing.name,
+    description: patch.description !== undefined ? patch.description : existing.description,
+    source: patch.source !== undefined ? patch.source : existing.source,
+    sections: isCustom && patch.sections !== undefined ? patch.sections : existing.sections,
+    frameworks: patch.frameworks !== undefined ? patch.frameworks : existing.frameworks,
+    schedule: patch.schedule !== undefined ? patch.schedule : existing.schedule,
+  };
+  await db.execute(sql`
+    UPDATE ${REPORT_TABLE} SET
+      name = ${next.name}, description = ${next.description}, source = ${next.source},
+      sections = ${JSON.stringify(next.sections)}::jsonb,
+      frameworks = ${JSON.stringify(next.frameworks)}::jsonb,
+      schedule = ${next.schedule}, updated_at = now()
+    WHERE id = ${id};
+  `);
+  return getReportTemplate(id);
+}
+
+// Delete a template. Built-in rows are protected (returns false) so the catalog can't be gutted.
+export async function deleteReportTemplate(id: string): Promise<boolean> {
+  const existing = await getReportTemplate(id);
+  if (!existing || existing.kind === 'builtin') return false;
+  await db.execute(sql`DELETE FROM ${REPORT_TABLE} WHERE id = ${id}`);
+  return true;
+}
+
+// ── Custom report generation ──────────────────────────────────────────────────────────────────
+// Compose a Markdown report from the operator-selected sections, each rendered from live data via
+// the same engines the built-in reports use — so a custom report can't drift from the dashboards.
+async function sectionBody(section: ReportSection, frameworks: string[]): Promise<string[]> {
+  switch (section) {
+    case 'compliance': {
+      const c = await computeCompliance();
+      return [`## Compliance posture`, `Overall control posture: ${c.posture}%`, ''];
+    }
+    case 'frameworks': {
+      const c = await computeCompliance();
+      const ids = frameworks.length ? frameworks : c.frameworks.map((f) => f.id);
+      return ['## Framework coverage', ...frameworkLines(c, ids), ''];
+    }
+    case 'controls': {
+      const c = await computeCompliance();
+      return [
+        '## Controls (live)',
+        ...c.controls.map((ctrl) => `- **${ctrl.name}** — ${ctrl.status.toUpperCase()} — ${ctrl.evidence}`),
+        '',
+      ];
+    }
+    case 'governance': {
+      return ['## Governance', ...governanceLines(await listGovernance()), ''];
+    }
+    case 'audit':
+      return ['## Audit & usage', await auditSummary(), ''];
+    case 'inventory':
+      return ['## Model & data inventory', await inventory(), ''];
+    case 'evals':
+      return ['## Retrieval quality', await evalReport(), ''];
+    case 'residency': {
+      const [policy, routes] = await Promise.all([getOrgPolicy(), listRoutingRules()]);
+      return [
+        '## Data residency & model routing',
+        `- Cloud egress: ${policy.egressAllowed ? 'allowed (leashed)' : 'blocked'}`,
+        `- Allowed models: ${policy.allowedModels.join(', ') || 'none'}`,
+        ...routes
+          .filter((x) => x.attribute === 'region')
+          .map((r) => `- Region rule: ${r.value} → ${r.action} (${r.model || 'default'})`),
+        '',
+      ];
+    }
+    default:
+      return [];
+  }
+}
+
+export async function generateCustomReport(
+  t: ReportTemplate,
+): Promise<{ filename: string; body: string }> {
+  const lines: string[] = [`# ${t.name}`, `Generated: ${new Date().toISOString()}`];
+  if (t.description) lines.push('', `> ${t.description}`);
+  lines.push('');
+  for (const section of t.sections) {
+    lines.push(...(await sectionBody(section, t.frameworks)));
+  }
+  return { filename: `offgrid-${t.id}.md`, body: lines.join('\n') };
 }
