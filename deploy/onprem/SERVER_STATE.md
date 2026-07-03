@@ -136,6 +136,36 @@ got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Conf
   revived remotely** (no network path to run `networksetup` on them); needs physical/console access.
   The g8 loss killed an in-flight model download. Only ~11 live hosts on the whole `/24` (fleet + router).
 
+## Fleet role assignment (decided 2026-07-04) — 6 GW + 2 servers
+
+Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
+**2 gemma-4-e4b · 1 qwythos-9b · 1 image (juggernaut) · 2 VL (grounding)**.
+
+| Machine | Role | State |
+|---|---|---|
+| S1 | server #1 (control plane) | ✅ up |
+| **g6** | **server #2 (aux tier — S2 replacement)** | **designated 2026-07-04; NOT yet provisioned** |
+| g1 | GW — qwythos-9b | ✅ serving |
+| g2 | GW — gemma-4-e4b | ✅ serving |
+| g5 | GW — gemma-4-e4b | ✅ serving |
+| g3 | GW — image (juggernaut Q8_0) | needs correct-quant download |
+| g4 | GW — VL (grounding) | needs a VERIFIED VL model |
+| g7 | GW — VL (grounding) | needs a VERIFIED VL model |
+| S2 | (old aux server) | ❌ offline since router reboot |
+| g8 | (spare) | ❌ offline since router reboot |
+
+**g6-as-server is BLOCKED remotely:** g6 has NO OrbStack installed (not even the .app),
+and the aux tier (Langfuse/Unleash/Superset/Fleet/Presidio via `services-node-b.yml`) is all
+Docker. Installing+initializing OrbStack needs the on-site GUI first-run + privileged-helper
+approval (same wall as g4). **Fastest real recovery of the aux tier is to WAKE S2 on-site** (it
+already has the whole tier installed & configured — just needs to rejoin wifi), not rebuild g6.
+Until on-site: aux tier down; g6 held as the server slot (out of the GW inference pool).
+
+**Two GW-config blockers (2026-07-04):** (1) no verified-working VL model — UI-Venus/Qwen3-VL
+decode gibberish on this llama.cpp build; must verify official `Qwen3-VL-8B-Instruct` on ONE node
+before committing g4+g7. (2) downloads ~230 KB/s — fleet stuck on slow `Airtel_Wednesday_2` SSID
+(fast SSID not broadcasting); ~5GB model ≈ 6h/node until the fast AP returns.
+
 ## HA plan — repurpose 2 GWs → servers (6 GW + 2 servers)
 
 The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decided target:
