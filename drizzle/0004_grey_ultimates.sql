@@ -1,0 +1,1 @@
+ALTER TABLE "connectors" ADD COLUMN "org_id" text DEFAULT 'default' NOT NULL;

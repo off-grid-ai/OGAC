@@ -65,6 +65,7 @@ export const commands = pgTable('commands', {
 // ─── Data plane (M3) ──────────────────────────────────────────────────────────
 export const connectors = pgTable('connectors', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   type: text('type').notNull(),
   status: text('status').notNull().default('connected'),

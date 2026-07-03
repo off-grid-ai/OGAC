@@ -28,6 +28,7 @@ import {
   users,
 } from '@/db/schema';
 import type { CheckResult } from '@/lib/checks';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { shipAudit } from '@/lib/siem';
 
@@ -504,9 +505,15 @@ function toConnector(r: typeof connectors.$inferSelect): Connector {
   };
 }
 
-export async function listConnectors(): Promise<Connector[]> {
+// Tenant-scoped: only returns connectors for `orgId` (defaults to DEFAULT_ORG so existing
+// single-tenant callers are unchanged). Callers with a session pass currentOrgId().
+export async function listConnectors(orgId: string = DEFAULT_ORG): Promise<Connector[]> {
   await ensureOrgSchema();
-  const rows = await db.select().from(connectors).orderBy(desc(connectors.createdAt));
+  const rows = await db
+    .select()
+    .from(connectors)
+    .where(eq(connectors.orgId, orgId))
+    .orderBy(desc(connectors.createdAt));
   return rows.map(toConnector);
 }
 
@@ -517,12 +524,14 @@ export async function createConnector(input: {
   auth?: string;
   description?: string;
   custom?: boolean;
+  orgId?: string;
 }): Promise<Connector> {
   await ensureOrgSchema();
   const [row] = await db
     .insert(connectors)
     .values({
       id: `con_${randomUUID().slice(0, 6)}`,
+      orgId: input.orgId ?? DEFAULT_ORG,
       name: input.name,
       type: input.type,
       endpoint: input.endpoint ?? '',
