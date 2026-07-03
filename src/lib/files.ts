@@ -11,6 +11,14 @@
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
 const base = `${S3}/${BUCKET}`;
+const PUBLIC_BASE = (process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co').replace(/\/$/, '');
+
+// The internet-reachable read URL for an object — the gateway's SeaweedFS path (serves the
+// bucket read-only). Single source of truth for file URLs across the console.
+export function publicUrlFor(id: string): string {
+  const key = id.split('/').map(encodeURIComponent).join('/'); // preserve slashes in nested keys
+  return `${PUBLIC_BASE}/files/${BUCKET}/${key}`;
+}
 
 export interface FileMeta {
   id: string; // the S3 object key

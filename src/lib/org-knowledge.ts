@@ -39,6 +39,10 @@ async function ensureSchema(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS org_knowledge_docs_col_idx ON org_knowledge_docs (collection_id);`,
   );
+  // Self-migrate the file-reference columns (the original upload lives in SeaweedFS) so a
+  // deploy needs no separate migration step — matches the CREATE-IF-NOT-EXISTS pattern above.
+  await db.execute(sql`ALTER TABLE org_knowledge_docs ADD COLUMN IF NOT EXISTS file_url text;`);
+  await db.execute(sql`ALTER TABLE org_knowledge_docs ADD COLUMN IF NOT EXISTS mime text;`);
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -155,6 +159,8 @@ export async function listDocuments(collectionId: string) {
       name: orgKnowledgeDocs.name,
       kind: orgKnowledgeDocs.kind,
       size: orgKnowledgeDocs.size,
+      fileUrl: orgKnowledgeDocs.fileUrl,
+      mime: orgKnowledgeDocs.mime,
       createdAt: orgKnowledgeDocs.createdAt,
     })
     .from(orgKnowledgeDocs)
@@ -167,6 +173,9 @@ export async function addDocument(
   collectionId: string,
   name: string,
   content: string,
+  // Reference to the original uploaded file in SeaweedFS (the single file-storage layer), so
+  // the user can view/download what they uploaded. Omitted for docs added as raw pasted text.
+  file?: { url: string; mime: string },
 ): Promise<{ id: string; chunks: number }> {
   await ensureSchema();
   const docId = rid();
@@ -176,8 +185,10 @@ export async function addDocument(
     id: docId,
     collectionId,
     name: name.slice(0, 200),
-    kind: 'text',
+    kind: file ? 'file' : 'text',
     size: content.length,
+    fileUrl: file?.url ?? null,
+    mime: file?.mime ?? null,
   });
   if (pieces.length) {
     await db.insert(orgKnowledgeChunks).values(
