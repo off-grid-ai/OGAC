@@ -97,8 +97,11 @@ Pattern to roll across the other scoped tables. RLS backstop pending a non-super
 
 `deploy/onprem/backup.sh` dumps console Postgres (52 tables) + corebank (PG) + policyadmin
 (MySQL) to `/Users/admin/offgrid/backups/<ts>/` (gzipped, 14-day retention). Verified working.
-TODO: schedule via launchd `co.getoffgridai.backup` (daily 02:00); MSSQL logical dump; push to
-MinIO for off-box copies. Restore commands in the script footer.
+**Off-box DR live**: backup.sh auto-rsyncs each dump to `admin@192.168.1.66:/backups-from-s1`
+(S1→.66 passwordless SSH works; no install on .66 — native rsync, NO OrbStack per decision).
+TODO: schedule via launchd `co.getoffgridai.backup` (daily 02:00); MSSQL logical dump.
+Full streaming replica on .66 (native PG16, no Docker) is the next HA step — needs a one-time
+sudo pw during the Homebrew/PG install.
 
 ## launchd services on S1 (root)
 
