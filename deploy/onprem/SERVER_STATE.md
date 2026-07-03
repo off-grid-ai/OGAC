@@ -39,6 +39,17 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 - `offgrid-ds-minio` — S3 warehouse `:9010` (console `:9011`). *(defined; bring up when wiring the warehouse connector)*
 - `offgrid-ds-crm` — mock CRM REST `:8090`. *(defined; needs `crm.json`)*
 
+## Registered connectors (rows in console DB `connectors`)
+
+- `con_corebank` → **Core Banking (Postgres)**, `postgres`, endpoint `postgres://corebank:corebank@127.0.0.1:5433/corebank`. Sync reports **real** row counts (16,850 seeded). Replay:
+  ```sql
+  INSERT INTO connectors (id,name,type,endpoint,auth,description,custom,status)
+  VALUES ('con_corebank','Core Banking (Postgres)','postgres',
+    'postgres://corebank:corebank@127.0.0.1:5433/corebank','password',
+    'Live core-banking OLTP',false,'connected')
+  ON CONFLICT (id) DO UPDATE SET endpoint=EXCLUDED.endpoint;
+  ```
+
 ## DNS (Cloudflare, via API) — replay with `dns-records.sh`
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
