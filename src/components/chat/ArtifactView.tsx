@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowCounterClockwise, Code, Eye, Play, X } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { type Artifact, buildSrcDoc, isLiveKind } from '@/lib/artifacts';
@@ -28,7 +28,12 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
   const runnable = artifact.kind === 'code';
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
-  const srcDoc = buildSrcDoc(artifact, { bridge: true });
+  // In-place editing: local code edits re-render the preview live. Reset restores the original.
+  const [code, setCode] = useState(artifact.code);
+  const [editing, setEditing] = useState(false);
+  const dirty = code !== artifact.code;
+  const current: Artifact = { ...artifact, code };
+  const srcDoc = buildSrcDoc(current, { bridge: true });
 
   async function run() {
     setRunning(true);
@@ -37,7 +42,7 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
       const r = await fetch('/api/v1/chat/run', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ language: artifact.language ?? 'python', code: artifact.code }),
+        body: JSON.stringify({ language: artifact.language ?? 'python', code }),
       });
       const d = await r.json();
       setResult(d.result ?? null);
@@ -54,6 +59,14 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
           {artifact.language ? ` · ${artifact.language}` : ''}
         </span>
         <div className="flex items-center gap-2">
+          {dirty ? (
+            <Button size="sm" variant="ghost" className="h-7 gap-1.5" onClick={() => setCode(artifact.code)} title="Revert to original">
+              <ArrowCounterClockwise className="size-3.5" /> Reset
+            </Button>
+          ) : null}
+          <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={() => setEditing((v) => !v)}>
+            {editing ? <><Eye className="size-3.5" /> Preview</> : <><Code className="size-3.5" /> Edit</>}
+          </Button>
           {runnable ? (
             <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={run} disabled={running}>
               <Play className="size-3.5" /> {running ? 'Running…' : 'Run'}
@@ -65,7 +78,14 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
         </div>
       </div>
       <div className="flex-1 overflow-auto">
-        {live ? (
+        {editing ? (
+          <textarea
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            spellCheck={false}
+            className="h-full w-full resize-none border-0 bg-background p-4 font-mono text-xs text-foreground focus:outline-none"
+          />
+        ) : live ? (
           <iframe
             title="artifact"
             sandbox="allow-scripts"
@@ -74,11 +94,11 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
           />
         ) : artifact.kind === 'text' ? (
           <div className="p-4">
-            <Markdown>{artifact.code}</Markdown>
+            <Markdown>{code}</Markdown>
           </div>
         ) : (
           <pre className="m-4 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs">
-            {artifact.code}
+            {code}
           </pre>
         )}
         {result ? (
