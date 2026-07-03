@@ -18,6 +18,11 @@ you add a node, a subdomain, or a service.
 > (`/Users/admin/provit`, `src/ui/server.ts`, log `server.log`). If provit.* 502s, it's usually
 > the process **crash-looping** — fix: `ssh admin@192.168.1.60` then
 > `sudo launchctl kickstart -k system/co.getoffgridai.provit`. (S1 can SSH to S2.)
+>
+> **Caddy edge gotcha:** never `caddy run` manually — a rogue 2nd instance fights the launchd
+> one (`co.getoffgridai.edge`) for :80 with a stale config → intermittent 502s on gated
+> subdomains. Fix: `sudo pkill -9 -f 'caddy run'` then `sudo launchctl kickstart -k
+> system/co.getoffgridai.edge`. Verify only ONE `caddy run` process remains.
 
 > Note the DNS name is still `gungnir.*`; the product is **Provit**. Rename the
 > subdomain to `provit.getoffgridai.co` when convenient and set `OFFGRID_PROVIT_URL`.
