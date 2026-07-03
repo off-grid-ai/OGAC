@@ -54,6 +54,8 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
     'Live core-banking OLTP',false,'connected')
   ON CONFLICT (id) DO UPDATE SET endpoint=EXCLUDED.endpoint;
   ```
+- `con_crm` → **Salesforce CRM (mock)**, `rest`, endpoint `http://127.0.0.1:8090/db`. Sync counts real records (13: accounts+opportunities+contacts). Same INSERT pattern, type `rest`.
+- *(when policyadmin/erp are up:)* register MySQL/MSSQL connectors — MySQL real counts need the `mysql2` driver (not yet added); MSSQL needs `mssql`. Until then register as `connected` without live counts.
 
 ## DNS (Cloudflare, via API) — replay with `dns-records.sh`
 
