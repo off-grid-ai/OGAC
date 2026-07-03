@@ -27,7 +27,7 @@ export const INPUT_BLOCKS: Block[] = [
   { id: 'input:file', group: 'Input', label: 'File upload', sub: 'pdf / doc / image' },
   { id: 'input:email', group: 'Input', label: 'Email trigger', sub: 'on inbound mail', comingSoon: true },
   { id: 'input:gmail', group: 'Input', label: 'Gmail trigger', sub: 'on new email', comingSoon: true },
-  { id: 'input:webhook', group: 'Input', label: 'Webhook', sub: 'POST event', comingSoon: true },
+  { id: 'input:webhook', group: 'Input', label: 'Webhook', sub: 'POST /api/v1/app/<slug>/run' },
   { id: 'input:schedule', group: 'Input', label: 'Schedule', sub: 'cron / interval', comingSoon: true },
 ];
 export const OUTPUT_BLOCKS: Block[] = [
