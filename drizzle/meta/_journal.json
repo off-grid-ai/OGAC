@@ -15,6 +15,13 @@
       "when": 1782971954318,
       "tag": "0001_gateway_config",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783048276007,
+      "tag": "0002_lucky_carmella_unuscione",
+      "breakpoints": true
     }
   ]
 }
