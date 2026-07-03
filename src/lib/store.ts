@@ -449,6 +449,30 @@ async function realRecordCount(type: string, endpoint: string): Promise<number |
       } finally { await conn.end(); }
     } catch { return null; }
   }
+  // MSSQL: sum row counts across user tables (sys.dm_db_partition_stats).
+  if (t.includes('mssql') && endpoint.startsWith('mssql')) {
+    try {
+      const mssqlMod = await import('mssql');
+      const mssql = mssqlMod.default ?? mssqlMod;
+      // Parse mssql://user:pass@host:port/db into a config (URL form is unreliable for mssql).
+      const u = new URL(endpoint);
+      const pool = await mssql.connect({
+        server: u.hostname,
+        port: Number(u.port || 1433),
+        user: decodeURIComponent(u.username) || 'sa',
+        password: decodeURIComponent(u.password) || process.env.OFFGRID_ERP_PASSWORD || '',
+        database: u.pathname.replace(/^\//, '') || 'master',
+        options: { encrypt: false, trustServerCertificate: true },
+        connectionTimeout: 4000,
+      });
+      try {
+        const res = await pool.request().query(
+          'SELECT COALESCE(SUM(row_count),0) AS n FROM sys.dm_db_partition_stats WHERE index_id IN (0,1)',
+        );
+        return Number(res.recordset?.[0]?.n ?? 0);
+      } finally { await pool.close(); }
+    } catch { return null; }
+  }
   // REST/HTTP (e.g. CRM): GET the endpoint and count records. Supports a top-level array,
   // or an object of arrays (json-server style: {accounts:[…], contacts:[…]}) → sum of lengths.
   if ((t.includes('rest') || t.includes('http') || t.includes('api') || t.includes('crm')) && /^https?:/.test(endpoint)) {
