@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createMaskingRule, listMaskingRules } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const ACTIONS = ['mask', 'tokenize', 'block'];
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listMaskingRules() });
+  return NextResponse.json({ object: 'list', data: await listMaskingRules(await currentOrgId()) });
 }
 
 export async function POST(req: Request) {
