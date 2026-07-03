@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { PostHog } from '@/components/PostHog';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-mono antialiased">
+        <PostHog />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
