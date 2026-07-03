@@ -1,0 +1,1 @@
+ALTER TABLE "api_keys" ADD COLUMN "org_id" text DEFAULT 'default' NOT NULL;
