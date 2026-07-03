@@ -3,12 +3,31 @@ credentials-file: /Users/admin/.cloudflared/00000000-0000-0000-0000-000000000000
 ingress:
   - hostname: onprem-console.getoffgridai.co
     service: http://127.0.0.1:3000
+  # AI Gateway aggregator (OpenAI-compatible) — direct, not via Caddy.
   - hostname: gateway.getoffgridai.co
     service: http://127.0.0.1:8800
+  # Keycloak — public issuer so external clients (e.g. Provit) can mint tokens the
+  # console trusts. Keycloak (dev mode) stamps iss from the request host, so tokens
+  # minted here get iss=https://auth.getoffgridai.co/realms/offgrid (console trusts it
+  # via OFFGRID_KEYCLOAK_ISSUERS). Added this session.
+  - hostname: auth.getoffgridai.co
+    service: http://127.0.0.1:8080
+  # SSH-from-outside: `ssh -o ProxyCommand="cloudflared access ssh --hostname ssh.example.internal"`.
+  # Added this session — also the deploy path when the LAN is unreachable.
+  - hostname: ssh.example.internal
+    service: ssh://localhost:22
+  # Provit (Prove It). Everything below goes through Caddy on :80.
+  - hostname: provit.getoffgridai.co
+    service: http://127.0.0.1:80
   - hostname: console-status.getoffgridai.co
     service: http://127.0.0.1:80
   - hostname: console-landing.getoffgridai.co
     service: http://127.0.0.1:80
+  # gungnir.* 301-redirects to provit.* at the Caddy layer (kept for old links).
   - hostname: gungnir.getoffgridai.co
     service: http://127.0.0.1:80
   - service: http_status:404
+
+# NOTE: DNS records for auth/ssh/provit were created via the Cloudflare API this session
+# (see dns-records.sh). The live config on S1 is /Users/admin/.cloudflared/config.yml — keep
+# this file in sync and copy it over on change, then restart cloudflared.
