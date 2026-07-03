@@ -63,7 +63,7 @@ http://console-landing.getoffgridai.co {
 }
 # Provit (Prove It — visual QA). Formerly gungnir.* — the old name 301-redirects here.
 http://provit.getoffgridai.co {
-	import gated offgrid-s2.local:7799
+	import gated 127.0.0.1:7799
 }
 http://gungnir.getoffgridai.co {
 	redir https://provit.getoffgridai.co{uri} permanent
