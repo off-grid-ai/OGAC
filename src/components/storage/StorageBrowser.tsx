@@ -18,6 +18,7 @@ import {
   UploadSimple,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -279,7 +280,20 @@ export function StorageBrowser() {
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
-  const [openFolder, setOpenFolder] = useState<string | null>(null);
+
+  // Folder navigation is URL-driven (?folder=…) so it pushes to the history stack — the browser
+  // Back button steps out of a folder coherently instead of leaving the page. See CLAUDE.md:
+  // every screen/navigation change must be reflected in the nav stack.
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const openFolder = search.get('folder');
+  const setOpenFolder = useCallback(
+    (folder: string | null) => {
+      router.push(folder ? `${pathname}?folder=${encodeURIComponent(folder)}` : pathname, { scroll: false });
+    },
+    [router, pathname],
+  );
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
