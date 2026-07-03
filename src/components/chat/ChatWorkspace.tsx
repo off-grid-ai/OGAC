@@ -2,6 +2,7 @@
 
 import {
   ArrowsClockwise,
+  Warning,
   CaretLeft,
   CaretRight,
   Check,
@@ -70,6 +71,8 @@ interface Message {
   // Edit & branch: position among sibling versions of this turn (‹ 2/3 ›).
   branchIndex?: number;
   branchCount?: number;
+  // Inline generation error (gateway offline, timeout, etc.) with a Retry affordance.
+  error?: string;
 }
 interface ModelInfo {
   id: string;
@@ -249,6 +252,15 @@ function MessageBubble({
         ) : (
           <p className="whitespace-pre-wrap text-sm">{m.content}</p>
         )}
+        {/* Inline generation error + retry (keeps any partial output above). */}
+        {isAssistant && m.error ? (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
+            <span className="flex items-center gap-1.5"><Warning className="size-3.5 shrink-0" />{m.error}</span>
+            <button onClick={onRegenerate} className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10">
+              <ArrowsClockwise className="size-3" /> Retry
+            </button>
+          </div>
+        ) : null}
       </div>
       {/* Branch navigation ‹ 2/3 › on turns with sibling versions. */}
       {m.id ? <BranchNav m={m} onNav={(d) => onNavBranch(m.id!, d)} /> : null}
@@ -649,7 +661,15 @@ export function ChatWorkspace({
         body: JSON.stringify(body),
         signal: ac.signal,
       });
-      if (!r.ok || !r.body) throw new Error('stream failed');
+      if (!r.ok || !r.body) {
+        const detail = await r.json().catch(() => null) as { error?: string } | null;
+        const reason = detail?.error
+          ?? (r.status === 401 || r.status === 403 ? 'Not authorized for this model.'
+            : r.status === 429 ? 'Rate limited — try again shortly.'
+            : r.status >= 500 ? `Gateway error (${r.status}).`
+            : `Request failed (${r.status}).`);
+        throw new Error(reason);
+      }
       const reader = r.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
@@ -663,7 +683,15 @@ export function ChatWorkspace({
           buf = buf.slice(nl + 2);
           if (!chunk.startsWith('data:')) continue;
           const evt = JSON.parse(chunk.slice(5).trim());
-          if (evt.error) toast.error(evt.error);
+          if (evt.error) {
+            // Surface inline on the assistant bubble (keeps partial output) instead of a toast.
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last?.role === 'assistant') last.error = String(evt.error);
+              return next;
+            });
+          }
           if (evt.approvalRequest) {
             setPendingApprovals(evt.approvalRequest);
             // drop the empty assistant placeholder while awaiting approval
@@ -689,7 +717,16 @@ export function ChatWorkspace({
         }
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') toast.error('Chat failed — is the gateway up?');
+      if ((e as Error).name !== 'AbortError') {
+        const reason = (e as Error).message || 'Chat failed — is the gateway up?';
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === 'assistant') { last.error = reason; }
+          else next.push({ role: 'assistant', content: '', error: reason });
+          return next;
+        });
+      }
     } finally {
       setStreaming(false);
       abortRef.current = null;
