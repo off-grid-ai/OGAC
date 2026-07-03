@@ -1,15 +1,37 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { readBackupsView } from '@/lib/backups';
+import { isBackupRunning, readBackupsView, readScheduleStatus, runBackupNow } from '@/lib/backups';
 
 export const dynamic = 'force-dynamic';
 
-// GET → read-only backup / DR status: latest backup + age, total size, count within retention,
-// off-box replication config, and per-backup rows. Read back from the on-prem backup directory
-// written by deploy/onprem/backup.sh.
+// GET → backup / DR status: latest backup + age, total size, count within retention, off-box
+// replication config, per-backup rows, the launchd schedule status, and whether a run is in flight.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const { view, error } = await readBackupsView();
-  return NextResponse.json({ object: 'backups_view', error, ...view });
+  const [{ view, error }, schedule] = await Promise.all([readBackupsView(), readScheduleStatus()]);
+  return NextResponse.json({
+    object: 'backups_view',
+    error,
+    schedule,
+    running: isBackupRunning(),
+    ...view,
+  });
+}
+
+// POST → run a backup now (triggers deploy/onprem/backup.sh). Admin-only, guarded against
+// concurrent runs (409). Returns the run status (exit code + tail of output).
+export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+  try {
+    const result = await runBackupNow();
+    return NextResponse.json({ object: 'backup_run', ...result }, { status: result.ok ? 201 : 500 });
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === 'CONCURRENT') {
+      return NextResponse.json({ error: 'a backup is already running' }, { status: 409 });
+    }
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
 }
