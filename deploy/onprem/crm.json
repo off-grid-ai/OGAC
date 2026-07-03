@@ -1,0 +1,21 @@
+{
+  "accounts": [
+    { "id": 1, "name": "HDFC Ergo General Insurance", "industry": "Insurance", "tier": "enterprise", "arr": 4200000, "owner": "Rajesh K." },
+    { "id": 2, "name": "Runwal Group", "industry": "Real Estate", "tier": "enterprise", "arr": 1800000, "owner": "Meera S." },
+    { "id": 3, "name": "Bajaj Finserv", "industry": "Financial Services", "tier": "enterprise", "arr": 3600000, "owner": "Anil P." },
+    { "id": 4, "name": "Tata AIG", "industry": "Insurance", "tier": "enterprise", "arr": 2900000, "owner": "Priya R." },
+    { "id": 5, "name": "Kotak Mahindra", "industry": "Banking", "tier": "mid-market", "arr": 950000, "owner": "Sameer J." }
+  ],
+  "opportunities": [
+    { "id": 1, "account_id": 1, "name": "Claims automation expansion", "stage": "negotiation", "value": 850000, "close_date": "2026-08-15" },
+    { "id": 2, "account_id": 3, "name": "FinOps platform rollout", "stage": "proposal", "value": 1200000, "close_date": "2026-09-30" },
+    { "id": 3, "account_id": 2, "name": "Tenant onboarding", "stage": "closed_won", "value": 400000, "close_date": "2026-06-01" },
+    { "id": 4, "account_id": 4, "name": "Fraud detection pilot", "stage": "discovery", "value": 300000, "close_date": "2026-10-20" }
+  ],
+  "contacts": [
+    { "id": 1, "account_id": 1, "name": "Rohan Mehta", "title": "CTO", "email": "rohan@hdfcergo.example.in" },
+    { "id": 2, "account_id": 1, "name": "Divya Nair", "title": "Head of Claims", "email": "divya@hdfcergo.example.in" },
+    { "id": 3, "account_id": 3, "name": "Vikram Singh", "title": "VP Engineering", "email": "vikram@bajaj.example.in" },
+    { "id": 4, "account_id": 4, "name": "Anjali Rao", "title": "Data Science Lead", "email": "anjali@tataaig.example.in" }
+  ]
+}
