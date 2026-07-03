@@ -463,6 +463,37 @@ A non-technical user with no prior AI experience can:
 
 ...without ever seeing: temperature, top-k, chunk size, embedding model, system prompt (unless they click "Advanced"), or any routing config.
 
+### Studio as a full product (expanded scope — "Lovable for on-prem AI")
+
+Beyond compose+run, Studio must be a complete builder. Sequenced sub-milestones:
+
+- **S1 — Run through governance (DONE).** "Run as app" executes via `runAgent()` — ABAC/policy gate, input+output guardrails, retrieval/grounding, provenance signing, persistence, lineage, QA, Temporal queue. Result shows a "✓ governed" badge.
+- **S2 — Deploy to a subdomain.** Publishing a Studio app mints a URL on `*.getoffgridai.co` (e.g. `app-<slug>.getoffgridai.co`) via a Cloudflare DNS record (API) + a Caddy vhost (gated) that serves the app shell → the template's runner. One-click deploy, like Lovable.
+- **S3 — Triggers.** Real synchronous (HTTP/webhook) and asynchronous (schedule/cron via Temporal, email/inbound) triggers wired to the runner — not the current inert Input blocks.
+- **S4 — Human-in-the-loop (real).** Server-side checkpoint: a run pauses at `status:'pending_review'`, persists, and exposes an approve/reject endpoint + inbox UI — replacing the current client-only toggle.
+- **S5 — Report cycles.** Scheduled runs that produce citation-backed reports (reuse the Reports module) on a cadence, delivered to the chosen sink.
+- **S6 — Real connectors + data.** Studio's data blocks bind to live enterprise sources (see Phase 4.7). No synthetic catalog.
+
+### Non-negotiables for all of the above
+- SOLID + the ports/adapters discipline in `docs/ENGINEERING.md`.
+- Every underlying service actually alive and exercised (no stubbed blocks presented as working).
+
+---
+
+## Phase 4.7 — Real data & connectors (kill synthetic data)
+
+**Goal:** nothing shown is fabricated. Two live fabrications removed (`syncConnector` random counts, random latency fallback); seed scripts (`src/db/seed.ts`, `seed-agentic.ts`, `brain.ts` SEED_DOCS) stop pre-populating; real producers wired.
+
+**Real enterprise data sources** (Docker on S1's existing OrbStack — no new node/OrbStack-first-run needed; Snowflake/Databricks aren't self-hostable so use connectable OSS equivalents, labeled honestly):
+- **Core Banking** — Postgres with a realistic schema + data (customers, accounts, transactions, claims).
+- **Warehouse** — MinIO (S3) + DuckDB/Trino as the "Snowflake/Databricks" stand-in.
+- **CRM** — a mock Salesforce-style REST API.
+- Console connectors point at these real endpoints; `syncConnector` reports **real** row/document counts.
+
+**Analytics/FinOps** already read the real `offgrid-gateway` OpenSearch index — the legacy Postgres-audit-seeded path is the synthetic one to retire.
+
+**Definition of done:** a fresh tenant shows empty or real data only; connectors connect to live sources; sync counts are actual; every metric traces to a real event.
+
 ---
 
 ## Phase 4.6 — Chat feature parity (ChatGPT/Claude-grade UX)
