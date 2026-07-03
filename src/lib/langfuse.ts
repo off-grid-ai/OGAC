@@ -26,12 +26,20 @@ export function langfuseReadConfigured(): boolean {
 async function lfGet<T>(path: string): Promise<T> {
   const auth = authHeader();
   if (!BASE || !auth) throw new Error('Langfuse read-back not configured');
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { authorization: auth, accept: 'application/json' },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`Langfuse ${res.status}`);
-  return (await res.json()) as T;
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { authorization: auth, accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`Langfuse ${res.status}`);
+    return (await res.json()) as T;
+  } catch (e) {
+    // Surface the real transport cause (ECONNREFUSED/ETIMEDOUT/EHOSTUNREACH…) so a bare
+    // "fetch failed" isn't opaque when the backing service is unreachable.
+    const err = e as Error & { cause?: { code?: string } };
+    throw new Error(`${err.message}${err.cause?.code ? ` [${err.cause.code}]` : ''}`);
+  }
 }
 
 export interface LangfuseTrace {

@@ -105,3 +105,22 @@ http://gateway.getoffgridai.co {
 		respond "Off Grid — network gateway" 200
 	}
 }
+
+# ── Internal S2-service proxies (localhost only) ────────────────────────────────
+# The console (next-server) can't egress to the LAN on this box — LAN connects fail with
+# EHOSTUNREACH while localhost works (macOS 15 Local-Network privacy blocks the SSH-launched
+# daemon; curl/short-lived node aren't blocked). Caddy (launchd) CAN reach S2 (it already
+# proxies provit → offgrid-s2.local), so we front each S2 HTTP service on 127.0.0.1 and point
+# the console's OFFGRID_*_URL at these. Loopback-bound → never exposed to the tunnel/LAN.
+http://127.0.0.1:8931 {
+	reverse_proxy offgrid-s2.local:3030
+}
+http://127.0.0.1:8932 {
+	reverse_proxy offgrid-s2.local:4242
+}
+http://127.0.0.1:8933 {
+	reverse_proxy offgrid-s2.local:8088
+}
+http://127.0.0.1:8934 {
+	reverse_proxy offgrid-s2.local:8070
+}
