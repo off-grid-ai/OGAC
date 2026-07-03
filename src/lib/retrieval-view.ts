@@ -117,6 +117,97 @@ export function normalizeRetrieval(input: NormalizeInput): RetrievalView {
   };
 }
 
+// ── Pure: collection-management request/response logic (zero I/O) ──────────────
+
+/** Distance metrics Qdrant accepts, in the exact casing its API expects. */
+export const QDRANT_DISTANCES = ['Cosine', 'Dot', 'Euclid'] as const;
+export type QdrantDistance = (typeof QDRANT_DISTANCES)[number];
+
+// Map the loose UI values (cosine/dot/euclid, any case) onto Qdrant's exact enum.
+const DISTANCE_ALIASES: Record<string, QdrantDistance> = {
+  cosine: 'Cosine',
+  cos: 'Cosine',
+  dot: 'Dot',
+  dotproduct: 'Dot',
+  euclid: 'Euclid',
+  euclidean: 'Euclid',
+  l2: 'Euclid',
+};
+
+export interface CreateCollectionInput {
+  name?: unknown;
+  vectorSize?: unknown;
+  distance?: unknown;
+}
+
+export interface CreateCollectionPayload {
+  vectors: { size: number; distance: QdrantDistance };
+}
+
+export interface BuildCreateResult {
+  name: string | null;
+  payload: CreateCollectionPayload | null;
+  error: string | null;
+}
+
+// Qdrant collection names: keep them filesystem/URL-safe. Letters, digits, -, _, ., 1..255 chars.
+const NAME_RE = /^[A-Za-z0-9._-]{1,255}$/;
+
+/** Normalize a distance string to Qdrant's enum, or null if unrecognized. */
+export function normalizeDistance(v: unknown): QdrantDistance | null {
+  if (typeof v !== 'string') return null;
+  const key = v.trim().toLowerCase();
+  return DISTANCE_ALIASES[key] ?? null;
+}
+
+/** Validate a proposed collection name. Returns the trimmed name or null. */
+export function normalizeCollectionName(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const name = v.trim();
+  return NAME_RE.test(name) ? name : null;
+}
+
+/**
+ * PURE: validate create-collection input and build the Qdrant `PUT /collections/{name}` body.
+ * Never throws — bad input comes back as { payload: null, error }.
+ */
+export function buildCreatePayload(input: CreateCollectionInput): BuildCreateResult {
+  const name = normalizeCollectionName(input.name);
+  if (!name) {
+    return { name: null, payload: null, error: 'name must be 1–255 chars of letters, digits, . _ or -' };
+  }
+  const sizeRaw = input.vectorSize;
+  const size =
+    typeof sizeRaw === 'number'
+      ? sizeRaw
+      : typeof sizeRaw === 'string' && sizeRaw.trim() !== ''
+        ? Number(sizeRaw)
+        : NaN;
+  if (!Number.isInteger(size) || size < 1 || size > 65536) {
+    return { name, payload: null, error: 'vectorSize must be an integer between 1 and 65536' };
+  }
+  const distance = normalizeDistance(input.distance);
+  if (!distance) {
+    return { name, payload: null, error: 'distance must be one of cosine, dot, euclid' };
+  }
+  return { name, payload: { vectors: { size, distance } }, error: null };
+}
+
+/** PURE: shape a Qdrant write response into a uniform { ok, error } result. Never throws. */
+export function normalizeWriteResponse(status: number, body: unknown): { ok: boolean; error: string | null } {
+  const rec = asRecord(body);
+  const result = rec?.result;
+  const ok = status >= 200 && status < 300 && result !== false;
+  if (ok) return { ok: true, error: null };
+  // Qdrant surfaces failures under status.error; fall back to a generic message.
+  const statusRec = asRecord(rec?.status);
+  const msg =
+    (typeof statusRec?.error === 'string' && statusRec.error) ||
+    (typeof rec?.error === 'string' && (rec.error as string)) ||
+    `HTTP ${status}`;
+  return { ok: false, error: msg };
+}
+
 // ── Best-effort reader (thin I/O) ──────────────────────────────────────────────
 
 export interface ReadResult {
