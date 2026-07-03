@@ -141,12 +141,14 @@ got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Conf
 The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decided target:
 **6 GW + 2 servers** (S1 + one repurposed node as the aux/S2-replacement).
 - Candidate repurpose nodes: the **image nodes g3/g4** (image-gen not yet working) are the least-critical.
-- **CORRECTION (2026-07-04): OrbStack initializes HEADLESSLY — no GUI "Continue" click needed.** The
-  earlier "blocked on on-site GUI first-run" assumption was WRONG. `open -a OrbStack` over SSH (a
-  console session exists) boots the VM in a few minutes (watch `~/.orbstack/log/*.log` for vmgr
-  startup phases); the docker CLI appears at `~/.orbstack/bin/docker` once the VM is up. So the aux
-  Docker tier (Langfuse/Unleash/Superset/Fleet/Presidio/Redis via `services-node-b.yml`) CAN be
-  stood up on a node **remotely**. g4/g5 already have `OrbStack.app` installed (g1/g2 don't).
+- **OrbStack headless init — PARTIAL (2026-07-04, corrected):** `open -a OrbStack` over SSH boots the
+  VM through ~15 startup phases headlessly, BUT it **stalls at `create_vm` because the privileged
+  helper isn't installed** (`/Library/PrivilegedHelperTools` empty; log stuck at `phase=create_vm`).
+  Installing that helper normally triggers a one-time **admin-auth GUI prompt** → effectively on-site
+  gated. So a fresh node can't fully init OrbStack purely headless. Possible remote workaround (untried):
+  boxes are `admin/1234`, so `sudo` (pw `1234`) MIGHT let us install/register the helper, or copy S1's
+  `dev.orbstack.OrbStack.privhelper` — but it's code-signed + SMAppService-registered, so a copy may
+  not validate. g4/g5 have `OrbStack.app` installed (g1/g2 don't); S1's OrbStack is fully working.
 - **Do NOT cram the heavy aux tier onto S1** — S1 is the sole tunnel-anchored control plane; OOMing it
   loses everything. Provit (lightweight Node, no Docker) is the exception and belongs on S1.
 
