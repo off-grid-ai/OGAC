@@ -760,5 +760,30 @@ CREATE TABLE organizations (
 
 ---
 
-_Last updated: 2026-07-02. Owned by: console team._
+## Phase 9 — Open source + CI/CD deploy (LATER — not now)
+
+**Goal:** make the full console open source and deploy it via GitHub Actions instead of the
+current manual rsync-over-tunnel. Deferred, but planned.
+
+- **Open-source prep:** license (AGPL-3.0 to match the workspace), scrub the repo of any real
+  secrets/hostnames/IPs (move all to env + `.env.example`), CONTRIBUTING + CLA, security policy.
+  Nothing in git should be a live secret — audit `deploy/`, `SERVER_STATE.md` (references only),
+  and the gateway/keycloak values.
+- **GitHub Actions deploy:** a workflow that builds + deploys to the fleet on merge to `main`.
+  Because git doesn't work on the servers and direct LAN isn't reachable, the runner deploys
+  **over the Cloudflare tunnel** (the SSH-from-outside path already proven this session):
+  `cloudflared access ssh` + rsync + build + restart.
+- **Secrets to create in the repo (GitHub → Settings → Secrets):**
+  `SSH_PRIVATE_KEY` (a deploy key authorized on S1), `CLOUDFLARE_*` (for `cloudflared access`),
+  the server env values needed to render `.env.production`. A Cloudflare **service token** for
+  the Access-gated SSH app (so the runner authenticates non-interactively).
+- **Zero-downtime restart** in the workflow (start new before killing old) so deploys stop
+  briefly 502-ing the gated services.
+
+**Definition of done:** push to `main` → GitHub Actions builds, tests (incl. Provit E2E once
+2.D lands), and deploys to the fleet over the tunnel, with no manual steps and no secrets in git.
+
+---
+
+_Last updated: 2026-07-03. Owned by: console team._
 _Related: `README.md`, `docs/research/`, `../shared/ROADMAP.md`_
