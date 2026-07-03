@@ -9,8 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
+import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { demoScan, readGuardrailsView } from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +32,7 @@ export default async function GuardrailsPage({
   const view = probe
     ? await readGuardrailsView(demoScan(probe), probe)
     : await readGuardrailsView();
+  const rules = await listGuardrailRules(await currentOrgId());
 
   return (
     <div className="space-y-6">
@@ -88,6 +92,15 @@ export default async function GuardrailsPage({
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Masking rules</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GuardrailRules rules={rules} />
         </CardContent>
       </Card>
 
