@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { getObjectText, putObject } from '@/lib/files';
 import {
   chatArtifacts,
   chatArtifactVersions,
@@ -129,6 +131,13 @@ export async function ensureChatSchema(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS chat_artifact_versions_idx ON chat_artifact_versions (artifact_id, version);`,
   );
+  // Artifact bodies live in SeaweedFS; self-migrate the key/hash columns and relax the legacy
+  // NOT NULL on `code` (new writes leave it empty). ADD COLUMN IF NOT EXISTS = no migration step.
+  for (const t of ['chat_artifacts', 'chat_artifact_versions']) {
+    await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_key text;`));
+    await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_hash text;`));
+    await db.execute(sql.raw(`ALTER TABLE ${t} ALTER COLUMN code DROP NOT NULL;`));
+  }
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_prefs (
       user_id text PRIMARY KEY, prefs jsonb NOT NULL DEFAULT '{}',
@@ -649,13 +658,33 @@ export async function projectMemoryBlock(projectId: string | null): Promise<stri
 }
 
 // ─── Artifacts library (saved renderable outputs, promoted to a top-level surface) ──
+// Bodies live in SeaweedFS (the single file-storage layer) at codeKey; Postgres holds metadata
+// + a sha256 (codeHash) for dedupe. Reads hydrate `code` from SeaweedFS so every caller/route/
+// component keeps the same shape (SeaweedFS is on the same host, so reads are ~loopback-fast).
+const ARTIFACT_EXT: Record<string, string> = { svg: 'svg', html: 'html', mermaid: 'mmd', react: 'jsx', code: 'txt', text: 'txt' };
+function hashCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
+async function putArtifactBody(artifactId: string, version: number, kind: string, code: string): Promise<{ key: string; hash: string }> {
+  const key = `artifacts/${artifactId}/v${version}.${ARTIFACT_EXT[kind] ?? 'txt'}`;
+  await putObject(key, code, 'text/plain; charset=utf-8');
+  return { key, hash: hashCode(code) };
+}
+// Hydrate the body: prefer SeaweedFS (codeKey), fall back to the legacy `code` column for rows
+// written before the migration.
+async function bodyOf(row: { codeKey?: string | null; code?: string | null }): Promise<string> {
+  if (row.codeKey) return (await getObjectText(row.codeKey)) ?? '';
+  return row.code ?? '';
+}
+
 export async function listArtifacts(userId: string) {
   await ensureChatSchema();
-  return db
+  const rows = await db
     .select()
     .from(chatArtifacts)
     .where(eq(chatArtifacts.userId, userId))
     .orderBy(desc(chatArtifacts.updatedAt));
+  return Promise.all(rows.map(async (r) => ({ ...r, code: await bodyOf(r) })));
 }
 
 // Save-on-open. Versioned by (user, conversation, title): re-saving the same logical artifact
@@ -690,23 +719,32 @@ export async function saveArtifact(
     )
     .limit(1);
 
+  const hash = hashCode(code);
+
   if (existing) {
-    // Identical head → no-op (opening an unchanged artifact again).
-    if (existing.code === code && existing.kind === a.kind) return existing.id;
+    // Identical head → no-op (opening an unchanged artifact again). Compare by hash so we don't
+    // fetch the body; fall back to hashing the legacy column for pre-migration rows.
+    const existingHash = existing.codeHash ?? hashCode(existing.code ?? '');
+    if (existingHash === hash && existing.kind === a.kind) return existing.id;
     const next = (existing.currentVersion ?? 1) + 1;
+    const { key } = await putArtifactBody(existing.id, next, a.kind, code);
     await db.insert(chatArtifactVersions).values({
       id: rid(),
       artifactId: existing.id,
       version: next,
       kind: a.kind,
-      code,
+      code: '',
+      codeKey: key,
+      codeHash: hash,
       language: a.language ?? null,
     });
     await db
       .update(chatArtifacts)
       .set({
         kind: a.kind,
-        code,
+        code: '',
+        codeKey: key,
+        codeHash: hash,
         language: a.language ?? null,
         currentVersion: next,
         updatedAt: new Date(),
@@ -716,11 +754,14 @@ export async function saveArtifact(
   }
 
   const id = rid();
+  const { key } = await putArtifactBody(id, 1, a.kind, code);
   await db.insert(chatArtifacts).values({
     id,
     userId,
     kind: a.kind,
-    code,
+    code: '',
+    codeKey: key,
+    codeHash: hash,
     language: a.language ?? null,
     title,
     conversationId: a.conversationId ?? null,
@@ -732,7 +773,9 @@ export async function saveArtifact(
     artifactId: id,
     version: 1,
     kind: a.kind,
-    code,
+    code: '',
+    codeKey: key,
+    codeHash: hash,
     language: a.language ?? null,
   });
   return id;
@@ -759,11 +802,12 @@ export async function listArtifactVersions(userId: string, id: string) {
     .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
     .limit(1);
   if (!owned) return null;
-  return db
+  const rows = await db
     .select()
     .from(chatArtifactVersions)
     .where(eq(chatArtifactVersions.artifactId, id))
     .orderBy(desc(chatArtifactVersions.version));
+  return Promise.all(rows.map(async (r) => ({ ...r, code: await bodyOf(r) })));
 }
 
 // Revert: copy an existing version's content forward as a new head version.
@@ -782,19 +826,26 @@ export async function revertArtifact(userId: string, id: string, version: number
     .limit(1);
   if (!target) return null;
   const next = (art.currentVersion ?? 1) + 1;
+  // Copy the target version's body forward as a new head version (re-put to its own key).
+  const targetCode = await bodyOf(target);
+  const { key, hash } = await putArtifactBody(id, next, target.kind, targetCode);
   await db.insert(chatArtifactVersions).values({
     id: rid(),
     artifactId: id,
     version: next,
     kind: target.kind,
-    code: target.code,
+    code: '',
+    codeKey: key,
+    codeHash: hash,
     language: target.language,
   });
   await db
     .update(chatArtifacts)
     .set({
       kind: target.kind,
-      code: target.code,
+      code: '',
+      codeKey: key,
+      codeHash: hash,
       language: target.language,
       currentVersion: next,
       updatedAt: new Date(),
@@ -827,7 +878,8 @@ export async function getPublishedArtifact(id: string) {
     .from(chatArtifacts)
     .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.published, true)))
     .limit(1);
-  return a ?? null;
+  if (!a) return null;
+  return { ...a, code: await bodyOf(a) };
 }
 
 // ─── Per-user preferences (Settings modal capabilities/appearance) ────────────
