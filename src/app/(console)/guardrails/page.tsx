@@ -23,7 +23,7 @@ export default async function GuardrailsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireModuleForUser('control');
+  await requireModuleForUser('guardrails');
   const { q } = await searchParams;
   const probe = typeof q === 'string' ? q : '';
   const view = probe
