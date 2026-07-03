@@ -486,6 +486,20 @@ Beyond compose+run, Studio must be a complete builder. Sequenced sub-milestones:
 - **S5 — Report cycles.** Scheduled runs that produce citation-backed reports (reuse the Reports module) on a cadence, delivered to the chosen sink.
 - **S6 — Real connectors + data.** Studio's data blocks bind to live enterprise sources (see Phase 4.7). No synthetic catalog.
 
+### S7 — World-class builder (Bolt.new / Lovable parity)
+
+The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lovable, and the open forks like bolt.diy / OpenHands). Concretely:
+
+- **Generative UI, not just a chat template.** Describe an app → the agent generates a real, editable app (forms, tables, dashboards) rendered live — reuse the console's artifact runtime (sandboxed iframe, already built) as the preview surface. Study bolt.diy's WebContainer approach for live code preview; on-prem we use the sandbox adapter.
+- **Iterative refine loop.** "Change the header", "add a filter" → diffs the app, re-renders. Chat-driven editing of the generated app (the bolt/Lovable core loop).
+- **Live preview + code view side-by-side**, in-place edit (already have the artifact editor — extend it).
+- **Templates gallery / one-click starts**, versioning + rollback per app (schema supports versions).
+- **Instant deploy** (S2, done) + custom subdomain, share links, embed snippet.
+- **Multi-file / multi-step apps**, not single prompts — the workflow graph already models this; wire the runner to execute multi-node.
+- **Evaluate the OSS field** (bolt.diy, OpenHands, Dyad, srcbook) and lift the best patterns; keep everything on-prem + governed (every generated app runs through `runAgent`).
+
+**Definition of done:** a non-technical user builds, previews, iteratively refines, and one-click deploys a real working app — parity with bolt.new/Lovable — entirely on-prem and governed.
+
 ### Non-negotiables for all of the above
 - SOLID + the ports/adapters discipline in `docs/ENGINEERING.md`.
 - Every underlying service actually alive and exercised (no stubbed blocks presented as working).
