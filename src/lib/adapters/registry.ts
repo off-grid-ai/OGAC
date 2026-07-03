@@ -123,6 +123,10 @@ export interface CapabilityBinding {
   active: AdapterMeta;
   alternatives: AdapterMeta[];
   healthy?: boolean;
+  // Whether the active adapter has a backing service configured (its env URL is set). Lets the
+  // UI tell "not configured yet" (calm) apart from "configured but down" (a real problem) —
+  // both otherwise surface as healthy===false. Adapters with no remote to reach report undefined.
+  configured?: boolean;
 }
 
 // Wrap a port array (whose adapters expose health()) into registry entries.
@@ -164,11 +168,15 @@ export async function listBindings(withHealth = false): Promise<CapabilityBindin
       const entries = ALL[capability];
       const active = pick(capability, entries);
       const healthy = withHealth && active.health ? await active.health() : undefined;
+      // A health-probed adapter is "configured" when its env-derived embedUrl is set. Adapters
+      // that reach no remote (no health probe) leave this undefined — the UI treats them as n/a.
+      const configured = active.health ? Boolean(active.meta.embedUrl) : undefined;
       return {
         capability,
         active: active.meta,
         alternatives: entries.map((e) => e.meta).filter((m) => m.id !== active.meta.id),
         healthy,
+        configured,
       };
     }),
   );

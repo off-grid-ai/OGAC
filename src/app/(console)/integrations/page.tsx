@@ -27,9 +27,11 @@ const RENDER: Record<string, string> = {
   embed: 'bg-muted text-muted-foreground',
 };
 
-function healthLabel(healthy: boolean | undefined): { text: string; cls: string } {
+function healthLabel(healthy: boolean | undefined, configured: boolean | undefined): { text: string; cls: string } {
   if (healthy === undefined) return { text: 'n/a', cls: 'bg-muted text-muted-foreground' };
   if (healthy) return { text: 'reachable', cls: 'bg-primary/10 text-primary' };
+  // healthy === false: distinguish "never wired up" (calm) from "wired but down" (real problem).
+  if (configured === false) return { text: 'not configured', cls: 'bg-muted text-muted-foreground' };
   return { text: 'unreachable', cls: 'bg-amber-500/10 text-amber-600' };
 }
 
@@ -152,9 +154,9 @@ export default async function IntegrationsPage() {
 
       <GatewayIntegrations />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {bindings.map((b) => {
-          const health = healthLabel(b.healthy);
+          const health = healthLabel(b.healthy, b.configured);
           const envKey = `OFFGRID_ADAPTER_${b.capability.toUpperCase()}`;
           const Icon = b.healthy ? PlugsConnected : Plugs;
           return (
