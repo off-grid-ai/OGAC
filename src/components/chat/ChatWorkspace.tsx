@@ -830,25 +830,20 @@ export function ChatWorkspace({
 
   // Edit a prior user message → server forks a new branch and re-answers from it. Persisted chats
   // only (temporary chats have no message ids). We reload the active-path transcript, then stream.
+  // Edit a prior user turn and re-run from that point: PATCH truncates the thread after the edited
+  // message (Phase 4.6), then reuse the existing regenerate path to re-answer from it.
   async function editMessage(id: string, newContent: string) {
     if (streaming || !activeId || temporary) return;
     setActiveStarters([]);
-    setMessages((prev) => {
-      const i = prev.findIndex((m) => m.id === id);
-      const trimmed = i >= 0 ? prev.slice(0, i) : prev;
-      return [
-        ...trimmed,
-        { role: 'user', content: newContent },
-        { role: 'assistant', content: '', reasoning: '' },
-      ];
+    const r = await fetch(`/api/v1/chat/conversations/${activeId}/messages/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: newContent }),
     });
-    await streamAssistant({
-      conversationId: activeId,
-      editMessageId: id,
-      content: newContent,
-      model,
-    });
-    await reloadActive(activeId);
+    if (!r.ok) return;
+    // Adopt the truncated transcript (edited turn is now the tail), then regenerate its answer.
+    setMessages((await r.json()).messages ?? []);
+    await regenerate();
   }
 
   // Reload the persisted active-path transcript (ids + branch metadata) after a branching edit or
