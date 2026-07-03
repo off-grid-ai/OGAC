@@ -63,11 +63,20 @@ async function getTable(): Promise<lancedb.Table> {
     const db = await lancedb.connect(LANCEDB_PATH);
     const names = await db.tableNames();
     if (names.includes(TABLE)) return db.openTable(TABLE);
-    const seeded: DocRow[] = [];
+    // Build rows from the sample SOPs (also used to define the table schema).
+    const rows: DocRow[] = [];
     for (const d of SEED_DOCS) {
-      seeded.push({ id: randomUUID(), ...d, vector: await embed(`${d.title}\n${d.text}`) });
+      rows.push({ id: randomUUID(), ...d, vector: await embed(`${d.title}\n${d.text}`) });
     }
-    return db.createTable(TABLE, seeded as unknown as Record<string, unknown>[]);
+    // Demo seed OFF by default — a real deployment's Brain starts EMPTY (real docs come from
+    // ingestion / addDocument). We still create the table from a sample row to fix the schema,
+    // then clear it, so RAG returns real results only. Opt in with OFFGRID_SEED_DEMO=1.
+    if (process.env.OFFGRID_SEED_DEMO === '1') {
+      return db.createTable(TABLE, rows as unknown as Record<string, unknown>[]);
+    }
+    const t = await db.createTable(TABLE, [rows[0]] as unknown as Record<string, unknown>[]);
+    await t.delete('true'); // remove the placeholder → empty table, correct schema
+    return t;
   })();
   return tablePromise;
 }
