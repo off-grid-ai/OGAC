@@ -13,6 +13,7 @@ import {
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { scoreInteraction } from '@/lib/qa/scoring';
 import { route } from '@/lib/retrieval/router';
@@ -175,11 +176,13 @@ function toRun(row: { id: string; startedAt: Date | string }, v: Omit<AgentRun, 
 async function persist(
   id: string,
   v: Omit<AgentRun, 'id' | 'startedAt'>,
+  orgId: string = DEFAULT_ORG,
 ): Promise<AgentRun> {
   const [row] = await db
     .insert(agentRuns)
     .values({
       id,
+      orgId,
       agentId: v.agentId,
       query: v.query,
       answer: v.answer,
@@ -206,8 +209,13 @@ function rowToRun(r: typeof agentRuns.$inferSelect): AgentRun {
   });
 }
 
-export async function listAgentRuns(limit = 15): Promise<AgentRun[]> {
-  const rows = await db.select().from(agentRuns).orderBy(desc(agentRuns.startedAt)).limit(limit);
+export async function listAgentRuns(limit = 15, orgId: string = DEFAULT_ORG): Promise<AgentRun[]> {
+  const rows = await db
+    .select()
+    .from(agentRuns)
+    .where(eq(agentRuns.orgId, orgId))
+    .orderBy(desc(agentRuns.startedAt))
+    .limit(limit);
   return rows.map(rowToRun);
 }
 
@@ -253,6 +261,7 @@ export async function runAgent(
   query: string,
   caller?: string,
   requireReview = false,
+  orgId: string = DEFAULT_ORG,
 ): Promise<AgentRun | null> {
   const agent = await resolveAgent(agentId);
   if (!agent) return null;
@@ -279,7 +288,7 @@ export async function runAgent(
     return persist(runId, {
       agentId, query, answer: '', status: 'denied', steps, citations: [],
       checks: [{ name: 'policy', verdict: 'blocked' as const, detail: decision.reason }], provenance: null,
-    });
+    }, orgId);
   }
 
   mark('plan', agent.name, query, [], Date.now());
@@ -292,7 +301,7 @@ export async function runAgent(
     return persist(runId, {
       agentId, query, answer: '', status: 'blocked', steps, citations: [],
       checks: preChecks, provenance: null,
-    });
+    }, orgId);
   }
 
   // 3. Retrieve — provenance refs come straight off the router's hits.
@@ -343,7 +352,7 @@ export async function runAgent(
   const run = await persist(runId, {
     agentId, query, answer, status: requireReview ? 'pending_review' : 'done', steps, citations,
     checks: [...preChecks, ...postChecks], provenance,
-  });
+  }, orgId);
 
   // 8. Lineage — record source→answer (best-effort, never blocks the response).
   void getLineage()

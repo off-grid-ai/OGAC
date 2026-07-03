@@ -43,6 +43,13 @@
       "when": 1783068197493,
       "tag": "0005_early_malcolm_colcord",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783068930764,
+      "tag": "0006_amusing_genesis",
+      "breakpoints": true
     }
   ]
 }

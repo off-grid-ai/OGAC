@@ -191,6 +191,7 @@ export const governanceItems = pgTable('governance_items', {
 // the sources it touched (provenance); the final answer carries the grounded citation set.
 export const agentRuns = pgTable('agent_runs', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   agentId: text('agent_id').notNull(),
   query: text('query').notNull(),
   answer: text('answer').notNull().default(''),
