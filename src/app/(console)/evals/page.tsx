@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { readEvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
 
@@ -119,6 +120,9 @@ export default async function EvalsPage({
           )}
         </CardContent>
       </Card>
+
+      {/* Golden-case management + run actions (client — CRUD + POST /evals/run). */}
+      <GoldenCasesManager />
 
       {/* Recent runs, newest-first (filtered to the active suite when set). */}
       <Card className="shadow-sm">
