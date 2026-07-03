@@ -44,14 +44,18 @@ function layout(blocks: Block[]): Node[] {
   return blocks.map((b) => {
     const col = COLS.indexOf(b.group);
     const row = (perCol[b.group] = (perCol[b.group] ?? 0) + 1) - 1;
+    const soon = b.comingSoon;
     return {
       id: b.id,
       position: { x: col * 200, y: 70 + row * 76 },
-      data: { label: `${b.label}${b.sub ? `\n${b.sub}` : ''}` },
+      data: { label: `${b.label}${soon ? '  · soon' : ''}${b.sub ? `\n${b.sub}` : ''}` },
       style: {
         width: 168, fontSize: 11, fontFamily: 'Menlo, monospace', borderRadius: 10,
-        border: '1px solid #e5e7eb', borderLeft: `4px solid ${COLOR[b.group]}`,
-        background: '#fff', whiteSpace: 'pre-line', textAlign: 'left', padding: '7px 9px',
+        border: soon ? '1px dashed #cbd5e1' : '1px solid #e5e7eb',
+        borderLeft: `4px ${soon ? 'dashed' : 'solid'} ${COLOR[b.group]}`,
+        background: soon ? '#f8fafc' : '#fff',
+        opacity: soon ? 0.55 : 1,
+        whiteSpace: 'pre-line', textAlign: 'left', padding: '7px 9px',
       },
     } as Node;
   });
@@ -196,6 +200,7 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
   const [output, setOutput] = useState('');
   const [governed, setGoverned] = useState<string | null>(null);
   const [steps, setSteps] = useState<{ kind: string; label: string; detail: string }[]>([]);
+  const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
 
   const trigger = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Input');
   const human   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Human');
@@ -238,20 +243,26 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
     }
   }
 
-  async function save(visibility: 'private' | 'org') {
+  async function save(visibility: 'private' | 'org', deploy = false) {
     if (!wf) return;
     setSaving(true);
     try {
       const r = await fetch('/api/v1/studio/templates', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: wf.title, summary: wf.summary, prompt, workflow: wf, visibility }),
+        body: JSON.stringify({ title: wf.title, summary: wf.summary, prompt, workflow: wf, visibility, deploy }),
       });
+      const d = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       if (r.ok) {
-        toast.success(visibility === 'org' ? 'Shared with your org.' : 'Saved to your gallery.');
-        setTab('gallery');
+        if (deploy && d.url) {
+          setDeployedUrl(d.url);
+          toast.success('Deployed! Your app has a shareable URL.');
+        } else {
+          toast.success(visibility === 'org' ? 'Shared with your org.' : 'Saved to your gallery.');
+          setTab('gallery');
+        }
       } else {
-        toast.error('Save failed.');
+        toast.error(d.error ?? 'Save failed.');
       }
     } finally { setSaving(false); }
   }
@@ -350,8 +361,8 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
                     {sink    && <span className="rounded bg-pink-100 px-1.5 py-0.5 text-pink-700">out: {sink.label}</span>}
                   </div>
 
-                  <div className="flex gap-1.5 pt-1">
-                    <Button size="sm" className="flex-1 gap-1.5" onClick={() => { setAppOpen(true); setPhase('idle'); setOutput(''); }}>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Button size="sm" className="gap-1.5" onClick={() => { setAppOpen(true); setPhase('idle'); setOutput(''); }}>
                       <Play className="size-3.5" /> Try it
                     </Button>
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void save('private')} disabled={saving}>
@@ -360,7 +371,18 @@ export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: s
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void save('org')} disabled={saving}>
                       <Globe className="size-3.5" /> Share
                     </Button>
+                    <Button size="sm" className="gap-1.5" onClick={() => void save('private', true)} disabled={saving}>
+                      <Sparkle className="size-3.5" /> Deploy
+                    </Button>
                   </div>
+                  {deployedUrl && (
+                    <div className="rounded-md border border-primary/40 bg-primary/5 p-2 text-xs">
+                      <p className="font-medium text-primary">🚀 Deployed — shareable app URL:</p>
+                      <a href={deployedUrl} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[11px] text-primary underline">
+                        {typeof window !== 'undefined' ? window.location.origin : ''}{deployedUrl}
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
