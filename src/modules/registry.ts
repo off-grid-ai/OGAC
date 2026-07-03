@@ -25,6 +25,7 @@ export type ModuleId =
   | 'access'
   | 'admin'
   | 'storage'
+  | 'api-docs'
   | 'config';
 
 export interface ModuleDef {
@@ -220,6 +221,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
     route: '/storage',
     service: 'files',
+  },
+  {
+    id: 'api-docs',
+    label: 'API docs & playground',
+    description:
+      'A curated catalog of the console’s public API surface — every endpoint grouped by area with method, auth level, and a live “try it” for safe GETs. The contract, browsable.',
+    route: '/api-docs',
+    service: 'console',
+    internal: true,
   },
   {
     id: 'config',
