@@ -22,17 +22,23 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const body = await req.json() as { title?: string; summary?: string; prompt?: string; workflow?: Workflow; visibility?: string };
+  const body = await req.json() as { title?: string; summary?: string; prompt?: string; workflow?: Workflow; visibility?: string; deploy?: boolean };
   if (!body.title || !body.workflow) return NextResponse.json({ error: 'title and workflow required' }, { status: 400 });
   const id = `st_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Deploy (S2): publish as a shareable app at /app/<slug>. Slug from title + short suffix.
+  const slug = body.deploy
+    ? `${(body.title ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'app'}-${Math.random().toString(36).slice(2, 6)}`
+    : null;
   await db.insert(studioTemplates).values({
     id,
-    ownerId: gate.user.email ?? "",
+    ownerId: gate.user.email ?? '',
     title: body.title,
     summary: body.summary ?? '',
     prompt: body.prompt ?? '',
     workflow: body.workflow,
-    visibility: body.visibility === 'org' ? 'org' : 'private',
+    visibility: body.deploy ? 'public' : body.visibility === 'org' ? 'org' : 'private',
+    slug,
+    published: !!body.deploy,
   });
-  return NextResponse.json({ id });
+  return NextResponse.json({ id, slug, url: slug ? `/app/${slug}` : null });
 }

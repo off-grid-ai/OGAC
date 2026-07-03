@@ -2,6 +2,28 @@ import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
 
+// Sliding-window rate limiter — 60 req/min per IP on /api/* routes.
+// Keyed on CF-Connecting-IP (set by Cloudflare Tunnel) then x-forwarded-for fallback.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 60;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(req: { headers: Headers; nextUrl: { pathname: string } }): boolean {
+  if (!req.nextUrl.pathname.startsWith('/api/')) return true;
+  const ip =
+    req.headers.get('cf-connecting-ip') ??
+    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    'unknown';
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= RATE_LIMIT;
+}
+
 const { auth } = NextAuth(authConfig);
 
 // Node endpoints authenticate with device/enrollment tokens, not user SSO — left public here.
@@ -22,6 +44,8 @@ const PUBLIC_PREFIX = [
   '/handbook',
   '/signin',
   '/api/auth',
+  '/app/', // deployed Studio apps (S2) — public shareable surfaces
+  '/api/v1/app/', // their public run endpoint
 ];
 
 function isPublic(pathname: string): boolean {
@@ -43,6 +67,12 @@ function isApiBearer(req: { headers: Headers; nextUrl: { pathname: string } }): 
 
 // User/admin surface (console UI + admin/audit APIs) requires an SSO session (or a service token).
 export default auth((req) => {
+  if (!checkRateLimit(req)) {
+    return NextResponse.json({ error: 'too many requests' }, {
+      status: 429,
+      headers: { 'Retry-After': '60' },
+    });
+  }
   if (isPublic(req.nextUrl.pathname)) return NextResponse.next();
   if (req.method === 'GET' && FILE_GET.test(req.nextUrl.pathname)) return NextResponse.next();
   if (isApiBearer(req)) return NextResponse.next();

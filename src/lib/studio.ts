@@ -19,19 +19,23 @@ export type BlockGroup =
 // Inputs (triggers) and outputs (sinks) the platform can wire a workflow to. Some are live
 // (manual prompt, file), some are stubs pending connector wiring — surfaced so the builder
 // shows the whole shape of an agent app, not just the model step.
+// Real (wired) vs coming-soon (shown disabled — the vision, never faked). Manual/file inputs,
+// Console output, and Human review are real; the event triggers and external sinks are marked
+// comingSoon so the canvas shows the full shape without pretending they fire.
 export const INPUT_BLOCKS: Block[] = [
   { id: 'input:manual', group: 'Input', label: 'Manual prompt', sub: 'type a request' },
   { id: 'input:file', group: 'Input', label: 'File upload', sub: 'pdf / doc / image' },
-  { id: 'input:email', group: 'Input', label: 'Email trigger', sub: 'on inbound mail' },
-  { id: 'input:webhook', group: 'Input', label: 'Webhook', sub: 'POST event' },
-  { id: 'input:schedule', group: 'Input', label: 'Schedule', sub: 'cron / interval' },
+  { id: 'input:email', group: 'Input', label: 'Email trigger', sub: 'on inbound mail', comingSoon: true },
+  { id: 'input:gmail', group: 'Input', label: 'Gmail trigger', sub: 'on new email', comingSoon: true },
+  { id: 'input:webhook', group: 'Input', label: 'Webhook', sub: 'POST event', comingSoon: true },
+  { id: 'input:schedule', group: 'Input', label: 'Schedule', sub: 'cron / interval', comingSoon: true },
 ];
 export const OUTPUT_BLOCKS: Block[] = [
   { id: 'output:console', group: 'Output', label: 'Console', sub: 'in-app result' },
   { id: 'output:human', group: 'Human', label: 'Human review', sub: 'approve / edit' },
-  { id: 'output:report', group: 'Output', label: 'Report', sub: 'signed PDF export' },
-  { id: 'output:email', group: 'Output', label: 'Email', sub: 'send result' },
-  { id: 'output:whatsapp', group: 'Output', label: 'WhatsApp', sub: 'message' },
+  { id: 'output:report', group: 'Output', label: 'Report', sub: 'signed PDF export', comingSoon: true },
+  { id: 'output:email', group: 'Output', label: 'Email', sub: 'send result', comingSoon: true },
+  { id: 'output:whatsapp', group: 'Output', label: 'WhatsApp', sub: 'message', comingSoon: true },
 ];
 
 export interface Block {
@@ -39,6 +43,8 @@ export interface Block {
   group: BlockGroup;
   label: string;
   sub?: string;
+  /** Vision shown but not wired yet — rendered disabled ("coming soon"), never faked. */
+  comingSoon?: boolean;
   meta?: Record<string, string | number | boolean>;
 }
 
