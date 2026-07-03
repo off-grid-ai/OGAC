@@ -113,15 +113,18 @@ async function authOK(req, url) {
 const PORT = Number(process.env.PORT || 8800);
 const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info URLs only
 // role map — one model per gateway (edit IPs via OFFGRID_POOL JSON if they change)
+// Hosts are mDNS hostnames (offgrid-gN.local), NOT IPs — so a network/DHCP change (e.g. the
+// Airtel_Wednesday migration) never breaks routing. Models reflect what each node currently
+// serves; update per-node as model swaps complete.
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
-  { name: 'g1',  host: '192.168.1.57', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g2',  host: '192.168.1.58', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g3',  host: '192.168.1.32', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g4',  host: '192.168.1.63', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g5',  host: '192.168.1.65', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g6',  host: '192.168.1.66', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g7',  host: '192.168.1.62', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g8',  host: '192.168.1.64', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
+  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  model: 'qwythos-9b' },
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
