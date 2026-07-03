@@ -10,16 +10,18 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SecretsManagerNav } from '@/components/secrets/SecretsManagerNav';
 import { requireModuleForUser } from '@/lib/module-access';
 import { readSecretsView } from '@/lib/secrets-view';
 
 export const dynamic = 'force-dynamic';
 
-// READ-ONLY secrets STATUS surface. Shows OpenBao reachability, seal status, active adapter, and the
-// mount table (paths + types) — never any secret value. All data comes from OpenBao's /sys/*
-// endpoints via readSecretsView(); this page never touches a KV data path.
+// Secrets MANAGEMENT surface. Shows OpenBao reachability, seal status, active adapter, and the mount
+// table (status/metadata only, from /sys/* endpoints), then a full key-CRUD manager: list key NAMES,
+// write (value is write-only), delete. A secret VALUE is never read or rendered anywhere on this
+// page — status comes from sys endpoints, and the manager's GET returns key names only.
 export default async function SecretsPage() {
-  // Re-gated at wiring; reuses the 'control' module for now.
+  // Reuses the 'control' module gate (no dedicated secrets module in the registry).
   await requireModuleForUser('secrets');
   const { data: view, error } = await readSecretsView();
 
@@ -35,8 +37,8 @@ export default async function SecretsPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
           <p className="text-sm text-muted-foreground">
-            Read-only status of the on-prem secrets store (OpenBao) — reachability, seal state,
-            active adapter, and mount paths. Secret values are never read or shown here.
+            Manage the on-prem secrets store (OpenBao) — seal state, active adapter, mount paths, and
+            full key CRUD. Secret values are write-only: never read back or shown here.
           </p>
         </div>
       </div>
@@ -72,7 +74,8 @@ export default async function SecretsPage() {
               {view.unsealThreshold !== null && view.unsealShares !== null
                 ? ` (${view.unsealProgress ?? 0}/${view.unsealThreshold} of ${view.unsealShares} key shares provided)`
                 : ''}
-              .
+              . Unsealing requires operator key shares and is performed against OpenBao directly —
+              not from this browser.
             </span>
           </CardContent>
         </Card>
@@ -88,9 +91,7 @@ export default async function SecretsPage() {
           sub={view.baoUrl ?? (view.configured ? 'no response' : 'not configured')}
         />
         <SummaryTile
-          icon={
-            unsealed ? <LockKeyOpen className="size-4" /> : <LockKey className="size-4" />
-          }
+          icon={unsealed ? <LockKeyOpen className="size-4" /> : <LockKey className="size-4" />}
           label="Seal status"
           value={sealed ? 'Sealed' : unsealed ? 'Unsealed' : 'Unknown'}
           tone={sealed ? 'bad' : unsealed ? 'good' : 'muted'}
@@ -115,6 +116,9 @@ export default async function SecretsPage() {
           sub={view.clusterName ?? (view.standby === true ? 'standby node' : 'active node')}
         />
       </div>
+
+      {/* Key management — names only, write-only values, delete with confirmation */}
+      <SecretsManagerNav configured={view.configured} sealed={sealed} />
 
       {/* Mount table — paths + types only, never values */}
       <Card className="shadow-sm">
@@ -182,11 +186,7 @@ function SummaryTile({
   tone: 'good' | 'bad' | 'muted';
 }) {
   const valueClass =
-    tone === 'good'
-      ? 'text-primary'
-      : tone === 'bad'
-        ? 'text-destructive'
-        : 'text-foreground';
+    tone === 'good' ? 'text-primary' : tone === 'bad' ? 'text-destructive' : 'text-foreground';
   return (
     <Card className="shadow-sm">
       <CardContent className="space-y-1 py-4">
