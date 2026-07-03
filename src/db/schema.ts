@@ -99,6 +99,7 @@ export const maskingRules = pgTable('masking_rules', {
 
 export const datasets = pgTable('datasets', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   source: text('source').notNull(),
   rows: integer('rows').notNull().default(0),
@@ -260,6 +261,7 @@ export const customAgents = pgTable('custom_agents', {
 // ─── Tool registry (router's `tool` source / MCP & HTTP invocations) ──────────
 export const tools = pgTable('tools', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   type: text('type').notNull().default('http'), // 'http' | 'mcp'
   endpoint: text('endpoint').notNull().default(''),

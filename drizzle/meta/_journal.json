@@ -50,6 +50,13 @@
       "when": 1783068930764,
       "tag": "0006_amusing_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783069303717,
+      "tag": "0007_nostalgic_red_shift",
+      "breakpoints": true
     }
   ]
 }

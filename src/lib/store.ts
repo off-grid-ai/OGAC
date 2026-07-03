@@ -608,8 +608,8 @@ export async function setMaskingRuleEnabled(id: string, enabled: boolean): Promi
   await db.update(maskingRules).set({ enabled }).where(eq(maskingRules.id, id));
 }
 
-export async function listDatasets(): Promise<Dataset[]> {
-  const rows = await db.select().from(datasets).orderBy(desc(datasets.updatedAt));
+export async function listDatasets(orgId: string = DEFAULT_ORG): Promise<Dataset[]> {
+  const rows = await db.select().from(datasets).where(eq(datasets.orgId, orgId)).orderBy(desc(datasets.updatedAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -1051,9 +1051,9 @@ export interface Tool {
   policy: ToolPolicy;
 }
 
-export async function listTools(): Promise<Tool[]> {
+export async function listTools(orgId: string = DEFAULT_ORG): Promise<Tool[]> {
   await ensureOrgSchema();
-  const rows = await db.select().from(tools).orderBy(desc(tools.createdAt));
+  const rows = await db.select().from(tools).where(eq(tools.orgId, orgId)).orderBy(desc(tools.createdAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
