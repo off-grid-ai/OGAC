@@ -46,6 +46,7 @@ const PUBLIC_PREFIX = [
   '/api/auth',
   '/app/', // deployed Studio apps (S2) — public shareable surfaces
   '/api/v1/app/', // their public run endpoint
+  '/api/v1/status', // public service status (uptime monitors)
 ];
 
 function isPublic(pathname: string): boolean {
