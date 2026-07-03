@@ -5,6 +5,8 @@ import {
   Gauge,
   PaperPlaneTilt as Send,
 } from '@phosphor-icons/react/dist/ssr';
+import { Suspense } from 'react';
+import { AnalyticsAlerts } from '@/components/analytics/AnalyticsAlerts';
 import {
   EventsChart,
   LatencyChart,
@@ -115,6 +117,10 @@ export default async function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Suspense fallback={null}>
+        <AnalyticsAlerts />
+      </Suspense>
 
       <GatewayUsage />
 
