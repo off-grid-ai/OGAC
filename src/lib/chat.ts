@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { messagesUpToInclusive } from '@/lib/chat-policy';
 import { getObjectText, putObject } from '@/lib/files';
 import {
   chatArtifacts,
@@ -434,6 +435,51 @@ export async function branchUserMessage(
     .set({ updatedAt: new Date() })
     .where(eq(chatConversations.id, conversationId));
   return id;
+}
+
+// ─── Edit a prior user message → truncate & re-run (Phase 4.6) ────────────────
+// The pure truncation rule lives in chat-policy.ts (zero imports, unit-tested); re-export it so
+// callers keep a single import surface.
+export { messagesUpToInclusive };
+
+// Edit a prior user message in place and truncate the thread after it, so the conversation re-runs
+// cleanly from the edit point. Verifies ownership (via the conversation), that the target is a
+// `user` message, updates its content, and DELETES every later message on the active path. Returns
+// the surviving (truncated) message list, or null if the caller doesn't own the conversation or the
+// target isn't an editable user message.
+export async function editUserMessage(
+  userId: string,
+  conversationId: string,
+  messageId: string,
+  newContent: string,
+): Promise<ThreadMessage[] | null> {
+  await ensureChatSchema();
+  // Ownership: the conversation must belong to the caller.
+  const convo = await getConversation(userId, conversationId);
+  if (!convo) return null;
+  // Operate on the shown (active) path so "everything after" matches what the user sees.
+  const path = await listMessages(conversationId);
+  const survivors = messagesUpToInclusive(path, messageId);
+  if (!survivors.length) return null;
+  const target = survivors[survivors.length - 1];
+  if (target.role !== 'user') return null;
+  // Update the target's content in place.
+  await db
+    .update(chatMessages)
+    .set({ content: String(newContent) })
+    .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, conversationId)));
+  // Drop every message after the target on the active path (the tail we're re-running from).
+  const survivorIds = new Set(survivors.map((m) => m.id));
+  for (const m of path) {
+    if (!survivorIds.has(m.id)) {
+      await db.delete(chatMessages).where(eq(chatMessages.id, m.id));
+    }
+  }
+  await db
+    .update(chatConversations)
+    .set({ updatedAt: new Date() })
+    .where(eq(chatConversations.id, conversationId));
+  return listMessages(conversationId);
 }
 
 // Switch which sibling of a given message is active (branch navigation ‹ 2/3 ›). `messageId` is
