@@ -1,10 +1,15 @@
-import { ArrowRight, FileText, TreeStructure } from '@phosphor-icons/react/dist/ssr';
-import { MarquezGraph } from '@/components/observability/MarquezGraph';
+import {
+  ArrowRight,
+  Database,
+  FileText,
+  Stack,
+  TreeStructure,
+} from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getLineage } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
-import { fetchLineageGraph } from '@/lib/marquez';
+import { readLineageView } from '@/lib/marquez';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -13,9 +18,10 @@ export const dynamic = 'force-dynamic';
 export default async function LineagePage() {
   await requireModuleForUser('lineage');
   const org = await currentOrgId();
-  const [runs, graph] = await Promise.all([listAgentRuns(25, org), fetchLineageGraph()]);
+  const [runs, lineage] = await Promise.all([listAgentRuns(25, org), readLineageView()]);
   const engine = getLineage().meta;
   const withSources = runs.filter((r) => r.citations.length > 0);
+  const { configured, data, error } = lineage;
 
   return (
     <div className="space-y-6">
@@ -23,14 +29,119 @@ export default async function LineagePage() {
         <p className="max-w-2xl text-sm text-muted-foreground">
           Data lineage for every agent run — which sources fed which answer, end to end. Each run
           emits an OpenLineage event through the lineage adapter ({engine.vendor}); the graph below
-          is reconstructed from the recorded source→answer edges.
+          is read back from Marquez, with a fallback reconstruction from recorded source→answer
+          edges.
         </p>
         <Badge variant="secondary" className="bg-primary/10 text-primary">
           {engine.id}
         </Badge>
       </div>
 
-      <MarquezGraph graph={graph} />
+      {/* Marquez read-back — the server-sourced namespaces / jobs / datasets model. */}
+      {!configured ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-8 text-center text-xs text-muted-foreground">
+            Marquez not configured — set OFFGRID_MARQUEZ_URL to read the server lineage graph.
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-8 text-center text-xs text-destructive">
+            Marquez unreachable: {error}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Marquez lineage</CardTitle>
+              <Badge variant="secondary" className="bg-primary/10 text-primary">
+                {data.namespace ?? '—'}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data.counts.namespaces} namespace(s) · {data.counts.jobs} job(s) ·{' '}
+              {data.counts.datasets} dataset(s) · {data.counts.edges} edge(s)
+              {data.lastRun ? ` · last run ${data.lastRun}` : ''} — read back from Marquez.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!data.jobs.length && !data.datasets.length ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">
+                No lineage in namespace {data.namespace ?? '—'} yet. Run a grounded agent to emit
+                OpenLineage events.
+              </p>
+            ) : (
+              data.jobs.map((j) => (
+                <div
+                  key={j.name}
+                  className="grid grid-cols-1 items-center gap-2 lg:grid-cols-[1fr_auto_1fr]"
+                >
+                  <div className="space-y-1">
+                    {j.inputs.length ? (
+                      j.inputs.map((i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1"
+                        >
+                          <Database className="size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-xs text-foreground">{i}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                        no inputs
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
+                    <Badge variant="outline" className="gap-1">
+                      <TreeStructure className="size-3" />
+                      {j.name}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {j.lastRunState}
+                    </Badge>
+                    <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
+                  </div>
+                  <div className="space-y-1">
+                    {j.outputs.length ? (
+                      j.outputs.map((o) => (
+                        <div
+                          key={o}
+                          className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1"
+                        >
+                          <Database className="size-3.5 shrink-0 text-primary" />
+                          <span className="truncate text-xs text-foreground">{o}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                        no outputs
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            {data.namespaces.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+                <Stack className="size-3.5 text-muted-foreground" />
+                {data.namespaces.map((n) => (
+                  <Badge
+                    key={n}
+                    variant={n === data.namespace ? 'secondary' : 'outline'}
+                    className="text-[10px]"
+                  >
+                    {n}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       {withSources.length === 0 ? (
         <Card className="shadow-sm">
