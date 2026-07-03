@@ -4,11 +4,15 @@ import { listFiles, saveFile } from '@/lib/files';
 
 export const dynamic = 'force-dynamic';
 
-// Public base for the returned URL — the network gateway (WAF + rate limit front the API).
+// Public URL = the gateway's SeaweedFS path (serves the `media` bucket directly, read-only to
+// the internet). SeaweedFS is the single storage backend, so a file's URL points straight at
+// it — any key (flat console uploads or nested keys pushed to the bucket) is reachable.
 const PUBLIC_BASE = process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co';
+const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
 
 function urlFor(id: string): string {
-  return `${PUBLIC_BASE}/api/v1/files/${id}`;
+  const key = id.split('/').map(encodeURIComponent).join('/'); // preserve slashes in nested keys
+  return `${PUBLIC_BASE}/files/${BUCKET}/${key}`;
 }
 
 // POST /api/v1/files — upload. Accepts either multipart/form-data (field "file") or a
