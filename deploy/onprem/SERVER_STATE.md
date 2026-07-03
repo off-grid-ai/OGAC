@@ -58,6 +58,7 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 - `con_warehouse` → **Data Warehouse (MinIO/S3)**, `s3`, endpoint `http://127.0.0.1:9010`, status connected (object-count wiring TBD).
 - `con_policyadmin` → **Policy Admin (MySQL)**, `mysql`, `mysql://policyadmin:policyadmin@127.0.0.1:3307/policyadmin`. Real count **6,110** (needs `mysql2` on server — installed; run `ANALYZE TABLE` once so InnoDB stats are accurate).
 - `con_kafka` → **Event Stream (Kafka)**, `kafka`, `127.0.0.1:19092` (Redpanda). Status connected (no row-count; stream).
+- `con_erp` → **Finance ERP (MSSQL)**, `mssql`, `mssql://sa@127.0.0.1:1433` (Azure SQL Edge). Up + connected. TODO: azure-sql-edge ships no sqlcmd; seed + real counts need the `mssql` npm driver (add like `mysql2`) + a node seed script. All 6 data sources now live.
 - **Removed the seeded/synthetic connectors** `con_core`, `con_dwh` (fake Snowflake), `con_s3` (fake). NOTE: `src/db/seed.ts` still defines these — trim `SEED_CONNECTORS`/`SEED_DATASETS` so a re-seed doesn't reintroduce them.
 
 ## Synthetic-data purge (server data ops — done this session)
