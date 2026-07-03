@@ -77,6 +77,21 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
 
+## Network migration (2026-07-03) — fleet moved to Airtel_Wednesday (fast net)
+
+The whole fleet was on `Airtel_Wednesday_2` (~190 KB/s WAN — WiFi backhaul cap). Migrated all
+10 machines to **`Airtel_Wednesday`** (pw `Wednesdaysol@25`) → ~3 MB/s (15×+). Method: staged a
+self-healing `networksetup` switch on every machine via S1, coordinated timed flip; the
+Cloudflare tunnel survived S1's move (it dials outbound). **Reach nodes by mDNS hostname
+`offgrid-gN.local` / `offgrid-s2.local` — NOT by IP** (DHCP reassigned everything).
+
+New IPs (do not hardcode — use hostnames): S1 `.85`, S2 `.84`, g1 `.82`, g2 `.83`, g3 `.86`,
+g4 `.89`, g5 `.90`, g6 `.88`, g7 `.91`, g8 `.87`. All config now uses hostnames/127.0.0.1
+(aggregator POOL, Caddyfile, console `.env.local`) so a future network change won't break it.
+
+> If a machine won't join: `networksetup -setairportnetwork en0 "Airtel_Wednesday" "Wednesdaysol@25"`.
+> `_2` uses the same password. S1's en0 is Wi-Fi (macOS 15 misreports "not associated").
+
 ## HA plan — repurpose 2 GWs → servers (decided; awaiting OrbStack first-run)
 
 The fleet has 8 GW nodes; dropping the 2 least-useful for HA (leaves 6 for inference):
