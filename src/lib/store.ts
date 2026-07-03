@@ -436,6 +436,19 @@ async function realRecordCount(type: string, endpoint: string): Promise<number |
       return Number(r.rows[0]?.n ?? 0);
     } catch { return null; } finally { await pool.end().catch(() => undefined); }
   }
+  // MySQL: sum table rows from information_schema.
+  if (t.includes('mysql') && endpoint.startsWith('mysql')) {
+    try {
+      const mysql = await import('mysql2/promise');
+      const conn = await mysql.createConnection(endpoint);
+      try {
+        const [rows] = await conn.query(
+          'SELECT COALESCE(SUM(table_rows),0) AS n FROM information_schema.tables WHERE table_schema = DATABASE()',
+        );
+        return Number((rows as { n: number }[])[0]?.n ?? 0);
+      } finally { await conn.end(); }
+    } catch { return null; }
+  }
   // REST/HTTP (e.g. CRM): GET the endpoint and count records. Supports a top-level array,
   // or an object of arrays (json-server style: {accounts:[…], contacts:[…]}) → sum of lengths.
   if ((t.includes('rest') || t.includes('http') || t.includes('api') || t.includes('crm')) && /^https?:/.test(endpoint)) {
