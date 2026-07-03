@@ -994,8 +994,12 @@ function toApiKey(r: typeof apiKeys.$inferSelect): ApiKey {
   };
 }
 
-export async function listApiKeys(): Promise<ApiKey[]> {
-  const rows = await db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+export async function listApiKeys(orgId: string = DEFAULT_ORG): Promise<ApiKey[]> {
+  const rows = await db
+    .select()
+    .from(apiKeys)
+    .where(eq(apiKeys.orgId, orgId))
+    .orderBy(desc(apiKeys.createdAt));
   return rows.map(toApiKey);
 }
 
@@ -1005,6 +1009,7 @@ export async function createApiKey(input: {
   subjectType: string;
   subject: string;
   budgetUsd: number | null;
+  orgId?: string;
 }): Promise<{ key: ApiKey; token: string }> {
   const id = `key_${randomUUID().slice(0, 8)}`;
   const secret = randomUUID().replace(/-/g, '');
@@ -1014,6 +1019,7 @@ export async function createApiKey(input: {
     .insert(apiKeys)
     .values({
       id,
+      orgId: input.orgId ?? DEFAULT_ORG,
       name: input.name,
       prefix,
       subjectType: input.subjectType,
