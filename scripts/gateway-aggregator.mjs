@@ -116,15 +116,19 @@ const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info U
 // Hosts are mDNS hostnames (offgrid-gN.local), NOT IPs — so a network/DHCP change (e.g. the
 // Airtel_Wednesday migration) never breaks routing. Models reflect what each node currently
 // serves; update per-node as model swaps complete.
+// `model` is the ROUTING TAG (pick() matches substrings on it); `kind` groups nodes by
+// role so chat traffic never lands on an image/grounding node. The card shows each node's
+// ACTUAL loaded model (from /v1/models), not this tag — so a mid-swap node reads truthfully.
+// Target config: g1 qwythos · g2/g5/g6 gemma-4-e4b · g3/g4 juggernaut (image) · g7/g8 UI-Venus.
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
-  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  model: 'qwen3.5-9b' },
-  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  model: 'qwythos-9b' },
-  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  model: 'qwythos-9b' },
+  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat',      model: 'qwythos-9b' },
+  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
+  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  kind: 'image',     model: 'juggernaut-xl-v9' },
+  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'image',     model: 'juggernaut-xl-v9' },
+  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
+  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
+  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b' },
+  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b' },
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
@@ -277,16 +281,21 @@ const hasImage = (b) => {
 };
 function pick(model, image) {
   const m = (model || '').toLowerCase();
-  const byModel = (tag) => LIVE.filter((g) => g.model.includes(tag));
-  if (image) {
-    if (m.includes('gemma')) return rrPick(LIVE.filter((g) => g.model.includes('gemma') && g.vision));
-    if (m.includes('qwen'))  return rrPick(LIVE.filter((g) => g.model.includes('qwen')  && g.vision));
-    return rrPick(LIVE.filter((g) => g.vision)); // any vision node
+  const chat = LIVE.filter((g) => (g.kind ?? 'chat') === 'chat'); // never route chat to image/grounding
+  const byModel = (tag) => chat.filter((g) => g.model.includes(tag));
+  // Explicit UI-grounding request → the grounding pool (UI-Venus).
+  if (m.includes('venus') || m.includes('grounding')) {
+    const ground = LIVE.filter((g) => g.kind === 'grounding');
+    if (ground.length) return rrPick(ground);
+  }
+  if (image) { // multimodal (vision INPUT) — a vision-capable chat node, not image-gen
+    if (m.includes('gemma')) return rrPick(chat.filter((g) => g.model.includes('gemma') && g.vision));
+    return rrPick(chat.filter((g) => g.vision));
   }
   if (m.includes('gemma'))   return rrPick(byModel('gemma'));
-if (m.includes('qwen'))    return rrPick(byModel('qwen3.5'));
+  if (m.includes('qwen'))    return rrPick(byModel('gemma'));   // qwen retired → gemma
   if (m.includes('qwythos')) return rrPick(byModel('qwythos'));
-  return rrPick(LIVE); // unspecified: round-robin everything
+  return rrPick(chat); // unspecified: round-robin CHAT nodes only
 }
 
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
@@ -303,14 +312,30 @@ function promptText(body) {
 
 // Fetch each gateway's own info JSON (modalities) and merge — so the console Gateway
 // page renders the full modality grid even though it's talking to the aggregator.
+// Turn a llama.cpp model id (an absolute .gguf path) into a readable tag, e.g.
+// "/…/UI-Venus-1.5-8B-Q4_K_M.gguf" -> "UI-Venus-1.5-8B". Drops the dir, the .gguf
+// extension, and a trailing quant token so the card shows the model, not the file.
+function prettyModel(idPath) {
+  if (!idPath || typeof idPath !== 'string') return null;
+  const base = idPath.split('/').pop().replace(/\.gguf$/i, '');
+  return base.replace(/-(Q\d[\w.]*|IQ\d[\w.]*|F16|BF16|F32)$/i, '');
+}
+
 async function poolInfo() {
   const infos = await Promise.all(POOL.map(async (g) => {
     try {
-      const r = await fetch(`http://${g.host}:${g.port}/`, { signal: AbortSignal.timeout(1500) });
+      // Fetch the node's info AND its actual loaded model in parallel, so the card reflects
+      // what each node is really serving (truthful mid-swap), not the static routing tag.
+      const [r, mr] = await Promise.all([
+        fetch(`http://${g.host}:${g.port}/`, { signal: AbortSignal.timeout(1500) }),
+        fetch(`http://${g.host}:${g.port}/v1/models`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
+      ]);
       // Seed reachability if we've never probed this gateway, so health isn't 'unknown' on cold start.
       if (!PROBE[g.name]) PROBE[g.name] = { reachable: r.ok, genOk: null, genMs: null, ts: Date.now() };
-      return { g, info: r.ok ? await r.json() : null };
-    } catch { if (!PROBE[g.name]) PROBE[g.name] = { reachable: false, genOk: null, genMs: null, ts: Date.now() }; return { g, info: null }; }
+      let loaded = null;
+      if (mr && mr.ok) { try { loaded = prettyModel((await mr.json())?.data?.[0]?.id); } catch { /* keep null */ } }
+      return { g, info: r.ok ? await r.json() : null, loaded };
+    } catch { if (!PROBE[g.name]) PROBE[g.name] = { reachable: false, genOk: null, genMs: null, ts: Date.now() }; return { g, info: null, loaded: null }; }
   }));
   const modalities = {};
   for (const { info } of infos) for (const [k, v] of Object.entries(info?.modalities || {}))
@@ -323,7 +348,7 @@ async function poolInfo() {
     mcp: `http://${HOST_HINT}:${PORT}/mcp`,
     modalities: Object.keys(modalities).length ? modalities : { text: 'ready', vision_understanding: 'ready' },
     image_models: [],
-    gateways: infos.map(({ g, info }) => ({ name: g.name, host: g.host, model: g.model, vision: g.vision, up: !!info, health: healthFor(g.name) })),
+    gateways: infos.map(({ g, info, loaded }) => ({ name: g.name, host: g.host, model: loaded ?? g.model, vision: g.vision, up: !!info, health: healthFor(g.name) })),
   };
 }
 
