@@ -567,6 +567,12 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 
 **Definition of done:** a fresh tenant shows empty or real data only; connectors connect to live sources; sync counts are actual; every metric traces to a real event.
 
+> **Status (2026-07-05): essentially done.** Live fabrications removed — `syncConnector` reports
+> real source counts, the random-latency fallback is gone (0 = unknown). The demo seed is gated
+> behind `OFFGRID_SEED_DEMO` (off by default), so a fresh tenant shows only real/empty data. Real
+> data sources (corebank Postgres, MySQL policy-admin, MSSQL ERP, Kafka, MinIO, CRM) are live with
+> actual row counts. Remaining: relabel the demo-only "Snowflake" seed as an honest OSS stand-in.
+
 ---
 
 ## Phase 4.6 — Chat feature parity (ChatGPT/Claude-grade UX)
@@ -610,6 +616,12 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 
 ### Definition of done
 The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste + inline image thumbnails + a per-conversation image gallery; in-place artifact editing with live re-render and version revert. A user coming from ChatGPT/Claude finds nothing obviously missing.
+
+> **Status (2026-07-05): essentially done.** Verified in `ChatWorkspace`/`ArtifactView`: Stop
+> (AbortController), Retry, edit-and-rerun with branch navigation, inline generation errors with a
+> retry affordance; drag-drop + paste + lightbox + inline image thumbnails; artifact in-place edit
+> with live re-render + "ask AI to change"; artifact version history + revert (routes + store wired).
+> Remaining is polish, not table-stakes gaps.
 
 ---
 
