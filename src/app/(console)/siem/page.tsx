@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import { ShieldWarning } from '@phosphor-icons/react/dist/ssr';
+import { SuppressionManager } from '@/components/siem/SuppressionManager';
 import { requireModuleForUser } from '@/lib/module-access';
+import { applySuppressions } from '@/lib/siem-suppress-policy';
+import { listSuppressions } from '@/lib/siem-suppress';
 import { filterByOutcome, readSiemView, type SiemOutcome } from '@/lib/siem-view';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +19,13 @@ export default async function SiemPage({
 }) {
   await requireModuleForUser('siem');
   const { outcome } = await searchParams;
-  const { configured, data, error } = await readSiemView();
+  const [{ configured, data: raw, error }, suppressions] = await Promise.all([
+    readSiemView(),
+    listSuppressions(await currentOrgId()).catch(() => []),
+  ]);
+  // Apply suppression rules first, then the URL outcome filter — so muted noise never inflates the
+  // tiles, actor rollup, or outcome facets. Both are pure transforms over the read-back view.
+  const data = applySuppressions(raw, suppressions);
   const view = filterByOutcome(data, outcome);
   const active = data.byOutcome.some((o) => o.outcome === outcome) ? outcome : undefined;
 
@@ -134,6 +144,10 @@ export default async function SiemPage({
           </table>
         </div>
       )}
+
+      {/* Management: suppression rules mute known-noise events (a scanner IP, a service account, a
+          health-probe path) so the feed stays signal. Applied server-side to the whole view. */}
+      <SuppressionManager rules={suppressions} />
     </div>
   );
 }
