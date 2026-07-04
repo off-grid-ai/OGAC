@@ -1,6 +1,7 @@
 // The module registry — the heart of modularity. Each capability is API-first and
 // independently adoptable; a deployment enables only the modules it bought (see lib/modules).
 export type ModuleId =
+  | 'overview'
   | 'chat'
   | 'services'
   | 'projects'
@@ -52,6 +53,15 @@ export interface ModuleDef {
 }
 
 export const MODULES: readonly ModuleDef[] = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    description:
+      'The operator home — governance posture, cost, traffic, service health, and recent activity in one glance, with quick actions into every module.',
+    route: '/overview',
+    service: 'console',
+    internal: true,
+  },
   {
     id: 'chat',
     label: 'Chat',

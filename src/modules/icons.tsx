@@ -33,10 +33,12 @@ import {
   Waveform,
   Archive,
   SealCheck,
+  Gauge,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
 export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
+  overview: Gauge,
   chat: ChatIcon,
   services: SquaresFour,
   projects: FolderOpen,
