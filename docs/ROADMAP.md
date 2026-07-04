@@ -417,27 +417,32 @@ Four `@offgrid/*` packages are complete and unused. Wire them now, not in a futu
 
 ### Per-service gap table
 
-| Service | Today | Phase 4 adds | Effort |
-|---|---|---|---|
-| OpenSearch | write-only `_bulk` | full-text search UI, aggregations, alert rules | M |
-| Langfuse | write-only OTLP | first-party trace waterfall, cost→FinOps, score charts | M |
-| Marquez | emit-only | read lineage graph from Marquez API directly | S |
-| OpenBao | scaffold (zero call sites) | real KV read/write/list, rotation UI | S |
-| Presidio | `/analyze` only | `/anonymize` wired, custom recognizers UI, per-request breakdown | S |
-| FleetDM | host list only | policy CRUD, live query UI, software inventory, MDM status | M |
-| Superset | health-ping only | guest-token SDK embed, default dashboard provisioned, SQL Lab link | M |
-| Unleash | flag lookups only | flag management UI, A/B variants, gradual rollout editor | S |
-| Qdrant | built, not default | flip default, wire `@offgrid/rag` | XS |
-| Temporal | scaffold | `@temporalio/client` binding, worker, durable agent runs | L |
+| Service | Status (verified 2026-07-04) | Remaining |
+|---|---|---|
+| OpenSearch | ✅ full-text audit search (`AuditSearch` on control + siem), outcome facets, **suppression rules** | aggregation charts, alert-rule CRUD |
+| Langfuse | ✅ first-party trace read-back (`safeListTraces` → `LangfuseTraces` on observability) + run-trace table | cost→FinOps rollup, score charts |
+| Marquez | ✅ lineage graph read-back (`readLineageView`, graceful fallback) + curate UI | richer graph viz |
+| OpenBao | ✅ KV read/write/list + secrets panel (control) | key-rotation UI |
+| Presidio | ✅ `/analyze` + **`/anonymize` wired** (live test box runs the active adapter) | custom-recognizers UI |
+| FleetDM | ✅ device list + enroll + device actions + policy version | live-query UI, software inventory |
+| Superset | ✅ guest-token SDK embed + SQL API (`superset.ts` + analytics page) | provision a default dashboard |
+| Unleash | ✅ **full flag management UI** (create/toggle/delete) + gate-open override | A/B variants, gradual rollout |
+| Qdrant | ✅ reindex-from-Brain + point-count inspector (built, LanceDB still default) | flip default when populated |
+| Temporal | runtime adapter (`agentruntime.ts`) scaffolded | `@temporalio/client` worker, durable runs (L) |
 
-S = 1–3 days · M = 1–2 weeks · L = 3–4 weeks · XS = hours
+**Definition of done:** every OSS service is a **full management surface** — read back AND
+create/update/delete + trigger actions. No write-only sinks, no read-only dashboards.
 
-**Definition of done:** every OSS service is a **full management surface**, per the cross-cutting mandate at the top of this doc — the console reads back from it AND lets operators create/update/delete its entities and trigger its actions (not just view). No service is a write-only sink, and no module is a read-only dashboard. The gap table above is fully green.
-
-> **Status (2026-07-04):** the read-back layer (the *R*) is built for evals, policy, guardrails,
-> security events, drift, lineage, provenance, sandbox, secrets, retrieval, backups, agent runs
-> (parallel-agent build). **Remaining for each: the C/U/D + actions** — forms, edit/delete, and the
-> manage-the-system operations. Until that lands, these modules are groundwork, not done.
+> **Status (2026-07-04, reconciled):** Phase 4 is **largely complete**. The read-back layer AND the
+> C/U/D + actions now exist for evals, policy, guardrails, security events (incl. suppression rules),
+> drift (thresholds + baseline), lineage, provenance, sandbox, secrets, retrieval (collection CRUD +
+> reindex), backups, agent runs, connectors (edit/sync/history), feature flags, and brain docs
+> (delete). Several service integrations above (Langfuse traces, Marquez read, Superset embed,
+> Presidio anonymize) were found already built when reconciling this table — the earlier "gap"
+> framing was stale. **Genuine remaining work:** the per-cell "Remaining" column above (mostly
+> richer viz + a few CRUD tails), Temporal durable runs (L), and everything gated on **S2 being
+> back online** (Langfuse/Marquez/Superset/FleetDM/Presidio all live on S2, currently offline — the
+> code degrades gracefully and lights up when S2 returns).
 
 ---
 
