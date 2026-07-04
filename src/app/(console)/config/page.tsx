@@ -1,5 +1,6 @@
 import { Sliders } from '@phosphor-icons/react/dist/ssr';
 import { ConfigManager } from '@/components/config/ConfigManager';
+import { FlagManager } from '@/components/config/FlagManager';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export default async function ConfigPage() {
         </div>
       </div>
       <ConfigManager />
+      <FlagManager />
     </div>
   );
 }
