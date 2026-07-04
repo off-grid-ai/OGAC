@@ -10,8 +10,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
+import { getPii } from '@/lib/adapters/registry';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
-import { demoScan, readGuardrailsView } from '@/lib/guardrails-view';
+import { readGuardrailsView } from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -19,8 +20,9 @@ export const dynamic = 'force-dynamic';
 
 // Guardrails / PII surface read-back. Server component: reads the active guardrails engine +
 // reachability + supported entity types through the pure view. Gated on the `control` module
-// (guardrails / egress policy / audit live there). The "test a string" demo is URL-driven
-// (?q=...) so it runs the regex floor with no client state — nav is URL/history only.
+// (guardrails / egress policy / audit live there). The "test a string" box runs the input through
+// the LIVE active adapter (Presidio detect + anonymize when configured, regex floor otherwise) so
+// it shows what actually happens — not just the regex demo. URL-driven (?q=...), no client state.
 export default async function GuardrailsPage({
   searchParams,
 }: {
@@ -30,7 +32,7 @@ export default async function GuardrailsPage({
   const { q } = await searchParams;
   const probe = typeof q === 'string' ? q : '';
   const view = probe
-    ? await readGuardrailsView(demoScan(probe), probe)
+    ? await readGuardrailsView(await getPii().scan(probe), probe)
     : await readGuardrailsView();
   const rules = await listGuardrailRules(await currentOrgId());
 
