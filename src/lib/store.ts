@@ -291,7 +291,7 @@ export async function appendAudit(
     leftDevice: e.leftDevice,
     tool: e.tool,
     outcome: e.outcome,
-    latencyMs: e.latencyMs ?? 200 + Math.floor(Math.random() * 1800),
+    latencyMs: e.latencyMs ?? 0, // never fabricate latency — 0 = unknown (Phase 4.7)
     checks: e.checks ?? null,
     keyId: e.keyId ?? null,
   }));
