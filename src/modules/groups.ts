@@ -33,7 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'data',
     label: 'Data',
-    modules: ['data', 'retrieval', 'integrations', 'lineage'],
+    modules: ['integrations', 'data', 'retrieval', 'lineage'],
   },
   {
     id: 'governance',
