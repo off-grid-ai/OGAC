@@ -41,9 +41,9 @@ export const NAV_GROUPS: NavGroup[] = [
     modules: ['control', 'policy', 'regulatory', 'provenance', 'secrets', 'access'],
   },
   {
-    id: 'observability',
-    label: 'Observability',
-    modules: ['observability', 'analytics', 'finops', 'reports', 'siem', 'drift'],
+    id: 'insights',
+    label: 'Insights',
+    modules: ['observability', 'analytics', 'drift', 'finops', 'reports', 'siem'],
   },
   {
     id: 'operations',
