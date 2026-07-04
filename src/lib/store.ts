@@ -543,6 +543,24 @@ export async function createConnector(input: {
   return toConnector(row);
 }
 
+export async function updateConnector(
+  id: string,
+  patch: { name?: string; type?: string; endpoint?: string; auth?: string; description?: string },
+): Promise<Connector | null> {
+  const set: Record<string, unknown> = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.type !== undefined) set.type = patch.type;
+  if (patch.endpoint !== undefined) set.endpoint = patch.endpoint;
+  if (patch.auth !== undefined) set.auth = patch.auth;
+  if (patch.description !== undefined) set.description = patch.description;
+  if (Object.keys(set).length === 0) {
+    const [cur] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
+    return cur ? toConnector(cur) : null;
+  }
+  const [row] = await db.update(connectors).set(set).where(eq(connectors.id, id)).returning();
+  return row ? toConnector(row) : null;
+}
+
 export async function deleteConnector(id: string): Promise<void> {
   await db.delete(ingestJobs).where(eq(ingestJobs.connectorId, id));
   await db.delete(connectors).where(eq(connectors.id, id));
