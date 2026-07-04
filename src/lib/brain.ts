@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import * as lancedb from '@lancedb/lancedb';
-import { qdrantAdd, qdrantList, qdrantSearch } from '@/lib/qdrant';
+import { qdrantAdd, qdrantDelete, qdrantList, qdrantSearch } from '@/lib/qdrant';
 
 // The Brain — the ingestion→retrieval (RAG) pipeline. LanceDB (embedded, on-disk) is the default
 // store; Qdrant is the server-scale swap-in, selected with OFFGRID_ADAPTER_RETRIEVAL=qdrant — the
@@ -110,6 +110,18 @@ export async function addDocument(title: string, source: string, text: string): 
   };
   await tbl.add([doc] as unknown as Record<string, unknown>[]);
   return { id: doc.id, title, source, text };
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  if (qdrantSelected()) {
+    await qdrantDelete(id);
+    return true;
+  }
+  const tbl = await getTable();
+  // id is a server-generated UUID; single-quote-escape defensively before the SQL-ish filter.
+  const safe = id.replace(/'/g, "''");
+  await tbl.delete(`id = '${safe}'`);
+  return true;
 }
 
 export async function searchDocuments(query: string, k = 5): Promise<BrainHit[]> {

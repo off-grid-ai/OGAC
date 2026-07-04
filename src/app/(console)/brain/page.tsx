@@ -131,7 +131,10 @@ export default async function BrainPage() {
                 <Link href={`/brain/docs/${d.id}`} className="text-sm font-medium text-foreground hover:text-primary">
                   {d.title}
                 </Link>
-                <Badge variant="secondary">{d.source}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{d.source}</Badge>
+                  <DeleteRowButton url={`/api/v1/admin/brain/documents/${d.id}`} label={d.title} />
+                </div>
               </div>
               <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{d.text}</p>
             </div>
