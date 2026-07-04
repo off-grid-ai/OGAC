@@ -135,12 +135,17 @@ async function gatewayAnswer(
 }
 
 const DEFAULT_SYSTEM = 'Answer only from the provided sources, concisely.';
+const UNGROUNDED_DEFAULT = 'You are a helpful assistant. Answer concisely.';
 
-// Build the system prompt for a run. A user-authored agent's instruction steers the answer, but we
-// always append the grounding rule so a custom agent can't opt out of source-faithfulness.
+// Build the system prompt for a run. For a GROUNDED agent (the default) the grounding rule is
+// always appended so it can't opt out of source-faithfulness. A non-grounded agent (grounded:false,
+// e.g. a brainstorming/drafting assistant) answers from the model directly — no sources are
+// retrieved for it, so forcing "answer only from sources" would make it uselessly refuse.
 function systemFor(agent: AgentDef): string {
-  if (!agent.systemPrompt?.trim()) return DEFAULT_SYSTEM;
-  return `${agent.systemPrompt.trim()}\n\nGround every claim in the provided sources; if they don't cover the question, say so rather than inventing facts.`;
+  const prompt = agent.systemPrompt?.trim();
+  if (agent.grounded === false) return prompt || UNGROUNDED_DEFAULT;
+  if (!prompt) return DEFAULT_SYSTEM;
+  return `${prompt}\n\nGround every claim in the provided sources; if they don't cover the question, say so rather than inventing facts.`;
 }
 
 async function compose(
@@ -326,10 +331,20 @@ export async function runAgent(
     }, orgId);
   }
 
-  // 3. Retrieve — provenance refs come straight off the router's hits.
+  // 3. Retrieve — provenance refs come straight off the router's hits. Skipped for a non-grounded
+  // agent (it answers from the model, so there are no sources to retrieve or cite).
   t = Date.now();
-  const routed = await route(query, 6);
-  mark('retrieve', 'router', `intent ${routed.decision.intent.join(', ')}`, routed.hits.map((h) => h.ref), t);
+  const routed =
+    agent.grounded === false
+      ? { hits: [] as RetrievalHit[], decision: { intent: ['ungrounded'] as string[] } }
+      : await route(query, 6);
+  mark(
+    'retrieve',
+    'router',
+    agent.grounded === false ? 'skipped (ungrounded agent)' : `intent ${routed.decision.intent.join(', ')}`,
+    routed.hits.map((h) => h.ref),
+    t,
+  );
   const toolHit = routed.hits.find((h) => h.sourceKind === 'tool');
   if (toolHit) {
     mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
