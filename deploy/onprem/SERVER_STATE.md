@@ -131,6 +131,12 @@ got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Conf
   (SIGABRT)** — corrupt wifi prefs, needs a reboot/on-site.
 - **`Airtel_Wednesday` (fast SSID) intermittently stops broadcasting** — after this reboot every node
   reported "Could not find network Airtel_Wednesday" and ran on `_2`. Reorder is dormant until it returns.
+  - **Re-checked 2026-07-04:** STILL down. Guarded switch test on g5 → `Could not find network
+    Airtel_Wednesday` again; g5 unharmed (stayed on `_2`, IP `.65`, reachable). `_2` WAN ~100 KB/s
+    (momentary 1 B/s stalls — flaky). `Airtel_Wednesday` is preferred **index 0** on nodes, so the
+    fleet AUTO-migrates the instant its AP rebroadcasts; g4's VL download is resumable so it just
+    accelerates mid-stream. **On-site action needed: power-cycle the `Airtel_Wednesday` AP** — cannot
+    force an AP to broadcast remotely.
 - **S2 and g8 went offline** and did NOT rejoin (powered off / wifi off). Proven unreachable by
   scanning the live subnet from *inside* it (probe node) — not on `_2`, not anywhere. **Cannot be
   revived remotely** (no network path to run `networksetup` on them); needs physical/console access.
