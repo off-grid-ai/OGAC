@@ -38,6 +38,7 @@ export function StudioBuilder({ tools }: { tools: Tool[] }) {
   const [grounded, setGrounded] = useState(true);
   const [visibility, setVisibility] = useState<'private' | 'org' | 'public'>('private');
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   // Once created, we keep the operator on this page and let them try it inline (Step 4).
   const [created, setCreated] = useState<{ agentId: string; title: string; url?: string } | null>(
     null,
@@ -47,6 +48,33 @@ export function StudioBuilder({ tools }: { tools: Tool[] }) {
 
   function toggleTool(id: string) {
     setSelectedTools((cur) => (cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id]));
+  }
+
+  // Ask the gateway to infer a name, relevant skills, and whether to ground — from the goal.
+  // Best-effort: on any failure the form is untouched and the user configures it manually.
+  async function suggest() {
+    if (goal.trim().length < 10 || suggesting) return;
+    setSuggesting(true);
+    try {
+      const res = await fetch('/api/v1/studio/suggest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ goal, tools }),
+      });
+      const s = (await res.json().catch(() => ({}))) as {
+        title?: string;
+        toolIds?: string[];
+        grounded?: boolean | null;
+      };
+      if (s.title && !title.trim()) setTitle(s.title);
+      if (Array.isArray(s.toolIds) && s.toolIds.length) setSelectedTools(s.toolIds);
+      if (typeof s.grounded === 'boolean') setGrounded(s.grounded);
+      toast.success('Suggested a setup from your description — tweak anything below.');
+    } catch {
+      toast.error('Could not suggest right now — configure it below.');
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   function reset() {
@@ -171,6 +199,19 @@ export function StudioBuilder({ tools }: { tools: Tool[] }) {
             placeholder="e.g. Answer employee questions about our HR policies, and always cite the policy document you used."
             className="text-sm"
           />
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={suggest}
+              disabled={goal.trim().length < 10 || suggesting}
+              className="gap-1.5"
+            >
+              <Sparkle className="size-4" />
+              {suggesting ? 'Thinking…' : 'Suggest a setup'}
+            </Button>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="assistant-name" className="text-xs text-muted-foreground">
               Name (optional)

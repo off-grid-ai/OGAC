@@ -155,7 +155,7 @@ Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
 | g1 | GW — qwythos-9b | ❌ offline (unresolvable, 2026-07-05) — qwythos now has 0 live nodes |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g5 | GW — gemma-4-e4b | ✅ serving |
-| g3 | GW — gemma-4-e4b (target image; sd-server verified loads, wiring pending) | ✅ serving gemma |
+| g3 | GW — gemma-4-e4b (:7878) + **image juggernaut-xl-v9 (:1234)** — dual-role | ✅ serving gemma + image |
 | g4 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | g7 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | S2 | (old aux server) | ❌ offline since router reboot — unresolvable, needs on-site/network |
@@ -199,11 +199,20 @@ Until on-site: aux tier down; g6 held as the server slot (out of the GW inferenc
   `gemma-4-e4b` still lands on gemma. **NOTE: qwythos now has ZERO live nodes** (g7 was its last
   reachable one; g1 offline) — qwythos requests will 502 until g1 returns.
 - **Image model = `offgrid-ai/juggernaut-xl-v9-GGUF`** → g3 has `juggernaut-xl-v9-Q4_K.gguf` (2.8 GB).
-  **Feasibility CONFIRMED (2026-07-05):** `sd-server` (stable-diffusion.cpp, in `.../Resources/bin/sd/`)
-  loads juggernaut fine (SDXL, 2.68 GB, self-contained; benign no-external-VAE warning) and listens on
-  `127.0.0.1:1234`. Started manually on g3 (pid may be stale). **STILL TO WIRE:** launchd job for
-  sd-server persistence on g3 + aggregator `/v1/images/generations` route proxying to g3:1234 +
-  POOL image entry (`kind:'image'`) + `image_models`. g3 currently still serves gemma on :7878.
+  **✅ WIRED + WORKING (2026-07-05):** end-to-end image gen verified through the aggregator (real
+  512×512 PNG returned, ~255 KB b64). Pieces:
+  - **g3 launchd `co.getoffgridai.sdserver`** (gui domain, `RunAtLoad`+`KeepAlive`) runs `sd-server`
+    on **`0.0.0.0:1234`** — MUST bind 0.0.0.0, not 127.0.0.1 (the aggregator on S1 connects over the
+    LAN at `offgrid-g3.local:1234`; 127.0.0.1 → aggregator returns `image gateway g3 error:` empty msg).
+    Plist committed at `deploy/onprem/co.getoffgridai.sdserver.plist`; load with
+    `launchctl bootstrap gui/$(id -u) <plist>`. Log `~/sd-server.log`. sd-server is OpenAI-compatible
+    (`POST /v1/images/generations` → `{data:[{b64_json}]}`), so it's a straight proxy, no translation.
+  - **Aggregator** (`scripts/gateway-aggregator.mjs`): `IMAGE_POOL` (`[{g3, offgrid-g3.local:1234,
+    juggernaut-xl-v9}]`, override via `OFFGRID_IMAGE_POOL`), a `/v1/images/*` proxy route (rrPick over
+    `IMAGE_LIVE`, logs `kind:'image'`), `image_models` surfaced in `/` + `/v1/models`.
+  - **g3 is DUAL-ROLE:** still serves gemma chat on :7878 AND image on :1234 (kept gemma to preserve
+    chat capacity while g1/qwythos is down). To make g3 image-only later, disable its chat POOL entry.
+  - Gotcha: `launchctl bootout` is async — sleep + verify it's gone before `bootstrap`, else error 5 (EIO).
 - **Network:** ~230–270 KB/s — fleet stuck on slow `Airtel_Wednesday_2` SSID
 (fast SSID not broadcasting); ~5GB model ≈ 6h/node until the fast AP returns.
 
