@@ -136,9 +136,14 @@ export function RunCodePanel({
         />
 
         <div className="flex items-center gap-3">
-          <Button onClick={run} disabled={gated || busy || !code.trim()} size="sm">
+          <Button
+            onClick={run}
+            disabled={gated || busy || !code.trim()}
+            size="sm"
+            variant={gated ? 'secondary' : 'default'}
+          >
             <Play className="size-4" />
-            {busy ? 'Running…' : 'Run'}
+            {busy ? 'Running…' : gated ? 'Run (disabled)' : 'Run'}
           </Button>
           <span className="text-xs text-muted-foreground">
             {language} · network disabled · 30s cap
