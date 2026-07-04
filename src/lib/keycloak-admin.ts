@@ -40,12 +40,31 @@ interface TokenCache {
   expiresAt: number; // ms epoch
 }
 
+// Error carrying the upstream Keycloak HTTP status so routes can map it to the right response.
+export class KeycloakError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'KeycloakError';
+  }
+}
+
 async function parseKcError(res: Response): Promise<Error> {
+  // 409 on create = the clientId/username already exists. Keycloak's 409 body is usually empty,
+  // so synthesize a human message instead of a bare "HTTP 409".
+  if (res.status === 409) {
+    return new KeycloakError('Already exists — pick a different ID (that one is taken).', 409);
+  }
   try {
-    const body = (await res.json()) as { error?: string; error_description?: string };
-    return new Error(body.error_description ?? body.error ?? `HTTP ${res.status}`);
+    const body = (await res.json()) as { error?: string; error_description?: string; errorMessage?: string };
+    return new KeycloakError(
+      body.error_description ?? body.errorMessage ?? body.error ?? `HTTP ${res.status}`,
+      res.status,
+    );
   } catch {
-    return new Error(`HTTP ${res.status}`);
+    return new KeycloakError(`HTTP ${res.status}`, res.status);
   }
 }
 
