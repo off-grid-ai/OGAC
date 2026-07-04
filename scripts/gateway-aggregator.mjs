@@ -136,6 +136,15 @@ const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
+// Image-generation nodes run sd-server (stable-diffusion.cpp) on a SEPARATE port from the
+// llama-server chat gateway — its API is OpenAI-compatible (`POST /v1/images/generations` →
+// { data: [{ b64_json }] }), so we proxy straight through, no translation. A node can be
+// dual-role (chat on :7878 AND image on :1234). Override the list via OFFGRID_IMAGE_POOL.
+const IMAGE_POOL = JSON.parse(process.env.OFFGRID_IMAGE_POOL || JSON.stringify([
+  { name: 'g3', host: 'offgrid-g3.local', port: 1234, model: 'juggernaut-xl-v9' },
+]));
+const IMAGE_LIVE = IMAGE_POOL.filter((g) => g.enabled !== false);
+
 // per-model round-robin counters
 const rr = {};
 function rrPick(nodes) {
@@ -353,7 +362,7 @@ async function poolInfo() {
     docs: `http://${HOST_HINT}:${PORT}/v1`,
     mcp: `http://${HOST_HINT}:${PORT}/mcp`,
     modalities: Object.keys(modalities).length ? modalities : { text: 'ready', vision_understanding: 'ready' },
-    image_models: [],
+    image_models: IMAGE_LIVE.map((g) => ({ id: g.model, gateways: [g.name] })),
     gateways: infos.map(({ g, info, loaded }) => ({ name: g.name, host: g.host, model: loaded ?? g.model, vision: g.vision, up: !!info, health: healthFor(g.name) })),
   };
 }
@@ -400,7 +409,33 @@ async function handle(req, res, chunks) {
       const vision = nodes.some((g) => g.vision);
       return { id, object: 'model', owned_by: 'offgrid', capabilities: vision ? ['text', 'vision'] : ['text'], gateways: nodes.map((g) => g.name) };
     });
-    return json(res, 200, { object: 'list', data: models });
+    const imageModels = IMAGE_LIVE.map((g) => ({ id: g.model, object: 'model', owned_by: 'offgrid', capabilities: ['image-generation'], gateways: [g.name] }));
+    return json(res, 200, { object: 'list', data: [...models, ...imageModels] });
+  }
+
+  if (req.url.startsWith('/v1/images/')) {
+    // Image generation/edit → sd-server (OpenAI-compatible) on an image node. Straight proxy.
+    captureToken(req);
+    const raw = Buffer.concat(chunks);
+    const target = IMAGE_LIVE.length ? rrPick(IMAGE_LIVE) : null;
+    if (!target) return json(res, 503, { error: { message: 'no image gateway available', type: 'no_backend' } });
+    const started = Date.now();
+    let prompt = ''; try { prompt = String(JSON.parse(raw.toString() || '{}').prompt || ''); } catch { /* non-json */ }
+    const caller = String(req.headers['user-agent'] || '').slice(0, 80);
+    const opts = { host: target.host, port: target.port, method: req.method, path: req.url,
+      headers: { ...req.headers, host: `${target.host}:${target.port}`, 'content-length': raw.length } };
+    const up = http.request(opts, (ur) => {
+      res.writeHead(ur.statusCode || 502, { ...ur.headers, 'x-offgrid-gateway': target.name, 'x-offgrid-model': target.model });
+      let bytes = 0;
+      ur.on('data', (c) => { bytes += c.length; res.write(c); });
+      ur.on('end', () => { res.end(); record({ gateway: target.name, model: target.model, modelServed: target.model, kind: 'image', status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens: 0, caller, corrId: '', params: {}, msgs: [], input: prompt.slice(0, 600), output: `(image ${bytes} bytes)` }); });
+    });
+    up.on('error', (e) => {
+      record({ gateway: target.name, model: target.model, modelServed: target.model, kind: 'image', status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId: '', params: {}, msgs: [], input: prompt.slice(0, 600), output: `(error: ${e.message})` });
+      json(res, 502, { error: { message: `image gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
+    });
+    up.setTimeout(Number(process.env.OFFGRID_IMAGE_UPSTREAM_TIMEOUT_MS || 300000), () => up.destroy(new Error('upstream timeout')));
+    return up.end(raw);
   }
 
   {
