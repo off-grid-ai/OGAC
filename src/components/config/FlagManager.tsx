@@ -27,7 +27,7 @@ interface Flag {
 // Feature-flag management surface. Runtime toggles that gate capabilities without a redeploy
 // (e.g. agent-code-exec, online-evals). Full CRUD: list, create-with-description, toggle, delete —
 // all driving the /admin/flags routes. The store is the first-party flag adapter (Unleash swaps in).
-export function FlagManager() {
+export function FlagManager({ forcedOpen = false }: { forcedOpen?: boolean }) {
   const [flags, setFlags] = useState<Flag[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState('');
@@ -106,6 +106,13 @@ export function FlagManager() {
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
+        {forcedOpen ? (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            <span className="font-medium text-primary">All capabilities are ON for this instance.</span>{' '}
+            <code>OFFGRID_FLAGS_OPEN=true</code> forces every gate open, so the toggles below are
+            ignored at runtime — nothing is gated. Unset it to enforce per-flag state.
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1.4fr_auto]">
           <div className="space-y-1">
             <Label htmlFor="flag-key" className="text-[10px] uppercase tracking-wide text-muted-foreground">

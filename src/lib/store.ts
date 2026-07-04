@@ -846,8 +846,15 @@ export async function deleteFlag(key: string): Promise<boolean> {
   return (res.rowCount ?? 0) > 0;
 }
 
+// A "gate-open" instance: OFFGRID_FLAGS_OPEN=true forces every capability ON, so nothing is gated
+// regardless of which flags exist in the DB. Set per-deployment for demo/eval instances.
+export function flagsForcedOpen(): boolean {
+  return process.env.OFFGRID_FLAGS_OPEN === 'true';
+}
+
 // Runtime check with a default. Falls back to the default when the flag is unset.
 export async function isEnabled(key: string, fallback = false): Promise<boolean> {
+  if (flagsForcedOpen()) return true;
   const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
   return row ? row.enabled : fallback;
 }
