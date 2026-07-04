@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { getInference } from '@/lib/adapters/registry';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
 
@@ -38,7 +37,10 @@ async function ensureCollection(): Promise<void> {
   return ready;
 }
 
-function embed(text: string): Promise<number[]> {
+// Lazy registry import to break the brain/qdrant ← registry ← adapters/evals ← brain cycle — see
+// the same note in brain.ts. A top-level import trips a TDZ on Node 22 during the build.
+async function embed(text: string): Promise<number[]> {
+  const { getInference } = await import('@/lib/adapters/registry');
   return getInference().embed(text);
 }
 
