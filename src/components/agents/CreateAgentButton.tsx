@@ -20,10 +20,18 @@ import { Textarea } from '@/components/ui/textarea';
 
 const TRIGGERS = ['on-demand', 'on-call', 'on-message', 'observed', 'scheduled'] as const;
 
-// Author an agent in plain language. Whatever you type becomes the agent's instruction — it then
-// runs through the SAME governed pipeline as the built-ins (policy gate, guardrails, retrieval
-// routing, grounding, provenance signing). No code, no special powers.
-export function CreateAgentButton() {
+export interface ToolOption {
+  id: string;
+  name: string;
+  policy: string; // 'allow' | 'approval' | 'block'
+}
+
+// Author an agent in plain language, and grant it capabilities. The instruction becomes the
+// agent's system prompt; the selected tools are what it can actually DO (call a connector, run a
+// query). Every run flows through the SAME governed pipeline as the built-ins (policy gate,
+// guardrails, retrieval routing, grounding, provenance signing) — a granted tool still obeys its
+// action policy (allow / needs-approval / blocked), so capability never bypasses governance.
+export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -32,6 +40,7 @@ export function CreateAgentButton() {
   const [model, setModel] = useState('');
   const [grounded, setGrounded] = useState(true);
   const [trigger, setTrigger] = useState<(typeof TRIGGERS)[number]>('on-demand');
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   function reset() {
@@ -41,6 +50,11 @@ export function CreateAgentButton() {
     setModel('');
     setGrounded(true);
     setTrigger('on-demand');
+    setSelectedTools([]);
+  }
+
+  function toggleTool(id: string) {
+    setSelectedTools((cur) => (cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id]));
   }
 
   async function create() {
@@ -50,7 +64,15 @@ export function CreateAgentButton() {
       const res = await fetch('/api/v1/admin/agents', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, role, systemPrompt, model, grounded, trigger }),
+        body: JSON.stringify({
+          name,
+          role,
+          systemPrompt,
+          model,
+          grounded,
+          trigger,
+          tools: selectedTools,
+        }),
       });
       if (!res.ok) throw new Error('failed');
       toast.success(`Created "${name}" — runs through the governed pipeline`);
@@ -74,10 +96,11 @@ export function CreateAgentButton() {
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create an agent from text</DialogTitle>
+          <DialogTitle>Create an agent</DialogTitle>
           <DialogDescription>
-            Describe the job in plain language. Every run is governed by the policy, guardrails,
-            model routing, and grounding configured on this console — automatically.
+            Give it a job, ground it in your knowledge, and grant it tools to act with. Every run is
+            governed by the policy, guardrails, model routing, and grounding on this console —
+            automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -150,6 +173,50 @@ export function CreateAgentButton() {
             </div>
             <Switch id="agent-grounded" checked={grounded} onCheckedChange={setGrounded} />
           </div>
+
+          {/* Capabilities: which registered tools this agent may call. This is what makes it an
+              agent rather than a canned prompt — but each tool still obeys its action policy. */}
+          <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
+            <div>
+              <Label>Tools this agent can use</Label>
+              <p className="text-[11px] text-muted-foreground">
+                What the agent can actually do — call a connector, run a query. Granted tools still
+                obey their action policy (allow / needs-approval / blocked).
+              </p>
+            </div>
+            {tools.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No tools registered yet. Add connectors on the Integrations page to grant agents
+                capabilities beyond text.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {tools.map((t) => {
+                  const on = selectedTools.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleTool(t.id)}
+                      className={
+                        on
+                          ? 'flex items-center gap-1 rounded-md border border-primary bg-primary/10 px-2 py-1 text-xs text-primary'
+                          : 'flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary/40'
+                      }
+                    >
+                      {t.name}
+                      {t.policy === 'approval' ? (
+                        <span className="text-[9px] uppercase text-amber-600">·gated</span>
+                      ) : t.policy === 'block' ? (
+                        <span className="text-[9px] uppercase text-destructive">·blocked</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <Button
             onClick={create}
             disabled={busy || !name.trim() || !systemPrompt.trim()}

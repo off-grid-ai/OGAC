@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { agentActivity, listAllAgents } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -25,8 +27,15 @@ function planeLabel(id: string): string {
 
 export default async function AgentsPage() {
   await requireModuleForUser('agents');
-  const [agents, activity] = await Promise.all([listAllAgents(), agentActivity()]);
+  const [agents, activity, tools] = await Promise.all([
+    listAllAgents(),
+    agentActivity(),
+    listTools(await currentOrgId()).catch(() => []),
+  ]);
   const customCount = agents.filter((a) => a.custom).length;
+  const toolOptions = tools
+    .filter((t) => t.enabled)
+    .map((t) => ({ id: t.id, name: t.name, policy: t.policy }));
 
   return (
     <div className="space-y-6">
@@ -36,7 +45,7 @@ export default async function AgentsPage() {
           governed pipeline: policy gate, guardrails, model routing, retrieval grounding, and
           tamper-evident provenance. No agent can opt out of the conventions set on this console.
         </p>
-        <CreateAgentButton />
+        <CreateAgentButton tools={toolOptions} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
