@@ -1,9 +1,11 @@
 'use client';
 
-import { ArrowRight, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import { ArrowRight, CheckCircle, Plus, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { AgentRunner } from '@/components/agents/AgentRunner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,11 +38,24 @@ export function StudioBuilder({ tools }: { tools: Tool[] }) {
   const [grounded, setGrounded] = useState(true);
   const [visibility, setVisibility] = useState<'private' | 'org' | 'public'>('private');
   const [busy, setBusy] = useState(false);
+  // Once created, we keep the operator on this page and let them try it inline (Step 4).
+  const [created, setCreated] = useState<{ agentId: string; title: string; url?: string } | null>(
+    null,
+  );
 
   const check = validateBuilderInput({ goal, title, grounded, visibility, toolIds: selectedTools });
 
   function toggleTool(id: string) {
     setSelectedTools((cur) => (cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id]));
+  }
+
+  function reset() {
+    setGoal('');
+    setTitle('');
+    setSelectedTools([]);
+    setGrounded(true);
+    setVisibility('private');
+    setCreated(null);
   }
 
   async function create() {
@@ -88,13 +103,54 @@ export function StudioBuilder({ tools }: { tools: Tool[] }) {
           ? `"${check.value!.title}" published — shareable at ${tpl.url}`
           : `"${check.value!.title}" created`,
       );
-      // Hand off to the agent's run page to try it (the governed runner lives there).
-      router.push(`/agents/${agent.id}`);
+      // Stay on the page and let them try it inline (Step 4). router.refresh so the gallery on
+      // /studio reflects the new assistant when they navigate back.
+      setCreated({ agentId: agent.id, title: check.value!.title, url: tpl.url });
+      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to create the assistant');
     } finally {
       setBusy(false);
     }
+  }
+
+  // Post-create: success banner + inline try-it (the governed runner), no page change.
+  if (created) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-5">
+        <Card className="border-primary/30 bg-primary/5 shadow-sm">
+          <CardContent className="flex flex-wrap items-center gap-3 py-4">
+            <CheckCircle className="size-5 text-primary" weight="fill" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                &ldquo;{created.title}&rdquo; is live.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Try it below. It runs through the full governed pipeline.
+                {created.url ? (
+                  <>
+                    {' '}Shared at{' '}
+                    <a href={created.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {created.url}
+                    </a>
+                    .
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={reset} className="gap-1.5">
+              <Plus className="size-4" />
+              New assistant
+            </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/studio">Done</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <AgentRunner agentId={created.agentId} />
+      </div>
+    );
   }
 
   return (
