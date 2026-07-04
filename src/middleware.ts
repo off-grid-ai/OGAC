@@ -67,27 +67,52 @@ function isApiBearer(req: { headers: Headers; nextUrl: { pathname: string } }): 
 }
 
 // User/admin surface (console UI + admin/audit APIs) requires an SSO session (or a service token).
-export default auth((req) => {
-  if (!checkRateLimit(req)) {
-    return NextResponse.json({ error: 'too many requests' }, {
-      status: 429,
-      headers: { 'Retry-After': '60' },
-    });
+// CORS for the public API surface (Phase 5). Scoped to /api/v1/* so the platform is callable
+// cross-origin (SDKs, browser apps). ACAO:* with NO Allow-Credentials on purpose: browsers won't
+// attach cookies to a wildcard-origin request, so session-cookie routes are never exposed
+// cross-site — only bearer-token calls (the machine-client flow) work cross-origin, which is what
+// a public API wants.
+const CORS_HEADERS: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Api-Key',
+  'Access-Control-Max-Age': '86400',
+};
+const isPublicApi = (pathname: string): boolean => pathname.startsWith('/api/v1/');
+function withCors(res: NextResponse, pathname: string): NextResponse {
+  if (isPublicApi(pathname)) {
+    for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
   }
-  if (isPublic(req.nextUrl.pathname)) return NextResponse.next();
-  if (req.method === 'GET' && FILE_GET.test(req.nextUrl.pathname)) return NextResponse.next();
-  if (isApiBearer(req)) return NextResponse.next();
+  return res;
+}
+
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
+
+  // CORS preflight — answer before auth/rate-limit so a browser can probe the public API.
+  if (req.method === 'OPTIONS' && isPublicApi(pathname)) {
+    return withCors(new NextResponse(null, { status: 204 }), pathname);
+  }
+  if (!checkRateLimit(req)) {
+    return withCors(
+      NextResponse.json({ error: 'too many requests' }, { status: 429, headers: { 'Retry-After': '60' } }),
+      pathname,
+    );
+  }
+  if (isPublic(pathname)) return withCors(NextResponse.next(), pathname);
+  if (req.method === 'GET' && FILE_GET.test(pathname)) return NextResponse.next();
+  if (isApiBearer(req)) return withCors(NextResponse.next(), pathname);
   if (!req.auth) {
     // API clients get a clean 401 (not an HTML login redirect); browsers get sent to
     // /signin with a callbackUrl so they return to where they were headed.
-    if (req.nextUrl.pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    if (pathname.startsWith('/api/')) {
+      return withCors(NextResponse.json({ error: 'unauthorized' }, { status: 401 }), pathname);
     }
     const signin = new URL('/signin', req.nextUrl.origin);
-    signin.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search);
+    signin.searchParams.set('callbackUrl', pathname + req.nextUrl.search);
     return NextResponse.redirect(signin);
   }
-  return NextResponse.next();
+  return withCors(NextResponse.next(), pathname);
 });
 
 export const config = {
