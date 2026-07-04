@@ -54,6 +54,11 @@ export async function qdrantAdd(title: string, source: string, text: string): Pr
   return { id, title, source, text };
 }
 
+export async function qdrantDelete(id: string): Promise<void> {
+  await ensureCollection();
+  await qfetch(`/collections/${COLLECTION}/points/delete`, 'POST', { points: [id] });
+}
+
 // Bulk reindex — push a set of already-materialized Brain docs into the Qdrant collection so that
 // switching OFFGRID_ADAPTER_RETRIEVAL=qdrant lands on a populated store instead of an empty one.
 // Docs are passed in (not imported from brain.ts) to avoid an import cycle: brain.ts imports this.
