@@ -4,8 +4,9 @@ import { auth } from '@/auth';
 import { provitRepos, provitRuns } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
 import { effectiveBaseRole } from '@/lib/module-access';
+import { abacAllows, pushVisibility, type ProvitAbacRule } from '@/lib/provit-policy';
 import { verifyToken } from '@/lib/provit-token';
-import { evaluateAbac } from '@/lib/store';
+import { listAbacRules } from '@/lib/store';
 import { currentOrgId, DEFAULT_ORG } from '@/lib/tenancy';
 
 // Single Provit access layer — inherits the console's RBAC + ABAC + tenancy rather than
@@ -32,16 +33,18 @@ export async function provitAbacAllows(p: ProvitPrincipal, action: string): Prom
   if (p.role === 'admin') return true;
   const base = await effectiveBaseRole(p.role);
   if (base === 'admin') return true;
-  // Deny-overrides: a matching deny for either the role or its base blocks.
+  // Fetch rules once; the deny-overrides / fail-open decision is the PURE abacAllows policy, applied
+  // to both the role and its base (a matching deny for either blocks).
+  const rules = (await listAbacRules()) as ProvitAbacRule[];
   for (const role of new Set([p.role, base])) {
-    const { allow, matched } = await evaluateAbac({ role, resource: 'provit', attributes: { action } });
-    if (matched.some((r) => r.effect === 'deny')) return false;
-    if (!allow && matched.length > 0) return false;
+    if (!abacAllows(rules, role, action)) return false;
   }
   return true; // no governing rule → allowed (RBAC module gate already applied)
 }
 
-/** Tenancy row filter for a Provit table (repos|runs): public ∪ own org ∪ own private. */
+/** Tenancy row filter for a Provit table (repos|runs): public ∪ own org ∪ own private. The SQL
+ *  predicate below is the DB-side twin of the pure `canSee` in provit-policy.ts — the two truth
+ *  tables MUST stay identical (public → anyone; org → same orgId; private → owner email). */
 export function visibilityFilter(table: typeof provitRepos | typeof provitRuns, p: ProvitPrincipal): SQL | undefined {
   return or(
     eq(table.visibility, 'public'),
