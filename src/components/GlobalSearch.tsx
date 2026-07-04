@@ -4,6 +4,7 @@ import {
   BookOpenText,
   ChatCircleDots,
   File,
+  Lightning,
   MagnifyingGlass,
   SquaresFour,
   TextAlignLeft,
@@ -13,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface SearchResult {
-  kind: 'module' | 'conversation' | 'prompt' | 'file';
+  kind: 'module' | 'feature' | 'conversation' | 'prompt' | 'file';
   id: string;
   title: string;
   subtitle?: string;
@@ -22,6 +23,7 @@ interface SearchResult {
 
 const KIND_ICON: Record<SearchResult['kind'], React.ReactNode> = {
   module: <SquaresFour className="size-3.5" />,
+  feature: <Lightning className="size-3.5" />,
   conversation: <ChatCircleDots className="size-3.5" />,
   prompt: <TextAlignLeft className="size-3.5" />,
   file: <File className="size-3.5" />,
@@ -29,6 +31,7 @@ const KIND_ICON: Record<SearchResult['kind'], React.ReactNode> = {
 
 const KIND_LABEL: Record<SearchResult['kind'], string> = {
   module: 'Page',
+  feature: 'Feature',
   conversation: 'Chat',
   prompt: 'Prompt',
   file: 'File',
