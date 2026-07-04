@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 //   • private files: require auth (session or Bearer key), else 404 (don't reveal existence).
 //   • ?meta=1 returns JSON metadata instead of the bytes.
 // eslint-disable-next-line complexity
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  const { id } = await params;
+export async function GET(req: Request, { params }: { params: Promise<{ id: string[] }> }): Promise<Response> {
+  const id = (await params).id.join('/'); // catch-all: nested keys (e.g. provit/x.png) rejoin to the object key
   const meta = await getFileMeta(id);
   if (!meta) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
@@ -39,10 +39,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 // PATCH /api/v1/files/:id — { visibility: "public" | "private" }.
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string[] }> }): Promise<Response> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const { id } = await params;
+  const id = (await params).id.join('/'); // catch-all: nested keys (e.g. provit/x.png) rejoin to the object key
   const body = (await req.json().catch(() => ({}))) as { visibility?: string };
   const updated = await setVisibility(id, String(body.visibility ?? ''), gate.user.email ?? '', gate.user.role === 'admin');
   if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -50,10 +50,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 // DELETE /api/v1/files/:id
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string[] }> }): Promise<Response> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const { id } = await params;
+  const id = (await params).id.join('/'); // catch-all: nested keys (e.g. provit/x.png) rejoin to the object key
   const ok = await deleteFile(id, gate.user.email ?? '', gate.user.role === 'admin');
   return ok ? NextResponse.json({ deleted: true }) : NextResponse.json({ error: 'not found' }, { status: 404 });
 }

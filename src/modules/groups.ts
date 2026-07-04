@@ -11,6 +11,11 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
+    id: 'home',
+    label: 'Home',
+    modules: ['overview'],
+  },
+  {
     id: 'workspace',
     label: 'Workspace',
     modules: ['chat', 'projects', 'artifacts', 'prompts', 'knowledge', 'storage', 'studio'],
