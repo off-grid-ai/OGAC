@@ -3,6 +3,8 @@ import { ilike, and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatConversations, promptLibrary, chatDocuments } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
+import { isModuleEnabled } from '@/lib/modules';
+import { matchFeatures } from '@/lib/search-features';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +40,20 @@ type FileResult = {
   href: string;
 };
 
-type SearchResult = ModuleResult | ConversationResult | PromptResult | FileResult;
+type FeatureResult = {
+  kind: 'feature';
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+};
+
+type SearchResult =
+  | ModuleResult
+  | FeatureResult
+  | ConversationResult
+  | PromptResult
+  | FileResult;
 
 export async function GET(req: Request): Promise<NextResponse> {
   const gate = await requireUser(req);
@@ -66,6 +81,17 @@ export async function GET(req: Request): Promise<NextResponse> {
       title: m.label,
       subtitle: m.description,
       href: m.route,
+    }));
+
+  // 1b. Features / sub-pages — find by what you want to DO, filtered to enabled modules.
+  const featureResults: FeatureResult[] = matchFeatures(q)
+    .filter((f) => isModuleEnabled(f.moduleId))
+    .map((f) => ({
+      kind: 'feature',
+      id: f.id,
+      title: f.title,
+      subtitle: f.subtitle,
+      href: f.href,
     }));
 
   // 2–4. DB queries in parallel
@@ -124,6 +150,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const results: SearchResult[] = [
     ...moduleResults,
+    ...featureResults,
     ...conversationResults,
     ...promptResults,
     ...fileResults,
