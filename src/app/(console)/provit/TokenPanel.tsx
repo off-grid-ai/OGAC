@@ -28,7 +28,8 @@ export function TokenPanel() {
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-foreground">Connect a Provit instance</h2>
       <p className="text-sm text-muted-foreground">
-        Mint a token, set it on your Provit instance, and its mapped repos + test runs push here as your team&apos;s data.
+        Without a token, Provit runs are public and land in the showcase. Mint a token, set it on your
+        Provit instance (hosted or self-hosted), and its repos and runs stay private to your org.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

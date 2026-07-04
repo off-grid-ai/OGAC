@@ -58,7 +58,8 @@ export default async function ProvitPage({
         <div>
           <h1 className="text-lg font-semibold text-foreground">Provit</h1>
           <p className="text-sm text-muted-foreground">
-            Visual QA — catch visual regressions and review UI changes on-prem.
+            Maps a repo into modules, runs every behavior end to end, and judges the recording with
+            vision. Free runs are public; your account keeps repos and runs private to your org.
           </p>
         </div>
       </div>
@@ -98,12 +99,12 @@ export default async function ProvitPage({
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-foreground">Mapped repos</h2>
+          <h2 className="text-sm font-semibold text-foreground">Your repos</h2>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{shownRepos.length}</span>
         </div>
         {shownRepos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No repos mapped yet. Feature maps Provit builds appear here, searchable.
+            No repos yet. Repos your org maps stay private here; public demo runs live in the showcase below.
           </p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -130,7 +131,7 @@ export default async function ProvitPage({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Showcase</h2>
+        <h2 className="text-sm font-semibold text-foreground">Public showcase</h2>
         {showcase.error ? (
           <p className="text-sm text-muted-foreground">
             Could not load the showcase: {showcase.error}
