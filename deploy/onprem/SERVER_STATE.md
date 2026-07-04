@@ -184,9 +184,14 @@ Until on-site: aux tier down; g6 held as the server slot (out of the GW inferenc
 `2× Qwen3-VL-8B-Instruct` (g4,g7) · `2× gemma-4-e4b` (g2,g5) · `1× image juggernaut` (g3) ·
 `1× qwythos-9b` (g1). No sub-9B qwythos exists (every HF release is 9B) → g1 stays 9B.
 - **VL model = `Qwen/Qwen3-VL-8B-Instruct-GGUF`** → `Qwen3VL-8B-Instruct-Q4_K_M.gguf` (5.03 GB)
-  + `mmproj-Qwen3VL-8B-Instruct-F16.gguf` (1.16 GB). Downloading on **g4** (~270 KB/s, ETA ~6 h),
-  resumable via `~/vl-dl.sh` (log `~/vl-dl.log`, marker `~/vl-dl.done`). Decision: verify it RUNS
-  on g4, then **LAN-copy both files g4→g7** (one internet pull, not two). Only ONE download at a time.
+  + `mmproj-Qwen3VL-8B-Instruct-F16.gguf` (1.16 GB). **✅ Download COMPLETE on g4 (2026-07-04 18:53)**
+  — `Qwen3VL-8B-Instruct-Q4_K_M.gguf` (4.7 GB) + `mmproj-Qwen3VL-8B-Instruct-F16.gguf` (1.1 GB) on disk,
+  marker `~/vl-dl.done` set (log `~/vl-dl.log`). The one internet pull is done.
+  **LAN-copy g4→g7 (2026-07-04 ~23:47):** g4↔g7 have no direct key auth, so routed **through S1**
+  (S1 has passwordless SSH to both): rsync g4→S1 stage → S1→g7, resumable `--partial`. Script
+  `~/vl-copy.sh` on S1 (log `~/vl-copy.log`, marker `~/vl-copy.done`, staging `~/vl-stage`).
+  After the copy lands, flip g7's `active-model.json` to VL + `launchctl kickstart co.getoffgridai.gateway`
+  and set the aggregator POOL entry `kind`/`model` to VL to actually serve it.
 - **Image model = `offgrid-ai/juggernaut-xl-v9-GGUF`** → g3 ALREADY has `juggernaut-xl-v9-Q4_K.gguf`
   (2.97 GB, canonical) so NO download. **BUT image-gen serving is UNWIRED**: the headless gateway
   on :7878 is llama-server (no txt2img); `POST /v1/images/generations` → 000. The `sd`
