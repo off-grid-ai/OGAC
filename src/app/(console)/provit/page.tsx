@@ -3,15 +3,19 @@ import { desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { provitRepos } from '@/db/schema';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentPrincipal, provitAbacAllows, visibilityFilter } from '@/lib/provit-access';
 import { getShowcase, provitBaseUrl, provitConfigured, provitHealth } from '@/lib/provit';
+import { TokenPanel } from './TokenPanel';
 
 export const dynamic = 'force-dynamic';
 
-// Mapped repos Provit has pushed here (feature maps + test cases). Never throws — a fresh DB or
-// a missing table just yields an empty list so the page still renders.
+// Mapped repos the viewer may see — inherits the console's ABAC (resource='provit') + tenancy
+// (public library ∪ own org ∪ own private). Never throws: a fresh DB just yields an empty list.
 async function mappedRepos() {
   try {
-    return await db.select().from(provitRepos).orderBy(desc(provitRepos.mappedAt)).limit(60);
+    const p = await currentPrincipal();
+    if (!(await provitAbacAllows(p, 'read'))) return [];
+    return await db.select().from(provitRepos).where(visibilityFilter(provitRepos, p)).orderBy(desc(provitRepos.mappedAt)).limit(60);
   } catch {
     return [];
   }
@@ -89,6 +93,8 @@ export default async function ProvitPage({
           Filter
         </button>
       </form>
+
+      <TokenPanel />
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">

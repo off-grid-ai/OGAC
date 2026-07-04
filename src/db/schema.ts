@@ -687,8 +687,15 @@ export const configSettings = pgTable('config_settings', {
 // ─── Provit (visual QA) — data pushed from Provit so every repo / feature map / run / verdict
 //     is first-class + searchable in the console (roadmap Phase 2). Provit authenticates with a
 //     service-account JWT (same seam as the gateway). ──────────────────────────────────────────
+// Tenancy: every row carries org_id (team) + owner_id (user) + visibility. The no-login /try
+// demo pushes visibility='public' (the PUBLIC LIBRARY, visible to all); authenticated team runs
+// push visibility='org' scoped to their org, or 'private' for owner-only. RBAC gates the module;
+// ABAC (abac_rules, resource='provit') refines per-attribute.
 export const provitRepos = pgTable('provit_repos', {
   id: text('id').primaryKey(),                 // owner-repo slug
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull().default(''),
+  visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
   url: text('url').notNull(),                  // canonical github url
   features: integer('features').notNull().default(0),
   testFiles: integer('test_files').notNull().default(0),
@@ -697,10 +704,13 @@ export const provitRepos = pgTable('provit_repos', {
   plan: jsonb('plan'),                         // full feature map incl. per-feature test cases
   mappedBy: text('mapped_by'),                 // principal (email / client id)
   mappedAt: timestamp('mapped_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({ orgIdx: index('provit_repos_org_idx').on(t.orgId), visIdx: index('provit_repos_vis_idx').on(t.visibility) }));
 
 export const provitRuns = pgTable('provit_runs', {
   id: text('id').primaryKey(),                 // run id
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull().default(''),
+  visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
   repoId: text('repo_id'),                     // provit_repos.id (nullable — some runs are ad-hoc)
   surface: text('surface'),                    // web | desktop | ios | android
   model: text('model'),
@@ -712,7 +722,21 @@ export const provitRuns = pgTable('provit_runs', {
   narrative: text('narrative'),
   payload: jsonb('payload'),                   // full run record
   ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ repoIdx: index('provit_runs_repo_idx').on(t.repoId) }));
+}, (t) => ({ repoIdx: index('provit_runs_repo_idx').on(t.repoId), orgIdx: index('provit_runs_org_idx').on(t.orgId) }));
+
+// Integration tokens: a user mints one in the console (bound to their org + identity), gives it
+// to their Provit instance, and Provit's pushes are attributed to that org (visibility='org').
+// Only the SHA-256 hash is stored; the plaintext is shown once at creation.
+export const provitTokens = pgTable('provit_tokens', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull(),         // user email who issued it
+  label: text('label').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  revoked: boolean('revoked').notNull().default(false),
+}, (t) => ({ hashIdx: index('provit_tokens_hash_idx').on(t.tokenHash) }));
 
 // Merged output of the judge API — one row per judged frame-batch (window).
 export const provitVerdicts = pgTable('provit_verdicts', {
