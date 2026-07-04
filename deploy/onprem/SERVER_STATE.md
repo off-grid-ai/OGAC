@@ -26,6 +26,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_FLEET_URL` | `http://offgrid-s2.local:8070` | Was `127.0.0.1:8070` (closed on S1). FleetDM runs on S2 `:8070`. |
 | `OFFGRID_LANGFUSE_OTLP_URL` | `http://127.0.0.1:8931/api/public/otel` | otel.ts appends `/v1/traces` + Basic auth (`OFFGRID_LANGFUSE_AUTH`). Via the localhost Caddy proxy (see below). |
 | `OFFGRID_LANGFUSE_URL` | `http://127.0.0.1:8931` | Langfuse read-back, via the localhost Caddy proxy. |
+| `OFFGRID_FLAGS_OPEN` | `true` | **Gate-open instance (2026-07-04):** forces every feature flag ON so nothing is gated (agent-code-exec, online-evals, etc.), regardless of DB flag state. Honored in `store.isEnabled` + the Unleash adapter. Unset it to enforce per-flag state. |
 | `OFFGRID_UNLEASH_URL` | `http://127.0.0.1:8932` | via localhost Caddy proxy → S2. |
 | `OFFGRID_SUPERSET_URL` | `http://127.0.0.1:8933` | via localhost Caddy proxy → S2. |
 | `OFFGRID_FLEET_URL` | `http://127.0.0.1:8934` | via localhost Caddy proxy → S2. |
