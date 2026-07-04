@@ -119,16 +119,20 @@ const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info U
 // `model` is the ROUTING TAG (pick() matches substrings on it); `kind` groups nodes by
 // role so chat traffic never lands on an image/grounding node. The card shows each node's
 // ACTUAL loaded model (from /v1/models), not this tag — so a mid-swap node reads truthfully.
-// Target config: g1 qwythos · g2/g5/g6 gemma-4-e4b · g3/g4 juggernaut (image) · g7/g8 UI-Venus.
+// LIVE config (2026-07-04 bring-up): all 6 reachable GWs serve chat, from models already on disk.
+//   g1 qwythos · g2/g3/g4/g5 gemma-4-e4b · g7 qwythos.
+// g6 is now aux SERVER #2 (Colima) — NOT a gateway; g8 is offline (on-site power/wifi). Both
+// disabled so pick() never routes to them. Image (g3 juggernaut Q8_0) + VL (g4/g7 UI-Venus) are
+// the target roles to restore once a verified image/VL quant lands — flip kind+model back then.
 const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
-  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat',      model: 'qwythos-9b' },
-  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
-  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  kind: 'image',     model: 'juggernaut-xl-v9' },
-  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'image',     model: 'juggernaut-xl-v9' },
-  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
-  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat',      model: 'gemma-4-e4b' },
-  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b' },
-  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b' },
+  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
+  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
+  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
+  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
+  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
+  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b', enabled: false },
+  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
+  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b', enabled: false },
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
