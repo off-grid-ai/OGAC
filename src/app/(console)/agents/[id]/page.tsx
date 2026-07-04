@@ -2,6 +2,7 @@ import { ArrowLeft, Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
+import { AgentRunner } from '@/components/agents/AgentRunner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -167,6 +168,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       </div>
+
+      <AgentRunner agentId={agent.id} />
 
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
