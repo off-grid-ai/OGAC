@@ -173,9 +173,20 @@ approval (same wall as g4). **Fastest real recovery of the aux tier is to WAKE S
 already has the whole tier installed & configured — just needs to rejoin wifi), not rebuild g6.
 Until on-site: aux tier down; g6 held as the server slot (out of the GW inference pool).
 
-**Two GW-config blockers (2026-07-04):** (1) no verified-working VL model — UI-Venus/Qwen3-VL
-decode gibberish on this llama.cpp build; must verify official `Qwen3-VL-8B-Instruct` on ONE node
-before committing g4+g7. (2) downloads ~230 KB/s — fleet stuck on slow `Airtel_Wednesday_2` SSID
+**Finalized node model plan (2026-07-04, confirmed with owner):**
+`2× Qwen3-VL-8B-Instruct` (g4,g7) · `2× gemma-4-e4b` (g2,g5) · `1× image juggernaut` (g3) ·
+`1× qwythos-9b` (g1). No sub-9B qwythos exists (every HF release is 9B) → g1 stays 9B.
+- **VL model = `Qwen/Qwen3-VL-8B-Instruct-GGUF`** → `Qwen3VL-8B-Instruct-Q4_K_M.gguf` (5.03 GB)
+  + `mmproj-Qwen3VL-8B-Instruct-F16.gguf` (1.16 GB). Downloading on **g4** (~270 KB/s, ETA ~6 h),
+  resumable via `~/vl-dl.sh` (log `~/vl-dl.log`, marker `~/vl-dl.done`). Decision: verify it RUNS
+  on g4, then **LAN-copy both files g4→g7** (one internet pull, not two). Only ONE download at a time.
+- **Image model = `offgrid-ai/juggernaut-xl-v9-GGUF`** → g3 ALREADY has `juggernaut-xl-v9-Q4_K.gguf`
+  (2.97 GB, canonical) so NO download. **BUT image-gen serving is UNWIRED**: the headless gateway
+  on :7878 is llama-server (no txt2img); `POST /v1/images/generations` → 000. The `sd`
+  (stable-diffusion.cpp) engine lives at `.../Resources/bin/sd/` but no persistent server/route
+  exists, and the aggregator has no image route (`image_models: []`). Wiring a txt2img endpoint +
+  aggregator `/v1/images/generations` proxy is the remaining task before g3 serves images.
+- **Network:** ~230–270 KB/s — fleet stuck on slow `Airtel_Wednesday_2` SSID
 (fast SSID not broadcasting); ~5GB model ≈ 6h/node until the fast AP returns.
 
 ## HA plan — repurpose 2 GWs → servers (6 GW + 2 servers)
