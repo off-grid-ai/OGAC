@@ -26,6 +26,11 @@ ingress:
   # gungnir.* 301-redirects to provit.* at the Caddy layer (kept for old links).
   - hostname: gungnir.getoffgridai.co
     service: http://127.0.0.1:80
+  # Unified API gateway (Phase 5) — one public surface: /v1/* → LLM gateway, /specs/* → each
+  # service's OpenAPI (via the console proxy), everything else → console. Through Caddy on :80.
+  # PENDING: add the matching DNS CNAME (dns-records.sh) + apply the Caddy vhost, then reload.
+  - hostname: console-api.getoffgridai.co
+    service: http://127.0.0.1:80
   - service: http_status:404
 
 # NOTE: DNS records for auth/ssh/provit were created via the Cloudflare API this session
