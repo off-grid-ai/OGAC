@@ -30,6 +30,7 @@ import {
 import type { CheckResult } from '@/lib/checks';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
+import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
 import { shipAudit } from '@/lib/siem';
 
 // Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
@@ -801,57 +802,17 @@ export async function deleteRoutingRule(id: string): Promise<void> {
   await db.delete(routingRules).where(eq(routingRules.id, id));
 }
 
-export interface RoutingDecision {
-  action: 'local' | 'cloud' | 'block';
-  effective: 'local' | 'cloud' | 'block';
-  model: string | null;
-  fallback: string | null;
-  matched: string | null;
-  reason: string;
-}
+// Re-export the routing-decision type from the pure module so existing importers are unaffected.
+export type { RoutingDecision } from '@/lib/routing-policy';
 
-// Evaluate where a request runs: first enabled rule (by ascending priority) whose condition
-// matches wins. The org egress switch is the master leash — a `cloud` action with egress off is
-// downgraded to `block`. No match → local (the safe default).
+// Evaluate where a request runs. Thin I/O adapter: fetch the routing rules + org egress switch, then
+// delegate to the PURE decideRouting() (routing-policy.ts) which owns the leash logic — first
+// matching rule by priority wins, and a `cloud` action with egress OFF is downgraded to `block`.
 export async function evaluateRouting(ctx: {
   attributes: Record<string, string>;
 }): Promise<RoutingDecision> {
   const [rules, policy] = await Promise.all([listRoutingRules(), getOrgPolicy()]);
-  const abacCtx: AbacContext = { role: '*', resource: '*', attributes: ctx.attributes };
-  const hit = rules.find((r) => r.enabled && ruleMatches(routeAsAbac(r), abacCtx));
-  if (!hit) {
-    return {
-      action: 'local',
-      effective: 'local',
-      model: null,
-      fallback: null,
-      matched: null,
-      reason: 'no rule matched; defaulted to local',
-    };
-  }
-  const action = hit.action as RoutingDecision['action'];
-  const leashed = action === 'cloud' && !policy.egressAllowed;
-  return {
-    action,
-    effective: leashed ? 'block' : action,
-    model: hit.model || null,
-    fallback: hit.fallback || null,
-    matched: hit.name,
-    reason: leashed ? `${hit.name} → cloud, but org egress is OFF (leashed to block)` : hit.name,
-  };
-}
-
-// Reuse the ABAC matcher: a routing rule's attribute/operator/value is an AbacRule shape.
-function routeAsAbac(r: RoutingRule): AbacRule {
-  return {
-    id: r.id,
-    role: '*',
-    resource: '*',
-    attribute: r.attribute,
-    operator: r.operator,
-    value: r.value,
-    effect: 'allow',
-  };
+  return decideRouting(rules, ctx.attributes, policy.egressAllowed);
 }
 
 // ─── Feature flags (runtime toggles) ───────────────────────────────────────────
