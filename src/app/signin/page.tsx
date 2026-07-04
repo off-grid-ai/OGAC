@@ -134,6 +134,29 @@ export default async function SignInPage({
               No sign-in method configured. Set the identity backend in the console environment.
             </p>
           ) : null}
+
+          {/* No account yet → route to sales. Book a call opens Mac's cal.com; write-to-us is a
+              mailto. A link (not an inline iframe) keeps the auth-page CSP tight (default-src 'self'). */}
+          <div className="space-y-2 border-t border-border pt-3">
+            <p className="text-center text-xs text-muted-foreground">Don&apos;t have an account?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href="https://cal.com/mohammed-ali-chherawalla-jlvdhw"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Book a call
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="mailto:mac@wednesday.is?subject=Off%20Grid%20Console%20access">
+                  Write to us
+                </a>
+              </Button>
+            </div>
+          </div>
+
           <p className="pt-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
             On-prem · Secure
           </p>
