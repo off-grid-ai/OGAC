@@ -148,11 +148,23 @@ Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
 | g1 | GW — qwythos-9b | ✅ serving |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g5 | GW — gemma-4-e4b | ✅ serving |
-| g3 | GW — image (juggernaut Q8_0) | needs correct-quant download |
-| g4 | GW — VL (grounding) | needs a VERIFIED VL model |
-| g7 | GW — VL (grounding) | needs a VERIFIED VL model |
+| g3 | GW — gemma-4-e4b (interim; target image) | ✅ serving |
+| g4 | GW — gemma-4-e4b (interim; target VL) | ✅ serving |
+| g7 | GW — qwythos-9b (interim; target VL) | ✅ serving |
 | S2 | (old aux server) | ❌ offline since router reboot |
 | g8 | (spare) | ❌ offline since router reboot |
+
+**GW bring-up (2026-07-04):** all 6 reachable GWs brought online with ZERO downloads by
+pointing each node's `~/.offgrid/models/active-model.json` at a model already on disk and
+`launchctl kickstart`-ing `co.getoffgridai.gateway`:
+- g4 had a complete gemma but its active-model pointed at an absent qwythos → repointed to gemma.
+- g7 had a complete qwythos present → repointed active-model to it (its UI-Venus is gibberish).
+- g3 had a complete gemma → brought up on gemma (its juggernaut is an unverified Q4_K quant; the
+  image role waits for a verified Q8_0).
+Aggregator `POOL` (in `scripts/gateway-aggregator.mjs`, committed) updated to match: 6 chat nodes,
+`g6`+`g8` set `enabled:false` (g6=server, g8=offline) so `pick()` stops 502-ing on them. Verified:
+gemma round-robins g3/g4/g5, qwythos hits g1/g7, `gateway.getoffgridai.co/health`=200.
+Image (g3) + VL (g4/g7) roles restore once verified quants land — flip `kind`+`model` back then.
 
 **g6-as-server is BLOCKED remotely:** g6 has NO OrbStack installed (not even the .app),
 and the aux tier (Langfuse/Unleash/Superset/Fleet/Presidio via `services-node-b.yml`) is all
