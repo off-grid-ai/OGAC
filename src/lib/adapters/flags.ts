@@ -1,4 +1,4 @@
-import { isEnabled as dbIsEnabled } from '@/lib/store';
+import { flagsForcedOpen, isEnabled as dbIsEnabled } from '@/lib/store';
 import type { FlagsPort } from './types';
 
 // Feature-flag backends behind the FlagsPort. The first-party store (Postgres, edited in the
@@ -54,6 +54,7 @@ export const unleashFlags: FlagsPort = {
     description: 'Feature-flag service — the backbone of modular control at scale.',
   },
   async isEnabled(key, fallback = false) {
+    if (flagsForcedOpen()) return true; // gate-open instance — honor it before hitting Unleash
     if (!UNLEASH_URL) return dbIsEnabled(key, fallback);
     try {
       return await unleashEnabled(key, fallback);
