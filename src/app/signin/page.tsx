@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import { devLoginEnabled, googleEnabled, microsoftEnabled, passwordEnabled } from '@/auth.config';
+import { BookCallDialog } from '@/components/auth/BookCallDialog';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -140,15 +141,7 @@ export default async function SignInPage({
           <div className="space-y-2 border-t border-border pt-3">
             <p className="text-center text-xs text-muted-foreground">Don&apos;t have an account?</p>
             <div className="grid grid-cols-2 gap-2">
-              <Button asChild variant="outline" size="sm">
-                <a
-                  href="https://cal.com/mohammed-ali-chherawalla-jlvdhw"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Book a call
-                </a>
-              </Button>
+              <BookCallDialog />
               <Button asChild variant="outline" size="sm">
                 <a href="mailto:mac@wednesday.is?subject=Off%20Grid%20Console%20access">
                   Write to us

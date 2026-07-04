@@ -16,6 +16,9 @@ const securityHeaders = [
       "media-src 'self' blob: https://gateway.getoffgridai.co",
       "font-src 'self'",
       "connect-src 'self' https://gateway.getoffgridai.co https://us.i.posthog.com https://us-assets.i.posthog.com",
+      // cal.com booking widget embedded (iframe only) in the sign-in "Book a call" modal. No cal
+      // script is loaded — script-src stays tight; this only permits framing cal.com's booking page.
+      "frame-src 'self' https://cal.com https://app.cal.com",
       "frame-ancestors 'none'",
     ].join('; '),
   },
