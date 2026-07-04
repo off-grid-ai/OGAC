@@ -102,6 +102,14 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
 
+**PENDING (Phase 5 — unified API gateway):** `console-api.getoffgridai.co` is staged in
+`cloudflared-tunnel.yml` (→ Caddy :80) + a Caddy vhost (`/v1/*`→:8800, `/specs/*`→console proxy,
+else→console:3000) in `deploy/Caddyfile`, but NOT yet live. To activate: (1) add the CNAME
+`console-api` → the tunnel (extend `dns-records.sh`), (2) copy the updated tunnel config to
+`~/.cloudflared/config.yml` on S1 + restart cloudflared, (3) copy the Caddyfile + reload Caddy.
+The console-side code is done + live: CORS on `/api/v1/*` (bearer-only) and the in-app spec proxy
+`/api/v1/specs/<id>`.
+
 ## Network migration (2026-07-03) — fleet moved to Airtel_Wednesday (fast net)
 
 The whole fleet was on `Airtel_Wednesday_2` (~190 KB/s WAN — WiFi backhaul cap). Migrated all
@@ -174,11 +182,11 @@ Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
 | g1 | GW — qwythos-9b | ✅ RECLAIMED to `_2` (2026-07-05, IP .57) — qwythos routes again |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g5 | GW — gemma-4-e4b | ✅ serving |
-| g3 | GW — gemma-4-e4b (:7878) + **image juggernaut-xl-v9 (:1234)** — dual-role | ✅ serving gemma + image |
+| g3 | **IMAGE-ONLY** — juggernaut-xl-v9 (:1234). gemma :7878 gateway booted-out+disabled (2026-07-05) | ✅ serving image |
 | g4 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | g7 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | S2 | (old aux server) | ❌ offline since router reboot — unresolvable, needs on-site/network |
-| g8 | (spare) | ⚠️ ALIVE but PARTITIONED (2026-07-05) — on `Airtel_Wednesday`, isolated from `_2` |
+| g8 | (spare) | ✅ RECLAIMED to `_2` (2026-07-05, IP .64) — held as spare, POOL `enabled:false` (UI-Venus not needed) |
 
 **GW bring-up (2026-07-04):** all 6 reachable GWs brought online with ZERO downloads by
 pointing each node's `~/.offgrid/models/active-model.json` at a model already on disk and

@@ -124,3 +124,22 @@ http://127.0.0.1:8933 {
 http://127.0.0.1:8934 {
 	reverse_proxy offgrid-s2.local:8070
 }
+
+# ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────
+# One public surface over the platform. /v1/* → the LLM aggregator; /specs/* → each
+# service's OpenAPI (rewritten to the console's in-app proxy, which fetches server-side to
+# dodge CORS + reach LAN-only hosts); everything else (/api/*, /docs) → the console. The
+# console already emits CORS on /api/v1/* (bearer-only, ACAO:*). PENDING on-server apply +
+# DNS CNAME (dns-records.sh) — staged here as the target config.
+http://console-api.getoffgridai.co {
+	handle /v1/* {
+		reverse_proxy 127.0.0.1:8800
+	}
+	handle_path /specs/* {
+		rewrite * /api/v1/specs{uri}
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
