@@ -683,3 +683,43 @@ export const configSettings = pgTable('config_settings', {
   updatedBy: text('updated_by').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Provit (visual QA) — data pushed from Provit so every repo / feature map / run / verdict
+//     is first-class + searchable in the console (roadmap Phase 2). Provit authenticates with a
+//     service-account JWT (same seam as the gateway). ──────────────────────────────────────────
+export const provitRepos = pgTable('provit_repos', {
+  id: text('id').primaryKey(),                 // owner-repo slug
+  url: text('url').notNull(),                  // canonical github url
+  features: integer('features').notNull().default(0),
+  testFiles: integer('test_files').notNull().default(0),
+  screens: integer('screens').notNull().default(0),
+  cases: integer('cases').notNull().default(0),
+  plan: jsonb('plan'),                         // full feature map incl. per-feature test cases
+  mappedBy: text('mapped_by'),                 // principal (email / client id)
+  mappedAt: timestamp('mapped_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const provitRuns = pgTable('provit_runs', {
+  id: text('id').primaryKey(),                 // run id
+  repoId: text('repo_id'),                     // provit_repos.id (nullable — some runs are ad-hoc)
+  surface: text('surface'),                    // web | desktop | ios | android
+  model: text('model'),
+  direction: text('direction'),               // on-track | partial | off-track | unknown
+  headline: text('headline'),
+  frames: integer('frames').notNull().default(0),
+  flagged: integer('flagged').notNull().default(0),
+  video: text('video'),
+  narrative: text('narrative'),
+  payload: jsonb('payload'),                   // full run record
+  ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ repoIdx: index('provit_runs_repo_idx').on(t.repoId) }));
+
+// Merged output of the judge API — one row per judged frame-batch (window).
+export const provitVerdicts = pgTable('provit_verdicts', {
+  id: text('id').primaryKey(),                 // `${runId}:${idx}`
+  runId: text('run_id').notNull(),
+  idx: integer('idx').notNull(),
+  frameRange: text('frame_range'),             // e.g. "10-14"
+  bad: boolean('bad').notNull().default(false),
+  note: text('note'),
+}, (t) => ({ runIdx: index('provit_verdicts_run_idx').on(t.runId) }));

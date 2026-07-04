@@ -1,8 +1,21 @@
 import { Eye, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
+import { desc } from 'drizzle-orm';
+import { db } from '@/db';
+import { provitRepos } from '@/db/schema';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getShowcase, provitBaseUrl, provitConfigured, provitHealth } from '@/lib/provit';
 
 export const dynamic = 'force-dynamic';
+
+// Mapped repos Provit has pushed here (feature maps + test cases). Never throws — a fresh DB or
+// a missing table just yields an empty list so the page still renders.
+async function mappedRepos() {
+  try {
+    return await db.select().from(provitRepos).orderBy(desc(provitRepos.mappedAt)).limit(60);
+  } catch {
+    return [];
+  }
+}
 
 // Provit — visual-QA product surfaced as a first-class console module. Shows reachability
 // status, a link to open Provit, and its public showcase. Navigation lives in the URL:
@@ -19,7 +32,9 @@ export default async function ProvitPage({
 
   const configured = provitConfigured();
   const baseUrl = provitBaseUrl();
-  const [health, showcase] = await Promise.all([provitHealth(), getShowcase()]);
+  const [health, showcase, repos] = await Promise.all([provitHealth(), getShowcase(), mappedRepos()]);
+  const needleR = (q ?? '').trim().toLowerCase();
+  const shownRepos = needleR ? repos.filter((r) => r.url.toLowerCase().includes(needleR)) : repos;
 
   const needle = query.toLowerCase();
   const items = needle
@@ -74,6 +89,39 @@ export default async function ProvitPage({
           Filter
         </button>
       </form>
+
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Mapped repos</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{shownRepos.length}</span>
+        </div>
+        {shownRepos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No repos mapped yet. Feature maps Provit builds appear here, searchable.
+          </p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {shownRepos.map((r) => (
+              <li key={r.id} className="rounded-md border border-border bg-card p-4">
+                <a
+                  href={`${baseUrl}/repos/${encodeURIComponent(r.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 break-all text-sm font-medium text-primary hover:underline"
+                >
+                  {r.url.replace(/^https:\/\/github.com\//, '').replace(/\.git$/, '')}
+                  <ArrowSquareOut className="size-3.5 shrink-0" />
+                </a>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span><b className="text-foreground">{r.features}</b> features</span>
+                  <span><b className="text-foreground">{r.cases}</b> tests</span>
+                  <span><b className="text-foreground">{r.screens}</b> screens</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Showcase</h2>
