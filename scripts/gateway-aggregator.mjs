@@ -128,10 +128,10 @@ const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
   { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
   { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
   { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
-  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
+  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
   { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
   { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b', enabled: false },
-  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
+  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
   { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b', enabled: false },
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
@@ -293,11 +293,13 @@ function pick(model, image) {
     if (ground.length) return rrPick(ground);
   }
   if (image) { // multimodal (vision INPUT) — a vision-capable chat node, not image-gen
+    if (m.includes('vl'))    return rrPick(chat.filter((g) => g.model.includes('vl') && g.vision));
     if (m.includes('gemma')) return rrPick(chat.filter((g) => g.model.includes('gemma') && g.vision));
     return rrPick(chat.filter((g) => g.vision));
   }
+  if (m.includes('vl'))      return rrPick(byModel('vl'));       // Qwen3-VL vision model → g4/g7 (before qwen→gemma)
   if (m.includes('gemma'))   return rrPick(byModel('gemma'));
-  if (m.includes('qwen'))    return rrPick(byModel('gemma'));   // qwen retired → gemma
+  if (m.includes('qwen'))    return rrPick(byModel('gemma'));   // legacy qwen (non-VL) retired → gemma
   if (m.includes('qwythos')) return rrPick(byModel('qwythos'));
   return rrPick(chat); // unspecified: round-robin CHAT nodes only
 }
