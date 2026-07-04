@@ -23,7 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'intelligence',
     label: 'Intelligence',
-    modules: ['agents', 'agent-runs', 'brain', 'evals', 'guardrails', 'sandbox', 'provit'],
+    modules: ['agents', 'agent-runs', 'brain', 'evals', 'sandbox', 'provit'],
   },
   {
     id: 'gateway',
@@ -38,7 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'governance',
     label: 'Governance',
-    modules: ['control', 'policy', 'regulatory', 'provenance', 'secrets', 'access'],
+    modules: ['control', 'policy', 'access', 'guardrails', 'secrets', 'regulatory', 'provenance'],
   },
   {
     id: 'insights',
