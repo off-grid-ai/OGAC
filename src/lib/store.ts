@@ -831,7 +831,19 @@ export async function setFlag(key: string, enabled: boolean, description = ''): 
   await db
     .insert(featureFlags)
     .values({ key, enabled, description })
-    .onConflictDoUpdate({ target: featureFlags.key, set: { enabled, updatedAt: new Date() } });
+    // Upsert: on an existing key, update enabled + description (only overwrite description when a
+    // non-empty one is supplied, so a bare toggle doesn't wipe it).
+    .onConflictDoUpdate({
+      target: featureFlags.key,
+      set: description
+        ? { enabled, description, updatedAt: new Date() }
+        : { enabled, updatedAt: new Date() },
+    });
+}
+
+export async function deleteFlag(key: string): Promise<boolean> {
+  const res = await db.delete(featureFlags).where(eq(featureFlags.key, key));
+  return (res.rowCount ?? 0) > 0;
 }
 
 // Runtime check with a default. Falls back to the default when the flag is unset.
