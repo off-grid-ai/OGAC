@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import * as lancedb from '@lancedb/lancedb';
-import { getInference } from '@/lib/adapters/registry';
 import { qdrantAdd, qdrantList, qdrantSearch } from '@/lib/qdrant';
 
 // The Brain — the ingestion→retrieval (RAG) pipeline. LanceDB (embedded, on-disk) is the default
@@ -33,7 +32,12 @@ interface DocRow extends BrainDoc {
 }
 
 // Embeddings go through the inference port — gateway when reachable, deterministic otherwise.
-function embed(text: string): Promise<number[]> {
+// The registry import is lazy (dynamic) ON PURPOSE: brain ← registry ← adapters/evals ← brain is a
+// circular dependency. A top-level import lets webpack bundle the cycle into one chunk whose
+// evaluation order trips a TDZ ("Cannot access 'x' before initialization") on Node 22 during the
+// build's collect-page-data pass. Loading the port lazily at call time breaks the import cycle.
+async function embed(text: string): Promise<number[]> {
+  const { getInference } = await import('@/lib/adapters/registry');
   return getInference().embed(text);
 }
 
