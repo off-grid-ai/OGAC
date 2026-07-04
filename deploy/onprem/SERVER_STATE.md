@@ -152,13 +152,13 @@ Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
 |---|---|---|
 | S1 | server #1 (control plane) | ✅ up |
 | **g6** | **server #2 (aux tier — S2 replacement)** | **designated 2026-07-04; NOT yet provisioned** |
-| g1 | GW — qwythos-9b | ✅ serving |
+| g1 | GW — qwythos-9b | ❌ offline (unresolvable, 2026-07-05) — qwythos now has 0 live nodes |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g5 | GW — gemma-4-e4b | ✅ serving |
-| g3 | GW — gemma-4-e4b (interim; target image) | ✅ serving |
-| g4 | GW — gemma-4-e4b (interim; target VL) | ✅ serving |
-| g7 | GW — qwythos-9b (interim; target VL) | ✅ serving |
-| S2 | (old aux server) | ❌ offline since router reboot |
+| g3 | GW — gemma-4-e4b (target image; sd-server verified loads, wiring pending) | ✅ serving gemma |
+| g4 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
+| g7 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
+| S2 | (old aux server) | ❌ offline since router reboot — unresolvable, needs on-site/network |
 | g8 | (spare) | ❌ offline since router reboot |
 
 **GW bring-up (2026-07-04):** all 6 reachable GWs brought online with ZERO downloads by
@@ -190,14 +190,20 @@ Until on-site: aux tier down; g6 held as the server slot (out of the GW inferenc
   **LAN-copy g4→g7 (2026-07-04 ~23:47):** g4↔g7 have no direct key auth, so routed **through S1**
   (S1 has passwordless SSH to both): rsync g4→S1 stage → S1→g7, resumable `--partial`. Script
   `~/vl-copy.sh` on S1 (log `~/vl-copy.log`, marker `~/vl-copy.done`, staging `~/vl-stage`).
-  After the copy lands, flip g7's `active-model.json` to VL + `launchctl kickstart co.getoffgridai.gateway`
-  and set the aggregator POOL entry `kind`/`model` to VL to actually serve it.
-- **Image model = `offgrid-ai/juggernaut-xl-v9-GGUF`** → g3 ALREADY has `juggernaut-xl-v9-Q4_K.gguf`
-  (2.97 GB, canonical) so NO download. **BUT image-gen serving is UNWIRED**: the headless gateway
-  on :7878 is llama-server (no txt2img); `POST /v1/images/generations` → 000. The `sd`
-  (stable-diffusion.cpp) engine lives at `.../Resources/bin/sd/` but no persistent server/route
-  exists, and the aggregator has no image route (`image_models: []`). Wiring a txt2img endpoint +
-  aggregator `/v1/images/generations` proxy is the remaining task before g3 serves images.
+  **✅ DONE (2026-07-05):** copy landed, g7's `active-model.json` flipped to VL + kickstarted; **both
+  g4 and g7 now serve `Qwen3VL-8B-Instruct-Q4_K_M.gguf` live** ("Vision server ready", :7878=200,
+  quant VERIFIED to load — answers the old "does it run" question). Aggregator POOL updated (g4,g7
+  → `model:'qwen3-vl-8b'`) AND `pick()` fixed: the new tag contains "qwen", which the legacy
+  `qwen→gemma` rule was catching → added a `vl` rule (text + vision-input) BEFORE it, so VL routes
+  to g4/g7. Aggregator restarted (sudo kickstart). Verified: `qwen3-vl-8b` requests land on VL nodes,
+  `gemma-4-e4b` still lands on gemma. **NOTE: qwythos now has ZERO live nodes** (g7 was its last
+  reachable one; g1 offline) — qwythos requests will 502 until g1 returns.
+- **Image model = `offgrid-ai/juggernaut-xl-v9-GGUF`** → g3 has `juggernaut-xl-v9-Q4_K.gguf` (2.8 GB).
+  **Feasibility CONFIRMED (2026-07-05):** `sd-server` (stable-diffusion.cpp, in `.../Resources/bin/sd/`)
+  loads juggernaut fine (SDXL, 2.68 GB, self-contained; benign no-external-VAE warning) and listens on
+  `127.0.0.1:1234`. Started manually on g3 (pid may be stale). **STILL TO WIRE:** launchd job for
+  sd-server persistence on g3 + aggregator `/v1/images/generations` route proxying to g3:1234 +
+  POOL image entry (`kind:'image'`) + `image_models`. g3 currently still serves gemma on :7878.
 - **Network:** ~230–270 KB/s — fleet stuck on slow `Airtel_Wednesday_2` SSID
 (fast SSID not broadcasting); ~5GB model ≈ 6h/node until the fast AP returns.
 
@@ -216,6 +222,17 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
   not validate. g4/g5 have `OrbStack.app` installed (g1/g2 don't); S1's OrbStack is fully working.
 - **Do NOT cram the heavy aux tier onto S1** — S1 is the sole tunnel-anchored control plane; OOMing it
   loses everything. Provit (lightweight Node, no Docker) is the exception and belongs on S1.
+- **2-server distribution status (2026-07-05):** S1 runs the full container stack (console/Keycloak/
+  Postgres + data-sources + services-a + services-extra, all healthy). The **aux tier**
+  (`services-node-b.yml`: Langfuse+deps, Presidio, Unleash, Redis, Superset, Fleet — ~15 containers,
+  ALL public images, **no `@offgrid/*`/monorepo dep**) is **down** — it lived on **S2, which is offline
+  and unresolvable**. **g6** (designated S2-replacement) re-probed: reachable via SSH, 187 GB free, but
+  **OrbStack NOT installed, no repo/compose on it** — so it is NOT a turnkey 2nd server; it needs an
+  OrbStack install (helper-install is the gated step) + rsync of `services-node-b.yml` + an env file.
+  Cleanest path = **S2 returning** (already has OrbStack + the stack; owner reports OrbStack self-inits
+  on installed nodes). To bring the aux tier up on whichever node: `docker compose -f services-node-b.yml
+  up -d`, then repoint console `.env.local` (`OFFGRID_LANGFUSE_URL`/`_UNLEASH_URL`/`_REDIS_URL`/
+  `_SUPERSET_URL`/`_FLEET_URL`) from `offgrid-s2.local` → the target host, and restart the console.
 
 ## Multi-tenancy (Phase 3 — in progress)
 
