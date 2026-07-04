@@ -2,7 +2,9 @@
 
 > From ops dashboard to the control plane for the AI age.
 
-This document is the authoritative phase plan. Each phase has a clear goal, a definition of done, and the critical decisions that unlock the next phase. Phases within a tier can overlap; a later tier cannot start until its predecessor's critical path item is complete.
+**Read [`VISION.md`](./VISION.md) first — it is the strategy ("make enterprises intelligent":
+harness internal + external intelligence under the org's own governance, on-prem) that this phase
+plan executes against.** This document is the authoritative phase plan. Each phase has a clear goal, a definition of done, and the critical decisions that unlock the next phase. Phases within a tier can overlap; a later tier cannot start until its predecessor's critical path item is complete.
 
 ---
 
