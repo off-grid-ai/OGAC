@@ -132,7 +132,7 @@ const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
   { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
   { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b', enabled: false },
   { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
-  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b', enabled: false },
+  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b', enabled: false }, // reclaimed to _2, held as spare (UI-Venus not needed)
 ]));
 const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
 
