@@ -1,4 +1,5 @@
 import { Waveform } from '@phosphor-icons/react/dist/ssr';
+import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -124,6 +125,10 @@ export default async function DriftPage() {
           </Card>
         </>
       )}
+
+      {/* Management: alert thresholds + baseline reset live here so an operator tunes drift where
+          they observe it (the same console-owned settings surfaced on Observability). */}
+      <ThresholdManager />
     </div>
   );
 }
