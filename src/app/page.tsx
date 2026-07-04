@@ -175,7 +175,7 @@ function Nav() {
             </a>
           </Button>
           <Button asChild size="sm">
-            <Link href="/fleet">Open console</Link>
+            <Link href="/overview">Open console</Link>
           </Button>
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function LandingPage() {
           <BlurFade delay={0.45} inView>
             <div className="mt-8 flex items-center justify-center gap-3">
               <Button asChild size="lg">
-                <Link href="/fleet">
+                <Link href="/overview">
                   Open console
                   <ArrowRight className="size-4" />
                 </Link>
@@ -479,7 +479,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-10 flex items-center justify-center">
             <Button asChild size="lg">
-              <Link href="/fleet">
+              <Link href="/overview">
                 Open the console
                 <ArrowRight className="size-4" />
               </Link>
