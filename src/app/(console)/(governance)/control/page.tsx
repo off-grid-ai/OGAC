@@ -105,13 +105,41 @@ export default async function ControlPage() {
           <div>
             <CardTitle className="text-sm">Model routing</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Conditional + smart routing. First matching rule (by priority) decides where a request
-              runs; cloud is leashed by the egress switch above.
+              For each request, the first matching rule (lowest priority number) decides where it
+              runs. No rule matches → runs locally.
             </p>
           </div>
           <AddRoutingRuleButton />
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Plain-language legend + the live egress state, so the leash is clear in context. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+            <span className="flex items-center gap-1.5">
+              <Badge variant="secondary" className="bg-primary/10 text-primary">local</Badge>
+              <span className="text-muted-foreground">on-prem model, data stays on the box</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600">cloud</Badge>
+              <span className="text-muted-foreground">external model — only if egress is ON</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Badge variant="secondary" className="bg-destructive/10 text-destructive">block</Badge>
+              <span className="text-muted-foreground">request refused</span>
+            </span>
+            <span className="ml-auto flex items-center gap-1.5">
+              <span className="text-muted-foreground">Cloud egress:</span>
+              <Badge
+                variant="secondary"
+                className={
+                  policy.egressAllowed
+                    ? 'bg-blue-500/10 text-blue-600'
+                    : 'bg-primary/10 text-primary'
+                }
+              >
+                {policy.egressAllowed ? 'ON' : 'OFF — cloud rules forced to block'}
+              </Badge>
+            </span>
+          </div>
           <RoutingTester />
           <Table>
             <TableHeader>
