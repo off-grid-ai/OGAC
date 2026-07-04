@@ -1,7 +1,7 @@
 import { Plugs, PlugsConnected } from '@phosphor-icons/react/dist/ssr';
-import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddConnectorButton } from '@/components/integrations/AddConnectorButton';
 import { CachePanel } from '@/components/integrations/CachePanel';
+import { ConnectorRowActions } from '@/components/integrations/ConnectorRowActions';
 import { GatewayIntegrations } from '@/components/integrations/GatewayIntegrations';
 import { ToolPolicySelect } from '@/components/integrations/ToolPolicySelect';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,18 @@ import {
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
-import { listConnectors, listTools } from '@/lib/store';
+import { listConnectors, listIngestJobs, listTools } from '@/lib/store';
+
+function relTime(iso: string | null): string {
+  if (!iso) return 'never';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'never';
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -43,10 +54,11 @@ const CON_STATUS: Record<string, string> = {
 export default async function IntegrationsPage() {
   await requireModuleForUser('integrations');
   const org = await currentOrgId();
-  const [bindings, connectors, tools] = await Promise.all([
+  const [bindings, connectors, tools, jobs] = await Promise.all([
     listBindings(true),
     listConnectors(org),
     listTools(org),
+    listIngestJobs(8),
   ]);
 
   return (
@@ -78,6 +90,7 @@ export default async function IntegrationsPage() {
                   <TableHead>Kind</TableHead>
                   <TableHead>Auth</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Last sync</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -99,10 +112,21 @@ export default async function IntegrationsPage() {
                         {c.status}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {relTime(c.lastSync)}
+                    </TableCell>
                     <TableCell>
-                      {c.custom ? (
-                        <DeleteRowButton url={`/api/v1/admin/connectors/${c.id}`} label={c.name} />
-                      ) : null}
+                      <ConnectorRowActions
+                        connector={{
+                          id: c.id,
+                          name: c.name,
+                          type: c.type,
+                          endpoint: c.endpoint,
+                          auth: c.auth,
+                          description: c.description,
+                          custom: c.custom,
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -111,6 +135,56 @@ export default async function IntegrationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {jobs.length > 0 ? (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm">Recent ingest runs</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The latest sync jobs — what each connector pulled and when.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Connector</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Records</TableHead>
+                  <TableHead className="text-right">When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jobs.map((j) => (
+                  <TableRow key={j.id}>
+                    <TableCell className="font-medium text-foreground">{j.connectorName}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          j.status === 'completed'
+                            ? 'bg-primary/10 text-primary'
+                            : j.status === 'failed'
+                              ? 'bg-destructive/10 text-destructive'
+                              : 'bg-muted text-muted-foreground'
+                        }
+                      >
+                        {j.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {j.records.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {relTime(j.startedAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="shadow-sm">
         <CardHeader>
