@@ -117,6 +117,25 @@ g4 `.89`, g5 `.90`, g6 `.88`, g7 `.91`, g8 `.87`. All config now uses hostnames/
 > If a machine won't join: `networksetup -setairportnetwork en0 "Airtel_Wednesday" "Wednesdaysol@25"`.
 > `_2` uses the same password. S1's en0 is Wi-Fi (macOS 15 misreports "not associated").
 
+## Network — SSID PARTITION discovered (2026-07-05)
+
+**The fleet is split across two client-isolated SSIDs — g1/g8 are NOT down, they're partitioned.**
+Guarded hop on g6 (`hop-probe.sh`: switch en0 to `Airtel_Wednesday`, probe, ARP-sweep, restore to
+`_2`, all detached/self-restoring) proved:
+- On `Airtel_Wednesday`, g6 got `.93` and **reached `offgrid-g1.local` AND `offgrid-g8.local`** — both
+  ALIVE. `offgrid-s2.local` unreachable on both SSIDs = **S2 is the only truly-down node.**
+- **The two SSIDs are separate L2 segments** (client isolation): router MAC is `a0:91:ca:37:1e:d1` on
+  `Airtel_Wednesday` vs `a0:91:ca:96:79:a0` on `_2`. So S1 (on `_2`) and its aggregator **cannot reach
+  g1/g8** even though they're up — that's why they looked "offline/unresolvable."
+- **`Airtel_Wednesday` IS broadcasting again** (contradicts the 2026-07-04 "not broadcasting" note below).
+  Nodes prefer it at index 0 but don't roam until they drop `_2`, so g2–g7 stayed on `_2` while g1/g8
+  are on `Airtel_Wednesday`.
+- **Live count: 9 of 10 up** (7 on `_2`: S1,g2,g3,g4,g5,g6,g7 · 2 on `Airtel_Wednesday`: g1,g8), S2 down.
+- **Impact:** g1's qwythos is alive but unusable (aggregator can't route to it) → qwythos still has 0
+  *reachable* nodes. **Fix = un-partition:** move g1/g8 onto `_2` (they'll re-prefer `Airtel_Wednesday`
+  on reconnect unless index-0 is changed), OR consolidate everyone on one SSID, OR disable AP client
+  isolation on the router (`.1`). Reachable meanwhile only via a g6-style hop (probe path, not serving).
+
 ## Network stability — learnings (2026-07-04, after a router reboot)
 
 A router/AP reboot (~23:29 on 2026-07-03) re-DHCP'd the whole fleet again (S1 `.85`→`.59`; nodes
@@ -152,14 +171,14 @@ Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
 |---|---|---|
 | S1 | server #1 (control plane) | ✅ up |
 | **g6** | **server #2 (aux tier — S2 replacement)** | **designated 2026-07-04; NOT yet provisioned** |
-| g1 | GW — qwythos-9b | ❌ offline (unresolvable, 2026-07-05) — qwythos now has 0 live nodes |
+| g1 | GW — qwythos-9b | ✅ RECLAIMED to `_2` (2026-07-05, IP .57) — qwythos routes again |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g5 | GW — gemma-4-e4b | ✅ serving |
 | g3 | GW — gemma-4-e4b (:7878) + **image juggernaut-xl-v9 (:1234)** — dual-role | ✅ serving gemma + image |
 | g4 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | g7 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | S2 | (old aux server) | ❌ offline since router reboot — unresolvable, needs on-site/network |
-| g8 | (spare) | ❌ offline since router reboot |
+| g8 | (spare) | ⚠️ ALIVE but PARTITIONED (2026-07-05) — on `Airtel_Wednesday`, isolated from `_2` |
 
 **GW bring-up (2026-07-04):** all 6 reachable GWs brought online with ZERO downloads by
 pointing each node's `~/.offgrid/models/active-model.json` at a model already on disk and
