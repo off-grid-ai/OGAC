@@ -7,10 +7,41 @@
 // SeaweedFS runs with `-s3` and no identity config, so its S3 API accepts anonymous requests
 // on the loopback interface — no SigV4 signing needed. We speak raw S3 over fetch to stay
 // dependency-free (matching the aggregator's style).
+//
+// Phase 4.10-B: when the service-token broker (`getServiceCredential('seaweedfs')`) has an S3 keypair
+// provisioned in OpenBao (SeaweedFS gets an `identities.json`), every request is SigV4-signed with it.
+// Until then the broker returns `kind:'none'` and we fall back to the current ANONYMOUS loopback
+// behavior UNCHANGED — byte-identical requests to today, so nothing breaks pre-deploy. All S3 calls go
+// through the one `s3Fetch` seam so signing is applied uniformly (or not at all).
+
+import { getServiceCredential } from './service-credentials';
+import { signS3Request } from './s3-sigv4';
 
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
 const base = `${S3}/${BUCKET}`;
+
+// The one S3 request seam. Fetches the broker credential; if it's an S3 keypair, SigV4-signs the
+// request (adds authorization + x-amz-date + x-amz-content-sha256). If it's `none` (unprovisioned),
+// the request is issued EXACTLY as before — same URL, same method, same headers, no signing.
+async function s3Fetch(url: string, init: RequestInit & { body?: Uint8Array } = {}): Promise<Response> {
+  const cred = await getServiceCredential('seaweedfs');
+  if (cred.kind !== 's3') return fetch(url, init);
+  const method = (init.method ?? 'GET').toUpperCase();
+  const callerHeaders = (init.headers as Record<string, string>) ?? {};
+  const signed = signS3Request({
+    method,
+    url,
+    headers: callerHeaders,
+    body: init.body,
+    accessKey: cred.accessKey,
+    secretKey: cred.secretKey,
+  });
+  // fetch sets Host itself; drop the signer's host echo so we don't fight it. Everything else (the
+  // caller's headers + the SigV4 auth/date/content-hash) is sent as-is.
+  const { host: _host, ...authHeaders } = signed;
+  return fetch(url, { ...init, headers: { ...callerHeaders, ...authHeaders } });
+}
 const PUBLIC_BASE = (process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co').replace(/\/$/, '');
 
 // The internet-reachable read URL for an object — the gateway's SeaweedFS path (serves the
@@ -36,7 +67,7 @@ let ensurePromise: Promise<void> | null = null;
 export async function ensureFileSchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
   ensurePromise = (async () => {
-    await fetch(base, { method: 'PUT' }).catch(() => {}); // create bucket; ignore "already exists"
+    await s3Fetch(base, { method: 'PUT' }).catch(() => {}); // create bucket; ignore "already exists"
   })().catch((e) => { ensurePromise = null; throw e; });
   return ensurePromise;
 }
@@ -63,12 +94,12 @@ export async function putObject(key: string, body: Buffer | string, contentType 
   await ensureFileSchema();
   const bytes = typeof body === 'string' ? Buffer.from(body) : body;
   const path = key.split('/').map(encodeURIComponent).join('/');
-  const res = await fetch(`${base}/${path}`, { method: 'PUT', headers: { 'content-type': contentType }, body: new Uint8Array(bytes) });
+  const res = await s3Fetch(`${base}/${path}`, { method: 'PUT', headers: { 'content-type': contentType }, body: new Uint8Array(bytes) });
   if (!res.ok) throw new Error(`seaweedfs put ${res.status}`);
 }
 export async function getObjectText(key: string): Promise<string | null> {
   const path = key.split('/').map(encodeURIComponent).join('/');
-  const res = await fetch(`${base}/${path}`);
+  const res = await s3Fetch(`${base}/${path}`);
   if (!res.ok) return null;
   return res.text();
 }
@@ -83,7 +114,7 @@ export async function saveFile(o: {
   await ensureFileSchema();
   const visibility = o.visibility === 'public' ? 'public' : 'private';
   const id = `${crypto.randomUUID()}-${safeName(o.name)}`;
-  const res = await fetch(`${base}/${encodeURIComponent(id)}`, {
+  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: {
       'content-type': o.mime || mimeFromName(o.name),
@@ -99,7 +130,7 @@ export async function saveFile(o: {
 }
 
 export async function getFileMeta(id: string): Promise<FileMeta | null> {
-  const res = await fetch(`${base}/${encodeURIComponent(id)}`, { method: 'HEAD' });
+  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, { method: 'HEAD' });
   if (!res.ok) return null;
   const h = res.headers;
   const metaName = h.get('x-amz-meta-name');
@@ -115,7 +146,7 @@ export async function getFileMeta(id: string): Promise<FileMeta | null> {
 }
 
 export async function readFileBytes(id: string): Promise<Buffer | null> {
-  const res = await fetch(`${base}/${encodeURIComponent(id)}`);
+  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`);
   if (!res.ok) return null;
   return Buffer.from(await res.arrayBuffer());
 }
@@ -126,7 +157,7 @@ export async function readFileBytes(id: string): Promise<Buffer | null> {
 // extension and treats objects as public (the default) — a per-object HEAD would be N calls.
 export async function listFiles(_owner: string): Promise<FileMeta[]> {
   await ensureFileSchema();
-  const res = await fetch(`${base}?list-type=2&max-keys=1000`);
+  const res = await s3Fetch(`${base}?list-type=2&max-keys=1000`);
   if (!res.ok) return [];
   const xml = await res.text();
   const out: FileMeta[] = [];
@@ -157,7 +188,7 @@ export async function setVisibility(id: string, visibility: string, owner: strin
   const meta = await getFileMeta(id);
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return null;
   const v = visibility === 'public' ? 'public' : 'private';
-  const res = await fetch(`${base}/${encodeURIComponent(id)}`, {
+  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: {
       'x-amz-copy-source': `/${BUCKET}/${encodeURIComponent(id)}`,
@@ -175,6 +206,6 @@ export async function setVisibility(id: string, visibility: string, owner: strin
 export async function deleteFile(id: string, owner: string, isAdmin: boolean): Promise<boolean> {
   const meta = await getFileMeta(id);
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return false;
-  const res = await fetch(`${base}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.ok;
 }

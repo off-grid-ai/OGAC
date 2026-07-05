@@ -14,6 +14,8 @@ import {
   type SoftwareInventory,
 } from '@/lib/fleetdm';
 import { listDevices } from '@/lib/store';
+import { getServiceCredential, invalidateServiceCredential } from '@/lib/service-credentials';
+import { chooseFleetToken } from '@/lib/service-credentials-lib';
 import type { MdmDevice, MdmPort } from './types';
 
 // MDM / device-management backends behind the Fleet Control port. The first-party registry is the
@@ -26,6 +28,15 @@ import type { MdmDevice, MdmPort } from './types';
 // `src/lib/fleetdm.ts`. This keeps the SOLID split the console mandates.
 const FLEET_URL = process.env.OFFGRID_FLEET_URL ?? process.env.FLEET_URL;
 const FLEET_TOKEN = process.env.OFFGRID_FLEET_TOKEN ?? process.env.FLEET_TOKEN;
+
+// Phase 4.10-B: the Fleet API token now flows through the service-token broker
+// (`getServiceCredential('fleet')`, a Keycloak service Bearer). When provisioned it's preferred; until
+// then the broker returns `kind:'none'` and we fall back to the legacy static `FLEET_TOKEN` UNCHANGED
+// — byte-identical to today. Selection is the pure, unit-tested `chooseFleetToken`.
+async function fleetToken(): Promise<string | undefined> {
+  const cred = await getServiceCredential('fleet');
+  return chooseFleetToken(cred, FLEET_TOKEN);
+}
 
 async function firstPartyDevices(): Promise<MdmDevice[]> {
   const rows = await listDevices();
@@ -65,20 +76,32 @@ interface FleetHost {
 }
 
 // One place to build a FleetDM URL + auth headers, with a hard timeout. Throws on non-2xx so the
-// callers can uniformly fall back / surface an error.
+// callers can uniformly fall back / surface an error. Auth comes from the broker (with legacy
+// fallback); on a 401 against a BROKERED token we invalidate + re-mint + retry once (spec B3). A 401
+// on the legacy static token is a real config error — surfaced, not retried.
 async function fleetFetch(
   path: string,
   init: RequestInit = {},
   timeoutMs = 8000,
 ): Promise<unknown> {
-  const res = await fetch(`${FLEET_URL}${path}`, {
-    ...init,
-    headers: fleetHeaders(FLEET_TOKEN, {
-      ...(init.body ? { 'content-type': 'application/json' } : {}),
-      ...((init.headers as Record<string, string>) ?? {}),
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const token = await fleetToken();
+  const doFetch = (t: string | undefined) =>
+    fetch(`${FLEET_URL}${path}`, {
+      ...init,
+      headers: fleetHeaders(t, {
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+        ...((init.headers as Record<string, string>) ?? {}),
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+  let res = await doFetch(token);
+  // Only retry when the token we used came from the broker (a brokered Bearer differs from the static
+  // env token). Invalidate the cache, re-mint, retry once.
+  if (res.status === 401 && token && token !== FLEET_TOKEN) {
+    invalidateServiceCredential('fleet');
+    res = await doFetch(await fleetToken());
+  }
   if (!res.ok) throw new Error(`fleet ${res.status}`);
   if (res.status === 204) return {};
   return res.json();
