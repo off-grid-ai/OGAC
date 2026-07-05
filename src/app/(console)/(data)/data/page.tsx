@@ -208,7 +208,7 @@ export default async function DataPage() {
         </CardContent>
       </Card>
 
-      <VectorDBInspector urlHint={process.env.OFFGRID_QDRANT_URL ?? 'http://offgrid-s1.local:6333'} />
+      <VectorDBInspector urlHint={process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333'} />
 
       <PiiScanner />
     </div>

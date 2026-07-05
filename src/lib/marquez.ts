@@ -2,7 +2,7 @@
 // (src/lib/adapters/lineage.ts → POST /api/v1/lineage). This reads the resulting graph back
 // through Marquez's REST API so the Lineage page can show the *server-sourced* job→dataset graph,
 // not just a reconstruction from the local audit trail.
-//   OFFGRID_MARQUEZ_URL — e.g. http://offgrid-s1.local:9000
+//   OFFGRID_MARQUEZ_URL — e.g. http://127.0.0.1:9000
 import { type LineageView, normalizeLineage } from './lineage-view';
 
 const BASE = process.env.OFFGRID_MARQUEZ_URL;

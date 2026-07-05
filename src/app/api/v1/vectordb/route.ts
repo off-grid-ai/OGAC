@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   }
 
   const kind = body.kind ?? 'qdrant';
-  const url = body.url ?? process.env.OFFGRID_QDRANT_URL ?? 'http://offgrid-s1.local:6333';
+  const url = body.url ?? process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333';
   const apiKey = body.apiKey ?? process.env.OFFGRID_QDRANT_API_KEY;
   const action = body.action ?? 'ping';
   const cfg: VectorDBConfig = { apiKey, collection: body.collection, kind, url };
