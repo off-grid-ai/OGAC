@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { searchDocuments } from '@/lib/brain';
 import { normalizeFilter, normalizeMode, type RetrievalOptions } from '@/lib/retrieval/query';
+import { askerFrom } from '@/lib/retrieval/acl';
 
 // Semantic retrieval over the Brain — returns scored hits (the citation set).
 //
@@ -26,7 +27,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'filter must be valid JSON' }, { status: 400 });
     }
   }
-  const data = await searchDocuments(q, 5, { mode, filter });
+  const asker = askerFrom({ email: gate.user.email, role: gate.user.role });
+  const data = await searchDocuments(q, 5, { mode, filter, asker });
   return NextResponse.json({ object: 'list', query: q, mode, data });
 }
 
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
   const k = typeof b.k === 'number' && b.k > 0 && b.k <= 100 ? Math.floor(b.k) : 5;
   const mode = normalizeMode(b.mode);
   const filter = normalizeFilter(b.filter) ?? undefined;
-  const data = await searchDocuments(b.query, k, { mode, filter });
+  const asker = askerFrom({ email: gate.user.email, role: gate.user.role });
+  const data = await searchDocuments(b.query, k, { mode, filter, asker });
   return NextResponse.json({ object: 'list', query: b.query, mode, data });
 }

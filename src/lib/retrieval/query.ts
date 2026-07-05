@@ -27,6 +27,10 @@ export interface MetaFilter {
 export interface RetrievalOptions {
   filter?: MetaFilter;
   mode?: SearchMode;
+  /** The asker's identity for permissions-aware retrieval. Absent → no ACL enforcement (today's
+   *  behaviour). Present → the adapters narrow server-side AND post-filter by the pure ACL rule so
+   *  only docs the asker may see are returned. Un-ACL'd docs stay visible regardless. */
+  asker?: { subject?: string | null; roles?: readonly string[] };
 }
 
 // ── Guards / normalization ─────────────────────────────────────────────────────
@@ -129,6 +133,49 @@ export function buildLanceWhere(filter?: MetaFilter | null): string | undefined 
     }
   }
   return clauses.length > 0 ? clauses.join(' AND ') : undefined;
+}
+
+// ── ACL server-side narrowing (permissions-aware retrieval) ────────────────────────
+// The pure access RULE lives in acl.ts (docVisibleTo). These builders translate an asker's grants
+// into each store's native predicate so the vector store can NARROW server-side — the authoritative
+// gate is still the post-filter (filterHitsByAcl), because the ACL predicate is a disjunction that
+// includes "un-ACL'd docs stay visible", which a store can't fully express as one clause. Narrowing
+// is an optimisation + defence-in-depth; the post-filter guarantees correctness on every backend.
+//
+// Grants shape: the asker matches a doc iff owner == subject, OR subject ∈ allowed_subjects, OR one
+// of the asker's roles ∈ allowed_roles, OR the doc is un-ACL'd. `null` grants (anonymous, no roles)
+// → no server narrowing (undefined), so the post-filter alone decides (still correct, just no push-down).
+export interface AclGrants {
+  subject?: string | null;
+  roles?: readonly string[];
+  /** Superuser roles that see everything — narrowing is skipped for them (post-filter also passes). */
+  superuserRoles?: readonly string[];
+  /** The ACL payload field names, so builder + ingest agree. */
+  fields: { owner: string; allowedRoles: string; allowedSubjects: string; dataClass: string };
+}
+
+function hasSuperuser(g: AclGrants): boolean {
+  const su = new Set((g.superuserRoles ?? []).map((r) => r.toLowerCase()));
+  return (g.roles ?? []).some((r) => su.has(r.toLowerCase()));
+}
+
+/**
+ * PURE: a Qdrant `should` (OR) group narrowing to docs the asker may see. Returns undefined when
+ * narrowing should be skipped (superuser, or no identifying grants) — the post-filter still runs.
+ * The "un-ACL'd stays visible" arm is handled by the post-filter, not here (Qdrant can't cheaply
+ * express "field is absent OR empty" across all schemas), so this is a NON-authoritative narrowing.
+ */
+export function buildQdrantAclShould(g: AclGrants): QdrantFieldCondition[] | undefined {
+  if (hasSuperuser(g)) return undefined;
+  const should: QdrantFieldCondition[] = [];
+  const subject = (g.subject ?? '').trim();
+  if (subject) {
+    should.push({ key: g.fields.owner, match: { value: subject } });
+    should.push({ key: g.fields.allowedSubjects, match: { any: [subject] } });
+  }
+  const roles = (g.roles ?? []).map((r) => r.trim()).filter(Boolean);
+  if (roles.length > 0) should.push({ key: g.fields.allowedRoles, match: { any: roles } });
+  return should.length > 0 ? should : undefined;
 }
 
 // ── Reciprocal Rank Fusion (hybrid) ──────────────────────────────────────────────
