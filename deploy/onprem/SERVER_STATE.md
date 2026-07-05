@@ -121,13 +121,23 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 CNAMEs → the tunnel (`…cfargotunnel.com`, proxied): `auth`, `ssh`, `provit`.
 
-**PENDING (Phase 5 — unified API gateway):** `console-api.getoffgridai.co` is staged in
-`cloudflared-tunnel.yml` (→ Caddy :80) + a Caddy vhost (`/v1/*`→:8800, `/specs/*`→console proxy,
-else→console:3000) in `deploy/Caddyfile`, but NOT yet live. To activate: (1) add the CNAME
-`console-api` → the tunnel (extend `dns-records.sh`), (2) copy the updated tunnel config to
-`~/.cloudflared/config.yml` on S1 + restart cloudflared, (3) copy the Caddyfile + reload Caddy.
-The console-side code is done + live: CORS on `/api/v1/*` (bearer-only) and the in-app spec proxy
-`/api/v1/specs/<id>`.
+**LIVE (Phase 5 — unified API gateway, applied 2026-07-05):** `console-api.getoffgridai.co` is up
+end-to-end. Verified: `/openapi.json` + `/docs` → 200, `/v1/models` → 401 (routes to aggregator
+:8800), `/specs/<id>` → 401 (routes to the console spec proxy via a `/specs/*`→`/api/v1/specs/*`
+rewrite), `/api/v1/status` → 200. What was done:
+1. **DNS:** CNAME `console-api` → the tunnel, created via the CF API (token in `mobile/.env.keygen`);
+   `console-api` added to `dns-records.sh` NAMES for replay.
+2. **Tunnel:** added the `console-api → http://127.0.0.1:80` ingress rule to the LIVE
+   `~/.cloudflared/config.yml` (surgical insert before the `http_status:404` catch-all; live config
+   differs from the repo copy, so DON'T blind-copy — edit in place), validated with
+   `cloudflared --config … tunnel ingress validate` (OK), reloaded with **SIGHUP** (graceful; note
+   SIGHUP briefly resets tunnel conns incl. the SSH-over-tunnel session, but routes recover).
+3. **Caddy:** the vhost was already on disk (rsync'd); `admin off` in the Caddyfile means no
+   API reload — restart via `sudo launchctl kickstart -k system/co.getoffgridai.edge` (brief blip on
+   Caddy-fronted routes: gateway/ai/provit/status/landing/console-api; onprem-console/auth/ssh bypass
+   Caddy and stay up). `caddy validate --config … --adapter caddyfile` first.
+Console-side code (CORS on `/api/v1/*` bearer-only + the in-app `/api/v1/specs/<id>` proxy) was
+already deployed.
 
 ## Network migration (2026-07-03) — fleet moved to Airtel_Wednesday (fast net)
 

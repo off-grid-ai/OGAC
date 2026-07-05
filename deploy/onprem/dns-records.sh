@@ -14,7 +14,7 @@ ZONE=$(grep '^CLOUDFLARE_ZONE_GETOFFGRIDAI=' "$ENV_FILE" | cut -d= -f2- | tr -d 
 TUNNEL_CNAME="00000000-0000-0000-0000-000000000000.cfargotunnel.com"
 
 # Subdomains created this session. Add new tunnel-fronted hostnames here.
-NAMES=(auth ssh provit)
+NAMES=(auth ssh provit console-api)
 
 for name in "${NAMES[@]}"; do
   resp=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
