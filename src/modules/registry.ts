@@ -18,6 +18,7 @@ export type ModuleId =
   | 'observability'
   | 'analytics'
   | 'finops'
+  | 'accounting'
   | 'reports'
   | 'lineage'
   | 'regulatory'
@@ -183,6 +184,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Virtual keys (token issuance), per-user/project usage, cost & budgets.',
     route: '/finops',
     service: 'finops',
+  },
+  {
+    id: 'accounting',
+    label: 'Usage & Spend',
+    description:
+      'Token usage and spend attributed per user, per project, and per model over any time range — the leaderboard of who spent what, on which models.',
+    route: '/accounting',
+    service: 'finops',
+    internal: true,
   },
   {
     id: 'reports',
