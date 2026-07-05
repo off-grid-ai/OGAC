@@ -44,7 +44,7 @@ export async function readAuditPage(f: AuditFilters): Promise<AuditPage> {
     q: f.q,
     outcome: f.outcome,
     size: FETCH_WINDOW,
-    from: 0,
+    offset: 0,
   });
   const view: AuditView = normalizeAudit(result);
   const filtered = filterAuditRows(view.rows, f);
@@ -67,7 +67,7 @@ export async function readAuditForExport(f: AuditFilters): Promise<{
   configured: boolean;
   error?: string;
 }> {
-  const result = await searchAudit({ q: f.q, outcome: f.outcome, size: FETCH_WINDOW, from: 0 });
+  const result = await searchAudit({ q: f.q, outcome: f.outcome, size: FETCH_WINDOW, offset: 0 });
   const view = normalizeAudit(result);
   return { rows: filterAuditRows(view.rows, f), configured: view.configured, error: view.error };
 }
