@@ -361,6 +361,36 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
     risky (admin API is `off`, the process is unsupervised PPID 1 fronting the public tunnel). Do it
     on-site or during a maintenance window. Until then Guardrails runs the always-on regex floor.
 
+## No-auth service exposure — hardening (Phase 4.10-A, 2026-07-05)
+
+Presidio, Marquez, and OPA are stock images with **zero built-in auth**. Analysis + fix:
+
+- **Public (internet) exposure: already closed, nothing to add.** The Cloudflare tunnel
+  (`cloudflared-tunnel.yml`) exposes only console/gateway/auth/ssh/provit/console-status/
+  -landing/gungnir/console-api; everything else is `http_status:404`. None of these three
+  services has a tunnel hostname, and the one broad public vhost (`console-api`) proxies only
+  to the console (:3000) and the aggregator (:8800). So they are **not reachable from outside**.
+  No public Caddy `gated` vhost was added — a browser-login redirect would break the console's
+  own server-to-server calls (Marquez `src/lib/marquez.ts`, OPA `src/lib/adapters/policy.ts`,
+  Presidio `src/lib/adapters/pii.ts`), which is the wrong gate for a machine-to-machine path.
+- **LAN exposure: the real gap, fixed by loopback-binding the Docker host ports** (they defaulted
+  to `0.0.0.0`, i.e. any LAN host could hit them unauthenticated). Changed in the compose files
+  (`services-node-a.yml` for S1, `docker-compose.yml` for dev):
+  - OPA `8181:8181` → `127.0.0.1:8181:8181`
+  - Marquez `9000:5000`/`5010:5010` → `127.0.0.1:9000:5000`/`127.0.0.1:5010:5010`
+    (marquez-web still reaches marquez over the internal Docker network — unaffected)
+  - Presidio (dev only, S1 uses g6) `5002/5001` → `127.0.0.1:5002/5001`
+  - The same-host console keeps working: it dials `127.0.0.1:9000` / `127.0.0.1:8181`.
+  - **APPLY ON SERVER:** re-create the affected containers so the new bind takes effect
+    (`docker compose -f services-node-a.yml up -d opa marquez`; port re-binds require a recreate,
+    not just restart). Verify from another LAN host that `curl s1:9000/api/v1/namespaces` and
+    `curl s1:8181/health` now **refuse/time out**, while `curl 127.0.0.1:...` on S1 still works.
+- **Presidio on g6 (LAN, prod):** S1's edge Caddy must still dial `g6:5002/5001`, so g6's ports
+  cannot be loopback-bound. A stock Presidio can't verify a bearer, so the gate is a **g6 host
+  firewall rule allowing S1 (127.0.0.1) only** on 5001/5002 (deny the rest of the LAN).
+  **TODO on g6:** add that pf/ufw rule (record the exact rule here once applied). The S1-side
+  8938/8939 Caddy proxies are `http://127.0.0.1:...` = loopback-bound, already not LAN/tunnel-reachable.
+
 ## Multi-tenancy (Phase 3 — in progress)
 
 org_id on 18 tenant tables (default 'default'). Connectors scoped end-to-end (list filters,
