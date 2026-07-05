@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { managedDeleteFlag, managedGetFlag, managedSetDescription } from '@/lib/flags-manager';
 
 // Flag detail — enabled state + variants + gradual-rollout % for the active environment. When
@@ -24,6 +26,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ key: s
     return NextResponse.json({ error: 'description (string) required' }, { status: 400 });
   }
   const backend = await managedSetDescription(decodeURIComponent(key), b.description.slice(0, 300));
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'flag.toggle',
+    resource: `flag:${decodeURIComponent(key)}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ ok: true, backend });
 }
 
@@ -33,5 +40,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ key: 
   const { key } = await params;
   const ok = await managedDeleteFlag(decodeURIComponent(key));
   if (!ok) return NextResponse.json({ error: 'unknown flag' }, { status: 404 });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'flag.toggle',
+    resource: `flag:${decodeURIComponent(key)}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ deleted: true });
 }

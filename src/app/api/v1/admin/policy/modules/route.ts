@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { deployModule, listModules } from '@/lib/opa-policy';
 import { formatCompileErrors, slugifyModuleId, validateRegoModule } from '@/lib/opa-policy-policy';
 
@@ -42,5 +44,10 @@ export async function POST(req: Request) {
   if (result.status === 'unreachable') {
     return NextResponse.json({ error: result.reason, reachable: false }, { status: 502 });
   }
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'policy.change',
+    resource: `opa-module:${parsed.value.id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json(result.module, { status: 201 });
 }

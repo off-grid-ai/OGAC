@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { type PolicyBundle, getOrgPolicy, pushPolicy } from '@/lib/store';
 
 type PolicyPatch = Partial<Omit<PolicyBundle, 'version' | 'updatedAt'>>;
@@ -19,5 +21,11 @@ export async function POST(req: Request) {
   if (typeof body?.egressAllowed === 'boolean') patch.egressAllowed = body.egressAllowed;
   if (Array.isArray(body?.guardrails)) patch.guardrails = body.guardrails;
   if (Array.isArray(body?.allowedModels)) patch.allowedModels = body.allowedModels;
-  return NextResponse.json(await pushPolicy(patch));
+  const pushed = await pushPolicy(patch);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'policy.change',
+    resource: `policy:v${pushed.version}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(pushed);
 }

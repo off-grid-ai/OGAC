@@ -31,7 +31,12 @@ import type { CheckResult } from '@/lib/checks';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
-import { shipAudit } from '@/lib/siem';
+import { shipAudit, shipAuditEvent } from '@/lib/siem';
+import {
+  type AuditEvent as CanonicalAuditEvent,
+  type AuditEventInput,
+  buildAuditEvent,
+} from '@/lib/audit-event';
 
 // Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
 // the deploy needs no migration step (matches the chat module's ensure* pattern). Memoized.
@@ -319,6 +324,79 @@ export async function listAudit(opts?: {
         .limit(limit)
     : await base;
   return rows.map(toAudit);
+}
+
+// ─── Canonical attributed audit events (Phase 4.11) ───────────────────────────
+// The device-keyed `audit_events` table above is the pre-4.11 gateway/device stream. The canonical
+// attributed events (who did what, per the roadmap contract) land in `audit_events_v2` — created
+// idempotently so the deploy needs no migration (matches the ensure* pattern). Postgres is the
+// source of truth; every write ALSO ships to OpenSearch. Both are best-effort — a failed audit
+// NEVER fails the action it records.
+let auditV2Ensure: Promise<void> | null = null;
+async function ensureAuditV2(): Promise<void> {
+  if (auditV2Ensure) return auditV2Ensure;
+  auditV2Ensure = (async (): Promise<void> => {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS audit_events_v2 (
+        id text PRIMARY KEY,
+        ts timestamptz NOT NULL DEFAULT now(),
+        actor_type text NOT NULL,
+        actor_id text NOT NULL,
+        actor_label text NOT NULL DEFAULT '',
+        org text NOT NULL DEFAULT 'default',
+        project text,
+        action text NOT NULL,
+        resource text,
+        model text,
+        prompt_tokens integer,
+        completion_tokens integer,
+        total_tokens integer,
+        cost_usd double precision,
+        outcome text NOT NULL,
+        run_id text,
+        ip text
+      );
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_ts_idx ON audit_events_v2 (ts DESC);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_actor_idx ON audit_events_v2 (actor_id);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_action_idx ON audit_events_v2 (action);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_org_idx ON audit_events_v2 (org);`);
+  })();
+  return auditV2Ensure;
+}
+
+// Persist a canonical audit event to Postgres (source of truth) AND ship it to OpenSearch.
+// Best-effort / non-blocking: both sinks are wrapped so a failure never propagates to the caller —
+// an audited action must never fail because auditing failed. Returns the normalized event so a
+// caller can log/inspect it. Producers use `recordAudit` (the fire-and-forget wrapper) instead.
+export async function persistAuditEvent(input: AuditEventInput): Promise<CanonicalAuditEvent> {
+  const ev = buildAuditEvent(input);
+  // Ship first (independent, cheap, already best-effort inside shipAuditEvent).
+  shipAuditEvent(input);
+  try {
+    await ensureAuditV2();
+    await db.execute(sql`
+      INSERT INTO audit_events_v2
+        (id, ts, actor_type, actor_id, actor_label, org, project, action, resource, model,
+         prompt_tokens, completion_tokens, total_tokens, cost_usd, outcome, run_id, ip)
+      VALUES (
+        ${randomUUID()}, ${ev.ts}, ${ev.actor.type}, ${ev.actor.id}, ${ev.actor.label}, ${ev.org},
+        ${ev.project ?? null}, ${ev.action}, ${ev.resource ?? null}, ${ev.model ?? null},
+        ${ev.tokens?.prompt ?? null}, ${ev.tokens?.completion ?? null}, ${ev.tokens?.total ?? null},
+        ${ev.costUsd ?? null}, ${ev.outcome}, ${ev.runId ?? null}, ${ev.ip ?? null}
+      );
+    `);
+    emitSpan('audit.event.v2', { action: ev.action, actor: ev.actor.id, outcome: ev.outcome });
+  } catch {
+    /* best-effort — Postgres audit insert must never fail the action */
+  }
+  return ev;
+}
+
+// Fire-and-forget producer entry point: record a canonical audit event without awaiting or throwing.
+// This is what governance / data / access producers call inline right after their write completes.
+export function recordAudit(input: AuditEventInput): void {
+  void persistAuditEvent(input).catch(() => {});
 }
 
 export async function queueKill(deviceId: string): Promise<Command | null> {

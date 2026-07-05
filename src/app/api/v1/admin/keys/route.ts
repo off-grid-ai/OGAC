@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { createApiKey, listApiKeys } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -28,13 +29,16 @@ export async function POST(req: Request) {
     );
   }
   const budget = typeof b!.budgetUsd === 'number' ? (b!.budgetUsd as number) : null;
-  return NextResponse.json(
-    await createApiKey({
-      name: b!.name as string,
-      subjectType: b!.subjectType as string,
-      subject: b!.subject as string,
-      budgetUsd: budget,
-    }),
-    { status: 201 },
-  );
+  const created = await createApiKey({
+    name: b!.name as string,
+    subjectType: b!.subjectType as string,
+    subject: b!.subject as string,
+    budgetUsd: budget,
+  });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'access.machine.issue',
+    resource: `key:${created.key.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }

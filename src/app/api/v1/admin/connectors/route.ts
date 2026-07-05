@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { createConnector, listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -25,16 +26,20 @@ export async function POST(req: Request) {
   if (!AUTHS.includes(auth)) {
     return NextResponse.json({ error: 'auth must be none | api-key | oauth' }, { status: 400 });
   }
-  return NextResponse.json(
-    await createConnector({
-      name,
-      type,
-      endpoint: (body?.endpoint as string | undefined) ?? '',
-      auth,
-      description: (body?.description as string | undefined) ?? '',
-      custom: true,
-      orgId: await currentOrgId(),
-    }),
-    { status: 201 },
-  );
+  const orgId = await currentOrgId();
+  const created = await createConnector({
+    name,
+    type,
+    endpoint: (body?.endpoint as string | undefined) ?? '',
+    auth,
+    description: (body?.description as string | undefined) ?? '',
+    custom: true,
+    orgId,
+  });
+  auditFromSession(gate, orgId, {
+    action: 'connector.create',
+    resource: `connector:${created.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }

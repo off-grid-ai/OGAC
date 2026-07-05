@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
 import { createCustomRole, getCustomRoleByName } from '@/lib/store';
 
@@ -81,6 +83,11 @@ export async function POST(req: Request) {
     }
 
     const client = await kc.getClient(id);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'access.machine.issue',
+      resource: `client:${body.clientId}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ configured: true, client, secret, scopedRole }, { status: 201 });
   } catch (err) {
     // Surface a conflict as 409 with the friendly message (e.g. "a client named X already exists")

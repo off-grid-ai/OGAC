@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { managedCreateFlag, managedListFlags, managedSetEnabled } from '@/lib/flags-manager';
 
 // A flag key is a lowercase, dash/dot-segmented identifier (e.g. agent-code-exec, online-evals).
@@ -29,6 +31,11 @@ export async function POST(req: Request) {
   const enabled = b?.enabled !== false; // default on
   const description = typeof b?.description === 'string' ? b.description.trim().slice(0, 300) : '';
   const backend = await managedCreateFlag(key, enabled, description);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'flag.toggle',
+    resource: `flag:${key}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ key, enabled, description, backend }, { status: 201 });
 }
 
@@ -40,5 +47,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'key (string) + enabled (boolean) required' }, { status: 400 });
   }
   const backend = await managedSetEnabled(b.key, b.enabled);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'flag.toggle',
+    resource: `flag:${b.key}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ ok: true, backend });
 }
