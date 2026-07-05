@@ -31,6 +31,93 @@ export function s3SecretKeyKey(service: string): string {
   return `${normalizeService(service)}/s3-secret-key`;
 }
 
+/**
+ * Logical KV key for a service's NATIVE API token (FleetDM, Unleash admin, …): `<service>/api-token`.
+ * This is the service's OWN token — NOT a Keycloak JWT — sent verbatim as its Authorization bearer.
+ */
+export function apiTokenKey(service: string): string {
+  return `${normalizeService(service)}/api-token`;
+}
+
+/** Logical KV key for a service's Basic-auth public key id (Langfuse project key): `<service>/public-key`. */
+export function publicKeyKey(service: string): string {
+  return `${normalizeService(service)}/public-key`;
+}
+
+/** Logical KV key for a service's Basic-auth secret key (Langfuse project key): `<service>/secret-key`. */
+export function secretKeyKey(service: string): string {
+  return `${normalizeService(service)}/secret-key`;
+}
+
+// ── Per-service credential PLAN (the single source of truth) ─────────────────────────────────────
+// The design gap this closes: a KC JWT is ONLY valid for services that validate Keycloak tokens.
+// Today that's just the aggregator (gateway). Every other backend authenticates with its OWN native
+// credential — sending it a KC JWT would BREAK it. So the broker must not blindly mint a JWT for any
+// service with a secret in OpenBao; it must first ask THIS map what KIND of credential the service
+// wants, then fetch/mint accordingly.
+//
+//   'oidc-jwt'     — mint a Keycloak client_credentials JWT (the service validates KC tokens).
+//   'native-bearer'— the service's OWN opaque API token, sent verbatim as `Authorization: Bearer`.
+//   'native-basic' — a public/secret keypair → HTTP Basic (Langfuse project keys).
+//   's3'           — SeaweedFS access/secret keypair for SigV4 signing.
+//   'none'         — no auth today (trusted-LAN, no-auth image). See the Phase-D TODO below.
+//
+// `baoPath` names the LOGICAL KV key the shell reads for a NATIVE plan; for 'oidc-jwt' it's the
+// client-secret path, for 'native-basic'/'s3' the shell reads the TWO keypair leaves under the same
+// `<service>/` prefix (baoPath points at the primary leaf for documentation/uniformity).
+
+export type CredentialMode = 'oidc-jwt' | 'native-bearer' | 'native-basic' | 's3' | 'none';
+
+export interface CredentialPlan {
+  mode: CredentialMode;
+  /** Primary logical KV key the shell reads (or mints from, for oidc-jwt). Undefined for 'none'. */
+  baoPath?: string;
+}
+
+// The declarative map. Verified against docs/INTEGRATION_ARCHITECTURE.md's per-service auth matrix.
+// A service ABSENT from here is treated as 'none' (fail-safe: no wrong-kind credential is ever sent).
+const PLAN_MODES: Record<string, CredentialMode> = {
+  // Only the aggregator validates a Keycloak JWT today (scripts/lib/keycloak-verify.mjs).
+  gateway: 'oidc-jwt',
+  // FleetDM authenticates its REST API with its OWN token — a KC JWT would 401 it.
+  fleet: 'native-bearer',
+  // Langfuse public REST API is HTTP Basic over project keys (pk:sk) — no OIDC.
+  langfuse: 'native-basic',
+  // SeaweedFS S3 IAM is access/secret keys (SigV4) — no OIDC.
+  seaweedfs: 's3',
+  s3: 's3',
+  // No-auth images on the trusted LAN today. TODO(Phase-D): OpenSearch can enable its security plugin
+  // with native OIDC/JWT → flip to 'oidc-jwt' + a KC client; Marquez/OPA/Presidio stay edge-gated
+  // (Caddy forward_auth) or move behind a console proxy — none of them validate a KC JWT today, so
+  // they MUST remain 'none' until that lands or we'd send a credential they can't verify.
+  opensearch: 'none',
+  marquez: 'none',
+  opa: 'none',
+  presidio: 'none',
+};
+
+/**
+ * The credential plan for a service (pure). Returns the KIND of credential the service actually
+ * accepts + the logical OpenBao key to read/mint from. Unknown services fail safe to 'none' so the
+ * broker never sends a wrong-kind credential to a service that can't validate it.
+ */
+export function credentialPlan(service: string): CredentialPlan {
+  const svc = normalizeService(service);
+  const mode = PLAN_MODES[svc] ?? 'none';
+  switch (mode) {
+    case 'oidc-jwt':
+      return { mode, baoPath: clientSecretKey(svc) };
+    case 'native-bearer':
+      return { mode, baoPath: apiTokenKey(svc) };
+    case 'native-basic':
+      return { mode, baoPath: publicKeyKey(svc) };
+    case 's3':
+      return { mode, baoPath: s3AccessKeyKey(svc) };
+    case 'none':
+      return { mode };
+  }
+}
+
 // ── Keycloak token endpoint ──────────────────────────────────────────────────────────────────────
 // Two env shapes exist in the repo: OFFGRID_KEYCLOAK_URL + _REALM (the admin client) or the OIDC
 // issuer AUTH_KEYCLOAK_ISSUER (which already IS the realm URL). Derive the token endpoint from
@@ -192,6 +279,7 @@ export function isRefreshDue(entry: CachedToken | null | undefined, nowMs: numbe
 
 export type ServiceCredential =
   | { kind: 'bearer'; token: string }
+  | { kind: 'basic'; publicKey: string; secretKey: string }
   | { kind: 's3'; accessKey: string; secretKey: string }
   | { kind: 'none' };
 
@@ -230,17 +318,17 @@ export function chooseFleetToken(
 }
 
 /**
- * Langfuse Basic-auth header. Broker S3-style pk/sk keypair wins (public-key = accessKey,
- * secret-key = secretKey); else the caller's existing env-derived Basic header UNCHANGED; else null.
- * `b64` is injected (Buffer/btoa) to keep this pure. Returns the full `Basic <base64(pk:sk)>` value.
+ * Langfuse Basic-auth header. Broker `basic` project keypair wins (publicKey:secretKey = pk:sk);
+ * else the caller's existing env-derived Basic header UNCHANGED; else null. `b64` is injected
+ * (Buffer/btoa) to keep this pure. Returns the full `Basic <base64(pk:sk)>` value.
  */
 export function chooseLangfuseAuth(
   cred: ServiceCredential,
   legacyBasic: string | null,
   b64: (s: string) => string,
 ): string | null {
-  if (cred.kind === 's3' && cred.accessKey && cred.secretKey) {
-    return `Basic ${b64(`${cred.accessKey}:${cred.secretKey}`)}`;
+  if (cred.kind === 'basic' && cred.publicKey && cred.secretKey) {
+    return `Basic ${b64(`${cred.publicKey}:${cred.secretKey}`)}`;
   }
   return legacyBasic;
 }
