@@ -13,6 +13,9 @@ import {
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
+import { emitRunTrace } from '@/lib/chat-trace';
+import { correlationIds } from '@/lib/correlation';
+import { shipRunAudit } from '@/lib/siem';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { scoreInteraction } from '@/lib/qa/scoring';
@@ -375,8 +378,16 @@ export async function runAgent(
   // 7. Provenance — sign the answer (ed25519 by default): tamper-evident, offline-verifiable.
   t = Date.now();
   const signing = getSigning();
+  // The runId (as provenanceRef) is part of the signed payload, so the provenance record is bound to
+  // — and correlated by — the same run id as the other three planes (C2).
   const provenance: Provenance = {
-    signature: signing.sign({ agentId, query, answer, refs: citations.map((c) => c.ref) }),
+    signature: signing.sign({
+      runId: correlationIds(runId).provenanceRef,
+      agentId,
+      query,
+      answer,
+      refs: citations.map((c) => c.ref),
+    }),
     algorithm: signing.algorithm,
     publicKey: signing.publicKey(),
     signedAt: new Date().toISOString(),
@@ -391,10 +402,35 @@ export async function runAgent(
     checks: [...preChecks, ...postChecks], provenance,
   }, orgId);
 
-  // 8. Lineage — record source→answer (best-effort, never blocks the response).
+  // 8. Observability fan-out — the SAME runId lands in all four planes, correlated by one key (C2).
+  //    Every emission is best-effort / fire-and-forget: a plane being down never fails the run.
+  const ids = correlationIds(runId);
+
+  // 8a. Lineage — record source→answer under run.runId == runId, namespace offgrid-console.
   void getLineage()
-    .emit({ job: `agent:${agentId}`, run: runId, status: 'COMPLETE', inputs: citations.map((c) => c.ref), outputs: [runId] })
+    .emit({
+      job: `agent:${agentId}`,
+      run: ids.lineageRunId,
+      status: 'COMPLETE',
+      inputs: citations.map((c) => c.ref),
+      outputs: [runId],
+    })
     .catch(() => {});
+
+  // 8b. Audit (OpenSearch offgrid-audit) — ship a governed-run doc keyed by runId (additive to the
+  //     device/gateway audit stream), so `_search?q=<runId>` hits.
+  shipRunAudit({
+    runId,
+    agentId,
+    outcome: run.status,
+    model: agent.model || ANSWER_MODEL,
+    tokens: 0,
+    caller,
+  });
+
+  // 8c. Langfuse trace — emit a run trace whose id == normalize(runId) for every run (not just the
+  //     sampled QA score), so the trace plane is reliably correlated.
+  emitRunTrace({ runId, agentId, model: agent.model || ANSWER_MODEL, input: query, output: answer, caller });
 
   return run;
 }
@@ -413,7 +449,7 @@ export async function scoreRun(run: AgentRun): Promise<void> {
       output: run.answer,
       sources: run.citations.map((c) => c.snippet),
       name: `agent:${run.agentId}`,
-      traceId: run.id.replace(/[^a-z0-9]/gi, ''),
+      traceId: correlationIds(run.id).traceId,
     });
   } catch {
     /* best-effort online scoring */
