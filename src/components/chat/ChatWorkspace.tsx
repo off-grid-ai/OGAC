@@ -29,9 +29,16 @@ import {
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  type ChatSelection,
+  selectionEquals,
+  selectionFromParams,
+  selectionToPath,
+} from '@/lib/chat-nav';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -299,8 +306,27 @@ export function ChatWorkspace({
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // NAVIGATIONAL position (which conversation, which project) lives in the URL — never useState —
+  // so a conversation is shareable, refresh-safe, and Back steps between conversations/projects.
+  // Route shape: /chat/<conversationId>?project=<projectId>; /chat = new-chat landing.
+  const router = useRouter();
+  const routeParams = useParams<{ conversationId?: string | string[] }>();
+  const searchParams = useSearchParams();
+  const selection = selectionFromParams({
+    conversationId: routeParams?.conversationId,
+    project: searchParams.get('project'),
+  });
+  const activeId = selection.conversationId;
+  const activeProjectId = selection.projectId;
+  // Push a new navigational position (a real history entry). No-op if we're already there, so we
+  // don't stack duplicate entries when re-selecting the current place.
+  const navigate = useCallback(
+    (next: ChatSelection) => {
+      if (selectionEquals(next, selection)) return;
+      router.push(selectionToPath(next));
+    },
+    [router, selection],
+  );
   // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
   // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
   const [temporary, setTemporary] = useState(false);
@@ -340,6 +366,10 @@ export function ChatWorkspace({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const abortRef = useRef<AbortController | null>(null);
+  // Which conversation the current `messages` array belongs to. Lets the URL-driven load effect
+  // skip a refetch when we already hold the transcript — e.g. right after we create a conversation
+  // client-side (send/newChat) and navigate to its URL, or when only the ?project= param changed.
+  const loadedIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
@@ -388,6 +418,28 @@ export function ChatWorkspace({
       if (r.ok) setSkillList((await r.json()).skills ?? []);
     })();
   }, [refreshConversations, refreshProjects]);
+
+  // URL-driven transcript load: the active conversation comes from the route, so whenever it
+  // changes (link, refresh, Back/Forward, sidebar click) we load that conversation's messages —
+  // unless we already hold them (loadedIdRef), e.g. right after creating it client-side. Temporary
+  // (incognito) chats have no persisted transcript, so we never fetch while temporary.
+  useEffect(() => {
+    if (temporary) return;
+    if (activeId === loadedIdRef.current) return;
+    loadedIdRef.current = activeId;
+    setArtifact(null);
+    setActiveStarters([]);
+    if (!activeId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const r = await fetch(`/api/v1/chat/conversations/${activeId}`);
+      if (!cancelled && r.ok) setMessages((await r.json()).messages ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [activeId, temporary]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -458,30 +510,40 @@ export function ChatWorkspace({
     [activeId],
   );
 
-  // Enter/leave incognito. Entering clears the thread into an ephemeral session; leaving drops it.
-  function toggleTemporary() {
-    setTemporary((prev) => {
-      const next = !prev;
-      setActiveId(null);
-      setMessages([]);
-      setActiveStarters([]);
-      setArtifact(null);
-      return next;
-    });
+  // Adopt a conversation we just created client-side (send/newChat/skill): we already hold its
+  // transcript, so record it as loaded before navigating so the URL-driven load effect won't refetch.
+  function adoptConversation(id: string, msgs: Message[]) {
+    loadedIdRef.current = id;
+    setMessages(msgs);
   }
 
-  async function openConversation(id: string) {
-    setTemporary(false);
-    setActiveId(id);
-    setArtifact(null);
+  // Enter/leave incognito — a client-only ephemeral mode, not a navigational "place". Both directions
+  // return to the /chat landing (no conversation) and clear the thread; the transient `temporary`
+  // flag stays in useState (correct — it's UI mode, not position).
+  function toggleTemporary() {
+    setTemporary((prev) => !prev);
+    setMessages([]);
     setActiveStarters([]);
-    const r = await fetch(`/api/v1/chat/conversations/${id}`);
-    if (r.ok) setMessages((await r.json()).messages ?? []);
+    setArtifact(null);
+    navigate({ conversationId: null, projectId: activeProjectId });
+  }
+
+  // Open an existing conversation = a real history entry. Reading its transcript is the URL-driven
+  // effect's job; here we only move the navigational position (and leave incognito if we were in it).
+  function openConversation(id: string) {
+    setTemporary(false);
+    navigate({ conversationId: id, projectId: activeProjectId });
+  }
+
+  // Switch the project filter = a history entry; resets to the new-chat landing under that project
+  // (null = "All chats"). The URL-driven effect clears the transcript since conversationId is null.
+  function selectProject(projectId: string | null) {
+    setTemporary(false);
+    navigate({ conversationId: null, projectId });
   }
 
   async function newChat() {
     setTemporary(false);
-    setActiveStarters([]);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -489,12 +551,14 @@ export function ChatWorkspace({
     });
     if (!r.ok) return;
     const { id } = await r.json();
-    setMessages([]);
-    setActiveId(id);
+    setActiveStarters([]);
+    adoptConversation(id, []);
+    navigate({ conversationId: id, projectId: activeProjectId });
     await refreshConversations();
   }
 
   async function startSkillChat(skillId: string, starters: string[] = []) {
+    setTemporary(false);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -502,10 +566,10 @@ export function ChatWorkspace({
     });
     if (!r.ok) return;
     const { id } = await r.json();
-    setActiveProjectId(null);
-    setMessages([]);
-    setActiveId(id);
+    adoptConversation(id, []);
     setActiveStarters(starters);
+    // Skill chats aren't scoped to a project — drop any project filter.
+    navigate({ conversationId: id, projectId: null });
     await refreshConversations();
   }
 
@@ -520,7 +584,7 @@ export function ChatWorkspace({
     if (!r.ok) return;
     const { id } = await r.json();
     await refreshProjects();
-    setActiveProjectId(id);
+    navigate({ conversationId: null, projectId: id });
     setDialogProject({ id, name, systemPrompt: '' });
   }
 
@@ -528,8 +592,8 @@ export function ChatWorkspace({
     e.stopPropagation();
     await fetch(`/api/v1/chat/conversations/${id}`, { method: 'DELETE' });
     if (activeId === id) {
-      setActiveId(null);
-      setMessages([]);
+      // Falling back to the new-chat landing (keep the project filter) is itself a history entry.
+      navigate({ conversationId: null, projectId: activeProjectId });
     }
     await refreshConversations();
   }
@@ -829,7 +893,10 @@ export function ChatWorkspace({
       });
       if (!r.ok) return;
       convId = (await r.json()).id;
-      setActiveId(convId);
+      // Sending from the new-chat landing: adopt the fresh conversation (mark loaded so the
+      // URL-driven effect won't clobber the optimistic turns below) then push its URL.
+      loadedIdRef.current = convId;
+      navigate({ conversationId: convId, projectId: activeProjectId });
     }
     const sentImages = images;
     setInput('');
@@ -986,7 +1053,7 @@ export function ChatWorkspace({
           </div>
           <div className="space-y-0.5">
             <button
-              onClick={() => setActiveProjectId(null)}
+              onClick={() => selectProject(null)}
               className={cn(
                 'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
                 !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -997,7 +1064,7 @@ export function ChatWorkspace({
             {projects.map((p) => (
               <button
                 key={p.id}
-                onClick={() => setActiveProjectId(p.id)}
+                onClick={() => selectProject(p.id)}
                 className={cn(
                   'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
                   activeProjectId === p.id
