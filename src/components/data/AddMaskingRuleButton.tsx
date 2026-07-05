@@ -1,17 +1,16 @@
 'use client';
 
 import { CaretDown as ChevronDown, Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,14 +19,35 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 const ACTIONS = ['mask', 'tokenize', 'block'];
 
+// The create panel's open/closed state lives in the URL (?panel=new-masking-rule) so Back closes
+// it and it's deep-linkable — never in local useState.
 export function AddMaskingRuleButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-masking-rule';
+
   const [kind, setKind] = useState('');
   const [action, setAction] = useState('mask');
+
+  const setPanel = useCallback(
+    (value: string | null) => {
+      const qs = withPanelParams(params.toString(), { panel: value });
+      router.replace(panelHref(pathname, qs), { scroll: false });
+    },
+    [params, pathname, router],
+  );
+
+  useEffect(() => {
+    if (open) {
+      setKind('');
+      setAction('mask');
+    }
+  }, [open]);
 
   async function create() {
     if (!kind.trim()) return;
@@ -38,8 +58,7 @@ export function AddMaskingRuleButton() {
     });
     if (res.ok) {
       toast.success(`Rule for "${kind}" added`);
-      setKind('');
-      setOpen(false);
+      setPanel(null);
       router.refresh();
     } else {
       toast.error('Failed to add rule');
@@ -47,50 +66,50 @@ export function AddMaskingRuleButton() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Plus className="size-4" />
-          Add rule
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add a masking rule</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-kind">PII type</Label>
-            <Input
-              id="rule-kind"
-              value={kind}
-              placeholder="email, phone, pan, aadhaar…"
-              onChange={(e) => setKind(e.target.value)}
-            />
+    <>
+      <Button size="sm" variant="outline" onClick={() => setPanel('new-masking-rule')}>
+        <Plus className="size-4" />
+        Add rule
+      </Button>
+      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add a masking rule</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-kind">PII type</Label>
+              <Input
+                id="rule-kind"
+                value={kind}
+                placeholder="email, phone, pan, aadhaar…"
+                onChange={(e) => setKind(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Action</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    {action}
+                    <ChevronDown className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                  {ACTIONS.map((a) => (
+                    <DropdownMenuItem key={a} onClick={() => setAction(a)}>
+                      {a}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Button onClick={create} className="w-full">
+              Add rule
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label>Action</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between">
-                  {action}
-                  <ChevronDown className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                {ACTIONS.map((a) => (
-                  <DropdownMenuItem key={a} onClick={() => setAction(a)}>
-                    {a}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <Button onClick={create} className="w-full">
-            Add rule
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

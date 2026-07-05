@@ -1,22 +1,22 @@
 'use client';
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 const TRIGGERS = ['on-demand', 'on-call', 'on-message', 'observed', 'scheduled'] as const;
 
@@ -31,9 +31,13 @@ export interface ToolOption {
 // query). Every run flows through the SAME governed pipeline as the built-ins (policy gate,
 // guardrails, retrieval routing, grounding, provenance signing) — a granted tool still obeys its
 // action policy (allow / needs-approval / blocked), so capability never bypasses governance.
+// The create panel's open/closed state lives in the URL (?panel=new-agent) so Back closes it and
+// it's deep-linkable — never in local useState.
 export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-agent';
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -42,6 +46,14 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   const [trigger, setTrigger] = useState<(typeof TRIGGERS)[number]>('on-demand');
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+
+  const setPanel = useCallback(
+    (value: string | null) => {
+      const qs = withPanelParams(params.toString(), { panel: value });
+      router.replace(panelHref(pathname, qs), { scroll: false });
+    },
+    [params, pathname, router],
+  );
 
   function reset() {
     setName('');
@@ -52,6 +64,11 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
     setTrigger('on-demand');
     setSelectedTools([]);
   }
+
+  // Reset the form each time the panel opens so a stale draft never lingers.
+  useEffect(() => {
+    if (open) reset();
+  }, [open]);
 
   function toggleTool(id: string) {
     setSelectedTools((cur) => (cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id]));
@@ -76,8 +93,7 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
       });
       if (!res.ok) throw new Error('failed');
       toast.success(`Created "${name}" — runs through the governed pipeline`);
-      reset();
-      setOpen(false);
+      setPanel(null);
       router.refresh();
     } catch {
       toast.error('Failed to create agent');
@@ -87,23 +103,22 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" />
-          New agent
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create an agent</DialogTitle>
-          <DialogDescription>
-            Give it a job, ground it in your knowledge, and grant it tools to act with. Every run is
-            governed by the policy, guardrails, model routing, and grounding on this console —
-            automatically.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
+    <>
+      <Button size="sm" onClick={() => setPanel('new-agent')}>
+        <Plus className="size-4" />
+        New agent
+      </Button>
+      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
+        <SheetContent className="sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Create an agent</SheetTitle>
+            <SheetDescription>
+              Give it a job, ground it in your knowledge, and grant it tools to act with. Every run
+              is governed by the policy, guardrails, model routing, and grounding on this console —
+              automatically.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="agent-name">Name</Label>
@@ -224,8 +239,9 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
           >
             {busy ? 'Creating…' : 'Create agent'}
           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
