@@ -199,19 +199,18 @@ got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Conf
   revived remotely** (no network path to run `networksetup` on them); needs physical/console access.
   The g8 loss killed an in-flight model download. Only ~11 live hosts on the whole `/24` (fleet + router).
 
-## Fleet role assignment (updated 2026-07-05) — 5 GW + 3 servers
+## Fleet role assignment (updated 2026-07-05) — 6 GW + 2 servers
 
-Topology moved to **5 GW + 3 servers**. g6 (server #2, aux tier) came up MAXED (15.5/16 GB) so it
-can't also host the heavy OpenSearch/Marquez/OpenBao trio — so **g5 was drained from the GW pool and
-made server #3 (node-c)** to run those three (owner: "Provision 3rd node now", 2026-07-05). GW
-inference mix is now **1 gemma (g2) + g3 dual-role gemma · 1 qwythos (g1) · 2 VL (g4,g7)** — gemma
-lost g5 but g3 still serves gemma chat, so capacity holds.
+Topology is **6 GW + 2 servers** (S1 control plane + g6 aux tier). A brief 2026-07-05 detour to make
+g5 a "server #3" for OpenSearch/Marquez/OpenBao was **abandoned** — those services were already running
+on S1 (the `offgrid-services-a` stack), so no 3rd server is needed. **g5 was restored to the GW pool.**
+The heavy backend trio lives on S1; the console reaches it over 127.0.0.1 (see the node-c note below).
 
 | Machine | Role | State |
 |---|---|---|
-| S1 | server #1 (control plane) | ✅ up |
+| S1 | server #1 (control plane + `offgrid-services-a`/`-extra`: OpenSearch, Marquez, OpenBao, OPA, Qdrant, Temporal, SeaweedFS…) | ✅ up |
 | **g6** | **server #2 (aux tier — Langfuse/Unleash/Superset/Fleet/Presidio)** | ✅ provisioned 2026-07-05 (Docker 29.5.2); MAXED 15.5/16 GB |
-| **g5** | **server #3 / node-c (SIEM/lineage/secrets — OpenSearch/Marquez/OpenBao)** | 🟡 provisioning 2026-07-05 (drained from GW pool, role=server) |
+| g5 | GW — gemma-4-e4b | ✅ serving (restored to pool 2026-07-05 after the abandoned node-c detour) |
 | g1 | GW — qwythos-9b | ✅ RECLAIMED to `_2` (2026-07-05, IP .57) — qwythos routes again |
 | g2 | GW — gemma-4-e4b | ✅ serving |
 | g3 | **IMAGE-ONLY** — juggernaut-xl-v9 (:1234). gemma :7878 gateway booted-out+disabled (2026-07-05) | ✅ serving image |
@@ -310,26 +309,44 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
   (fleet), reload Caddy; Redis (`:6379`, non-HTTP) needs a TCP forward or stays in-memory fallback.
   S2 no longer required — g6 replaces it. Note: g6 was `enabled:false` in the aggregator POOL (server,
   not a GW) — keep it that way.
-- **node-c (g5) — server #3, IN PROGRESS (2026-07-05):** g6 came up MAXED (15.5/16 GB) with the aux
-  tier, so the three heavy remaining services (**OpenSearch** SIEM, **Marquez** lineage, **OpenBao**
-  secrets) go on a 3rd server. **g5 was drained from the GW pool** (`PATCH /api/v1/gateway/fleet/g5
-  {enabled:false}` then `{role:'server'}` — both applied; gemma still served by g2 + g3-dual-role) and
-  is being provisioned OrbStack-headless via the recipe above. Compose file: **`services-node-c.yml`**
-  (self-contained, env inline, named volumes). **Provisioning gotcha hit + fixed (2026-07-05):** the
-  privhelper first copied to g5 as a **0-byte file** (`cat|tee` over the SSH pipe silently produced
-  nothing → `launchctl bootstrap` failed `5: Input/output error`). Re-copy the helper **binary-safe**:
-  `sudo -S base64` it on the source node → pipe → `base64 -d > /tmp/ph.bin` on the target → `sudo cp`
-  into place (do NOT pipe binary through `cat|tee`, and do NOT feed the sudo password into the same
-  stdin as the data). Verify SHA-256 matches the source before bootstrapping — the empty-file hash is
-  `e3b0c442…852b855`, an instant tell that the copy produced nothing.
-  **REMAINING once docker is up on g5:** (1) `docker compose -f services-node-c.yml up -d` (detached —
-  pulls ~4 images slowly over `_2`); (2) add S1 Caddy loopback proxies **8935→`offgrid-g5.local:9200`**
-  (OpenSearch), **8936→`:9000`** (Marquez), **8937→`:8200`** (OpenBao) — console can't egress LAN
-  directly (macOS Local Network privacy), so it reaches them via 127.0.0.1; (3) set console
-  `.env.local`: `OFFGRID_OPENSEARCH_URL=http://127.0.0.1:8935`, `OFFGRID_MARQUEZ_URL=http://127.0.0.1:8936`,
-  `OFFGRID_ADAPTER_SECRETS=openbao` + `OFFGRID_OPENBAO_URL=http://127.0.0.1:8937` +
-  `OFFGRID_OPENBAO_TOKEN=offgrid-root`; restart console → SIEM/Lineage/Secrets go live. g5 stays
-  `enabled:false` in the aggregator POOL (server, not a GW).
+- **node-c (g5) plan — ABANDONED (2026-07-05), was never needed.** The premise ("OpenSearch/Marquez/
+  OpenBao aren't running → provision a 3rd server") was **WRONG**: all three have been running the whole
+  time in the **`offgrid-services-a` Docker stack ON S1** (up 4 days — see the S1 container list above).
+  `_cat/indices` on S1:9200 showed the real `offgrid-gateway` index (760+ docs — the audit events
+  behind Analytics/FinOps); Marquez :9000 answered with a `default` namespace; OpenBao :8200 was
+  initialized+unsealed. The actual gap was **console WIRING** (env vars unset), not missing services.
+  And because these run on S1 *localhost*, the console reaches them **directly at 127.0.0.1** — no g5,
+  no OrbStack, no Caddy loopback proxy needed (Analytics already read `127.0.0.1:9200` fine).
+  - **g5 restored to the GW pool** (`PATCH /api/v1/gateway/fleet/g5 {role:'gateway',enabled:true,
+    model:'gemma-4-e4b'}`); its llama.cpp :7878 still serves gemma. OrbStack on g5 quit. Topology is
+    back to the intended GW count. `deploy/onprem/services-node-c.yml` is kept only as a reference for a
+    future standalone aux node; it is **not deployed**.
+  - **Wiring applied to the console `.env.local` on S1 (2026-07-05), console restarted (launchd
+    `kickstart -k gui/501/co.getoffgridai.console`):**
+    `OFFGRID_OPENSEARCH_URL=http://127.0.0.1:9200`, `OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000`,
+    `OFFGRID_ADAPTER_LINEAGE=marquez`, `OFFGRID_ADAPTER_SECRETS=openbao`,
+    `OFFGRID_OPENBAO_URL=http://127.0.0.1:8200`, `OFFGRID_OPENBAO_TOKEN=offgrid-dev-token`,
+    `OFFGRID_SIEM_INDEX=offgrid-audit`. **Verified live:** Secrets page = openbao, reachable, unsealed
+    (seeded 3 real secrets under `datasources/`,`gateway/` via KV v2 at mount `secret`); Lineage =
+    connected to Marquez `default` ns (empty until runs emit OpenLineage); services-health shows
+    opensearch/openbao/marquez/opa/temporal/qdrant/langfuse/unleash all UP.
+  - **OpenBao gotcha:** the console adapter (`src/lib/adapters/secrets.ts`) expects a **KV v2 engine at
+    mount `secret`** (`OFFGRID_OPENBAO_MOUNT` default `secret`) and the token `offgrid-dev-token` (the
+    container's `BAO_DEV_ROOT_TOKEN_ID`, NOT `offgrid-root`). Enable once:
+    `curl -H "X-Vault-Token: offgrid-dev-token" -XPOST 127.0.0.1:8200/v1/sys/mounts/secret -d '{"type":"kv","options":{"version":"2"}}'`.
+  - **SIEM still empty:** the SIEM view reads `OFFGRID_SIEM_INDEX` (`offgrid-audit`) — a DIFFERENT index
+    than Analytics (`offgrid-gateway`). `offgrid-audit` doesn't exist until `shipAudit()` writes to it;
+    now that `OFFGRID_OPENSEARCH_URL` is set, governed activity will create+populate it. Generate a few
+    governed runs to seed, or point `OFFGRID_SIEM_INDEX=offgrid-gateway` (field-sparse) as a stopgap.
+  - **Presidio (Guardrails) DEFERRED:** Presidio is live on g6 (:5002/:5001) and reachable from a shell,
+    but the **launchd next-server can't reach a standalone loopback forwarder** on S1 (fresh `node`
+    can — an unresolved macOS launchd loopback quirk; caddy `reverse-proxy` also binds IPv6-`*` only).
+    The proven next-server→g6 path is the **edge Caddy** (root, binds `127.0.0.1` explicitly — that's
+    how the 8931-8934 g6 proxies work). Wire Presidio by adding `8938→g6:5002`,`8939→g6:5001` to the
+    edge Caddyfile (already staged there) + `OFFGRID_ADAPTER_GUARDRAILS=presidio` +
+    `OFFGRID_PRESIDIO_URL`/`_ANONYMIZER_URL` — but that needs an **edge-Caddy reload/restart**, which is
+    risky (admin API is `off`, the process is unsupervised PPID 1 fronting the public tunnel). Do it
+    on-site or during a maintenance window. Until then Guardrails runs the always-on regex floor.
 
 ## Multi-tenancy (Phase 3 — in progress)
 

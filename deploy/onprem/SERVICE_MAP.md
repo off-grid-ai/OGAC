@@ -32,9 +32,8 @@ you add a node, a subdomain, or a service.
 
 | Node | IP | Runs |
 |------|----|----|
-| **S1** (control plane) | `127.0.0.1` | Console (native `next start`), Postgres (OrbStack), Keycloak, **gateway aggregator :8800**, queue worker, Caddy edge, Cloudflare tunnel |
-| **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (provisioned 2026-07-05; **S2 replacement — S2 retired**). MAXED 15.5/16 GB. |
-| **g5** (server #3 — node-c) | `192.168.1.65` | OpenSearch `:9200` (SIEM), Marquez `:9000` (lineage), OpenBao `:8200` (secrets) — `services-node-c.yml` (provisioning 2026-07-05; g6 was maxed so these moved to a 3rd server). Drained from the GW pool. |
+| **S1** (control plane + backends) | `127.0.0.1` | Console (native `next start`), **gateway aggregator :8800**, Caddy edge, Cloudflare tunnel, queue worker, and the **`offgrid-services-a`/`-extra` Docker stacks**: Postgres, Keycloak, **OpenSearch :9200, Marquez :9000, OpenBao :8200**, OPA :8181, Qdrant :6333, Temporal :7233/:8081, SeaweedFS, VictoriaMetrics, Evidently + the seeded data-source containers. Console reaches all of these over **127.0.0.1** (localhost — not gated by Local-Network privacy). |
+| **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (provisioned 2026-07-05; **S2 replacement — S2 retired**). MAXED 15.5/16 GB. Console reaches these via S1 Caddy loopback proxies (LAN not directly reachable by the console daemon). |
 | ~~S2~~ (retired) | `192.168.1.60` | ❌ offline since router reboot — aux tier moved to g6, node not required |
 
 ## AI Gateway aggregator (the LLM control point)
@@ -62,7 +61,7 @@ you add a node, a subdomain, or a service.
 | g2 | `192.168.1.58` | qwen3.5-9b | text + vision |
 | g3 | `192.168.1.32` | qwythos-9b | text + vision |
 | g4 | `192.168.1.63` | qwythos-9b | text + vision |
-| ~~g5~~ | `192.168.1.65` | — (drained → **server #3 / node-c**: OpenSearch/Marquez/OpenBao) | — |
+| g5 | `192.168.1.65` | gemma-4-e4b | text + vision |
 | ~~g6~~ | `192.168.1.66` | — (drained → **server #2 / aux tier**) | — |
 | g7 | `192.168.1.62` | qwen3-coder-30b | text |
 | g8 | `192.168.1.64` | (confirm before pulling) | — |
@@ -78,21 +77,24 @@ launchd job (see `GATEWAY_PROVISIONING.md`).
 |---------|-----------|-------------|-------|
 | Keycloak | `127.0.0.1:8080` | `/health/ready` | IAM |
 | Qdrant | `:6333` (env `OFFGRID_QDRANT_URL`) | `/healthz` | vector store |
-| OpenSearch | g5 `:9200` via `OFFGRID_OPENSEARCH_URL=http://127.0.0.1:8935` (Caddy loopback) | `/_cluster/health` | SIEM / logs (node-c) |
-| Temporal (UI) | `127.0.0.1:8081` | `/` | workflows |
-| OPA | `127.0.0.1:8181` | `/health` | policy |
-| OpenBao | g5 `:8200` via `OFFGRID_OPENBAO_URL=http://127.0.0.1:8937` (Caddy loopback) | `/v1/sys/health` | secrets (node-c); token `offgrid-root` |
-| Marquez | g5 `:9000` via `OFFGRID_MARQUEZ_URL=http://127.0.0.1:8936` (Caddy loopback) | `/api/v1/namespaces` | lineage (node-c) |
-| Langfuse | g6 `:3030` via `127.0.0.1:8931` (Caddy loopback) | `/api/public/health` | observability |
-| Unleash | g6 `:4242` via `127.0.0.1:8932` (Caddy loopback) | `/health` | flags |
-| Superset | g6 `:8088` via `127.0.0.1:8933` (Caddy loopback) | `/health` | BI / analytics embed |
-| FleetDM | g6 `:8070` via `127.0.0.1:8934` (Caddy loopback) | `/healthz` | MDM |
-| Presidio | g6 `:5002` (analyzer) / `:5001` (anonymizer) | `/health` | PII masking |
+| OpenSearch | S1 `127.0.0.1:9200` (`OFFGRID_OPENSEARCH_URL`) | `/_cluster/health` | SIEM/analytics/audit; index `offgrid-gateway` (Analytics), `offgrid-audit` (SIEM) |
+| Temporal (UI) | S1 `127.0.0.1:8081` (API `:7233`) | `/` | workflows |
+| OPA | S1 `127.0.0.1:8181` | `/health` | policy |
+| OpenBao | S1 `127.0.0.1:8200` (`OFFGRID_OPENBAO_URL`) | `/v1/sys/health` | secrets; token `offgrid-dev-token`, KV v2 mount `secret` |
+| Marquez | S1 `127.0.0.1:9000` (`OFFGRID_MARQUEZ_URL`) | `/api/v1/namespaces` | lineage; namespace `default` |
+| Langfuse | g6 `:3030` via `127.0.0.1:8931` (edge-Caddy loopback) | `/api/public/health` | observability |
+| Unleash | g6 `:4242` via `127.0.0.1:8932` (edge-Caddy loopback) | `/health` | flags |
+| Superset | g6 `:8088` via `127.0.0.1:8933` (edge-Caddy loopback) | `/health` | BI / analytics embed |
+| FleetDM | g6 `:8070` via `127.0.0.1:8934` (edge-Caddy loopback) | `/healthz` | MDM |
+| Presidio | g6 `:5002` / `:5001` — **not yet wired** (needs edge-Caddy 8938/8939 + edge reload) | `/health` | PII masking (Guardrails on regex floor until wired) |
 
-> **Loopback proxies (S1 Caddy):** the console (SSH-launched `next-server`) can't egress to the LAN
-> (macOS 15 Local-Network privacy). Caddy on S1 fronts each aux service on `127.0.0.1:893x` and the
-> console's `OFFGRID_*_URL` point at the loopback, not the node IP. Map: 8931 Langfuse · 8932 Unleash ·
-> 8933 Superset · 8934 FleetDM (all g6) · 8935 OpenSearch · 8936 Marquez · 8937 OpenBao (all g5).
+> **Two connectivity classes:** (1) **S1-local backends** (OpenSearch/Marquez/OpenBao/OPA/Qdrant/
+> Temporal) — the console reaches them DIRECTLY at `127.0.0.1:<port>`; no proxy. (2) **g6 aux tier**
+> (Langfuse/Unleash/Superset/FleetDM/Presidio) — on the LAN, which the SSH-launched `next-server`
+> can't reach (macOS 15 Local-Network privacy), so the **edge Caddy** fronts each on `127.0.0.1:893x`
+> and the console's `OFFGRID_*_URL` point at the loopback. Map: 8931 Langfuse · 8932 Unleash · 8933
+> Superset · 8934 FleetDM · (8938 Presidio-analyzer / 8939 Presidio-anonymizer — staged in the
+> Caddyfile, pending an edge-Caddy reload).
 
 > If any of these show **Down** on the Services page, the `OFFGRID_*_URL` env var on
 > S1 is pointing at `127.0.0.1` (only correct for services actually on S1). Set the
