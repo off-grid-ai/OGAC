@@ -34,6 +34,7 @@ import {
   Archive,
   SealCheck,
   Gauge,
+  ClipboardText,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -69,6 +70,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   policy: Gavel,
   evals: Flask,
   siem: ShieldWarning,
+  audit: ClipboardText,
   drift: Waveform,
   backups: Archive,
   retrieval: Database,
