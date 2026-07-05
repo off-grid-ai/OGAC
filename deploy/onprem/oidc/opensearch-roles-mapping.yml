@@ -1,0 +1,14 @@
+# OpenSearch roles_mapping — Keycloak realm roles → OpenSearch roles. Phase-D, READY not enabled.
+# Mount at /usr/share/opensearch/config/opensearch-security/roles_mapping.yml. See oidc-services.md § 1c.
+_meta:
+  type: 'rolesmapping'
+  config_version: 2
+all_access:
+  reserved: false
+  backend_roles:
+    - 'svc-opensearch'   # the console broker's service-token role → full access
+    - 'console-admin'    # operators carrying the console-admin realm role
+kibana_user:
+  reserved: false
+  backend_roles:
+    - 'svc-opensearch'

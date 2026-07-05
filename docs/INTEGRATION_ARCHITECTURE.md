@@ -102,9 +102,28 @@ OpenBao without code changes.
 8. Caddy `forward_auth` (the existing `(gated)` snippet) on Presidio (8938/8939) and Marquez (:9000);
    OPA stays console-only on the trusted LAN. Nothing reachable unauthenticated.
 
-**Phase D — native-OIDC for the UI services (direct SSO)**
+**Phase D — native-OIDC for the UI services (direct SSO)** — **CONFIG READY (2026-07-06), NOT enabled**
 9. OpenSearch: enable the security plugin + OIDC/JWT (KC client) so Dashboards + API take Keycloak.
 10. FleetDM SSO + Superset OAuth (`superset_config.py`) for people who open those UIs directly.
+
+> **Status (2026-07-06).** The Phase-D config is delivered as a **one-flag enable** — nothing is
+> flipped live (enabling is an on-site maintenance step). Deliverables:
+> - **Config file:** `deploy/onprem/oidc-services.md` — verbatim, ready-to-flip config for all three
+>   (OpenSearch security-plugin `config.yml` OIDC+JWT / Dashboards yml / roles-mapping; FleetDM
+>   `sso_settings` + `FLEET_SSO_*` env; Superset `superset_config.py` AUTH_OAUTH), each with issuer/JWKS
+>   endpoints, audience, and step-by-step enable instructions.
+> - **Compose staging:** `services-node-a.yml` (OpenSearch) + `services-node-b.yml` (FleetDM, Superset)
+>   carry commented, ready-to-uncomment mounts/env pointing at those config blocks.
+> - **Keycloak clients:** `offgrid-opensearch` + `offgrid-fleet` already existed; **`offgrid-superset`
+>   is new** (login client — `standardFlow` + `oauth-authorized/keycloak` redirect + audience mapper +
+>   role `svc-superset`), added to the realm seed AND the code SSOT (`src/lib/service-clients.ts`).
+> - **Honest ready-vs-enable split + on-site steps:** `SERVER_STATE.md` § "Native-OIDC for UI services
+>   (Phase D — READY, NOT enabled)".
+>
+> **The one gotcha:** enabling OpenSearch security is NOT flip-and-forget — the console reads OpenSearch
+> anonymously over loopback today (`DISABLE_SECURITY_PLUGIN=true`). Turning security on requires the
+> PAIRED broker-plan flip `opensearch: 'none'→'oidc-jwt'` in `service-credentials-lib.ts` in the SAME
+> change, or console analytics/audit reads 401. FleetDM/Superset OIDC are login-only → no console impact.
 
 **Phase E — hardening**
 11. OpenBao prod mode (persistent backend + OIDC auth method, drop the dev root token).

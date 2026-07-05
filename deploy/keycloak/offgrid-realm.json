@@ -14,6 +14,7 @@
       { "name": "svc-fleet", "description": "Off Grid service scope: svc-fleet" },
       { "name": "svc-temporal", "description": "Off Grid service scope: svc-temporal" },
       { "name": "svc-seaweedfs", "description": "Off Grid service scope: svc-seaweedfs" },
+      { "name": "svc-superset", "description": "Off Grid service scope: svc-superset (Superset OIDC login)" },
       { "name": "console-admin", "description": "Off Grid console capability: admin (machine principals only)" }
     ]
   },
@@ -164,6 +165,38 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "offgrid-superset",
+      "name": "Off Grid Superset (SSO)",
+      "description": "OIDC login client for the Superset BI UI (Flask-AppBuilder AUTH_OAUTH). Unlike the other service clients this backs an interactive authorization-code login, so standardFlow + redirectUris are enabled. serviceAccountsEnabled is kept on for provisioning/parity uniformity but is unused by the login flow.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-superset-secret",
+      "redirectUris": [
+        "https://superset.getoffgridai.co/oauth-authorized/keycloak",
+        "http://offgrid-g6.local:8088/oauth-authorized/keycloak",
+        "http://127.0.0.1:8933/oauth-authorized/keycloak",
+        "http://localhost:8088/oauth-authorized/keycloak"
+      ],
+      "webOrigins": ["+"],
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-superset",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-superset",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -196,6 +229,12 @@
       "enabled": true,
       "serviceAccountClientId": "offgrid-seaweedfs",
       "realmRoles": ["svc-seaweedfs"]
+    },
+    {
+      "username": "service-account-offgrid-superset",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-superset",
+      "realmRoles": ["svc-superset"]
     },
     {
       "username": "mohammed.ali@wednesday.is",
