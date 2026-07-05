@@ -57,6 +57,8 @@ drizzle migrations** (`drizzle/000X_*.sql`) so a migrate-based deploy reproduces
 **`fleet_nodes`** (2026-07-05 — the gateway SSOT; seeded with the 9 live nodes).
 DDL for each is in `src/db/schema.ts`; the create statements used are in git history / DEPLOY.md.
 
+Self-creating tables (via `CREATE TABLE IF NOT EXISTS` on first use — no manual/migration step, deploy over SSH just works): `guardrails_rules`, and (2026-07-05, DEEP Presidio guardrails) **`presidio_recognizers`** (org-scoped custom recognizers: regex-pattern + context words, or deny-list terms — pushed to Presidio `/analyze` as `ad_hoc_recognizers`) and **`presidio_thresholds`** (per-org global + per-entity `score_threshold`). DDL in `src/lib/presidio-recognizers.ts` (`ensureRecognizersSchema`).
+
 ### Gateway fleet SSOT (2026-07-05) — how it's wired
 `fleet_nodes` is the single source of truth for the on-prem fleet. Flow + gotchas:
 - **Console** `GET /api/v1/gateway/pool` derives the aggregator POOL/IMAGE_POOL from the table;
