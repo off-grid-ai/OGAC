@@ -1,35 +1,39 @@
 # Docs gaps ledger
 
-Gaps observed while writing the product docs (`/docs`, content in `src/lib/docs.ts`). Each is
-something the docs describe or imply that isn't fully true/built yet, needs verification, or is a
-content area still to cover. Keep this current as docs + product evolve.
+Gaps observed while writing the product docs (`/docs`, content in `src/lib/docs/`). Kept current as
+docs + product evolve. Copy is written to `brand/` (outcomes-first, Off Grid voice, no em-dashes/
+AI-slop) — re-audit on each new page.
 
-## Product/doc mismatches to resolve
-- **Provenance signing in the pipeline** — the governed-pipeline doc says answers "can be signed."
-  Verify the sign step is actually invoked on chat/agent runs by default (vs. only on report export)
-  and reconcile the wording.
+## Coverage (as of the comprehensive pass)
+Breadth is now comprehensive — a page per capability across Introduction, Core concepts, Build,
+Govern, Operate, Integrations, API (with curl/Python/Node samples), and Self-hosting (~45 pages).
+Content lives in per-section files under `src/lib/docs/` so pages can be deepened in parallel.
+
+## Product/doc mismatches to verify or reconcile
+- **Provenance signing default** — docs say agent answers "can be signed." Confirm the sign step
+  runs on chat/agent runs by default vs. only on report export; reconcile wording.
 - **Cloud egress / cloud models** — docs describe routing to cloud models "when policy allows," but
-  the routing/leash framework has no cloud provider clients wired yet (local-only today). Docs should
-  not imply cloud is live until a provider is connected. Currently phrased as conditional ("when your
-  policy allows") — keep it aspirational-but-honest; revisit when cloud routing ships.
-- **Permissions-aware retrieval** — Knowledge doc implies retrieval "respects who is allowed to see
-  what." Verify real-time source-level permission binding exists vs. project/ABAC scoping only.
-- **Image models in chat** — verified live (juggernaut via sd-server). Fine.
+  no cloud provider clients are wired yet (local-only today). Phrased conditionally on purpose;
+  make it concrete once cloud routing ships.
+- **Permissions-aware retrieval** — Knowledge/architecture imply retrieval "respects who can see
+  what." Verify real-time source-level permission binding vs. project/ABAC scoping only.
+- **Temporal durable runs** — listed as a platform service; the runtime adapter is scaffolded but
+  full durable-run wiring is the open Phase 6/8 item. Don't imply it's fully live.
+- **Backups restore** — docs mention restore within a recovery target; verify the restore path is
+  wired end-to-end (daily dump exists; DR failover is not configured).
 
-## Coverage still to write (per-capability depth)
-- Deeper guides with request/response examples for: Gateway routing rules, Agents + tools, Studio
-  publish/share, FinOps budgets, Evals/golden sets, Fleet node config.
-- **Integrations catalog** — a page listing every supported connector + how to configure each
-  (Portkey has a big integrations section). Only a short Data page exists now.
-- **SDK/code samples** — the API page points to the reference, but there are no per-language
-  quickstart snippets (Python/Node/curl) like Portkey's landing. Add once the SDK (Phase 7) exists.
-- **Self-hosting runbook** — the self-hosting page is a map, not a runbook. A real deploy guide
-  (topology, env, TLS, scaling) belongs here or in DEPLOY.md, linked.
+## Depth still to add (per page)
+- Screenshots / short walkthroughs on the capability guides (currently prose + steps, no images).
+- More request/response examples on the console-API side (the model API has curl/Python/Node; the
+  console REST routes point to the interactive reference only).
+- A first-party **SDK** page becomes real once the SDK (Phase 7) exists; today it points at the
+  OpenAI SDKs.
+- Per-connector setup detail in the Integration catalog (endpoint formats, auth per source).
 
-## Docs-platform gaps (the docs site itself)
-- **Search** — no docs search yet (Portkey has ⌘K search). Could extend the console global search or
-  add a docs-only search.
-- **Prev/next + on-page TOC** — pages have no footer prev/next nav or right-rail table of contents.
-- **Versioning** — no doc versioning; fine for now.
-- **Copy audit** — all copy written against `brand/` (outcomes-first, Off Grid voice, no em-dashes/
-  AI-slop). Re-audit on each new page.
+## Docs-platform gaps (the site itself)
+- **Search** — no docs search yet (Portkey has ⌘K). Extend the console global search to docs, or add
+  a docs-only index.
+- **Prev/next + on-page TOC** — pages have no footer prev/next or right-rail table of contents.
+- **Versioning** — none; fine for now.
+- **Code-block copy button + syntax highlighting** — code renders monospaced but without a copy
+  button or highlighting.
