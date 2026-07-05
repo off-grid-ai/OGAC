@@ -10,6 +10,9 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DynamicDbPanel } from '@/components/secrets/DynamicDbPanel';
+import { LeasesPanel } from '@/components/secrets/LeasesPanel';
+import { SealControl } from '@/components/secrets/SealControl';
 import { SecretsManagerNav } from '@/components/secrets/SecretsManagerNav';
 import { requireModuleForUser } from '@/lib/module-access';
 import { readSecretsView } from '@/lib/secrets-view';
@@ -117,8 +120,24 @@ export default async function SecretsPage() {
         />
       </div>
 
-      {/* Key management — names only, write-only values, delete with confirmation */}
+      {/* Key management — names only, write-only values, versioning/rotation, delete with confirmation */}
       <SecretsManagerNav configured={view.configured} sealed={sealed} />
+
+      {/* Operational controls — only meaningful when OpenBao is configured & reachable */}
+      {view.configured && view.reachable && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SealControl
+            sealed={view.sealed}
+            threshold={view.unsealThreshold}
+            shares={view.unsealShares}
+            progress={view.unsealProgress}
+          />
+          <DynamicDbPanel sealed={sealed} />
+          <div className="lg:col-span-2">
+            <LeasesPanel sealed={sealed} />
+          </div>
+        </div>
+      )}
 
       {/* Mount table — paths + types only, never values */}
       <Card className="shadow-sm">
