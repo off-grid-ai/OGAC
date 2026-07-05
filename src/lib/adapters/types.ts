@@ -140,6 +140,12 @@ export interface LineageEvent {
   status: 'START' | 'COMPLETE' | 'FAIL';
   inputs?: string[];
   outputs?: string[];
+  // Optional per-dataset OpenLineage facets (schema / columnLineage / dataQuality), keyed by the
+  // dataset name so the adapter can attach them to the matching input/output. A producer that knows
+  // its shape (brain.ingest knows source fields; a DB dataset knows its columns) supplies these;
+  // producers with no facet info simply omit them and a bare dataset is emitted. See
+  // `src/lib/lineage-facets.ts` (DatasetFacetSpec) for the shape.
+  facets?: import('@/lib/lineage-facets').DatasetFacetSpec[];
 }
 
 export interface LineagePort {

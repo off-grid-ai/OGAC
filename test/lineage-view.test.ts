@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeLineage } from '../src/lib/lineage-view.ts';
+import { normalizeDatasetDetail, normalizeLineage } from '../src/lib/lineage-view.ts';
 
 // Pure Marquez → display-model normalizer. No network, no mocks — sample REST JSON in, asserted
 // display model out. Covers a realistic response, empty inputs, and malformed/partial shapes.
@@ -95,4 +95,48 @@ test('normalizeLineage: malformed / partial shapes never throw', () => {
   assert.equal(v.lastRun, null); // no timestamps present
   // one input edge from j2's 'in'
   assert.deepEqual(v.edges, [{ from: 'in', to: '(unnamed)', kind: 'input' }]);
+});
+
+// ── normalizeDatasetDetail — single-dataset read (schema + facets + tags) ──────────────────────
+test('normalizeDatasetDetail: lifts fields, tags, facet names + rowCount/bytes', () => {
+  const d = normalizeDatasetDetail({
+    name: 'answer.grounded',
+    namespace: 'offgrid-console',
+    type: 'STREAM',
+    description: 'grounded answers',
+    updatedAt: '2026-07-01T10:00:00Z',
+    fields: [
+      { name: 'id', type: 'string', description: 'pk' },
+      { name: 'text', type: 'string' },
+      { type: 'noname' }, // dropped
+    ],
+    tags: ['pii', { name: 'critical' }, { name: '' }],
+    facets: {
+      schema: { fields: [] },
+      dataQualityMetrics: { rowCount: 42, bytes: 8192 },
+    },
+  });
+  assert.ok(d);
+  assert.equal(d.name, 'answer.grounded');
+  assert.equal(d.namespace, 'offgrid-console');
+  assert.equal(d.type, 'STREAM');
+  assert.equal(d.fields.length, 2);
+  assert.deepEqual(d.fields[0], { name: 'id', type: 'string', description: 'pk' });
+  assert.deepEqual(d.tags, ['pii', 'critical']); // empty tag dropped
+  assert.deepEqual(d.facetNames.sort(), ['dataQualityMetrics', 'schema']);
+  assert.equal(d.rowCount, 42);
+  assert.equal(d.bytes, 8192);
+});
+
+test('normalizeDatasetDetail: null/nameless → null; missing facets degrade safely', () => {
+  assert.equal(normalizeDatasetDetail(null), null);
+  assert.equal(normalizeDatasetDetail(undefined), null);
+  assert.equal(normalizeDatasetDetail({ type: 'x' }), null); // no name
+  const bare = normalizeDatasetDetail({ name: 'd' });
+  assert.ok(bare);
+  assert.deepEqual(bare.fields, []);
+  assert.deepEqual(bare.tags, []);
+  assert.deepEqual(bare.facetNames, []);
+  assert.equal(bare.rowCount, null);
+  assert.equal(bare.bytes, null);
 });
