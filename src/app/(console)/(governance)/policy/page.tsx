@@ -1,8 +1,10 @@
 import { Scales } from '@phosphor-icons/react/dist/ssr';
 import { Suspense } from 'react';
 import { PolicyRulesManager } from '@/components/policy/PolicyRulesManager';
+import { RegoModulesManager } from '@/components/policy/RegoModulesManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -12,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listModules } from '@/lib/opa-policy';
 import { listPolicyRules } from '@/lib/policy-rules';
 import { readDecisions, readPolicyStatus } from '@/lib/policy-view';
 import { currentOrgId } from '@/lib/tenancy';
@@ -24,10 +27,11 @@ export const dynamic = 'force-dynamic';
 export default async function PolicyPage() {
   await requireModuleForUser('policy');
   const orgId = await currentOrgId();
-  const [status, decisions, rules] = await Promise.all([
+  const [status, decisions, rules, opaModules] = await Promise.all([
     readPolicyStatus(),
     readDecisions(),
     listPolicyRules(orgId),
+    listModules(),
   ]);
 
   return (
@@ -98,12 +102,33 @@ export default async function PolicyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Policy rules</CardTitle>
+          <CardTitle className="text-base">Policy authoring</CardTitle>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading rules…</p>}>
-            <PolicyRulesManager rules={rules} />
-          </Suspense>
+          <Tabs defaultValue="abac">
+            <TabsList>
+              <TabsTrigger value="abac">ABAC rules (default)</TabsTrigger>
+              <TabsTrigger value="rego">Rego modules (advanced)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="abac" className="pt-4">
+              <Suspense
+                fallback={<p className="text-sm text-muted-foreground">Loading rules…</p>}
+              >
+                <PolicyRulesManager rules={rules} />
+              </Suspense>
+            </TabsContent>
+            <TabsContent value="rego" className="pt-4">
+              <Suspense
+                fallback={<p className="text-sm text-muted-foreground">Loading modules…</p>}
+              >
+                <RegoModulesManager
+                  modules={opaModules.reachable ? opaModules.modules : []}
+                  reachable={opaModules.reachable}
+                  reason={opaModules.reachable ? undefined : opaModules.reason}
+                />
+              </Suspense>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
