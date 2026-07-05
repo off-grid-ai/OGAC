@@ -5,6 +5,7 @@ import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import { devLoginEnabled, googleEnabled, microsoftEnabled, passwordEnabled } from '@/auth.config';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
+import { WriteToUsDialog } from '@/components/auth/WriteToUsDialog';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,17 +137,14 @@ export default async function SignInPage({
             </p>
           ) : null}
 
-          {/* No account yet → route to sales. Book a call opens Mac's cal.com; write-to-us is a
-              mailto. A link (not an inline iframe) keeps the auth-page CSP tight (default-src 'self'). */}
+          {/* No account yet → route to sales. Book a call opens Mac's cal.com; "Write to us" is a
+              request-access form that posts to /api/waitlist → the same Google Sheet as the marketing
+              waitlist. Both are dialogs (no third-party script / mailto), keeping the auth-page CSP tight. */}
           <div className="space-y-2 border-t border-border pt-3">
             <p className="text-center text-xs text-muted-foreground">Don&apos;t have an account?</p>
             <div className="grid grid-cols-2 gap-2">
               <BookCallDialog />
-              <Button asChild variant="outline" size="sm">
-                <a href="mailto:mac@wednesday.is?subject=Off%20Grid%20Console%20access">
-                  Write to us
-                </a>
-              </Button>
+              <WriteToUsDialog />
             </div>
           </div>
 
