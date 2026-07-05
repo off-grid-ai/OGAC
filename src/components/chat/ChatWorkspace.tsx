@@ -1014,9 +1014,9 @@ export function ChatWorkspace({
   }
 
   return (
-    <div className="-m-6 flex h-full">
+    <div className="-m-6 flex h-[calc(100%+3rem)] min-h-0">
       {/* Rail: projects + conversations */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
+      <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
         {/* Top: primary action + search */}
         <div className="space-y-2 p-2.5">
           <Button
