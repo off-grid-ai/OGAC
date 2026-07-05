@@ -27,7 +27,7 @@ interface GatewayInfo {
   docs: string;
   mcp: string;
   modalities: Record<string, string>;
-  image_models?: string[];
+  image_models?: (string | { id: string; gateways?: string[] })[];
   gateways?: GatewayNode[];
 }
 
@@ -129,11 +129,15 @@ export default async function GatewayPage() {
                 <CardTitle className="text-sm">Image models</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-1.5">
-                {info.image_models.map((m) => (
-                  <Badge key={m} variant="secondary" className="font-mono">
-                    {m}
-                  </Badge>
-                ))}
+                {info.image_models.map((m) => {
+                  // The aggregator may return image_models as strings OR {id, gateways} objects.
+                  const id = typeof m === 'string' ? m : m.id;
+                  return (
+                    <Badge key={id} variant="secondary" className="font-mono">
+                      {id}
+                    </Badge>
+                  );
+                })}
               </CardContent>
             </Card>
           ) : null}
