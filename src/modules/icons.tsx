@@ -34,12 +34,14 @@ import {
   Archive,
   SealCheck,
   Gauge,
+  Image as ImageIcon,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
 export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   overview: Gauge,
   chat: ChatIcon,
+  images: ImageIcon,
   services: SquaresFour,
   projects: FolderOpen,
   artifacts: Cube,

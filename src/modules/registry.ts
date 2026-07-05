@@ -3,6 +3,7 @@
 export type ModuleId =
   | 'overview'
   | 'chat'
+  | 'images'
   | 'services'
   | 'projects'
   | 'artifacts'
@@ -68,6 +69,14 @@ export const MODULES: readonly ModuleDef[] = [
     description:
       'Your own ChatGPT — chat, projects, and knowledge, answered by the on-prem gateways. No per-seat cost.',
     route: '/chat',
+    service: 'gateway',
+  },
+  {
+    id: 'images',
+    label: 'Image Studio',
+    description:
+      'Generate images on your own hardware — prompt, size, and steps, rendered by the on-prem image gateway. Nothing leaves the box.',
+    route: '/images',
     service: 'gateway',
   },
   {
