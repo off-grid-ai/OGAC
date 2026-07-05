@@ -150,3 +150,71 @@ export function selectPrunable(rows: readonly BackupRow[]): BackupRow[] {
     (r) => r.timestampMs !== null && r.withinRetention === false,
   );
 }
+
+// ── Restore command derivation (PURE — no execution) ─────────────────────────────────────────────
+//
+// Restoring a dump is DESTRUCTIVE (it overwrites a live database), so the console does NOT run it
+// one-click. Instead it inspects a chosen backup, lists its dump files, and derives the EXACT,
+// copy-pasteable restore command an operator runs on S1 during a maintenance window. This maps each
+// known dump filename to its target container + client, mirroring the RESTORE notes in backup.sh.
+// Unknown files are surfaced with a null command (honest: "we don't know how to restore this").
+
+export interface DumpFile {
+  file: string; // bare filename inside the backup dir, e.g. "console.sql.gz"
+  sizeBytes: number;
+}
+
+// One restore instruction: the dump file, the human target, and the exact shell command (or null
+// when the file isn't a recognised dump).
+export interface RestorePlanItem {
+  file: string;
+  sizeBytes: number;
+  target: string; // human label of what gets overwritten
+  command: string | null; // exact restore command, or null if unrecognised
+}
+
+// Recognised dump → restore mapping. Kept beside the script so the two never drift. `{path}` is the
+// absolute path to the dump file (the reader fills it in).
+const RESTORE_TARGETS: ReadonlyArray<{
+  match: RegExp;
+  target: string;
+  command: (path: string) => string;
+}> = [
+  {
+    match: /^console\.sql\.gz$/,
+    target: 'Console Postgres (offgrid_console) — the whole console',
+    command: (p) =>
+      `gunzip -c '${p}' | /Users/admin/.orbstack/bin/docker exec -i offgrid-console-postgres-1 psql -U offgrid offgrid_console`,
+  },
+  {
+    match: /^corebank\.sql\.gz$/,
+    target: 'Core Banking (Postgres)',
+    command: (p) =>
+      `gunzip -c '${p}' | /Users/admin/.orbstack/bin/docker exec -i offgrid-ds-corebank psql -U corebank corebank`,
+  },
+  {
+    match: /^policyadmin\.sql\.gz$/,
+    target: 'Policy Admin (MySQL)',
+    command: (p) =>
+      `gunzip -c '${p}' | /Users/admin/.orbstack/bin/docker exec -i offgrid-ds-policyadmin mysql -upolicyadmin -ppolicyadmin policyadmin`,
+  },
+];
+
+// Build the restore plan for a backup's dump files. Pure: the reader passes the dir listing + the
+// absolute path resolver. Each recognised dump gets its exact command; unknown files get command:null.
+export function buildRestorePlan(
+  files: readonly DumpFile[],
+  absPathFor: (file: string) => string,
+): RestorePlanItem[] {
+  return (Array.isArray(files) ? files : [])
+    .filter((f) => f && typeof f.file === 'string' && f.file.length > 0)
+    .map((f) => {
+      const hit = RESTORE_TARGETS.find((t) => t.match.test(f.file));
+      return {
+        file: f.file,
+        sizeBytes: num(f.sizeBytes),
+        target: hit ? hit.target : 'unrecognised dump — no known restore path',
+        command: hit ? hit.command(absPathFor(f.file)) : null,
+      };
+    });
+}
