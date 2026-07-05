@@ -470,6 +470,7 @@ Usage: mint at `https://auth.getoffgridai.co/realms/offgrid/protocol/openid-conn
 ### Per-service service-account clients (realm `offgrid`) — Phase 4.10-A
 Five confidential, service-accounts-enabled clients the service-token broker mints from:
 `offgrid-gateway`, `offgrid-opensearch`, `offgrid-fleet`, `offgrid-temporal`, `offgrid-seaweedfs`.
+(Phase D added a sixth, `offgrid-superset`, an interactive OIDC *login* client — see the next section.)
 Each has an `oidc-audience-mapper` (aud = its own clientId) and a realm role `svc-<service>` assigned
 to its service-account user, so the minted access token carries a usable `aud` + role claim. All are
 declared in `deploy/keycloak/offgrid-realm.json` (roles + clients + `service-account-*` users) so a
@@ -481,3 +482,28 @@ find-or-creates each client + role via the console's Keycloak admin client, then
 OpenBao at `secret/<service>/client-secret`. Body `{"rotate":true}` forces new secrets; default reuses
 existing ones (no churn). `GET` the same path reports desired-state vs what exists. Does NOT touch
 `offgrid-console` / `offgrid-console-admin`. Requires live Keycloak + OpenBao.
+
+### Native-OIDC for UI services (Phase D — READY, NOT enabled)
+"One identity everywhere," the literal version: the three services with their own UI can validate
+Keycloak tokens **directly** (not just console-brokered). This is **config on the stock images + KC
+clients** — no image patching. **All of it is delivered but NONE of it is live** — enabling is an
+on-site maintenance-window step. Full config + per-service enable steps: **`deploy/onprem/oidc-services.md`**.
+
+| Service | KC client (seeded) | Config delivered | Live? | On-site enable = |
+|---|---|---|:--:|---|
+| **OpenSearch** | `offgrid-opensearch` (existing) | security-plugin `config.yml` (OIDC+JWT), Dashboards yml, `roles_mapping.yml` — in oidc-services.md § 1; ready-to-uncomment mounts in `services-node-a.yml` | ❌ | remove `DISABLE_SECURITY_PLUGIN`, mount security config, run `securityadmin.sh`, **flip broker plan `opensearch: 'none'→'oidc-jwt'`** in `src/lib/service-credentials-lib.ts` (else console reads 401) |
+| **FleetDM** | `offgrid-fleet` (existing) | `sso_settings` YAML + `FLEET_SSO_*` env — oidc-services.md § 2; commented in `services-node-b.yml` | ❌ | enable `standardFlow`+callback redirect on the KC client, set `FLEET_SSO_*` env, restart. **No console impact** (broker keeps `fleet: 'native-bearer'` — UI login only) |
+| **Superset** | `offgrid-superset` (**NEW** — this change) | `superset_config.py` AUTH_OAUTH block — oidc-services.md § 3; commented mount + `SUPERSET_CONFIG_PATH` in `services-node-b.yml` | ❌ | mount `superset_config.py`, `superset init`, restart. **No console impact** (brokered guest-token embed unaffected) |
+
+**New Keycloak entities this change adds (in `offgrid-realm.json`):** realm role `svc-superset`; client
+`offgrid-superset` (confidential, `standardFlowEnabled` for the auth-code login, redirect
+`…/oauth-authorized/keycloak`, audience mapper `aud-offgrid-superset`, dev secret
+`offgrid-dev-svc-superset-secret`); service-account user `service-account-offgrid-superset` with role
+`svc-superset`. A fresh realm import creates them; for an existing realm run the provisioning route
+(above) — `offgrid-superset` is now in the code SSOT (`src/lib/service-clients.ts`).
+
+**Why nothing is flipped here:** OpenSearch runs `DISABLE_SECURITY_PLUGIN=true` today and the console
+reads it anonymously over loopback — turning the security plugin on without the paired broker-plan flip
+would 401 every console analytics/audit read. FleetDM/Superset OIDC are login-only and safe to add, but
+still need the on-site config mount + restart. The deliverable is a **one-flag enable** with the config
+staged, not a live cutover.
