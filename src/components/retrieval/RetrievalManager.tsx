@@ -14,6 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -245,16 +254,16 @@ export function RetrievalManager({ initialView, initialError }: Props) {
         </Card>
       )}
 
-      {/* Create dialog */}
-      <Dialog open={creating} onOpenChange={(o) => !o && setParam('new', null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New collection</DialogTitle>
-            <DialogDescription>
+      {/* Create panel — open/close in the URL (?new=1). */}
+      <Sheet open={creating} onOpenChange={(o) => !o && setParam('new', null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>New collection</SheetTitle>
+            <SheetDescription>
               Creates a Qdrant collection via <span className="font-mono">PUT /collections</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
             <div className="space-y-1.5">
               <Label htmlFor="col-name">Name</Label>
               <Input
@@ -292,17 +301,17 @@ export function RetrievalManager({ initialView, initialError }: Props) {
               </select>
             </div>
             {formError && <p className="text-sm text-destructive">{formError}</p>}
-          </div>
-          <DialogFooter>
+          </SheetBody>
+          <SheetFooter>
             <Button variant="ghost" onClick={() => setParam('new', null)} disabled={busy}>
               Cancel
             </Button>
             <Button onClick={submitCreate} disabled={busy}>
               {busy ? 'Creating…' : 'Create'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete confirmation */}
       <Dialog open={deleteTarget !== null} onOpenChange={(o) => !o && setParam('delete', null)}>
