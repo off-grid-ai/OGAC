@@ -52,7 +52,22 @@ service is down, the platform keeps working on the built-in floor.
 
 Capabilities can be gated by runtime feature flags, managed on the **Configuration** page (create,
 toggle, delete) — no redeploy to flip one. A deployment can also open all gates at once for a
-demo/eval instance.`,
+demo/eval instance.
+
+## One identity across every service
+
+By default, cross-service calls are brokered through the console: it verifies your identity, checks
+[policy](/docs/guides/policy), then talks to the backend with a per-service credential held in the
+[secrets](/docs/guides/secrets) vault, and the no-auth backends are reachable only from the console
+host. So a single credential — your SSO login or a machine client — already governs the whole
+platform, with no per-service keys to hand out.
+
+Some backends (for example OpenSearch) can additionally validate a Keycloak token themselves. When you
+want a service to check identity directly rather than trust the console broker, enable its native OIDC
+path: register a Keycloak client for it, point it at your realm, and turn its security on. It is an
+opt-in operational step — the brokered path keeps working until you flip it — so you can move to
+direct-service validation one service at a time, no flag day. Your platform team's runbook holds the
+exact per-service settings.`,
     },
     {
       slug: 'self-hosting/scaling',
