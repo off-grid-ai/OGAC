@@ -14,6 +14,22 @@ A developer or an org admin sits down at the console and sees every AI service t
 
 ---
 
+## Cross-cutting mandate — motion & micro-interactions (finesse)
+
+**Every click, hover, toggle, open/close, and state change must be animated.** The console should
+feel **smooth, not snappy** — considered easing, not instant jank. Lots of finesse.
+
+- **Interactions:** buttons/tiles/rows get hover + `active:` press feedback (subtle scale/opacity),
+  smooth `transition` on color/background/transform (≈150–250ms, ease-out).
+- **Entrances/exits:** dialogs, dropdowns, toasts, drawers, and list items animate in/out (fade +
+  slight translate/scale) — never pop.
+- **State & layout:** loading→loaded, empty→filled, tab/route changes, and list reorders transition
+  (shared-layout / crossfade where it helps). Streaming text and progress feel alive.
+- **Tools:** prefer CSS transitions for micro-interactions; use `motion` (framer-motion, already a
+  dep) for orchestrated entrances, layout, and gestures. Respect `prefers-reduced-motion`.
+- **Bar:** if an interaction lands instantly with no transition, it's not done. This applies to
+  every surface, retroactively — treat it like the CRUD mandate below.
+
 ## Cross-cutting mandate — every integration is a full management surface (not a dashboard)
 
 **This applies to ALL integration modules** (evals, policy, guardrails, security events, drift,
