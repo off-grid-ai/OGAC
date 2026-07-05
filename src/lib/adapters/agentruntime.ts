@@ -1,34 +1,49 @@
 import type { AdapterMeta } from './types';
+import {
+  type AgentRunWorkflowInput,
+  type AgentRunWorkflowResult,
+  type DurableConfig,
+  durableConfigFromEnv,
+  durableEnabled,
+  statusFromWorkflow,
+  type WorkflowExecutionStatus,
+  workflowIdFor,
+} from '@/lib/agent-run-durable';
 
 // Agent-runtime adapters — the seam that decides HOW an agent run executes. The default is
 // synchronous, in-process (runAgent in src/lib/agentrun.ts). The Temporal adapter is a durable
 // swap-in: long-running / retryable / resumable agent workflows submitted to a Temporal cluster.
 //
-// This is a best-effort scaffold. Temporal's real client speaks gRPC (:7233) and is heavy to bind
-// server-side in Next.js; the durable adapter here exposes the port + a submission path against a
-// Temporal HTTP-facing endpoint if configured, and otherwise reports itself unavailable so the
-// caller keeps the synchronous default. Selecting it never breaks agent runs.
+// The Temporal client speaks gRPC (:7233). We bind @temporalio/client here via a DYNAMIC import so
+// the dep never enters the default Next build/bundle (next.config aliases @temporalio/worker to
+// false for webpack; the client is a serverExternalPackage, required at runtime only when durable
+// mode is actually selected). If the connection fails, submit() reports submitted:false and the
+// caller falls through to the synchronous in-process path — selecting Temporal NEVER breaks a run.
 //
-// Config: OFFGRID_ADAPTER_AGENTRUNTIME=temporal, OFFGRID_TEMPORAL_ADDRESS (host:7233),
-//   OFFGRID_TEMPORAL_NAMESPACE (default 'default'), OFFGRID_TEMPORAL_TASK_QUEUE,
-//   OFFGRID_TEMPORAL_HTTP_URL (optional: a Temporal HTTP API / bridge for submission).
+// Config (all optional; fleet defaults applied in agent-run-durable.ts):
+//   OFFGRID_QUEUE_ENABLED=1 | OFFGRID_ADAPTER_AGENTRUNTIME=temporal — opt into durable dispatch
+//   OFFGRID_TEMPORAL_ADDRESS (host:7233, default offgrid-s1.local:7233)
+//   OFFGRID_TEMPORAL_NAMESPACE (default 'default'), OFFGRID_AGENT_TASK_QUEUE (default offgrid-agents)
 
 export interface DurableRunHandle {
   runId: string;
   workflowId: string;
   mode: 'sync' | 'durable';
   submitted: boolean;
+  /** Terminal/interim run status when known (durable submit that awaited or polled). */
+  status?: string;
   note?: string;
 }
 
 export interface AgentRuntimePort {
   meta: AdapterMeta;
-  // True when this runtime can actually accept a durable submission right now. When false the
-  // caller must fall through to the synchronous in-process path.
+  // True when durable dispatch is CONFIGURED (opted in). Whether the cluster is actually reachable
+  // is discovered at submit-time — a submit that can't reach Temporal reports submitted:false.
   available(): boolean;
-  // Submit an agent run for durable execution. Returns a handle; MUST NOT throw — a runtime that
-  // can't accept the run reports submitted:false and the caller runs it synchronously instead.
-  submit(input: { agentId: string; query: string; runId: string }): Promise<DurableRunHandle>;
+  // Submit an agent run for durable execution and await its result. Returns a handle; MUST NOT
+  // throw — a runtime that can't accept/complete the run reports submitted:false and the caller
+  // runs it synchronously instead.
+  submit(input: AgentRunWorkflowInput): Promise<DurableRunHandle>;
   health(): Promise<boolean>;
 }
 
@@ -54,10 +69,19 @@ export const syncRuntime: AgentRuntimePort = {
   health: () => Promise.resolve(true),
 };
 
-const TEMPORAL_ADDRESS = process.env.OFFGRID_TEMPORAL_ADDRESS;
-const TEMPORAL_HTTP = process.env.OFFGRID_TEMPORAL_HTTP_URL;
-const TEMPORAL_NS = process.env.OFFGRID_TEMPORAL_NAMESPACE ?? 'default';
-const TASK_QUEUE = process.env.OFFGRID_TEMPORAL_TASK_QUEUE ?? 'offgrid-agents';
+// A cached Temporal Client keyed by address/namespace so repeated submits reuse one gRPC channel.
+let cachedClient: { key: string; client: import('@temporalio/client').Client } | null = null;
+
+async function temporalClient(cfg: DurableConfig): Promise<import('@temporalio/client').Client> {
+  const key = `${cfg.temporalAddress}/${cfg.namespace}`;
+  if (cachedClient?.key === key) return cachedClient.client;
+  // Dynamic import: keeps @temporalio/client out of the default Next bundle.
+  const { Connection, Client } = await import('@temporalio/client');
+  const connection = await Connection.connect({ address: cfg.temporalAddress });
+  const client = new Client({ connection, namespace: cfg.namespace });
+  cachedClient = { key, client };
+  return client;
+}
 
 export const temporalRuntime: AgentRuntimePort = {
   meta: {
@@ -70,65 +94,88 @@ export const temporalRuntime: AgentRuntimePort = {
     description:
       'Durable agent workflows submitted to a Temporal cluster (:7233). Retryable/resumable runs.',
   },
-  // Only advertise availability when an HTTP submission bridge is configured — a raw gRPC :7233
-  // address alone can't be reached from this fetch-only seam, so we stay honest and fall back.
-  available: () => Boolean(TEMPORAL_HTTP),
-  async submit({ agentId, query, runId }) {
-    const workflowId = `${agentId}:${runId}`;
-    if (!TEMPORAL_HTTP) {
-      // TODO(temporal): bind @temporalio/client (gRPC) in a Node runtime to submit against
-      // OFFGRID_TEMPORAL_ADDRESS directly. Until then, without an HTTP bridge we cannot submit.
-      return {
-        runId,
-        workflowId,
-        mode: 'sync',
-        submitted: false,
-        note: TEMPORAL_ADDRESS
-          ? 'Temporal gRPC configured but no HTTP bridge (OFFGRID_TEMPORAL_HTTP_URL); running sync'
-          : 'Temporal not configured; running sync',
-      };
-    }
+  available: () => durableEnabled(process.env),
+  async submit(input) {
+    const cfg = durableConfigFromEnv(process.env);
+    const workflowId = workflowIdFor(input.agentId, input.runId);
     try {
-      const res = await fetch(
-        `${TEMPORAL_HTTP}/api/v1/namespaces/${TEMPORAL_NS}/workflows/${encodeURIComponent(workflowId)}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            workflowType: { name: 'AgentRunWorkflow' },
-            taskQueue: { name: TASK_QUEUE },
-            input: [{ agentId, query, runId }],
-          }),
-          signal: AbortSignal.timeout(5000),
-        },
-      );
-      if (!res.ok) {
-        return { runId, workflowId, mode: 'sync', submitted: false, note: `Temporal ${res.status}` };
+      const client = await temporalClient(cfg);
+      // Idempotent start: reusing the same workflowId for a given runId won't spawn a duplicate.
+      await client.workflow.start('AgentRunWorkflow', {
+        taskQueue: cfg.taskQueue,
+        workflowId,
+        args: [input, cfg.maxAttempts],
+      });
+      const handle = client.workflow.getHandle(workflowId);
+      // Await the durable result. The workflow runs the real pipeline in the worker and persists;
+      // its result carries the persisted run's terminal status. If the worker is slow/down the
+      // workflow simply sits in the queue durably — but the console request would block, so we
+      // bound the await and, on timeout, return a 'running' handle the UI/poller can follow.
+      const result = await withTimeout(handle.result() as Promise<AgentRunWorkflowResult>, awaitBudgetMs());
+      if (result === TIMED_OUT) {
+        const wfStatus = await handle
+          .describe()
+          .then((d) => d.status.name as WorkflowExecutionStatus)
+          .catch(() => 'RUNNING' as const);
+        return {
+          runId: input.runId,
+          workflowId,
+          mode: 'durable',
+          submitted: true,
+          status: statusFromWorkflow(wfStatus),
+          note: 'workflow started; result pending',
+        };
       }
-      return { runId, workflowId, mode: 'durable', submitted: true };
+      return {
+        runId: result.runId,
+        workflowId,
+        mode: 'durable',
+        submitted: true,
+        status: result.found ? result.status : 'not_found',
+      };
     } catch (e) {
-      return { runId, workflowId, mode: 'sync', submitted: false, note: (e as Error).message };
+      // Any failure to reach/submit to Temporal → fall back to the synchronous path.
+      return { runId: input.runId, workflowId, mode: 'sync', submitted: false, note: (e as Error).message };
     }
   },
   async health() {
-    if (!TEMPORAL_HTTP) return false;
+    if (!durableEnabled(process.env)) return false;
+    const cfg = durableConfigFromEnv(process.env);
     try {
-      const res = await fetch(`${TEMPORAL_HTTP}/api/v1/namespaces/${TEMPORAL_NS}`, {
-        signal: AbortSignal.timeout(2500),
-      });
-      return res.ok;
+      const { Connection } = await import('@temporalio/client');
+      const connection = await Connection.connect({ address: cfg.temporalAddress });
+      await connection.workflowService.getSystemInfo({});
+      return true;
     } catch {
       return false;
     }
   },
 };
 
+// ── await helpers ───────────────────────────────────────────────────────────────────────────
+const TIMED_OUT = Symbol('timed-out');
+function awaitBudgetMs(): number {
+  const v = Number(process.env.OFFGRID_AGENT_AWAIT_MS ?? '25000');
+  return Number.isFinite(v) && v > 0 ? v : 25000;
+}
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  return Promise.race([
+    p,
+    new Promise<typeof TIMED_OUT>((resolve) => {
+      const t = setTimeout(() => resolve(TIMED_OUT), ms);
+      t.unref?.();
+    }),
+  ]);
+}
+
 export const AGENT_RUNTIME_PORTS: AgentRuntimePort[] = [syncRuntime, temporalRuntime];
 
-// Select the active runtime (defaults to sync). Kept local to avoid touching the shared registry's
-// Capability union — this is a best-effort scaffold, not yet a first-class capability row.
+// Select the active runtime. Durable is chosen when it's configured/opted-in; otherwise sync. The
+// caller still treats a submitted:false handle as "run synchronously", so this only reflects intent.
 export function getAgentRuntime(): AgentRuntimePort {
   const wanted = process.env.OFFGRID_ADAPTER_AGENTRUNTIME;
-  const chosen = AGENT_RUNTIME_PORTS.find((p) => p.meta.id === wanted) ?? syncRuntime;
-  return chosen.available() ? chosen : syncRuntime;
+  if (wanted && wanted !== 'temporal') {
+    return AGENT_RUNTIME_PORTS.find((p) => p.meta.id === wanted) ?? syncRuntime;
+  }
+  return temporalRuntime.available() ? temporalRuntime : syncRuntime;
 }
