@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // full-text search + structured filters + smart presets. Sits alongside /traffic; the
 // gateway page renders both (live tail + this explorer). Falls back to available:false when
 // OpenSearch is unreachable so the UI degrades gracefully.
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 // Status class → numeric range, so "5xx" etc. become a clean filter.

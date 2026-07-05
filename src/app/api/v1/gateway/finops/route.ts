@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // FinopsStore, and returns a plain FinopsReport (byModel/byCaller/daily/projectedMonthly/totals)
 // the finops plane renders directly. Local models are priced at an estimated blended rate.
 // Degrades to available:false when OpenSearch is unreachable (mirrors /logs).
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 export async function GET() {

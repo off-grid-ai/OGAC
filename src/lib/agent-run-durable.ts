@@ -23,7 +23,7 @@ export interface DurableConfig {
 export const AGENT_TASK_QUEUE = 'offgrid-agents';
 
 /** Default Temporal frontend address for the on-prem fleet. */
-export const DEFAULT_TEMPORAL_ADDRESS = 'offgrid-s1.local:7233';
+export const DEFAULT_TEMPORAL_ADDRESS = '127.0.0.1:7233';
 
 // A source-of-env indirection so this module stays pure: callers pass the raw env map in, they
 // don't reach into process.env here. Adapters call durableConfigFromEnv(process.env).

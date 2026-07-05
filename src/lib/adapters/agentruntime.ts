@@ -22,7 +22,7 @@ import {
 //
 // Config (all optional; fleet defaults applied in agent-run-durable.ts):
 //   OFFGRID_QUEUE_ENABLED=1 | OFFGRID_ADAPTER_AGENTRUNTIME=temporal — opt into durable dispatch
-//   OFFGRID_TEMPORAL_ADDRESS (host:7233, default offgrid-s1.local:7233)
+//   OFFGRID_TEMPORAL_ADDRESS (host:7233, default 127.0.0.1:7233)
 //   OFFGRID_TEMPORAL_NAMESPACE (default 'default'), OFFGRID_AGENT_TASK_QUEUE (default offgrid-agents)
 
 export interface DurableRunHandle {

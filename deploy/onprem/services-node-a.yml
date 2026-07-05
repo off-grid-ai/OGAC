@@ -19,7 +19,7 @@ services:
       bootstrap.memory_lock: 'true'
     ulimits:
       memlock: { soft: -1, hard: -1 }
-    ports: ['9200:9200']
+    ports: ['127.0.0.1:9200:9200']
     volumes: [opensearch:/usr/share/opensearch/data]
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.18.0

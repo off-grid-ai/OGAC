@@ -13,7 +13,7 @@ import { type Analytics } from '@/lib/analytics-types';
 //
 // gatewayEvents() (raw-doc fetch) is retained for the FinOps cost model (finops.ts), which needs
 // per-event keyId/subject attribution the aggregation can't provide.
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 // Re-export the result types so existing `@/lib/analytics` importers are unchanged.
