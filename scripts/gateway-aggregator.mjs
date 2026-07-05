@@ -14,6 +14,7 @@
 // configured the endpoint is open (LAN-only dev default).
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { verifierFromEnv } from './lib/keycloak-verify.mjs';
 
 const API_KEY = process.env.OFFGRID_GATEWAY_API_KEY || '';
@@ -124,26 +125,65 @@ const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info U
 // g6 is now aux SERVER #2 (Colima) — NOT a gateway; g8 is offline (on-site power/wifi). Both
 // disabled so pick() never routes to them. Image (g3 juggernaut Q8_0) + VL (g4/g7 UI-Venus) are
 // the target roles to restore once a verified image/VL quant lands — flip kind+model back then.
-const POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify([
+// FALLBACK topology — the last-known-good hardcoded pool. The live pool is fetched
+// from the console (fleet_nodes SSOT) by refreshPool(); if that's ever unreachable we
+// keep serving from this, so routing can NEVER go down because of the DB/console.
+const FALLBACK_POOL = [
   { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
   { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
-  { name: 'g3',  host: 'offgrid-g3.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
   { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
   { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
-  { name: 'g6',  host: 'offgrid-g6.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b', enabled: false },
   { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
-  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'grounding', model: 'ui-venus-1.5-8b', enabled: false }, // reclaimed to _2, held as spare (UI-Venus not needed)
-]));
-const LIVE = POOL.filter((g) => g.enabled !== false); // only route to enabled gateways
+  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
+];
+const FALLBACK_IMAGE_POOL = [{ name: 'g3', host: 'offgrid-g3.local', port: 1234, model: 'juggernaut-xl-v9' }];
 
-// Image-generation nodes run sd-server (stable-diffusion.cpp) on a SEPARATE port from the
-// llama-server chat gateway — its API is OpenAI-compatible (`POST /v1/images/generations` →
-// { data: [{ b64_json }] }), so we proxy straight through, no translation. A node can be
-// dual-role (chat on :7878 AND image on :1234). Override the list via OFFGRID_IMAGE_POOL.
-const IMAGE_POOL = JSON.parse(process.env.OFFGRID_IMAGE_POOL || JSON.stringify([
-  { name: 'g3', host: 'offgrid-g3.local', port: 1234, model: 'juggernaut-xl-v9' },
-]));
-const IMAGE_LIVE = IMAGE_POOL.filter((g) => g.enabled !== false);
+// Live, refreshable pools (let, not const — refreshPool() reassigns). OFFGRID_POOL /
+// OFFGRID_IMAGE_POOL env still override (highest precedence) for pinned/dev setups.
+let POOL = JSON.parse(process.env.OFFGRID_POOL || JSON.stringify(FALLBACK_POOL));
+let IMAGE_POOL = JSON.parse(process.env.OFFGRID_IMAGE_POOL || JSON.stringify(FALLBACK_IMAGE_POOL));
+let LIVE = POOL.filter((g) => g.enabled !== false);       // only route to enabled gateways
+let IMAGE_LIVE = IMAGE_POOL.filter((g) => g.enabled !== false);
+
+// The fleet_nodes SSOT lives in the console DB; the console derives the routing pools at
+// GET /api/v1/gateway/pool. We pull them here on startup + on an interval. Pinned env
+// (OFFGRID_POOL) wins and disables the pull, so nothing surprises a manual override.
+const POOL_SRC = process.env.OFFGRID_POOL_URL || 'http://127.0.0.1:3000/api/v1/gateway/pool';
+const POOL_REFRESH_MS = Number(process.env.OFFGRID_POOL_REFRESH_MS || 30000);
+async function refreshPool() {
+  if (process.env.OFFGRID_POOL) return; // explicit pin — don't override
+  try {
+    const r = await fetch(POOL_SRC, { headers: API_KEY ? { 'x-api-key': API_KEY } : {}, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return; // keep current pools on any non-200 (fallback stays live)
+    const d = await r.json();
+    if (Array.isArray(d?.pool) && d.pool.length) {
+      POOL = d.pool;
+      LIVE = POOL.filter((g) => g.enabled !== false);
+    }
+    if (Array.isArray(d?.imagePool)) {
+      IMAGE_POOL = d.imagePool;
+      IMAGE_LIVE = IMAGE_POOL.filter((g) => g.enabled !== false);
+    }
+  } catch { /* console/DB unreachable → keep last-known-good pools */ }
+}
+
+// Node control (model swap / restart) runs FROM here — the aggregator is on S1 and CAN
+// reach the LAN nodes (the console, a user LaunchAgent, is blocked by Local Network
+// privacy). Uses S1's default ssh key (~/.ssh/id_ed25519, already trusted by every node).
+function sshExec(host, cmd) {
+  return new Promise((resolve) => {
+    execFile('ssh', ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=12', `admin@${host}`, cmd],
+      { timeout: 90000 }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout || ''}${stderr || ''}`.slice(0, 600) }));
+  });
+}
+// Write active-model.json (base64 to dodge SSH quoting) + kickstart the node's gateway.
+function applyNodeModel(host, cfg) {
+  const b64 = Buffer.from(JSON.stringify(cfg)).toString('base64');
+  return sshExec(host, `echo ${b64} | base64 -d > ~/.offgrid/models/active-model.json && launchctl kickstart -k gui/$(id -u)/co.getoffgridai.gateway`);
+}
+function restartNode(host) {
+  return sshExec(host, 'launchctl kickstart -k gui/$(id -u)/co.getoffgridai.gateway');
+}
 
 // per-model round-robin counters
 const rr = {};
@@ -399,13 +439,46 @@ async function handle(req, res, chunks) {
       return { name: g.name, host: g.host, port: g.port, model: g.model, vision: g.vision, health: h, installedModels };
     })).then((nodes) => json(res, 200, { nodes }));
   }
+  // CONTROL: POST /nodes/<name> — the console (via fleet_nodes SSOT) drives node changes here.
+  //   { action:'activate', id, primary, mmproj?, ctx? } → write active-model.json + kickstart (SSH)
+  //   { action:'restart' }                             → kickstart the node's gateway (SSH)
+  //   { action:'enable'|'disable' }                    → console already persisted the flag in the
+  //                                                       SSOT; we just refresh so routing follows.
+  {
+    const m = req.url.match(/^\/nodes\/([^/?]+)$/);
+    if (m && req.method === 'POST') {
+      const name = decodeURIComponent(m[1]);
+      const node = [...POOL, ...IMAGE_POOL].find((g) => g.name === name);
+      if (!node) return json(res, 404, { error: `node "${name}" not in pool` });
+      let body = {};
+      try { body = JSON.parse(Buffer.concat(chunks).toString() || '{}'); } catch { /* non-json */ }
+      if (body.action === 'activate') {
+        if (!body.id || !body.primary) return json(res, 400, { error: 'activate needs id + primary (gguf)' });
+        const cfg = { id: body.id, primary: body.primary };
+        if (body.mmproj) cfg.mmproj = body.mmproj;
+        if (body.ctx) cfg.ctx = body.ctx;
+        const r = await applyNodeModel(node.host, cfg);
+        await refreshPool();
+        return json(res, r.ok ? 200 : 502, { ok: r.ok, node: name, applied: cfg, output: r.out });
+      }
+      if (body.action === 'restart') {
+        const r = await restartNode(node.host);
+        return json(res, r.ok ? 200 : 502, { ok: r.ok, node: name, output: r.out });
+      }
+      if (body.action === 'enable' || body.action === 'disable') {
+        await refreshPool(); // SSOT already updated by the console; adopt it now
+        return json(res, 200, { ok: true, node: name, action: body.action, note: 'pool refreshed from SSOT' });
+      }
+      return json(res, 400, { error: 'action must be activate|restart|enable|disable' });
+    }
+  }
   if (req.url === '/tokens') {
     // Snapshot of the client-token store for the console to persist (ip/token/meta records).
     return json(res, 200, [...TOKENS.values()]);
   }
   if (req.url === '/v1/models') {
-    const models = [...new Set(POOL.map((g) => g.model))].map((id) => {
-      const nodes = POOL.filter((g) => g.model === id);
+    const models = [...new Set(LIVE.map((g) => g.model))].map((id) => {
+      const nodes = LIVE.filter((g) => g.model === id);
       const vision = nodes.some((g) => g.vision);
       return { id, object: 'model', owned_by: 'offgrid', capabilities: vision ? ['text', 'vision'] : ['text'], gateways: nodes.map((g) => g.name) };
     });
@@ -560,4 +633,9 @@ async function handle(req, res, chunks) {
   }
 }
 server.listen(PORT, '0.0.0.0', () => console.log(`[aggregator] routing on 0.0.0.0:${PORT} across`, POOL.map((g) => `${g.name}:${g.model}${g.vision ? '+vision' : ''}`).join(', ')));
+
+// Pull the live pool from the fleet_nodes SSOT (console) on startup + on an interval.
+// Fallback pools keep serving until/if the first pull succeeds, so startup never blocks.
+refreshPool().then(() => console.log('[aggregator] pool after SSOT refresh:', LIVE.map((g) => `${g.name}:${g.model}`).join(', ')));
+setInterval(refreshPool, POOL_REFRESH_MS).unref();
 startProbing();

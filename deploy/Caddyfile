@@ -109,20 +109,21 @@ http://gateway.getoffgridai.co {
 # ── Internal S2-service proxies (localhost only) ────────────────────────────────
 # The console (next-server) can't egress to the LAN on this box — LAN connects fail with
 # EHOSTUNREACH while localhost works (macOS 15 Local-Network privacy blocks the SSH-launched
-# daemon; curl/short-lived node aren't blocked). Caddy (launchd) CAN reach S2 (it already
-# proxies provit → offgrid-s2.local), so we front each S2 HTTP service on 127.0.0.1 and point
-# the console's OFFGRID_*_URL at these. Loopback-bound → never exposed to the tunnel/LAN.
+# daemon; curl/short-lived node aren't blocked). Caddy (launchd) CAN reach the aux node, so we
+# front each aux HTTP service on 127.0.0.1 and point the console's OFFGRID_*_URL at these.
+# Loopback-bound → never exposed to the tunnel/LAN.
+# 2026-07-05: aux tier moved S2 → g6 (S2 retired). Repointed to offgrid-g6.local.
 http://127.0.0.1:8931 {
-	reverse_proxy offgrid-s2.local:3030
+	reverse_proxy offgrid-g6.local:3030
 }
 http://127.0.0.1:8932 {
-	reverse_proxy offgrid-s2.local:4242
+	reverse_proxy offgrid-g6.local:4242
 }
 http://127.0.0.1:8933 {
-	reverse_proxy offgrid-s2.local:8088
+	reverse_proxy offgrid-g6.local:8088
 }
 http://127.0.0.1:8934 {
-	reverse_proxy offgrid-s2.local:8070
+	reverse_proxy offgrid-g6.local:8070
 }
 
 # ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────

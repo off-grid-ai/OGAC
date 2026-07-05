@@ -6,14 +6,15 @@ import http from 'node:http';
 
 const PORT = Number(process.env.PORT || 9100);
 const NODES = JSON.parse(process.env.OFFGRID_NODES || JSON.stringify([
-  { name: 'offgrid-s1', role: 'Server · edge/db/keycloak/aggregator/metrics' },
-  { name: 'offgrid-s2', role: 'Server · console (standby)' },
+  { name: 'offgrid-s1', role: 'Server · edge/db/keycloak/aggregator/metrics/console' },
+  { name: 'offgrid-g6', role: 'Server · aux tier (langfuse/unleash/presidio/superset/fleet/redis)' },
   { name: 'offgrid-g1', role: 'Gateway · qwythos-9b (vision)' },
-  { name: 'offgrid-g2', role: 'Gateway · qwen3.5-9b (vision)' },
-  { name: 'offgrid-g3', role: 'Gateway · qwythos-9b (vision)' },
-  { name: 'offgrid-g4', role: 'Gateway · qwythos-9b (vision)' },
-  { name: 'offgrid-g5', role: 'Gateway · qwen3.5-9b (vision)' },
-{ name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
+  { name: 'offgrid-g2', role: 'Gateway · gemma-4-e4b (vision)' },
+  { name: 'offgrid-g3', role: 'Image · juggernaut-xl-v9 (sd-server :1234)' },
+  { name: 'offgrid-g4', role: 'Gateway · qwen3-vl-8b (vision)' },
+  { name: 'offgrid-g5', role: 'Gateway · gemma-4-e4b (vision)' },
+  { name: 'offgrid-g7', role: 'Gateway · qwen3-vl-8b (vision)' },
+  { name: 'offgrid-g8', role: 'Gateway · qwythos-9b (vision)' },
 ]));
 
 const SSH = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'];
@@ -79,16 +80,16 @@ const BOOK = `
 <h2>1 · WHAT RUNS WHERE</h2>
 <p>Reach every node by its stable mDNS name (<code>*.local</code>) — survives IP changes.</p>
 <table><tr><th>Node</th><th>IP</th><th>Role</th><th>Runs</th></tr>
-<tr><td><b>offgrid-s1</b></td><td>127.0.0.1</td><td>Server / control plane</td><td>Caddy edge :80 · Postgres :5432 · Keycloak :8080 · aggregator :8800 · metrics :9100 · Console :3000</td></tr>
-<tr><td><b>offgrid-s2</b></td><td>192.168.1.60</td><td>Console (standby)</td><td>Console :3000 (shares S1 Postgres)</td></tr>
+<tr><td><b>offgrid-s1</b></td><td>127.0.0.1</td><td>Server #1 / control plane</td><td>Caddy edge :80 · Postgres :5432 · Keycloak :8080 · aggregator :8800 · metrics :9100 · Console :3000 · data-sources + services-a/extra (OrbStack)</td></tr>
+<tr><td><b>offgrid-g6</b></td><td>192.168.1.66</td><td>Server #2 / aux tier</td><td>Langfuse :3030 · Unleash :4242 · Presidio :5001/5002 · Superset :8088 · Fleet :8070 · Redis :6379 (OrbStack)</td></tr>
 <tr><td><b>offgrid-g1</b></td><td>192.168.1.57</td><td>Gateway · inference</td><td>Qwythos 9B — text + vision</td></tr>
-<tr><td><b>offgrid-g2</b></td><td>192.168.1.58</td><td>Gateway · inference</td><td>Qwen 3.5 9B — text + vision</td></tr>
-<tr><td><b>offgrid-g3</b></td><td>192.168.1.32</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision</td></tr>
-<tr><td><b>offgrid-g4</b></td><td>192.168.1.63</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision (redundancy)</td></tr>
-<tr><td><b>offgrid-g5</b></td><td>192.168.1.65</td><td>Gateway · inference</td><td>Qwen 3.5 9B — text + vision (redundancy)</td></tr>
-<tr><td><b>offgrid-g6</b></td><td>192.168.1.66</td><td>Gateway · inference</td><td>Qwen3-Coder 30B IQ3_XXS — text/coding</td></tr>
-<tr><td><b>offgrid-g7</b></td><td>192.168.1.62</td><td>Gateway · inference</td><td>Qwen3-Coder 30B IQ3_XXS — text/coding (redundancy)</td></tr>
-<tr><td><b>offgrid-g8</b></td><td>192.168.1.64</td><td>Gateway · inference</td><td>Qwythos 9B — text + vision (redundancy)</td></tr></table>
+<tr><td><b>offgrid-g2</b></td><td>192.168.1.58</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision</td></tr>
+<tr><td><b>offgrid-g3</b></td><td>192.168.1.32</td><td>Image generation</td><td>Juggernaut XL v9 — sd-server :1234 (SDXL txt2img)</td></tr>
+<tr><td><b>offgrid-g4</b></td><td>192.168.1.63</td><td>Gateway · inference</td><td>Qwen3-VL 8B — text + vision (grounding)</td></tr>
+<tr><td><b>offgrid-g5</b></td><td>192.168.1.65</td><td>Gateway · inference</td><td>Gemma 4 E4B — text + vision</td></tr>
+<tr><td><b>offgrid-g7</b></td><td>192.168.1.62</td><td>Gateway · inference</td><td>Qwen3-VL 8B — text + vision (grounding)</td></tr>
+<tr><td><b>offgrid-g8</b></td><td>192.168.1.64</td><td>Gateway · inference</td><td>Qwythos 9B — text + vision</td></tr>
+<tr><td colspan="4" style="color:#9ca3af"><b>offgrid-s2</b> — retired (was standby console); replaced by g6 as server #2</td></tr></table>
 <p>All nodes: user <code>admin</code>, sleep disabled (lids can stay closed). LAN-only — nothing exposed to the internet.</p>
 
 <h2>2 · URLS & ACCESS</h2>
