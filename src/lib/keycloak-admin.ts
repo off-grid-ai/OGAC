@@ -42,13 +42,32 @@ interface TokenCache {
 
 // Error carrying the upstream Keycloak HTTP status so routes can map it to the right response.
 export class KeycloakError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
     super(message);
     this.name = 'KeycloakError';
+    this.status = status;
   }
+}
+
+// Parse a Keycloak success response body as JSON, tolerating an EMPTY body.
+//
+// Keycloak's write endpoints routinely answer with no JSON payload:
+//   • POST /clients, POST /roles, POST /users → 201 Created, body empty (id is in the Location header)
+//   • PUT (update), DELETE, POST/DELETE role-mappings → 204 No Content
+// Calling `res.json()` on any of those throws "Unexpected end of JSON input". This helper checks the
+// status and Content-Length first and returns `undefined` for a body-less response, so callers that
+// don't need a payload (fetchJson<void>) never trip over an empty body. Pure over a Response — unit-testable.
+export async function parseKcBody<T>(res: Response): Promise<T> {
+  // 204 No Content and 201 Created (Keycloak create endpoints) carry no JSON body.
+  if (res.status === 204 || res.status === 201) return undefined as unknown as T;
+  const len = res.headers.get('content-length');
+  if (len === '0') return undefined as unknown as T;
+  // Fall back to reading the text so a spurious empty body (no Content-Length header) is tolerated too.
+  const text = await res.text();
+  if (text.trim() === '') return undefined as unknown as T;
+  return JSON.parse(text) as T;
 }
 
 async function parseKcError(res: Response): Promise<Error> {
@@ -127,8 +146,8 @@ export class KeycloakAdminClient {
   private async fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await this.fetch(path, init);
     if (!res.ok) throw await parseKcError(res);
-    if (res.status === 204) return undefined as unknown as T;
-    return res.json() as Promise<T>;
+    // Tolerates empty bodies (201 create / 204 update-delete-roleassign) instead of throwing on res.json().
+    return parseKcBody<T>(res);
   }
 
   private async fetchNullable<T>(path: string): Promise<T | null> {
