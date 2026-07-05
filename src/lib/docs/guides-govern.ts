@@ -12,11 +12,13 @@ export const governSection: DocSection = {
 it is the path every request takes. Each piece below is a surface you operate, not a dashboard you
 watch.
 
+- **[Control](/docs/guides/control)** — the control room: egress, routing, policy, users, audit search.
 - **[Policy](/docs/guides/policy)** — attribute-based access, deny by default.
 - **[Guardrails](/docs/guides/guardrails)** — PII detection and masking on every prompt.
 - **[Access](/docs/guides/access)** — one identity model across every surface.
 - **[Secrets](/docs/guides/secrets)** — credentials and keys in a vault.
-- **Audit** — a tamper-evident record of every completion (see [Security events](/docs/guides/security-events)).
+- **[Audit](/docs/guides/audit)** — a tamper-evident record of every completion.
+- **[Lineage](/docs/guides/lineage)** — trace an answer back to its sources.
 - **[Provenance](/docs/guides/provenance)** — sign answers and reports so they're verifiable.
 - **[Regulatory](/docs/guides/regulatory)** — a governance registry and compliance exports.
 
@@ -25,6 +27,36 @@ watch.
 Every completion records the model, tokens, whether data left the box, which guardrails fired with
 what verdict, latency, and the cost key. This is the artifact you hand a regulator: not a claim that
 the AI is controlled, but the evidence.`,
+    },
+    {
+      slug: 'guides/control',
+      title: 'Control center',
+      description: 'The governance control room — egress, routing, policy, users, secrets, and audit search in one place.',
+      body: `Control is the room a risk officer runs the platform from. It gathers the governance levers
+that decide what the platform is allowed to do, so you can set the posture and prove it in one place.
+
+## The egress leash
+
+The master switch. Cloud egress ON or OFF decides whether any request can reach a cloud model. With
+it off, a \`cloud\` routing rule is forced to block — customer data physically cannot leave the box.
+The live state is shown here.
+
+## Routing rules
+
+Add, edit, enable/disable, and reorder the rules that decide where each request runs (local, cloud,
+or block), by data class and priority. The **routing tester** lets you check any request against your
+rules before you commit them, so you never guess at what a rule will do.
+
+## Policy, users, and secrets
+
+The same surface exposes the [policy](/docs/guides/policy) editor, [users and roles](/docs/guides/access),
+and the [secrets](/docs/guides/secrets) vault panel — the levers you reach for together when you're
+setting or auditing the org's posture.
+
+## Audit search
+
+Full-text search across the audit stream lives here: find every event for an actor, a run, or an
+outcome. It's the fastest path from "did this happen" to the evidence.`,
     },
     {
       slug: 'guides/policy',
