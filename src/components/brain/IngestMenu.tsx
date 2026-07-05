@@ -7,17 +7,18 @@ import {
   Image as ImageIcon,
   TextT,
 } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,10 +170,32 @@ const MENU: { kind: IngestKind; label: string; icon: typeof TextT }[] = [
   { kind: 'database', label: 'From dataset', icon: Database },
 ];
 
+const KINDS: IngestKind[] = ['text', 'file', 'image', 'database'];
+
 export function IngestMenu({ datasets }: { datasets: Dataset[] }) {
   const router = useRouter();
-  const [kind, setKind] = useState<IngestKind | null>(null);
+  const params = useSearchParams();
   const [busy, setBusy] = useState(false);
+
+  // Which ingest form is open lives in the URL (?panel=ingest&kind=<kind>) — Back closes it.
+  const raw = params.get('panel') === 'ingest' ? params.get('kind') : null;
+  const kind: IngestKind | null = raw && KINDS.includes(raw as IngestKind) ? (raw as IngestKind) : null;
+
+  const setKind = useCallback(
+    (next: IngestKind | null) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) {
+        p.set('panel', 'ingest');
+        p.set('kind', next);
+      } else {
+        p.delete('panel');
+        p.delete('kind');
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
 
   async function ingest(body: Record<string, unknown>) {
     setBusy(true);
@@ -211,15 +234,17 @@ export function IngestMenu({ datasets }: { datasets: Dataset[] }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={kind !== null} onOpenChange={(o) => !o && setKind(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{kind ? TITLES[kind] : ''}</DialogTitle>
-            <DialogDescription>Extracted, embedded, and indexed with provenance.</DialogDescription>
-          </DialogHeader>
-          {kind ? <Panel kind={kind} ingest={ingest} busy={busy} datasets={datasets} /> : null}
-        </DialogContent>
-      </Dialog>
+      <Sheet open={kind !== null} onOpenChange={(o) => !o && setKind(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{kind ? TITLES[kind] : ''}</SheetTitle>
+            <SheetDescription>Extracted, embedded, and indexed with provenance.</SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            {kind ? <Panel kind={kind} ingest={ingest} busy={busy} datasets={datasets} /> : null}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
