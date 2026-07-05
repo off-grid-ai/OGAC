@@ -40,7 +40,7 @@ export function Sidebar() {
                     key={m.id}
                     href={m.route}
                     className={cn(
-                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
+                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-150 active:scale-[0.98]',
                       active
                         ? 'bg-primary/10 font-medium text-primary'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
