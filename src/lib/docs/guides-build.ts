@@ -161,7 +161,80 @@ content; Retrieval is where you inspect how it's indexed and served.
 ## Permissions-aware
 
 Retrieval respects the same access rules as the rest of the console: an answer only ever draws on
-sources the asker is allowed to see, so grounding never becomes a way around policy.`,
+sources the asker is allowed to see, so grounding never becomes a way around policy. See
+[Permissions-aware retrieval](/docs/guides/permissions-aware) for exactly how a document's audience
+is bound and enforced.`,
+    },
+    {
+      slug: 'guides/permissions-aware',
+      title: 'Permissions-aware retrieval',
+      description: 'An answer only ever cites what the person asking is allowed to see.',
+      body: `The fastest way to leak a secret with AI is to ground on a document the asker was never
+allowed to open. Permissions-aware retrieval closes that: grounding is bound to the same access rules
+as everything else, so an answer can only ever cite sources the person asking is permitted to see.
+
+## Document-level, not just project-level
+
+Grounding used to be scoped by project — everyone in a project saw everything in it. Now each
+document can carry its own audience, and retrieval filters to it per asker:
+
+- **Owner** — the person who added the document always sees it.
+- **Allowed subjects** — specific people, by email or id.
+- **Allowed roles** — a whole role (e.g. \`claims\`, \`legal\`), so access follows the org chart.
+- **Data class** — rides along for filtering and audit; it labels, it doesn't by itself grant access.
+
+## Default-safe, and backward compatible
+
+The rule is deliberately conservative at both ends:
+
+- A document with **no** audience set stays visible exactly as before, so existing content doesn't
+  vanish the day you turn this on.
+- A document that **does** carry an audience is hidden from anyone who doesn't match at least one
+  grant — even if it's sitting in their project. Present-but-unmatched means hidden, not shown.
+
+An \`admin\` role is the one break-glass that sees everything, kept small and explicit.
+
+## Enforced twice, so it can't slip
+
+The audience check is applied where the vector store can express it (as a metadata filter, so
+disallowed documents never come back) **and** as a post-filter on the results as defence in depth.
+A backend that can't filter server-side still gets the same outcome. Either way, an answer's
+citations are a subset of what the asker could open by hand — grounding is never a way around
+[Policy](/docs/guides/policy).`,
+    },
+    {
+      slug: 'guides/provit',
+      title: 'Provit',
+      description: 'Point it at a repo; it maps every behavior, runs each end to end, and judges the result with vision.',
+      body: `Provit answers a question every team dreads: does the app still do what it's supposed to.
+Point it at a repository and it maps the app into behaviors, runs each one end to end, and judges the
+recording with a vision model — so "it works" becomes evidence, not a hope. Provit is a first-class
+console module, brokered through the console's own auth, fleet, and budgets.
+
+## What you can do here
+
+- **Run its intelligence** — the feature-mapping, test-synthesis, and copilot engine, driven from the
+  console rather than a separate tool.
+- **Upload a file** — send a file to Provit through the console's own [Storage](/docs/guides/storage),
+  so an artifact goes in without leaving your infrastructure.
+- **See your repos and runs** — repos your org maps stay private to your org; free demo runs live in
+  the public showcase.
+- **Open Provit** — jump to the full product with the reachability status shown inline, so you know
+  it's live before you go.
+
+## It rides the console's gateway
+
+Provit does not run its own model gateway. Its intelligence — feature mapping, test synthesis, the
+copilot, and the vision judge — runs on **this console's** [gateway](/docs/guides/gateway). Point a
+Provit instance at the console and every one of those calls inherits the same fleet, routing,
+governance, and [budgets](/docs/guides/budgets) as the rest of the platform. Nothing about Provit
+sits outside the leash.
+
+## Private by default
+
+Repos and runs are scoped by the console's access rules (ABAC on the \`provit\` resource, plus
+tenancy): you see the public library, your own org's repos, and your own private ones — nothing
+else. A fresh account simply shows an empty list, never someone else's work.`,
     },
     {
       slug: 'guides/studio',

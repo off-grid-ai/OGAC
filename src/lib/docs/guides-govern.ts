@@ -127,7 +127,27 @@ it needs. Rotate its secret from the same surface.
 ## Single sign-on
 
 Providers activate from configuration: Google, Microsoft Entra, or Keycloak. Users sign in with the
-login they already have; the browser never leaves the console.`,
+login they already have; the browser never leaves the console.
+
+## Realm administration
+
+The deep identity controls that usually live in the Keycloak admin console are surfaced here, so you
+run identity from one place instead of two:
+
+- **Sessions** — see every active session for a user (client, IP, last access) and revoke one, or all
+  of them, to sign someone out everywhere on the spot.
+- **MFA** — read whether a user has an authenticator (OTP), a password, or a passkey set, and require
+  them to enrol MFA at next login.
+- **Required actions** — queue what a user must do before they can proceed (verify email, update
+  password, configure OTP), so a lapsed control self-heals at the next sign-in.
+- **Federation (IdP)** — connect an external OIDC identity provider and review the ones already
+  federated, so a partner or parent org's login flows straight in.
+- **Realm lifetimes** — set token and session durations (access-token lifespan, SSO idle and max
+  lifetimes, offline-session idle, action-token lifespan), so how long a login stays valid is your
+  policy, not a default.
+
+These write straight through to your Keycloak realm via a service account granted the
+\`realm-management\` role, so a change here is a change in the identity provider itself.`,
     },
     {
       slug: 'guides/secrets',
