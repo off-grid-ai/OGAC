@@ -33,6 +33,8 @@ export type AuditAction =
   | 'masking.change'
   | 'routing.change'
   | 'secret.write'
+  // budget enforcement — a call denied for exceeding a spend limit (hard stop, outcome=blocked)
+  | 'budget.deny'
   | 'access.role.change'
   | 'access.user.change'
   | 'flag.toggle'
