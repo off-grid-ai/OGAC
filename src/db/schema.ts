@@ -747,3 +747,27 @@ export const provitVerdicts = pgTable('provit_verdicts', {
   bad: boolean('bad').notNull().default(false),
   note: text('note'),
 }, (t) => ({ runIdx: index('provit_verdicts_run_idx').on(t.runId) }));
+
+// ─── Fleet nodes — SINGLE SOURCE OF TRUTH for the on-prem fleet topology ───────
+// The aggregator's routing POOL, the status page's node list, and each node's
+// served model all derive from this table. Editing a row here (via the AI Gateway
+// console) is what changes what a node serves — the aggregator reads the derived
+// pool and pushes model/restart changes to the node over SSH. See src/lib/fleet.ts
+// (pure derivePool) and scripts/gateway-aggregator.mjs (consumer + executor).
+export const fleetNodes = pgTable('fleet_nodes', {
+  name: text('name').primaryKey(),                       // 'g1', 's1', 'g6', …
+  host: text('host').notNull(),                          // 'offgrid-g1.local'
+  port: integer('port').notNull().default(7878),         // llama-server / gateway port
+  role: text('role').notNull().default('gateway'),       // gateway | server | image | spare
+  kind: text('kind').notNull().default('chat'),          // chat | grounding | image (aggregator routing)
+  model: text('model').notNull().default(''),            // routing tag, e.g. 'qwythos-9b'
+  primaryGguf: text('primary_gguf').notNull().default(''),// active-model.json "primary"
+  mmprojGguf: text('mmproj_gguf').notNull().default(''),  // active-model.json "mmproj" (vision)
+  modelId: text('model_id').notNull().default(''),        // active-model.json "id" (HF repo id)
+  contextSize: integer('context_size'),                   // n_ctx override (null = node default)
+  vision: boolean('vision').notNull().default(true),
+  enabled: boolean('enabled').notNull().default(true),    // in the routing pool?
+  notes: text('notes').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
