@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { machineConsoleRole } from '@/lib/auth/machine-roles';
 import { getTokenVerifier } from '@/lib/auth/token-verifier';
 
 // Shared authorization gates for API route handlers. There is ONE key flow: a machine
@@ -36,7 +37,12 @@ async function fromToken(token: string): Promise<AuthzSession | null> {
   if (!verifier) return null;
   const p = await verifier.verify(token);
   if (!p) return null;
-  return { user: { email: p.email ?? p.clientId ?? p.subject, name: p.clientId ?? p.email ?? 'Service', role: p.role } };
+  // A MACHINE principal (client_credentials — no user email, identified by clientId/azp) is authorized
+  // by its Keycloak realm roles: an explicit console-capability grant (e.g. console-admin) elevates it,
+  // a bare svc-<service> scope role does NOT (least-privilege — see lib/auth/machine-roles). User tokens
+  // keep the role resolved from their session claims untouched.
+  const role = p.kind === 'service' ? machineConsoleRole(p.realmRoles, p.role) : p.role;
+  return { user: { email: p.email ?? p.clientId ?? p.subject, name: p.clientId ?? p.email ?? 'Service', role } };
 }
 
 // Any authenticated principal (session, service-account JWT, or break-glass token).
