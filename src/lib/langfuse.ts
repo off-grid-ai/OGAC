@@ -135,6 +135,215 @@ export interface WaterfallSpan {
   depth: number;
 }
 
+// ── Cost/usage + eval-score read-back ──────────────────────────────────────
+// Langfuse emits per-trace cost + usage and per-trace eval scores. The console never read these
+// back — FinOps cost comes only from the gateway/audit index, and score trends were never surfaced.
+// These functions close that gap as a pure READ-BACK: they shape Langfuse's public-API JSON into
+// display models. They do NOT feed the audit-log-derived FinOps core — this is a distinct,
+// Langfuse-sourced view. All shaping below is pure + unit-tested against representative JSON.
+
+// GET /api/public/metrics/daily response — one row per day, each with a per-model usage breakdown.
+export interface LangfuseDailyMetric {
+  date: string;
+  countTraces?: number | null;
+  countObservations?: number | null;
+  totalCost?: number | null;
+  usage?: Array<{
+    model?: string | null;
+    inputUsage?: number | null;
+    outputUsage?: number | null;
+    totalUsage?: number | null;
+    countObservations?: number | null;
+    totalCost?: number | null;
+  }>;
+}
+
+// GET /api/public/scores response row — a single eval/quality score attached to a trace.
+export interface LangfuseScore {
+  id: string;
+  name?: string | null;
+  value?: number | null;
+  stringValue?: string | null;
+  dataType?: string | null;
+  timestamp?: string;
+  traceId?: string | null;
+  source?: string | null;
+  comment?: string | null;
+}
+
+// Shaped cost/usage rollup for the Langfuse-sourced FinOps panel.
+export interface LangfuseCostPoint {
+  day: string; // YYYY-MM-DD
+  cost: number;
+  traces: number;
+  tokens: number;
+}
+export interface LangfuseModelCost {
+  model: string;
+  cost: number;
+  tokens: number;
+}
+export interface LangfuseCostSummary {
+  totalCost: number;
+  totalTokens: number;
+  totalTraces: number;
+  daily: LangfuseCostPoint[];
+  byModel: LangfuseModelCost[];
+}
+
+function round(n: number): number {
+  return Math.round(n * 1e6) / 1e6;
+}
+
+// Pure: shape the daily-metrics API rows into a cost summary (per-day series + per-model rollup).
+// Zero network. Tolerant of nulls/missing fields — Langfuse omits usage on trace-only days.
+export function shapeCostSummary(rows: LangfuseDailyMetric[]): LangfuseCostSummary {
+  const daily: LangfuseCostPoint[] = [];
+  const modelMap = new Map<string, LangfuseModelCost>();
+  let totalCost = 0;
+  let totalTokens = 0;
+  let totalTraces = 0;
+
+  // Oldest → newest so the series reads left-to-right in time.
+  const sorted = [...rows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  for (const row of sorted) {
+    const usage = row.usage ?? [];
+    let dayTokens = 0;
+    for (const u of usage) {
+      const model = u.model ?? 'unknown';
+      const tokens = u.totalUsage ?? (u.inputUsage ?? 0) + (u.outputUsage ?? 0);
+      const cost = u.totalCost ?? 0;
+      dayTokens += tokens;
+      const entry = modelMap.get(model) ?? { model, cost: 0, tokens: 0 };
+      entry.cost += cost;
+      entry.tokens += tokens;
+      modelMap.set(model, entry);
+    }
+    const dayCost = row.totalCost ?? 0;
+    const dayTraces = row.countTraces ?? 0;
+    totalCost += dayCost;
+    totalTokens += dayTokens;
+    totalTraces += dayTraces;
+    daily.push({ day: row.date, cost: round(dayCost), traces: dayTraces, tokens: dayTokens });
+  }
+
+  const byModel = [...modelMap.values()]
+    .map((m) => ({ model: m.model, cost: round(m.cost), tokens: m.tokens }))
+    .sort((a, b) => b.cost - a.cost);
+
+  return { totalCost: round(totalCost), totalTokens, totalTraces, daily, byModel };
+}
+
+// Shaped score trend — per named metric, a time-ordered series + summary stats.
+export interface ScoreTrendSeries {
+  name: string;
+  count: number;
+  latest: number | null;
+  average: number | null;
+  points: Array<{ ts: string; value: number }>;
+}
+
+// Pure: group raw scores by name, keep only NUMERIC scores, order each series oldest→newest, and
+// compute latest + average. Non-numeric (categorical/boolean-as-string) scores are excluded from
+// the trend line (no meaningful numeric average). Zero network.
+export function shapeScoreTrends(scores: LangfuseScore[]): ScoreTrendSeries[] {
+  const byName = new Map<string, Array<{ ts: string; value: number }>>();
+  for (const s of scores) {
+    if (typeof s.value !== 'number' || Number.isNaN(s.value)) continue;
+    const name = s.name ?? 'unnamed';
+    const list = byName.get(name) ?? [];
+    list.push({ ts: s.timestamp ?? '', value: s.value });
+    byName.set(name, list);
+  }
+  return [...byName.entries()]
+    .map(([name, pts]) => {
+      const points = pts.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+      const sum = points.reduce((acc, p) => acc + p.value, 0);
+      return {
+        name,
+        count: points.length,
+        latest: points.length ? points[points.length - 1].value : null,
+        average: points.length ? round(sum / points.length) : null,
+        points,
+      };
+    })
+    .sort((a, b) => b.count - a.count);
+}
+
+// GET /api/public/metrics/daily — aggregated cost/usage per day over a window.
+// fromIso/toIso are ISO strings; Langfuse filters traces whose timestamp is in range.
+export async function fetchDailyMetrics(
+  fromIso?: string,
+  toIso?: string,
+): Promise<LangfuseDailyMetric[]> {
+  const qs = new URLSearchParams({ limit: '100' });
+  if (fromIso) qs.set('fromTimestamp', fromIso);
+  if (toIso) qs.set('toTimestamp', toIso);
+  const json = await lfGet<Paged<LangfuseDailyMetric>>(`/api/public/metrics/daily?${qs.toString()}`);
+  return json.data ?? [];
+}
+
+// GET /api/public/scores — eval/quality scores, filtered to a window.
+export async function fetchScores(
+  fromIso?: string,
+  toIso?: string,
+  limit = 100,
+): Promise<LangfuseScore[]> {
+  const qs = new URLSearchParams({ limit: String(Math.min(limit, 100)) });
+  if (fromIso) qs.set('fromTimestamp', fromIso);
+  if (toIso) qs.set('toTimestamp', toIso);
+  const json = await lfGet<Paged<LangfuseScore>>(`/api/public/scores?${qs.toString()}`);
+  return json.data ?? [];
+}
+
+// URL-driven time range. `range` is a searchParams value like '7d' | '30d' | '90d'; default 7d.
+// Pure: given a range token and a "now", return the ISO from/to window. Unknown tokens fall to 7d.
+export const RANGE_DAYS: Record<string, number> = { '24h': 1, '7d': 7, '30d': 30, '90d': 90 };
+export const DEFAULT_RANGE = '7d';
+
+export function resolveRange(
+  range: string | undefined,
+  now: Date = new Date(),
+): { range: string; days: number; fromIso: string; toIso: string } {
+  const key = range && range in RANGE_DAYS ? range : DEFAULT_RANGE;
+  const days = RANGE_DAYS[key];
+  const to = now;
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return { range: key, days, fromIso: from.toISOString(), toIso: to.toISOString() };
+}
+
+// Best-effort combined read-back for the page — never throws. Real zeros when unconfigured/unreachable.
+export interface LangfuseInsights {
+  configured: boolean;
+  cost: LangfuseCostSummary;
+  trends: ScoreTrendSeries[];
+  error?: string;
+}
+
+const EMPTY_COST: LangfuseCostSummary = {
+  totalCost: 0,
+  totalTokens: 0,
+  totalTraces: 0,
+  daily: [],
+  byModel: [],
+};
+
+export async function safeLangfuseInsights(
+  fromIso?: string,
+  toIso?: string,
+): Promise<LangfuseInsights> {
+  if (!langfuseReadConfigured()) return { configured: false, cost: EMPTY_COST, trends: [] };
+  try {
+    const [metrics, scores] = await Promise.all([
+      fetchDailyMetrics(fromIso, toIso),
+      fetchScores(fromIso, toIso),
+    ]);
+    return { configured: true, cost: shapeCostSummary(metrics), trends: shapeScoreTrends(scores) };
+  } catch (e) {
+    return { configured: true, cost: EMPTY_COST, trends: [], error: (e as Error).message };
+  }
+}
+
 export function buildWaterfall(obs: LangfuseObservation[]): WaterfallSpan[] {
   if (!obs.length) return [];
   const times = obs.map((o) => ({
