@@ -14,6 +14,13 @@ services:
     restart: unless-stopped
     environment:
       discovery.type: single-node
+      # Security plugin OFF today → the console reads OpenSearch anonymously over loopback.
+      # Phase-D native-OIDC/JWT is READY but NOT enabled here (it turns auth ON and would break the
+      # current no-auth console reads — a bigger operational change). To enable, follow
+      # deploy/onprem/oidc-services.md § 1: remove the next line, mount the security-config files
+      # (see the commented volumes below), run securityadmin.sh, and flip the broker plan
+      # opensearch: 'none'→'oidc-jwt' in src/lib/service-credentials-lib.ts. KC client
+      # offgrid-opensearch + role svc-opensearch are already seeded. DO NOT flip unattended.
       DISABLE_SECURITY_PLUGIN: 'true'
       OPENSEARCH_JAVA_OPTS: '-Xms512m -Xmx512m'
       bootstrap.memory_lock: 'true'
@@ -21,11 +28,20 @@ services:
       memlock: { soft: -1, hard: -1 }
     ports: ['127.0.0.1:9200:9200']
     volumes: [opensearch:/usr/share/opensearch/data]
+    # ── Phase-D READY (commented): to enable Keycloak OIDC+JWT, drop DISABLE_SECURITY_PLUGIN above and
+    # replace `volumes:` with the mounts below (config blocks live in oidc-services.md § 1a/1c):
+    #   volumes:
+    #     - opensearch:/usr/share/opensearch/data
+    #     - ./oidc/opensearch-security-config.yml:/usr/share/opensearch/config/opensearch-security/config.yml:ro
+    #     - ./oidc/opensearch-roles-mapping.yml:/usr/share/opensearch/config/opensearch-security/roles_mapping.yml:ro
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.18.0
     restart: unless-stopped
     depends_on: [opensearch]
     environment:
+      # Dashboards security OFF today. Phase-D READY: remove DISABLE_SECURITY_DASHBOARDS_PLUGIN, mount
+      # opensearch_dashboards.yml (OIDC frontend — oidc-services.md § 1b), and switch OPENSEARCH_HOSTS
+      # to https once the cluster runs TLS. NOT enabled here.
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: 'true'
     ports: ['5601:5601']

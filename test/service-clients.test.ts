@@ -17,10 +17,17 @@ import {
 
 // ── Desired state ─────────────────────────────────────────────────────────────
 
-test('SERVICE_CLIENTS covers exactly the five broker-fronted services', () => {
+test('SERVICE_CLIENTS covers exactly the six service clients (5 broker-fronted + Superset SSO)', () => {
   assert.deepEqual(
     SERVICE_CLIENTS.map((c) => c.clientId).sort(),
-    ['offgrid-fleet', 'offgrid-gateway', 'offgrid-opensearch', 'offgrid-seaweedfs', 'offgrid-temporal'],
+    [
+      'offgrid-fleet',
+      'offgrid-gateway',
+      'offgrid-opensearch',
+      'offgrid-seaweedfs',
+      'offgrid-superset',
+      'offgrid-temporal',
+    ],
   );
 });
 
