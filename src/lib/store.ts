@@ -37,6 +37,11 @@ import {
   type AuditEventInput,
   buildAuditEvent,
 } from '@/lib/audit-event';
+import type {
+  ActivityQuery,
+  ActivityRow,
+  ProvenanceCoverage,
+} from '@/lib/compliance-activity';
 
 // Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
 // the deploy needs no migration step (matches the chat module's ensure* pattern). Memoized.
@@ -397,6 +402,74 @@ export async function persistAuditEvent(input: AuditEventInput): Promise<Canonic
 // This is what governance / data / access producers call inline right after their write completes.
 export function recordAudit(input: AuditEventInput): void {
   void persistAuditEvent(input).catch(() => {});
+}
+
+// ─── Compliance-activity read (Regulatory / DPO evidence over a time range) ───────────────────
+// Read the REAL canonical audit ledger (`audit_events_v2`) for a window + org, plus provenance
+// coverage from `agent_runs`, so the Regulatory export/DPO view aggregates who-did-what /
+// what-was-blocked / cost from actual data (no mocks). The pure aggregation + serialization live in
+// `compliance-activity.ts`; this is the thin I/O seam. Best-effort: an empty/absent table yields an
+// empty window rather than throwing.
+export async function readComplianceActivity(
+  q: ActivityQuery,
+): Promise<{ rows: ActivityRow[]; coverage: ProvenanceCoverage }> {
+  const org = (q.org ?? DEFAULT_ORG).trim() || DEFAULT_ORG;
+  const from = q.from && !Number.isNaN(Date.parse(q.from)) ? new Date(q.from).toISOString() : null;
+  const to = q.to && !Number.isNaN(Date.parse(q.to)) ? new Date(q.to).toISOString() : null;
+
+  let rows: ActivityRow[] = [];
+  try {
+    await ensureAuditV2();
+    const res = await db.execute(sql`
+      SELECT ts, actor_type, actor_id, actor_label, org, project, action, resource, model,
+             total_tokens, cost_usd, outcome, run_id
+      FROM audit_events_v2
+      WHERE org = ${org}
+        AND (${from}::timestamptz IS NULL OR ts >= ${from}::timestamptz)
+        AND (${to}::timestamptz IS NULL OR ts <= ${to}::timestamptz)
+      ORDER BY ts DESC
+      LIMIT 20000`);
+    const list =
+      (res as unknown as { rows?: Record<string, unknown>[] }).rows ??
+      (res as unknown as Record<string, unknown>[]);
+    rows = (list as Record<string, unknown>[]).map((r) => ({
+      ts: r.ts instanceof Date ? r.ts.toISOString() : r.ts ? String(r.ts) : undefined,
+      actorType: r.actor_type == null ? undefined : String(r.actor_type),
+      actorId: r.actor_id == null ? undefined : String(r.actor_id),
+      actorLabel: r.actor_label == null ? undefined : String(r.actor_label),
+      org: r.org == null ? undefined : String(r.org),
+      project: r.project == null ? null : String(r.project),
+      action: r.action == null ? undefined : String(r.action),
+      resource: r.resource == null ? null : String(r.resource),
+      model: r.model == null ? null : String(r.model),
+      totalTokens: r.total_tokens == null ? null : Number(r.total_tokens),
+      costUsd: r.cost_usd == null ? null : Number(r.cost_usd),
+      outcome: r.outcome == null ? undefined : String(r.outcome),
+      runId: r.run_id == null ? null : String(r.run_id),
+    }));
+  } catch {
+    /* best-effort — a missing table / read error yields an empty window, never a 500 */
+  }
+
+  // Provenance coverage over the same window: how many agent runs, how many carry a signed record.
+  let coverage: ProvenanceCoverage = { runs: 0, signed: 0 };
+  try {
+    const res = await db.execute(sql`
+      SELECT COUNT(*)::int AS runs,
+             COUNT(*) FILTER (WHERE provenance IS NOT NULL)::int AS signed
+      FROM agent_runs
+      WHERE org_id = ${org}
+        AND (${from}::timestamptz IS NULL OR started_at >= ${from}::timestamptz)
+        AND (${to}::timestamptz IS NULL OR started_at <= ${to}::timestamptz)`);
+    const row =
+      ((res as unknown as { rows?: { runs?: unknown; signed?: unknown }[] }).rows ??
+        (res as unknown as { runs?: unknown; signed?: unknown }[]))[0] ?? {};
+    coverage = { runs: Number(row.runs ?? 0), signed: Number(row.signed ?? 0) };
+  } catch {
+    /* best-effort */
+  }
+
+  return { rows, coverage };
 }
 
 export async function queueKill(deviceId: string): Promise<Command | null> {
@@ -1041,6 +1114,31 @@ export async function createGovernance(input: Omit<GovernanceItem, 'id'>): Promi
     .values({ id: `gov_${randomUUID().slice(0, 8)}`, ...input })
     .returning();
   return toGovernance(row);
+}
+
+// Update the mutable fields of a governance record (title / owner / status / detail / reviewedAt).
+// Only supplied fields change. Returns the updated item, or null if the id doesn't exist.
+export async function updateGovernance(
+  id: string,
+  patch: Partial<Omit<GovernanceItem, 'id'>>,
+): Promise<GovernanceItem | null> {
+  const set: Partial<typeof governanceItems.$inferInsert> = {};
+  if (patch.title !== undefined) set.title = patch.title;
+  if (patch.owner !== undefined) set.owner = patch.owner;
+  if (patch.status !== undefined) set.status = patch.status;
+  if (patch.kind !== undefined) set.kind = patch.kind;
+  if (patch.detail !== undefined) set.detail = patch.detail;
+  if (patch.reviewedAt !== undefined) set.reviewedAt = patch.reviewedAt;
+  if (Object.keys(set).length === 0) {
+    const [cur] = await db.select().from(governanceItems).where(eq(governanceItems.id, id));
+    return cur ? toGovernance(cur) : null;
+  }
+  const [row] = await db
+    .update(governanceItems)
+    .set(set)
+    .where(eq(governanceItems.id, id))
+    .returning();
+  return row ? toGovernance(row) : null;
 }
 
 export async function deleteGovernance(id: string): Promise<void> {
