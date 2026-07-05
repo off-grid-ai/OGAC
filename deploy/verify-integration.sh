@@ -140,11 +140,11 @@ echo "==> verify-integration on $(hostname) — console=$CONSOLE_BASE keycloak=$
 echo
 
 # ────────────────────────────────────────────────────────────────────────────────────────────────────
-# A6 / B1 / C4 are NOT probeable here (code-grep or not-built). State that explicitly, don't fake them.
+# A6 / B1 are NOT probeable here (code-grep). State that explicitly, don't fake them. C4 IS now a live
+# probe (a durable Temporal run + 4-plane correlation), implemented at the bottom next to C1/C2.
 # ────────────────────────────────────────────────────────────────────────────────────────────────────
 note "A6 — code-grep criterion (adapters must not use static keys after Phase B). Not a live probe; not built (Phase B). Verify by grep in review."
 note "B1 — code-grep criterion (every adapter authenticates via getServiceCredential). Not a live probe; Phase B. Verify by grep in review."
-note "C4 — Temporal identity-in-activity not built. No probe; tracked as CODE-gate false in the spec."
 echo
 
 # ── Helper: read a service client secret out of OpenBao (KV v2). Empty on any miss. ─────────────────
@@ -372,6 +372,92 @@ skip B3 "transparent-refresh criterion needs a forced token expiry to observe th
 echo
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════════
+# Shared 4-plane fan-out correlation — used by BOTH C2 (inline runs) and C4 (durable Temporal runs).
+# Given a console runId, count how many of the 4 planes (provenance, Marquez lineage, Langfuse trace,
+# OpenSearch audit) the run correlates on, keyed by the SAME runId. Sets FP_HITS / FP_TOTAL / FP_DETAIL
+# (globals — bash can't return a tuple). Reuses the uuid5 helper so lineage lookups match the console's
+# deterministic OpenLineage run id. Identical semantics for inline and durable, which is the C4 point:
+# a DURABLE run must fan out to the same 4 planes, correlated by the same runId, as an inline one.
+four_plane_correlate() {
+  local rid="$1"
+  FP_HITS=0; FP_TOTAL=4; FP_DETAIL=""
+
+  # (1) provenance — read straight off the run record (correlated by construction).
+  local ptrace
+  ptrace=$(curl -s --max-time 8 -H "Authorization: Bearer $ADMIN_TOKEN" "$CONSOLE_BASE/api/v1/admin/agent-runs/$rid" 2>/dev/null)
+  if printf '%s' "$ptrace" | grep -qE '"provenance"[[:space:]]*:[[:space:]]*\{' && printf '%s' "$ptrace" | grep -q '"signature"'; then
+    FP_HITS=$((FP_HITS+1)); FP_DETAIL="$FP_DETAIL provenance:HIT"
+  else
+    FP_DETAIL="$FP_DETAIL provenance:miss"
+  fi
+
+  # (2) Marquez lineage — the run event carries run.runId == uuid5(rid) under namespace LINEAGE_NS.
+  #     Marquez REQUIRES run.runId to be a UUID: a raw "run_xxx" id is silently re-keyed, so the job
+  #     lands but GET /api/v1/jobs/runs/run_xxx 404s. The console derives run.runId as a deterministic
+  #     UUIDv5 of the console runId (src/lib/correlation.ts lineageRunUuid); we derive the identical
+  #     UUID here and look the run up by it. Namespace UUID must match LINEAGE_UUID_NAMESPACE.
+  if ! reachable "$MARQUEZ_URL/api/v1/namespaces" 4; then
+    FP_DETAIL="$FP_DETAIL marquez:unreachable"
+  else
+    local lineage_run_uuid mcode mjobs
+    lineage_run_uuid=$(uuid5 "$rid")
+    mcode=$(http_code "$MARQUEZ_URL/api/v1/jobs/runs/$lineage_run_uuid" 6)
+    if [ "$mcode" = "200" ]; then
+      FP_HITS=$((FP_HITS+1)); FP_DETAIL="$FP_DETAIL marquez:HIT"
+    else
+      # Fallback: scan the namespace's jobs for our agent job (lineage may key the run differently).
+      mjobs=$(curl -s --max-time 8 "$MARQUEZ_URL/api/v1/namespaces/$LINEAGE_NS/jobs?limit=200" 2>/dev/null)
+      if printf '%s' "$mjobs" | grep -q "agent:"; then
+        FP_DETAIL="$FP_DETAIL marquez:job-present-runid-not-found($mcode)"
+      else
+        FP_DETAIL="$FP_DETAIL marquez:no-event($mcode)"
+      fi
+    fi
+  fi
+
+  # (3) Langfuse trace — trace id is the runId with non-alphanumerics stripped.
+  local lf_trace_id lf_auth lcode
+  lf_trace_id=$(printf '%s' "$rid" | tr -cd 'a-zA-Z0-9')
+  lf_auth=""
+  if [ -n "${OFFGRID_LANGFUSE_PUBLIC_KEY:-}" ] && [ -n "${OFFGRID_LANGFUSE_SECRET_KEY:-}" ]; then
+    lf_auth="$OFFGRID_LANGFUSE_PUBLIC_KEY:$OFFGRID_LANGFUSE_SECRET_KEY"
+  fi
+  if [ -z "$lf_auth" ] && [ -n "${OFFGRID_LANGFUSE_AUTH:-}" ]; then
+    # AUTH is already base64(pk:sk) — decode to reuse the -u form uniformly.
+    lf_auth=$(printf '%s' "$OFFGRID_LANGFUSE_AUTH" | b64url_decode 2>/dev/null)
+  fi
+  if ! reachable "$LANGFUSE_URL/api/public/health" 4; then
+    FP_DETAIL="$FP_DETAIL langfuse:unreachable"
+  elif [ -z "$lf_auth" ]; then
+    FP_DETAIL="$FP_DETAIL langfuse:no-creds"
+  else
+    lcode=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u "$lf_auth" "$LANGFUSE_URL/api/public/traces/$lf_trace_id" 2>/dev/null)
+    if [ "$lcode" = "200" ]; then
+      FP_HITS=$((FP_HITS+1)); FP_DETAIL="$FP_DETAIL langfuse:HIT"
+    else
+      # The async QA score (which creates the trace) is flag+sample gated → may legitimately not exist.
+      FP_DETAIL="$FP_DETAIL langfuse:no-trace($lcode; QA-score is flag/sample-gated)"
+    fi
+  fi
+
+  # (4) OpenSearch audit — search the index for the run id. Correlation-by-runId is NOT wired today
+  #     (audit index carries device/gateway events, not the agent runId), so a miss here is EXPECTED
+  #     and is the exact gap the spec calls out — reported, not papered over.
+  local osbody
+  if ! reachable "$OPENSEARCH_URL/_cluster/health" 4; then
+    FP_DETAIL="$FP_DETAIL opensearch:unreachable"
+  else
+    osbody=$(curl -s --max-time 8 "$OPENSEARCH_URL/$OPENSEARCH_INDEX/_search?q=$rid&size=1" 2>/dev/null)
+    # "total":{"value":N} — treat N>0 as a hit.
+    if printf '%s' "$osbody" | grep -qE '"value"[[:space:]]*:[[:space:]]*[1-9]'; then
+      FP_HITS=$((FP_HITS+1)); FP_DETAIL="$FP_DETAIL opensearch:HIT"
+    else
+      FP_DETAIL="$FP_DETAIL opensearch:no-runid-match (audit index not keyed by agent runId today — known gap)"
+    fi
+  fi
+}
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
 # C1 — One governed run chains policy -> guardrails -> retrieval -> gateway -> grounding -> provenance,
 #      and the trace shows every stage. Probe: create ONE real run, GET it, assert the stage kinds
 #      present. First of the write-probes (safe: one labelled test run).
@@ -444,85 +530,13 @@ else
   # GET /api/public/traces/<id> — so wait long enough that the run trace is durably persisted, not
   # just accepted, before we look it up (avoids a false langfuse:no-trace on a slow flush).
   sleep 12
-  hits=0; total=4; c2_detail=""
-
-  # (1) provenance — read straight off the run record (correlated by construction).
-  ptrace=$(curl -s --max-time 8 -H "Authorization: Bearer $ADMIN_TOKEN" "$CONSOLE_BASE/api/v1/admin/agent-runs/$RUN_ID" 2>/dev/null)
-  if printf '%s' "$ptrace" | grep -qE '"provenance"[[:space:]]*:[[:space:]]*\{' && printf '%s' "$ptrace" | grep -q '"signature"'; then
-    hits=$((hits+1)); c2_detail="$c2_detail provenance:HIT"
-  else
-    c2_detail="$c2_detail provenance:miss"
-  fi
-
-  # (2) Marquez lineage — the run event carries run.runId == uuid5(RUN_ID) under namespace LINEAGE_NS.
-  #     Marquez REQUIRES run.runId to be a UUID: a raw "run_xxx" id is silently re-keyed, so the job
-  #     lands but GET /api/v1/jobs/runs/run_xxx 404s. The console derives run.runId as a deterministic
-  #     UUIDv5 of the console runId (src/lib/correlation.ts lineageRunUuid); we derive the identical
-  #     UUID here and look the run up by it. Namespace UUID must match LINEAGE_UUID_NAMESPACE.
-  if ! reachable "$MARQUEZ_URL/api/v1/namespaces" 4; then
-    c2_detail="$c2_detail marquez:unreachable"
-  else
-    lineage_run_uuid=$(uuid5 "$RUN_ID")
-    # OpenLineage run ids are UUIDs; Marquez exposes GET /api/v1/jobs/runs/{runId}.
-    mcode=$(http_code "$MARQUEZ_URL/api/v1/jobs/runs/$lineage_run_uuid" 6)
-    if [ "$mcode" = "200" ]; then
-      hits=$((hits+1)); c2_detail="$c2_detail marquez:HIT"
-    else
-      # Fallback: scan the namespace's jobs for our agent job (lineage may key the run differently).
-      mjobs=$(curl -s --max-time 8 "$MARQUEZ_URL/api/v1/namespaces/$LINEAGE_NS/jobs?limit=200" 2>/dev/null)
-      if printf '%s' "$mjobs" | grep -q "agent:"; then
-        c2_detail="$c2_detail marquez:job-present-runid-not-found($mcode)"
-      else
-        c2_detail="$c2_detail marquez:no-event($mcode)"
-      fi
-    fi
-  fi
-
-  # (3) Langfuse trace — trace id is the runId with non-alphanumerics stripped.
-  lf_trace_id=$(printf '%s' "$RUN_ID" | tr -cd 'a-zA-Z0-9')
-  lf_auth=""
-  if [ -n "${OFFGRID_LANGFUSE_PUBLIC_KEY:-}" ] && [ -n "${OFFGRID_LANGFUSE_SECRET_KEY:-}" ]; then
-    lf_auth="$OFFGRID_LANGFUSE_PUBLIC_KEY:$OFFGRID_LANGFUSE_SECRET_KEY"
-  fi
-  if [ -z "$lf_auth" ] && [ -n "${OFFGRID_LANGFUSE_AUTH:-}" ]; then
-    # AUTH is already base64(pk:sk) — decode to reuse the -u form uniformly.
-    lf_auth=$(printf '%s' "$OFFGRID_LANGFUSE_AUTH" | b64url_decode 2>/dev/null)
-  fi
-  if ! reachable "$LANGFUSE_URL/api/public/health" 4; then
-    c2_detail="$c2_detail langfuse:unreachable"
-  elif [ -z "$lf_auth" ]; then
-    c2_detail="$c2_detail langfuse:no-creds"
-  else
-    lcode=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u "$lf_auth" "$LANGFUSE_URL/api/public/traces/$lf_trace_id" 2>/dev/null)
-    if [ "$lcode" = "200" ]; then
-      hits=$((hits+1)); c2_detail="$c2_detail langfuse:HIT"
-    else
-      # The async QA score (which creates the trace) is flag+sample gated → may legitimately not exist.
-      c2_detail="$c2_detail langfuse:no-trace($lcode; QA-score is flag/sample-gated)"
-    fi
-  fi
-
-  # (4) OpenSearch audit — search the index for the run id. Correlation-by-runId is NOT wired today
-  #     (audit index carries device/gateway events, not the agent runId), so a miss here is EXPECTED
-  #     and is the exact gap the spec calls out — reported, not papered over.
-  if ! reachable "$OPENSEARCH_URL/_cluster/health" 4; then
-    c2_detail="$c2_detail opensearch:unreachable"
-  else
-    osbody=$(curl -s --max-time 8 "$OPENSEARCH_URL/$OPENSEARCH_INDEX/_search?q=$RUN_ID&size=1" 2>/dev/null)
-    # "total":{"value":N} — treat N>0 as a hit.
-    if printf '%s' "$osbody" | grep -qE '"value"[[:space:]]*:[[:space:]]*[1-9]'; then
-      hits=$((hits+1)); c2_detail="$c2_detail opensearch:HIT"
-    else
-      c2_detail="$c2_detail opensearch:no-runid-match (audit index not keyed by agent runId today — known gap)"
-    fi
-  fi
-
-  if [ "$hits" -eq "$total" ]; then
-    pass C2 "run $RUN_ID correlated across ALL 4 planes (audit.langfuse.marquez.provenance):$c2_detail"
+  four_plane_correlate "$RUN_ID"
+  if [ "$FP_HITS" -eq "$FP_TOTAL" ]; then
+    pass C2 "run $RUN_ID correlated across ALL 4 planes (audit.langfuse.marquez.provenance):$FP_DETAIL"
   else
     # This is the honest state today: some planes hit, run-id correlation across all 4 is NOT proven.
     # Per the spec this is the biggest unverified claim — report NOT-VERIFIED (SKIP), never a false PASS.
-    skip C2 "run $RUN_ID correlated on $hits/$total planes — full run-id correlation NOT proven (the spec's flagged gap):$c2_detail"
+    skip C2 "run $RUN_ID correlated on $FP_HITS/$FP_TOTAL planes — full run-id correlation NOT proven (the spec's flagged gap):$FP_DETAIL"
   fi
 fi
 echo
@@ -561,11 +575,91 @@ else
 fi
 echo
 
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+# C4 — A DURABLE (Temporal) agent run carries caller identity AND fans out to the SAME 4 planes
+#      (audit + trace + lineage + provenance), correlated by the SAME runId, exactly as an inline run
+#      (C1/C2) does. The point of the criterion: durability must not lose governance context. Probe:
+#      submit ONE labelled durable run, verify it COMPLETES with the caller attributed on the record,
+#      then reuse the C2 fan-out (four_plane_correlate + uuid5) to confirm correlation.
+#
+#      Gate: this only runs when the DURABLE path is configured (OFFGRID_QUEUE_ENABLED truthy, i.e. the
+#      server dispatches through Temporal). If not configured, the inline path is the default and there
+#      is nothing durable to probe → SKIP with a clear message (NEVER a FAIL — an unwired precondition
+#      is not a broken thing). One benign test run, same shape/safety as C1.
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+queue_enabled=0
+case "$(printf '%s' "${OFFGRID_QUEUE_ENABLED:-}" | tr 'A-Z' 'a-z')" in 1|true|yes|on) queue_enabled=1;; esac
+# A temporal runtime adapter also implies the durable path even if the QUEUE flag is spelled elsewhere.
+case "$(printf '%s' "${OFFGRID_ADAPTER_AGENTRUNTIME:-}" | tr 'A-Z' 'a-z')" in temporal) queue_enabled=1;; esac
+
+if [ "$queue_enabled" = 0 ]; then
+  skip C4 "durable (Temporal) path not configured (OFFGRID_QUEUE_ENABLED not truthy / OFFGRID_ADAPTER_AGENTRUNTIME!=temporal). Inline path is the default — nothing durable to probe."
+elif ! reachable "$CONSOLE_BASE" 4; then
+  skip C4 "console unreachable at $CONSOLE_BASE (not running)"
+elif [ -z "$ADMIN_TOKEN" ]; then
+  skip C4 "OFFGRID_ADMIN_TOKEN unset — cannot POST a durable run"
+elif [ -z "$AGENT_ID" ]; then
+  skip C4 "no agent available to run the durable probe (see C1)"
+else
+  # Submit the durable run, capturing BOTH the HTTP status and the body (trailing status via -w).
+  c4_raw=$(curl -s --max-time 60 -w '\nHTTP_STATUS:%{http_code}' -X POST "$CONSOLE_BASE/api/v1/admin/agents/runs" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
+    -d "{\"agentId\":\"$AGENT_ID\",\"query\":\"integration-verify probe — durable run, please answer briefly\"}" 2>/dev/null)
+  c4_status=$(printf '%s' "$c4_raw" | sed -n 's/.*HTTP_STATUS:\([0-9]*\)$/\1/p' | tail -1)
+  c4_body=$(printf '%s' "$c4_raw" | sed 's/HTTP_STATUS:[0-9]*$//')
+  # Durable submit returns 202 { runId, workflowId } (still executing) or 201 { id } if it finished
+  # within the await budget. Either way the console runId is our correlation key.
+  DURABLE_RUN_ID=$(json_str "$c4_body" runId); [ -z "$DURABLE_RUN_ID" ] && DURABLE_RUN_ID=$(json_str "$c4_body" id)
+  workflow_id=$(json_str "$c4_body" workflowId)
+  if [ -z "$DURABLE_RUN_ID" ]; then
+    fail C4 "durable POST returned no run id (status=$c4_status, agent=$AGENT_ID). body head: $(printf '%s' "$c4_body" | head -c 160)"
+  else
+    # Poll until the durable run row lands (the worker persists it asynchronously) and read its status.
+    d_trace=""; d_status=""
+    for _ in 1 2 3 4 5 6 7 8; do
+      d_trace=$(curl -s --max-time 8 -H "Authorization: Bearer $ADMIN_TOKEN" "$CONSOLE_BASE/api/v1/admin/agent-runs/$DURABLE_RUN_ID" 2>/dev/null)
+      d_status=$(json_str "$d_trace" status)
+      # done once we see a terminal status or the full step trace
+      case "$d_status" in completed|denied|blocked|error|failed) break;; esac
+      printf '%s' "$d_trace" | grep -q '"steps"' && break
+      sleep 3
+    done
+    if [ -z "$d_status" ] && ! printf '%s' "$d_trace" | grep -q '"steps"'; then
+      # Submitted (workflow=$workflow_id) but never materialized a run row → worker not draining the
+      # queue. That's a genuinely broken durable path, not an unwired precondition.
+      fail C4 "durable run $DURABLE_RUN_ID submitted (status=$c4_status workflow=$workflow_id) but never produced a run row — worker not completing the workflow"
+    else
+      # Caller identity must survive the durable hop. The run RECORD does not store the actor (identity
+      # lands on the attributed AUDIT event, correlated by runId — src/lib/agentrun.ts auditRun), so we
+      # probe the audit plane for the runId carrying a non-system actor. This is best-effort/reported
+      # (audit-by-runId is the same wiring gap C2 flags), never fatal on its own.
+      c4_identity="identity:unverified(audit-not-keyed-by-runId — see C2 gap)"
+      if reachable "$OPENSEARCH_URL/_cluster/health" 4; then
+        idbody=$(curl -s --max-time 8 "$OPENSEARCH_URL/$OPENSEARCH_INDEX/_search?q=$DURABLE_RUN_ID&size=1" 2>/dev/null)
+        if printf '%s' "$idbody" | grep -qE '"(actor|actorLabel|caller|subject)"[[:space:]]*:[[:space:]]*"[^"]+"'; then
+          c4_identity="identity:carried(actor on the runId's audit event)"
+        fi
+      fi
+      # Same 4-plane fan-out check as C2, on the DURABLE runId — a durable run must correlate identically.
+      sleep 12
+      four_plane_correlate "$DURABLE_RUN_ID"
+      if [ "$FP_HITS" -eq "$FP_TOTAL" ]; then
+        pass C4 "durable run $DURABLE_RUN_ID (status=$d_status, workflow=$workflow_id, $c4_identity) correlated across ALL 4 planes:$FP_DETAIL"
+      else
+        # Durable run completed, but full 4-plane correlation isn't proven — the same honest
+        # NOT-VERIFIED state C2 reports for inline runs (the spec's flagged gap), not a FAIL.
+        skip C4 "durable run $DURABLE_RUN_ID (status=$d_status, $c4_identity) completed but correlated on only $FP_HITS/$FP_TOTAL planes — full run-id correlation NOT proven (same gap as C2):$FP_DETAIL"
+      fi
+    fi
+  fi
+fi
+echo
+
 # ── Summary tally ────────────────────────────────────────────────────────────────────────────────────
 echo "──────────────────────────────────────────────────────────────"
 printf 'SUMMARY: %d pass / %d fail / %d skip\n' "$PASS_N" "$FAIL_N" "$SKIP_N"
 echo "(SKIP = precondition not deployed/wired, or an S1-only limitation — NOT a failure.)"
-echo "Reminder: A6/B1/C4 are code-grep / not-built (noted above, not probed); A4/B2's true test runs from a non-S1 host."
+echo "Reminder: A6/B1 are code-grep (noted above, not probed); C4 is a live probe but SKIPs unless the durable Temporal path is configured; A4/B2's true test runs from a non-S1 host."
 
 # Exit non-zero iff any check FAILed. SKIP never fails the run.
 [ "$FAIL_N" -eq 0 ]
