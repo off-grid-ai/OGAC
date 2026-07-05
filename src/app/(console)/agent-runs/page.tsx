@@ -1,5 +1,6 @@
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/ssr';
-import { AgentRunsManager } from '@/components/agent-runs/AgentRunsManager';
+import { Suspense } from 'react';
+import { AgentRunsTabs } from '@/components/agent-runs/AgentRunsTabs';
 import { getRecentRunsView } from '@/lib/agent-runs-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -66,11 +67,13 @@ export default async function AgentRunsPage() {
         </div>
       )}
 
-      <AgentRunsManager
-        runs={runs}
-        statusCounts={summary.statusCounts}
-        totalRuns={summary.totalRuns}
-      />
+      <Suspense fallback={null}>
+        <AgentRunsTabs
+          runs={runs}
+          statusCounts={summary.statusCounts}
+          totalRuns={summary.totalRuns}
+        />
+      </Suspense>
     </div>
   );
 }
