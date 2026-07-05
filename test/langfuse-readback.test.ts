@@ -3,10 +3,16 @@ import { test } from 'node:test';
 import {
   DEFAULT_RANGE,
   type LangfuseDailyMetric,
+  type LangfuseDataset,
+  type LangfusePromptMeta,
   type LangfuseScore,
+  type LangfuseSession,
   resolveRange,
   shapeCostSummary,
+  shapeDatasets,
+  shapePrompts,
   shapeScoreTrends,
+  shapeSessions,
 } from '../src/lib/langfuse.ts';
 
 // Pure shaping of Langfuse public-API responses. No network, no mocks — real functions fed
@@ -131,4 +137,82 @@ test('resolveRange: unknown/undefined token falls back to default', () => {
   assert.equal(resolveRange(undefined, NOW).range, DEFAULT_RANGE);
   assert.equal(resolveRange('bogus', NOW).range, DEFAULT_RANGE);
   assert.equal(resolveRange('7d', NOW).days, 7);
+});
+
+// ── shapePrompts (GET /api/public/v2/prompts) ─────────────────────────────────
+const PROMPTS_JSON: LangfusePromptMeta[] = [
+  {
+    name: 'rag-answer',
+    versions: [1, 2, 3],
+    labels: ['production', 'latest'],
+    tags: ['rag'],
+    lastUpdatedAt: '2026-07-03T10:00:00Z',
+  },
+  {
+    name: 'classify-intent',
+    versions: [1],
+    labels: [],
+    lastUpdatedAt: '2026-07-05T10:00:00Z',
+  },
+  // Bare prompt: nulls throughout.
+  { name: 'bare', versions: null, labels: null, tags: null, lastUpdatedAt: null },
+];
+
+test('shapePrompts: latest version + counts, newest-updated first', () => {
+  const rows = shapePrompts(PROMPTS_JSON);
+  // Sorted by updatedAt desc — classify-intent (07-05) before rag-answer (07-03); bare (empty) last.
+  assert.deepEqual(
+    rows.map((r) => r.name),
+    ['classify-intent', 'rag-answer', 'bare'],
+  );
+  const rag = rows.find((r) => r.name === 'rag-answer')!;
+  assert.equal(rag.latestVersion, 3);
+  assert.equal(rag.versionCount, 3);
+  assert.deepEqual(rag.labels, ['production', 'latest']);
+  const bare = rows.find((r) => r.name === 'bare')!;
+  assert.equal(bare.latestVersion, null);
+  assert.equal(bare.versionCount, 0);
+  assert.deepEqual(bare.labels, []);
+});
+
+test('shapePrompts: empty input yields empty array', () => {
+  assert.deepEqual(shapePrompts([]), []);
+});
+
+// ── shapeDatasets (GET /api/public/datasets) ──────────────────────────────────
+const DATASETS_JSON: LangfuseDataset[] = [
+  { name: 'golden-qa', description: 'QA golden set', createdAt: '2026-07-01T00:00:00Z' },
+  { name: 'redteam', description: null, createdAt: '2026-07-04T00:00:00Z' },
+];
+
+test('shapeDatasets: newest-created first, null description → empty', () => {
+  const rows = shapeDatasets(DATASETS_JSON);
+  assert.deepEqual(
+    rows.map((r) => r.name),
+    ['redteam', 'golden-qa'],
+  );
+  assert.equal(rows.find((r) => r.name === 'redteam')!.description, '');
+});
+
+// ── shapeSessions (GET /api/public/sessions) ──────────────────────────────────
+const SESSIONS_JSON: LangfuseSession[] = [
+  { id: 'sess-1', createdAt: '2026-07-01T00:00:00Z', countTraces: 5 },
+  { id: 'sess-2', createdAt: '2026-07-06T00:00:00Z', traceCount: 3 }, // alternate key
+  { id: null, createdAt: '2026-07-02T00:00:00Z' }, // missing id + count
+];
+
+test('shapeSessions: newest first, reads either trace-count key, tolerates nulls', () => {
+  const rows = shapeSessions(SESSIONS_JSON);
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ['sess-2', 'unknown', 'sess-1'],
+  );
+  assert.equal(rows.find((r) => r.id === 'sess-2')!.traces, 3);
+  assert.equal(rows.find((r) => r.id === 'sess-1')!.traces, 5);
+  assert.equal(rows.find((r) => r.id === 'unknown')!.traces, 0);
+});
+
+test('shapeSessions/shapeDatasets: empty input yields empty arrays', () => {
+  assert.deepEqual(shapeSessions([]), []);
+  assert.deepEqual(shapeDatasets([]), []);
 });

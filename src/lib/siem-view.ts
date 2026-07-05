@@ -163,12 +163,39 @@ export function filterByOutcome(view: SiemView, outcome?: string): SiemView {
   };
 }
 
+// ── Index resolution (pure) ────────────────────────────────────────────────────────────────────
+// The attributed governance audit stream ships to `offgrid-audit` (see siem.ts / OFFGRID_OPENSEARCH_INDEX),
+// NOT `offgrid-security`. Historically this reader defaulted to `offgrid-security`, so the SIEM page
+// could render empty while the real attributed audit stream sat in offgrid-audit. We now default the
+// SIEM READ to where that data actually lands (`offgrid-audit`), and accept a comma-separated index
+// list so an operator can point it at both (or a legacy security index) without code changes.
+//
+//   OFFGRID_SIEM_INDEX  — comma-separated index/alias list the SIEM page reads (default: offgrid-audit).
+//                         OpenSearch multi-target search accepts `a,b` in the path, so
+//                         `offgrid-audit,offgrid-security` reads both. If unset, falls back to
+//                         OFFGRID_OPENSEARCH_INDEX (the ship-side index) then the hardcoded default —
+//                         so the read tracks wherever the audit stream is shipped, with zero config.
+export const DEFAULT_SIEM_INDEX = 'offgrid-audit';
+
+// Resolve the index path segment from env: prefer the explicit SIEM read var, then the ship-side
+// index var, then the hardcoded default. Trims/dedupes the comma list and URL-encodes each target
+// (commas stay literal so OpenSearch multi-target search still splits them).
+export function resolveSiemIndex(env: Record<string, string | undefined>): string {
+  const raw = env.OFFGRID_SIEM_INDEX ?? env.OFFGRID_OPENSEARCH_INDEX ?? DEFAULT_SIEM_INDEX;
+  const seen = new Set<string>();
+  const list = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((p) => p && !seen.has(p) && (seen.add(p), true));
+  return (list.length ? list : [DEFAULT_SIEM_INDEX]).map((p) => encodeURIComponent(p)).join(',');
+}
+
 // ── Thin best-effort reader (network I/O; zero imports so the file stays self-contained) ───────
-// Queries the OpenSearch security/audit index and hands raw hits to the pure normalizer above.
+// Queries the OpenSearch security/audit index(es) and hands raw hits to the pure normalizer above.
 // Never throws: returns { data, error, configured } so the read-back page renders reachability
 // without try/catch.
 //   OFFGRID_OPENSEARCH_URL — e.g. http://127.0.0.1:9200 (defaults to localhost)
-//   OFFGRID_SIEM_INDEX     — the security/audit index (defaults to offgrid-security)
+//   OFFGRID_SIEM_INDEX     — index/alias list the SIEM page reads (defaults to offgrid-audit; see resolveSiemIndex)
 export interface SiemReadResult {
   configured: boolean;
   data: SiemView;
@@ -179,7 +206,7 @@ export async function readSiemView(limit = 500): Promise<SiemReadResult> {
   const empty = normalizeSiem(null);
   const configured = Boolean(process.env.OFFGRID_OPENSEARCH_URL);
   const url = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
-  const index = process.env.OFFGRID_SIEM_INDEX ?? 'offgrid-security';
+  const index = resolveSiemIndex(process.env);
   try {
     const r = await fetch(`${url}/${index}/_search`, {
       method: 'POST',
