@@ -466,16 +466,50 @@ Four `@offgrid/*` packages are complete and unused. Wire them now, not in a futu
 **Definition of done:** every OSS service is a **full management surface** — read back AND
 create/update/delete + trigger actions. No write-only sinks, no read-only dashboards.
 
-> **Status (2026-07-04, reconciled):** Phase 4 is **largely complete**. The read-back layer AND the
-> C/U/D + actions now exist for evals, policy, guardrails, security events (incl. suppression rules),
-> drift (thresholds + baseline), lineage, provenance, sandbox, secrets, retrieval (collection CRUD +
-> reindex), backups, agent runs, connectors (edit/sync/history), feature flags, and brain docs
-> (delete). Several service integrations above (Langfuse traces, Marquez read, Superset embed,
-> Presidio anonymize) were found already built when reconciling this table — the earlier "gap"
-> framing was stale. **Genuine remaining work:** the per-cell "Remaining" column above (mostly
-> richer viz + a few CRUD tails), Temporal durable runs (L), and everything gated on **S2 being
-> back online** (Langfuse/Marquez/Superset/FleetDM/Presidio all live on S2, currently offline — the
-> code degrades gracefully and lights up when S2 returns).
+> **Status (2026-07-04) — RETRACTED as too optimistic. See the VERIFIED audit below (2026-07-05).**
+> The read-back layer + basic C/U/D exist broadly, but the earlier "largely complete / mostly richer
+> viz tails" framing was **wrong**, and the "S2 offline" excuse is void (the services are up on S1/g6).
+>
+> **VERIFIED audit (2026-07-05, five parallel file:line code audits — see
+> `docs/SERVICE_CAPABILITY_AUDIT.md`):** of 14 integrations only **2 are DEEP** (SeaweedFS, Langfuse).
+> **4 are SCAFFOLD** — the integration is inert or first-party does the real work:
+> - **Temporal** — fire-and-forget POST never polled; `runAgent()` is 100% synchronous. Not durable.
+> - **FleetDM** — list-hosts only; device commands/policy hit first-party Postgres, not FleetDM.
+> - **Superset** — embeds a possibly-nonexistent dashboard UUID (ghost → blank iframe); no provisioning.
+> - **OPA** — pushes console ABAC as JSON, not Rego; first-party ABAC is the real engine.
+>
+> Plus SHALLOW/quality gaps: **vector search has no metadata filtering or hybrid/BM25** (RAG quality),
+> **OpenSearch aggregations run in JS on ≤5000 fetched docs** (won't scale), Presidio has no custom
+> recognizers, OpenBao is thin KV-only, Unleash is read-only (CRUD is first-party). **This is the
+> active priority — see Phase 4.9 below.** (Note: rate limiting is the Caddy edge's job, not the
+> aggregator — not a gap.)
+
+---
+
+## Phase 4.9 — Deep integrations (ACTIVE PRIORITY, started 2026-07-05)
+
+**Goal:** make each integration actually *use* its service, or stop claiming it. Close the gap between
+what the UI/marketing implies and what the code does. Parallel execution — 3 agents at a time,
+worktree-isolated (nothing deploys until reviewed/merged).
+
+**Ranked worklist** (value × the fact that the current state misleads):
+
+| # | Integration | From → To | Effort | Batch |
+|---|---|---|---|---|
+| 1 | **Vector filtering + hybrid search** | ANN-only → metadata filters + BM25/hybrid rerank; fix 1000-scroll cap | M | 1 |
+| 2 | **OpenSearch real aggregations** | JS rollups on 5000 docs → native `aggs` (terms/date_histogram/percentiles); alert-rule CRUD | M | 1 |
+| 3 | **Superset dashboard provisioning** | ghost UUID → provision a real dashboard over the audit index; verify-or-fail the embed | S | 1 |
+| 4 | **Temporal durable runs** | sync `runAgent()` → real `@temporalio/client` + worker + `AgentRunWorkflow`; poll state; queue on `OFFGRID_QUEUE_ENABLED` | L | 2 |
+| 5 | **FleetDM live-query + software inventory** | list-only → osquery live query UI + per-device software/CVE inventory + policy CRUD against FleetDM | M | 2 |
+| 6 | **Presidio custom recognizers** | analyze/anonymize → manage custom recognizers + deny lists + per-entity thresholds | M | 2 |
+| 7 | **OPA Rego authoring/deploy** | JSON push → author/validate/deploy real Rego bundles; keep first-party ABAC as the default | M | 3 |
+| 8 | **OpenBao depth** | KV CRUD → key rotation, dynamic secrets (DB), lease/TTL view, seal/unseal ops | M | 3 |
+| 9 | **Unleash real management** | read-only eval → real Unleash flag CRUD + variants + gradual rollout (or drop the Unleash label) | S/M | 3 |
+
+**Definition of done per item:** the service's real capability is reachable from the console
+(read + create/update/delete + trigger), pure logic in `src/lib`, thin routes, **tests in `test/`**,
+`npm run typecheck` clean, and the UI stops implying anything the code can't do. No scaffolds left
+labeled as features.
 
 ---
 
