@@ -138,3 +138,62 @@ export function signS3Request(input: SignInput): Record<string, string> {
     host: u.host,
   };
 }
+
+export interface PresignInput {
+  method?: string;
+  /** Absolute URL of the object (host + path). Any existing query is preserved and signed. */
+  url: string;
+  accessKey: string;
+  secretKey: string;
+  /** Link lifetime in seconds (1…604800 — S3 caps presigned URLs at 7 days). */
+  expiresIn: number;
+  /** Injectable clock for deterministic tests. Defaults to now. */
+  date?: Date;
+}
+
+/**
+ * Presign an S3 GET URL — the query-parameter variant of SigV4 (RFC: "Authenticating Requests: Using
+ * Query Parameters"). Instead of an Authorization header, the credential/date/scope/signed-headers and
+ * the final signature ride in the query string, so the URL alone grants time-limited read access with
+ * no header contract on the client. `host` is the only signed header (a bare browser GET sends just
+ * Host). The payload hash is the literal `UNSIGNED-PAYLOAD` sentinel that S3 mandates for presigned
+ * URLs. Pure given `date` — returns the fully-signed absolute URL.
+ */
+export function presignS3Url(input: PresignInput): string {
+  const method = (input.method ?? 'GET').toUpperCase();
+  const u = new URL(input.url);
+  const { amzDate, dateStamp } = amzDates(input.date ?? new Date());
+  const expires = Math.max(1, Math.min(604800, Math.floor(input.expiresIn)));
+
+  const scope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
+  const signedHeaders = 'host';
+
+  // Merge the required X-Amz-* presign params INTO the existing query, then canonicalise the whole set.
+  const q = new URLSearchParams(u.search);
+  q.set('X-Amz-Algorithm', ALGORITHM);
+  q.set('X-Amz-Credential', `${input.accessKey}/${scope}`);
+  q.set('X-Amz-Date', amzDate);
+  q.set('X-Amz-Expires', String(expires));
+  q.set('X-Amz-SignedHeaders', signedHeaders);
+
+  const canonicalHeaders = `host:${u.host}\n`;
+  const canonicalRequest = [
+    method,
+    encodePath(u.pathname),
+    canonicalQuery(q),
+    canonicalHeaders,
+    signedHeaders,
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+
+  const stringToSign = [ALGORITHM, amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const kDate = hmac(`AWS4${input.secretKey}`, dateStamp);
+  const kRegion = hmac(kDate, REGION);
+  const kService = hmac(kRegion, SERVICE);
+  const kSigning = hmac(kService, 'aws4_request');
+  const signature = createHmac('sha256', kSigning).update(stringToSign, 'utf8').digest('hex');
+
+  q.set('X-Amz-Signature', signature);
+  u.search = canonicalQuery(q);
+  return u.toString();
+}
