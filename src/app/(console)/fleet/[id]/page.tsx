@@ -2,6 +2,7 @@ import { ArrowLeft, Cpu } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DeviceActions } from '@/components/fleet/DeviceActions';
+import { DeviceSoftware } from '@/components/fleet/DeviceSoftware';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getMdm } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getDevice, listAudit, pullPolicyForDevice } from '@/lib/store';
 
@@ -132,6 +134,9 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
     pullPolicyForDevice(id),
     listAudit({ deviceId: id, limit: 25 }),
   ]);
+  // Software inventory + CVEs come from FleetDM by numeric host id — only show when the active MDM
+  // supports it and this device carries a FleetDM-style numeric id.
+  const showSoftware = getMdm().supportsFleet === true && /^\d+$/.test(id);
   const statusCls =
     device.status === 'online' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground';
 
@@ -185,6 +190,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <PolicyCard policy={policy} />
         <ActivityCard audit={audit} />
+        {showSoftware ? <DeviceSoftware hostId={id} /> : null}
       </div>
     </div>
   );
