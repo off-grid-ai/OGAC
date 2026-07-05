@@ -62,8 +62,18 @@ http://console-landing.getoffgridai.co {
 	import gated 127.0.0.1:3100
 }
 # Provit (Prove It — visual QA). Formerly gungnir.* — the old name 301-redirects here.
+# Provit is the FREE PUBLIC showcase: the demo-walk paths (repos → features → session → live) and
+# the read-only APIs they call bypass auth; everything else (/judge, /review, admin APIs) stays gated.
+# Repo is the source of truth — mirrors the live edge config applied on S1. Provit runs on S1 (native
+# :7799) so this is a same-host loopback hop — 127.0.0.1 by design (not a fleet IP; mDNS not needed).
 http://provit.getoffgridai.co {
-	import gated 127.0.0.1:7799
+	@public path / /try /repos /features /session /live/* /api/try* /api/showcase* /api/mapped* /api/features* /api/session* /api/runs* /api/repos* /assets/*
+	handle @public {
+		reverse_proxy 127.0.0.1:7799
+	}
+	handle {
+		import gated 127.0.0.1:7799
+	}
 }
 http://gungnir.getoffgridai.co {
 	redir https://provit.getoffgridai.co{uri} permanent
