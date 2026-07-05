@@ -153,7 +153,10 @@ const POOL_REFRESH_MS = Number(process.env.OFFGRID_POOL_REFRESH_MS || 30000);
 async function refreshPool() {
   if (process.env.OFFGRID_POOL) return; // explicit pin — don't override
   try {
-    const r = await fetch(POOL_SRC, { headers: API_KEY ? { 'x-api-key': API_KEY } : {}, signal: AbortSignal.timeout(8000) });
+    // Bearer (not x-api-key): the console middleware lets any /api/* request with an
+    // `Authorization: Bearer` header through to the handler (which does its own auth); /pool
+    // is gate-less read-only topology. x-api-key alone gets a 401 at the middleware.
+    const r = await fetch(POOL_SRC, { headers: API_KEY ? { authorization: `Bearer ${API_KEY}` } : {}, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return; // keep current pools on any non-200 (fallback stays live)
     const d = await r.json();
     if (Array.isArray(d?.pool) && d.pool.length) {
@@ -170,9 +173,14 @@ async function refreshPool() {
 // Node control (model swap / restart) runs FROM here — the aggregator is on S1 and CAN
 // reach the LAN nodes (the console, a user LaunchAgent, is blocked by Local Network
 // privacy). Uses S1's default ssh key (~/.ssh/id_ed25519, already trusted by every node).
+// Explicit -i key + known_hosts: the launchd process has no HOME, so ssh can't find
+// ~/.ssh by default → "Permission denied (publickey)". S1's id_ed25519 is trusted by
+// every node. Override the key path via OFFGRID_SSH_KEY if it ever moves.
+const SSH_KEY = process.env.OFFGRID_SSH_KEY || '/Users/admin/.ssh/id_ed25519';
 function sshExec(host, cmd) {
   return new Promise((resolve) => {
-    execFile('ssh', ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=12', `admin@${host}`, cmd],
+    execFile('ssh', ['-i', SSH_KEY, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', 'UserKnownHostsFile=/Users/admin/.ssh/known_hosts', '-o', 'ConnectTimeout=12', `admin@${host}`, cmd],
       { timeout: 90000 }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout || ''}${stderr || ''}`.slice(0, 600) }));
   });
 }
