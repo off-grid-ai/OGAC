@@ -84,6 +84,41 @@ what lets you take just the gateway, just the data plane, or the whole control p
 rest when you're ready.`,
     },
     {
+      slug: 'concepts/multi-tenancy',
+      title: 'Multi-tenancy & isolation',
+      description: 'How one deployment serves many orgs without one ever seeing another’s data.',
+      body: `One Off Grid deployment can serve several organizations at once, each fully walled off from
+the others. The point of isolation is simple: a valid login for one org must never return another
+org's chats, runs, connectors, or audit records — not by accident, not by a crafted request.
+
+## The isolation model
+
+- **One realm, an org claim per user.** Everyone signs in through the same identity provider; each
+  user's token carries the org they belong to. The console reads that claim on every request.
+- **An org column on every tenant-scoped table.** Chats, agent runs, connectors, routing rules,
+  studio templates, provit repos, and the rest each carry an \`org_id\`. Every query is filtered to
+  the caller's org at one seam, not re-implemented per route.
+- **Files namespaced by org.** Objects in your store are pathed by org, so a presigned URL is scoped
+  to the org that owns the file.
+
+## The database backstop
+
+Filtering in the query layer is the primary control; a defense-in-depth backstop sits behind it in
+the database itself. Postgres row-level security policies on the tenant-scoped tables enforce the
+same \`org_id\` boundary, so even a query that forgot the filter still can't cross orgs.
+
+The backstop is deliberately a no-op until you opt in: it activates only when the app sets the
+current-org session variable and connects as a non-superuser role, so switching it on changes nothing
+you can see on day one — it only removes the last way isolation could be bypassed. Turning it on is an
+operational step for a shared deployment, documented for your platform team.
+
+## Single-tenant is just one org
+
+A deployment for one organization is the same code with a single org — nothing about the model is
+bolted on later. Everything an org owns ([backups](/docs/guides/backups) included) is scoped by the
+same boundary, so growing from one org to many is a switch, not a migration.`,
+    },
+    {
       slug: 'concepts/data-sovereignty',
       title: 'Data sovereignty',
       description: 'Where your data lives, and what it takes to keep it that way.',
