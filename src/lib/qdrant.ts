@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
+import { buildQdrantFilter, type RetrievalOptions } from '@/lib/retrieval/query';
 
 // Qdrant retrieval backend — the server-scale swap-in for the Brain's vector store, selected via
 // OFFGRID_ADAPTER_RETRIEVAL=qdrant. Same BrainDoc/BrainHit contract as the LanceDB default, reached
@@ -109,41 +110,141 @@ interface ScrollPoint {
   payload: { title: string; source: string; text: string };
 }
 
+// Full scroll — paginate past Qdrant's per-request page size with the scroll cursor so large
+// collections are NOT truncated at 1000. Each page returns a `next_page_offset`; we follow it
+// until it's null. A hard safety cap (MAX_SCROLL) bounds worst-case memory/time.
+const SCROLL_PAGE = 1000;
+const MAX_SCROLL = 1_000_000;
+
 export async function qdrantList(): Promise<BrainDoc[]> {
   await ensureCollection();
-  const res = await qfetch(`/collections/${COLLECTION}/points/scroll`, 'POST', {
-    limit: 1000,
-    with_payload: true,
-  });
-  const data = (await res.json()) as { result?: { points?: ScrollPoint[] } };
-  return (data.result?.points ?? []).map((p) => ({
-    id: String(p.id),
-    title: p.payload.title,
-    source: p.payload.source,
-    text: p.payload.text,
-  }));
+  const docs: BrainDoc[] = [];
+  let offset: unknown = undefined;
+  do {
+    const res = await qfetch(`/collections/${COLLECTION}/points/scroll`, 'POST', {
+      limit: SCROLL_PAGE,
+      with_payload: true,
+      ...(offset !== undefined && offset !== null ? { offset } : {}),
+    });
+    const data = (await res.json()) as {
+      result?: { points?: ScrollPoint[]; next_page_offset?: unknown };
+    };
+    for (const p of data.result?.points ?? []) {
+      docs.push({
+        id: String(p.id),
+        title: p.payload.title,
+        source: p.payload.source,
+        text: p.payload.text,
+      });
+    }
+    offset = data.result?.next_page_offset ?? null;
+  } while (offset !== null && offset !== undefined && docs.length < MAX_SCROLL);
+  return docs;
 }
 
 interface SearchPoint extends ScrollPoint {
   score: number;
 }
 
-export async function qdrantSearch(query: string, k = 5): Promise<BrainHit[]> {
-  await ensureCollection();
-  const vector = await embed(query);
-  const res = await qfetch(`/collections/${COLLECTION}/points/search`, 'POST', {
-    vector,
-    limit: k,
-    with_payload: true,
-  });
-  const data = (await res.json()) as { result?: SearchPoint[] };
-  return (data.result ?? []).map((p) => ({
+function toHit(p: SearchPoint): BrainHit {
+  return {
     id: String(p.id),
     title: p.payload.title,
     source: p.payload.source,
     text: p.payload.text,
     score: Number(p.score.toFixed(3)),
-  }));
+  };
+}
+
+// Keyword condition set for hybrid retrieval: match ANY of the query's word tokens against the
+// `text` field (needs a full-text payload index on `text`, ensured lazily below). This is the
+// BM25-flavoured lexical leg that RRF fuses with the dense-vector leg.
+function keywordShould(query: string): Array<{ key: string; match: { text: string } }> {
+  const terms = Array.from(new Set((query.toLowerCase().match(/[a-z0-9]{2,}/g) ?? []))).slice(0, 16);
+  return terms.map((t) => ({ key: 'text', match: { text: t } }));
+}
+
+let textIndexReady: Promise<void> | null = null;
+// A full-text payload index on `text` is required for the keyword leg's text-match. Create it
+// lazily and tolerate "already exists"; never let a failure here break vector search.
+async function ensureTextIndex(): Promise<void> {
+  if (textIndexReady) return textIndexReady;
+  textIndexReady = (async () => {
+    try {
+      await qfetch(`/collections/${COLLECTION}/index`, 'PUT', {
+        field_name: 'text',
+        field_schema: { type: 'text', tokenizer: 'word', lowercase: true },
+      });
+    } catch {
+      /* best-effort — hybrid falls back to vector-only if this never lands */
+    }
+  })();
+  return textIndexReady;
+}
+
+/**
+ * Vector search over the Qdrant collection, now with optional metadata filtering and a hybrid
+ * (keyword + vector) mode. Backward compatible: called as `qdrantSearch(query, k)` with no options
+ * it issues the exact same pure-vector `/points/search` request as before.
+ *
+ * - opts.filter → threaded through buildQdrantFilter() into Qdrant's `filter: { must: [...] }`.
+ * - opts.mode === 'hybrid' → uses the Query API with two prefetch legs (dense vector + keyword
+ *   text-match) fused server-side by Reciprocal Rank Fusion.
+ */
+export async function qdrantSearch(
+  query: string,
+  k = 5,
+  opts: RetrievalOptions = {},
+): Promise<BrainHit[]> {
+  await ensureCollection();
+  const vector = await embed(query);
+  const filter = buildQdrantFilter(opts.filter);
+
+  // Pure-vector path — byte-identical to the original request when no filter is supplied.
+  if (opts.mode !== 'hybrid') {
+    const res = await qfetch(`/collections/${COLLECTION}/points/search`, 'POST', {
+      vector,
+      limit: k,
+      with_payload: true,
+      ...(filter ? { filter } : {}),
+    });
+    const data = (await res.json()) as { result?: SearchPoint[] };
+    return (data.result ?? []).map(toHit);
+  }
+
+  // Hybrid path — Query API: prefetch a dense-vector leg and a keyword leg, fuse with RRF. The
+  // optional metadata filter applies to both legs. Any tokens are OR'd via a nested should filter.
+  await ensureTextIndex();
+  const should = keywordShould(query);
+  const prefetchFilter = (extra?: Record<string, unknown>) =>
+    filter || extra ? { filter: { ...(filter ?? {}), ...(extra ?? {}) } } : {};
+
+  const body = {
+    prefetch: [
+      { query: vector, limit: Math.max(k * 4, 20), ...prefetchFilter() },
+      ...(should.length > 0
+        ? [{ query: vector, limit: Math.max(k * 4, 20), ...prefetchFilter({ should }) }]
+        : []),
+    ],
+    query: { fusion: 'rrf' },
+    limit: k,
+    with_payload: true,
+  };
+  const res = await qfetch(`/collections/${COLLECTION}/points/query`, 'POST', body);
+  if (res.ok) {
+    const data = (await res.json()) as { result?: { points?: SearchPoint[] } };
+    const points = data.result?.points;
+    if (points) return points.map(toHit);
+  }
+  // Fallback: if the Query API isn't available (older Qdrant), degrade to filtered vector search.
+  const res2 = await qfetch(`/collections/${COLLECTION}/points/search`, 'POST', {
+    vector,
+    limit: k,
+    with_payload: true,
+    ...(filter ? { filter } : {}),
+  });
+  const data2 = (await res2.json()) as { result?: SearchPoint[] };
+  return (data2.result ?? []).map(toHit);
 }
 
 export async function qdrantHealth(): Promise<boolean> {
