@@ -76,7 +76,19 @@ export function workflowIdFor(agentId: string, runId: string): string {
 
 // ── Workflow I/O contract ─────────────────────────────────────────────────────────────────────
 
-/** Input handed to AgentRunWorkflow (and through it to the pipeline activity). */
+// Type-only import (erased at compile) so this module stays safe to reference from the deterministic
+// Temporal workflow bundle — it carries no runtime code, only the Actor shape the input embeds.
+import type { Actor } from '@/lib/audit-event';
+
+/**
+ * Input handed to AgentRunWorkflow (and through it to the pipeline activity).
+ *
+ * C4: it carries the CALLER CONTEXT resolved at submit time — the resolved `actor` (machine vs user
+ * + label preserved, not just an email string) and the owning `project` — alongside the existing
+ * caller/org/runId. The worker has no request to resolve identity from, so this is how a durable run
+ * attributes its audit/trace/lineage/provenance fan-out identically to an inline run. All plain,
+ * JSON-serializable data so Temporal can carry it across the workflow boundary.
+ */
 export interface AgentRunWorkflowInput {
   agentId: string;
   query: string;
@@ -84,6 +96,10 @@ export interface AgentRunWorkflowInput {
   caller?: string;
   requireReview?: boolean;
   orgId?: string;
+  /** Resolved acting principal (C4). Absent → the worker derives one from `caller`, as before. */
+  actor?: Actor;
+  /** Owning project (C4), attributed onto the run's audit event. */
+  project?: string;
 }
 
 /**
@@ -97,6 +113,18 @@ export interface AgentRunWorkflowResult {
   status: string;
 }
 
+/** Coerce an unknown into a canonical Actor, or undefined if it isn't a usable {type,id} shape. Pure
+ *  — accepts only the two valid actor types and a non-empty id; label defaults to the id. */
+export function normalizeActor(raw: unknown): Actor | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as { type?: unknown; id?: unknown; label?: unknown };
+  const type = r.type === 'machine' || r.type === 'user' ? r.type : undefined;
+  const id = typeof r.id === 'string' && r.id.trim() ? r.id.trim() : undefined;
+  if (!type || !id) return undefined;
+  const label = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : id;
+  return { type, id, label };
+}
+
 /** Validate + normalize a raw submission into a workflow input. Throws on missing required fields. */
 export function toWorkflowInput(raw: {
   agentId?: unknown;
@@ -105,6 +133,8 @@ export function toWorkflowInput(raw: {
   caller?: unknown;
   requireReview?: unknown;
   orgId?: unknown;
+  actor?: unknown;
+  project?: unknown;
 }): AgentRunWorkflowInput {
   if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) {
     throw new Error('agentId required');
@@ -122,6 +152,8 @@ export function toWorkflowInput(raw: {
     caller: typeof raw.caller === 'string' ? raw.caller : undefined,
     requireReview: raw.requireReview === true,
     orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
+    actor: normalizeActor(raw.actor),
+    project: typeof raw.project === 'string' && raw.project.trim() ? raw.project.trim() : undefined,
   };
 }
 
