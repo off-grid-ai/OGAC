@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   classifyOutcome,
+  DEFAULT_SIEM_INDEX,
   filterByOutcome,
   normalizeSiem,
   type RawSiemHit,
+  resolveSiemIndex,
 } from '../src/lib/siem-view.ts';
 
 // Pure SIEM/security-events normalizer. No network, no mocks — sample OpenSearch hits in, asserted
@@ -150,6 +152,33 @@ test('classifyOutcome: verdict words and status fallbacks', () => {
   assert.equal(classifyOutcome('', 404), 'blocked');
   assert.equal(classifyOutcome('', 200), 'allowed');
   assert.equal(classifyOutcome('', 0), 'unknown');
+});
+
+// ── resolveSiemIndex (SIEM read defaults to where the attributed audit stream ships) ─────────────
+test('resolveSiemIndex: defaults to offgrid-audit when nothing is set', () => {
+  assert.equal(resolveSiemIndex({}), 'offgrid-audit');
+  assert.equal(DEFAULT_SIEM_INDEX, 'offgrid-audit');
+});
+
+test('resolveSiemIndex: falls back to the ship-side OFFGRID_OPENSEARCH_INDEX', () => {
+  assert.equal(resolveSiemIndex({ OFFGRID_OPENSEARCH_INDEX: 'offgrid-audit' }), 'offgrid-audit');
+  assert.equal(resolveSiemIndex({ OFFGRID_OPENSEARCH_INDEX: 'custom-audit' }), 'custom-audit');
+});
+
+test('resolveSiemIndex: explicit SIEM var wins over the ship-side var', () => {
+  assert.equal(
+    resolveSiemIndex({ OFFGRID_SIEM_INDEX: 'offgrid-security', OFFGRID_OPENSEARCH_INDEX: 'offgrid-audit' }),
+    'offgrid-security',
+  );
+});
+
+test('resolveSiemIndex: comma list is trimmed, deduped, and URL-encoded', () => {
+  assert.equal(
+    resolveSiemIndex({ OFFGRID_SIEM_INDEX: ' offgrid-audit , offgrid-security , offgrid-audit ' }),
+    'offgrid-audit,offgrid-security',
+  );
+  // Empty/whitespace-only falls back to the default rather than an empty path segment.
+  assert.equal(resolveSiemIndex({ OFFGRID_SIEM_INDEX: '  ' }), 'offgrid-audit');
 });
 
 test('filterByOutcome: narrows events, keeps rollups, ignores bad filter', () => {
