@@ -1,3 +1,18 @@
+import {
+  FLEET_API,
+  type FleetPolicy,
+  type FleetPolicyInput,
+  fleetHeaders,
+  type LiveQueryResult,
+  mapPolicies,
+  mapPolicy,
+  mapQueryReport,
+  mapSoftware,
+  policyBody,
+  runCampaignBody,
+  saveQueryBody,
+  type SoftwareInventory,
+} from '@/lib/fleetdm';
 import { listDevices } from '@/lib/store';
 import type { MdmDevice, MdmPort } from './types';
 
@@ -6,8 +21,11 @@ import type { MdmDevice, MdmPort } from './types';
 // osquery-based, cross-platform MDM reached over its REST API; we use the MIT-licensed Fleet Free
 // tier (Fleet Premium is paid and NOT required). FleetDM falls back to the first-party registry if
 // unreachable, so the swap is never a hard dependency.
-const FLEET_URL = process.env.OFFGRID_FLEET_URL;
-const FLEET_TOKEN = process.env.OFFGRID_FLEET_TOKEN;
+//
+// The network lives here (thin) — request/response *shaping* is the zero-import, unit-tested
+// `src/lib/fleetdm.ts`. This keeps the SOLID split the console mandates.
+const FLEET_URL = process.env.OFFGRID_FLEET_URL ?? process.env.FLEET_URL;
+const FLEET_TOKEN = process.env.OFFGRID_FLEET_TOKEN ?? process.env.FLEET_TOKEN;
 
 async function firstPartyDevices(): Promise<MdmDevice[]> {
   const rows = await listDevices();
@@ -31,6 +49,7 @@ export const nativeMdm: MdmPort = {
     description: 'The nodes enrolled in this console — provision, policy, audit, kill-switch (default).',
   },
   listDevices: firstPartyDevices,
+  supportsFleet: false, // no osquery agent — the deep methods are FleetDM-only
   health: () => Promise.resolve(true),
 };
 
@@ -45,6 +64,28 @@ interface FleetHost {
   seen_time?: string;
 }
 
+// One place to build a FleetDM URL + auth headers, with a hard timeout. Throws on non-2xx so the
+// callers can uniformly fall back / surface an error.
+async function fleetFetch(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 8000,
+): Promise<unknown> {
+  const res = await fetch(`${FLEET_URL}${path}`, {
+    ...init,
+    headers: fleetHeaders(FLEET_TOKEN, {
+      ...(init.body ? { 'content-type': 'application/json' } : {}),
+      ...((init.headers as Record<string, string>) ?? {}),
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`fleet ${res.status}`);
+  if (res.status === 204) return {};
+  return res.json();
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export const fleetDmMdm: MdmPort = {
   meta: {
     id: 'fleetdm',
@@ -54,17 +95,13 @@ export const fleetDmMdm: MdmPort = {
     render: 'embed',
     embedUrl: FLEET_URL,
     description:
-      'Cross-platform osquery MDM (macOS/Windows/Linux/iOS/Android) over its REST API — inventory, policies, GitOps. Falls back to the first-party registry if unreachable.',
+      'Cross-platform osquery MDM (macOS/Windows/Linux/iOS/Android) over its REST API — inventory, live query, software/CVEs, policies. Falls back to the first-party registry if unreachable.',
   },
+  supportsFleet: true,
   async listDevices() {
     if (!FLEET_URL) return firstPartyDevices();
     try {
-      const res = await fetch(`${FLEET_URL}/api/v1/fleet/hosts`, {
-        headers: FLEET_TOKEN ? { authorization: `Bearer ${FLEET_TOKEN}` } : {},
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) throw new Error(`fleet ${res.status}`);
-      const data = (await res.json()) as { hosts?: FleetHost[] };
+      const data = (await fleetFetch(`${FLEET_API}/hosts`, {}, 5000)) as { hosts?: FleetHost[] };
       return (data.hosts ?? []).map((h) => ({
         id: String(h.id),
         name: h.display_name || h.computer_name || h.hostname || `host-${h.id}`,
@@ -77,6 +114,71 @@ export const fleetDmMdm: MdmPort = {
       return firstPartyDevices(); // never a hard dependency
     }
   },
+
+  // osquery live query: save the query, launch a campaign against the hosts, then poll the report
+  // until every targeted host reports or we run out of attempts (osquery is push-then-collect).
+  async liveQuery(sql: string, hostIds: number[]): Promise<LiveQueryResult> {
+    const name = `offgrid-live-${Date.now().toString(36)}`;
+    const saved = (await fleetFetch(`${FLEET_API}/queries`, {
+      method: 'POST',
+      body: JSON.stringify(saveQueryBody(name, sql)),
+    })) as { query?: { id?: number } };
+    const queryId = saved.query?.id;
+    if (!queryId) throw new Error('fleet: query not created');
+    try {
+      await fleetFetch(`${FLEET_API}/queries/${queryId}/run`, {
+        method: 'POST',
+        body: JSON.stringify(runCampaignBody(hostIds)),
+      });
+      // Poll the aggregated report; live results land within a few seconds of the agents checking in.
+      let result = mapQueryReport(queryId, sql, {}, hostIds.length);
+      for (let i = 0; i < 8; i++) {
+        await sleep(1500);
+        const report = await fleetFetch(`${FLEET_API}/queries/${queryId}/report`, {}, 5000);
+        result = mapQueryReport(queryId, sql, report as object, hostIds.length);
+        if (result.status === 'complete') break;
+      }
+      return result;
+    } finally {
+      // Clean up the ephemeral query object; best-effort.
+      await fleetFetch(`${FLEET_API}/queries/id/${queryId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  },
+
+  async hostSoftware(hostId: number): Promise<SoftwareInventory> {
+    const data = await fleetFetch(`${FLEET_API}/hosts/${hostId}/software`, {}, 8000);
+    return mapSoftware(hostId, data);
+  },
+
+  async listPolicies(): Promise<FleetPolicy[]> {
+    const data = await fleetFetch(`${FLEET_API}/global/policies`);
+    return mapPolicies(data);
+  },
+
+  async createPolicy(input: FleetPolicyInput): Promise<FleetPolicy> {
+    const data = (await fleetFetch(`${FLEET_API}/global/policies`, {
+      method: 'POST',
+      body: JSON.stringify(policyBody(input)),
+    })) as { policy?: object };
+    return mapPolicy(data.policy ?? {});
+  },
+
+  async updatePolicy(id: number, input: Partial<FleetPolicyInput>): Promise<FleetPolicy> {
+    const data = (await fleetFetch(`${FLEET_API}/global/policies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(policyBody(input)),
+    })) as { policy?: object };
+    return mapPolicy(data.policy ?? {});
+  },
+
+  async deletePolicy(id: number): Promise<void> {
+    // FleetDM deletes global policies by id list.
+    await fleetFetch(`${FLEET_API}/global/policies/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: [id] }),
+    });
+  },
+
   async health() {
     if (!FLEET_URL) return false;
     try {
