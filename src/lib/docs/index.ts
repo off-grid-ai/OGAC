@@ -40,3 +40,40 @@ export function docIndex(): { slug: string; title: string; description: string; 
     s.pages.map((p) => ({ slug: p.slug, title: p.title, description: p.description, section: s.label })),
   );
 }
+
+// Flat page order (sidebar order) — for prev/next footer navigation.
+export function orderedDocs(): { slug: string; title: string }[] {
+  return ALL_PAGES.map((p) => ({ slug: p.slug, title: p.title }));
+}
+
+export function docNeighbors(slug: string): {
+  prev: { slug: string; title: string } | null;
+  next: { slug: string; title: string } | null;
+} {
+  const order = orderedDocs();
+  const i = order.findIndex((p) => p.slug === slug);
+  if (i === -1) return { prev: null, next: null };
+  return { prev: i > 0 ? order[i - 1] : null, next: i < order.length - 1 ? order[i + 1] : null };
+}
+
+// Extract on-page headings (## / ###) from a markdown body for the table of contents. Slug ids
+// match the ones DocsMarkdown renders on headings, so anchor links line up.
+export function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+
+export function docHeadings(body: string): { id: string; text: string; level: 2 | 3 }[] {
+  const out: { id: string; text: string; level: 2 | 3 }[] = [];
+  for (const line of body.split('\n')) {
+    const m = /^(##|###)\s+(.*)$/.exec(line.trim());
+    if (m) {
+      const text = m[2].trim();
+      out.push({ id: slugifyHeading(text), text, level: m[1] === '##' ? 2 : 3 });
+    }
+  }
+  return out;
+}
