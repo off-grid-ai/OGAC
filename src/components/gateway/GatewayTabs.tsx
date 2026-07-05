@@ -8,9 +8,10 @@ import { GatewayLogs } from '@/components/gateway/GatewayLogs';
 import { ConfigManager } from '@/components/config/ConfigManager';
 import { GatewayTokens } from '@/components/gateway/GatewayTokens';
 import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
+import { GatewayTuning } from '@/components/gateway/GatewayTuning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TABS = ['overview', 'traffic', 'logs', 'control', 'tokens', 'settings'] as const;
+const TABS = ['overview', 'traffic', 'logs', 'control', 'tuning', 'tokens', 'settings'] as const;
 type TabValue = (typeof TABS)[number];
 
 // The gateway page's tabs, with the active tab reflected in the `?tab=` query string
@@ -36,6 +37,7 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
         <TabsTrigger value="traffic">Traffic</TabsTrigger>
         <TabsTrigger value="logs">Logs</TabsTrigger>
         <TabsTrigger value="control">Control</TabsTrigger>
+        <TabsTrigger value="tuning">Tuning</TabsTrigger>
         <TabsTrigger value="tokens">Tokens</TabsTrigger>
         <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
@@ -51,6 +53,9 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
       <TabsContent value="control" className="space-y-6">
         <GatewayFleetConfig />
         <GatewayControl />
+      </TabsContent>
+      <TabsContent value="tuning" className="space-y-4">
+        <GatewayTuning />
       </TabsContent>
       <TabsContent value="tokens" className="space-y-6">
         <GatewayTokens />
