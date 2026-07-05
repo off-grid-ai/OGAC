@@ -44,6 +44,7 @@ const PUBLIC_PREFIX = [
   '/handbook',
   '/signin',
   '/api/auth',
+  '/api/waitlist', // public request-access capture from the signin page (no session needed)
   '/app/', // deployed Studio apps (S2) — public shareable surfaces
   '/api/v1/app/', // their public run endpoint
   '/api/v1/status', // public service status (uptime monitors)
