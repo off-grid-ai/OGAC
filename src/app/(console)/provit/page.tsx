@@ -6,6 +6,8 @@ import { requireModuleForUser } from '@/lib/module-access';
 import { currentPrincipal, provitAbacAllows, visibilityFilter } from '@/lib/provit-access';
 import { getShowcase, provitBaseUrl, provitConfigured, provitHealth } from '@/lib/provit';
 import { TokenPanel } from './TokenPanel';
+import { IntelligencePanel } from './IntelligencePanel';
+import { UploadPanel } from './UploadPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +38,8 @@ export default async function ProvitPage({
 
   const configured = provitConfigured();
   const baseUrl = provitBaseUrl();
+  // The gateway Provit rents (its oracle). Public edge by default; the console fronts it.
+  const gatewayUrl = process.env.OFFGRID_PUBLIC_BASE ?? 'https://gateway.getoffgridai.co';
   const [health, showcase, repos] = await Promise.all([provitHealth(), getShowcase(), mappedRepos()]);
   const needleR = (q ?? '').trim().toLowerCase();
   const shownRepos = needleR ? repos.filter((r) => r.url.toLowerCase().includes(needleR)) : repos;
@@ -94,6 +98,16 @@ export default async function ProvitPage({
           Filter
         </button>
       </form>
+
+      {/* Capability 1 — Provit's intelligence engine, brokered through the console. */}
+      <IntelligencePanel baseUrl={baseUrl} />
+
+      {/* Capability 3 — send a file to Provit via the console's own storage. */}
+      <UploadPanel />
+
+      {/* Capability 2 — the gateway. Provit does NOT run its own gateway: its oracle points at the
+          console's gateway, so the honest surface is a reference, not a duplicate. */}
+      <GatewayReference gatewayUrl={gatewayUrl} />
 
       <TokenPanel />
 
@@ -166,6 +180,28 @@ export default async function ProvitPage({
         )}
       </section>
     </div>
+  );
+}
+
+// The gateway capability — surfaced HONESTLY. Provit doesn't run its own LLM gateway; its oracle
+// is the console's gateway (provit/src/core/provider.ts points PROVIT at `${console}/api/v1/gateway/v1`).
+// So we reference the shared gateway and link to the console's own gateway module rather than
+// duplicating it.
+function GatewayReference({ gatewayUrl }: { gatewayUrl: string }) {
+  return (
+    <section className="space-y-2 rounded-md border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-foreground">Gateway</h2>
+      <p className="text-sm text-muted-foreground">
+        Provit doesn&apos;t run its own model gateway — its intelligence (feature mapping, test
+        synthesis, the copilot, and the vision judge) runs on <b>this console&apos;s gateway</b>. Point a
+        Provit instance at it and everything above rides the same fleet, auth, and budgets as the
+        rest of the console.
+      </p>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <code className="rounded bg-background px-2 py-1 text-xs text-muted-foreground">{gatewayUrl}</code>
+        <a href="/gateway" className="text-primary hover:underline">Manage the gateway →</a>
+      </div>
+    </section>
   );
 }
 
