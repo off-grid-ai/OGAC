@@ -14,18 +14,22 @@ A developer or an org admin sits down at the console and sees every AI service t
 
 ---
 
-## Cross-cutting mandate — no modals/dialogs (LATER)
+## Cross-cutting mandate — no modals (the exact rule)
 
-**Don't use dialogs/modals anywhere.** They're ugly and restrictive. Every "create/edit/detail"
-interaction that currently opens a modal should instead be **its own screen (a route)** or, where a
-side-by-side is better, a **side panel/drawer** — driven by the URL, not modal state.
+**No modals/dialogs, with one exception.** They're ugly and restrictive. The pattern for every
+entity:
 
-- Applies retroactively to existing modals: connector add/edit, agent create, project dialog,
-  studio, machine-client create, book-a-call, write-to-us, delete-confirm, skills, etc.
-- New work: reach for a route or a side panel, never a `<Dialog>`.
-- Keep it URL-driven (per the navigation rule) so Back works and views are deep-linkable.
-- **Scheduled LATER** — a deliberate pass once the current build settles; don't rip out working
-  modals mid-stream. Tracked here so it isn't lost.
+- **Listing → its own page** (the module's index).
+- **Create / update → its own page** (a route like `/<module>/new`, `/<module>/<id>/edit`), or **at
+  most a side panel/drawer** when a side-by-side genuinely helps. Never a centered modal.
+- **Delete → a confirmation modal is fine** (this is the only permitted modal).
+- Everything URL-driven (per the navigation rule) so Back works and views are deep-linkable.
+
+Applies retroactively to existing dialogs (connector add/edit, agent create, project, studio,
+machine-client create, book-a-call, write-to-us, skills, threshold/suppression/masking editors,
+routing-rule add, etc.) — convert each create/edit dialog to a page or side panel; keep only
+delete-confirms as modals. Don't rip out working modals mid-demo-prep; schedule the conversion as a
+deliberate pass.
 
 ## Cross-cutting mandate — motion & micro-interactions (finesse)
 
