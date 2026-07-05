@@ -530,6 +530,58 @@ inline runs.
 
 ---
 
+## Phase 4.11 — Audit log & accountability (ACTIVE PRIORITY, started 2026-07-05)
+
+**Goal:** an enterprise-grade audit + accounting layer — *who did what*, and *what it cost*. Every
+auditable action is attributed to an actor (user or machine) and a project/org, and usage + spend
+roll up per user, per project, per model, and org-wide. This is a first-class governance requirement,
+not analytics polish.
+
+**What we need audit logs / accounting for (the coverage list):**
+- **Chats** — who sent which chats (actor, model, tokens, when), per user + per project.
+- **Workflows / agent runs** — who ran which workflow/agent, its steps, outcome, tokens, cost.
+- **Spend** — attributed cost per user, per project/org, per model, and totals (the on-prem $ story).
+- **Token usage** — prompt/completion/total tokens per user, per project, per model, org-wide.
+- **Governance actions** — policy/guardrail/routing changes, secret writes, role/access changes, flag
+  toggles, connector CRUD, backups — who changed what, when (config-change audit trail).
+- **Access events** — logins, machine-client issuance/rotation, denials.
+- **Data actions** — connector syncs, ingests, retrieval queries (who queried what).
+
+**The audit-event contract (single canonical shape — all producers emit it, all views read it):**
+```
+{
+  ts,                       // ISO timestamp
+  actor: { type: 'user'|'machine', id, label },   // email for users, client-id for machines
+  org, project?,            // tenant + project attribution
+  action,                   // chat.send | agent.run | workflow.run | policy.change |
+                            // secret.write | access.role.change | flag.toggle |
+                            // connector.sync | retrieval.query | ...
+  resource?,                // what was acted on (conversation id, agent id, rule id, ...)
+  model?, tokens?: { prompt, completion, total }, costUsd?,
+  outcome,                  // ok | blocked | redacted | error
+  runId?, ip?
+}
+```
+Stored in Postgres `audit_events` (source of truth) + shipped to OpenSearch `offgrid-audit`
+(full-text + aggregations). Correlated by `runId` where applicable (Phase-C2 already wired this).
+
+**Surfaces to build (full CRUD-console standard — read + filter + export):**
+1. **Audit log** — a filterable log: by actor, action type, project, time range, outcome. "Who sent
+   what chats / ran what workflows" answered directly. Full-text search + export (CSV/JSON) for
+   compliance. Backed by OpenSearch `searchAudit` (extend its filters/facets).
+2. **Usage & spend accounting** — token usage + spend rolled up **per user**, **per project/org**,
+   **per model**, and org-wide, over a time range. Native OpenSearch aggregations (terms on actor/
+   project/model + sum on tokens/cost), not JS rollups. Feeds a leaderboard/breakdown view + the
+   existing FinOps/Analytics surfaces (attributed, not just aggregate).
+
+**DoD:** every producer (chat, agent/workflow runs, governance actions, access, data actions) emits
+the canonical audit event with actor + project attribution; the Audit-log surface filters by actor/
+action/project/time and exports; usage + spend are queryable and displayed per user, per project, per
+model, and org-wide; correlated by runId; verified live (a probe that a chat by user X shows up
+attributed to X with its tokens/cost). No un-attributed actions.
+
+---
+
 ## Phase 4.5 — AI Studio (non-technical builder)
 **Goal:** non-technical users — ops, analysts, domain experts — can build AI workflows without knowing routing, policy pipelines, or any technical terminology. They describe what they want in plain language; Studio wires it.
 
