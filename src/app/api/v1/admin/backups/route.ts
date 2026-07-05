@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { isBackupRunning, readBackupsView, readScheduleStatus, runBackupNow } from '@/lib/backups';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +28,11 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   try {
     const result = await runBackupNow();
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'backup.run',
+      resource: 'backup:run',
+      outcome: result.ok ? 'ok' : 'error',
+    });
     return NextResponse.json({ object: 'backup_run', ...result }, { status: result.ok ? 201 : 500 });
   } catch (e) {
     const code = (e as Error & { code?: string }).code;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { validatePolicyRule } from '@/lib/policy-rules-policy';
 import { createPolicyRule, listPolicyRules } from '@/lib/policy-rules';
 import { currentOrgId } from '@/lib/tenancy';
@@ -20,7 +21,12 @@ export async function POST(req: Request) {
   if (!result.ok || !result.value) {
     return NextResponse.json({ error: result.errors.join('; ') }, { status: 400 });
   }
-  return NextResponse.json(await createPolicyRule(result.value, await currentOrgId()), {
-    status: 201,
+  const orgId = await currentOrgId();
+  const created = await createPolicyRule(result.value, orgId);
+  auditFromSession(gate, orgId, {
+    action: 'policy.change',
+    resource: `policy-rule:${(created as { id?: string }).id ?? 'rule'}`,
+    outcome: 'ok',
   });
+  return NextResponse.json(created, { status: 201 });
 }
