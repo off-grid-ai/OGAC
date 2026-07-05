@@ -69,3 +69,23 @@ export function canSee(
   if (row.visibility === 'private') return row.ownerId === viewer.email;
   return false;
 }
+
+/**
+ * Row-level DELETE authority (stricter than canSee — seeing a public demo row must NOT let just
+ * anyone delete it). Truth table:
+ *   admin                              → always
+ *   private  AND row.ownerId == email  → the owner
+ *   org      AND row.orgId == orgId     → same-org members
+ *   public                              → the original mapper (ownerId) or an admin only
+ * A public row with an ownerId not matching the viewer → denied (someone else's demo).
+ */
+export function canDeleteRow(
+  row: { visibility: string; orgId: string; ownerId: string },
+  viewer: { orgId: string; email: string; isAdmin: boolean },
+): boolean {
+  if (viewer.isAdmin) return true;
+  if (row.visibility === 'private') return row.ownerId === viewer.email;
+  if (row.visibility === 'org') return row.orgId === viewer.orgId;
+  if (row.visibility === 'public') return !!row.ownerId && row.ownerId === viewer.email;
+  return false;
+}
