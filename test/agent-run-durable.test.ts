@@ -6,6 +6,7 @@ import {
   durableConfigFromEnv,
   durableEnabled,
   isTerminalStatus,
+  normalizeActor,
   statusFromWorkflow,
   toWorkflowInput,
   workflowIdFor,
@@ -66,6 +67,8 @@ test('toWorkflowInput: validates required fields, normalizes optionals', () => {
     caller: undefined,
     requireReview: false,
     orgId: undefined,
+    actor: undefined,
+    project: undefined,
   });
   const full = toWorkflowInput({
     agentId: 'a',
@@ -82,6 +85,46 @@ test('toWorkflowInput: validates required fields, normalizes optionals', () => {
   assert.throws(() => toWorkflowInput({ query: 'q', runId: 'r' }), /agentId required/);
   assert.throws(() => toWorkflowInput({ agentId: 'a', query: '  ', runId: 'r' }), /query required/);
   assert.throws(() => toWorkflowInput({ agentId: 'a', query: 'q' }), /runId required/);
+});
+
+test('normalizeActor: accepts a valid {type,id} shape, defaults label, rejects garbage', () => {
+  assert.deepEqual(normalizeActor({ type: 'user', id: 'a@x.io', label: 'Alice' }), {
+    type: 'user',
+    id: 'a@x.io',
+    label: 'Alice',
+  });
+  assert.deepEqual(normalizeActor({ type: 'machine', id: 'svc-1' }), {
+    type: 'machine',
+    id: 'svc-1',
+    label: 'svc-1', // label defaults to id
+  });
+  // Invalid type / missing id / non-object → undefined (worker then falls back to caller-derived).
+  assert.equal(normalizeActor({ type: 'alien', id: 'x' }), undefined);
+  assert.equal(normalizeActor({ type: 'user' }), undefined);
+  assert.equal(normalizeActor({ type: 'user', id: '  ' }), undefined);
+  assert.equal(normalizeActor(null), undefined);
+  assert.equal(normalizeActor('nope'), undefined);
+});
+
+test('toWorkflowInput: carries the C4 caller context (actor + project)', () => {
+  const full = toWorkflowInput({
+    agentId: 'a',
+    query: 'q',
+    runId: 'run_1',
+    caller: 'me@x.io',
+    orgId: 'org_2',
+    actor: { type: 'machine', id: 'svc-ci', label: 'CI' },
+    project: 'proj_x',
+  });
+  assert.deepEqual(full.actor, { type: 'machine', id: 'svc-ci', label: 'CI' });
+  assert.equal(full.project, 'proj_x');
+  // Bare submission (no actor/project) → undefined, so the worker falls back to caller-derived.
+  const bare = toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1' });
+  assert.equal(bare.actor, undefined);
+  assert.equal(bare.project, undefined);
+  // Blank project is dropped.
+  const blank = toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1', project: '  ' });
+  assert.equal(blank.project, undefined);
 });
 
 test('statusFromWorkflow: maps Temporal execution status → run vocabulary', () => {
