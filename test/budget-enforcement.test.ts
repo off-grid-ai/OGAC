@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkBudget, costForTokens, priceFor } from '@/lib/finops';
-import { envEnforceState } from '@/lib/budget-config';
+import { envEnforceState, orgEnforceFlagKey, resolveEnforce } from '@/lib/budget-config';
 
 // Pure budget-ENFORCEMENT logic (Phase 0 Tier-0 gap). No I/O, no mocks — real functions, real
 // assertions. `checkBudget` is the single decision the chat + agent spend gates call; these lock
@@ -103,4 +103,53 @@ test('envEnforceState: explicit enable values → on', () => {
 
 test('envEnforceState: unrecognized value defers (fails toward the safe default)', () => {
   assert.equal(envEnforceState('maybe'), 'unset');
+});
+
+// ─── Per-org enforce key (GAP #33) ───────────────────────────────────────────────
+test('orgEnforceFlagKey: a real org → a per-org flag key namespaced under the global flag', () => {
+  assert.equal(orgEnforceFlagKey('acme'), 'budget.enforce:acme');
+  assert.equal(orgEnforceFlagKey('  acme  '), 'budget.enforce:acme'); // trimmed
+});
+
+test('orgEnforceFlagKey: blank / undefined org → null (no per-org scope → use global)', () => {
+  assert.equal(orgEnforceFlagKey(undefined), null);
+  assert.equal(orgEnforceFlagKey(''), null);
+  assert.equal(orgEnforceFlagKey('   '), null);
+});
+
+// ─── Pure org-scoped enforce resolution (GAP #33) ────────────────────────────────
+// resolveEnforce(env, orgOverride, globalFlag): precedence env → per-org override → global flag.
+test('resolveEnforce: env kill-switch wins over everything (both directions)', () => {
+  // env=off beats a per-org ON and a global ON
+  assert.equal(resolveEnforce('off', true, true), false);
+  // env=on beats a per-org OFF and a global OFF
+  assert.equal(resolveEnforce('on', false, false), true);
+});
+
+test('resolveEnforce: per-org override applied when env is unset (overrides the global default)', () => {
+  // org turned OFF while the deployment default is ON → this org is exempt
+  assert.equal(resolveEnforce('unset', false, true), false);
+  // org turned ON while the deployment default is OFF → this org is enforced
+  assert.equal(resolveEnforce('unset', true, false), true);
+});
+
+test('resolveEnforce: no per-org override (undefined) → falls back to the global flag', () => {
+  assert.equal(resolveEnforce('unset', undefined, true), true);
+  assert.equal(resolveEnforce('unset', undefined, false), false);
+});
+
+test('resolveEnforce: default ON — env unset, no per-org override, global defaults ON', () => {
+  // This is the out-of-the-box posture: enforcement holds by default, not by opt-in.
+  assert.equal(resolveEnforce('unset', undefined, true), true);
+});
+
+test('resolveEnforce: backward compatible — with no per-org override, result == old env→global behavior', () => {
+  // For every combination of env tri-state and global flag, dropping the per-org override
+  // (undefined) must reproduce exactly the pre-GAP-33 behavior: env if set, else the global flag.
+  for (const env of ['on', 'off', 'unset'] as const) {
+    for (const global of [true, false]) {
+      const expected = env === 'unset' ? global : env === 'on';
+      assert.equal(resolveEnforce(env, undefined, global), expected, `${env}/${global}`);
+    }
+  }
 });

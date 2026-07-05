@@ -238,7 +238,9 @@ export async function POST(req: Request) {
   );
   const estCallTokens = estimateTokens(String(promptChars ? promptChars : content)) + 2048; // + max_tokens reply
   const incomingCost = costForTokens(effectiveModel || 'unknown', estCallTokens);
-  const budget = await projectBudget(ragProjectId, incomingCost);
+  // Thread the run's org so the per-org enforce state is honored (chat runs under DEFAULT_ORG, the
+  // same org used for this path's audit events above/below — keep them in lockstep).
+  const budget = await projectBudget(ragProjectId, incomingCost, DEFAULT_ORG);
   if (!budget.ok) {
     // Record the denial in the audit ledger (canonical event: action=budget.deny, outcome=blocked)
     // so "we can prove spend limits are enforced" holds — the block is attributable + auditable.
