@@ -3,6 +3,8 @@
 // Shipping is fire-and-forget and best-effort — a SIEM outage never blocks or fails an audited
 // request. Read-back (searchAudit) powers the console's Audit view: full-text + filtered search
 // over the shipped stream, well beyond the 25-row Postgres slice on the Control page.
+import { correlationIds } from '@/lib/correlation';
+
 const OPENSEARCH_URL = process.env.OFFGRID_OPENSEARCH_URL;
 const INDEX = process.env.OFFGRID_OPENSEARCH_INDEX ?? 'offgrid-audit';
 
@@ -14,7 +16,45 @@ interface Shippable {
   tokens: number;
   leftDevice: boolean;
   keyId?: string | null;
+  // Present ONLY on governed agent/chat-run audit docs — the correlation key that ties this audit
+  // record to the same run's Langfuse trace, Marquez lineage event, and provenance record (C2).
+  // Device/gateway events (the historical audit stream) leave it undefined.
+  runId?: string | null;
   ts: string;
+}
+
+export interface RunAudit {
+  runId: string;
+  agentId: string;
+  outcome: string;
+  model: string;
+  tokens?: number;
+  caller?: string | null;
+  ts?: string;
+}
+
+// Pure: shape a governed-run into an OpenSearch audit doc keyed by the run's correlation id. The doc
+// `_id` (== `id`) AND its `runId` field are the run's `auditId` (== runId), so the C2 harness's
+// `_search?q=<runId>` hits. No I/O — unit-testable in isolation.
+export function buildRunAuditDoc(run: RunAudit): Shippable {
+  const auditId = correlationIds(run.runId).auditId;
+  return {
+    id: auditId,
+    runId: auditId,
+    deviceId: `agent:${run.agentId}`,
+    model: run.model,
+    outcome: run.outcome,
+    tokens: run.tokens ?? 0,
+    leftDevice: true,
+    keyId: run.caller ?? null,
+    ts: run.ts ?? new Date().toISOString(),
+  };
+}
+
+// Ship the governed-run audit doc. ADDITIVE to the device/gateway audit stream (shipAudit) — it does
+// not touch that path. Best-effort and non-blocking: an OpenSearch outage never fails the run.
+export function shipRunAudit(run: RunAudit): void {
+  shipAudit([buildRunAuditDoc(run)]);
 }
 
 export function shipAudit(events: Shippable[]): void {
@@ -73,7 +113,7 @@ function buildQuery(p: AuditSearchParams): Record<string, unknown> {
     must.push({
       multi_match: {
         query: p.q.trim(),
-        fields: ['model', 'outcome', 'deviceId', 'keyId'],
+        fields: ['model', 'outcome', 'deviceId', 'keyId', 'runId'],
         type: 'best_fields',
         fuzziness: 'AUTO',
       },
