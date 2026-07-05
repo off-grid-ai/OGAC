@@ -10,13 +10,11 @@ export const dynamic = 'force-dynamic';
 // Read-only. If this is unreachable the aggregator falls back to its hardcoded
 // POOL, so routing can never go down because of the DB/console.
 //
-// Auth: the gateway API key via x-api-key (the aggregator already holds it). Topology
-// isn't secret, but we gate writes-adjacent surfaces consistently.
-export async function GET(req: NextRequest) {
-  const key = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
-  if (key && (req.headers.get('x-api-key') ?? '') !== key) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
+// No key gate: this returns only non-secret topology (node names/models/.local hosts),
+// the aggregator calls it from localhost on S1, and external access already passes the
+// tunnel's Keycloak/oauth2-proxy gate. (A build-time-inlined OFFGRID_GATEWAY_API_KEY
+// made an x-api-key gate unreliable across separate build environments.)
+export async function GET(_req: NextRequest) {
   try {
     const rows = await db.select().from(fleetNodes);
     const nodes: FleetNode[] = rows.map((r) => ({

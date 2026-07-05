@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { GatewayControl } from '@/components/gateway/GatewayControl';
+import { GatewayFleetConfig } from '@/components/gateway/GatewayFleetConfig';
 import { GatewayLogs } from '@/components/gateway/GatewayLogs';
 import { ConfigManager } from '@/components/config/ConfigManager';
 import { GatewayTokens } from '@/components/gateway/GatewayTokens';
@@ -47,7 +48,8 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
       <TabsContent value="logs">
         <GatewayLogs />
       </TabsContent>
-      <TabsContent value="control">
+      <TabsContent value="control" className="space-y-6">
+        <GatewayFleetConfig />
         <GatewayControl />
       </TabsContent>
       <TabsContent value="tokens" className="space-y-6">
