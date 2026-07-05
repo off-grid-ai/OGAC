@@ -83,17 +83,20 @@ services:
     image: openpolicyagent/opa:0.70.0
     profiles: [policy, all]
     command: ['run', '--server', '--addr=0.0.0.0:8181', '--log-level=error']
-    ports: ['8181:8181']
+    # Stock OPA has ZERO auth — bind to loopback so only same-host next-server reaches it.
+    ports: ['127.0.0.1:8181:8181']
 
   # ── GUARDRAILS (PII detection / redaction) ────────────────────────────────────────
+  # Stock Presidio images have ZERO auth — bind to loopback so only same-host next-server
+  # (OFFGRID_PRESIDIO_URL / _ANONYMIZER_URL) reaches them, never the LAN.
   presidio-analyzer:
     image: mcr.microsoft.com/presidio-analyzer:2.2.356
     profiles: [guardrails, all]
-    ports: ['5002:3000']
+    ports: ['127.0.0.1:5002:3000']
   presidio-anonymizer:
     image: mcr.microsoft.com/presidio-anonymizer:2.2.356
     profiles: [guardrails, all]
-    ports: ['5001:3000']
+    ports: ['127.0.0.1:5001:3000']
 
   # ── OBSERVABILITY (metrics/logs/traces — one OTLP wire, any backend) ───────────────
   victoriametrics:
@@ -270,7 +273,9 @@ services:
       POSTGRES_DB: marquez
       POSTGRES_USER: marquez
       POSTGRES_PASSWORD: marquez
-    ports: ['9000:5000', '5010:5010']
+    # Stock Marquez has ZERO auth — bind to loopback so only same-host next-server reads it.
+    # marquez-web reaches marquez over the internal Docker network (MARQUEZ_HOST), unaffected.
+    ports: ['127.0.0.1:9000:5000', '127.0.0.1:5010:5010']
   marquez-web:
     image: marquezproject/marquez-web:0.50.0
     profiles: [lineage, all]
