@@ -898,33 +898,46 @@ export function ChatWorkspace({
     <div className="-m-6 flex h-full">
       {/* Rail: projects + conversations */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
-        <div className="space-y-2 p-2">
-          <Button onClick={newChat} className="w-full justify-start gap-2" size="sm">
-            <Plus className="size-4" /> New chat
-          </Button>
+        {/* Top: primary action + search */}
+        <div className="space-y-2 p-2.5">
           <Button
-            onClick={() => setSkillsOpen(true)}
-            variant="outline"
-            className="w-full justify-start gap-2"
+            onClick={newChat}
+            className="w-full justify-start gap-2 transition-transform duration-150 active:scale-[0.98]"
             size="sm"
           >
-            <Sparkle className="size-4" /> Skills
+            <Plus className="size-4" /> New chat
           </Button>
-          <div className="flex items-center justify-between px-1 pt-1">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="relative">
+            <MagnifyingGlass className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats"
+              className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-2 text-xs outline-none transition-colors duration-150 focus:border-primary/50"
+            />
+          </div>
+        </div>
+
+        {/* Projects */}
+        <div className="px-2.5 pb-1">
+          <div className="flex items-center justify-between px-1 pb-1">
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
               Projects
             </span>
-            <FolderSimplePlus
+            <button
               onClick={newProject}
-              className="size-4 cursor-pointer text-muted-foreground hover:text-foreground"
-            />
+              aria-label="New project"
+              className="text-muted-foreground transition-colors duration-150 hover:text-primary"
+            >
+              <FolderSimplePlus className="size-4" />
+            </button>
           </div>
           <div className="space-y-0.5">
             <button
               onClick={() => setActiveProjectId(null)}
               className={cn(
-                'w-full rounded-md px-2.5 py-1.5 text-left text-sm',
-                !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted',
+                'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
+                !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               All chats
@@ -934,7 +947,7 @@ export function ChatWorkspace({
                 key={p.id}
                 onClick={() => setActiveProjectId(p.id)}
                 className={cn(
-                  'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm',
+                  'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
                   activeProjectId === p.id
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -946,20 +959,24 @@ export function ChatWorkspace({
                     e.stopPropagation();
                     setDialogProject(p);
                   }}
-                  className="size-3.5 shrink-0 opacity-0 hover:text-foreground group-hover:opacity-100"
+                  className="size-3.5 shrink-0 opacity-0 transition-opacity duration-150 hover:text-foreground group-hover:opacity-100"
                 />
               </button>
             ))}
           </div>
-          <div className="relative pt-1">
-            <MagnifyingGlass className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search chats"
-              className="w-full rounded-md border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none"
-            />
-          </div>
+        </div>
+
+        {/* Chats */}
+        <div className="flex items-center justify-between px-3.5 pb-1 pt-2">
+          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+            Chats
+          </span>
+          <button
+            onClick={() => setSkillsOpen(true)}
+            className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors duration-150 hover:text-primary"
+          >
+            <Sparkle className="size-3" /> Skills
+          </button>
         </div>
 
         <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
@@ -968,7 +985,7 @@ export function ChatWorkspace({
               key={c.id}
               onClick={() => openConversation(c.id)}
               className={cn(
-                'group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors',
+                'group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.99]',
                 activeId === c.id
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
