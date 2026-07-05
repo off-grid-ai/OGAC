@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { correlationIds } from '@/lib/correlation';
 
 // Chat -> Langfuse trace emission. Plain chat completions never pushed a trace (only the agent-run
 // pipeline did via OTLP), so the Observability page's trace list was empty. This posts a trace +
@@ -27,6 +28,12 @@ export interface ChatTraceInput {
   model: string;
   input: string;
   output: string;
+  // Optional deterministic trace id. Chat turns leave it unset (a random id is minted). A GOVERNED
+  // RUN passes the run's `traceId` (== normalized runId) so the Langfuse trace is correlated with the
+  // audit/lineage/provenance planes by the one run id (C2).
+  traceId?: string;
+  // Optional trace name — defaults to 'chat'; governed runs use 'agent-run'.
+  name?: string;
   // Optional metrics — a generation observation records these when present.
   startTime?: number; // epoch ms when the upstream request began
   endTime?: number; // epoch ms when the completion finalized
@@ -34,9 +41,10 @@ export interface ChatTraceInput {
   completionTokens?: number;
 }
 
-// Build the two-event ingestion batch: a 'chat' trace plus a nested generation observation.
+// Build the two-event ingestion batch: a trace plus a nested generation observation.
 function buildBatch(t: ChatTraceInput): unknown[] {
-  const traceId = randomUUID();
+  const traceId = t.traceId || randomUUID();
+  const traceName = t.name || 'chat';
   const start = t.startTime ?? Date.now();
   const end = t.endTime ?? start;
   const startISO = new Date(start).toISOString();
@@ -52,7 +60,7 @@ function buildBatch(t: ChatTraceInput): unknown[] {
       timestamp: startISO,
       body: {
         id: traceId,
-        name: 'chat',
+        name: traceName,
         timestamp: startISO,
         userId: t.userId,
         sessionId: t.conversationId || undefined,
@@ -95,4 +103,28 @@ async function postTrace(t: ChatTraceInput): Promise<void> {
 export function emitChatTrace(t: ChatTraceInput): void {
   if (!configured() || !t.output) return;
   void postTrace(t).catch(() => {});
+}
+
+// Fire-and-forget entry point for a GOVERNED AGENT RUN. Emits a Langfuse trace whose id is the run's
+// deterministic `traceId` (== normalized runId), so `traceId === normalize(runId)` and the C2 harness
+// finds it at GET /api/public/traces/<traceId>. Unlike the sampled/flag-gated online QA score, this
+// fires for EVERY run so the trace plane is reliably correlated. Best-effort: never blocks the run.
+export function emitRunTrace(t: {
+  runId: string;
+  agentId: string;
+  model: string;
+  input: string;
+  output: string;
+  caller?: string;
+}): void {
+  if (!configured() || !t.output) return;
+  void postTrace({
+    conversationId: t.runId,
+    userId: t.caller || 'agent',
+    model: t.model,
+    input: t.input,
+    output: t.output,
+    traceId: correlationIds(t.runId).traceId,
+    name: 'agent-run',
+  }).catch(() => {});
 }
