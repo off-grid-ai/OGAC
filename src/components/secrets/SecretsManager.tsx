@@ -1,6 +1,14 @@
 'use client';
 
-import { FolderSimple, Key, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
+import {
+  ArrowsClockwise,
+  CaretDown,
+  CaretRight,
+  FolderSimple,
+  Key,
+  Plus,
+  Trash,
+} from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +24,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { type SecretKeyRow, validateKeyPath } from '@/lib/secret-keys';
+import type { SecretVersionsView } from '@/lib/secrets-ops';
 
-// Secret-KEY management surface. Full CRUD over key NAMES via /api/v1/admin/secrets:
-//   list (names only) · write (value is WRITE-ONLY — typed once, sent, never rendered back) · delete.
+// Secret-KEY management surface. Full CRUD over key NAMES via /api/v1/admin/secrets plus KV v2
+// versioning/rotation via /api/v1/admin/secrets/versions:
+//   list (names only) · write · delete · expand → version history · rotate · destroy old versions.
 //
-// SAFETY: this component never fetches, stores in state, or renders a secret VALUE. The value input
-// is a password field, its state is cleared immediately after a successful write, and the GET
-// response carries only key names — there is no code path that could display secret material.
+// SAFETY: this component never fetches, stores in state, or renders a secret VALUE. Values are typed
+// into write-only password fields, cleared after submit; every GET returns names / version metadata
+// only — there is no code path that could display secret material.
 //
 // The "add" panel open/closed state is a navigational position, so it lives in the URL (?add=1)
 // driven by the parent page; this component just receives it and reports changes via onToggleAdd.
@@ -44,6 +54,7 @@ export function SecretsManager({
   // from any server response.
   const [newValue, setNewValue] = useState('');
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!configured) {
@@ -229,39 +240,17 @@ export function SecretsManager({
                   </TableRow>
                 ) : (
                   keys.map((k) => (
-                    <TableRow key={k.key}>
-                      <TableCell className="font-mono text-xs text-foreground">
-                        {k.folder ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <FolderSimple className="size-3.5 text-muted-foreground" />
-                            {k.key}
-                          </span>
-                        ) : (
-                          k.key
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {k.folder ? 'folder' : 'secret'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {k.folder ? (
-                          <span className="text-[10px] text-muted-foreground">namespace</span>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            disabled={busy || sealed}
-                            onClick={() => void remove(k.key)}
-                            title="Delete secret"
-                          >
-                            <Trash className="size-3.5" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                    <SecretRow
+                      key={k.key}
+                      row={k}
+                      sealed={sealed}
+                      busy={busy}
+                      expanded={expanded === k.key}
+                      onToggle={() =>
+                        setExpanded((prev) => (prev === k.key ? null : k.key))
+                      }
+                      onRemove={() => void remove(k.key)}
+                    />
                   ))
                 )}
               </TableBody>
@@ -270,5 +259,342 @@ export function SecretsManager({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// A single key row plus, when expanded, its inline KV v2 version history + rotate/destroy controls.
+function SecretRow({
+  row,
+  sealed,
+  busy,
+  expanded,
+  onToggle,
+  onRemove,
+}: {
+  row: SecretKeyRow;
+  sealed: boolean;
+  busy: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  if (row.folder) {
+    return (
+      <TableRow>
+        <TableCell className="font-mono text-xs text-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <FolderSimple className="size-3.5 text-muted-foreground" />
+            {row.key}
+          </span>
+        </TableCell>
+        <TableCell>
+          <Badge variant="outline" className="text-muted-foreground">
+            folder
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right">
+          <span className="text-[10px] text-muted-foreground">namespace</span>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <>
+      <TableRow>
+        <TableCell className="font-mono text-xs text-foreground">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center gap-1.5 hover:text-primary"
+            title="Show version history"
+          >
+            {expanded ? (
+              <CaretDown className="size-3.5 text-muted-foreground" />
+            ) : (
+              <CaretRight className="size-3.5 text-muted-foreground" />
+            )}
+            {row.key}
+          </button>
+        </TableCell>
+        <TableCell>
+          <Badge variant="outline" className="text-muted-foreground">
+            secret
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            disabled={busy || sealed}
+            onClick={onRemove}
+            title="Delete secret (soft-delete latest version)"
+          >
+            <Trash className="size-3.5" />
+          </Button>
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow>
+          <TableCell colSpan={3} className="bg-muted/20 p-0">
+            <VersionPanel keyPath={row.key} sealed={sealed} />
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+// eslint-disable-next-line complexity
+function VersionPanel({ keyPath, sealed }: { keyPath: string; sealed: boolean }) {
+  const [data, setData] = useState<SecretVersionsView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotateValue, setRotateValue] = useState('');
+  const [destroyOld, setDestroyOld] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/admin/secrets/versions?key=${encodeURIComponent(keyPath)}`,
+      );
+      const json = (await res.json()) as { versions?: SecretVersionsView; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Failed to load versions.');
+      setData(json.versions ?? null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [keyPath]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const versionAction = async (
+    body: Record<string, unknown>,
+    ok: string,
+  ): Promise<void> => {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/v1/admin/secrets/versions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: keyPath, ...body }),
+      });
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Action failed.');
+      toast.success(ok);
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rotate = async () => {
+    if (!rotateValue) {
+      toast.error('A new value is required to rotate.');
+      return;
+    }
+    const priorActive = (data?.versions ?? [])
+      .filter((v) => v.state === 'active' && !v.current)
+      .map((v) => v.version);
+    await versionAction(
+      {
+        action: 'rotate',
+        value: rotateValue,
+        destroyPrior: destroyOld ? priorActive : [],
+      },
+      `Rotated "${keyPath}" to a new version${destroyOld ? ' and destroyed prior versions' : ''}.`,
+    );
+    setRotateValue('');
+    setRotateOpen(false);
+    setDestroyOld(false);
+  };
+
+  const destroy = async (version: number) => {
+    if (
+      !window.confirm(
+        `Permanently DESTROY version ${version} of "${keyPath}"? This is irreversible — the material is gone forever.`,
+      )
+    ) {
+      return;
+    }
+    await versionAction({ action: 'destroy', versions: [version] }, `Destroyed version ${version}.`);
+  };
+
+  const undelete = async (version: number) => {
+    await versionAction({ action: 'undelete', versions: [version] }, `Recovered version ${version}.`);
+  };
+
+  return (
+    <div className="space-y-3 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Version history{' '}
+          {data && (
+            <>
+              · current v{data.currentVersion ?? '—'} · keeps{' '}
+              {data.maxVersions && data.maxVersions > 0 ? data.maxVersions : '10 (default)'}
+            </>
+          )}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={sealed || busy}
+          onClick={() => setRotateOpen((o) => !o)}
+        >
+          <ArrowsClockwise className="mr-1 size-3.5" />
+          Rotate
+        </Button>
+      </div>
+
+      {rotateOpen && !sealed && (
+        <form
+          className="space-y-2 rounded-md border border-border bg-background p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void rotate();
+          }}
+        >
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            New value (write-only)
+          </label>
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={rotateValue}
+            onChange={(e) => setRotateValue(e.target.value)}
+            placeholder="new secret material"
+          />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={destroyOld}
+              onChange={(e) => setDestroyOld(e.target.checked)}
+            />
+            Also permanently destroy prior versions (irreversible)
+          </label>
+          <div className="flex gap-2">
+            <Button size="sm" type="submit" disabled={busy}>
+              {busy ? 'Rotating…' : 'Rotate secret'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                setRotateOpen(false);
+                setRotateValue('');
+                setDestroyOld(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {loading ? (
+        <p className="py-2 text-center text-xs text-muted-foreground">Loading versions…</p>
+      ) : !data || data.versions.length === 0 ? (
+        <p className="py-2 text-center text-xs text-muted-foreground">No version metadata.</p>
+      ) : (
+        <table className="w-full text-left text-xs">
+          <thead className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            <tr className="border-b border-border">
+              <th className="py-1 pr-4 font-medium">Version</th>
+              <th className="py-1 pr-4 font-medium">Created</th>
+              <th className="py-1 pr-4 font-medium">State</th>
+              <th className="py-1 pr-4 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.versions.map((v) => (
+              <VersionRow
+                key={v.version}
+                v={v}
+                disabled={sealed || busy}
+                onUndelete={() => void undelete(v.version)}
+                onDestroy={() => void destroy(v.version)}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const STATE_CLASS: Record<SecretVersionsView['versions'][number]['state'], string> = {
+  destroyed: 'text-destructive',
+  deleted: 'text-amber-600',
+  active: 'text-muted-foreground',
+};
+
+// One row of the version-history table. Kept as its own component so the parent's render stays flat.
+function VersionRow({
+  v,
+  disabled,
+  onUndelete,
+  onDestroy,
+}: {
+  v: SecretVersionsView['versions'][number];
+  disabled: boolean;
+  onUndelete: () => void;
+  onDestroy: () => void;
+}) {
+  return (
+    <tr className="border-b border-border/50 last:border-0">
+      <td className="py-1 pr-4 font-mono">
+        v{v.version}
+        {v.current && (
+          <Badge variant="secondary" className="ml-1.5 bg-primary/10 text-[9px] text-primary">
+            current
+          </Badge>
+        )}
+      </td>
+      <td className="py-1 pr-4 text-muted-foreground">
+        {v.createdTime ? new Date(v.createdTime).toLocaleString() : '—'}
+      </td>
+      <td className="py-1 pr-4">
+        <Badge variant="outline" className={STATE_CLASS[v.state]}>
+          {v.state}
+        </Badge>
+      </td>
+      <td className="py-1 pr-4 text-right">
+        {v.state === 'deleted' ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={disabled}
+            onClick={onUndelete}
+            title="Recover this soft-deleted version"
+          >
+            Recover
+          </Button>
+        ) : v.state === 'destroyed' ? (
+          <span className="text-[10px] text-muted-foreground">gone</span>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            disabled={disabled}
+            onClick={onDestroy}
+            title="Permanently destroy this version"
+          >
+            Destroy
+          </Button>
+        )}
+      </td>
+    </tr>
   );
 }
