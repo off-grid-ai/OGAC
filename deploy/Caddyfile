@@ -125,18 +125,11 @@ http://127.0.0.1:8933 {
 http://127.0.0.1:8934 {
 	reverse_proxy offgrid-g6.local:8070
 }
-# node-c (g5) — server #3 (g6 was maxed): OpenSearch (SIEM), Marquez (lineage), OpenBao (secrets).
-# Same loopback pattern — console reaches these via 127.0.0.1, not the LAN. Added 2026-07-05.
-http://127.0.0.1:8935 {
-	reverse_proxy offgrid-g5.local:9200
-}
-http://127.0.0.1:8936 {
-	reverse_proxy offgrid-g5.local:9000
-}
-http://127.0.0.1:8937 {
-	reverse_proxy offgrid-g5.local:8200
-}
+# NOTE: OpenSearch (:9200), Marquez (:9000), OpenBao (:8200) run in the `offgrid-services-a` stack
+# ON S1 (localhost) — the console reaches them DIRECTLY at 127.0.0.1, no proxy needed. (The aborted
+# 2026-07-05 g5/node-c plan is void: those services were already up on S1 the whole time.)
 # Presidio (g6) — analyzer :5002 / anonymizer :5001 → entity-grade PII masking in Guardrails.
+# These DO need a loopback proxy (g6 is on the LAN, which the console daemon can't reach directly).
 http://127.0.0.1:8938 {
 	reverse_proxy offgrid-g6.local:5002
 }

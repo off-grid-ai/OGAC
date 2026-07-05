@@ -80,7 +80,9 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'opensearch',
     label: 'OpenSearch',
     description: 'SIEM / log search — gateway analytics, audit logs, dashboards.',
-    url: process.env.OFFGRID_OPENSEARCH_URL ?? 'http://192.168.1.59:9200',
+    // Runs in the offgrid-services-a stack ON S1 → reached over loopback (the next-server daemon
+    // can't egress to other LAN hosts, but 127.0.0.1 always works). Same for OpenBao/Marquez below.
+    url: process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200',
     healthPath: '/_cluster/health',
     auth: 'api-key',
     kind: 'api',
@@ -116,7 +118,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'openbao',
     label: 'OpenBao',
     description: 'Secrets vault — API keys, credentials, rotation.',
-    url: process.env.OFFGRID_OPENBAO_URL ?? 'http://192.168.1.59:8200',
+    url: process.env.OFFGRID_OPENBAO_URL ?? 'http://127.0.0.1:8200',
     healthPath: '/v1/sys/health',
     auth: 'api-key',
     kind: 'api',
@@ -125,7 +127,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'marquez',
     label: 'Marquez',
     description: 'Data lineage — OpenLineage-compatible source→answer provenance.',
-    url: process.env.OFFGRID_MARQUEZ_URL ?? 'http://192.168.1.59:9000',
+    url: process.env.OFFGRID_MARQUEZ_URL ?? 'http://127.0.0.1:9000',
     healthPath: '/api/v1/namespaces',
     auth: 'api-key',
     kind: 'api',
@@ -143,7 +145,9 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'presidio',
     label: 'Presidio',
     description: 'PII detection & anonymisation — data masking for ingest.',
-    url: 'http://192.168.1.60:5002',
+    // On g6 (LAN). The console can't reach it directly; it needs an edge-Caddy loopback proxy
+    // (8938 staged in the Caddyfile, pending an edge reload). Env override points at the loopback.
+    url: process.env.OFFGRID_PRESIDIO_URL ?? 'http://127.0.0.1:8938',
     healthPath: '/health',
     auth: 'api-key',
     kind: 'api',
