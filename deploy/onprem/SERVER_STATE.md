@@ -30,6 +30,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_UNLEASH_URL` | `http://127.0.0.1:8932` | via localhost Caddy proxy → S2. |
 | `OFFGRID_SUPERSET_URL` | `http://127.0.0.1:8933` | via localhost Caddy proxy → S2. |
 | `OFFGRID_FLEET_URL` | `http://127.0.0.1:8934` | via localhost Caddy proxy → S2. |
+| `OFFGRID_SUPERSET_DB_URI` | _(unset — falls back to `DATABASE_URL`)_ | SQLAlchemy URI Superset uses to reach the console Postgres when **provisioning** the starter dashboard (`POST /api/v1/admin/superset/provision`). Set this if Superset runs on a different host than the console DB (localhost won't route). |
 
 > **⚠️ Console can't egress to the LAN (root cause of every S2 "unreachable"/Langfuse "fetch
 > failed"):** the `next-server` process gets `EHOSTUNREACH` connecting to any `192.168.1.x` host,
