@@ -38,9 +38,13 @@ export async function POST(req: Request) {
   const rotate = body?.rotate === true;
 
   const results: ServiceClientResult[] = [];
+  const failures: { service: string; clientId: string; error: string }[] = [];
 
-  try {
-    for (const def of SERVICE_CLIENTS) {
+  // Provision each client independently: one client failing (e.g. a transient Keycloak error) must not
+  // abort the other four. A failure is recorded and we move on, so the response reports exactly which
+  // clients landed and which didn't rather than losing all progress to a single throw.
+  for (const def of SERVICE_CLIENTS) {
+    try {
       // ── 1) Ensure the client exists (find-or-create by clientId) ─────────────
       let clientAction: ProvisionAction;
       const existing = (await kc.listClients(def.clientId)).find((c) => c.clientId === def.clientId);
@@ -83,16 +87,18 @@ export async function POST(req: Request) {
       await openBaoSecrets.set(clientSecretPath(def.service), secret);
 
       results.push(buildResult(def, clientAction, roleAction, secretAction));
+    } catch (err) {
+      failures.push({ service: def.service, clientId: def.clientId, error: (err as Error).message });
     }
-  } catch (err) {
-    return NextResponse.json(
-      { configured: true, error: (err as Error).message, partial: results },
-      { status: 500 },
-    );
   }
 
   // Secret VALUES are never returned — only the action + the OpenBao path they landed at.
-  return NextResponse.json({ configured: true, provisioned: results });
+  // 200 when all five succeed; 207 (Multi-Status) when some landed and some failed.
+  const status = failures.length === 0 ? 200 : 207;
+  return NextResponse.json(
+    { configured: true, provisioned: results, ...(failures.length ? { failures } : {}) },
+    { status },
+  );
 }
 
 // Report desired-state vs what actually exists in Keycloak, without mutating anything.
