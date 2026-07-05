@@ -372,6 +372,26 @@ sudo pw during the Homebrew/PG install.
 - `co.getoffgridai.metrics` — metrics.
 - Console + cloudflared run as backgrounded processes (not launchd) — see DEPLOY.md.
 
+### Durable agent-run worker (Temporal, task queue `offgrid-agents`)
+
+Agent runs (`POST /api/v1/admin/agents/runs`) can now execute DURABLY on Temporal (`:7233`,
+already up on S1) via the `AgentRunWorkflow` + `runAgentPipeline` activity — the workflow wraps the
+existing `runAgent` pipeline (policy → guardrails → retrieval → LLM → grounding → provenance →
+persist), so a worker crash mid-run is retried/resumed, not lost. This is SEPARATE from the
+inference queue (`offgrid-inference`): this queue is `offgrid-agents`.
+
+- **To go live it needs a running worker process** (not yet launchd-managed): from the console dir,
+  `npm run worker:agents` (`tsx scripts/temporal-worker.mts`). It needs the same runtime env as the
+  console (`DATABASE_URL`, gateway creds, adapter config) — it loads `.env.local`.
+- **Enable dispatch** by setting `OFFGRID_QUEUE_ENABLED=1` (or `OFFGRID_ADAPTER_AGENTRUNTIME=temporal`)
+  in the console's `.env.local`. Without the flag OR without a reachable worker, the console
+  gracefully runs agent runs synchronously in-process (unchanged behaviour).
+- Env: `OFFGRID_TEMPORAL_ADDRESS` (default `offgrid-s1.local:7233` → use `127.0.0.1:7233` on S1),
+  `OFFGRID_TEMPORAL_NAMESPACE=default`, `OFFGRID_AGENT_TASK_QUEUE=offgrid-agents`,
+  `OFFGRID_AGENT_MAX_ATTEMPTS`, `OFFGRID_AGENT_AWAIT_MS`, `OFFGRID_AGENT_MAX_CONCURRENT`.
+- TODO: add a launchd job `co.getoffgridai.agent-worker` (RunAtLoad+KeepAlive) once validated, so the
+  drain survives reboots like the aggregator does.
+
 ## Public file store (SeaweedFS, internet-exposed via the gateway)
 
 The SeaweedFS S3 store on S1 (`127.0.0.1:8333`, container `offgrid-services-extra-seaweedfs-1`)
