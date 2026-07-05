@@ -8,12 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -110,12 +111,12 @@ function RuleDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{draft.id ? 'Edit alert rule' : 'New alert rule'}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{draft.id ? 'Edit alert rule' : 'New alert rule'}</SheetTitle>
+        </SheetHeader>
+        <SheetBody>
           <div className="space-y-1">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Name</Label>
             <Input
@@ -189,17 +190,17 @@ function RuleDialog({
             />
             Enabled
           </label>
-        </div>
-        <DialogFooter>
+        </SheetBody>
+        <SheetFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy}>
             {draft.id ? 'Save' : 'Create'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -241,12 +242,12 @@ function ViewDialog({ open, onClose, onSaved }: { open: boolean; onClose: () => 
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New saved view</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>New saved view</SheetTitle>
+        </SheetHeader>
+        <SheetBody>
           <div className="space-y-1">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} className="text-xs" />
@@ -289,17 +290,17 @@ function ViewDialog({ open, onClose, onSaved }: { open: boolean; onClose: () => 
               </select>
             </div>
           </div>
-        </div>
-        <DialogFooter>
+        </SheetBody>
+        <SheetFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy}>
             Create
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -313,11 +314,28 @@ export function AnalyticsAlerts() {
 
   const [rules, setRules] = useState<Rule[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
-  const [ruleDialog, setRuleDialog] = useState<{ open: boolean; rule: Rule | null }>({
-    open: false,
-    rule: null,
-  });
-  const [viewDialog, setViewDialog] = useState(false);
+
+  // Which create/edit panel is open lives in the URL (?panel=alert-rule[&rid=<id>] | new-view) so
+  // Back closes it and the panel is deep-linkable — never local-only state.
+  const panel = params.get('panel');
+  const editRuleId = params.get('rid');
+
+  const setPanel = useCallback(
+    (next: { panel: string; rid?: string } | null) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) {
+        p.set('panel', next.panel);
+        if (next.rid) p.set('rid', next.rid);
+        else p.delete('rid');
+      } else {
+        p.delete('panel');
+        p.delete('rid');
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -385,7 +403,7 @@ export function AnalyticsAlerts() {
             <Button
               size="sm"
               className="gap-1.5"
-              onClick={() => setRuleDialog({ open: true, rule: null })}
+              onClick={() => setPanel({ panel: 'alert-rule' })}
             >
               <Plus className="size-4" />
               Add rule
@@ -427,7 +445,7 @@ export function AnalyticsAlerts() {
                     <TableCell className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setRuleDialog({ open: true, rule: r })}
+                        onClick={() => setPanel({ panel: 'alert-rule', rid: r.id })}
                         className="text-muted-foreground hover:text-primary"
                         title="Edit rule"
                       >
@@ -460,7 +478,7 @@ export function AnalyticsAlerts() {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm">Saved views · {views.length}</CardTitle>
-          <Button size="sm" className="gap-1.5" onClick={() => setViewDialog(true)}>
+          <Button size="sm" className="gap-1.5" onClick={() => setPanel({ panel: 'new-view' })}>
             <Plus className="size-4" />
             Save view
           </Button>
@@ -509,12 +527,13 @@ export function AnalyticsAlerts() {
       </Card>
 
       <RuleDialog
-        open={ruleDialog.open}
-        rule={ruleDialog.rule}
-        onClose={() => setRuleDialog({ open: false, rule: null })}
+        key={editRuleId ?? 'new'}
+        open={panel === 'alert-rule'}
+        rule={editRuleId ? (rules.find((r) => r.id === editRuleId) ?? null) : null}
+        onClose={() => setPanel(null)}
         onSaved={load}
       />
-      <ViewDialog open={viewDialog} onClose={() => setViewDialog(false)} onSaved={load} />
+      <ViewDialog open={panel === 'new-view'} onClose={() => setPanel(null)} onSaved={load} />
     </>
   );
 }

@@ -1,18 +1,18 @@
 'use client';
 
 import { Copy, Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -20,7 +20,20 @@ const TYPES = ['user', 'project'] as const;
 
 export function IssueKeyButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-key';
+
+  const setPanelOpen = useCallback(
+    (next: boolean) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) p.set('panel', 'new-key');
+      else p.delete('panel');
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
+
   const [name, setName] = useState('');
   const [subjectType, setSubjectType] = useState<(typeof TYPES)[number]>('user');
   const [subject, setSubject] = useState('');
@@ -57,26 +70,26 @@ export function IssueKeyButton() {
   }
 
   function close(o: boolean) {
-    setOpen(o);
+    setPanelOpen(o);
     if (!o) setToken('');
   }
 
   return (
-    <Dialog open={open} onOpenChange={close}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" />
-          Issue key
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Issue a virtual key</DialogTitle>
-          <DialogDescription>
-            Scoped to a user or project, with an optional monthly budget. The secret is shown once.
-          </DialogDescription>
-        </DialogHeader>
-
+    <>
+      <Button size="sm" onClick={() => setPanelOpen(true)}>
+        <Plus className="size-4" />
+        Issue key
+      </Button>
+      <Sheet open={open} onOpenChange={close}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Issue a virtual key</SheetTitle>
+            <SheetDescription>
+              Scoped to a user or project, with an optional monthly budget. The secret is shown
+              once.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
         {token ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -146,7 +159,9 @@ export function IssueKeyButton() {
             </Button>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

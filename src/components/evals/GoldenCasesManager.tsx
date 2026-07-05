@@ -1,7 +1,7 @@
 'use client';
 
 import { PencilSimple, Play, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,12 +51,34 @@ const RUN_ENGINES = ['golden', 'promptfoo', 'ragas'] as const;
 
 export function GoldenCasesManager() {
   const router = useRouter();
+  const params = useSearchParams();
   const [cases, setCases] = useState<GoldenCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<GoldenCase | null>(null);
   const [running, setRunning] = useState(false);
+
+  const panel = params.get('panel'); // 'new-goldencase' | 'edit-goldencase' | null
+  const editId = params.get('id');
+
+  // Which create/edit panel is open lives in the URL — Back closes it, links are shareable.
+  const setPanel = useCallback(
+    (next: { panel: string; id?: string } | null) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) {
+        p.set('panel', next.panel);
+        if (next.id) p.set('id', next.id);
+        else p.delete('id');
+      } else {
+        p.delete('panel');
+        p.delete('id');
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
 
   const load = useCallback(async () => {
     const r = await fetch('/api/v1/admin/golden-cases');
@@ -58,6 +89,25 @@ export function GoldenCasesManager() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Derive the form draft from the URL: seed a fresh draft for create, hydrate from the row for
+  // edit, and clear when the panel closes — so open/close state is the URL, not local state.
+  useEffect(() => {
+    if (panel === 'new-goldencase') {
+      setDraft((d) => (d && !d.id ? d : { ...EMPTY_DRAFT }));
+    } else if (panel === 'edit-goldencase' && editId) {
+      const c = cases.find((x) => x.id === editId);
+      if (c) {
+        setDraft((d) =>
+          d && d.id === c.id
+            ? d
+            : { id: c.id, name: c.name, query: c.query, expected: c.expected, suite: c.suite },
+        );
+      }
+    } else {
+      setDraft(null);
+    }
+  }, [panel, editId, cases]);
 
   async function save() {
     if (!draft) return;
@@ -82,7 +132,7 @@ export function GoldenCasesManager() {
     setSaving(false);
     if (r.ok) {
       toast.success(draft.id ? 'Case updated' : 'Case added');
-      setDraft(null);
+      setPanel(null);
       void load();
     } else {
       const e = await r.json().catch(() => null);
@@ -137,7 +187,11 @@ export function GoldenCasesManager() {
               Run {eng}
             </Button>
           ))}
-          <Button size="sm" variant="secondary" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setPanel({ panel: 'new-goldencase' })}
+          >
             <Plus className="mr-1.5 size-3.5" />
             Add case
           </Button>
@@ -182,15 +236,7 @@ export function GoldenCasesManager() {
                         size="icon"
                         variant="ghost"
                         aria-label="Edit case"
-                        onClick={() =>
-                          setDraft({
-                            id: c.id,
-                            name: c.name,
-                            query: c.query,
-                            expected: c.expected,
-                            suite: c.suite,
-                          })
-                        }
+                        onClick={() => setPanel({ panel: 'edit-goldencase', id: c.id })}
                       >
                         <PencilSimple className="size-4" />
                       </Button>
@@ -211,18 +257,18 @@ export function GoldenCasesManager() {
         )}
       </CardContent>
 
-      {/* Create / edit form. */}
-      <Dialog open={draft !== null} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{draft?.id ? 'Edit golden case' : 'Add golden case'}</DialogTitle>
-            <DialogDescription>
+      {/* Create / edit form — open/close state lives in the URL (?panel=…). */}
+      <Sheet open={draft !== null} onOpenChange={(o) => !o && setPanel(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{draft?.id ? 'Edit golden case' : 'Add golden case'}</SheetTitle>
+            <SheetDescription>
               A query and the expected source/answer it should surface. Scored offline against the
               gateway.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           {draft && (
-            <div className="space-y-3">
+            <SheetBody>
               <div className="space-y-1.5">
                 <Label htmlFor="gc-name">Name</Label>
                 <Input
@@ -257,18 +303,18 @@ export function GoldenCasesManager() {
                   onChange={(e) => setDraft({ ...draft, suite: e.target.value })}
                 />
               </div>
-            </div>
+            </SheetBody>
           )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
+          <SheetFooter>
+            <Button variant="ghost" onClick={() => setPanel(null)} disabled={saving}>
               Cancel
             </Button>
             <Button onClick={save} disabled={saving}>
               {saving ? 'Saving…' : draft?.id ? 'Save changes' : 'Add case'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete confirmation. */}
       <Dialog open={pendingDelete !== null} onOpenChange={(o) => !o && setPendingDelete(null)}>

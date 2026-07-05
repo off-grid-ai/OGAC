@@ -1,18 +1,18 @@
 'use client';
 
 import { Gear, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 interface Doc {
   id: string;
@@ -22,6 +22,8 @@ interface Doc {
 
 // Admin surface for a single collection: upload/index text documents and remove existing ones.
 // Files are read client-side and sent as text; the server chunks + embeds them via the gateway.
+// Which collection panel is open lives in the URL (?panel=manage-collection&collection=<id>) so
+// Back closes it and the panel is deep-linkable — never local-only state.
 export function ManageCollection({
   collection,
   documents,
@@ -30,7 +32,26 @@ export function ManageCollection({
   documents: Doc[];
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const params = useSearchParams();
+  const open =
+    params.get('panel') === 'manage-collection' && params.get('collection') === collection.id;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) {
+        p.set('panel', 'manage-collection');
+        p.set('collection', collection.id);
+      } else {
+        p.delete('panel');
+        p.delete('collection');
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router, collection.id],
+  );
+
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -67,20 +88,19 @@ export function ManageCollection({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Gear className="mr-1 size-4" /> Manage
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{collection.name}</DialogTitle>
-          <DialogDescription>
-            Index text documents into this collection. Each is chunked and embedded on-prem.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Gear className="mr-1 size-4" /> Manage
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{collection.name}</SheetTitle>
+            <SheetDescription>
+              Index text documents into this collection. Each is chunked and embedded on-prem.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
           <div>
             <input
               ref={fileRef}
@@ -117,8 +137,9 @@ export function ManageCollection({
               ))
             )}
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -366,12 +367,12 @@ function TagDatasetDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-mono text-sm">Tag dataset · {dataset}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle className="font-mono text-sm">Tag dataset · {dataset}</SheetTitle>
+        </SheetHeader>
+        <SheetBody>
           <div className="space-y-1">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Tag name
@@ -397,8 +398,8 @@ function TagDatasetDialog({
               Remove tag
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
   );
 }
