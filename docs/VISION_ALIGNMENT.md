@@ -8,6 +8,16 @@ surfaces. This is the *strategic* measuring stick (distinct from the tactical ha
 > pre-2026-07-06 state. Many items it flagged "missing" were **closed in the 2026-07-05→06 session**
 > (see the correction column). This doc is the reconciled version.
 
+> **✅ RECONCILED 2026-07-06 (overnight build).** The "still-open" items called out below were CLOSED
+> this session and are merged + (mostly) deployed + live-verified: **budget enforcement** (402 deny +
+> audit, default-ON, per-org), **permissions-aware retrieval** (document-scoped ACL), **jobs-oriented
+> Overview** (synthesized operator home), **native-OIDC Phase D** (config ready-to-flip), **C4** (durable
+> runs carry identity — code-complete, flips live once the Temporal worker is bootstrapped). Also
+> shipped: Studio real builder, Provit deep-integration, Keycloak realm admin, Marquez/Langfuse/
+> OpenSearch/FleetDM/OpenBao/Superset/Unleash depth, full audit+accounting, RLS backstop + backups.
+> Live harness: **8 PASS / 0 FAIL / 4 SKIP** (C2 4/4). Authoritative current state:
+> `ROADMAP_STATUS.md`. The pillar table + lists below are the pre-session snapshot, kept for history.
+
 ## The vision, in 4 pillars (from VISION.md)
 1. **Harness internal intelligence** — connectors → ingest → permission-aware retrieval → cited answers, on-prem.
 2. **Leverage external intelligence, leashed** — one OpenAI-compatible gateway; default-local; policy gates cloud egress; no PII leaves the box.
