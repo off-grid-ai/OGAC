@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -40,8 +41,17 @@ const ROLES = ['gateway', 'server', 'image', 'spare'];
 const KINDS = ['chat', 'grounding', 'image'];
 const inputCls = 'h-8 text-xs font-mono';
 
-function EditDialog({ node, onSaved }: { node: FleetNode; onSaved: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
+function EditDialog({
+  node,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  node: FleetNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => Promise<void>;
+}) {
   const [form, setForm] = useState<FleetNode>(node);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -77,7 +87,7 @@ function EditDialog({ node, onSaved }: { node: FleetNode; onSaved: () => Promise
         const pushed = d.push?.ok ? ' · pushed to node' : d.push?.status === 501 ? ' · saved (node push not actionable)' : d.push?.error ? ` · push error: ${d.push.error}` : '';
         setMsg({ ok: true, text: `saved${pushed}` });
         await onSaved();
-        setTimeout(() => setOpen(false), 900);
+        setTimeout(() => onOpenChange(false), 900);
       }
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -100,16 +110,12 @@ function EditDialog({ node, onSaved }: { node: FleetNode; onSaved: () => Promise
   );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-7 text-xs">
-          Configure
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-sm">Configure {node.name}</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle className="font-mono text-sm">Configure {node.name}</SheetTitle>
+        </SheetHeader>
+        <SheetBody>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Role</Label>
@@ -155,19 +161,43 @@ function EditDialog({ node, onSaved }: { node: FleetNode; onSaved: () => Promise
             Saving writes the fleet SSOT and pushes model changes to the node (active-model.json + restart).
           </p>
         )}
-        <DialogFooter>
+        </SheetBody>
+        <SheetFooter>
           <Button size="sm" onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save & apply'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
 export function GatewayFleetConfig() {
+  const router = useRouter();
+  const params = useSearchParams();
   const [nodes, setNodes] = useState<FleetNode[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // Which node's config panel is open lives in the URL (?panel=configure-node&node=<name>) so
+  // Back closes it and the panel is deep-linkable — never local-only state.
+  const configuring =
+    params.get('panel') === 'configure-node' ? params.get('node') : null;
+
+  const setConfiguring = useCallback(
+    (name: string | null) => {
+      const p = new URLSearchParams(params.toString());
+      if (name) {
+        p.set('panel', 'configure-node');
+        p.set('node', name);
+      } else {
+        p.delete('panel');
+        p.delete('node');
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
 
   const load = async () => {
     try {
@@ -209,7 +239,20 @@ export function GatewayFleetConfig() {
               )}
               {!n.enabled && n.role !== 'server' ? <Badge variant="outline" className="text-[10px]">disabled</Badge> : null}
             </div>
-            <EditDialog node={n} onSaved={load} />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setConfiguring(n.name)}
+            >
+              Configure
+            </Button>
+            <EditDialog
+              node={n}
+              open={configuring === n.name}
+              onOpenChange={(o) => setConfiguring(o ? n.name : null)}
+              onSaved={load}
+            />
           </div>
         ))}
       </CardContent>
