@@ -110,6 +110,26 @@ http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time "${2:-6}" "$1" 2
 # Is a URL reachable at all (any HTTP response, i.e. code != 000)?
 reachable() { local c; c=$(http_code "$1" "${2:-4}"); [ -n "$c" ] && [ "$c" != "000" ]; }
 
+# Deterministic RFC-4122 UUIDv5 (SHA-1) of a name under a fixed namespace — the EXACT algorithm in
+# src/lib/correlation.ts (uuidv5). Marquez requires run.runId to be a UUID, so the console emits
+# uuid5(runId) as the lineage run id; this reproduces that id in bash so the C2 Marquez lookup keys by
+# the same value. Pure openssl+xxd (both present on S1); NEVER change LINEAGE_UUID_NS — it must equal
+# LINEAGE_UUID_NAMESPACE in correlation.ts or previously-emitted lineage runs stop correlating.
+LINEAGE_UUID_NS='6f1a9d3e-2c4b-5a67-8f90-1b2c3d4e5f60'
+uuid5() {
+  local name="$1" ns_hex hex b6 b8
+  ns_hex=$(printf '%s' "$LINEAGE_UUID_NS" | tr -d '-')
+  # SHA1( namespace(16 raw bytes) || name(utf8) ) → first 16 bytes as hex.
+  # Feed namespace bytes then the name to openssl sha1 over one binary stream.
+  hex=$( { printf '%s' "$ns_hex" | xxd -r -p; printf '%s' "$name"; } \
+    | openssl dgst -sha1 -binary | xxd -p -c 256 | tr -d '\n' | cut -c1-32 )
+  # Set version nibble (byte 6 high-nibble → 5) and variant bits (byte 8 → 10xx xxxx).
+  b6=$(( 0x${hex:12:2} & 0x0f | 0x50 ))
+  b8=$(( 0x${hex:16:2} & 0x3f | 0x80 ))
+  printf '%s-%s-5%s-%02x%s-%s\n' \
+    "${hex:0:8}" "${hex:8:4}" "${hex:13:3}" "$b8" "${hex:18:2}" "${hex:20:12}"
+}
+
 # Preflight: curl is non-negotiable.
 if ! have curl; then
   echo "FATAL: curl not found — cannot probe anything." >&2
@@ -409,7 +429,9 @@ echo
 #      hit for PASS. This is the real integrated-platform proof — and the spec flags run-id correlation
 #      as the biggest UNPROVEN claim, so this check reports the truth precisely:
 #        • provenance: embedded in the run record (correlated by construction) → checked on the trace.
-#        • marquez:    lineage emits run.runId == <console runId>, namespace=OFFGRID_LINEAGE_NAMESPACE.
+#        • marquez:    lineage emits run.runId == uuid5(<console runId>) (Marquez requires a UUID run
+#                      id), namespace=OFFGRID_LINEAGE_NAMESPACE; harness derives the same uuid5 to look
+#                      the run up. See src/lib/correlation.ts (lineageRunUuid) for the derivation.
 #        • langfuse:   trace id == runId with non-alphanumerics stripped (run.id.replace(/[^a-z0-9]/gi,'')).
 #        • opensearch: audit index is fed by device/gateway events, NOT the agent runId today, so a
 #                      by-runId hit is NOT guaranteed — reported honestly (a miss is a known gap, not a bug).
@@ -417,8 +439,11 @@ echo
 if [ -z "$RUN_ID" ]; then
   skip C2 "no run id from C1 (console down / no admin token / no agent) — cannot check fan-out correlation"
 else
-  # Give the best-effort emitters (lineage, async QA->Langfuse) a moment to land.
-  sleep 5
+  # Give the best-effort emitters a moment to land. Marquez ingests the OpenLineage POST synchronously,
+  # but Langfuse buffers ingestion events through an async worker before a trace is queryable via
+  # GET /api/public/traces/<id> — so wait long enough that the run trace is durably persisted, not
+  # just accepted, before we look it up (avoids a false langfuse:no-trace on a slow flush).
+  sleep 12
   hits=0; total=4; c2_detail=""
 
   # (1) provenance — read straight off the run record (correlated by construction).
@@ -429,12 +454,17 @@ else
     c2_detail="$c2_detail provenance:miss"
   fi
 
-  # (2) Marquez lineage — the run event carries run.runId == RUN_ID under namespace LINEAGE_NS.
+  # (2) Marquez lineage — the run event carries run.runId == uuid5(RUN_ID) under namespace LINEAGE_NS.
+  #     Marquez REQUIRES run.runId to be a UUID: a raw "run_xxx" id is silently re-keyed, so the job
+  #     lands but GET /api/v1/jobs/runs/run_xxx 404s. The console derives run.runId as a deterministic
+  #     UUIDv5 of the console runId (src/lib/correlation.ts lineageRunUuid); we derive the identical
+  #     UUID here and look the run up by it. Namespace UUID must match LINEAGE_UUID_NAMESPACE.
   if ! reachable "$MARQUEZ_URL/api/v1/namespaces" 4; then
     c2_detail="$c2_detail marquez:unreachable"
   else
-    # OpenLineage run ids are stored as-is; Marquez exposes GET /api/v1/jobs/runs/{runId}.
-    mcode=$(http_code "$MARQUEZ_URL/api/v1/jobs/runs/$RUN_ID" 6)
+    lineage_run_uuid=$(uuid5 "$RUN_ID")
+    # OpenLineage run ids are UUIDs; Marquez exposes GET /api/v1/jobs/runs/{runId}.
+    mcode=$(http_code "$MARQUEZ_URL/api/v1/jobs/runs/$lineage_run_uuid" 6)
     if [ "$mcode" = "200" ]; then
       hits=$((hits+1)); c2_detail="$c2_detail marquez:HIT"
     else
