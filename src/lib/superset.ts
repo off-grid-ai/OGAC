@@ -2,7 +2,7 @@
 //  1) Guest token (embedded-SDK flow) — mint a short-lived guest token scoped to a dashboard so the
 //     browser can embed it without Superset session cookies. Wired into the Analytics page.
 //  2) SQL API — run a governed read-only SQL query against a Superset database for a native view.
-// Config (S1 = http://192.168.1.60:8088):
+// Config (S1 = http://offgrid-g6.local:8088):
 //   OFFGRID_SUPERSET_URL, OFFGRID_SUPERSET_USERNAME, OFFGRID_SUPERSET_PASSWORD,
 //   OFFGRID_SUPERSET_EMBED_UUID (dashboard embed id), OFFGRID_SUPERSET_DB_ID (SQL API database id)
 const BASE = process.env.OFFGRID_SUPERSET_URL;
