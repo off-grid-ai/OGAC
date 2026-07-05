@@ -11,7 +11,7 @@ import { db } from '@/db';
 // over SSH with no migration step. `allocated_tokens` is a bigint stored/read as a JS number
 // (mode: 'number') — token counts stay well within Number.MAX_SAFE_INTEGER.
 
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 export const tokenBudgets = pgTable('token_budgets', {

@@ -3,10 +3,10 @@
 // page can render a real trace list + span waterfall instead of only the local run store.
 //
 // Push side (documented for S1):
-//   OFFGRID_LANGFUSE_OTLP_URL  — e.g. http://192.168.1.60:3030/api/public/otel
+//   OFFGRID_LANGFUSE_OTLP_URL  — e.g. http://offgrid-g6.local:3030/api/public/otel
 //   OFFGRID_LANGFUSE_AUTH      — base64("pk-lf-...:sk-lf-...")
 // Read side:
-//   OFFGRID_LANGFUSE_URL       — e.g. http://192.168.1.60:3030
+//   OFFGRID_LANGFUSE_URL       — e.g. http://offgrid-g6.local:3030
 //   OFFGRID_LANGFUSE_PUBLIC_KEY / OFFGRID_LANGFUSE_SECRET_KEY  (falls back to decoding *_AUTH)
 const BASE = process.env.OFFGRID_LANGFUSE_URL;
 const PK = process.env.OFFGRID_LANGFUSE_PUBLIC_KEY;

@@ -6,7 +6,7 @@ import type { BrainDoc, BrainHit } from '@/lib/brain';
 // OFFGRID_ADAPTER_RETRIEVAL=qdrant. Same BrainDoc/BrainHit contract as the LanceDB default, reached
 // purely over Qdrant's REST API (no client dependency). Embeddings still go through the inference
 // port, so the model endpoint is unchanged. The collection is created lazily on first use.
-const QDRANT_URL = process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333';
+const QDRANT_URL = process.env.OFFGRID_QDRANT_URL ?? 'http://offgrid-s1.local:6333';
 const COLLECTION = process.env.OFFGRID_QDRANT_COLLECTION ?? 'offgrid-brain';
 const API_KEY = process.env.OFFGRID_QDRANT_API_KEY;
 

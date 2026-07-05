@@ -86,7 +86,7 @@ export default async function SignInPage({
           <Image src="/logo.png" alt="Off Grid" width={40} height={40} className="mb-2" priority />
           <CardTitle className="text-base">Off Grid Console</CardTitle>
           <CardDescription>
-            Sign in to your control plane — fleet, models, data, agents, and governance.
+            Sign in to your control plane: fleet, models, data, agents, and governance.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

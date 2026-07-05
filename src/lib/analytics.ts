@@ -4,7 +4,7 @@ import { type AuditEvent } from '@/lib/store';
 // durable sink the gateway usage/logs views use), NOT the seeded Postgres audit table. Empty or
 // unreachable → real zeros, never synthetic. Each gateway record is mapped to the AuditEvent
 // shape so the existing rollups (byModel/series/percentiles/drift) work unchanged.
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 export async function gatewayEvents(): Promise<AuditEvent[]> {

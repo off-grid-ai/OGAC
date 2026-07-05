@@ -19,7 +19,7 @@ export interface BackupEntry {
 export interface BackupsConfig {
   retentionDays: number; // how many days/dirs the script keeps (14)
   backupRoot: string; // where dumps live on the server
-  offBoxTarget: string | null; // rsync peer, e.g. "admin@192.168.1.66:/…"; null = disabled
+  offBoxTarget: string | null; // rsync peer, e.g. "admin@offgrid-g6.local:/…"; null = disabled
   staleAfterHours: number; // overdue threshold (24h → a nightly job that missed is stale)
 }
 

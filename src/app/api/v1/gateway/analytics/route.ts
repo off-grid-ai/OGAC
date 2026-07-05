@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // AnalyticsStore, and returns the rolled-up totals/by-model/by-caller/by-gateway/timeseries so
 // the analytics plane can render usage without any chart libs. Degrades to available:false when
 // OpenSearch is unreachable (mirrors /logs).
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
