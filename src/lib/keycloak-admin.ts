@@ -35,6 +35,14 @@ export interface KcClient {
   secret?: string;
 }
 
+export interface KcProtocolMapper {
+  id?: string;
+  name: string;
+  protocol: string;
+  protocolMapper: string;
+  config?: Record<string, string>;
+}
+
 interface TokenCache {
   accessToken: string;
   expiresAt: number; // ms epoch
@@ -299,6 +307,24 @@ export class KeycloakAdminClient {
   // assigned to this user become the roles in the client's access token.
   async getServiceAccountUser(internalClientId: string): Promise<KcUser | null> {
     return this.fetchNullable<KcUser>(`/clients/${internalClientId}/service-account-user`);
+  }
+
+  // ── Client protocol mappers ─────────────────────────────────────────────────
+  // Protocol mappers shape a client's tokens (e.g. an oidc-audience-mapper emits the client's own
+  // `aud`). Runtime-created clients get NO mappers by default — they must be attached explicitly, or
+  // Keycloak emits only the default aud ("account"). These two calls let provisioning ensure the
+  // audience mapper idempotently (list → create-if-absent).
+
+  async listClientProtocolMappers(internalClientId: string): Promise<KcProtocolMapper[]> {
+    return this.fetchJson<KcProtocolMapper[]>(`/clients/${internalClientId}/protocol-mappers/models`);
+  }
+
+  async createClientProtocolMapper(internalClientId: string, mapper: KcProtocolMapper): Promise<void> {
+    // 201 Created with empty body — parseKcBody tolerates it (fetchJson<void>).
+    await this.fetchJson<void>(`/clients/${internalClientId}/protocol-mappers/models`, {
+      method: 'POST',
+      body: JSON.stringify(mapper),
+    });
   }
 
   // Ensure a realm role exists (idempotent) and return it with its id.

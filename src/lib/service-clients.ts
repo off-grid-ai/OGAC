@@ -1,3 +1,5 @@
+import { CONSOLE_ADMIN_ROLE } from '@/lib/auth/machine-roles';
+
 // Pure, zero-IO logic for the per-service Keycloak service-account clients that the service-token
 // broker mints tokens for. Everything here is deterministic and side-effect free so it can be
 // unit-tested without a live Keycloak / OpenBao. The IO orchestration (ensure-client, rotate-secret,
@@ -21,6 +23,10 @@ export interface ServiceClientDef {
   realmRole: string;
   // Value the JWT `aud` claim should carry — the service the token is scoped to.
   audience: string;
+  // OPTIONAL, least-privilege: an extra realm role that elevates this client's service account to a
+  // console capability (e.g. CONSOLE_ADMIN_ROLE). Only the integration-bus (gateway) client carries
+  // one — every other client stays scope-only and cannot reach admin-gated console routes.
+  grantsRole?: string;
 }
 
 // ── Desired state ─────────────────────────────────────────────────────────────
@@ -34,6 +40,10 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
     description: 'Service-account client for the AI gateway/aggregator.',
     realmRole: 'svc-gateway',
     audience: 'offgrid-gateway',
+    // The gateway is the console's own integration-bus caller — it must reach admin-gated
+    // console routes (e.g. /api/v1/admin/agents), so its service account carries console-admin.
+    // No other service client does: least-privilege by construction.
+    grantsRole: CONSOLE_ADMIN_ROLE,
   },
   {
     service: 'opensearch',
@@ -103,6 +113,44 @@ export function clientCreateConfig(def: ServiceClientDef): {
     description: def.description,
     serviceAccountsEnabled: true,
     directAccessGrantsEnabled: false,
+  };
+}
+
+// The Keycloak protocol-mapper name for a client's audience mapper. Stable idempotency key:
+// provisioning finds-or-creates the mapper by this name so a re-run never duplicates it.
+export function audienceMapperName(def: ServiceClientDef): string {
+  return `aud-${def.audience}`;
+}
+
+// Shape of a Keycloak `oidc-audience-mapper` protocol-mapper create body, as accepted by
+// POST /admin/realms/{realm}/clients/{id}/protocol-mappers/models. Kept explicit so the shape is
+// asserted in tests and stays in lockstep with the realm seed's declarative mapper.
+export interface AudienceMapperPayload {
+  name: string;
+  protocol: 'openid-connect';
+  protocolMapper: 'oidc-audience-mapper';
+  config: {
+    // Emit the client's own aud into the access token. We use the "custom" audience form (a literal
+    // string) rather than "included.client.audience" (a client-id picker) so the aud is exactly the
+    // service name string the verifier checks — matching the realm seed exactly.
+    'included.custom.audience': string;
+    'access.token.claim': 'true';
+    'id.token.claim': 'false';
+  };
+}
+
+// Build the audience-mapper create body for a client. Pure — the provisioning route POSTs this after
+// ensuring the client exists (idempotent: it first checks the client's existing mappers by name).
+export function audienceMapperConfig(def: ServiceClientDef): AudienceMapperPayload {
+  return {
+    name: audienceMapperName(def),
+    protocol: 'openid-connect',
+    protocolMapper: 'oidc-audience-mapper',
+    config: {
+      'included.custom.audience': def.audience,
+      'access.token.claim': 'true',
+      'id.token.claim': 'false',
+    },
   };
 }
 
