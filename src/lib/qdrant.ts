@@ -1,7 +1,27 @@
 import { randomUUID } from 'crypto';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
-import { buildQdrantFilter, type RetrievalOptions } from '@/lib/retrieval/query';
+import {
+  buildQdrantFilter,
+  buildQdrantAclShould,
+  type QdrantFieldCondition,
+  type RetrievalOptions,
+} from '@/lib/retrieval/query';
+import { ACL_FIELDS, aclFromPayload, filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
+
+// Superuser roles that bypass server-side ACL narrowing (the post-filter also passes them).
+const SUPERUSER_ROLES = ['admin'];
+
+// Only write ACL keys that carry a value → un-ACL'd docs keep the exact payload shape as before.
+function aclPayload(acl?: DocAcl): Record<string, unknown> {
+  const p: Record<string, unknown> = {};
+  if (acl?.owner) p[ACL_FIELDS.owner] = acl.owner;
+  if (acl?.allowed_roles && acl.allowed_roles.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
+  if (acl?.allowed_subjects && acl.allowed_subjects.length)
+    p[ACL_FIELDS.allowedSubjects] = acl.allowed_subjects;
+  if (acl?.data_class) p[ACL_FIELDS.dataClass] = acl.data_class;
+  return p;
+}
 
 // Qdrant retrieval backend — the server-scale swap-in for the Brain's vector store, selected via
 // OFFGRID_ADAPTER_RETRIEVAL=qdrant. Same BrainDoc/BrainHit contract as the LanceDB default, reached
@@ -45,14 +65,19 @@ async function embed(text: string): Promise<number[]> {
   return getInference().embed(text);
 }
 
-export async function qdrantAdd(title: string, source: string, text: string): Promise<BrainDoc> {
+export async function qdrantAdd(
+  title: string,
+  source: string,
+  text: string,
+  acl?: DocAcl,
+): Promise<BrainDoc> {
   await ensureCollection();
   const id = randomUUID();
   const vector = await embed(`${title}\n${text}`);
   await qfetch(`/collections/${COLLECTION}/points`, 'PUT', {
-    points: [{ id, vector, payload: { title, source, text } }],
+    points: [{ id, vector, payload: { title, source, text, ...aclPayload(acl) } }],
   });
-  return { id, title, source, text };
+  return { id, title, source, text, acl };
 }
 
 export async function qdrantDelete(id: string): Promise<void> {
@@ -66,7 +91,7 @@ export async function qdrantDelete(id: string): Promise<void> {
 // Embeddings are recomputed through the inference port; the doc id is preserved so re-runs upsert
 // rather than duplicate. Returns the number of points written.
 export async function qdrantReindex(
-  docs: ReadonlyArray<{ id: string; title: string; source: string; text: string }>,
+  docs: ReadonlyArray<{ id: string; title: string; source: string; text: string; acl?: DocAcl }>,
 ): Promise<number> {
   await ensureCollection();
   if (docs.length === 0) return 0;
@@ -78,7 +103,7 @@ export async function qdrantReindex(
       slice.map(async (d) => ({
         id: d.id,
         vector: await embed(`${d.title}\n${d.text}`),
-        payload: { title: d.title, source: d.source, text: d.text },
+        payload: { title: d.title, source: d.source, text: d.text, ...aclPayload(d.acl) },
       })),
     );
     const res = await qfetch(`/collections/${COLLECTION}/points`, 'PUT', { points });
@@ -107,7 +132,9 @@ export function qdrantCollectionName(): string {
 
 interface ScrollPoint {
   id: string;
-  payload: { title: string; source: string; text: string };
+  // ACL keys (owner / allowed_roles / allowed_subjects / data_class) ride along in the payload;
+  // aclFromPayload() reads them back for the post-filter. Absent keys → un-ACL'd (visible).
+  payload: { title: string; source: string; text: string } & Record<string, unknown>;
 }
 
 // Full scroll — paginate past Qdrant's per-request page size with the scroll cursor so large
@@ -135,6 +162,7 @@ export async function qdrantList(): Promise<BrainDoc[]> {
         title: p.payload.title,
         source: p.payload.source,
         text: p.payload.text,
+        acl: aclFromPayload(p.payload),
       });
     }
     offset = data.result?.next_page_offset ?? null;
@@ -152,6 +180,7 @@ function toHit(p: SearchPoint): BrainHit {
     title: p.payload.title,
     source: p.payload.source,
     text: p.payload.text,
+    acl: aclFromPayload(p.payload),
     score: Number(p.score.toFixed(3)),
   };
 }
@@ -190,6 +219,11 @@ async function ensureTextIndex(): Promise<void> {
  * - opts.filter → threaded through buildQdrantFilter() into Qdrant's `filter: { must: [...] }`.
  * - opts.mode === 'hybrid' → uses the Query API with two prefetch legs (dense vector + keyword
  *   text-match) fused server-side by Reciprocal Rank Fusion.
+ * - opts.asker → permissions-aware retrieval. Server-side NARROWING (an ACL `should` group, AND'd
+ *   into the metadata filter) prunes obviously-disallowed docs; the pure post-filter
+ *   (filterHitsByAcl → docVisibleTo) is the AUTHORITATIVE gate, so correctness holds even without
+ *   the push-down (older Qdrant / fallback). Un-ACL'd docs stay visible; the `should` group carries
+ *   `is_empty` arms so narrowing never hides them. Composes with filter + hybrid.
  */
 export async function qdrantSearch(
   query: string,
@@ -198,18 +232,31 @@ export async function qdrantSearch(
 ): Promise<BrainHit[]> {
   await ensureCollection();
   const vector = await embed(query);
-  const filter = buildQdrantFilter(opts.filter);
 
-  // Pure-vector path — byte-identical to the original request when no filter is supplied.
+  // Compose the metadata filter with an ACL narrowing `should` group (OR of the asker's grants plus
+  // `is_empty` arms so un-ACL'd docs still match). Both live under the same `filter` object: `must`
+  // (metadata) AND `should` (≥1 must hold). Post-filter is authoritative regardless.
+  const aclShould = opts.asker ? buildAclShouldWithUnAcled(opts.asker) : undefined;
+  const baseFilter = buildQdrantFilter(opts.filter);
+  const filter =
+    baseFilter || aclShould
+      ? { ...(baseFilter ?? {}), ...(aclShould ? { should: aclShould } : {}) }
+      : undefined;
+  // When an ACL applies, over-fetch so the post-filter still yields up to k allowed hits.
+  const fetchK = opts.asker ? Math.max(k * 4, 20) : k;
+  const aclPass = (hits: BrainHit[]) =>
+    (opts.asker ? filterHitsByAcl(opts.asker, hits, (h) => h.acl ?? null) : hits).slice(0, k);
+
+  // Pure-vector path — byte-identical to the original request when no filter/asker is supplied.
   if (opts.mode !== 'hybrid') {
     const res = await qfetch(`/collections/${COLLECTION}/points/search`, 'POST', {
       vector,
-      limit: k,
+      limit: fetchK,
       with_payload: true,
       ...(filter ? { filter } : {}),
     });
     const data = (await res.json()) as { result?: SearchPoint[] };
-    return (data.result ?? []).map(toHit);
+    return aclPass((data.result ?? []).map(toHit));
   }
 
   // Hybrid path — Query API: prefetch a dense-vector leg and a keyword leg, fuse with RRF. The
@@ -227,24 +274,55 @@ export async function qdrantSearch(
         : []),
     ],
     query: { fusion: 'rrf' },
-    limit: k,
+    limit: fetchK,
     with_payload: true,
   };
   const res = await qfetch(`/collections/${COLLECTION}/points/query`, 'POST', body);
   if (res.ok) {
     const data = (await res.json()) as { result?: { points?: SearchPoint[] } };
     const points = data.result?.points;
-    if (points) return points.map(toHit);
+    if (points) return aclPass(points.map(toHit));
   }
   // Fallback: if the Query API isn't available (older Qdrant), degrade to filtered vector search.
   const res2 = await qfetch(`/collections/${COLLECTION}/points/search`, 'POST', {
     vector,
-    limit: k,
+    limit: fetchK,
     with_payload: true,
     ...(filter ? { filter } : {}),
   });
   const data2 = (await res2.json()) as { result?: SearchPoint[] };
-  return (data2.result ?? []).map(toHit);
+  return aclPass((data2.result ?? []).map(toHit));
+}
+
+// The ACL narrowing `should` (OR) group for Qdrant: the asker's grant conditions (from the pure
+// builder) PLUS `is_empty` arms on every ACL field so un-ACL'd docs also match (stay visible). This
+// is NON-authoritative narrowing — the post-filter is the real gate — but it prunes the candidate
+// set server-side. Returns undefined for superusers / no grants (→ narrowing skipped, post-filter
+// alone decides). Kept in the adapter (not query.ts) because `is_empty` is a Qdrant-specific arm.
+function buildAclShouldWithUnAcled(asker: {
+  subject?: string | null;
+  roles?: readonly string[];
+}): Array<QdrantFieldCondition | { is_empty: { key: string } }> | undefined {
+  const grants = buildQdrantAclShould({
+    subject: asker.subject,
+    roles: asker.roles,
+    superuserRoles: SUPERUSER_ROLES,
+    fields: {
+      owner: ACL_FIELDS.owner,
+      allowedRoles: ACL_FIELDS.allowedRoles,
+      allowedSubjects: ACL_FIELDS.allowedSubjects,
+      dataClass: ACL_FIELDS.dataClass,
+    },
+  });
+  if (!grants) return undefined; // superuser or no identifying grants → no narrowing
+  // Un-ACL'd = ALL three enforcement fields empty. Qdrant `should` is OR at the top; to require all
+  // three empty together they must be one nested `must`, so we wrap it as a single should-arm.
+  const unAcled = {
+    is_empty: { key: ACL_FIELDS.owner },
+  };
+  // Compose: grants OR (owner empty). allowed_roles/allowed_subjects-only docs are still caught by
+  // the authoritative post-filter, so this narrowing stays safe (never hides a doc it shouldn't).
+  return [...grants, unAcled];
 }
 
 export async function qdrantHealth(): Promise<boolean> {
