@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { provitRepos } from '@/db/schema';
+import { provitRepos, provitRuns, provitVerdicts } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
+import { canDeleteRow } from '@/lib/provit-policy';
 import { currentPrincipal, provitAbacAllows, resolvePushPrincipal, visibilityFilter } from '@/lib/provit-access';
 
 export const dynamic = 'force-dynamic';
@@ -40,4 +41,28 @@ export async function POST(req: Request): Promise<Response> {
     set: { url: row.url, orgId: row.orgId, ownerId: row.ownerId, visibility: row.visibility, features: row.features, testFiles: row.testFiles, screens: row.screens, cases: row.cases, plan: row.plan, mappedBy: row.mappedBy, mappedAt: row.mappedAt },
   });
   return NextResponse.json({ ok: true, id: b.id, scope: who.visibility });
+}
+
+// DELETE /api/v1/provit/repos?id=… — remove a mapped repo the caller owns/administers (a
+// console-owned entity), cascading its runs + verdicts. Deletion authority is the PURE
+// `canDeleteRow` rule (owner of a private row, same-org member of an org row, or admin).
+export async function DELETE(req: Request): Promise<Response> {
+  const gate = await requireUser(req);
+  if (gate instanceof NextResponse) return gate;
+  const p = await currentPrincipal();
+  const id = new URL(req.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const [repo] = await db.select().from(provitRepos).where(eq(provitRepos.id, id)).limit(1);
+  if (!repo) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (!canDeleteRow(repo, { orgId: p.orgId, email: p.email, isAdmin: p.role === 'admin' })) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
+
+  // Cascade: verdicts of this repo's runs, then the runs, then the repo.
+  const runs = await db.select({ id: provitRuns.id }).from(provitRuns).where(eq(provitRuns.repoId, id));
+  for (const r of runs) await db.delete(provitVerdicts).where(eq(provitVerdicts.runId, r.id));
+  await db.delete(provitRuns).where(eq(provitRuns.repoId, id));
+  await db.delete(provitRepos).where(eq(provitRepos.id, id));
+  return NextResponse.json({ deleted: true, id, runs: runs.length });
 }
