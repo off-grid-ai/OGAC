@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { validatePolicyRulePatch } from '@/lib/policy-rules-policy';
 import { deletePolicyRule, updatePolicyRule } from '@/lib/policy-rules';
 import { currentOrgId } from '@/lib/tenancy';
@@ -15,8 +16,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!result.ok || !result.value) {
     return NextResponse.json({ error: result.errors.join('; ') }, { status: 400 });
   }
-  const updated = await updatePolicyRule(id, result.value, await currentOrgId());
+  const orgId = await currentOrgId();
+  const updated = await updatePolicyRule(id, result.value, orgId);
   if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  auditFromSession(gate, orgId, {
+    action: 'policy.change',
+    resource: `policy-rule:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json(updated);
 }
 
@@ -24,7 +31,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const ok = await deletePolicyRule(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const ok = await deletePolicyRule(id, orgId);
   if (!ok) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  auditFromSession(gate, orgId, {
+    action: 'policy.change',
+    resource: `policy-rule:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ deleted: true });
 }

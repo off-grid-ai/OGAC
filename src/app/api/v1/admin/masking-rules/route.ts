@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { createMaskingRule, listMaskingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -23,5 +24,11 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json(await createMaskingRule(kind, action), { status: 201 });
+  const created = await createMaskingRule(kind, action);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'masking.change',
+    resource: `masking:${created.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }

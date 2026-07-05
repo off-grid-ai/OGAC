@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import {
   deleteGuardrailRule,
   setGuardrailRuleEnabled,
@@ -22,6 +23,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body && typeof body.enabled === 'boolean' && body.matcher === undefined) {
     const updated = await setGuardrailRuleEnabled(id, body.enabled, orgId);
     if (!updated) return NextResponse.json({ error: 'rule not found' }, { status: 404 });
+    auditFromSession(gate, orgId, {
+      action: 'guardrail.change',
+      resource: `guardrail:${id}`,
+      outcome: 'ok',
+    });
     return NextResponse.json(updated);
   }
 
@@ -30,6 +36,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const updated = await updateGuardrailRule(id, parsed.value, orgId);
   if (!updated) return NextResponse.json({ error: 'rule not found' }, { status: 404 });
+  auditFromSession(gate, orgId, {
+    action: 'guardrail.change',
+    resource: `guardrail:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json(updated);
 }
 
@@ -37,7 +48,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const deleted = await deleteGuardrailRule(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const deleted = await deleteGuardrailRule(id, orgId);
   if (!deleted) return NextResponse.json({ error: 'rule not found' }, { status: 404 });
+  auditFromSession(gate, orgId, {
+    action: 'guardrail.change',
+    resource: `guardrail:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ deleted: true });
 }

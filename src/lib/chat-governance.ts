@@ -3,6 +3,9 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { abacRules, apiKeys, auditEvents } from '@/db/schema';
 import { effectiveBaseRole } from '@/lib/module-access';
+import { actorFrom } from '@/lib/audit-event';
+import { recordAudit } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Chat governance — write an audit row per chat completion (so Analytics/FinOps/Regulatory count
 // chat usage), enforce which models/skills/connectors a role may use via abacRules, and attribute
@@ -93,7 +96,14 @@ export async function writeChatAudit(input: {
   outcome: string;
   keyId?: string | null;
   tool?: string | null;
+  // Phase 4.11 attribution (optional so existing callers still compile). `userId` IS the actor email;
+  // org/project scope the event; promptTokens/completionTokens split the estimate when known.
+  org?: string;
+  project?: string | null;
+  promptTokens?: number;
+  completionTokens?: number;
 }): Promise<void> {
+  // Legacy device-keyed audit row (kept: FinOps/Analytics/budget still read audit_events by key_id).
   try {
     await db.insert(auditEvents).values({
       id: randomUUID(),
@@ -109,4 +119,19 @@ export async function writeChatAudit(input: {
   } catch {
     /* audit is best-effort — never break the chat */
   }
+  // Canonical attributed audit (Phase 4.11): chat.send by this user, with model/tokens/cost. Cost is
+  // derived from model + total tokens by the builder. Best-effort (recordAudit never throws).
+  const tokens =
+    input.promptTokens != null || input.completionTokens != null
+      ? { prompt: input.promptTokens ?? 0, completion: input.completionTokens ?? 0, total: input.tokens }
+      : { prompt: 0, completion: 0, total: input.tokens };
+  recordAudit({
+    actor: actorFrom({ email: input.userId }),
+    org: input.org ?? DEFAULT_ORG,
+    project: input.project ?? undefined,
+    action: 'chat.send',
+    model: input.model || 'unknown',
+    tokens,
+    outcome: input.outcome,
+  });
 }

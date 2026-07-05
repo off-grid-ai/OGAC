@@ -8,12 +8,18 @@ export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const url = new URL(req.url);
+  const g = (k: string) => url.searchParams.get(k) ?? undefined;
   const result = await searchAudit({
-    q: url.searchParams.get('q') ?? undefined,
-    outcome: url.searchParams.get('outcome') ?? undefined,
-    deviceId: url.searchParams.get('deviceId') ?? undefined,
-    size: url.searchParams.get('size') ? Number(url.searchParams.get('size')) : undefined,
-    from: url.searchParams.get('from') ? Number(url.searchParams.get('from')) : undefined,
+    q: g('q'),
+    outcome: g('outcome'),
+    actor: g('actor'),
+    action: g('action'),
+    project: g('project'),
+    deviceId: g('deviceId'),
+    from: g('from'), // ISO time-window lower bound
+    to: g('to'), // ISO time-window upper bound
+    size: g('size') ? Number(g('size')) : undefined,
+    offset: g('offset') ? Number(g('offset')) : undefined,
   });
   return NextResponse.json(result);
 }
