@@ -82,6 +82,168 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Motion system — shared tokens + a small tw-animate-compatible utility layer.
+
+   The codebase's Dialog/Sheet primitives reference `animate-in`, `slide-in-from-*`,
+   `zoom-in-95`, `fade-in-0`, `duration-*` etc. — the tailwindcss-animate / tw-animate
+   vocabulary — but no such plugin is installed, so those classes were previously dead
+   (the modals appeared instantly). This block defines exactly those utilities plus a
+   couple of reusable page/list entrance classes, all driven by shared duration/easing
+   tokens, and switches everything off under `prefers-reduced-motion: reduce`.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Shared motion tokens — "smooth, not snappy, lots of finesse". */
+  --og-ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out, gentle overshoot-free */
+  --og-dur-fast: 150ms;
+  --og-dur: 300ms;
+  --og-dur-slow: 400ms;
+  /* Defaults consumed by the animate-in/out utilities; each fade/zoom/slide utility below
+     flips exactly one of these, so classes compose (e.g. `fade-in-0 zoom-in-95`). */
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+  --tw-exit-opacity: initial;
+  --tw-exit-scale: initial;
+  --tw-exit-translate-x: initial;
+  --tw-exit-translate-y: initial;
+}
+
+@keyframes og-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(
+        var(--tw-enter-translate-x, 0),
+        var(--tw-enter-translate-y, 0),
+        0
+      )
+      scale(var(--tw-enter-scale, 1));
+  }
+}
+
+@keyframes og-exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(
+        var(--tw-exit-translate-x, 0),
+        var(--tw-exit-translate-y, 0),
+        0
+      )
+      scale(var(--tw-exit-scale, 1));
+  }
+}
+
+/* Radix data-state driven enter/exit (used by Dialog + Sheet). */
+@utility animate-in {
+  animation-name: og-enter;
+  animation-duration: var(--og-dur);
+  animation-timing-function: var(--og-ease);
+  animation-fill-mode: both;
+}
+@utility animate-out {
+  animation-name: og-exit;
+  animation-duration: var(--og-dur);
+  animation-timing-function: var(--og-ease);
+  animation-fill-mode: both;
+}
+
+@utility fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
+}
+@utility zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+@utility slide-in-from-right {
+  --tw-enter-translate-x: 100%;
+}
+@utility slide-in-from-left {
+  --tw-enter-translate-x: -100%;
+}
+@utility slide-in-from-top {
+  --tw-enter-translate-y: -100%;
+}
+@utility slide-in-from-bottom {
+  --tw-enter-translate-y: 100%;
+}
+@utility slide-out-to-right {
+  --tw-exit-translate-x: 100%;
+}
+@utility slide-out-to-left {
+  --tw-exit-translate-x: -100%;
+}
+@utility slide-out-to-top {
+  --tw-exit-translate-y: -100%;
+}
+@utility slide-out-to-bottom {
+  --tw-exit-translate-y: 100%;
+}
+
+/* NB: the modal primitives also carry `duration-300`/`duration-500` classes — those are
+   Tailwind's built-in *transition*-duration utilities (not animation-duration), so they
+   don't affect these keyframe animations; the `animate-in`/`animate-out` duration above
+   governs the enter/exit timing. We intentionally do NOT redefine `duration-*` here, to
+   avoid clobbering the framework's transition utilities app-wide. */
+
+/* ── Reusable app-chrome entrances ──────────────────────────────────────── */
+
+/* Page / route entrance — subtle fade + rise. Applied once at the console layout
+   (keyed on pathname), so every module page and every route-based section-nav tab
+   change cross-fades in with zero per-page code. */
+@keyframes og-page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.5rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@utility og-page-enter {
+  animation: og-page-enter var(--og-dur-slow) var(--og-ease) both;
+}
+
+/* Tab-content cross-fade — a quick fade+rise when the active tab's panel mounts. */
+@keyframes og-fade-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.375rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@utility og-fade-in {
+  animation: og-fade-rise var(--og-dur) var(--og-ease) both;
+}
+
+/* List/row/card entrance — same fade+rise, meant to be combined with an inline
+   `animation-delay` for a cheap stagger. */
+@utility og-rise {
+  animation: og-fade-rise var(--og-dur) var(--og-ease) both;
+}
+
+/* One global opt-out: strip all motion for users who ask for reduced motion.
+   Covers these utilities plus any Tailwind `animate-*` / `transition-*` in the app. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html,
 body {
   height: 100%;
