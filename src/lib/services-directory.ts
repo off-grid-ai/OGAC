@@ -62,7 +62,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'keycloak',
     label: 'Keycloak',
     description: 'Identity & access management — SSO, realm, service accounts.',
-    url: process.env.OFFGRID_KEYCLOAK_URL ?? 'http://127.0.0.1:8080',
+    url: process.env.OFFGRID_KEYCLOAK_URL ?? 'http://offgrid-s1.local:8080',
     healthPath: '/health/ready',
     auth: 'session',
     kind: 'api',
@@ -71,7 +71,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'qdrant',
     label: 'Qdrant',
     description: 'Vector store — Brain / RAG retrieval backend.',
-    url: process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333',
+    url: process.env.OFFGRID_QDRANT_URL ?? 'http://offgrid-s1.local:6333',
     healthPath: '/healthz',
     auth: 'api-key',
     kind: 'api',
@@ -80,9 +80,10 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'opensearch',
     label: 'OpenSearch',
     description: 'SIEM / log search — gateway analytics, audit logs, dashboards.',
-    // Runs in the offgrid-services-a stack ON S1 → reached over loopback (the next-server daemon
-    // can't egress to other LAN hosts, but 127.0.0.1 always works). Same for OpenBao/Marquez below.
-    url: process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200',
+    // Runs in the offgrid-services-a stack ON S1 → addressed by S1's mDNS name (stable across
+    // SSID/IP changes; the next-server resolves it to S1's own routable address). Same for the
+    // other S1-hosted services (OpenBao/Marquez/Qdrant/Keycloak/Temporal/OPA).
+    url: process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200',
     healthPath: '/_cluster/health',
     auth: 'api-key',
     kind: 'api',
@@ -91,7 +92,9 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'langfuse',
     label: 'Langfuse',
     description: 'LLM observability — traces, eval scores, session replay.',
-    url: process.env.OFFGRID_LANGFUSE_URL ?? 'http://192.168.1.60:3030',
+    // On g6 (aux tier). The console can't reach the LAN directly, so it goes through the S1
+    // edge-Caddy loopback proxy (8931→offgrid-g6.local:3030). Env override sets this on S1.
+    url: process.env.OFFGRID_LANGFUSE_URL ?? 'http://127.0.0.1:8931',
     healthPath: '/api/public/health',
     auth: 'api-key',
     kind: 'api',
@@ -100,7 +103,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'temporal',
     label: 'Temporal',
     description: 'Durable workflows — agent runs, long-running tasks.',
-    url: 'http://127.0.0.1:8081',
+    url: 'http://offgrid-s1.local:8081',
     healthPath: '/',
     auth: 'session',
     kind: 'api',
@@ -109,7 +112,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'opa',
     label: 'OPA',
     description: 'Open Policy Agent — ABAC policy evaluation.',
-    url: 'http://127.0.0.1:8181',
+    url: 'http://offgrid-s1.local:8181',
     healthPath: '/health',
     auth: 'api-key',
     kind: 'api',
@@ -118,7 +121,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'openbao',
     label: 'OpenBao',
     description: 'Secrets vault — API keys, credentials, rotation.',
-    url: process.env.OFFGRID_OPENBAO_URL ?? 'http://127.0.0.1:8200',
+    url: process.env.OFFGRID_OPENBAO_URL ?? 'http://offgrid-s1.local:8200',
     healthPath: '/v1/sys/health',
     auth: 'api-key',
     kind: 'api',
@@ -127,7 +130,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'marquez',
     label: 'Marquez',
     description: 'Data lineage — OpenLineage-compatible source→answer provenance.',
-    url: process.env.OFFGRID_MARQUEZ_URL ?? 'http://127.0.0.1:9000',
+    url: process.env.OFFGRID_MARQUEZ_URL ?? 'http://offgrid-s1.local:9000',
     healthPath: '/api/v1/namespaces',
     auth: 'api-key',
     kind: 'api',
@@ -136,7 +139,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'unleash',
     label: 'Unleash',
     description: 'Feature flags — capability toggles per org / user.',
-    url: process.env.OFFGRID_UNLEASH_URL ?? 'http://192.168.1.60:4242',
+    // On g6 — via the S1 edge-Caddy loopback proxy (8932→offgrid-g6.local:4242). Env override on S1.
+    url: process.env.OFFGRID_UNLEASH_URL ?? 'http://127.0.0.1:8932',
     healthPath: '/health',
     auth: 'api-key',
     kind: 'api',

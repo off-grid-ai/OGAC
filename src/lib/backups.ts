@@ -23,7 +23,8 @@ const RETENTION_DAYS = Number(process.env.OFFGRID_BACKUPS_RETENTION_DAYS) || 14;
 const STALE_AFTER_HOURS = Number(process.env.OFFGRID_BACKUPS_STALE_HOURS) || 24;
 // Mirrors backup.sh's OFFSITE_HOST/OFFSITE_DIR default; empty disables (as in the script).
 const OFFBOX_TARGET =
-  process.env.OFFGRID_BACKUPS_OFFBOX_TARGET ?? 'admin@192.168.1.66:/Users/admin/offgrid/backups-from-s1';
+  process.env.OFFGRID_BACKUPS_OFFBOX_TARGET ??
+  'admin@offgrid-g6.local:/Users/admin/offgrid/backups-from-s1';
 
 function config(): BackupsConfig {
   return {

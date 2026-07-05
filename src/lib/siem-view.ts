@@ -167,7 +167,7 @@ export function filterByOutcome(view: SiemView, outcome?: string): SiemView {
 // Queries the OpenSearch security/audit index and hands raw hits to the pure normalizer above.
 // Never throws: returns { data, error, configured } so the read-back page renders reachability
 // without try/catch.
-//   OFFGRID_OPENSEARCH_URL — e.g. http://127.0.0.1:9200 (defaults to localhost)
+//   OFFGRID_OPENSEARCH_URL — e.g. http://offgrid-s1.local:9200 (defaults to localhost)
 //   OFFGRID_SIEM_INDEX     — the security/audit index (defaults to offgrid-security)
 export interface SiemReadResult {
   configured: boolean;
@@ -178,7 +178,7 @@ export interface SiemReadResult {
 export async function readSiemView(limit = 500): Promise<SiemReadResult> {
   const empty = normalizeSiem(null);
   const configured = Boolean(process.env.OFFGRID_OPENSEARCH_URL);
-  const url = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
+  const url = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
   const index = process.env.OFFGRID_SIEM_INDEX ?? 'offgrid-security';
   try {
     const r = await fetch(`${url}/${index}/_search`, {
