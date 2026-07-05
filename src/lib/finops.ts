@@ -15,9 +15,17 @@ const PRICE_PER_1K: Record<string, number> = {
 };
 const DEFAULT_CLOUD_PRICE = 0.002;
 
-function priceFor(model: string): number {
+// Exported for reuse by the accounting rollups (accounting-aggs.ts) so per-model pricing lives in
+// ONE place. Adding an export changes no existing behavior — the internal callers below still use it.
+export function priceFor(model: string): number {
   if (model in PRICE_PER_1K) return PRICE_PER_1K[model];
   return model.includes('local') ? 0 : DEFAULT_CLOUD_PRICE;
+}
+
+// Pure cost from a token count for a model — USD, priced per 1K tokens. Reused by accounting-aggs
+// to price aggregation buckets (which carry summed tokens, not per-event AuditEvents).
+export function costForTokens(model: string, tokens: number): number {
+  return (tokens / 1000) * priceFor(model);
 }
 
 function costOf(e: AuditEvent): number {
