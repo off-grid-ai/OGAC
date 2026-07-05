@@ -1,5 +1,18 @@
 # Underlying-service capability audit — VERIFIED (2026-07-05)
 
+> **⚠️ 2026-07-06 UPDATE — this scorecard below is now STALE.** In the 2026-07-05→06 session most of
+> the SHALLOW/SCAFFOLD gaps were closed and deployed: vector filtering+hybrid, OpenSearch native aggs,
+> Superset provisioning, FleetDM live-query **+ device-commands**, Presidio custom recognizers, Temporal
+> durable runs **+ schedules/visibility**, OPA Rego authoring, OpenBao rotation/leases/dynamic, Unleash
+> variants/rollout, Marquez facets/column-lineage, Langfuse cost→FinOps read-back, SeaweedFS presigned/
+> lifecycle. Plus: service-token broker + per-service credentials **provisioned & verified live**, C2
+> run-id correlation **verified 4/4 live**, full audit attribution + `/audit` + `/accounting`. The live
+> integration harness is **8 PASS / 0 FAIL / 3 SKIP** (SKIPs are manual/off-host by design). See
+> `VISION_ALIGNMENT.md` for the reconciled state. Genuinely still open: **budget enforcement**,
+> document-scoped permissions-aware retrieval, native-OIDC (Phase D), C4 durable-run identity, jobs-
+> oriented Overview. The rows below are the pre-session grading — kept for history; trust the banner.
+
+
 For every integrated service: what it can do, and **how much the console actually uses** — graded by
 reading the real `fetch()` calls, not by claims. Five parallel code audits (file:line-cited) replaced
 the earlier optimistic self-assessment. **Bottom line: of 14 real integrations, only 2 are genuinely
