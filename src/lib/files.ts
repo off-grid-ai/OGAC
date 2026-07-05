@@ -15,7 +15,14 @@
 // through the one `s3Fetch` seam so signing is applied uniformly (or not at all).
 
 import { getServiceCredential } from './service-credentials';
-import { signS3Request } from './s3-sigv4';
+import { presignS3Url, signS3Request } from './s3-sigv4';
+import {
+  buildLifecycleXml,
+  buildPublicReadPolicy,
+  classifyBucketPolicy,
+  parseLifecycleXml,
+  type LifecycleRule,
+} from './storage-lifecycle';
 
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
@@ -208,4 +215,137 @@ export async function deleteFile(id: string, owner: string, isAdmin: boolean): P
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return false;
   const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.ok;
+}
+
+// ── Presigned share URLs ────────────────────────────────────────────────────────────────────────
+// A time-limited SigV4 query-signed GET URL for one object — the URL alone grants read access for
+// `ttlSeconds`, no auth header needed, then expires. The signature only VERIFIES against the S3
+// endpoint that holds the keypair, so we sign against the *externally reachable* S3 endpoint
+// (OFFGRID_SEAWEEDFS_PUBLIC_S3_URL, falling back to the internal S3 URL). SeaweedFS only enforces the
+// signature when IAM identities are configured (broker returns kind:'s3'); with anonymous loopback S3
+// there's nothing to presign against, so we DEGRADE: return the plain public gateway URL + signed:false
+// so the UI can be honest rather than hand out a fake "expiring" link.
+
+// The externally reachable SeaweedFS S3 endpoint (must be the host that validates the signature).
+const PUBLIC_S3 = (process.env.OFFGRID_SEAWEEDFS_PUBLIC_S3_URL || process.env.OFFGRID_SEAWEEDFS_URL || S3).replace(/\/$/, '');
+
+export interface ShareLink {
+  url: string;
+  /** true = a real SigV4-signed expiring link; false = degraded plain URL (no IAM on SeaweedFS). */
+  signed: boolean;
+  expiresAt: string | null;
+  ttlSeconds: number;
+}
+
+/** Generate a presigned, time-limited GET URL for object `id`. `now` injectable for tests (unused in
+ *  the pure signer path — that clock is injected there — but kept for a deterministic expiresAt). */
+export async function presignShareUrl(id: string, ttlSeconds: number, now: Date = new Date()): Promise<ShareLink> {
+  const ttl = Math.max(1, Math.min(604800, Math.floor(ttlSeconds)));
+  const cred = await getServiceCredential('seaweedfs');
+  const key = id.split('/').map(encodeURIComponent).join('/');
+  if (cred.kind !== 's3') {
+    // No IAM keypair to sign with — anonymous SeaweedFS serves the object regardless, so an "expiring"
+    // link would be a lie. Hand back the honest public URL and flag it unsigned.
+    return { url: publicUrlFor(id), signed: false, expiresAt: null, ttlSeconds: ttl };
+  }
+  const url = presignS3Url({
+    url: `${PUBLIC_S3}/${BUCKET}/${key}`,
+    accessKey: cred.accessKey,
+    secretKey: cred.secretKey,
+    expiresIn: ttl,
+    date: now,
+  });
+  return { url, signed: true, expiresAt: new Date(now.getTime() + ttl * 1000).toISOString(), ttlSeconds: ttl };
+}
+
+// ── Bucket lifecycle (object expiry) ──────────────────────────────────────────────────────────────
+// Read/write the bucket's lifecycle configuration via the S3 lifecycle sub-resource. SeaweedFS
+// implements PutBucketLifecycleConfiguration with Expiration.Days + Filter.Prefix. If the running
+// SeaweedFS build doesn't support it, the call returns a non-2xx and we surface {supported:false}
+// rather than pretending it worked.
+
+export interface LifecycleState {
+  supported: boolean;
+  rules: LifecycleRule[];
+  note?: string;
+}
+
+export async function getBucketLifecycle(): Promise<LifecycleState> {
+  await ensureFileSchema();
+  const res = await s3Fetch(`${base}?lifecycle=`, { method: 'GET' });
+  if (res.status === 404 || res.status === 204) return { supported: true, rules: [] }; // no config yet
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    // NoSuchLifecycleConfiguration is "supported, just empty"; anything else = not supported here.
+    if (/NoSuchLifecycleConfiguration/i.test(body)) return { supported: true, rules: [] };
+    if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for GetBucketLifecycle` };
+    return { supported: false, rules: [], note: `lifecycle read failed (${res.status})` };
+  }
+  return { supported: true, rules: parseLifecycleXml(await res.text()) };
+}
+
+/** Replace the bucket lifecycle with `rules` (empty array clears it). Returns the resulting state. */
+export async function setBucketLifecycle(rules: LifecycleRule[]): Promise<LifecycleState> {
+  await ensureFileSchema();
+  const xml = buildLifecycleXml(rules);
+  const res = await s3Fetch(`${base}?lifecycle=`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/xml' },
+    body: new Uint8Array(Buffer.from(xml)),
+  });
+  if (!res.ok) {
+    if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for PutBucketLifecycle` };
+    const body = await res.text().catch(() => '');
+    return { supported: false, rules: [], note: `lifecycle write failed (${res.status}) ${body.slice(0, 200)}` };
+  }
+  return getBucketLifecycle();
+}
+
+// ── Bucket policy (public / private) ──────────────────────────────────────────────────────────────
+// Read/set the bucket-level anonymous-read policy. "public" = the canonical GetObject-for-* policy;
+// "private" = no policy (DeleteBucketPolicy). SeaweedFS's bucket-policy support is partial, so we
+// degrade gracefully on non-2xx.
+
+export interface BucketPolicyState {
+  supported: boolean;
+  access: 'public' | 'private';
+  note?: string;
+}
+
+export async function getBucketPolicy(): Promise<BucketPolicyState> {
+  await ensureFileSchema();
+  const res = await s3Fetch(`${base}?policy=`, { method: 'GET' });
+  if (res.status === 404) return { supported: true, access: 'private' }; // no policy = private
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    if (/NoSuchBucketPolicy/i.test(body)) return { supported: true, access: 'private' };
+    if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for GetBucketPolicy` };
+    return { supported: false, access: 'private', note: `policy read failed (${res.status})` };
+  }
+  return { supported: true, access: classifyBucketPolicy(await res.text()) };
+}
+
+/** Set the bucket to 'public' (put anonymous-read policy) or 'private' (delete policy). */
+export async function setBucketPolicy(access: 'public' | 'private'): Promise<BucketPolicyState> {
+  await ensureFileSchema();
+  if (access === 'private') {
+    const res = await s3Fetch(`${base}?policy=`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) {
+      if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for DeleteBucketPolicy` };
+      return { supported: false, access: 'private', note: `policy delete failed (${res.status})` };
+    }
+    return { supported: true, access: 'private' };
+  }
+  const policy = buildPublicReadPolicy(BUCKET);
+  const res = await s3Fetch(`${base}?policy=`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: new Uint8Array(Buffer.from(policy)),
+  });
+  if (!res.ok) {
+    if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for PutBucketPolicy` };
+    const body = await res.text().catch(() => '');
+    return { supported: false, access: 'private', note: `policy write failed (${res.status}) ${body.slice(0, 200)}` };
+  }
+  return { supported: true, access: 'public' };
 }
