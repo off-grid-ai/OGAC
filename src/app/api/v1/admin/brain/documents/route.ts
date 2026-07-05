@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { addDocument, listDocuments } from '@/lib/brain';
+import { normalizeAcl } from '@/lib/retrieval/acl';
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
@@ -18,5 +19,7 @@ export async function POST(req: Request) {
   if (!title || !text) {
     return NextResponse.json({ error: 'title and text are required' }, { status: 400 });
   }
-  return NextResponse.json(await addDocument(title, source, text), { status: 201 });
+  // Optional per-document ACL for permissions-aware retrieval. Absent/empty → un-ACL'd (visible).
+  const acl = normalizeAcl(body?.acl) ?? undefined;
+  return NextResponse.json(await addDocument(title, source, text, acl), { status: 201 });
 }
