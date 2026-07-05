@@ -52,6 +52,10 @@ you add a node, a subdomain, or a service.
   ```
 - **Modalities live:** text, vision, embeddings, transcription, speech.
   (image generation/edit: not installed.)
+- **Rate limiting / WAF is the Caddy edge's job, NOT the aggregator.** The public edge
+  (`gateway.getoffgridai.co`, the root `caddy run` on S1) does rate limiting + WAF; the Next.js
+  `src/middleware.ts` adds a 60 req/min per-IP layer. The aggregator legitimately exposes no
+  rate-limit endpoint — don't file that as a gap.
 
 ### Gateway nodes → models (each node runs Off Grid Desktop/headless on `:7878`)
 
