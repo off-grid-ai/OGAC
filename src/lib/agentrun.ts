@@ -17,7 +17,12 @@ import { emitRunTrace } from '@/lib/chat-trace';
 import { correlationIds } from '@/lib/correlation';
 import { shipRunAudit } from '@/lib/siem';
 import { recordAudit } from '@/lib/store';
-import { actorFrom, outcomeFromStatus } from '@/lib/audit-event';
+import { outcomeFromStatus } from '@/lib/audit-event';
+import {
+  effectiveRunId,
+  type RunContext,
+  resolveRunAttribution,
+} from '@/lib/agent-run-context';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { scoreInteraction } from '@/lib/qa/scoring';
@@ -294,20 +299,36 @@ export async function runAgent(
   caller?: string,
   requireReview = false,
   orgId: string = DEFAULT_ORG,
+  // Optional resolved caller CONTEXT (C4). The DURABLE path (Temporal worker) has no request to
+  // resolve identity from, so the route resolves {runId, actor, org, project} at submit time and
+  // threads it here. When provided it is authoritative — the run's runId + attribution come from
+  // it, so a durable run's four-plane fan-out is keyed/attributed IDENTICALLY to an inline run.
+  // Absent (the inline path) → behavior is exactly as before: mint a runId, derive the actor from
+  // `caller`, org from the orgId param, no project.
+  context?: RunContext,
 ): Promise<AgentRun | null> {
   const agent = await resolveAgent(agentId);
   if (!agent) return null;
-  const runId = `run_${randomUUID().slice(0, 8)}`;
+  // Honor a context-supplied runId (durable: the id the workflow/dispatch already tracks) so the
+  // persisted run + all four planes share the one correlation key; else mint one (inline).
+  const runId = effectiveRunId(context?.runId, () => `run_${randomUUID().slice(0, 8)}`);
   const runModel = agent.model || ANSWER_MODEL;
+  // Resolve the attribution ONCE (pure) — context wins (durable), else derive from caller/orgId
+  // (inline), else a system machine actor for a caller-less scheduled/system run.
+  const attribution = resolveRunAttribution({
+    context,
+    caller,
+    orgId,
+    machineFallback: { type: 'machine', id: 'system', label: 'system' },
+  });
   // Canonical attributed audit (Phase 4.11): who ran which agent, its outcome/model, correlated by
-  // runId. Emitted on EVERY terminal path (denied / blocked / done), best-effort. `caller` is the
-  // invoking user's email (undefined for system/scheduled runs → falls back to a machine actor).
+  // runId. Emitted on EVERY terminal path (denied / blocked / done), best-effort. Actor/org/project
+  // come from the resolved attribution so inline and durable emit an identical event.
   const auditRun = (status: string, tokens = 0): void => {
     recordAudit({
-      actor: caller
-        ? actorFrom({ email: caller })
-        : { type: 'machine', id: 'system', label: 'system' },
-      org: orgId,
+      actor: attribution.actor,
+      org: attribution.org,
+      project: attribution.project,
       action: 'agent.run',
       resource: `agent:${agentId}`,
       model: runModel,
@@ -339,7 +360,7 @@ export async function runAgent(
     return persist(runId, {
       agentId, query, answer: '', status: 'denied', steps, citations: [],
       checks: [{ name: 'policy', verdict: 'blocked' as const, detail: decision.reason }], provenance: null,
-    }, orgId);
+    }, attribution.org);
   }
 
   mark('plan', agent.name, query, [], Date.now());
@@ -353,7 +374,7 @@ export async function runAgent(
     return persist(runId, {
       agentId, query, answer: '', status: 'blocked', steps, citations: [],
       checks: preChecks, provenance: null,
-    }, orgId);
+    }, attribution.org);
   }
 
   // 3. Retrieve — provenance refs come straight off the router's hits. Skipped for a non-grounded
@@ -422,7 +443,7 @@ export async function runAgent(
   const run = await persist(runId, {
     agentId, query, answer, status: requireReview ? 'pending_review' : 'done', steps, citations,
     checks: [...preChecks, ...postChecks], provenance,
-  }, orgId);
+  }, attribution.org);
 
   // 8. Observability fan-out — the SAME runId lands in all four planes, correlated by one key (C2).
   //    Every emission is best-effort / fire-and-forget: a plane being down never fails the run.
