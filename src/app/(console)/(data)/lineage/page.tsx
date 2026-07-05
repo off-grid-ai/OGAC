@@ -5,6 +5,7 @@ import {
   Stack,
   TreeStructure,
 } from '@phosphor-icons/react/dist/ssr';
+import { DatasetDetailPanel } from '@/components/lineage/DatasetDetailPanel';
 import { LineageCurate } from '@/components/lineage/LineageCurate';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,12 +146,16 @@ export default async function LineagePage() {
       )}
 
       {configured && !error ? (
-        <LineageCurate
-          namespaces={data.namespaces}
-          datasets={data.datasets.map((d) => d.name)}
-          jobs={data.jobs.map((j) => j.name)}
-          activeNamespace={data.namespace}
-        />
+        <>
+          <LineageCurate
+            namespaces={data.namespaces}
+            datasets={data.datasets.map((d) => d.name)}
+            jobs={data.jobs.map((j) => j.name)}
+            activeNamespace={data.namespace}
+          />
+          {/* URL-driven (?dataset=) detail panel — schema / facets / tags for one dataset. */}
+          <DatasetDetailPanel namespace={data.namespace} />
+        </>
       ) : null}
 
       {withSources.length === 0 ? (
