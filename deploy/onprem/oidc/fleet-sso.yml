@@ -1,0 +1,13 @@
+# FleetDM OIDC SSO — apply with `fleetctl apply -f fleet-sso.yml` (or use the FLEET_SSO_* env in
+# services-node-b.yml). Phase-D, READY not enabled. KC client offgrid-fleet is seeded; enable
+# standardFlow + the SSO callback redirect on it before turning this on. See oidc-services.md § 2.
+apiVersion: v1
+kind: config
+spec:
+  sso_settings:
+    enable_sso: true
+    enable_jit_provisioning: true          # auto-create the Fleet user on first Keycloak login
+    idp_name: 'Off Grid Keycloak'
+    entity_id: offgrid-fleet
+    issuer_uri: https://auth.getoffgridai.co/realms/offgrid
+    metadata_url: https://auth.getoffgridai.co/realms/offgrid/.well-known/openid-configuration
