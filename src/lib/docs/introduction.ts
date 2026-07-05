@@ -85,6 +85,47 @@ That's the loop: ask, ground, build, generate, all on your infrastructure. The g
 by capability from here.`,
     },
     {
+      slug: 'how-to',
+      title: 'How to…',
+      description: 'The tasks operators do most, each in a few steps.',
+      body: `A task-oriented index. Pick what you need to get done; each links to the full guide.
+
+## Run and answer
+
+- **Ask a grounded question.** Upload a doc in [Knowledge](/docs/guides/knowledge), turn grounding on
+  in [Chat](/docs/guides/chat), ask. The reply cites the source.
+- **Publish an assistant for your team.** [Studio → New assistant](/docs/guides/studio), describe it,
+  pick knowledge and skills, try it, publish to your org or a shareable link.
+- **Watch a run's full pipeline.** Open an [agent](/docs/guides/agents), run it, and read the
+  [run trace](/docs/guides/agent-runs): policy, guard, retrieve, answer, ground, sign, stage by stage.
+
+## Govern and prove
+
+- **Stop customer data leaving the box.** In [Control](/docs/guides/control), add a routing rule
+  \`data_class = PII → block\` and confirm cloud egress is off. Test it with the routing tester before
+  you commit it.
+- **Catch and mask PII.** Set the guardrails adapter to Presidio, then test a string on the
+  [Guardrails](/docs/guides/guardrails) page to see the live redaction.
+- **Restrict who can do what.** Add rules on the [Policy](/docs/guides/policy) page; deny wins.
+- **Hand a regulator a report.** Generate a signed compliance export in
+  [Regulatory](/docs/guides/regulatory); it cites the audit trail and eval evidence.
+- **Answer "who did what, when."** Search the [Audit](/docs/guides/audit) ledger or filter the
+  [Security events](/docs/guides/security-events) stream.
+
+## Operate the platform
+
+- **Add or drain a model node.** Register it in [Fleet](/docs/guides/fleet), assign a model, enable
+  it; disable to drain for maintenance.
+- **Check every service is healthy.** The [Services](/docs/guides/services) directory shows live,
+  server-probed health for the console, gateway, and every backend.
+- **Set a team's budget.** Create a virtual key and a monthly limit in [FinOps](/docs/guides/finops);
+  a completion checks the budget before it runs.
+- **Connect a system of record.** Add a connector in [Data](/docs/guides/data), point it at an
+  endpoint, sync. Real row counts, no fabricated data.
+- **Back up the control plane.** Run a backup on demand or verify the schedule in
+  [Backups](/docs/guides/backups).`,
+    },
+    {
       slug: 'why-off-grid',
       title: 'Why Off Grid',
       description: 'Why an integrated, on-prem platform beats a pile of SaaS point tools.',

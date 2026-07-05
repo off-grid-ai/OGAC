@@ -65,3 +65,50 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
   admin tails (Keycloak realm config, etc.) live in each service's own UI by design — not gaps.
 - Genuine build gaps are #12–20. The demo-blockers are #1–5 (mostly config + real content, not
   builds).
+
+---
+
+## Integration sweep #1 (2026-07-06) — platform-integration cadence agent
+
+**Live harness result (`deploy/verify-integration.sh` on S1, read-only):** `8 pass / 0 fail / 3 skip`.
+This is a large step up from `INTEGRATION_SUCCESS_SPEC.md`'s recorded "GATE 1 only, nothing WIRED/
+VERIFIED" (2026-07-05). Full line-by-line:
+
+- PASS A1 (aggregator: minted Keycloak JWT → 200, garbage → 401)
+- PASS A2 (all 5 clients mint `client_credentials` JWT with `aud == offgrid-<svc>`)
+- PASS A3 (all 5 service secrets readable at `secret/<svc>/client-secret` in OpenBao)
+- PASS A4 (opensearch/opa/marquez bound to loopback, not 0.0.0.0)
+- PASS A5 (machine SA JWT → 200, unauth → 401 on `/api/v1/admin/agents`)
+- PASS **C1** (governed run `run_7ac428c0` shows all stages: policy·guard·ground·sign)
+- PASS **C2 — the money test** (`run_7ac428c0` correlated across ALL 4 planes:
+  opensearch·langfuse·marquez·provenance all HIT)
+- PASS **C3** (PII probe `run_bf0e5156` shows a pii/guard check that blocked/redacted)
+- SKIP A7 (destructive rotate-and-reject — by design, not automated)
+- SKIP B2 (network-boundary — real proof is A4 from a non-S1 host)
+- SKIP B3 (transparent-refresh — needs forced token expiry)
+
+**Coherence spot-check (code paths, not just the harness):**
+
+- **C2 correlation is real and centralized.** `src/lib/correlation.ts` `correlationIds(runId)` derives
+  all four plane ids from one runId (audit=verbatim, Langfuse trace=`normalizeTraceId`, Marquez=
+  deterministic UUIDv5 `lineageRunUuid`, provenance=verbatim). This closes the biggest flagged unknown
+  in `INTEGRATION_SUCCESS_SPEC.md` (C2 "NOT proven"). **Action: update the spec's status table + honest
+  status line — C1/C2/C3 are now VERIFIED on the live box, not GATE 1.**
+- **Identity is threaded through the durable path (C4 code-level).** `src/lib/agent-run-context.ts`
+  (pure `CallerContext` rule) + `src/lib/agent-run-durable.ts` now carry the session actor, org,
+  project, AND the canonical runId into a worker run, so its audit/trace/lineage/provenance fan-out is
+  meant to match an inline run. This is newer than the spec/backlog (#12, C4 = "identity-in-activity
+  not built"). **GAP: C4 is NOT probed by the harness** — the durable fan-out parity is unverified
+  end-to-end. Add a C4 probe (run via worker, diff fan-out vs. C2) before claiming durable runs are
+  integrated. Update backlog #12 to reflect the code now exists at GATE 1.
+
+**New items found (not fixed — record only):**
+
+| # | Gap | Where | Owner |
+|---|---|---|---|
+| 29 | **C4 durable-run fan-out is unverified.** Identity + runId threading exists in code (`agent-run-context.ts`, `agent-run-durable.ts`) but the harness has no C4 probe. Add one: launch a run through the Temporal worker, then run the C2 4-plane correlation against its runId. | `deploy/verify-integration.sh`, `src/lib/agent-run-durable.ts` | console + infra |
+| 30 | **A6/B1 residual static auth.** `src/lib/adapters/evals.ts:60` still hard-codes `config.apiKey = 'offgrid-local'` for the eval gateway call rather than routing through `getServiceCredential()`. It's a config-object default (not the broker seam the other adapters now use — cf. `gateway.ts`, `langfuse.ts`, `files.ts`, `adapters/mdm.ts`), so it's the exact kind of primary-path static key A6 says must become a fallback-only branch. | `src/lib/adapters/evals.ts` | console |
+| 31 | **Spec status drift.** `INTEGRATION_SUCCESS_SPEC.md` still says "every item is GATE 1 only … nothing VERIFIED" (2026-07-05) and marks C2 correlation "NOT proven." The live harness now PASSES A1–A5 + C1–C3. The spec's status tables + "Honest status line" are stale and under-report reality — reconcile them. | `docs/INTEGRATION_SUCCESS_SPEC.md` | console |
+
+**Not a regression:** the 3 SKIPs (A7, B2, B3) are all SKIP-by-design per the spec (destructive /
+non-S1 / forced-expiry), so `0 fail` is a genuine clean run, not masked failures.
