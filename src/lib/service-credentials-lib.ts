@@ -196,3 +196,51 @@ export type ServiceCredential =
   | { kind: 'none' };
 
 export const NO_CREDENTIAL: ServiceCredential = { kind: 'none' };
+
+// ── PURE auth-selection rules (Phase 4.10-B) ────────────────────────────────────────────────────────
+// The one decision every adapter shares: given a broker credential and the adapter's LEGACY fallback,
+// what auth do we attach? Kept pure + zero-I/O so it's unit-tested with no network. The rule is
+// uniform: a broker credential wins; otherwise the adapter's existing static/env auth is used
+// UNCHANGED; otherwise no auth at all. When the broker returns `none` (the current, unprovisioned
+// reality) the output is byte-identical to what the adapter sent before this phase.
+
+/**
+ * Gateway auth headers. Broker Bearer JWT wins (the aggregator already accepts Keycloak JWTs);
+ * else the legacy static `OFFGRID_GATEWAY_API_KEY` as `x-api-key`; else no auth header.
+ */
+export function chooseGatewayAuth(
+  cred: ServiceCredential,
+  legacyApiKey: string | undefined,
+): Record<string, string> {
+  if (cred.kind === 'bearer' && cred.token) return { authorization: `Bearer ${cred.token}` };
+  if (legacyApiKey) return { 'x-api-key': legacyApiKey };
+  return {};
+}
+
+/**
+ * FleetDM bearer token to hand to `fleetHeaders()`. Broker Bearer wins; else the legacy static
+ * `OFFGRID_FLEET_TOKEN` / `FLEET_TOKEN`; else undefined (→ no Authorization header, unchanged).
+ */
+export function chooseFleetToken(
+  cred: ServiceCredential,
+  legacyToken: string | undefined,
+): string | undefined {
+  if (cred.kind === 'bearer' && cred.token) return cred.token;
+  return legacyToken;
+}
+
+/**
+ * Langfuse Basic-auth header. Broker S3-style pk/sk keypair wins (public-key = accessKey,
+ * secret-key = secretKey); else the caller's existing env-derived Basic header UNCHANGED; else null.
+ * `b64` is injected (Buffer/btoa) to keep this pure. Returns the full `Basic <base64(pk:sk)>` value.
+ */
+export function chooseLangfuseAuth(
+  cred: ServiceCredential,
+  legacyBasic: string | null,
+  b64: (s: string) => string,
+): string | null {
+  if (cred.kind === 's3' && cred.accessKey && cred.secretKey) {
+    return `Basic ${b64(`${cred.accessKey}:${cred.secretKey}`)}`;
+  }
+  return legacyBasic;
+}

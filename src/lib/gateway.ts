@@ -1,18 +1,56 @@
 // Single source of truth for reaching the Off Grid AI Gateway (the OpenAI-compatible
-// cluster aggregator). The aggregator authenticates /v1/* with a static API key
-// (OFFGRID_GATEWAY_API_KEY) sent as `x-api-key`. Every server-side call to the gateway
-// must go through gatewayHeaders() so the key is attached — without it the aggregator
-// returns 401 and the console shows "no models" / empty responses.
+// cluster aggregator). The aggregator authenticates /v1/* with EITHER a Keycloak service
+// JWT (Bearer) OR a static API key (OFFGRID_GATEWAY_API_KEY) sent as `x-api-key`.
+//
+// Phase 4.10-B: auth now flows through the service-token broker (`getServiceCredential('gateway')`).
+// When the broker has a Keycloak client secret provisioned it returns a Bearer JWT (preferred); until
+// then it returns `kind:'none'` and we fall back to the legacy static `x-api-key` — BYTE-IDENTICAL to
+// the pre-broker behavior, so nothing breaks pre-deploy. The auth-selection rule is the pure,
+// unit-tested `chooseGatewayAuth`.
+import { getServiceCredential, invalidateServiceCredential } from './service-credentials';
+import { chooseGatewayAuth, NO_CREDENTIAL } from './service-credentials-lib';
+
 export const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
 
-/** Headers for a gateway call — attaches the API key when configured, plus any extras. */
+/**
+ * Synchronous gateway headers (LEGACY seam). Emits exactly what the console sent before the broker:
+ * the static `x-api-key` when configured, else no auth. Kept for the many synchronous call sites that
+ * can't await; `gatewayHeadersAsync` is the broker-preferring path for calls that can.
+ */
 export function gatewayHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return {
-    ...(GATEWAY_API_KEY ? { 'x-api-key': GATEWAY_API_KEY } : {}),
-    ...extra,
-  };
+  // NO_CREDENTIAL → chooseGatewayAuth falls straight through to the legacy x-api-key branch.
+  return { ...chooseGatewayAuth(NO_CREDENTIAL, GATEWAY_API_KEY || undefined), ...extra };
+}
+
+/**
+ * Broker-preferring gateway headers. Prefers a Keycloak Bearer from the broker; falls back to the
+ * legacy static `x-api-key`; else no auth. When the broker is unprovisioned this is byte-identical to
+ * `gatewayHeaders()`.
+ */
+export async function gatewayHeadersAsync(
+  extra: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const cred = await getServiceCredential('gateway');
+  return { ...chooseGatewayAuth(cred, GATEWAY_API_KEY || undefined), ...extra };
+}
+
+/**
+ * Fetch the gateway with broker auth + a single transparent 401 refresh-and-retry (spec B3): on a 401
+ * from a brokered Bearer, invalidate the cached token, re-mint, and retry once. If we're on the legacy
+ * static key (no brokered bearer), a 401 is a real config error — surfaced, not retried.
+ */
+export async function gatewayFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const extra = (init.headers as Record<string, string>) ?? {};
+  const headers = await gatewayHeadersAsync(extra);
+  const res = await fetch(`${GATEWAY_URL}${path}`, { ...init, headers });
+  if (res.status === 401 && headers.authorization) {
+    invalidateServiceCredential('gateway');
+    const retryHeaders = await gatewayHeadersAsync(extra);
+    return fetch(`${GATEWAY_URL}${path}`, { ...init, headers: retryHeaders });
+  }
+  return res;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
