@@ -14,6 +14,8 @@ import {
   Folder,
   CaretLeft,
   CaretRight,
+  ShareNetwork,
+  Sliders,
   Trash,
   UploadSimple,
   X,
@@ -24,6 +26,17 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface FileMeta {
   id: string;
@@ -56,10 +69,12 @@ function FileCard({
   file,
   onDelete,
   onToggleVisibility,
+  onShare,
 }: {
   file: FileMeta;
   onDelete: (id: string) => void;
   onToggleVisibility: (id: string, current: 'public' | 'private') => void;
+  onShare: (file: FileMeta) => void;
 }) {
   const isImage = file.mime.startsWith('image/');
   const isVideo = file.mime.startsWith('video/');
@@ -134,6 +149,16 @@ function FileCard({
             onClick={() => window.open(file.url, '_blank')}
           >
             <ArrowSquareOut className="size-3.5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Share (expiring link)"
+            onClick={() => onShare(file)}
+          >
+            <ShareNetwork className="size-3.5" />
           </Button>
 
           <Button
@@ -276,6 +301,280 @@ function FolderCard({ name, files, onOpen }: { name: string; files: FileMeta[]; 
   );
 }
 
+// ── Share dialog: pick a TTL, mint an expiring signed link, copy it. ────────────────────────────
+const TTL_CHOICES: { label: string; seconds: number }[] = [
+  { label: '15 min', seconds: 900 },
+  { label: '1 hour', seconds: 3600 },
+  { label: '24 hours', seconds: 86400 },
+  { label: '7 days', seconds: 604800 },
+];
+
+function ShareDialog({ file, onClose }: { file: FileMeta | null; onClose: () => void }) {
+  const [ttl, setTtl] = useState(3600);
+  const [loading, setLoading] = useState(false);
+  const [link, setLink] = useState<{ url: string; signed: boolean; expiresAt: string | null } | null>(null);
+
+  // Reset when a different file opens.
+  useEffect(() => {
+    setLink(null);
+    setTtl(3600);
+  }, [file?.id]);
+
+  const mint = useCallback(async () => {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/v1/files/${file.id}/share?ttl=${ttl}`, { method: 'POST' });
+      if (!res.ok) {
+        toast.error('Could not create share link.');
+        return;
+      }
+      const data = (await res.json()) as { url: string; signed: boolean; expiresAt: string | null };
+      setLink(data);
+      await navigator.clipboard.writeText(data.url).catch(() => {});
+      toast.success(data.signed ? 'Expiring link copied.' : 'Link copied (see note).');
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setLoading(false);
+    }
+  }, [file, ttl]);
+
+  return (
+    <Dialog open={!!file} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Share {file?.name}</DialogTitle>
+          <DialogDescription>
+            Generate a time-limited link that grants read access, then expires — no login required to open it.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Label className="text-xs">Link expires after</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {TTL_CHOICES.map((c) => (
+              <button
+                key={c.seconds}
+                onClick={() => setTtl(c.seconds)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  ttl === c.seconds ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {link && (
+            <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                <Input readOnly value={link.url} className="font-mono text-[11px]" onFocus={(e) => e.currentTarget.select()} />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0"
+                  title="Copy"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(link.url);
+                    toast.success('Copied.');
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+              {link.signed ? (
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  Expires {link.expiresAt ? new Date(link.expiresAt).toLocaleString() : ''}
+                </p>
+              ) : (
+                <p className="font-mono text-[10px] text-amber-600 dark:text-amber-500">
+                  Note: SeaweedFS has no IAM keypair provisioned, so this link cannot expire — it is the
+                  plain object URL. Provision S3 credentials to get true time-limited links.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button onClick={() => void mint()} disabled={loading}>
+            {loading ? 'Generating…' : link ? 'Regenerate' : 'Create link'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Bucket settings panel: object-expiry lifecycle rules + public/private policy. URL-driven via
+// ?panel=bucket so it's a real place on the history stack (Back closes it). Admin-only server-side.
+interface LifecycleRuleUI {
+  id: string;
+  prefix: string;
+  expireDays: number;
+  enabled: boolean;
+}
+interface BucketState {
+  lifecycle: { supported: boolean; rules: LifecycleRuleUI[]; note?: string };
+  policy: { supported: boolean; access: 'public' | 'private'; note?: string };
+}
+
+function BucketPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [state, setState] = useState<BucketState | null>(null);
+  const [rules, setRules] = useState<LifecycleRuleUI[]>([]);
+  const [access, setAccess] = useState<'public' | 'private'>('private');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/v1/storage/bucket');
+      if (res.status === 403) {
+        toast.error('Bucket settings are admin-only.');
+        onClose();
+        return;
+      }
+      const data = (await res.json()) as BucketState;
+      setState(data);
+      setRules(data.lifecycle.rules ?? []);
+      setAccess(data.policy.access);
+    } catch {
+      toast.error('Failed to load bucket settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
+
+  const addRule = () =>
+    setRules((r) => [...r, { id: `expire-${r.length + 1}`, prefix: '', expireDays: 30, enabled: true }]);
+  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
+  const patchRule = (i: number, patch: Partial<LifecycleRuleUI>) =>
+    setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule)));
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/v1/storage/bucket', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rules, access }),
+      });
+      if (!res.ok) {
+        toast.error('Save failed.');
+        return;
+      }
+      const data = (await res.json()) as Partial<BucketState>;
+      const lc = data.lifecycle;
+      const pol = data.policy;
+      if (lc && !lc.supported) toast.warning(`Lifecycle not applied: ${lc.note ?? 'unsupported by SeaweedFS'}`);
+      if (pol && !pol.supported) toast.warning(`Policy not applied: ${pol.note ?? 'unsupported by SeaweedFS'}`);
+      if ((!lc || lc.supported) && (!pol || pol.supported)) toast.success('Bucket settings saved.');
+      await load();
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setSaving(false);
+    }
+  }, [rules, access, load]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Bucket settings</DialogTitle>
+          <DialogDescription>Object-expiry lifecycle rules and the bucket's public/private access policy.</DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <p className="py-8 text-center text-xs text-muted-foreground">Loading…</p>
+        ) : (
+          <div className="space-y-6">
+            {/* Access policy */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Bucket access</Label>
+                  <p className="text-xs text-muted-foreground">Public grants anonymous read to every object in the bucket.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">{access}</span>
+                  <Switch
+                    checked={access === 'public'}
+                    onCheckedChange={(c) => setAccess(c ? 'public' : 'private')}
+                    disabled={state ? !state.policy.supported : false}
+                  />
+                </div>
+              </div>
+              {state && !state.policy.supported && (
+                <p className="font-mono text-[10px] text-amber-600 dark:text-amber-500">
+                  Bucket policy unsupported here: {state.policy.note ?? 'SeaweedFS S3 rejected the call'}
+                </p>
+              )}
+            </section>
+
+            {/* Lifecycle rules */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Expiry rules</Label>
+                <Button size="sm" variant="outline" onClick={addRule} disabled={state ? !state.lifecycle.supported : false}>
+                  Add rule
+                </Button>
+              </div>
+              {state && !state.lifecycle.supported && (
+                <p className="font-mono text-[10px] text-amber-600 dark:text-amber-500">
+                  Lifecycle unsupported here: {state.lifecycle.note ?? 'SeaweedFS S3 rejected the call'}
+                </p>
+              )}
+              {rules.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No expiry rules — objects are kept indefinitely.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rules.map((r, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                      <Input
+                        value={r.prefix}
+                        placeholder="prefix (blank = all)"
+                        className="h-8 flex-1 font-mono text-xs"
+                        onChange={(e) => patchRule(i, { prefix: e.target.value })}
+                      />
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={r.expireDays}
+                          className="h-8 w-16 font-mono text-xs"
+                          onChange={(e) => patchRule(i, { expireDays: Number(e.target.value) })}
+                        />
+                        <span className="font-mono text-xs text-muted-foreground">days</span>
+                      </div>
+                      <Switch checked={r.enabled} onCheckedChange={(c) => patchRule(i, { enabled: c })} />
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Remove" onClick={() => removeRule(i)}>
+                        <Trash className="size-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button onClick={() => void save()} disabled={saving || loading}>
+            {saving ? 'Saving…' : 'Save settings'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function StorageBrowser() {
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,6 +593,22 @@ export function StorageBrowser() {
     },
     [router, pathname],
   );
+
+  // Bucket-settings panel is a URL place (?panel=bucket) so Back closes it — see CLAUDE.md.
+  const panelOpen = search.get('panel') === 'bucket';
+  const setPanelOpen = useCallback(
+    (openIt: boolean) => {
+      const q = new URLSearchParams(search.toString());
+      if (openIt) q.set('panel', 'bucket');
+      else q.delete('panel');
+      const qs = q.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname, search],
+  );
+
+  // Share dialog is transient (not a navigational place) — the file being shared is local state.
+  const [shareFile, setShareFile] = useState<FileMeta | null>(null);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
@@ -342,7 +657,17 @@ export function StorageBrowser() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
+          <Sliders className="mr-1.5 size-3.5" />
+          Bucket settings
+        </Button>
+      </div>
+
       <UploadZone onUploaded={fetchFiles} />
+
+      <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />
+      <BucketPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
 
       {/* Stats row */}
       <div className="flex items-center gap-6 font-mono text-xs text-muted-foreground">
@@ -398,7 +723,7 @@ export function StorageBrowser() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {current[1].map((f) => (
-              <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} />
+              <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} onShare={setShareFile} />
             ))}
           </div>
         </div>
