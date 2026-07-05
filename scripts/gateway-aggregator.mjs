@@ -433,6 +433,50 @@ async function handle(req, res, chunks) {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     return res.end(JSON.stringify(trafficJSON()));
   }
+  // Read-only runtime TUNING snapshot — the actual values this process is running with.
+  // Every knob here is set from process env in the launchd plist on S1 and requires an
+  // aggregator restart (launchctl kickstart) to change — so this is honestly READ-ONLY;
+  // the aggregator has no live-reconfigure endpoint. No secrets are exposed. The console's
+  // Gateway "Tuning" tab renders this. Routing (POOL) is edited via the fleet SSOT, not here.
+  if (req.url === '/config') {
+    return json(res, 200, {
+      readonly: true,
+      // How the router picks nodes, refreshes the pool, and what it falls back to.
+      routing: {
+        poolSource: POOL_SRC,
+        poolRefreshMs: POOL_REFRESH_MS,
+        poolPinned: Boolean(process.env.OFFGRID_POOL), // OFFGRID_POOL env pin disables SSOT refresh
+        liveNodes: LIVE.length,
+        poolNodes: POOL.length,
+        imageLiveNodes: IMAGE_LIVE.length,
+        fallbackPoolNodes: FALLBACK_POOL.length, // hardcoded last-known-good if SSOT unreachable
+      },
+      // TRUE-inference health thresholds (see healthFor()).
+      health: {
+        probeEnabled: PROBE_ENABLED,
+        windowMs: HEALTH_WINDOW_MS,
+        slowMs: SLOW_MS,
+        jamMs: JAM_MS,
+        degradedErrRate: DEGRADED_ERR_RATE,
+        downErrRate: DOWN_ERR_RATE,
+        probeEveryMs: PROBE_EVERY,
+        probeTimeoutMs: PROBE_TIMEOUT,
+      },
+      // Upstream request timeouts (per proxied call).
+      timeouts: {
+        chatUpstreamMs: Number(process.env.OFFGRID_GATEWAY_UPSTREAM_TIMEOUT_MS || 300000),
+        imageUpstreamMs: Number(process.env.OFFGRID_IMAGE_UPSTREAM_TIMEOUT_MS || 300000),
+      },
+      // Honest capability flags — features the aggregator does NOT have, so the console
+      // never renders a fake control for them.
+      capabilities: {
+        responseCache: false,          // no response/prompt cache in the router
+        perRequestFallbackChain: false, // no model→model fallback; only the pool + hardcoded FALLBACK_POOL
+        rateLimit: false,               // rate-limit + WAF live at the Caddy edge / console middleware, by design
+        liveReconfigure: false,         // knobs are env-set on S1; restart to change
+      },
+    });
+  }
   if (req.url === '/nodes') {
     return Promise.all(POOL.map(async (g) => {
       const h = healthFor(g.name);

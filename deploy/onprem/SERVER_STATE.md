@@ -67,6 +67,12 @@ Self-creating tables (via `CREATE TABLE IF NOT EXISTS` on first use — no manua
   Editor UI: AI Gateway → **Control** tab (`GatewayFleetConfig`).
 - **Aggregator** (`scripts/gateway-aggregator.mjs`) fetches `/pool` on startup + every 30s with a
   **hardcoded fallback** (routing can't drop if console/DB is down). `OFFGRID_POOL` env still pins.
+  - **`GET /config` (read-only tuning):** exposes the aggregator's live runtime knobs — routing
+    refresh interval, health thresholds (`OFFGRID_HEALTH_*`), upstream timeouts (`OFFGRID_GATEWAY_/
+    IMAGE_UPSTREAM_TIMEOUT_MS`), pool/fallback counts — plus honest capability flags (no response
+    cache, no per-request fallback chain, no live-reconfigure; rate-limit is Caddy's). All knobs are
+    env-set in the aggregator plist → **restart (`launchctl kickstart`) to change.** Console reads it
+    at `GET /api/v1/gateway/config` → AI Gateway → **Tuning** tab. No secrets in the payload.
   - **/pool auth:** aggregator MUST send `Authorization: Bearer <key>` (the console middleware only
     lets `/api/*` through with a Bearer header; `x-api-key` alone → 401 at middleware). /pool itself
     is gate-less (read-only topology, behind the tunnel's Keycloak gate).
