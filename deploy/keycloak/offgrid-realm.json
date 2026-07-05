@@ -7,6 +7,15 @@
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "rememberMe": true,
+  "roles": {
+    "realm": [
+      { "name": "svc-gateway", "description": "Off Grid service scope: svc-gateway" },
+      { "name": "svc-opensearch", "description": "Off Grid service scope: svc-opensearch" },
+      { "name": "svc-fleet", "description": "Off Grid service scope: svc-fleet" },
+      { "name": "svc-temporal", "description": "Off Grid service scope: svc-temporal" },
+      { "name": "svc-seaweedfs", "description": "Off Grid service scope: svc-seaweedfs" }
+    ]
+  },
   "clients": [
     {
       "clientId": "offgrid-console",
@@ -29,9 +38,164 @@
         "http://localhost:3000/*"
       ],
       "webOrigins": ["+"]
+    },
+    {
+      "clientId": "offgrid-gateway",
+      "name": "Off Grid Gateway (service)",
+      "description": "Service-account client for the AI gateway/aggregator.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-gateway-secret",
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-gateway",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-gateway",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "offgrid-opensearch",
+      "name": "Off Grid OpenSearch (service)",
+      "description": "Service-account client for OpenSearch access.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-opensearch-secret",
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-opensearch",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-opensearch",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "offgrid-fleet",
+      "name": "Off Grid Fleet (service)",
+      "description": "Service-account client for fleet management.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-fleet-secret",
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-fleet",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-fleet",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "offgrid-temporal",
+      "name": "Off Grid Temporal (service)",
+      "description": "Service-account client for the Temporal workflow engine.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-temporal-secret",
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-temporal",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-temporal",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "offgrid-seaweedfs",
+      "name": "Off Grid SeaweedFS (service)",
+      "description": "Service-account client for SeaweedFS object storage.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "offgrid-dev-svc-seaweedfs-secret",
+      "protocolMappers": [
+        {
+          "name": "aud-offgrid-seaweedfs",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "offgrid-seaweedfs",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [
+    {
+      "username": "service-account-offgrid-gateway",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-gateway",
+      "realmRoles": ["svc-gateway"]
+    },
+    {
+      "username": "service-account-offgrid-opensearch",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-opensearch",
+      "realmRoles": ["svc-opensearch"]
+    },
+    {
+      "username": "service-account-offgrid-fleet",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-fleet",
+      "realmRoles": ["svc-fleet"]
+    },
+    {
+      "username": "service-account-offgrid-temporal",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-temporal",
+      "realmRoles": ["svc-temporal"]
+    },
+    {
+      "username": "service-account-offgrid-seaweedfs",
+      "enabled": true,
+      "serviceAccountClientId": "offgrid-seaweedfs",
+      "realmRoles": ["svc-seaweedfs"]
+    },
     {
       "username": "mohammed.ali@example.com",
       "enabled": true,
