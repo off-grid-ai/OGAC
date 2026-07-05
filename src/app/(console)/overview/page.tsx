@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   ChatCircle,
   Database,
   FileText,
@@ -7,58 +6,57 @@ import {
   ShieldCheck,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth } from '@/auth';
-import { type HomeStat, buildHomeOverview } from '@/lib/home-view';
-import { cn } from '@/lib/utils';
+import { listAgentRuns } from '@/lib/agentrun';
+import { computeAnalytics } from '@/lib/analytics';
+import { computeFinOps } from '@/lib/finops';
+import { readGuardrailsView } from '@/lib/guardrails-view';
+import { type OperatorHomeInput, synthesizeOperatorHome } from '@/lib/overview-synthesis';
+import { readDecisions, readPolicyStatus } from '@/lib/policy-view';
+import { type ServiceHealth, getServices } from '@/lib/services-directory';
+import { readSiemView } from '@/lib/siem-view';
+import { probeService } from '@/lib/status';
+import { listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
+import {
+  ActivityCard,
+  BlockingFeed,
+  Section,
+  ServicesCard,
+  TileCard,
+} from './overview-components';
+
+// Overview — the jobs-oriented operator home (VISION Pillar 4). This page is the THIN I/O shell:
+// it fetches the real module snapshots server-side (each fault-isolated so one dead service can't
+// blank the home), then hands them to the PURE synthesizer in src/lib/overview-synthesis.ts, which
+// cross-references audit + policy + guardrails + finops + health + runs into one operator-home
+// view-model. Rendering lives in ./overview-components. Zero business logic here — that's the SOLID
+// seam (mirrors tenancy.ts → tenancy-policy.ts): I/O here, the rule there, both testable apart.
 
 export const dynamic = 'force-dynamic';
 
-const TONE: Record<HomeStat['tone'], string> = {
-  good: 'text-primary',
-  warn: 'text-amber-600',
-  bad: 'text-destructive',
-  muted: 'text-foreground',
-};
-
-function StatCard({ s }: { s: HomeStat }) {
-  return (
-    <Link
-      href={s.href}
-      className="group rounded-lg border border-border bg-card p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-    >
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{s.label}</div>
-      <div className={cn('mt-1.5 text-2xl font-semibold tabular-nums', TONE[s.tone])}>{s.value}</div>
-      {s.hint ? <div className="mt-1 text-xs text-muted-foreground">{s.hint}</div> : null}
-    </Link>
-  );
+async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
 }
 
-function Section({
-  title,
-  href,
-  linkLabel,
-  children,
-}: {
-  title: string;
-  href: string;
-  linkLabel: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-foreground">{title}</h2>
-        <Link
-          href={href}
-          className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
-        >
-          {linkLabel} <ArrowRight className="size-3" />
-        </Link>
-      </div>
-      {children}
-    </section>
+// Probe only the core on-prem services on the home — fast and legible. The full directory lives on
+// the Services module.
+const HOME_SERVICE_IDS = ['gateway', 'langfuse', 'presidio', 'keycloak', 'openbao', 'qdrant', 'opa'];
+
+async function probeHomeServices() {
+  const entries = getServices().filter((s) => HOME_SERVICE_IDS.includes(s.id));
+  return Promise.all(
+    entries.map(async (s) => {
+      const h: Omit<ServiceHealth, 'id'> = await safe(
+        () => probeService(s.url, s.healthPath, 3000),
+        { status: 'down' as const, httpStatus: null, ms: null },
+      );
+      return { id: s.id, label: s.label, status: h.status, ms: h.ms };
+    }),
   );
 }
 
@@ -72,7 +70,67 @@ const QUICK_ACTIONS = [
 
 export default async function ConsoleHome() {
   const session = await auth();
-  const o = await buildHomeOverview();
+  const org = await safe(() => currentOrgId(), 'org_default');
+
+  // Fetch every module snapshot the synthesizer cross-references — all in parallel, all fault-
+  // isolated to a safe fallback so a single unreachable backend degrades one tile, not the page.
+  const [analytics, finops, policy, guardrails, siem, decisions, runs, connectors, services] =
+    await Promise.all([
+      safe(() => computeAnalytics(), null),
+      safe(() => computeFinOps(), null),
+      safe(() => readPolicyStatus(), null),
+      safe(() => readGuardrailsView(), null),
+      safe(() => readSiemView(500), null),
+      safe(() => readDecisions(), []),
+      safe(() => listAgentRuns(6, org), []),
+      safe(() => listConnectors(org), []),
+      probeHomeServices(),
+    ]);
+
+  const input: OperatorHomeInput = {
+    analytics,
+    finops: finops
+      ? {
+          totals: finops.totals,
+          byKey: finops.byKey.map((k) => ({ label: k.label, pct: k.pct, budgetUsd: k.budgetUsd })),
+        }
+      : null,
+    policy: policy ? { engine: policy.engine, reachable: policy.reachable } : null,
+    guardrails: guardrails
+      ? {
+          engine: guardrails.engine,
+          reachable: guardrails.reachable,
+          configured: guardrails.configured,
+        }
+      : null,
+    audit: (siem?.data.events ?? []).map((e) => ({
+      id: e.id,
+      ts: e.ts,
+      actor: e.actor,
+      action: e.action,
+      outcome: e.outcome,
+      detail: e.detail,
+    })),
+    decisions: decisions.map((d) => ({
+      id: d.id,
+      allow: d.allow,
+      path: d.path,
+      input: d.input,
+      timestamp: d.timestamp,
+    })),
+    services,
+    activity: runs.map((r) => ({
+      id: r.id,
+      agentId: r.agentId,
+      query: r.query,
+      status: r.status,
+      startedAt: r.startedAt,
+    })),
+    connectors: connectors.map((c) => ({ status: c.status })),
+    now: Date.now(),
+  };
+
+  const home = synthesizeOperatorHome(input);
   const firstName = session?.user?.name?.split(' ')[0] ?? session?.user?.email?.split('@')[0];
 
   return (
@@ -82,8 +140,8 @@ export default async function ConsoleHome() {
           {firstName ? `Welcome back, ${firstName}` : 'Overview'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your private intelligence platform at a glance — what it&apos;s doing, what it&apos;s
-          costing, and whether it&apos;s controlled.
+          Everything your platform is doing right now — what it stopped, what it cost, and whether
+          it&apos;s healthy — in one place, so you can run it without digging through five modules.
         </p>
       </div>
 
@@ -101,113 +159,44 @@ export default async function ConsoleHome() {
         ))}
       </div>
 
-      {o.posture.length > 0 ? (
+      {/* Governance posture — the synthesized "is it controlled right now?" answer */}
+      {home.posture.length > 0 ? (
         <Section title="Governance posture" href="/control" linkLabel="Governance">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {o.posture.map((s) => (
-              <StatCard key={s.label} s={s} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {home.posture.map((t) => (
+              <TileCard key={t.label} t={t} />
             ))}
           </div>
         </Section>
       ) : null}
 
+      {/* The cross-module blocking feed: audit ∪ policy ∪ guardrails, last 24h */}
+      <BlockingFeed blocking={home.blocking} />
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {o.spend.length > 0 ? (
+        {home.cost.length > 0 ? (
           <Section title="Cost" href="/finops" linkLabel="FinOps">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {o.spend.map((s) => (
-                <StatCard key={s.label} s={s} />
+              {home.cost.map((t) => (
+                <TileCard key={t.label} t={t} />
               ))}
             </div>
           </Section>
         ) : null}
 
-        {o.traffic.length > 0 ? (
-          <Section title="Traffic & health" href="/analytics" linkLabel="Analytics">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {o.traffic.map((s) => (
-                <StatCard key={s.label} s={s} />
-              ))}
-            </div>
-          </Section>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Services health */}
         <Section
-          title={`Services (${o.services.up}/${o.services.total} up)`}
+          title={`Services (${home.health.up}/${home.health.total} up)`}
           href="/services"
           linkLabel="All services"
         >
-          <Card className="shadow-sm">
-            <CardContent className="divide-y divide-border p-0">
-              {o.services.items.map((svc) => (
-                <div key={svc.id} className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-sm text-foreground">{svc.label}</span>
-                  <div className="flex items-center gap-2">
-                    {svc.ms !== null ? (
-                      <span className="text-xs text-muted-foreground tabular-nums">{svc.ms} ms</span>
-                    ) : null}
-                    <Badge
-                      variant="secondary"
-                      className={
-                        svc.status === 'up'
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-destructive/10 text-destructive'
-                      }
-                    >
-                      {svc.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </Section>
-
-        {/* Recent activity */}
-        <Section title="Recent activity" href="/agent-runs" linkLabel="All runs">
-          <Card className="shadow-sm">
-            <CardHeader className="sr-only">
-              <CardTitle>Recent agent runs</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y divide-border p-0">
-              {o.activity.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground">
-                  No agent runs yet. Start one from{' '}
-                  <Link href="/chat" className="text-primary hover:underline">
-                    chat
-                  </Link>
-                  .
-                </p>
-              ) : (
-                o.activity.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/agent-runs?run=${r.id}`}
-                    className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
-                  >
-                    <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
-                    <Badge
-                      variant="secondary"
-                      className={
-                        r.status === 'blocked' || r.status === 'denied'
-                          ? 'bg-destructive/10 text-destructive'
-                          : r.status === 'done'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted text-muted-foreground'
-                      }
-                    >
-                      {r.status}
-                    </Badge>
-                  </Link>
-                ))
-              )}
-            </CardContent>
-          </Card>
+          <ServicesCard health={home.health} />
         </Section>
       </div>
+
+      {/* Recent activity */}
+      <Section title="Recent activity" href="/agent-runs" linkLabel="All runs">
+        <ActivityCard activity={home.activity} />
+      </Section>
     </div>
   );
 }
