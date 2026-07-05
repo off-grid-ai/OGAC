@@ -42,6 +42,7 @@ const PUBLIC_PREFIX = [
   '/features',
   '/fleet-control',
   '/handbook',
+  '/docs', // the product documentation site (public, like any docs site) — /docs, /docs/*, /docs/api
   '/signin',
   '/api/auth',
   '/api/waitlist', // public request-access capture from the signin page (no session needed)
