@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ShieldWarning } from '@phosphor-icons/react/dist/ssr';
+import { AlertingManager } from '@/components/siem/AlertingManager';
 import { SuppressionManager } from '@/components/siem/SuppressionManager';
 import { requireModuleForUser } from '@/lib/module-access';
 import { applySuppressions } from '@/lib/siem-suppress-policy';
@@ -148,6 +149,10 @@ export default async function SiemPage({
       {/* Management: suppression rules mute known-noise events (a scanner IP, a service account, a
           health-probe path) so the feed stays signal. Applied server-side to the whole view. */}
       <SuppressionManager rules={suppressions} />
+
+      {/* Management: OpenSearch alerting monitors (threshold triggers over the audit/gateway
+          indices) + the ISM retention/rollover policy. URL-driven (?panel=alerting, ?atab=). */}
+      <AlertingManager />
     </div>
   );
 }
