@@ -23,6 +23,7 @@ export async function GET() {
     const all = (data?.data ?? []).map((m: { id: string; capabilities?: string[] }) => ({
       id: m.id,
       vision: (m.capabilities ?? []).includes('vision'),
+      image: (m.capabilities ?? []).includes('image-generation'),
     }));
     // RBAC gate: hide models this role is denied (abacRules resource 'chat.model'). Admins see all.
     const role = session.user.role ?? 'viewer';

@@ -77,6 +77,7 @@ interface Message {
 interface ModelInfo {
   id: string;
   vision: boolean;
+  image?: boolean; // image-generation model (sd-server) — the composer generates instead of chats
 }
 
 function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifact) => void }) {
@@ -739,9 +740,60 @@ export function ChatWorkspace({
     }
   }
 
+  // Image-generation turn: when an image model is selected, the composer generates instead of
+  // chatting. The prompt is the user turn; the result renders inline as an assistant image (the
+  // message model already carries `images`). The PNG is also saved to Storage (SeaweedFS).
+  async function sendImage(text: string) {
+    setInput('');
+    setImages([]);
+    setFiles([]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '', reasoning: '' },
+    ]);
+    setStreaming(true);
+    try {
+      const r = await fetch('/api/v1/images/generations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: text }),
+      });
+      const data = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant') {
+          if (r.ok && data.url) {
+            next[next.length - 1] = { ...last, content: '', images: [data.url] };
+          } else {
+            next[next.length - 1] = { ...last, content: '', error: data.error ?? 'Image generation failed' };
+          }
+        }
+        return next;
+      });
+    } catch (e) {
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant') {
+          next[next.length - 1] = { ...last, content: '', error: e instanceof Error ? e.message : 'failed' };
+        }
+        return next;
+      });
+    } finally {
+      setStreaming(false);
+    }
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    // Image model selected → generate an image instead of a chat completion.
+    if (activeModel?.image) {
+      await sendImage(text);
+      return;
+    }
     const sentFiles = files.map((f) => ({ name: f.name, text: f.text }));
     const sentSkill = turnSkill?.id ?? null;
     // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
@@ -1078,7 +1130,7 @@ export function ChatWorkspace({
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.id}
-                    {m.vision ? ' (vision)' : ''}
+                    {m.image ? ' (image)' : m.vision ? ' (vision)' : ''}
                   </option>
                 ))}
               </select>
@@ -1330,7 +1382,11 @@ export function ChatWorkspace({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onComposerKey}
                 rows={1}
-                placeholder="Message the model…  (type / for skills)"
+                placeholder={
+                  activeModel?.image
+                    ? 'Describe an image to generate…'
+                    : 'Message the model…  (type / for skills)'
+                }
                 className="max-h-40 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none"
               />
               {streaming ? (

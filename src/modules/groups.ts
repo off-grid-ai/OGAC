@@ -18,7 +18,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'workspace',
     label: 'Workspace',
-    modules: ['chat', 'images', 'projects', 'artifacts', 'prompts', 'knowledge', 'storage', 'studio'],
+    modules: ['chat', 'projects', 'artifacts', 'prompts', 'knowledge', 'storage', 'studio'],
   },
   {
     id: 'intelligence',
