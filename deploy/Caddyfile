@@ -135,11 +135,47 @@ http://127.0.0.1:8933 {
 http://127.0.0.1:8934 {
 	reverse_proxy offgrid-g6.local:8070
 }
+# ── No-auth backend services: edge-exposure analysis (Phase 4.10-A) ─────────────
+# Presidio, Marquez, and OPA are stock images with ZERO built-in auth. The rule is
+# "not reachable unauthenticated from OUTSIDE." Two boundaries matter — and the edge
+# gate belongs at only one of them:
+#
+#   (1) PUBLIC (internet, via the Cloudflare tunnel): ALREADY closed, no vhost added.
+#       The tunnel ingress (deploy/onprem/cloudflared-tunnel.yml) routes only console,
+#       gateway, auth, ssh, provit, console-status/-landing, gungnir, console-api —
+#       everything else falls to `http_status:404`. NONE of these three services has a
+#       tunnel hostname, and the one broad public vhost (console-api, below) proxies
+#       only to the console (:3000) and the LLM aggregator (:8800), never to Marquez/
+#       OPA/Presidio. So from the internet they are already unreachable. Adding an
+#       `import gated` here would be wrong (see (2)) — there is nothing public to gate.
+#
+#   (2) These are consumed SERVER-TO-SERVER by next-server over loopback:
+#         • Marquez  — src/lib/marquez.ts,          OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000
+#         • OPA      — src/lib/adapters/policy.ts,   OFFGRID_OPA_URL=http://127.0.0.1:8181
+#         • Presidio — src/lib/adapters/pii.ts, via the 8938/8939 loopback proxies below
+#       A browser-login `import gated` on any of these would 302 the console's OWN
+#       machine-to-machine calls to /signin and BREAK Guardrails, Lineage, and Policy.
+#       So the correct gate is NETWORK reachability, not a login redirect:
+#         • Marquez & OPA run on S1; the console dials them on 127.0.0.1. Their Docker
+#           host ports are bound to loopback (127.0.0.1:9000 / 127.0.0.1:8181) in the
+#           compose files (docker-compose.yml + onprem/services-node-a.yml) so the LAN
+#           can't reach them while the same-host console still can. No Caddy vhost needed.
+#         • Presidio runs on g6 (LAN); S1's Caddy must still dial g6:5002/5001, so g6's
+#           ports stay LAN-bound and are firewalled to S1 only at g6 (a stock Presidio
+#           can't verify a bearer, so the network boundary is the gate — recorded in
+#           SERVER_STATE.md as the required g6 host-firewall rule).
+#       The 8938/8939 Caddy vhosts below are `http://127.0.0.1:...` — Caddy binds them to
+#       loopback, so they are NOT reachable from the LAN or tunnel; they exist only so
+#       next-server (which can't egress to the LAN on this box) can hop to g6. This is the
+#       intended shape of the edge gate for a machine-to-machine path: confine reachability,
+#       don't wrap a human-login redirect around it.
+#
 # NOTE: OpenSearch (:9200), Marquez (:9000), OpenBao (:8200) run in the `offgrid-services-a` stack
 # ON S1 (localhost) — the console reaches them DIRECTLY at 127.0.0.1, no proxy needed. (The aborted
 # 2026-07-05 g5/node-c plan is void: those services were already up on S1 the whole time.)
 # Presidio (g6) — analyzer :5002 / anonymizer :5001 → entity-grade PII masking in Guardrails.
 # These DO need a loopback proxy (g6 is on the LAN, which the console daemon can't reach directly).
+# Loopback-bound (site address 127.0.0.1) → reachable only from S1, never the LAN/tunnel.
 http://127.0.0.1:8938 {
 	reverse_proxy offgrid-g6.local:5002
 }
