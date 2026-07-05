@@ -14,6 +14,19 @@ A developer or an org admin sits down at the console and sees every AI service t
 
 ---
 
+## Cross-cutting mandate — no modals/dialogs (LATER)
+
+**Don't use dialogs/modals anywhere.** They're ugly and restrictive. Every "create/edit/detail"
+interaction that currently opens a modal should instead be **its own screen (a route)** or, where a
+side-by-side is better, a **side panel/drawer** — driven by the URL, not modal state.
+
+- Applies retroactively to existing modals: connector add/edit, agent create, project dialog,
+  studio, machine-client create, book-a-call, write-to-us, delete-confirm, skills, etc.
+- New work: reach for a route or a side panel, never a `<Dialog>`.
+- Keep it URL-driven (per the navigation rule) so Back works and views are deep-linkable.
+- **Scheduled LATER** — a deliberate pass once the current build settles; don't rip out working
+  modals mid-stream. Tracked here so it isn't lost.
+
 ## Cross-cutting mandate — motion & micro-interactions (finesse)
 
 **Every click, hover, toggle, open/close, and state change must be animated.** The console should
