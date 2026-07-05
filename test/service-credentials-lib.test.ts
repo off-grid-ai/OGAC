@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  apiTokenKey,
   buildGrantRequest,
   clientSecretKey,
   computeCacheEntry,
+  credentialPlan,
   decodeJwtExp,
   isRefreshDue,
   normalizeService,
   parseGrantResponse,
+  publicKeyKey,
   resolveTokenEndpoint,
   s3AccessKeyKey,
   s3SecretKeyKey,
+  secretKeyKey,
   type ParsedGrant,
 } from '../src/lib/service-credentials-lib.ts';
 
@@ -34,6 +38,46 @@ test('OpenBao key builders follow secret/<service>/<leaf> convention', () => {
   assert.equal(clientSecretKey('  FLEET '), 'fleet/client-secret');
   assert.equal(s3AccessKeyKey('seaweedfs'), 'seaweedfs/s3-access-key');
   assert.equal(s3SecretKeyKey('seaweedfs'), 'seaweedfs/s3-secret-key');
+  assert.equal(apiTokenKey('fleet'), 'fleet/api-token');
+  assert.equal(apiTokenKey('  Fleet '), 'fleet/api-token');
+  assert.equal(publicKeyKey('langfuse'), 'langfuse/public-key');
+  assert.equal(secretKeyKey('langfuse'), 'langfuse/secret-key');
+});
+
+// ── credentialPlan: the single source of truth for what KIND each service accepts ──────────────────
+// This is the design-gap fix: a KC JWT is only minted for services that VALIDATE one. The plan pins
+// the mode + the OpenBao key the shell reads, per service, purely (no I/O).
+test('credentialPlan: gateway is oidc-jwt (mints a KC JWT the aggregator validates)', () => {
+  assert.deepEqual(credentialPlan('gateway'), { mode: 'oidc-jwt', baoPath: 'gateway/client-secret' });
+});
+
+test('credentialPlan: fleet is native-bearer (FleetDM API token, NOT a KC JWT)', () => {
+  assert.deepEqual(credentialPlan('fleet'), { mode: 'native-bearer', baoPath: 'fleet/api-token' });
+});
+
+test('credentialPlan: langfuse is native-basic (pk/sk project keys → Basic)', () => {
+  assert.deepEqual(credentialPlan('langfuse'), { mode: 'native-basic', baoPath: 'langfuse/public-key' });
+});
+
+test('credentialPlan: seaweedfs/s3 are s3 (SigV4 access/secret keys)', () => {
+  assert.deepEqual(credentialPlan('seaweedfs'), { mode: 's3', baoPath: 'seaweedfs/s3-access-key' });
+  assert.deepEqual(credentialPlan('s3'), { mode: 's3', baoPath: 's3/s3-access-key' });
+});
+
+test('credentialPlan: no-auth images (opensearch/marquez/opa/presidio) are none', () => {
+  for (const svc of ['opensearch', 'marquez', 'opa', 'presidio']) {
+    assert.deepEqual(credentialPlan(svc), { mode: 'none' }, svc);
+  }
+});
+
+test('credentialPlan: an UNKNOWN service fails safe to none (never a wrong-kind credential)', () => {
+  assert.deepEqual(credentialPlan('some-new-service'), { mode: 'none' });
+  assert.deepEqual(credentialPlan(''), { mode: 'none' });
+});
+
+test('credentialPlan: normalizes the service name (case/whitespace) before lookup', () => {
+  assert.deepEqual(credentialPlan('  GATEWAY '), { mode: 'oidc-jwt', baoPath: 'gateway/client-secret' });
+  assert.deepEqual(credentialPlan('Fleet'), { mode: 'native-bearer', baoPath: 'fleet/api-token' });
 });
 
 test('resolveTokenEndpoint prefers base+realm, then issuer, else null', () => {

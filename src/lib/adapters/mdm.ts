@@ -30,9 +30,12 @@ const FLEET_URL = process.env.OFFGRID_FLEET_URL ?? process.env.FLEET_URL;
 const FLEET_TOKEN = process.env.OFFGRID_FLEET_TOKEN ?? process.env.FLEET_TOKEN;
 
 // Phase 4.10-B: the Fleet API token now flows through the service-token broker
-// (`getServiceCredential('fleet')`, a Keycloak service Bearer). When provisioned it's preferred; until
-// then the broker returns `kind:'none'` and we fall back to the legacy static `FLEET_TOKEN` UNCHANGED
-// — byte-identical to today. Selection is the pure, unit-tested `chooseFleetToken`.
+// (`getServiceCredential('fleet')`). The broker's per-service plan classifies fleet as 'native-bearer',
+// so it returns FleetDM's OWN API token (from `secret/fleet/api-token` in OpenBao) as a
+// `{ kind:'bearer' }` — NOT a Keycloak JWT (FleetDM's REST API validates its own token, a KC JWT would
+// 401). When provisioned it's preferred; until then the broker returns `kind:'none'` and we fall back
+// to the legacy static `FLEET_TOKEN` UNCHANGED — byte-identical to today. Selection is the pure,
+// unit-tested `chooseFleetToken`.
 async function fleetToken(): Promise<string | undefined> {
   const cred = await getServiceCredential('fleet');
   return chooseFleetToken(cred, FLEET_TOKEN);
