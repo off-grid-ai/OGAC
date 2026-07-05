@@ -404,15 +404,82 @@ create sets) — **isolation proven on the real DB**: org-a/org-b rows never cro
 Pattern to roll across the other scoped tables. RLS backstop pending a non-superuser DB role
 (app connects as superuser `offgrid`, which bypasses RLS).
 
+### RLS backstop — READY TO APPLY (reviewed .sql, NOT auto-run)
+
+The DB-enforced safety net behind the app-level org filtering is delivered as a reviewed migration:
+**`deploy/onprem/2026-rls-backstop.sql`** (generated from the pure `src/lib/rls-policy.ts` →
+`buildRlsMigrationSql`, unit-tested in `test/rls-policy.test.ts`). It:
+1. Creates a **non-superuser role `offgrid_app`** (`LOGIN NOSUPERUSER NOBYPASSRLS`) + baseline schema/
+   table/sequence grants (so the non-tenant auth/session/config tables still work).
+2. `ENABLE + FORCE ROW LEVEL SECURITY` on the **13 tenant-scoped tables in the code schema** (api_keys,
+   connectors, masking_rules, datasets, governance_items, agent_runs, routing_rules, tools,
+   chat_artifacts, studio_templates, provit_repos, provit_runs, provit_tokens) with an `org_isolation`
+   policy. Every block is **guarded** (`to_regclass` + `information_schema` org_id check) so it skips a
+   table that's absent or lacks org_id — re-runnable and drift-safe against tables created directly on S1.
+3. Policy predicate: `org_id = current_setting('app.current_org_id', true) OR current_setting(...) IS
+   NULL`. **Dormant by default:** the app doesn't set that GUC today, so the backstop is a no-op and
+   the app's existing query-layer filtering governs — switching to the role does NOT change results on
+   day one; it only removes the superuser bypass so the policy CAN take effect. Setting the GUC per
+   request (the documented `setOrgGucSql` / `withOrg` wrapper) turns it live without any route change.
+
+**Apply steps (on S1, during a maintenance window — the DATABASE_URL switch is the risky live step):**
+```bash
+# a) apply the migration as the superuser (drizzle-kit push hangs over SSH — use psql via docker):
+cat deploy/onprem/2026-rls-backstop.sql | \
+  /Users/admin/.orbstack/bin/docker exec -i offgrid-console-postgres-1 psql -U offgrid offgrid_console
+# b) set a real password for the app role (do NOT commit it):
+/Users/admin/.orbstack/bin/docker exec -i offgrid-console-postgres-1 \
+  psql -U offgrid offgrid_console -c "ALTER ROLE offgrid_app WITH PASSWORD '<STRONG-PW>';"
+# c) VERIFY as the app role BEFORE flipping the app (RLS enforces once the GUC is set):
+#   psql "postgresql://offgrid_app:<PW>@127.0.0.1:5432/offgrid_console" \
+#     -c "SET app.current_org_id='org-a'; SELECT count(*) FROM connectors;"  # only org-a rows
+```
+**⚠️ RISKY LIVE STEP — switching the app's DATABASE_URL to the non-superuser role.** Only after (a)-(c)
+verify clean, edit the console's `.env.local` `DATABASE_URL` from the `offgrid` superuser to
+`postgresql://offgrid_app:<PW>@127.0.0.1:5432/offgrid_console` and restart the console. Do this on-site
+with a rollback ready (revert DATABASE_URL to the superuser DSN + restart). If any table's grants are
+missing, the app will 42501-permission-error — that's why (c) verifies first. The backstop stays dormant
+(GUC unset) until the app opts into setting `app.current_org_id`, so functional behaviour is unchanged;
+the only change is that RLS is no longer bypassed.
+
 ## Backups (Phase 3A — done)
 
 `deploy/onprem/backup.sh` dumps console Postgres (52 tables) + corebank (PG) + policyadmin
 (MySQL) to `/Users/admin/offgrid/backups/<ts>/` (gzipped, 14-day retention). Verified working.
 **Off-box DR live**: backup.sh auto-rsyncs each dump to `admin@192.168.1.66:/backups-from-s1`
 (S1→.66 passwordless SSH works; no install on .66 — native rsync, NO OrbStack per decision).
-TODO: schedule via launchd `co.getoffgridai.backup` (daily 02:00); MSSQL logical dump.
 Full streaming replica on .66 (native PG16, no Docker) is the next HA step — needs a one-time
 sudo pw during the Homebrew/PG install.
+
+### Nightly schedule — plist READY TO INSTALL (`deploy/onprem/co.getoffgridai.backup.plist`)
+
+Daily 02:00 backup via a **system LaunchDaemon** (runs as root, no login required). The console's
+Backups page reads its state via `launchctl list co.getoffgridai.backup` (`readScheduleStatus`) and
+shows "scheduled" once loaded. **Apply on S1 (sudo):**
+```bash
+sudo cp deploy/onprem/co.getoffgridai.backup.plist /Library/LaunchDaemons/
+sudo chown root:wheel /Library/LaunchDaemons/co.getoffgridai.backup.plist
+sudo chmod 644        /Library/LaunchDaemons/co.getoffgridai.backup.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/co.getoffgridai.backup.plist
+sudo launchctl list co.getoffgridai.backup            # exit 0 = loaded
+sudo launchctl kickstart -k system/co.getoffgridai.backup   # run once now to validate
+```
+Logs to `/Users/admin/offgrid/backups/backup.log`. `RunAtLoad=false` (don't fire on every reboot;
+02:00 only). Note: a root daemon has root's own ssh identity/known_hosts — the off-box rsync in
+backup.sh is best-effort (`BatchMode`, never fails the backup); if the off-box copy must run as
+`admin` (whose key is authorized on the peer), either add `UserName=admin` to the plist or authorize
+root's key on the peer. Still TODO: MSSQL logical dump.
+
+### Console Backups page — trigger + prune + restore-inspect (all live in the module)
+
+The `/backups` module is a full management surface (routes under `/api/v1/admin/backups`, admin-gated):
+- **Run backup now** — `POST /api/v1/admin/backups` (spawns backup.sh; 409 if one's already running).
+- **Delete / Prune** — `DELETE …/[name]` and `POST …/prune` (path-safety choke-point).
+- **Restore** — `GET …/[name]/restore` is a **NON-destructive inspector**: it lists the dump files in a
+  chosen backup and returns the EXACT copy-pasteable restore command per dump (built by `buildRestorePlan`
+  in `backups-view.ts`, mirroring backup.sh's RESTORE notes). **Deliberately NOT one-click** — restoring
+  overwrites a live DB, so the UI shows a hard warning + the command to run on S1 in a maintenance window,
+  rather than executing it. This is the honest, guarded surface.
 
 ## launchd services on S1 (root)
 
