@@ -9,6 +9,22 @@ import {
   type WorkflowExecutionStatus,
   workflowIdFor,
 } from '@/lib/agent-run-durable';
+import {
+  agentRunListQuery,
+  buildExecutionsView,
+  buildWorkflowDetail,
+  type RawWorkflowDescription,
+  type RawWorkflowExecutionInfo,
+  type WorkflowDetail,
+  type WorkflowExecutionsView,
+} from '@/lib/temporal-visibility';
+import {
+  buildSchedulesView,
+  type RawScheduleDescription,
+  type ScheduleSpec,
+  scheduleRunIdSeed,
+  type SchedulesView,
+} from '@/lib/temporal-schedules';
 
 // Agent-runtime adapters — the seam that decides HOW an agent run executes. The default is
 // synchronous, in-process (runAgent in src/lib/agentrun.ts). The Temporal adapter is a durable
@@ -178,4 +194,182 @@ export function getAgentRuntime(): AgentRuntimePort {
     return AGENT_RUNTIME_PORTS.find((p) => p.meta.id === wanted) ?? syncRuntime;
   }
   return temporalRuntime.available() ? temporalRuntime : syncRuntime;
+}
+
+// ── Workflow visibility (read side) ───────────────────────────────────────────────────────────
+// I/O bridge over @temporalio/client. Maps the client's WorkflowExecutionInfo / describe() objects
+// onto the raw shapes the PURE temporal-visibility module normalizes. NEVER throws — Temporal
+// unreachable/unconfigured returns an empty, configured/reachable-flagged view with a note.
+
+const NOT_CONFIGURED = 'Durable runtime not enabled — set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_AGENTRUNTIME=temporal.';
+
+/** List recent AgentRunWorkflow executions from Temporal's visibility store. */
+export async function listWorkflowExecutions(limit = 50): Promise<WorkflowExecutionsView> {
+  if (!durableEnabled(process.env)) {
+    return buildExecutionsView([], { configured: false, reachable: false, note: NOT_CONFIGURED });
+  }
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const raws: RawWorkflowExecutionInfo[] = [];
+    // client.workflow.list yields an async iterable of WorkflowExecutionInfo. Scope to our workflow
+    // type via the visibility query; bound the scan by `limit` so a huge history doesn't stream in.
+    for await (const wf of client.workflow.list({ query: agentRunListQuery() })) {
+      raws.push({
+        workflowId: wf.workflowId,
+        runId: wf.runId,
+        type: wf.type,
+        status: wf.status?.name,
+        startTime: wf.startTime,
+        closeTime: wf.closeTime,
+        historyLength: wf.historyLength,
+        taskQueue: wf.taskQueue,
+      });
+      if (raws.length >= limit) break;
+    }
+    return buildExecutionsView(raws, { configured: true, reachable: true });
+  } catch (e) {
+    return buildExecutionsView([], {
+      configured: true,
+      reachable: false,
+      note: `Temporal unreachable: ${(e as Error).message}`,
+    });
+  }
+}
+
+/** Fetch a single workflow's status/result summary by workflowId. */
+export async function describeWorkflow(workflowId: string): Promise<WorkflowDetail> {
+  if (!durableEnabled(process.env)) {
+    return buildWorkflowDetail(null, undefined, { note: NOT_CONFIGURED });
+  }
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const handle = client.workflow.getHandle(workflowId);
+    const desc = await handle.describe();
+    const raw: RawWorkflowDescription = {
+      workflowId: desc.workflowId,
+      runId: desc.runId,
+      type: desc.type,
+      status: desc.status?.name,
+      startTime: desc.startTime,
+      closeTime: desc.closeTime,
+      historyLength: desc.historyLength,
+      taskQueue: desc.taskQueue,
+    };
+    // Only a closed workflow has a result; reading it on a running one would block. Guard by status.
+    let result: unknown;
+    if (desc.status?.name === 'COMPLETED') {
+      result = await handle.result().catch(() => undefined);
+    }
+    return buildWorkflowDetail(raw, result);
+  } catch (e) {
+    const msg = (e as Error).message ?? '';
+    // A missing workflow is a clean not-found, not an error to surface as unreachable.
+    const notFound = /not found|no execution|WorkflowNotFound/i.test(msg);
+    return buildWorkflowDetail(null, undefined, {
+      note: notFound ? 'workflow not found' : `Temporal unreachable: ${msg}`,
+    });
+  }
+}
+
+// ── Schedules (recurring agent runs) ──────────────────────────────────────────────────────────
+// I/O bridge over @temporalio/client ScheduleClient. Create/list/pause/unpause/delete Temporal
+// Schedules that fire AgentRunWorkflow on a cron spec. All shaping/validation is pure (see
+// temporal-schedules.ts). List NEVER throws; the mutating ops return { ok, error? } for the route.
+
+export async function listSchedules(): Promise<SchedulesView> {
+  if (!durableEnabled(process.env)) {
+    return buildSchedulesView([], { configured: false, reachable: false, note: NOT_CONFIGURED });
+  }
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const raws: RawScheduleDescription[] = [];
+    for await (const s of client.schedule.list()) {
+      // ScheduleSummary carries spec + info; fall back gracefully on partial summaries.
+      const spec = (s as { spec?: { cronExpressions?: string[] } }).spec;
+      const info = (s as { info?: { recentActions?: { takenAt?: Date }[]; nextActionTimes?: Date[] } }).info;
+      const action = (s as { action?: { workflowType?: string } }).action;
+      raws.push({
+        scheduleId: s.scheduleId,
+        paused: (s as { state?: { paused?: boolean } }).state?.paused,
+        note: (s as { state?: { note?: string } }).state?.note,
+        cronExpressions: spec?.cronExpressions,
+        workflowType: action?.workflowType,
+        recentActions: info?.recentActions?.map((a) => a.takenAt).filter(Boolean) as Date[] | undefined,
+        nextActions: info?.nextActionTimes,
+      });
+    }
+    return buildSchedulesView(raws, { configured: true, reachable: true });
+  } catch (e) {
+    return buildSchedulesView([], {
+      configured: true,
+      reachable: false,
+      note: `Temporal unreachable: ${(e as Error).message}`,
+    });
+  }
+}
+
+export interface ScheduleMutationResult {
+  ok: boolean;
+  scheduleId?: string;
+  error?: string;
+}
+
+/** Create a Temporal Schedule that fires AgentRunWorkflow on the given cron spec. */
+export async function createSchedule(spec: ScheduleSpec): Promise<ScheduleMutationResult> {
+  if (!durableEnabled(process.env)) return { ok: false, error: NOT_CONFIGURED };
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    // Each fire runs the same AgentRunWorkflow; Temporal appends the scheduled time to the workflow
+    // id, so a stable base id per schedule yields a distinct execution per fire. The workflow input
+    // carries a per-schedule runId seed (the pipeline persists its own concrete run id downstream).
+    await client.schedule.create({
+      scheduleId: spec.scheduleId,
+      spec: { cronExpressions: [spec.cron] },
+      action: {
+        type: 'startWorkflow',
+        workflowType: 'AgentRunWorkflow',
+        taskQueue: cfg.taskQueue,
+        args: [{ ...spec.input, runId: scheduleRunIdSeed(spec.scheduleId) }, cfg.maxAttempts],
+      },
+      state: {
+        paused: spec.paused,
+        note: spec.note,
+      },
+    });
+    return { ok: true, scheduleId: spec.scheduleId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Pause or resume a schedule. */
+export async function setSchedulePaused(scheduleId: string, paused: boolean): Promise<ScheduleMutationResult> {
+  if (!durableEnabled(process.env)) return { ok: false, error: NOT_CONFIGURED };
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const handle = client.schedule.getHandle(scheduleId);
+    if (paused) await handle.pause();
+    else await handle.unpause();
+    return { ok: true, scheduleId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Delete a schedule. */
+export async function deleteSchedule(scheduleId: string): Promise<ScheduleMutationResult> {
+  if (!durableEnabled(process.env)) return { ok: false, error: NOT_CONFIGURED };
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    await client.schedule.getHandle(scheduleId).delete();
+    return { ok: true, scheduleId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
