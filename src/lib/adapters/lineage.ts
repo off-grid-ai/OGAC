@@ -1,3 +1,4 @@
+import { buildDatasetObject, type DatasetFacetSpec } from '@/lib/lineage-facets';
 import { LINEAGE } from './services';
 import type { LineageEvent, LineagePort } from './types';
 
@@ -22,20 +23,23 @@ export const nullLineage: LineagePort = {
   },
 };
 
-function datasets(names: string[] | undefined) {
-  return (names ?? []).map((name) => ({ namespace: NAMESPACE, name }));
+// Build the OpenLineage dataset list, attaching any per-dataset facets (schema / columnLineage /
+// dataQuality) the producer supplied for that name. A dataset with no matching spec stays bare.
+function datasets(names: string[] | undefined, specs: DatasetFacetSpec[] | undefined) {
+  return (names ?? []).map((name) => buildDatasetObject(NAMESPACE, name, specs));
 }
 
 // One OpenLineage RunEvent — the open standard Marquez ingests at POST /api/v1/lineage.
-function runEvent(event: LineageEvent, eventTime: string) {
+// Exported (pure, no I/O) so the facet-attachment shape is unit-testable without a live Marquez.
+export function runEvent(event: LineageEvent, eventTime: string) {
   return {
     eventType: event.status === 'FAIL' ? 'FAIL' : event.status,
     eventTime,
     producer: PRODUCER,
     run: { runId: event.run },
     job: { namespace: NAMESPACE, name: event.job },
-    inputs: datasets(event.inputs),
-    outputs: datasets(event.outputs),
+    inputs: datasets(event.inputs, event.facets),
+    outputs: datasets(event.outputs, event.facets),
   };
 }
 

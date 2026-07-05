@@ -11,7 +11,10 @@ import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const VISION_MODEL = process.env.OFFGRID_VISION_MODEL ?? 'gemma-local';
 
 // Record source→document lineage through the lineage port (no-op by default, Marquez when
-// configured). Funnels every ingest path so the provenance graph stays complete.
+// configured). Funnels every ingest path so the provenance graph stays complete. brain.ingest
+// KNOWS the shape of an indexed document, so it emits a real OpenLineage schema facet (the doc's
+// fields) plus a dataQuality metric (indexed character count) on the output dataset — a bare
+// event only names the datasets; the facet lets Marquez render the document's structure.
 async function recordIngest(source: string, doc: BrainDoc): Promise<BrainDoc> {
   await getLineage().emit({
     job: 'brain.ingest',
@@ -19,6 +22,22 @@ async function recordIngest(source: string, doc: BrainDoc): Promise<BrainDoc> {
     status: 'COMPLETE',
     inputs: [source],
     outputs: [doc.title],
+    facets: [
+      {
+        name: doc.title,
+        fields: [
+          { name: 'id', type: 'string', description: 'stable document id' },
+          { name: 'title', type: 'string', description: 'document title' },
+          { name: 'source', type: 'string', description: 'origin (text/file/image/database)' },
+          { name: 'text', type: 'string', description: 'indexed, embedded content' },
+        ],
+        dataQuality: {
+          rowCount: 1,
+          byteCount: doc.text.length,
+          columns: { text: { count: doc.text.length } },
+        },
+      },
+    ],
   });
   return doc;
 }
