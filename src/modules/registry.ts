@@ -33,6 +33,7 @@ export type ModuleId =
   | 'policy'
   | 'evals'
   | 'siem'
+  | 'audit'
   | 'drift'
   | 'backups'
   | 'retrieval'
@@ -300,6 +301,15 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Security Events',
     description: 'Security/audit event stream from OpenSearch — outcomes, top actors, and blocked/denied activity.',
     route: '/siem',
+    service: 'control',
+    internal: true,
+  },
+  {
+    id: 'audit',
+    label: 'Audit Log',
+    description:
+      'Accountability trail — who sent which chats, ran which workflows, and changed what. Filter by actor, action, project, outcome, and time; export CSV/JSON for compliance.',
+    route: '/audit',
     service: 'control',
     internal: true,
   },

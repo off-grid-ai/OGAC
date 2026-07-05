@@ -39,7 +39,10 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
   },
   {
     heading: 'Security',
-    tabs: [{ id: 'siem', label: 'Security Events', route: '/siem' }],
+    tabs: [
+      { id: 'siem', label: 'Security Events', route: '/siem' },
+      { id: 'audit', label: 'Audit Log', route: '/audit' },
+    ],
   },
 ];
 
