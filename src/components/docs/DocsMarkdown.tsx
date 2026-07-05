@@ -4,20 +4,25 @@ import { Check, Copy } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { slugifyHeading } from '@/lib/docs';
+import { nodeText } from '@/lib/docs/node-text';
 
+// The copy button needs the raw code text, but after syntax highlighting the code block's children
+// are nested <span class="hljs-*"> elements, not a flat string. Recurse through the React tree to
+// recover the plain text.
 function headingText(children: React.ReactNode): string {
-  if (typeof children === 'string') return children;
-  if (Array.isArray(children)) return children.map(headingText).join('');
-  return '';
+  return nodeText(children);
 }
 
 // A fenced code block with a copy button (docs are terminal/mono; the copy affordance is the key
 // finesse for API samples).
-function CodeBlock({ children }: { children: React.ReactNode }) {
+function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
   const [copied, setCopied] = useState(false);
   const text = headingText(children);
+  // rehype-highlight adds `hljs language-*` to the <code> className; keep it so the highlight.js
+  // theme (imported in globals.css) styles the nested spans.
   return (
     <div className="group relative">
       <button
@@ -28,11 +33,15 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
           setTimeout(() => setCopied(false), 1500);
         }}
         aria-label="Copy code"
-        className="absolute right-2 top-2 rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground opacity-0 transition-all duration-150 hover:text-foreground group-hover:opacity-100"
+        className="absolute right-2 top-2 z-10 rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground opacity-0 transition-all duration-150 hover:text-foreground group-hover:opacity-100"
       >
         {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
       </button>
-      <code className="block overflow-x-auto rounded-md bg-muted/60 p-3 font-mono text-xs text-foreground">
+      <code
+        className={`block overflow-x-auto rounded-md bg-muted/60 p-3 font-mono text-xs text-foreground${
+          className ? ` ${className}` : ''
+        }`}
+      >
         {children}
       </code>
     </div>
@@ -47,6 +56,7 @@ export function DocsMarkdown({ body }: { body: string }) {
     <div className="max-w-none space-y-4 text-sm leading-relaxed text-foreground">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
         components={{
           h2: ({ children }) => (
             <h2
@@ -92,6 +102,23 @@ export function DocsMarkdown({ body }: { body: string }) {
               </a>
             );
           },
+          img: ({ src, alt }) => (
+            // Screenshots on capability guides. Bordered/rounded to read as a framed screenshot,
+            // responsive, with the alt as a caption. Plain <img> (not next/image) keeps /docs a
+            // clean static export.
+            <span className="mt-4 block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={typeof src === 'string' ? src : ''}
+                alt={alt ?? ''}
+                loading="lazy"
+                className="w-full rounded-lg border border-border shadow-sm"
+              />
+              {alt ? (
+                <span className="mt-1.5 block text-center text-xs text-muted-foreground">{alt}</span>
+              ) : null}
+            </span>
+          ),
           code: ({ children, className }) => {
             const inline = !className;
             if (inline) {
@@ -101,7 +128,7 @@ export function DocsMarkdown({ body }: { body: string }) {
                 </code>
               );
             }
-            return <CodeBlock>{children}</CodeBlock>;
+            return <CodeBlock className={className}>{children}</CodeBlock>;
           },
           pre: ({ children }) => <>{children}</>,
         }}

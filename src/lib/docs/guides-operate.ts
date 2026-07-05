@@ -12,6 +12,8 @@ export const operateSection: DocSection = {
 three questions you have every morning — is my AI healthy, is it safe, what is it costing — and puts
 the next action one click away.
 
+![The Overview home — governance posture, traffic, spend, and recent activity](/docs-shots/overview.png)
+
 ## What it shows
 
 - **Governance posture** — the policy engine state, guardrail actions in the window, and the live
@@ -74,6 +76,8 @@ enforced before a request ever reaches a service.`,
       body: `The gateway is the single, OpenAI-compatible endpoint every model call flows through —
 open-weight models on your own nodes, and cloud models when your policy allows.
 
+![The AI Gateway — routing rules, per-model cost, and which node served each call](/docs-shots/gateway.png)
+
 ## Routing
 
 For each request, the first matching routing rule (by priority) decides where it runs:
@@ -101,6 +105,8 @@ whole model estate.`,
       description: 'Run the nodes and models that serve your AI.',
       body: `Fleet is how you run the hardware behind the platform. A single source-of-truth table
 holds your topology; everything downstream is derived from it.
+
+![Fleet — nodes, their roles, the model each serves, and enable/disable](/docs-shots/fleet.png)
 
 ## What you manage
 
@@ -200,6 +206,8 @@ report is the reconciliation.`,
       body: `Accounting turns raw usage into the numbers a finance owner needs: cost attributed to the
 team, model, and use-case that spent it, over a period you choose.
 
+![Accounting — chargeback-grade cost by team, model, and use-case](/docs-shots/accounting.png)
+
 ## What it answers
 
 - **Who spent what** — cost by team and virtual key, so spend has an owner.
@@ -281,6 +289,8 @@ Full-text audit search across the stream is available from the Control page.`,
 and changed what, when. It reads the same tamper-evident \`offgrid-audit\` index every governed run
 writes to, so it's the artifact you hand a regulator, not a claim.
 
+![The Audit ledger — actor, action, outcome, model, and cost per governed run](/docs-shots/audit.png)
+
 ## What each entry holds
 
 Every completion records the actor, the action and outcome, the model and tokens, whether data left
@@ -305,6 +315,8 @@ ledger; SIEM is the security-signal stream over the same events, tuned with supp
       body: `Lineage traces where an answer came from: which sources fed a grounded run, all the way
 back to the document. It reads OpenLineage events from Marquez, with a fallback reconstruction from
 the source→answer references recorded on each run.
+
+![Lineage — the source-to-answer graph for a governed run](/docs-shots/lineage.png)
 
 ## What it shows
 

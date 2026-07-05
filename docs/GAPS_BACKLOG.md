@@ -47,8 +47,8 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 ## Docs depth (from DOCS_GAPS.md)
 | # | Gap | Owner |
 |---|---|---|
-| 21 | Screenshots/walkthroughs on capability guides | console + Mac |
-| 22 | Syntax highlighting + per-connector setup detail | console (needs a dep) |
+| 21 | ✅ **DONE (2026-07-06)** — 14 fresh module screenshots optimized (`sips -Z 1400`, ~2.8 MB total) into `public/docs-shots/` and referenced in the matching capability guides (overview, chat, knowledge, agents, gateway, control, guardrails, policy, provenance, audit, accounting, lineage, retrieval, fleet). `DocsMarkdown` got a styled `img` renderer (bordered/rounded/lazy, alt as caption) — plain markdown `![alt](/docs-shots/x.png)`, no new type field, static-export clean. | console + Mac |
+| 22 | ✅ **DONE (2026-07-06)** — Syntax highlighting via **rehype-highlight** (`highlight.js`) wired into the docs code renderer as a `rehypePlugins` entry: highlights at render → SSR/SSG-safe (verified `hljs-*` spans present in `.next/server/app/docs/api/chat.html`, no client-only hack). Copy button + heading anchors intact; copy button recovers raw source through nested highlight spans via the pure, unit-tested `src/lib/docs/node-text.ts`. A brand-matched hljs theme (emerald/mono, light+dark) lives in `globals.css` instead of a third-party stylesheet. Per-connector setup detail left for a follow-up. | console (needs a dep) |
 | 23 | First-party SDK page (once Phase 7 exists) | console |
 | 24 | Docs search is sidebar-inline; consider ⌘K parity | console |
 

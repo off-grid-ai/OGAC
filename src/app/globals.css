@@ -288,3 +288,70 @@ body {
     }
   }
 }
+
+/* highlight.js token colors for docs code blocks (rehype-highlight adds .hljs-* spans). Scoped to
+   the Off Grid brand palette and flipped light/dark via the existing token vars, so highlighted
+   code stays terminal/mono and on-brand instead of pulling a third-party theme. */
+:root {
+  --hljs-keyword: #059669;
+  --hljs-string: #0f766e;
+  --hljs-number: #b45309;
+  --hljs-comment: #9097a1;
+  --hljs-title: #0f1115;
+  --hljs-attr: #4b5563;
+  --hljs-meta: #6b7280;
+}
+[data-theme='dark'] {
+  --hljs-keyword: #34d399;
+  --hljs-string: #6ee7b7;
+  --hljs-number: #fbbf24;
+  --hljs-comment: #808080;
+  --hljs-title: #e5e7eb;
+  --hljs-attr: #b0b0b0;
+  --hljs-meta: #9ca3af;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-literal {
+  color: var(--hljs-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-symbol,
+.hljs-addition {
+  color: var(--hljs-string);
+}
+.hljs-number,
+.hljs-bullet,
+.hljs-quote {
+  color: var(--hljs-number);
+}
+.hljs-comment,
+.hljs-deletion {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.hljs-title,
+.hljs-name,
+.hljs-section,
+.hljs-function .hljs-title {
+  color: var(--hljs-title);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--hljs-attr);
+}
+.hljs-meta,
+.hljs-tag,
+.hljs-doctag {
+  color: var(--hljs-meta);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
