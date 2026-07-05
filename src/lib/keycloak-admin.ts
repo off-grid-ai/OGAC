@@ -348,6 +348,107 @@ export class KeycloakAdminClient {
     });
     return data.value;
   }
+
+  // ── Realm admin: active sessions ────────────────────────────────────────────
+  // Additive — realm-level operational admin. Raw Keycloak JSON is shaped by the pure
+  // helpers in keycloak-realm.ts; these methods only do I/O.
+
+  // List a single user's active sessions. GET /users/{id}/sessions returns UserSessionRepresentation[].
+  async listUserSessions(userId: string): Promise<unknown[]> {
+    return this.fetchJson<unknown[]>(`/users/${userId}/sessions`);
+  }
+
+  // List active sessions for a client (realm-wide sessions are only exposed per-client in Keycloak's
+  // admin API). GET /clients/{internalClientId}/user-sessions.
+  async listClientSessions(internalClientId: string, first?: number, max?: number): Promise<unknown[]> {
+    const params = new URLSearchParams();
+    if (first !== undefined) params.set('first', String(first));
+    if (max !== undefined) params.set('max', String(max));
+    const qs = params.toString() ? `?${params}` : '';
+    return this.fetchJson<unknown[]>(`/clients/${internalClientId}/user-sessions${qs}`);
+  }
+
+  // Log out every session of a user. POST /users/{id}/logout.
+  async logoutUser(userId: string): Promise<void> {
+    await this.fetchJson<void>(`/users/${userId}/logout`, { method: 'POST' });
+  }
+
+  // Revoke a single session by id. DELETE /admin/realms/{realm}/sessions/{session}.
+  async deleteSession(sessionId: string): Promise<void> {
+    const res = await this.fetch(`/sessions/${sessionId}`, { method: 'DELETE' });
+    if (!res.ok) throw await parseKcError(res);
+  }
+
+  // ── Realm admin: MFA / required actions ─────────────────────────────────────
+
+  // The realm's required-action providers. GET /authentication/required-actions.
+  async listRequiredActions(): Promise<unknown[]> {
+    return this.fetchJson<unknown[]>('/authentication/required-actions');
+  }
+
+  // A user's stored credentials (password, otp, webauthn…). GET /users/{id}/credentials.
+  async listUserCredentials(userId: string): Promise<unknown[]> {
+    return this.fetchJson<unknown[]>(`/users/${userId}/credentials`);
+  }
+
+  // Overwrite a user's requiredActions (used to enable/disable "Configure OTP"). The caller merges
+  // via the pure helper (withConfigureOtp) and PUTs back only the requiredActions field — Keycloak's
+  // user PUT merges scalars but replaces arrays, so we send the full array.
+  async setUserRequiredActions(userId: string, requiredActions: string[]): Promise<void> {
+    await this.fetchJson<void>(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ requiredActions }),
+    });
+  }
+
+  // Delete a single credential (e.g. remove a configured OTP device).
+  // DELETE /users/{id}/credentials/{credentialId}.
+  async deleteUserCredential(userId: string, credentialId: string): Promise<void> {
+    const res = await this.fetch(`/users/${userId}/credentials/${credentialId}`, { method: 'DELETE' });
+    if (!res.ok) throw await parseKcError(res);
+  }
+
+  // ── Realm admin: identity-provider federation ───────────────────────────────
+
+  // List configured IdP instances. GET /identity-provider/instances.
+  async listIdentityProviders(): Promise<unknown[]> {
+    return this.fetchJson<unknown[]>('/identity-provider/instances');
+  }
+
+  // Create an IdP from a prepared representation (built + validated by buildOidcIdpRep).
+  // POST /identity-provider/instances.
+  async createIdentityProvider(rep: unknown): Promise<void> {
+    await this.fetchJson<void>('/identity-provider/instances', {
+      method: 'POST',
+      body: JSON.stringify(rep),
+    });
+  }
+
+  // Delete an IdP by alias. DELETE /identity-provider/instances/{alias}.
+  async deleteIdentityProvider(alias: string): Promise<void> {
+    const res = await this.fetch(`/identity-provider/instances/${encodeURIComponent(alias)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw await parseKcError(res);
+  }
+
+  // ── Realm admin: token / session lifetimes ──────────────────────────────────
+
+  // The full realm representation. GET /admin/realms/{realm} (the client's baseUrl already includes
+  // /admin/realms/{realm}, so an empty path hits the realm root). Returned untyped — the pure helper
+  // extractLifetimes() shapes it, and mergeRealmLifetimes() prepares the write.
+  async getRealm(): Promise<Record<string, unknown>> {
+    return this.fetchJson<Record<string, unknown>>('');
+  }
+
+  // Overwrite the realm representation. PUT /admin/realms/{realm}. CAUTION: this replaces the whole
+  // rep — callers MUST pass a merge of the current rep (mergeRealmLifetimes), never a bare patch.
+  async updateRealm(rep: Record<string, unknown>): Promise<void> {
+    await this.fetchJson<void>('', {
+      method: 'PUT',
+      body: JSON.stringify(rep),
+    });
+  }
 }
 
 // Singleton per process (token is cached in-instance).
