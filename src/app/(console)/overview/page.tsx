@@ -26,7 +26,7 @@ function StatCard({ s }: { s: HomeStat }) {
   return (
     <Link
       href={s.href}
-      className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40"
+      className="group rounded-lg border border-border bg-card p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{s.label}</div>
       <div className={cn('mt-1.5 text-2xl font-semibold tabular-nums', TONE[s.tone])}>{s.value}</div>
@@ -93,7 +93,7 @@ export default async function ConsoleHome() {
           <Link
             key={a.href}
             href={a.href}
-            className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <a.icon className="size-4" />
             {a.label}
