@@ -14,6 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -311,15 +320,16 @@ function RuleDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{rule ? 'Edit policy rule' : 'Add policy rule'}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{rule ? 'Edit policy rule' : 'Add policy rule'}</SheetTitle>
+          <SheetDescription>
             When a request&apos;s attribute matches the condition, the effect applies. Deny
             overrides allow.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
+        <SheetBody>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="p-name">Name</Label>
@@ -397,15 +407,16 @@ function RuleDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
+        </SheetBody>
+        <SheetFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button onClick={save} disabled={busy || !form.name.trim() || !form.value.trim()}>
             {busy ? 'Saving…' : rule ? 'Save changes' : 'Add rule'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

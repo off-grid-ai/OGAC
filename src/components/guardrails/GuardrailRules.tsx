@@ -1,18 +1,19 @@
 'use client';
 
 import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,20 +61,57 @@ const EMPTY: Draft = { matcher: 'entity', pattern: '', action: 'redact', label: 
 
 export function GuardrailRules({ rules }: { rules: Rule[] }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Rule | null>(null);
+  const params = useSearchParams();
+  // Which panel is open lives in the URL: ?panel=new-mask (create) or ?panel=edit-mask&id=<id>.
+  const panel = params.get('panel');
+  const editId = params.get('id');
+  const editing =
+    panel === 'edit-mask' && editId ? (rules.find((r) => r.id === editId) ?? null) : null;
+  const open = panel === 'new-mask' || (panel === 'edit-mask' && editing !== null);
+
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
 
+  const setPanel = useCallback(
+    (next: 'new-mask' | { id: string } | null) => {
+      const p = new URLSearchParams(params.toString());
+      if (next === null) {
+        p.delete('panel');
+        p.delete('id');
+      } else if (next === 'new-mask') {
+        p.set('panel', 'new-mask');
+        p.delete('id');
+      } else {
+        p.set('panel', 'edit-mask');
+        p.set('id', next.id);
+      }
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
+
+  const setOpen = useCallback((o: boolean) => !o && setPanel(null), [setPanel]);
+
+  // Seed the draft from the URL-selected target whenever it changes (open, switch rows, create).
+  useEffect(() => {
+    if (panel === 'new-mask') {
+      setDraft(EMPTY);
+    } else if (editing) {
+      setDraft({
+        matcher: editing.matcher,
+        pattern: editing.pattern,
+        action: editing.action,
+        label: editing.label,
+      });
+    }
+  }, [panel, editing]);
+
   function openCreate() {
-    setEditing(null);
-    setDraft(EMPTY);
-    setOpen(true);
+    setPanel('new-mask');
   }
   function openEdit(r: Rule) {
-    setEditing(r);
-    setDraft({ matcher: r.matcher, pattern: r.pattern, action: r.action, label: r.label });
-    setOpen(true);
+    setPanel({ id: r.id });
   }
 
   async function save() {
@@ -93,7 +131,7 @@ export function GuardrailRules({ rules }: { rules: Rule[] }) {
     setBusy(false);
     if (res.ok) {
       toast.success(editing ? 'Rule updated' : 'Rule added');
-      setOpen(false);
+      setPanel(null);
       router.refresh();
     } else {
       const d = await res.json().catch(() => null);
@@ -132,78 +170,88 @@ export function GuardrailRules({ rules }: { rules: Rule[] }) {
         <p className="text-sm text-muted-foreground">
           Console-owned masking rules. Each maps an entity type or regex to an action.
         </p>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline" onClick={openCreate}>
-              <Plus className="size-4" />
-              Add rule
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editing ? 'Edit rule' : 'Add a rule'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Matcher</Label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">
-                      {draft.matcher}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                    {MATCHERS.map((m) => (
-                      <DropdownMenuItem key={m} onClick={() => setDraft((d) => ({ ...d, matcher: m }))}>
-                        {m}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+        <Button size="sm" variant="outline" onClick={openCreate}>
+          <Plus className="size-4" />
+          Add rule
+        </Button>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{editing ? 'Edit rule' : 'Add a rule'}</SheetTitle>
+            </SheetHeader>
+            <SheetBody>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Matcher</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        {draft.matcher}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                      {MATCHERS.map((m) => (
+                        <DropdownMenuItem
+                          key={m}
+                          onClick={() => setDraft((d) => ({ ...d, matcher: m }))}
+                        >
+                          {m}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rule-pattern">
+                    {draft.matcher === 'entity' ? 'Entity type' : 'Regex pattern'}
+                  </Label>
+                  <Input
+                    id="rule-pattern"
+                    value={draft.pattern}
+                    placeholder={
+                      draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : '\\bACME-\\d+\\b'
+                    }
+                    onChange={(e) => setDraft((d) => ({ ...d, pattern: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Action</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        {draft.action}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                      {ACTIONS.map((a) => (
+                        <DropdownMenuItem
+                          key={a}
+                          onClick={() => setDraft((d) => ({ ...d, action: a }))}
+                        >
+                          {a}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rule-label">Label (optional)</Label>
+                  <Input
+                    id="rule-label"
+                    value={draft.label}
+                    placeholder="Why this rule exists"
+                    onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="rule-pattern">
-                  {draft.matcher === 'entity' ? 'Entity type' : 'Regex pattern'}
-                </Label>
-                <Input
-                  id="rule-pattern"
-                  value={draft.pattern}
-                  placeholder={draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : '\\bACME-\\d+\\b'}
-                  onChange={(e) => setDraft((d) => ({ ...d, pattern: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Action</Label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">
-                      {draft.action}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                    {ACTIONS.map((a) => (
-                      <DropdownMenuItem key={a} onClick={() => setDraft((d) => ({ ...d, action: a }))}>
-                        {a}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="rule-label">Label (optional)</Label>
-                <Input
-                  id="rule-label"
-                  value={draft.label}
-                  placeholder="Why this rule exists"
-                  onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-                />
-              </div>
+            </SheetBody>
+            <SheetFooter>
               <Button onClick={save} className="w-full" disabled={busy}>
                 {editing ? 'Save changes' : 'Add rule'}
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <Table>

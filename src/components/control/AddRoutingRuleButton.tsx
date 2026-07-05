@@ -1,18 +1,19 @@
 'use client';
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -20,7 +21,20 @@ const ACTIONS = ['local', 'cloud', 'block'] as const;
 
 export function AddRoutingRuleButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-routing';
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      const p = new URLSearchParams(params.toString());
+      if (next) p.set('panel', 'new-routing');
+      else p.delete('panel');
+      const qs = p.toString();
+      router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    },
+    [params, router],
+  );
+
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState('data_class');
   const [value, setValue] = useState('');
@@ -52,76 +66,80 @@ export function AddRoutingRuleButton() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" />
-          Add rule
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add a routing rule</DialogTitle>
-          <DialogDescription>
-            If a request&apos;s attribute matches, it routes to the chosen target. Cloud is leashed
-            by the org egress switch.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="r-name">Name</Label>
-            <Input id="r-name" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="r-attr">Attribute</Label>
-              <Input
-                id="r-attr"
-                value={attribute}
-                onChange={(e) => setAttribute(e.target.value)}
-                placeholder="data_class | task | cost"
-              />
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <Plus className="size-4" />
+        Add rule
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add a routing rule</SheetTitle>
+            <SheetDescription>
+              If a request&apos;s attribute matches, it routes to the chosen target. Cloud is
+              leashed by the org egress switch.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="r-name">Name</Label>
+                <Input id="r-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="r-attr">Attribute</Label>
+                  <Input
+                    id="r-attr"
+                    value={attribute}
+                    onChange={(e) => setAttribute(e.target.value)}
+                    placeholder="data_class | task | cost"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="r-val">Equals</Label>
+                  <Input
+                    id="r-val"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="pii | longcontext | low"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Route to</Label>
+                <div className="flex gap-2">
+                  {ACTIONS.map((a) => (
+                    <Button
+                      key={a}
+                      type="button"
+                      size="sm"
+                      variant={action === a ? 'default' : 'outline'}
+                      onClick={() => setAction(a)}
+                    >
+                      {a}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="r-model">Model (optional)</Label>
+                <Input
+                  id="r-model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="gemma-local | cloud-claude"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="r-val">Equals</Label>
-              <Input
-                id="r-val"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="pii | longcontext | low"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Route to</Label>
-            <div className="flex gap-2">
-              {ACTIONS.map((a) => (
-                <Button
-                  key={a}
-                  type="button"
-                  size="sm"
-                  variant={action === a ? 'default' : 'outline'}
-                  onClick={() => setAction(a)}
-                >
-                  {a}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="r-model">Model (optional)</Label>
-            <Input
-              id="r-model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="gemma-local | cloud-claude"
-            />
-          </div>
-          <Button onClick={create} disabled={busy || !name || !value} className="w-full">
-            {busy ? 'Adding…' : 'Add rule'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </SheetBody>
+          <SheetFooter>
+            <Button onClick={create} disabled={busy || !name || !value} className="w-full">
+              {busy ? 'Adding…' : 'Add rule'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
