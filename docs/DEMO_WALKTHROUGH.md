@@ -19,26 +19,26 @@ dividend), Evals (86% pass, 22 cases), Provenance (7 signed records), Integratio
 connected), Gateway (4 models incl. vision + image), Fleet (9 nodes), Access (machine clients),
 Reports, Prompts, Docs site.
 
+**🟢 NOW WIRED (2026-07-05) — the backends were on S1 all along; just needed console env:**
+Secrets (OpenBao live — reachable/unsealed, 3 real secrets), Lineage (connected to Marquez `default`
+ns — fills as runs emit OpenLineage), Model routing (4 real rules — pii/confidential→local,
+restricted→block, public→cloud), Audit search on Control (6 real events backfilled to OpenSearch).
+
 **🟡 Usable but thin — show briefly or populate first:**
-Guardrails (regex floor only — Presidio not wired), Drift (stable, but no feature signals yet),
-Retrieval (LanceDB works; Qdrant inspector empty), Secrets (env adapter, no keys — OpenBao not
-wired), Backups (status only, schedule not controllable), Observability (Langfuse up on g6; confirm
-traces are flowing).
+Guardrails (regex floor — Presidio DEFERRED, needs an edge-Caddy reload), Drift (stable, no feature
+signals yet), Retrieval (LanceDB works; Qdrant inspector empty), Security events/SIEM (6 real events
+but sparse actor/action — enriching needs a shipAudit change; grows live as chat happens), Backups
+(status only), Observability (Langfuse up on g6; confirm traces flow).
 
-**🔴 Empty / not wired — DON'T demo until fixed (see punch list):**
-Policy → Model routing (0 rules), Lineage (Marquez not configured), Security events / SIEM
-(OpenSearch not configured).
-
-### Punch list before the demo
-1. **Routing rules** — add 2-3 demo rules on Control (e.g. \`data_class=PII → block\`, \`bulk →
-   local\`) so the egress-leash story is visible, not empty. HIGH value, easy.
-2. **SIEM/OpenSearch** — wire \`OFFGRID_OPENSEARCH_URL\` (is OpenSearch on g6 now?) so Security
-   Events + audit search show data; else avoid that page.
-3. **Lineage/Marquez** — set \`OFFGRID_MARQUEZ_URL\` if Marquez is on g6; else avoid Lineage.
-4. **Presidio** — set \`OFFGRID_PRESIDIO_URL\`/\`_ANONYMIZER_URL\` (on g6?) so Guardrails shows
-   entity-grade masking, not just regex. Nice-to-have.
-5. **Seed a little demo content** — a couple of knowledge docs and one Studio assistant so Chat
-   grounding + Studio have something real to show.
+### Punch list before the demo  *(most now DONE — 2026-07-05)*
+1. ✅ **Routing rules** — 4 real rules seeded on Control; egress-leash story is live (verified).
+2. 🟡 **SIEM/OpenSearch** — OpenSearch was up on S1 all along; wired `OFFGRID_OPENSEARCH_URL`,
+   backfilled 6 real audit events → Audit search populated, SIEM shows them (sparse actor/action).
+3. ✅ **Lineage/Marquez** — Marquez was up on S1; wired `OFFGRID_MARQUEZ_URL` + `ADAPTER_LINEAGE`.
+4. 🟡 **Presidio** — live on g6 but the launchd next-server can't reach a standalone loopback proxy;
+   proper fix = add to the edge Caddy (needs an edge reload — do on-site). Regex floor until then.
+5. ⏳ **Seed a little demo content** — a couple of knowledge docs + one Studio assistant (Mac's real
+   docs) so Chat grounding + Studio have genuine content. Still the main remaining demo-prep item.
 
 ---
 
@@ -156,12 +156,12 @@ per-capability guides, integrations, API with code samples, self-hosting) + inte
 | Unleash (g6 :8932) | 🟢 | Config/flags |
 | Superset (g6 :8933) | 🟡 | Analytics embed |
 | FleetDM (g6 :8934) | 🟡 | Fleet (MDM) |
-| Qdrant (:6333) | 🟡 not default | Retrieval inspector |
-| OpenSearch | 🔴 not configured | SIEM, audit search |
-| Marquez | 🔴 not configured | Lineage |
-| OpenBao | 🔴 not configured | Secrets |
-| Presidio | 🔴 not configured | Guardrails (entity-grade) |
-| Temporal | 🟡 adapter scaffold | Durable agent runs |
+| Qdrant (S1 127.0.0.1:6333) | 🟡 not default | Retrieval inspector |
+| OpenSearch (S1 127.0.0.1:9200) | 🟢 wired | Analytics (offgrid-gateway), SIEM/Audit (offgrid-audit) |
+| Marquez (S1 127.0.0.1:9000) | 🟢 wired | Lineage (default ns) |
+| OpenBao (S1 127.0.0.1:8200) | 🟢 wired | Secrets (KV v2 mount `secret`, 3 real secrets) |
+| Presidio (g6 :5002/:5001) | 🔴 deferred (needs edge-Caddy 8938/8939 reload) | Guardrails (entity-grade) |
+| Temporal (S1 127.0.0.1:7233) | 🟡 adapter scaffold | Durable agent runs |
 
 ## Next iteration (from this audit)
 1. Close the 🔴s that are quick env wiring (OpenSearch, Marquez, Presidio, OpenBao) IF those services
