@@ -12,6 +12,8 @@ import {
 } from '@/lib/adapters/registry';
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
+import { estimateTokens, projectBudget } from '@/lib/chat-governance';
+import { costForTokens } from '@/lib/finops';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { emitRunTrace } from '@/lib/chat-trace';
 import { correlationIds } from '@/lib/correlation';
@@ -374,6 +376,34 @@ export async function runAgent(
     return persist(runId, {
       agentId, query, answer: '', status: 'blocked', steps, citations: [],
       checks: preChecks, provenance: null,
+    }, attribution.org);
+  }
+
+  // 2b. Budget GATE — the hard stop before this run incurs cost (retrieve → compose → gateway).
+  // Price what the answer WOULD cost at the run model's finops rate; ask the pure `checkBudget` gate
+  // (via projectBudget, which honors the per-org enforce flag). Local ($0) models never exceed, so
+  // on-prem runs are never blocked; only real cloud egress can be denied. On DENY → persist the run
+  // as 'denied' + a budget.deny audit event (outcome=blocked), so the block is attributable.
+  const estRunTokens = estimateTokens(query) + 2048; // prompt estimate + reply headroom
+  const runCost = costForTokens(runModel, estRunTokens);
+  const budget = await projectBudget(attribution.project ?? null, runCost, attribution.org);
+  if (!budget.ok) {
+    mark('budget', 'deny', `over budget — spent $${budget.spent.toFixed(4)} of $${budget.limit}`, [], Date.now());
+    recordAudit({
+      actor: attribution.actor,
+      org: attribution.org,
+      project: attribution.project,
+      action: 'budget.deny',
+      resource: `agent:${agentId}`,
+      model: runModel,
+      costUsd: runCost,
+      outcome: 'blocked',
+      runId,
+    });
+    return persist(runId, {
+      agentId, query, answer: '', status: 'denied', steps, citations: [],
+      checks: [{ name: 'budget', verdict: 'blocked' as const, detail: `project budget exceeded ($${budget.spent.toFixed(4)}/$${budget.limit})` }],
+      provenance: null,
     }, attribution.org);
   }
 

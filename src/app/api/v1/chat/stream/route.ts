@@ -23,9 +23,12 @@ import {
 import { extractMemory } from '@/lib/chat-memory';
 import { resolveTools } from '@/lib/chat-tools';
 import { emitChatTrace } from '@/lib/chat-trace';
+import { actorFrom } from '@/lib/audit-event';
+import { costForTokens } from '@/lib/finops';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
-import { getOrgSystemPrompt } from '@/lib/store';
+import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -224,8 +227,42 @@ export async function POST(req: Request) {
   if (activeSkillId && (await isDenied(role, 'chat.skill', activeSkillId))) {
     return deny('this skill is not permitted for your role');
   }
-  const budget = await projectBudget(ragProjectId);
-  if (!budget.ok) return deny('project budget exhausted for this month');
+  // Budget GATE — a hard stop, not just an alert. Price the cost this call WOULD incur (prompt
+  // estimate + the reply headroom, at this model's finops rate) and ask the pure `checkBudget` gate
+  // via projectBudget. Local ($0) models never exceed, so on-prem chat is never blocked; only real
+  // cloud egress can be denied. On DENY → 402 (Payment Required) to the client + a budget.deny audit
+  // event (outcome=blocked). Enforcement is togglable per org (default ON) — projectBudget honors it.
+  const promptChars = messages.reduce(
+    (n, m) => n + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length),
+    0,
+  );
+  const estCallTokens = estimateTokens(String(promptChars ? promptChars : content)) + 2048; // + max_tokens reply
+  const incomingCost = costForTokens(effectiveModel || 'unknown', estCallTokens);
+  const budget = await projectBudget(ragProjectId, incomingCost);
+  if (!budget.ok) {
+    // Record the denial in the audit ledger (canonical event: action=budget.deny, outcome=blocked)
+    // so "we can prove spend limits are enforced" holds — the block is attributable + auditable.
+    recordAudit({
+      actor: actorFrom({ email: userId }),
+      org: DEFAULT_ORG,
+      project: ragProjectId ?? undefined,
+      action: 'budget.deny',
+      resource: budget.keyId ? `key:${budget.keyId}` : ragProjectId ? `project:${ragProjectId}` : undefined,
+      model: effectiveModel || undefined,
+      costUsd: incomingCost,
+      outcome: 'blocked',
+    });
+    return new Response(
+      JSON.stringify({
+        error: 'budget_exceeded',
+        message: `Project budget exceeded — this call would cost ~$${incomingCost.toFixed(4)} and the monthly budget of $${budget.limit} is already at $${budget.spent.toFixed(4)}. Contact an admin to raise it.`,
+        spent: budget.spent,
+        limit: budget.limit,
+        incomingCost,
+      }),
+      { status: 402, headers: { 'content-type': 'application/json' } },
+    );
+  }
 
   // Org connectors (tool-calling): let the model decide whether to call a permitted tool. Mutating
   // tools require human approval — if any is pending, stop and ask the UI to approve before running.
