@@ -6,12 +6,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getEnabledModules } from '@/lib/modules';
 import { cn } from '@/lib/utils';
-import { groupModules } from '@/modules/groups';
+import { sidebarActiveIdFor, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 
 export function Sidebar() {
   const pathname = usePathname();
-  const sections = groupModules(getEnabledModules());
+  const modules = getEnabledModules();
+  const sections = sidebarSections(modules);
+
+  // Resolve which module the current URL belongs to (longest-matching route wins so /agents/x
+  // beats /a), then highlight that module's group landing — so being on a secondary route (e.g.
+  // /policy) keeps its section's primary row (Control) active in the sidebar.
+  const current = modules
+    .filter((m) => pathname === m.route || pathname.startsWith(`${m.route}/`))
+    .sort((a, b) => b.route.length - a.route.length)[0];
+  const activeId = current ? sidebarActiveIdFor(current.id) : undefined;
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
@@ -34,7 +43,7 @@ export function Sidebar() {
             <div className="space-y-0.5">
               {section.items.map((m) => {
                 const Icon = MODULE_ICONS[m.id];
-                const active = pathname === m.route || pathname.startsWith(`${m.route}/`);
+                const active = activeId === m.id;
                 return (
                   <Link
                     key={m.id}
