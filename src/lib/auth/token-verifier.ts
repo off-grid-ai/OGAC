@@ -20,6 +20,9 @@ export interface Principal {
   /** App role resolved from the token's realm/client roles. Built-in (admin/editor/
    *  viewer) or a custom/scoped role name that module-access resolves to module grants. */
   role: string;
+  /** Raw Keycloak realm-access roles, verbatim. Authz maps a MACHINE principal's realm roles
+   *  (e.g. an explicit console-admin grant) to a console capability — see lib/auth/machine-roles. */
+  realmRoles: string[];
   /** Whether this is a machine (service account) or a person. */
   kind: 'service' | 'user';
 }
@@ -136,11 +139,13 @@ class KeycloakVerifier implements IdentityVerifier {
 
       const username = String(c['preferred_username'] ?? '');
       const isService = username.startsWith('service-account-') || (!c['email'] && Boolean(c['azp']));
+      const realmRoles = (c['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
       return {
         subject: String(c['sub'] ?? ''),
         email: (c['email'] as string) || undefined,
         clientId: (c['azp'] as string) || undefined,
         role: roleFrom(c),
+        realmRoles,
         kind: isService ? 'service' : 'user',
       };
     } catch {
