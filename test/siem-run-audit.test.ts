@@ -35,11 +35,15 @@ test('buildRunAuditDoc carries run metadata and defaults', () => {
   assert.equal(typeof doc.ts, 'string');
 });
 
-test('the audit doc runId round-trips to the same key the other planes use', () => {
+test('the audit doc runId is the raw runId — the same value the audit + provenance planes key by', () => {
   const runId = 'run_De4dB33f';
   const doc = buildRunAuditDoc({ runId, agentId: 'a', outcome: 'done', model: 'm' });
   const ids = correlationIds(runId);
+  // Audit + provenance planes are keyed by the raw runId (verbatim), so they round-trip to it.
   assert.equal(doc.runId, ids.auditId);
-  assert.equal(doc.runId, ids.lineageRunId);
   assert.equal(doc.runId, ids.provenanceRef);
+  assert.equal(doc.runId, runId);
+  // Lineage keys by a derived UUID (Marquez requires a UUID run id), so it is NOT the raw runId —
+  // it is a deterministic function of it. All planes still correlate FROM the one runId.
+  assert.notEqual(doc.runId, ids.lineageRunId);
 });
