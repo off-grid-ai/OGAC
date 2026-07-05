@@ -28,6 +28,55 @@ export function costForTokens(model: string, tokens: number): number {
   return (tokens / 1000) * priceFor(model);
 }
 
+// ─── Budget ENFORCEMENT (Phase 0 Tier-0 gap) ──────────────────────────────────
+// The single, pure budget decision. Zero I/O — the caller supplies the real spend-so-far (priced
+// with the SAME finops rates via costOf/costForTokens) and the incoming call's cost; this decides
+// whether the call is admitted. It is the one place the "spend limit" rule lives, so the gate on
+// the chat + agent spend paths and the FinOps alert math agree by construction.
+//
+// This is the SINGLE source of truth for budgets: the `apiKeys.budgetUsd` (whole-USD monthly cap
+// per virtual key, scoped to a user/project) metered against real per-model spend from the gateway
+// traffic log (priced by `priceFor`). The old chat-governance `withinBudget` (flat blended rate on
+// the legacy Postgres audit_events table) is deprecated and now delegates here.
+//
+// Rules (exhaustive):
+//   - limit === null            → no budget set → ALLOW (unlimited)
+//   - incomingCost <= 0         → a $0 (local / on-prem) call NEVER exceeds → ALLOW, always. This is
+//                                 the on-device dividend: local inference is free and unthrottled.
+//   - spent + incomingCost > limit → the call would push spend OVER the cap → DENY.
+//   - otherwise (still at/under the cap after this call) → ALLOW.
+// A zero-limit ($0 budget) denies the first real-cost call but still lets $0 local calls through.
+export type BudgetReason = 'no-limit' | 'within-budget' | 'zero-cost' | 'over-budget';
+
+export interface BudgetDecision {
+  allow: boolean;
+  reason: BudgetReason;
+  spent: number; // spend already billed this period, USD
+  limit: number | null; // the cap, USD, or null for unlimited
+  incomingCost: number; // priced cost of the call under consideration, USD
+}
+
+export function checkBudget(
+  spent: number,
+  limit: number | null,
+  incomingCost: number,
+): BudgetDecision {
+  const cost = Number.isFinite(incomingCost) ? Math.max(0, incomingCost) : 0;
+  const spentSoFar = Number.isFinite(spent) ? Math.max(0, spent) : 0;
+  if (limit === null) {
+    return { allow: true, reason: 'no-limit', spent: spentSoFar, limit, incomingCost: cost };
+  }
+  // A $0 call (local / on-prem) can never push spend over any limit — admit it unconditionally,
+  // even at a spent-out or zero budget. Only real (cloud) cost is metered against the cap.
+  if (cost <= 0) {
+    return { allow: true, reason: 'zero-cost', spent: spentSoFar, limit, incomingCost: cost };
+  }
+  if (spentSoFar + cost > limit) {
+    return { allow: false, reason: 'over-budget', spent: spentSoFar, limit, incomingCost: cost };
+  }
+  return { allow: true, reason: 'within-budget', spent: spentSoFar, limit, incomingCost: cost };
+}
+
 function costOf(e: AuditEvent): number {
   return (e.tokens / 1000) * priceFor(e.model);
 }

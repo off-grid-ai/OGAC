@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { abacRules, apiKeys, auditEvents } from '@/db/schema';
 import { effectiveBaseRole } from '@/lib/module-access';
 import { actorFrom } from '@/lib/audit-event';
+import { budgetEnforced } from '@/lib/budget-config';
+import { checkBudget, costForTokens } from '@/lib/finops';
 import { recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -63,24 +65,78 @@ export async function projectKeyId(projectId: string | null): Promise<string | n
   return k?.id ?? null;
 }
 
-// Budget check: sum tokens already billed to the key this month against its budget (blended local
-// cost is $0, so this only bites for cloud models — mirrors FinOps' costOf). Returns true if within.
-const RATE_PER_1K = 0.002; // blended cloud rate; local models are free upstream
-export async function withinBudget(keyId: string | null, budgetUsd: number | null): Promise<boolean> {
-  if (!keyId || budgetUsd === null) return true;
+// Spend already billed to a key this month, in USD — priced with the SAME per-model finops rates as
+// FinOps (not a flat blended rate). Tokens are grouped by model in Postgres and each bucket is priced
+// via `costForTokens`, so local models correctly contribute $0 and only real cloud cost counts.
+export async function spentThisMonth(keyId: string): Promise<number> {
   const rows = await db.execute(sql`
-    SELECT COALESCE(SUM(tokens), 0) AS tokens FROM audit_events
-    WHERE key_id = ${keyId} AND ts >= date_trunc('month', now())`);
-  const list = (rows as unknown as { rows?: { tokens: string }[] }).rows ?? (rows as unknown as { tokens: string }[]);
-  const tokens = Number((list as { tokens: string }[])[0]?.tokens ?? 0);
-  return (tokens / 1000) * RATE_PER_1K < budgetUsd;
+    SELECT model, COALESCE(SUM(tokens), 0) AS tokens FROM audit_events
+    WHERE key_id = ${keyId} AND ts >= date_trunc('month', now())
+    GROUP BY model`);
+  const list =
+    (rows as unknown as { rows?: { model: string; tokens: string }[] }).rows ??
+    (rows as unknown as { model: string; tokens: string }[]);
+  let spent = 0;
+  for (const r of list as { model: string; tokens: string }[]) {
+    spent += costForTokens(r.model ?? 'unknown', Number(r.tokens ?? 0));
+  }
+  return spent;
 }
 
-export async function projectBudget(projectId: string | null): Promise<{ keyId: string | null; ok: boolean }> {
+// DEPRECATED: kept for back-compat, now delegates to the single `checkBudget` decision. Prices the
+// key's real per-model spend this month and asks the pure gate whether the next call (cost supplied
+// by the caller, default 0 = local) stays within budget. Returns true if within/allowed.
+export async function withinBudget(
+  keyId: string | null,
+  budgetUsd: number | null,
+  incomingCost = 0,
+): Promise<boolean> {
+  if (!keyId || budgetUsd === null) return true;
+  const spent = await spentThisMonth(keyId);
+  return checkBudget(spent, budgetUsd, incomingCost).allow;
+}
+
+// The GATE the spend paths call. Resolves the project's virtual key + budget, prices its spend so
+// far, and returns the pure `checkBudget` decision for the incoming call's cost. `enforced` reflects
+// the org enforce flag: when false the decision is advisory (the caller may warn but must not block).
+export interface BudgetGate {
+  keyId: string | null;
+  ok: boolean; // allow the call? (true when unattributed, unlimited, $0 cost, within budget, or not enforced)
+  enforced: boolean; // is hard enforcement on for this org?
+  spent: number;
+  limit: number | null;
+  incomingCost: number;
+  reason: string;
+}
+
+export async function projectBudget(
+  projectId: string | null,
+  incomingCost = 0,
+  org: string = DEFAULT_ORG,
+): Promise<BudgetGate> {
+  const enforced = await budgetEnforced(org);
   const keyId = await projectKeyId(projectId);
-  if (!keyId) return { keyId: null, ok: true };
-  const [k] = await db.select({ budgetUsd: apiKeys.budgetUsd }).from(apiKeys).where(eq(apiKeys.id, keyId));
-  return { keyId, ok: await withinBudget(keyId, k?.budgetUsd ?? null) };
+  if (!keyId) {
+    return { keyId: null, ok: true, enforced, spent: 0, limit: null, incomingCost, reason: 'no-key' };
+  }
+  const [k] = await db
+    .select({ budgetUsd: apiKeys.budgetUsd })
+    .from(apiKeys)
+    .where(eq(apiKeys.id, keyId));
+  const limit = k?.budgetUsd ?? null;
+  const spent = limit === null ? 0 : await spentThisMonth(keyId);
+  const decision = checkBudget(spent, limit, incomingCost);
+  // When enforcement is OFF the gate never blocks — the decision is still returned so the caller can
+  // warn/log, but `ok` is forced true so it "can't surprise the demo".
+  return {
+    keyId,
+    ok: enforced ? decision.allow : true,
+    enforced,
+    spent: decision.spent,
+    limit: decision.limit,
+    incomingCost: decision.incomingCost,
+    reason: decision.reason,
+  };
 }
 
 // ─── Audit a chat completion ──────────────────────────────────────────────────
