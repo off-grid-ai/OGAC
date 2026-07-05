@@ -33,8 +33,9 @@ you add a node, a subdomain, or a service.
 | Node | IP | Runs |
 |------|----|----|
 | **S1** (control plane) | `127.0.0.1` | Console (native `next start`), Postgres (OrbStack), Keycloak, **gateway aggregator :8800**, queue worker, Caddy edge, Cloudflare tunnel |
-| **S2** (standby / aux) | `192.168.1.60` | Provit `:7799`, Langfuse, Unleash, Presidio, Redis |
-| Services A | `192.168.1.63` | OpenSearch, Qdrant, OPA, OpenBao, Temporal, Marquez (also gateway node g4) |
+| **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (provisioned 2026-07-05; **S2 replacement — S2 retired**). MAXED 15.5/16 GB. |
+| **g5** (server #3 — node-c) | `192.168.1.65` | OpenSearch `:9200` (SIEM), Marquez `:9000` (lineage), OpenBao `:8200` (secrets) — `services-node-c.yml` (provisioning 2026-07-05; g6 was maxed so these moved to a 3rd server). Drained from the GW pool. |
+| ~~S2~~ (retired) | `192.168.1.60` | ❌ offline since router reboot — aux tier moved to g6, node not required |
 
 ## AI Gateway aggregator (the LLM control point)
 
@@ -61,8 +62,8 @@ you add a node, a subdomain, or a service.
 | g2 | `192.168.1.58` | qwen3.5-9b | text + vision |
 | g3 | `192.168.1.32` | qwythos-9b | text + vision |
 | g4 | `192.168.1.63` | qwythos-9b | text + vision |
-| g5 | `192.168.1.65` | qwen3.5-9b | text + vision |
-| g6 | `192.168.1.66` | qwen3-coder-30b | text |
+| ~~g5~~ | `192.168.1.65` | — (drained → **server #3 / node-c**: OpenSearch/Marquez/OpenBao) | — |
+| ~~g6~~ | `192.168.1.66` | — (drained → **server #2 / aux tier**) | — |
 | g7 | `192.168.1.62` | qwen3-coder-30b | text |
 | g8 | `192.168.1.64` | (confirm before pulling) | — |
 
@@ -77,14 +78,21 @@ launchd job (see `GATEWAY_PROVISIONING.md`).
 |---------|-----------|-------------|-------|
 | Keycloak | `127.0.0.1:8080` | `/health/ready` | IAM |
 | Qdrant | `:6333` (env `OFFGRID_QDRANT_URL`) | `/healthz` | vector store |
-| OpenSearch | `127.0.0.1:9200` | `/_cluster/health` | SIEM / logs |
+| OpenSearch | g5 `:9200` via `OFFGRID_OPENSEARCH_URL=http://127.0.0.1:8935` (Caddy loopback) | `/_cluster/health` | SIEM / logs (node-c) |
 | Temporal (UI) | `127.0.0.1:8081` | `/` | workflows |
 | OPA | `127.0.0.1:8181` | `/health` | policy |
-| OpenBao | `127.0.0.1:8200` | `/v1/sys/health` | secrets |
-| Marquez | `127.0.0.1:9000` | `/api/v1/namespaces` | lineage |
-| Langfuse | `192.168.1.60:3030` (env `OFFGRID_LANGFUSE_URL`) | `/api/public/health` | observability |
-| Unleash | `192.168.1.60:4242` (env `OFFGRID_UNLEASH_URL`) | `/health` | flags |
-| Presidio | `192.168.1.60:5002` | `/health` | PII masking |
+| OpenBao | g5 `:8200` via `OFFGRID_OPENBAO_URL=http://127.0.0.1:8937` (Caddy loopback) | `/v1/sys/health` | secrets (node-c); token `offgrid-root` |
+| Marquez | g5 `:9000` via `OFFGRID_MARQUEZ_URL=http://127.0.0.1:8936` (Caddy loopback) | `/api/v1/namespaces` | lineage (node-c) |
+| Langfuse | g6 `:3030` via `127.0.0.1:8931` (Caddy loopback) | `/api/public/health` | observability |
+| Unleash | g6 `:4242` via `127.0.0.1:8932` (Caddy loopback) | `/health` | flags |
+| Superset | g6 `:8088` via `127.0.0.1:8933` (Caddy loopback) | `/health` | BI / analytics embed |
+| FleetDM | g6 `:8070` via `127.0.0.1:8934` (Caddy loopback) | `/healthz` | MDM |
+| Presidio | g6 `:5002` (analyzer) / `:5001` (anonymizer) | `/health` | PII masking |
+
+> **Loopback proxies (S1 Caddy):** the console (SSH-launched `next-server`) can't egress to the LAN
+> (macOS 15 Local-Network privacy). Caddy on S1 fronts each aux service on `127.0.0.1:893x` and the
+> console's `OFFGRID_*_URL` point at the loopback, not the node IP. Map: 8931 Langfuse · 8932 Unleash ·
+> 8933 Superset · 8934 FleetDM (all g6) · 8935 OpenSearch · 8936 Marquez · 8937 OpenBao (all g5).
 
 > If any of these show **Down** on the Services page, the `OFFGRID_*_URL` env var on
 > S1 is pointing at `127.0.0.1` (only correct for services actually on S1). Set the

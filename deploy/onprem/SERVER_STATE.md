@@ -199,18 +199,21 @@ got fresh IPs) — same router (`.1`, MAC `a0:91:ca:96:79:a0`), same `/24`. Conf
   revived remotely** (no network path to run `networksetup` on them); needs physical/console access.
   The g8 loss killed an in-flight model download. Only ~11 live hosts on the whole `/24` (fleet + router).
 
-## Fleet role assignment (decided 2026-07-04) — 6 GW + 2 servers
+## Fleet role assignment (updated 2026-07-05) — 5 GW + 3 servers
 
-Target topology **6 GW + 2 servers**, with this inference model mix on the GWs:
-**2 gemma-4-e4b · 1 qwythos-9b · 1 image (juggernaut) · 2 VL (grounding)**.
+Topology moved to **5 GW + 3 servers**. g6 (server #2, aux tier) came up MAXED (15.5/16 GB) so it
+can't also host the heavy OpenSearch/Marquez/OpenBao trio — so **g5 was drained from the GW pool and
+made server #3 (node-c)** to run those three (owner: "Provision 3rd node now", 2026-07-05). GW
+inference mix is now **1 gemma (g2) + g3 dual-role gemma · 1 qwythos (g1) · 2 VL (g4,g7)** — gemma
+lost g5 but g3 still serves gemma chat, so capacity holds.
 
 | Machine | Role | State |
 |---|---|---|
 | S1 | server #1 (control plane) | ✅ up |
-| **g6** | **server #2 (aux tier — S2 replacement)** | **designated 2026-07-04; NOT yet provisioned** |
+| **g6** | **server #2 (aux tier — Langfuse/Unleash/Superset/Fleet/Presidio)** | ✅ provisioned 2026-07-05 (Docker 29.5.2); MAXED 15.5/16 GB |
+| **g5** | **server #3 / node-c (SIEM/lineage/secrets — OpenSearch/Marquez/OpenBao)** | 🟡 provisioning 2026-07-05 (drained from GW pool, role=server) |
 | g1 | GW — qwythos-9b | ✅ RECLAIMED to `_2` (2026-07-05, IP .57) — qwythos routes again |
 | g2 | GW — gemma-4-e4b | ✅ serving |
-| g5 | GW — gemma-4-e4b | ✅ serving |
 | g3 | **IMAGE-ONLY** — juggernaut-xl-v9 (:1234). gemma :7878 gateway booted-out+disabled (2026-07-05) | ✅ serving image |
 | g4 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
 | g7 | GW — **qwen3-vl-8b** | ✅ serving VL (2026-07-05) |
@@ -307,6 +310,26 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
   (fleet), reload Caddy; Redis (`:6379`, non-HTTP) needs a TCP forward or stays in-memory fallback.
   S2 no longer required — g6 replaces it. Note: g6 was `enabled:false` in the aggregator POOL (server,
   not a GW) — keep it that way.
+- **node-c (g5) — server #3, IN PROGRESS (2026-07-05):** g6 came up MAXED (15.5/16 GB) with the aux
+  tier, so the three heavy remaining services (**OpenSearch** SIEM, **Marquez** lineage, **OpenBao**
+  secrets) go on a 3rd server. **g5 was drained from the GW pool** (`PATCH /api/v1/gateway/fleet/g5
+  {enabled:false}` then `{role:'server'}` — both applied; gemma still served by g2 + g3-dual-role) and
+  is being provisioned OrbStack-headless via the recipe above. Compose file: **`services-node-c.yml`**
+  (self-contained, env inline, named volumes). **Provisioning gotcha hit + fixed (2026-07-05):** the
+  privhelper first copied to g5 as a **0-byte file** (`cat|tee` over the SSH pipe silently produced
+  nothing → `launchctl bootstrap` failed `5: Input/output error`). Re-copy the helper **binary-safe**:
+  `sudo -S base64` it on the source node → pipe → `base64 -d > /tmp/ph.bin` on the target → `sudo cp`
+  into place (do NOT pipe binary through `cat|tee`, and do NOT feed the sudo password into the same
+  stdin as the data). Verify SHA-256 matches the source before bootstrapping — the empty-file hash is
+  `e3b0c442…852b855`, an instant tell that the copy produced nothing.
+  **REMAINING once docker is up on g5:** (1) `docker compose -f services-node-c.yml up -d` (detached —
+  pulls ~4 images slowly over `_2`); (2) add S1 Caddy loopback proxies **8935→`offgrid-g5.local:9200`**
+  (OpenSearch), **8936→`:9000`** (Marquez), **8937→`:8200`** (OpenBao) — console can't egress LAN
+  directly (macOS Local Network privacy), so it reaches them via 127.0.0.1; (3) set console
+  `.env.local`: `OFFGRID_OPENSEARCH_URL=http://127.0.0.1:8935`, `OFFGRID_MARQUEZ_URL=http://127.0.0.1:8936`,
+  `OFFGRID_ADAPTER_SECRETS=openbao` + `OFFGRID_OPENBAO_URL=http://127.0.0.1:8937` +
+  `OFFGRID_OPENBAO_TOKEN=offgrid-root`; restart console → SIEM/Lineage/Secrets go live. g5 stays
+  `enabled:false` in the aggregator POOL (server, not a GW).
 
 ## Multi-tenancy (Phase 3 — in progress)
 

@@ -125,6 +125,17 @@ http://127.0.0.1:8933 {
 http://127.0.0.1:8934 {
 	reverse_proxy offgrid-g6.local:8070
 }
+# node-c (g5) — server #3 (g6 was maxed): OpenSearch (SIEM), Marquez (lineage), OpenBao (secrets).
+# Same loopback pattern — console reaches these via 127.0.0.1, not the LAN. Added 2026-07-05.
+http://127.0.0.1:8935 {
+	reverse_proxy offgrid-g5.local:9200
+}
+http://127.0.0.1:8936 {
+	reverse_proxy offgrid-g5.local:9000
+}
+http://127.0.0.1:8937 {
+	reverse_proxy offgrid-g5.local:8200
+}
 
 # ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────
 # One public surface over the platform. /v1/* → the LLM aggregator; /specs/* → each
