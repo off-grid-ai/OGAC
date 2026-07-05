@@ -7,13 +7,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -31,27 +24,22 @@ interface Props {
   activeNamespace: string | null;
 }
 
-// Curation controls for the Marquez lineage graph: create a namespace, declare + apply tags to
-// datasets/jobs. The "tag a dataset" modal is a navigational place driven by `?curate=<dataset>`
-// so Back closes it and the URL is shareable. Delete is shown but disabled with its reason.
+// Curation controls for the Marquez lineage graph: create a namespace, declare tags, tag jobs.
+// Clicking a dataset opens the dataset detail panel (`?dataset=<name>`, a navigational place —
+// Back closes it, the URL is shareable) where its schema/facets/tags are shown and it can be
+// tagged/untagged. Delete is shown but disabled with its reason.
 export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: Props) {
   const router = useRouter();
   const params = useSearchParams();
-  const curateDataset = params.get('curate');
 
-  const openCurate = useCallback(
+  const openDataset = useCallback(
     (dataset: string) => {
       const next = new URLSearchParams(params.toString());
-      next.set('curate', dataset);
+      next.set('dataset', dataset);
       router.push(`?${next.toString()}`, { scroll: false });
     },
     [params, router],
   );
-  const closeCurate = useCallback(() => {
-    const next = new URLSearchParams(params.toString());
-    next.delete('curate');
-    router.push(next.toString() ? `?${next.toString()}` : '?', { scroll: false });
-  }, [params, router]);
 
   return (
     <Card className="shadow-sm">
@@ -82,7 +70,7 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: P
                     size="sm"
                     variant="outline"
                     className="h-7 gap-1 text-xs"
-                    onClick={() => openCurate(d)}
+                    onClick={() => openDataset(d)}
                   >
                     <Tag className="size-3" />
                     {d}
@@ -122,17 +110,6 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: P
           </div>
         ) : null}
       </CardContent>
-
-      <TagDatasetDialog
-        open={Boolean(curateDataset)}
-        dataset={curateDataset}
-        namespace={activeNamespace}
-        onClose={closeCurate}
-        onDone={() => {
-          closeCurate();
-          router.refresh();
-        }}
-      />
     </Card>
   );
 }
@@ -328,78 +305,3 @@ function TagJobForm({
   );
 }
 
-function TagDatasetDialog({
-  open,
-  dataset,
-  namespace,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  dataset: string | null;
-  namespace: string | null;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [tag, setTag] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function apply(action: 'tag-dataset' | 'untag-dataset') {
-    if (!namespace || !dataset || !tag.trim()) {
-      toast.error('Enter a tag.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch('/api/v1/admin/lineage/tags', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action, namespace, dataset, tag: tag.trim() }),
-      });
-      if (res.status === 403) return void toast.error('Admins only.');
-      if (!res.ok) return void toast.error('Failed.');
-      toast.success(action === 'tag-dataset' ? 'Dataset tagged.' : 'Tag removed.');
-      setTag('');
-      onDone();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle className="font-mono text-sm">Tag dataset · {dataset}</SheetTitle>
-        </SheetHeader>
-        <SheetBody>
-          <div className="space-y-1">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Tag name
-            </Label>
-            <Input
-              value={tag}
-              onChange={(e) => setTag(e.target.value)}
-              placeholder="pii"
-              className="font-mono text-xs"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => apply('tag-dataset')} disabled={busy} className="flex-1 gap-1.5">
-              <Tag className="size-4" />
-              Apply tag
-            </Button>
-            <Button
-              onClick={() => apply('untag-dataset')}
-              disabled={busy}
-              variant="outline"
-              className="flex-1"
-            >
-              Remove tag
-            </Button>
-          </div>
-        </SheetBody>
-      </SheetContent>
-    </Sheet>
-  );
-}

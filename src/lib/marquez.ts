@@ -3,7 +3,13 @@
 // through Marquez's REST API so the Lineage page can show the *server-sourced* job→dataset graph,
 // not just a reconstruction from the local audit trail.
 //   OFFGRID_MARQUEZ_URL — e.g. http://127.0.0.1:9000
-import { type LineageView, normalizeLineage } from './lineage-view';
+import {
+  type DatasetDetailView,
+  type LineageView,
+  type RawDatasetDetail,
+  normalizeDatasetDetail,
+  normalizeLineage,
+} from './lineage-view';
 
 const BASE = process.env.OFFGRID_MARQUEZ_URL;
 
@@ -128,5 +134,26 @@ export async function readLineageView(): Promise<{
     return { configured: true, data, error: null };
   } catch (e) {
     return { configured: true, data: empty, error: (e as Error).message };
+  }
+}
+
+// Read ONE dataset's schema + facets + tags: GET /api/v1/namespaces/{ns}/datasets/{ds}. Drives
+// the dataset detail panel (?dataset=). Best-effort: never throws — returns { configured, data,
+// error } so the panel renders a note when Marquez is unreachable or the dataset is absent.
+export async function readDataset(
+  namespace: string,
+  dataset: string,
+): Promise<{ configured: boolean; data: DatasetDetailView | null; error: string | null }> {
+  if (!BASE) return { configured: false, data: null, error: null };
+  const ns = namespace.trim();
+  const ds = dataset.trim();
+  if (!ns || !ds) return { configured: true, data: null, error: 'namespace and dataset required' };
+  try {
+    const raw = await mqGet<RawDatasetDetail>(
+      `/api/v1/namespaces/${encodeURIComponent(ns)}/datasets/${encodeURIComponent(ds)}`,
+    );
+    return { configured: true, data: normalizeDatasetDetail(raw), error: null };
+  } catch (e) {
+    return { configured: true, data: null, error: (e as Error).message };
   }
 }
