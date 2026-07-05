@@ -8,6 +8,10 @@ import {
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
+import {
+  LangfuseRegistryPanel,
+  resolveRegistryTab,
+} from '@/components/observability/LangfuseRegistryPanel';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
@@ -24,7 +28,12 @@ import {
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
-import { resolveRange, safeLangfuseInsights, safeListTraces } from '@/lib/langfuse';
+import {
+  resolveRange,
+  safeLangfuseInsights,
+  safeLangfuseRegistry,
+  safeListTraces,
+} from '@/lib/langfuse';
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { currentOrgId } from '@/lib/tenancy';
@@ -184,14 +193,17 @@ export default async function ObservabilityPage({
   const org = await currentOrgId();
   const sp = await searchParams;
   const lfRangeRaw = Array.isArray(sp.lfRange) ? sp.lfRange[0] : sp.lfRange;
+  const lfRegRaw = Array.isArray(sp.lfReg) ? sp.lfReg[0] : sp.lfReg;
+  const regTab = resolveRegistryTab(lfRegRaw);
   const { range, fromIso, toIso } = resolveRange(lfRangeRaw);
-  const [evals, drift, runs, onlineEnabled, traces, insights] = await Promise.all([
+  const [evals, drift, runs, onlineEnabled, traces, insights, registry] = await Promise.all([
     listEvalRuns(20),
     getDrift().analyze(),
     listAgentRuns(15, org),
     getFlags().isEnabled('online-evals', true),
     safeListTraces(30),
     safeLangfuseInsights(fromIso, toIso),
+    safeLangfuseRegistry(50),
   ]);
 
   const latest = evals[0];
@@ -337,6 +349,15 @@ export default async function ObservabilityPage({
         trends={insights.trends}
         error={insights.error}
         range={range}
+      />
+
+      <LangfuseRegistryPanel
+        configured={registry.configured}
+        prompts={registry.prompts}
+        datasets={registry.datasets}
+        sessions={registry.sessions}
+        error={registry.error}
+        tab={regTab}
       />
 
       <Card className="shadow-sm">
