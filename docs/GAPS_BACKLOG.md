@@ -11,7 +11,7 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 ## P0 — before the demo
 | # | Gap | What to do | Owner | Effort |
 |---|---|---|---|---|
-| 1 | **Routing rules empty** (Control shows 0) | Add real, sensible rules: `data_class=pii → block`, `data_class=confidential → local`. Real governance config, not a mock. Makes the egress-leash story concrete. | console | XS |
+| 1 | ✅ **DONE (2026-07-05)** — Routing rules seeded on live console: `data_class=pii→local`, `confidential→local`, `restricted→block`, `public→cloud (fallback local)`. Verified via `/routing/evaluate` — all enforced by `decideRouting`. Demo note: egress switch is ON so `public`→cloud; flip egress OFF to show `public` leashing to block. | console | ✅ |
 | 2 | **Presidio not wired** (guardrails = regex only) | Presidio is LIVE on g6 (:5002/:5001). Add Caddy loopback proxies + `OFFGRID_ADAPTER_GUARDRAILS=presidio` + URLs → real entity-grade PII masking in Guardrails. | console + infra | S |
 | 3 | **No real knowledge to ground on** | Upload 1-2 of the org's *real* docs (not fabricated) so Chat grounding + a Studio assistant have genuine content. Needs Mac's real docs. | Mac + console | XS |
 | 4 | **Decide demo path** | From `DEMO_WALKTHROUGH.md`: lead with the 🟢 pages; skip 🔴 (SIEM/Lineage/Secrets) unless their services get started. | Mac | — |

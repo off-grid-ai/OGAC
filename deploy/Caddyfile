@@ -136,6 +136,13 @@ http://127.0.0.1:8936 {
 http://127.0.0.1:8937 {
 	reverse_proxy offgrid-g5.local:8200
 }
+# Presidio (g6) — analyzer :5002 / anonymizer :5001 → entity-grade PII masking in Guardrails.
+http://127.0.0.1:8938 {
+	reverse_proxy offgrid-g6.local:5002
+}
+http://127.0.0.1:8939 {
+	reverse_proxy offgrid-g6.local:5001
+}
 
 # ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────
 # One public surface over the platform. /v1/* → the LLM aggregator; /specs/* → each
