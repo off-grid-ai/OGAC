@@ -5,6 +5,69 @@ export const operateSection: DocSection = {
   label: 'Operate & observe',
   pages: [
     {
+      slug: 'guides/overview',
+      title: 'Overview (home)',
+      description: 'The operator’s landing page — health, governance posture, cost, and quick actions.',
+      body: `Overview is where an operator lands. Instead of a flat list of modules, it answers the
+three questions you have every morning — is my AI healthy, is it safe, what is it costing — and puts
+the next action one click away.
+
+## What it shows
+
+- **Governance posture** — the policy engine state, guardrail actions in the window, and the live
+  cloud-egress state. At a glance: is the box leashed.
+- **Traffic & health** — request volume, latency p95, and how much of your traffic is served
+  on-prem vs. cloud.
+- **Spend** — cost for the window, the on-prem share (local models cost zero), and any virtual key
+  over budget.
+- **Data & recent activity** — connected data sources and the most recent governed runs.
+
+## Quick actions
+
+Every stat is a link into the surface behind it, so you go from a number to the place you act on it:
+a key over budget jumps to [FinOps](/docs/guides/finops), a guardrail spike to
+[Guardrails](/docs/guides/guardrails), egress to [Control](/docs/guides/control). Start a chat,
+add a connector, or open a report straight from here.
+
+Every figure traces to a real event. An unreachable source reads as unknown or zero, never a
+fabricated number.`,
+    },
+    {
+      slug: 'guides/services',
+      title: 'Services',
+      description: 'The map of everything you run, with live, server-probed health.',
+      body: `Services is the directory of every Off Grid surface — the console, the model gateway, the
+product subdomains, and the swappable backends — each with health probed live from the server.
+
+## What you see
+
+- **Every service in one place** — its subdomain, what it does, and whether it's reachable right now.
+- **Server-probed health** — the reachability check runs from the console host (where the backends
+  bind to loopback), so it reflects what the platform can actually reach, not what your browser can.
+- **One login** — reach any surface from here without a second sign-in.
+
+Use it as your first stop when something looks off: a backend showing unreachable tells you where to
+look before you dig into a specific module.`,
+    },
+    {
+      slug: 'guides/edge',
+      title: 'Edge & network',
+      description: 'The reverse proxy and tunnel that expose the platform without open ports.',
+      body: `Edge is the network boundary. A reverse proxy (Caddy) fronts your public subdomains and an
+outbound tunnel exposes them without opening any inbound ports, so the platform stays reachable even
+as your public IP changes.
+
+## What it covers
+
+- **Subdomain routing** — which public hostname maps to which internal service.
+- **The tunnel** — an outbound-only connection, so nothing inbound is exposed on your network.
+- **Exposure posture** — backends bind to loopback and are only reached through the console;
+  the edge is the one controlled front door.
+
+Rate limiting and WAF rules live at the edge (Caddy), not in the application, so the boundary is
+enforced before a request ever reaches a service.`,
+    },
+    {
       slug: 'guides/gateway',
       title: 'AI Gateway & routing',
       description: 'One endpoint for every model, with the cloud on a leash.',
@@ -92,6 +155,40 @@ traces to a real event — an unreachable source shows real zeros, never synthet
 Manage virtual keys and their budgets from the FinOps surface.`,
     },
     {
+      slug: 'guides/accounting',
+      title: 'Accounting',
+      description: 'Chargeback-grade cost, attributed to the team and use-case that spent it.',
+      body: `Accounting turns raw usage into the numbers a finance owner needs: cost attributed to the
+team, model, and use-case that spent it, over a period you choose.
+
+## What it answers
+
+- **Who spent what** — cost by team and virtual key, so spend has an owner.
+- **On what** — by model and use-case, so you can see which workloads cost the most.
+- **Over which period** — pick a range; every figure is metered from the real traffic log.
+
+Where [FinOps](/docs/guides/finops) is the live operational view (budgets, keys, the on-prem
+dividend), Accounting is the period close: the chargeback report you reconcile against.`,
+    },
+    {
+      slug: 'guides/reports',
+      title: 'Reports',
+      description: 'Create, run, and export signed reports over your live platform data.',
+      body: `Reports turn the dashboards into a document you can hand someone. Built-in reports are
+seeded; you can also compose your own templates.
+
+## Manage and run
+
+- **Templates** — built-in reports are ready to run; create, edit, and delete custom templates.
+- **Run live** — a report renders against your current platform data using the same section
+  renderers as the dashboards, so a report can't drift from what the console shows.
+- **Export** — as Markdown or PDF, carrying a [provenance](/docs/guides/provenance) signature so the
+  exported figures are verifiable after the fact.
+
+Custom templates compose the same live sections as the built-ins, so anything you build stays
+grounded in real data.`,
+    },
+    {
       slug: 'guides/drift',
       title: 'Drift',
       description: 'Catch model and data drift against a baseline you control.',
@@ -136,6 +233,52 @@ rate before rolling out.`,
   path). Rules apply to the whole view server-side, so tiles and facets reflect them.
 
 Full-text audit search across the stream is available from the Control page.`,
+    },
+    {
+      slug: 'guides/audit',
+      title: 'Audit ledger',
+      description: 'Who sent which chats, ran which runs, and changed what — the record a regulator reads.',
+      body: `The Audit ledger is the accountability record: who sent which chats, ran which workflows,
+and changed what, when. It reads the same tamper-evident \`offgrid-audit\` index every governed run
+writes to, so it's the artifact you hand a regulator, not a claim.
+
+## What each entry holds
+
+Every completion records the actor, the action and outcome, the model and tokens, whether data left
+the box, which guardrails fired with what verdict, latency, and the cost key. A single governed run
+is correlated by its run id across the audit ledger, the trace store, lineage, and the signed
+provenance record, so one id ties the whole story together.
+
+## Read it
+
+- **Filter** by actor, action, or outcome; the view is URL-driven, so a filtered slice is linkable
+  and shareable.
+- **Follow a run** by its id from the ledger into its [trace](/docs/guides/observability),
+  [lineage](/docs/guides/lineage), and [provenance](/docs/guides/provenance).
+
+Audit differs from [Security events](/docs/guides/security-events): audit is the full accountability
+ledger; SIEM is the security-signal stream over the same events, tuned with suppression rules.`,
+    },
+    {
+      slug: 'guides/lineage',
+      title: 'Lineage',
+      description: 'Trace an answer back to the sources it came from — source to answer, provable.',
+      body: `Lineage traces where an answer came from: which sources fed a grounded run, all the way
+back to the document. It reads OpenLineage events from Marquez, with a fallback reconstruction from
+the source→answer references recorded on each run.
+
+## What it shows
+
+- **Source-to-answer graph** — for a governed run, the retrieved sources and the answer they
+  produced, linked.
+- **Correlated by run id** — a lineage run is keyed to the same run id as the audit ledger and the
+  trace, so you can pivot between them.
+
+## Why it matters
+
+When an auditor asks "how did the AI arrive at this," lineage is the map. Combined with
+[provenance](/docs/guides/provenance) signing, you can both show the path and prove the answer wasn't
+altered afterward.`,
     },
     {
       slug: 'guides/sandbox',
