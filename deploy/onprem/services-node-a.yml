@@ -42,7 +42,9 @@ services:
     image: openpolicyagent/opa:0.70.0
     restart: unless-stopped
     command: ['run', '--server', '--addr=0.0.0.0:8181', '--log-level=error']
-    ports: ['8181:8181']
+    # Stock OPA has ZERO auth. Bind the host port to loopback so only same-host
+    # next-server (OFFGRID_OPA_URL=http://127.0.0.1:8181) can reach it — never the LAN.
+    ports: ['127.0.0.1:8181:8181']
 
   # ── secrets vault ──
   openbao:
@@ -115,7 +117,10 @@ services:
       POSTGRES_DB: marquez
       POSTGRES_USER: marquez
       POSTGRES_PASSWORD: marquez
-    ports: ['9000:5000', '5010:5010']
+    # Stock Marquez has ZERO auth. Bind host ports to loopback so only same-host
+    # next-server (OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000) can read it — never the LAN.
+    # marquez-web reaches marquez over the internal Docker network (MARQUEZ_HOST), unaffected.
+    ports: ['127.0.0.1:9000:5000', '127.0.0.1:5010:5010']
   marquez-web:
     image: marquezproject/marquez-web:0.50.0
     restart: unless-stopped
