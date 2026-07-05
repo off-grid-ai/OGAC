@@ -1,29 +1,45 @@
 'use client';
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 
+// Open/close state lives in the URL (?panel=new-document) so Back closes the panel.
 export function AddDocumentButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-document';
+
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('KB');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      const sp = new URLSearchParams(params.toString());
+      if (next) sp.set('panel', 'new-document');
+      else sp.delete('panel');
+      const qs = sp.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [params, pathname, router],
+  );
 
   async function create() {
     if (!title.trim() || !text.trim()) return;
@@ -48,46 +64,48 @@ export function AddDocumentButton() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" />
-          Add document
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add to the Brain</DialogTitle>
-          <DialogDescription>
-            Embedded and indexed into the RAG store for retrieval.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="doc-title">Title</Label>
-              <Input id="doc-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <Plus className="size-4" />
+        Add document
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add to the Brain</SheetTitle>
+            <SheetDescription>
+              Embedded and indexed into the RAG store for retrieval.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-title">Title</Label>
+                <Input id="doc-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-source">Source</Label>
+                <Input id="doc-source" value={source} onChange={(e) => setSource(e.target.value)} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="doc-source">Source</Label>
-              <Input id="doc-source" value={source} onChange={(e) => setSource(e.target.value)} />
+              <Label htmlFor="doc-text">Content</Label>
+              <Textarea
+                id="doc-text"
+                rows={6}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="The SOP / knowledge text…"
+              />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="doc-text">Content</Label>
-            <Textarea
-              id="doc-text"
-              rows={6}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="The SOP / knowledge text…"
-            />
-          </div>
-          <Button onClick={create} disabled={busy} className="w-full">
-            {busy ? 'Indexing…' : 'Index document'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </SheetBody>
+          <SheetFooter>
+            <Button onClick={create} disabled={busy} className="w-full">
+              {busy ? 'Indexing…' : 'Index document'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

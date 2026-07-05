@@ -1,32 +1,48 @@
 'use client';
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 
 const TYPES = ['http', 'mcp'] as const;
 
+// Open/close state lives in the URL (?panel=new-tool) so Back closes the panel.
 export function AddToolButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-tool';
+
   const [name, setName] = useState('');
   const [type, setType] = useState<(typeof TYPES)[number]>('http');
   const [endpoint, setEndpoint] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      const sp = new URLSearchParams(params.toString());
+      if (next) sp.set('panel', 'new-tool');
+      else sp.delete('panel');
+      const qs = sp.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [params, pathname, router],
+  );
 
   async function create() {
     if (!name.trim()) return;
@@ -52,66 +68,68 @@ export function AddToolButton() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Plus className="size-4" />
-          Register tool
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Register a tool</DialogTitle>
-          <DialogDescription>
-            The router invokes it when a query&apos;s intent matches the &quot;when to use&quot;
-            description.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="tool-name">Name</Label>
-            <Input id="tool-name" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Type</Label>
-            <div className="flex gap-2">
-              {TYPES.map((t) => (
-                <Button
-                  key={t}
-                  type="button"
-                  size="sm"
-                  variant={type === t ? 'default' : 'outline'}
-                  onClick={() => setType(t)}
-                >
-                  {t.toUpperCase()}
-                </Button>
-              ))}
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Plus className="size-4" />
+        Register tool
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Register a tool</SheetTitle>
+            <SheetDescription>
+              The router invokes it when a query&apos;s intent matches the &quot;when to use&quot;
+              description.
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            <div className="space-y-1.5">
+              <Label htmlFor="tool-name">Name</Label>
+              <Input id="tool-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="tool-endpoint">Endpoint</Label>
-            <Input
-              id="tool-endpoint"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder={type === 'mcp' ? 'mcp://server' : 'https://service/api'}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="tool-desc">When to use</Label>
-            <Textarea
-              id="tool-desc"
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what this tool does — used to match query intent."
-            />
-          </div>
-          <Button onClick={create} disabled={busy || !name} className="w-full">
-            {busy ? 'Registering…' : 'Register tool'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <div className="flex gap-2">
+                {TYPES.map((t) => (
+                  <Button
+                    key={t}
+                    type="button"
+                    size="sm"
+                    variant={type === t ? 'default' : 'outline'}
+                    onClick={() => setType(t)}
+                  >
+                    {t.toUpperCase()}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tool-endpoint">Endpoint</Label>
+              <Input
+                id="tool-endpoint"
+                value={endpoint}
+                onChange={(e) => setEndpoint(e.target.value)}
+                placeholder={type === 'mcp' ? 'mcp://server' : 'https://service/api'}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tool-desc">When to use</Label>
+              <Textarea
+                id="tool-desc"
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what this tool does — used to match query intent."
+              />
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button onClick={create} disabled={busy || !name} className="w-full">
+              {busy ? 'Registering…' : 'Register tool'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
