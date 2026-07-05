@@ -77,6 +77,19 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
     realmRole: 'svc-seaweedfs',
     audience: 'offgrid-seaweedfs',
   },
+  {
+    // Superset OAuth login (Flask-AppBuilder AUTH_OAUTH). Unlike the others this client backs an
+    // interactive OIDC authorization-code login into the Superset UI (not client_credentials): its
+    // confidential secret is consumed by Superset's superset_config.py directly rather than by the
+    // console broker. It lives in the same SSOT so provisioning/rotation/audience stay uniform.
+    // Ready-to-flip config: deploy/onprem/oidc-services.md § Superset.
+    service: 'superset',
+    clientId: 'offgrid-superset',
+    name: 'Off Grid Superset (SSO)',
+    description: 'OIDC login client for the Superset BI UI (Flask-AppBuilder AUTH_OAUTH).',
+    realmRole: 'svc-superset',
+    audience: 'offgrid-superset',
+  },
 ] as const;
 
 // clientId prefixes that MUST NOT be touched by provisioning — the console's own OIDC clients.
