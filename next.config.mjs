@@ -34,7 +34,19 @@ const nextConfig = {
   // c2pa-node ships a native binding + a vendored sharp; sigstore is required server-side only.
   // @offgrid/gateway pulls in @temporalio/worker (swc/wasm native binaries) that webpack cannot
   // bundle — keep it external so the node control API routes require it at runtime.
-  serverExternalPackages: ['@lancedb/lancedb', 'c2pa-node', 'sigstore'],
+  // @temporalio/client is bound only via a dynamic import in the durable agent-runtime adapter
+  // (src/lib/adapters/agentruntime.ts) — required at runtime on the server path, never bundled.
+  // @temporalio/worker + /workflow are used only by the standalone worker process (src/worker/,
+  // scripts/temporal-worker.mts), never by a Next route; external here as belt-and-suspenders so
+  // their swc/wasm native binaries are never pulled into the webpack bundle.
+  serverExternalPackages: [
+    '@lancedb/lancedb',
+    'c2pa-node',
+    'sigstore',
+    '@temporalio/client',
+    '@temporalio/worker',
+    '@temporalio/workflow',
+  ],
   // Stable build id so the multiple console instances behind the edge LB produce identical
   // asset hashes — otherwise /_next/static/* 404s when a request lands on the other instance.
   generateBuildId: () => process.env.OFFGRID_BUILD_ID ?? 'offgrid-onprem',
