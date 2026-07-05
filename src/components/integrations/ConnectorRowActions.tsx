@@ -1,8 +1,8 @@
 'use client';
 
 import { ArrowsClockwise, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,9 +20,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm';
 
@@ -38,17 +46,45 @@ export interface ConnectorLite {
 
 // Row-level management for a connector: trigger a sync (all connectors), and — for custom
 // connectors — edit its config or delete it. Server routes: POST /sync, PATCH & DELETE /[id].
+// The edit panel is a URL-driven side panel (?panel=edit-connector&id=<id>) so Back closes it and
+// it's deep-linkable; delete stays a confirmation modal (local state) per the NO-MODALS carve-out.
 export function ConnectorRowActions({ connector }: { connector: ConnectorLite }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const [busy, setBusy] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // This row's edit panel is open only when the URL targets this connector's id.
+  const editOpen =
+    params.get('panel') === 'edit-connector' && params.get('id') === connector.id;
 
   // edit form state
   const [name, setName] = useState(connector.name);
   const [auth, setAuth] = useState(connector.auth);
   const [endpoint, setEndpoint] = useState(connector.endpoint);
   const [description, setDescription] = useState(connector.description);
+
+  const setEditPanel = useCallback(
+    (targetId: string | null) => {
+      const qs = withPanelParams(params.toString(), {
+        panel: targetId ? 'edit-connector' : null,
+        id: targetId,
+      });
+      router.replace(panelHref(pathname, qs), { scroll: false });
+    },
+    [params, pathname, router],
+  );
+
+  // Seed the form from the connector each time this row's panel opens.
+  useEffect(() => {
+    if (editOpen) {
+      setName(connector.name);
+      setAuth(connector.auth);
+      setEndpoint(connector.endpoint);
+      setDescription(connector.description);
+    }
+  }, [editOpen, connector.name, connector.auth, connector.endpoint, connector.description]);
 
   async function sync() {
     if (busy) return;
@@ -79,7 +115,7 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
     setBusy(false);
     if (res.ok) {
       toast.success(`Connector "${name}" updated`);
-      setEditOpen(false);
+      setEditPanel(null);
       router.refresh();
     } else {
       toast.error('Update failed');
@@ -115,7 +151,7 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
           </DropdownMenuItem>
           {connector.custom ? (
             <>
-              <DropdownMenuItem onClick={() => setEditOpen(true)}>
+              <DropdownMenuItem onClick={() => setEditPanel(connector.id)}>
                 <PencilSimple className="size-4" />
                 Edit
               </DropdownMenuItem>
@@ -132,13 +168,13 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Edit dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit connector</DialogTitle>
-            <DialogDescription>Update how this connector reaches its source.</DialogDescription>
-          </DialogHeader>
+      {/* Edit panel — URL-driven side panel (?panel=edit-connector&id=<id>) */}
+      <Sheet open={editOpen} onOpenChange={(o) => !o && setEditPanel(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Edit connector</SheetTitle>
+            <SheetDescription>Update how this connector reaches its source.</SheetDescription>
+          </SheetHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-name">Name</Label>
@@ -179,10 +215,10 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
               Save changes
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      {/* Delete confirm */}
+      {/* Delete confirm — stays a confirmation modal per the NO-MODALS delete carve-out */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>
           <DialogHeader>
