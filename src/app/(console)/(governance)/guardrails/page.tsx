@@ -10,10 +10,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
+import { PresidioRecognizers } from '@/components/guardrails/PresidioRecognizers';
+import { PresidioThresholds } from '@/components/guardrails/PresidioThresholds';
 import { getPii } from '@/lib/adapters/registry';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { readGuardrailsView } from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { getThresholds, listRecognizers } from '@/lib/presidio-recognizers';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +37,13 @@ export default async function GuardrailsPage({
   const view = probe
     ? await readGuardrailsView(await getPii().scan(probe), probe)
     : await readGuardrailsView();
-  const rules = await listGuardrailRules(await currentOrgId());
+  const orgId = await currentOrgId();
+  const rules = await listGuardrailRules(orgId);
+  // The DEEP layer — best-effort so a missing DB never breaks the page.
+  const [recognizers, thresholds] = await Promise.all([
+    listRecognizers(orgId).catch(() => []),
+    getThresholds(orgId).catch(() => ({ global: 0, perEntity: {} })),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -108,6 +117,24 @@ export default async function GuardrailsPage({
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Custom recognizers &amp; deny lists</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PresidioRecognizers recognizers={recognizers} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Confidence thresholds</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PresidioThresholds thresholds={thresholds} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Test a string</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -127,7 +154,9 @@ export default async function GuardrailsPage({
             </button>
           </form>
           <p className="text-xs text-muted-foreground">
-            Runs the always-on first-party regex floor in-console — read-only, nothing is stored.
+            Runs the LIVE active engine — when Presidio is on, your custom recognizers, deny lists,
+            and thresholds all apply, so you see exactly what a real request would. Read-only,
+            nothing is stored.
           </p>
           {view.demo ? (
             <div className="space-y-1 rounded-md border border-border p-3">
