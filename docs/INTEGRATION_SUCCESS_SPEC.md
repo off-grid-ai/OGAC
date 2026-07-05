@@ -62,21 +62,61 @@ correlated by a single run id. This is the real "integrated platform" test.
 
 ## The verification harness (how we prove it — not by claiming)
 
-Success is measured by a **runnable probe script**, not by review. Build `deploy/verify-integration.sh`
-(a sibling to `deploy/prod.sh verify`) that runs against the live server and prints PASS/FAIL per
-criterion above. Until that script exists and passes, integration status is "GATE 1 — code only."
+Success is measured by a **runnable probe script**, not by review. The harness is
+**`deploy/verify-integration.sh`** (a sibling to `deploy/prod.sh verify`). It runs against the live
+server and prints one line per criterion — `PASS <id>`, `FAIL <id>`, or `SKIP <id>` — then a tally.
+Until it runs clean on the live box, integration status is "GATE 1 — code only."
 
-Skeleton (each check maps to a criterion ID; exits non-zero on any FAIL):
+### How to run it
+
+It is meant to run **ON S1** (`127.0.0.1`), where every backend is reachable over loopback and the
+creds live in the console's `.env.local` (which the script sources — nothing is hardcoded):
+
+```bash
+ssh admin@127.0.0.1
+cd /Users/admin/offgrid/console
+./deploy/verify-integration.sh
+# override env file / console base if needed:
+OFFGRID_ENV_FILE=/path/.env.production CONSOLE_BASE=http://127.0.0.1:3000 ./deploy/verify-integration.sh
 ```
-A2: for svc in gateway opensearch fleet temporal seaweedfs; do
-      token=$(client_credentials grant for offgrid-$svc)
-      aud=$(decode $token .aud);  [ "$aud" = "offgrid-$svc" ] && PASS A2/$svc || FAIL
-    done
-A4: from a NON-S1 host: curl --max-time 3 offgrid-s1.local:9200 → expect failure = PASS
-C2: runId=$(run one governed agent); sleep; \
-    check OpenSearch offgrid-audit for runId · Langfuse trace · Marquez event · provenance record \
-    → all 4 present = PASS
+
+From a dev Mac (bonus — the backends bind to S1 loopback, so it still executes on S1):
+
+```bash
+ssh -t admin@offgrid-s1 'cd /Users/admin/offgrid/console && ./deploy/verify-integration.sh'
 ```
+
+### What each result means
+
+- **PASS** — an end-to-end probe against the live system succeeded (the VERIFIED gate for that id).
+- **FAIL** — a *deployed* thing is broken. The script exits **non-zero** if any check FAILs.
+- **SKIP** — a precondition isn't met (service not deployed, secret not provisioned, tool missing, or
+  an S1-only limitation). SKIP does **not** fail the run — it is the honest "NOT-VERIFIED yet" state,
+  never a false PASS and never a misleading FAIL.
+
+### Coverage (check id → probe)
+
+| id | Probe |
+|---|---|
+| **A1** | Aggregator (`:8800`): a minted gateway JWT (or the static key fallback) → 200; a garbage bearer → 401. |
+| **A2** | For each of the 5 clients: OpenBao secret → Keycloak `client_credentials` grant → decode JWT `aud` == `offgrid-<svc>`. |
+| **A3** | OpenBao GET `secret/<svc>/client-secret` × 5 → value present. |
+| **A4** | **Bind-check only on S1** (loopback is always reachable from S1): assert `:9200/:8181/:9000` bind to `127.0.0.1`, not `0.0.0.0`. The true external-unreachability test **must run from a non-S1 host** (`curl offgrid-s1.local:9200 → refused`). |
+| **A5** | A machine bearer (SA JWT, or `OFFGRID_ADMIN_TOKEN` fallback) → 200 and unauth → 401 on `/api/v1/admin/agents`. (Session-cookie parity is a browser test, noted not covered.) |
+| **A7** | **Manual** — destructive rotate-and-reject; SKIP-by-design so the harness never mutates a live secret. |
+| **B2** | Derived from A4 + the Caddy exposure analysis; SKIP on S1 (real proof is A4 from a non-S1 host). |
+| **B3** | **Manual** — needs a forced token expiry to observe the single transparent re-mint; SKIP-by-design. |
+| **C1** | POST one **labelled** governed run (`"integration-verify probe …"`), GET it, assert stages `policy·guard·ground·sign` (a `denied`/`blocked` short-circuit is a valid governed outcome). |
+| **C2** | *The money test.* That run id, correlated across **all 4** planes: OpenSearch `offgrid-audit`, a Langfuse trace (`traceId = runId` with non-alphanumerics stripped), a Marquez lineage event (`run.runId`, namespace `offgrid-console`), and the embedded provenance record. All 4 hit → PASS; fewer → SKIP (NOT-VERIFIED). **Today the audit index is keyed by device/gateway events, not the agent runId — so full correlation is the flagged gap and reads as SKIP, not a false PASS.** |
+| **C3** | POST a labelled PII prompt → expect a guard/policy block. SKIP when Presidio isn't edge-wired yet (Guardrails on the regex floor). |
+| **A6 / B1 / C4** | **Not probed** here — A6/B1 are code-grep criteria (verify by `grep` in review), C4 is not built. The script prints an explicit note for each. |
+
+### The missing-tool problem (jq / python3 on S1)
+
+S1's `python3` is the Xcode-CLT stub and `jq` may be absent, so the harness uses **neither** for
+anything load-bearing: flat JSON fields are read with `grep`/`sed`, and JWTs are base64url-decoded with
+`openssl base64 -d` (falling back to `base64 -D`/`-d`). If a genuinely required tool is missing, the
+affected check DEGRADES to SKIP with a clear message rather than FAILing.
 
 ## Honest status line (update this, don't inflate it)
 
@@ -85,7 +125,9 @@ C2: runId=$(run one governed agent); sleep; \
 - **Cross-service composition (Part C):** emitters exist individually; **run-id correlation across
   audit/trace/lineage/provenance is NOT proven** — this is the biggest unverified claim and the real
   test of "integrate very well."
-- **The verify harness:** not built. Until it is, "integration works" is unproven.
+- **The verify harness:** built (`deploy/verify-integration.sh`). Until it runs clean (0 FAIL, and the
+  VERIFIED-gate ids PASS rather than SKIP) on the live box, "integration works" is still unproven —
+  SKIPs are honest NOT-VERIFIEDs, not passes.
 
 **Rule for this workstream:** report progress as a gate (`A2: CODE`), never as a bare "done." "Done"
 means VERIFIED, and VERIFIED means the probe passed on the live box.
