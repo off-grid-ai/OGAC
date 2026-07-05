@@ -13,7 +13,8 @@
       { "name": "svc-opensearch", "description": "Off Grid service scope: svc-opensearch" },
       { "name": "svc-fleet", "description": "Off Grid service scope: svc-fleet" },
       { "name": "svc-temporal", "description": "Off Grid service scope: svc-temporal" },
-      { "name": "svc-seaweedfs", "description": "Off Grid service scope: svc-seaweedfs" }
+      { "name": "svc-seaweedfs", "description": "Off Grid service scope: svc-seaweedfs" },
+      { "name": "console-admin", "description": "Off Grid console capability: admin (machine principals only)" }
     ]
   },
   "clients": [
@@ -170,7 +171,7 @@
       "username": "service-account-offgrid-gateway",
       "enabled": true,
       "serviceAccountClientId": "offgrid-gateway",
-      "realmRoles": ["svc-gateway"]
+      "realmRoles": ["svc-gateway", "console-admin"]
     },
     {
       "username": "service-account-offgrid-opensearch",
