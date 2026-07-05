@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Off Grid on-prem nightly backup (Phase 3A). Runs deploy/onprem/backup.sh on S1 at 02:00
+     daily: dumps the console Postgres + enterprise data-source DBs to
+     /Users/admin/offgrid/backups/<ts>/, prunes to 14, and rsyncs off-box.
+
+     This is a SYSTEM LaunchDaemon (runs as root, independent of a logged-in user), so it lives at
+     /Library/LaunchDaemons/co.getoffgridai.backup.plist and is loaded into the system domain.
+
+     The console's Backups page reads its status via `launchctl list co.getoffgridai.backup`
+     (src/lib/backups.ts → readScheduleStatus) and shows "scheduled" once it is loaded.
+
+     Install (on S1, needs sudo):
+       sudo cp deploy/onprem/co.getoffgridai.backup.plist /Library/LaunchDaemons/
+       sudo chown root:wheel /Library/LaunchDaemons/co.getoffgridai.backup.plist
+       sudo chmod 644        /Library/LaunchDaemons/co.getoffgridai.backup.plist
+       sudo launchctl bootstrap system /Library/LaunchDaemons/co.getoffgridai.backup.plist
+     Verify:  sudo launchctl list co.getoffgridai.backup   (exit 0 = loaded)
+     Run once now: sudo launchctl kickstart -k system/co.getoffgridai.backup
+     Uninstall: sudo launchctl bootout system /Library/LaunchDaemons/co.getoffgridai.backup.plist
+
+     NOTE: backup.sh calls docker (OrbStack at /Users/admin/.orbstack/bin/docker) and ssh for the
+     off-box copy. A root LaunchDaemon has a minimal PATH and root's own ssh identity/known_hosts —
+     backup.sh uses an absolute docker path already; the off-box rsync is best-effort (BatchMode,
+     never fails the backup). If the off-box copy must run as `admin` (whose SSH key is authorized
+     on the peer), either set UserName=admin below OR pre-authorize root's key on the peer. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>co.getoffgridai.backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/admin/offgrid/console/deploy/onprem/backup.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>2</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BACKUP_DIR</key><string>/Users/admin/offgrid/backups</string>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/admin/offgrid/backups/backup.log</string>
+  <key>StandardErrorPath</key><string>/Users/admin/offgrid/backups/backup.log</string>
+</dict>
+</plist>

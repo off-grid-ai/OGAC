@@ -7,7 +7,10 @@ import {
   type BackupsConfig,
   buildBackupsView,
   type BackupsView,
+  buildRestorePlan,
+  type DumpFile,
   isSafeBackupName,
+  type RestorePlanItem,
   selectPrunable,
 } from './backups-view';
 
@@ -247,6 +250,47 @@ export interface ScheduleStatus {
 // exits 0 when the job is registered. We deliberately DON'T load/unload launchd remotely from the
 // web app (needs the right user context / sudo and is easy to get wrong) — the UI shows status +
 // the documented plist instructions instead. Honest about that via `controllable: false`.
+// ── Restore inspection (NON-destructive) ─────────────────────────────────────────────────────────
+//
+// The console deliberately does NOT run a one-click destructive restore (restoring a dump overwrites
+// a LIVE database — far too dangerous to trigger from a web button). Instead it inspects a chosen
+// backup, lists its dump files, and derives the EXACT copy-pasteable restore command an operator
+// runs on S1 during a maintenance window. This is the honest safe surface the task calls for.
+
+export interface RestoreInspection {
+  ok: boolean;
+  name: string;
+  plan: RestorePlanItem[];
+  error?: string;
+}
+
+// Inspect a single backup dir by bare name and produce its (non-destructive) restore plan. Path
+// safety enforced via resolveBackupPath; the pure buildRestorePlan maps each dump file → command.
+export async function inspectRestore(name: string): Promise<RestoreInspection> {
+  const full = resolveBackupPath(name);
+  if (!full) return { ok: false, name, plan: [], error: 'invalid backup name (path-safety rejected)' };
+  try {
+    const st = await stat(full);
+    if (!st.isDirectory()) return { ok: false, name, plan: [], error: 'not a backup directory' };
+    const dirents = await readdir(full, { withFileTypes: true });
+    const files: DumpFile[] = [];
+    for (const de of dirents) {
+      if (!de.isFile()) continue;
+      let sizeBytes = 0;
+      try {
+        sizeBytes = (await stat(path.join(full, de.name))).size;
+      } catch {
+        // unreadable — surface it anyway with size 0
+      }
+      files.push({ file: de.name, sizeBytes });
+    }
+    const plan = buildRestorePlan(files, (f) => path.join(full, f));
+    return { ok: true, name, plan };
+  } catch (e) {
+    return { ok: false, name, plan: [], error: (e as Error).message };
+  }
+}
+
 export async function readScheduleStatus(): Promise<ScheduleStatus> {
   const base = {
     label: LAUNCHD_LABEL,

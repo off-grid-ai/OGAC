@@ -49,8 +49,10 @@ fi
 echo "==> done. $(du -sh "$OUT" | cut -f1) in $OUT"
 
 # ── Schedule (launchd, daily 02:00) ────────────────────────────────────────────
-#   Create /Library/LaunchDaemons/co.getoffgridai.backup.plist running this script,
-#   StartCalendarInterval Hour=2. Or a cron line: `0 2 * * * /path/backup.sh`.
+#   Ready-to-install plist: deploy/onprem/co.getoffgridai.backup.plist (system LaunchDaemon,
+#   StartCalendarInterval Hour=2). Install steps in SERVER_STATE.md § "Nightly schedule". The
+#   console's Backups page reads its status via `launchctl list co.getoffgridai.backup`.
+#   Or a cron line: `0 2 * * * /path/backup.sh`.
 #
 # ── Restore ────────────────────────────────────────────────────────────────────
 #   console : gunzip -c console.sql.gz  | docker exec -i offgrid-console-postgres-1 psql -U offgrid offgrid_console
