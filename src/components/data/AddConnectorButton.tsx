@@ -1,18 +1,17 @@
 'use client';
 
 import { CaretDown as ChevronDown, Plus } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,15 +20,36 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 const TYPES = ['postgres', 'mysql', 'snowflake', 's3', 'salesforce', 'gdrive'];
 
+// The create panel's open/closed state lives in the URL (?panel=new-connector) so Back closes it
+// and it's deep-linkable — never in local useState.
 export function AddConnectorButton() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const open = params.get('panel') === 'new-connector';
+
   const [name, setName] = useState('');
   const [type, setType] = useState('postgres');
   const [busy, setBusy] = useState(false);
+
+  const setPanel = useCallback(
+    (value: string | null) => {
+      const qs = withPanelParams(params.toString(), { panel: value });
+      router.replace(panelHref(pathname, qs), { scroll: false });
+    },
+    [params, pathname, router],
+  );
+
+  useEffect(() => {
+    if (open) {
+      setName('');
+      setType('postgres');
+    }
+  }, [open]);
 
   async function create() {
     if (!name.trim()) return;
@@ -42,8 +62,7 @@ export function AddConnectorButton() {
       });
       if (!res.ok) throw new Error('failed');
       toast.success(`Connector "${name}" added`);
-      setName('');
-      setOpen(false);
+      setPanel(null);
       router.refresh();
     } catch {
       toast.error('Failed to add connector');
@@ -53,51 +72,51 @@ export function AddConnectorButton() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" />
-          Add connector
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add a connector</DialogTitle>
-          <DialogDescription>Connect a database, warehouse, or SaaS source.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="con-name">Name</Label>
-            <Input
-              id="con-name"
-              value={name}
-              placeholder="Core Banking (Postgres)"
-              onChange={(e) => setName(e.target.value)}
-            />
+    <>
+      <Button size="sm" onClick={() => setPanel('new-connector')}>
+        <Plus className="size-4" />
+        Add connector
+      </Button>
+      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Add a connector</SheetTitle>
+            <SheetDescription>Connect a database, warehouse, or SaaS source.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="con-name">Name</Label>
+              <Input
+                id="con-name"
+                value={name}
+                placeholder="Core Banking (Postgres)"
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    {type}
+                    <ChevronDown className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                  {TYPES.map((t) => (
+                    <DropdownMenuItem key={t} onClick={() => setType(t)}>
+                      {t}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Button onClick={create} disabled={busy} className="w-full">
+              {busy ? 'Adding…' : 'Add connector'}
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label>Type</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between">
-                  {type}
-                  <ChevronDown className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                {TYPES.map((t) => (
-                  <DropdownMenuItem key={t} onClick={() => setType(t)}>
-                    {t}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <Button onClick={create} disabled={busy} className="w-full">
-            {busy ? 'Adding…' : 'Add connector'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
