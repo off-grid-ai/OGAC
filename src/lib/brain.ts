@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import * as lancedb from '@lancedb/lancedb';
 import { qdrantAdd, qdrantDelete, qdrantList, qdrantSearch } from '@/lib/qdrant';
+import { buildLanceWhere, rrfFuse, type RetrievalOptions } from '@/lib/retrieval/query';
+
+export type { RetrievalOptions } from '@/lib/retrieval/query';
 
 // The Brain — the ingestion→retrieval (RAG) pipeline. LanceDB (embedded, on-disk) is the default
 // store; Qdrant is the server-scale swap-in, selected with OFFGRID_ADAPTER_RETRIEVAL=qdrant — the
@@ -124,18 +127,85 @@ export async function deleteDocument(id: string): Promise<boolean> {
   return true;
 }
 
-export async function searchDocuments(query: string, k = 5): Promise<BrainHit[]> {
-  if (qdrantSelected()) return qdrantSearch(query, k);
-  const tbl = await getTable();
-  const vector = await embed(query);
-  const rows = (await tbl.search(vector).limit(k).toArray()) as Array<
-    DocRow & { _distance: number }
-  >;
-  return rows.map((r) => ({
+function rowToHit(r: DocRow & { _distance: number }): BrainHit {
+  return {
     id: r.id,
     title: r.title,
     source: r.source,
     text: r.text,
     score: Number((1 / (1 + r._distance)).toFixed(3)),
-  }));
+  };
+}
+
+// LanceDB full-text (BM25) index on `text`, ensured lazily for the hybrid keyword leg. Best-effort:
+// if it can't be created (older engine, empty table) hybrid degrades to vector-only.
+let ftsReady: Promise<boolean> | null = null;
+async function ensureFts(tbl: lancedb.Table): Promise<boolean> {
+  if (!ftsReady) {
+    ftsReady = tbl
+      .createIndex('text', { config: lancedb.Index.fts() })
+      .then(() => true)
+      .catch(() => {
+        ftsReady = null; // allow a later retry once the table has rows/index support
+        return false;
+      });
+  }
+  return ftsReady;
+}
+
+/**
+ * Semantic retrieval over the Brain, with optional metadata filtering and a hybrid (keyword +
+ * vector) mode. Backward compatible: `searchDocuments(query, k)` behaves exactly as before —
+ * a pure filtered-nothing vector search on whichever backend is selected.
+ *
+ * - opts.filter → LanceDB `.where(...)` / Qdrant `filter.must[]` (threaded down, no behaviour
+ *   change when absent).
+ * - opts.mode === 'hybrid' → fuse a full-text (BM25) ranking with the vector ranking by RRF.
+ */
+export async function searchDocuments(
+  query: string,
+  k = 5,
+  opts: RetrievalOptions = {},
+): Promise<BrainHit[]> {
+  if (qdrantSelected()) return qdrantSearch(query, k, opts);
+  const tbl = await getTable();
+  const vector = await embed(query);
+  const where = buildLanceWhere(opts.filter);
+
+  // Vector leg (always run). Over-fetch on hybrid so fusion has candidates to work with.
+  const vLimit = opts.mode === 'hybrid' ? Math.max(k * 4, 20) : k;
+  let vq = tbl.search(vector).limit(vLimit);
+  if (where) vq = vq.where(where);
+  const vRows = (await vq.toArray()) as Array<DocRow & { _distance: number }>;
+
+  if (opts.mode !== 'hybrid') {
+    return vRows.slice(0, k).map(rowToHit);
+  }
+
+  // Keyword leg — LanceDB full-text search over `text`. If the FTS index can't be built, fall back
+  // to vector-only (still correct, just not fused).
+  const rowById = new Map<string, DocRow & { _distance: number }>();
+  for (const r of vRows) rowById.set(r.id, r);
+
+  let kwIds: string[] = [];
+  if (await ensureFts(tbl).catch(() => false)) {
+    try {
+      let fq = tbl.search(query, 'fts', 'text').limit(vLimit);
+      if (where) fq = fq.where(where);
+      const fRows = (await fq.toArray()) as Array<DocRow & { _distance?: number }>;
+      kwIds = fRows.map((r) => r.id);
+      for (const r of fRows) if (!rowById.has(r.id)) rowById.set(r.id, { ...r, _distance: 1 });
+    } catch {
+      kwIds = [];
+    }
+  }
+
+  if (kwIds.length === 0) return vRows.slice(0, k).map(rowToHit);
+
+  const vIds = vRows.map((r) => r.id);
+  const fusedIds = rrfFuse([vIds, kwIds]).slice(0, k);
+  return fusedIds
+    .map((id) => rowById.get(id))
+    .filter((r): r is DocRow & { _distance: number } => Boolean(r))
+    .map(rowToHit);
 }
