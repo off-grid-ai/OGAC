@@ -11,6 +11,8 @@
 //   - run === null with mode 'sync'/'durable' means unknown agent (404).
 
 import { randomUUID } from 'crypto';
+import type { Actor } from '@/lib/audit-event';
+import type { RunContext } from '@/lib/agent-run-context';
 import { getAgentRun, type AgentRun, runAgent } from '@/lib/agentrun';
 import { getAgentRuntime } from '@/lib/adapters/agentruntime';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
@@ -33,7 +35,15 @@ export async function dispatchAgentRun(args: {
   caller?: string;
   requireReview?: boolean;
   orgId?: string;
+  // C4: the caller context resolved by the route from the request — the resolved actor (machine vs
+  // user + label) and owning project. Threaded into BOTH paths so the run's attribution is identical
+  // whether it executes durably (in the worker, which has no request) or in the sync fallback.
+  actor?: Actor;
+  project?: string;
 }): Promise<DispatchResult> {
+  // One canonical runId minted here and carried through BOTH paths: it is the workflowId seed AND
+  // (via the RunContext) the id the pipeline persists + keys all four planes by, so the dispatch,
+  // the workflow, and the run's fan-out all share one correlation key.
   const runId = newRunId();
   const orgId = args.orgId ?? DEFAULT_ORG;
   const input: AgentRunWorkflowInput = {
@@ -43,6 +53,8 @@ export async function dispatchAgentRun(args: {
     caller: args.caller,
     requireReview: args.requireReview ?? false,
     orgId,
+    actor: args.actor,
+    project: args.project,
   };
 
   // Durable path — only when opted in AND the runtime accepts the submission. The adapter never
@@ -64,7 +76,21 @@ export async function dispatchAgentRun(args: {
     // submitted:false → graceful fallback below.
   }
 
-  // Synchronous in-process fallback (the default). runAgent generates its own runId; we return it.
-  const run = await runAgent(args.agentId, args.query, args.caller, args.requireReview ?? false, orgId);
+  // Synchronous in-process fallback (the default). Pass the SAME context (incl. the minted runId) so
+  // the fallback attributes + correlates identically to the durable path and reuses the one runId.
+  const context: RunContext = {
+    runId,
+    actor: args.actor,
+    org: orgId,
+    project: args.project,
+  };
+  const run = await runAgent(
+    args.agentId,
+    args.query,
+    args.caller,
+    args.requireReview ?? false,
+    orgId,
+    context,
+  );
   return { run, mode: 'sync', runId: run?.id ?? runId };
 }
