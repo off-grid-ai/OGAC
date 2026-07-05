@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { deleteModule, deployModule, getModule } from '@/lib/opa-policy';
 import { formatCompileErrors, validateRegoModule } from '@/lib/opa-policy-policy';
 
@@ -39,6 +41,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (result.status === 'unreachable') {
     return NextResponse.json({ error: result.reason, reachable: false }, { status: 502 });
   }
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'policy.change',
+    resource: `opa-module:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json(result.module);
 }
 
@@ -50,5 +57,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!res.reachable) {
     return NextResponse.json({ error: res.reason, reachable: false }, { status: 502 });
   }
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'policy.change',
+    resource: `opa-module:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ deleted: res.deleted });
 }

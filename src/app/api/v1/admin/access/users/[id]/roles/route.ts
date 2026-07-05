@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { keycloakAdmin, type KcRole } from '@/lib/keycloak-admin';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +37,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     await kc.assignRoles(id, body.roles);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'access.role.change',
+      resource: `user:${id}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ configured: true, ok: true });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
@@ -56,6 +63,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
   try {
     await kc.removeRoles(id, body.roles);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'access.role.change',
+      resource: `user:${id}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ configured: true, ok: true });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

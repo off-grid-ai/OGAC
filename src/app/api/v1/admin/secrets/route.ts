@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
 import { readSecretsView } from '@/lib/secrets-view';
 
@@ -37,6 +39,11 @@ export async function POST(req: Request) {
   }
   try {
     await openBaoSecrets.set(v.key, b.value);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'secret.write',
+      resource: `secret:${v.key}`,
+      outcome: 'ok',
+    });
     // Echo only the KEY name back — never the value.
     return NextResponse.json({ ok: true, key: v.key }, { status: 201 });
   } catch (e) {
@@ -54,6 +61,11 @@ export async function DELETE(req: Request) {
   }
   try {
     await openBaoSecrets.remove(v.key);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'secret.write',
+      resource: `secret:${v.key}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ ok: true, key: v.key });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

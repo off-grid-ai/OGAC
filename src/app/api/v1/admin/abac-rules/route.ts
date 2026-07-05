@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { createAbacRule, listAbacRules } from '@/lib/store';
 
 const OPS = ['eq', 'neq', 'in'];
@@ -29,15 +31,18 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json(
-    await createAbacRule({
-      role: (b!.role as string | undefined) ?? '*',
-      resource: (b!.resource as string | undefined) ?? '*',
-      attribute: b!.attribute as string,
-      operator: b!.operator as string,
-      value: b!.value as string,
-      effect: b!.effect as string,
-    }),
-    { status: 201 },
-  );
+  const created = await createAbacRule({
+    role: (b!.role as string | undefined) ?? '*',
+    resource: (b!.resource as string | undefined) ?? '*',
+    attribute: b!.attribute as string,
+    operator: b!.operator as string,
+    value: b!.value as string,
+    effect: b!.effect as string,
+  });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'abac.change',
+    resource: `abac:${created.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }
