@@ -248,27 +248,36 @@ Until on-site: aux tier down; g6 held as the server slot (out of the GW inferenc
 The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decided target:
 **6 GW + 2 servers** (S1 + one repurposed node as the aux/S2-replacement).
 - Candidate repurpose nodes: the **image nodes g3/g4** (image-gen not yet working) are the least-critical.
-- **OrbStack headless init — PARTIAL (2026-07-04, corrected):** `open -a OrbStack` over SSH boots the
-  VM through ~15 startup phases headlessly, BUT it **stalls at `create_vm` because the privileged
-  helper isn't installed** (`/Library/PrivilegedHelperTools` empty; log stuck at `phase=create_vm`).
-  Installing that helper normally triggers a one-time **admin-auth GUI prompt** → effectively on-site
-  gated. So a fresh node can't fully init OrbStack purely headless. Possible remote workaround (untried):
-  boxes are `admin/1234`, so `sudo` (pw `1234`) MIGHT let us install/register the helper, or copy S1's
-  `dev.orbstack.OrbStack.privhelper` — but it's code-signed + SMAppService-registered, so a copy may
-  not validate. g4/g5 have `OrbStack.app` installed (g1/g2 don't); S1's OrbStack is fully working.
+- **OrbStack headless init — ✅ SOLVED (2026-07-05): a bare node CAN be provisioned fully headless.**
+  The old "create_vm stalls / admin-GUI-gated" blocker is broken. Exact recipe (used to provision g6):
+  1. **Copy `OrbStack.app` from a node that has it** (g4 has it; g5 does NOT) over the **LAN** via
+     `tar czf - -C /Applications OrbStack.app | ssh <target> 'tar xzf - -C /Applications'` — bsdtar
+     preserves the code signature (verify: `codesign -v` → "satisfies its Designated Requirement").
+     Do NOT internet-download it on `_2` (~100 KB/s → hours). Do NOT `rsync -X` (macOS openrsync
+     rejects `-X`).
+  2. **Copy the privileged helper + its LaunchDaemon** from the same source node:
+     `/Library/PrivilegedHelperTools/dev.orbstack.OrbStack.privhelper` (world-readable) and
+     `/Library/LaunchDaemons/dev.orbstack.OrbStack.privhelper.plist`. Place them on the target with
+     `sudo` (boxes are `admin`/**`1234`** → `echo 1234 | sudo -S ...`), `chown root:wheel`,
+     `chmod 755`/`644`, then `sudo launchctl bootstrap system <plist>`. Signature validates (same
+     TeamID `HUAQ24HBR6`), so it registers. State shows `not running` = fine (on-demand Mach service).
+  3. **`open -a OrbStack`** (rc=0) then the engine self-inits — **docker up in ~5s** (`orbctl start`
+     may print "timed out" but docker comes up anyway). docker at
+     `/Applications/OrbStack.app/Contents/MacOS/xbin/docker`, `docker compose` = plugin (v5.3.0).
+  So the owner was right: **once app+helper are in place, OrbStack comes up on its own headlessly.**
 - **Do NOT cram the heavy aux tier onto S1** — S1 is the sole tunnel-anchored control plane; OOMing it
   loses everything. Provit (lightweight Node, no Docker) is the exception and belongs on S1.
-- **2-server distribution status (2026-07-05):** S1 runs the full container stack (console/Keycloak/
-  Postgres + data-sources + services-a + services-extra, all healthy). The **aux tier**
-  (`services-node-b.yml`: Langfuse+deps, Presidio, Unleash, Redis, Superset, Fleet — ~15 containers,
-  ALL public images, **no `@offgrid/*`/monorepo dep**) is **down** — it lived on **S2, which is offline
-  and unresolvable**. **g6** (designated S2-replacement) re-probed: reachable via SSH, 187 GB free, but
-  **OrbStack NOT installed, no repo/compose on it** — so it is NOT a turnkey 2nd server; it needs an
-  OrbStack install (helper-install is the gated step) + rsync of `services-node-b.yml` + an env file.
-  Cleanest path = **S2 returning** (already has OrbStack + the stack; owner reports OrbStack self-inits
-  on installed nodes). To bring the aux tier up on whichever node: `docker compose -f services-node-b.yml
-  up -d`, then repoint console `.env.local` (`OFFGRID_LANGFUSE_URL`/`_UNLEASH_URL`/`_REDIS_URL`/
-  `_SUPERSET_URL`/`_FLEET_URL`) from `offgrid-s2.local` → the target host, and restart the console.
+- **2-server distribution — IN PROGRESS on g6 (2026-07-05):** S1 runs the full container stack
+  (console/Keycloak/Postgres + data-sources + services-a + services-extra). **g6 is now server #2:**
+  provisioned OrbStack headless (recipe above), **Docker 29.5.2 up**. `services-node-b.yml` copied to
+  `~/services-node-b.yml` on g6 (self-contained — all env inline, NO external .env/secrets needed) and
+  **`docker compose up -d` is PULLING the ~15 aux images** (log `~/aux-up.log`) — slow over `_2`, runs
+  detached. **REMAINING once pulled:** (1) verify all aux containers healthy on g6; (2) repoint the
+  console's S2→loopback Caddy proxies from S2 to **g6**: edit `deploy/Caddyfile` so 8931→
+  `offgrid-g6.local:3030` (langfuse), 8932→`:4242` (unleash), 8933→`:8088` (superset), 8934→`:8070`
+  (fleet), reload Caddy; Redis (`:6379`, non-HTTP) needs a TCP forward or stays in-memory fallback.
+  S2 no longer required — g6 replaces it. Note: g6 was `enabled:false` in the aggregator POOL (server,
+  not a GW) — keep it that way.
 
 ## Multi-tenancy (Phase 3 — in progress)
 
