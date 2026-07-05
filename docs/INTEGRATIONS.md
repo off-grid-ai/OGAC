@@ -259,7 +259,18 @@ OFFGRID_ADAPTER_SECRETS=openbao      ; OFFGRID_OPENBAO_URL=http://127.0.0.1:8200
 OFFGRID_ADAPTER_CACHING=redis        ; OFFGRID_REDIS_URL=redis://127.0.0.1:6379
 OFFGRID_ADAPTER_SIEM=opensearch      ; OFFGRID_OPENSEARCH_URL=http://127.0.0.1:9200
 OFFGRID_ADAPTER_FLAGS=unleash        ; OFFGRID_UNLEASH_URL=http://127.0.0.1:4242
+OFFGRID_UNLEASH_TOKEN=<frontend-token>       ; flag *evaluation* (read-only, isEnabled)
+OFFGRID_UNLEASH_ADMIN_TOKEN=<admin-token>    ; flag *management* — create/toggle/archive, variants, gradual rollout
+OFFGRID_UNLEASH_ENV=development              ; OFFGRID_UNLEASH_PROJECT=default
 ```
+
+Two tokens, two jobs: the **frontend/client** token (`OFFGRID_UNLEASH_TOKEN`) is read-only and powers
+runtime `isEnabled` checks; the **admin** token (`OFFGRID_UNLEASH_ADMIN_TOKEN`, generate under
+_Unleash → Settings → API access → Admin tokens_) is what the Configuration module uses to drive the
+Admin API — create/update/archive toggles, enable/disable per environment, set variant buckets, and
+set a `flexibleRollout` percentage. When the admin token is set the console manages **Unleash** as
+the source of truth; without it (or if Unleash is unreachable) flag CRUD falls back to the
+first-party Postgres store, and variants/rollout are disabled (they have no first-party equivalent).
 
 Bring each up with its profile (`make secrets|identity|… `), confirm with `make smoke`. The full
 env reference with every URL is `deploy/.env.example`; every service's config knobs are in

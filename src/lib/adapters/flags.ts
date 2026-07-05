@@ -5,6 +5,9 @@ import type { FlagsPort } from './types';
 // admin UI) is the always-on default; Unleash queries a central flag service so flags can be
 // governed org-wide. Unleash falls back to the first-party store if it's unreachable, so the flag
 // check always returns and selecting Unleash is never a hard dependency.
+// Evaluation uses the frontend/client token; MANAGEMENT (create/toggle/variants/rollout) uses the
+// admin token and lives in src/lib/unleash-client.ts (+ the pure src/lib/unleash-admin.ts shapers),
+// driven by the /api/v1/admin/flags routes. This adapter is only the read/evaluation path.
 const UNLEASH_URL = process.env.OFFGRID_UNLEASH_URL;
 const UNLEASH_TOKEN = process.env.OFFGRID_UNLEASH_TOKEN; // client/frontend API token
 const UNLEASH_ENV = process.env.OFFGRID_UNLEASH_ENV ?? 'development';
