@@ -112,3 +112,62 @@ VERIFIED" (2026-07-05). Full line-by-line:
 
 **Not a regression:** the 3 SKIPs (A7, B2, B3) are all SKIP-by-design per the spec (destructive /
 non-S1 / forced-expiry), so `0 fail` is a genuine clean run, not masked failures.
+
+---
+
+## Integration sweep #2 (2026-07-06) — platform-integration cadence agent
+
+**Live harness result (`deploy/verify-integration.sh` on S1, read-only):** `8 pass / 0 fail / 3 skip`
+— identical to sweep #1, reproduced on fresh run ids. Full line-by-line:
+
+- PASS A1 (aggregator: minted Keycloak JWT → 200, garbage → 401; cred = minted-keycloak-jwt)
+- PASS A2 (all 5 clients mint `client_credentials` JWT with `aud == offgrid-<svc>`)
+- PASS A3 (all 5 service secrets readable at `secret/<svc>/client-secret` in OpenBao)
+- PASS A4 (opensearch/opa/marquez bound to loopback, not 0.0.0.0)
+- PASS A5 (machine SA JWT → 200, unauth → 401 on `/api/v1/admin/agents`)
+- PASS **C1** (governed run `run_2c0d55c7`, agent=sop-synth, shows all stages: policy·guard·ground·sign)
+- PASS **C2 — the money test** (`run_2c0d55c7` correlated across ALL 4 planes:
+  opensearch·langfuse·marquez·provenance all HIT)
+- PASS **C3** (PII probe `run_ff727a0b` shows a pii/guard check that blocked/redacted)
+- SKIP A7 (destructive rotate-and-reject — by design), SKIP B2 (network boundary — real proof is A4
+  off-host), SKIP B3 (transparent-refresh — needs forced expiry)
+
+**Prior sweep-#1 gaps — status:**
+
+- **#29 (C4 durable-run fan-out unverified) — STILL OPEN.** The harness still has no C4 probe. Identity
+  + runId threading remains in code only (`src/lib/agent-run-context.ts`, `src/lib/agent-run-durable.ts`);
+  no worker run was launched and correlated against C2's 4-plane check. Durable-run parity is unproven.
+- **#30 (`adapters/evals.ts` hard-coded apiKey) — STILL OPEN.** `src/lib/adapters/evals.ts` still sets
+  `config.apiKey = 'offgrid-local'` on the primary path (not the `getServiceCredential()` seam the other
+  adapters use). It is the exact primary-path static key A6/B1 say must become fallback-only.
+- **#31 (spec status drift) — CLOSED this sweep.** `docs/INTEGRATION_SUCCESS_SPEC.md` status tables +
+  honest-status line reconciled: A1–A5 + C1–C3 marked VERIFIED (8/0/3), C2 correlation marked proven,
+  C4 flagged as the remaining unverified claim, A7/B2/B3 kept as honest SKIP-by-design.
+
+**Coherence spot-check of features merged since sweep #1 (code paths read, not just the harness):**
+
+- **Budget enforcement is real and default-on.** `src/lib/budget-config.ts` resolves an env kill-switch
+  (`OFFGRID_BUDGET_ENFORCE`) over a `budget.enforce` flag, defaulting ON; `projectBudget()` in
+  `src/lib/chat-governance.ts` prices the incoming call, sums month-to-date spend, and returns a
+  `BudgetGate` whose `ok` is forced true only when enforcement is off (advisory). Coherent: the gate is
+  a pre-call check on the spend path, not an after-the-fact alert.
+- **Permissions-aware retrieval is document-level and default-safe.** `src/lib/retrieval/acl.ts` is a
+  pure rule (`docVisibleTo`) binding owner/allowed_subjects/allowed_roles per document, with un-ACL'd
+  docs staying visible (backward compatible) and enforced-but-unmatched docs hidden even inside the
+  asker's project. Enforced as a metadata filter + post-filter (defence in depth). Closes vision item #27.
+- **Studio builder** publishes a real governed agent + a template pointing at it (`src/lib/studio-builder.ts`),
+  so a Studio assistant runs the same pipeline as a hand-built one — no special path.
+- **Provit** is brokered honestly (`src/lib/provit.ts`, `src/app/(console)/provit/`): it runs no own
+  gateway — its oracle points at the console's gateway, so its intelligence rides the same fleet/auth/
+  budgets. Repos/runs scoped by ABAC (`resource='provit'`) + tenancy (`src/lib/provit-access.ts`).
+- **Operator Overview** (`src/lib/overview-synthesis.ts`) synthesizes health/governance/spend from real
+  events; **Access realm admin** (`src/lib/keycloak-realm.ts` + `src/app/api/v1/admin/access/*`) surfaces
+  sessions/MFA/required-actions/IdP/realm-lifetimes, writing through to Keycloak via `realm-management`.
+  All coherent with the platform; no new gaps found in these paths.
+
+**New items found (record only, not fixed):**
+
+| # | Gap | Where | Owner |
+|---|---|---|---|
+| 32 | **A4 off-host proof still owed.** The harness's A4 is a loopback bind-check run ON S1; the spec's own coverage note says the true external-unreachability test must be `curl offgrid-s1.local:9200/:8181/:9000 → refused` from a NON-S1 host. That off-host curl has never been run/recorded. Add it to the harness (or a companion script meant to run from a dev Mac) so B2/A4 stop resting on the bind-check stand-in. | `deploy/verify-integration.sh` | console + infra |
+| 33 | **Budget enforcement is global, not per-org.** `budgetEnforced(_org?)` accepts an org but ignores it — the `budget.enforce` flag store is global. For a multi-tenant deployment, one tenant's kill-switch would flip enforcement for all. Wire a per-org flag before multi-tenant. | `src/lib/budget-config.ts` | console |
