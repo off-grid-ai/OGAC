@@ -2,8 +2,10 @@
 
 import {
   Archive,
+  ArrowCounterClockwise,
   CloudArrowUp,
   Clock,
+  Copy,
   Database,
   Play,
   Trash,
@@ -70,6 +72,20 @@ interface RunResult {
   error?: string;
 }
 
+interface RestorePlanItem {
+  file: string;
+  sizeBytes: number;
+  target: string;
+  command: string | null;
+}
+
+interface RestoreInspection {
+  ok: boolean;
+  name: string;
+  plan: RestorePlanItem[];
+  error?: string;
+}
+
 // A "confirm" dialog is a navigational place → drive it from the URL (?confirm=delete:<name> |
 // confirm=prune) so Back closes it and it's deep-linkable, per the console's nav standard.
 function useConfirm() {
@@ -93,12 +109,38 @@ function useConfirm() {
   return { value, open, close };
 }
 
+// The restore inspector is a navigational place → drive it from ?restore=<name> so Back closes it
+// and it's deep-linkable, same as the confirm dialogs.
+function useRestoreParam() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const name = params.get('restore');
+  const open = useCallback(
+    (v: string) => {
+      const next = new URLSearchParams(params.toString());
+      next.set('restore', v);
+      router.push(`?${next.toString()}`);
+    },
+    [params, router],
+  );
+  const close = useCallback(() => {
+    const next = new URLSearchParams(params.toString());
+    next.delete('restore');
+    const qs = next.toString();
+    router.push(qs ? `?${qs}` : '?');
+  }, [params, router]);
+  return { name, open, close };
+}
+
 export function BackupsManager({ initial }: { initial: BackupsPayload }) {
   const [data, setData] = useState<BackupsPayload>(initial);
   const [busy, setBusy] = useState<null | 'run' | 'prune' | 'delete'>(null);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [restore, setRestore] = useState<RestoreInspection | null>(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   const confirm = useConfirm();
+  const restoreParam = useRestoreParam();
 
   const reload = useCallback(async () => {
     try {
@@ -113,6 +155,32 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Fetch the (non-destructive) restore plan whenever ?restore=<name> is set.
+  useEffect(() => {
+    const name = restoreParam.name;
+    if (!name) {
+      setRestore(null);
+      return;
+    }
+    let cancelled = false;
+    setRestoreLoading(true);
+    setRestore(null);
+    (async () => {
+      try {
+        const r = await fetch(`/api/v1/admin/backups/${encodeURIComponent(name)}/restore`);
+        const body = (await r.json()) as RestoreInspection;
+        if (!cancelled) setRestore(body);
+      } catch (e) {
+        if (!cancelled) setRestore({ ok: false, name, plan: [], error: (e as Error).message });
+      } finally {
+        if (!cancelled) setRestoreLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreParam.name]);
 
   const runBackup = async () => {
     setBusy('run');
@@ -373,16 +441,28 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
                         )}
                       </td>
                       <td className="py-2 pr-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          disabled={busy !== null}
-                          onClick={() => confirm.open(`delete:${r.name}`)}
-                          className="gap-1 text-destructive hover:text-destructive"
-                        >
-                          <Trash className="size-3" />
-                          Delete
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            disabled={busy !== null}
+                            onClick={() => restoreParam.open(r.name)}
+                            className="gap-1"
+                          >
+                            <ArrowCounterClockwise className="size-3" />
+                            Restore
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            disabled={busy !== null}
+                            onClick={() => confirm.open(`delete:${r.name}`)}
+                            className="gap-1 text-destructive hover:text-destructive"
+                          >
+                            <Trash className="size-3" />
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -392,6 +472,86 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Restore inspector — NON-destructive: shows the dump files + the exact command to run on
+          S1 during a maintenance window. The console does NOT run a destructive restore from a
+          button (it overwrites a live DB). Driven by ?restore=<name> (URL, not a modal). */}
+      {restoreParam.name ? (
+        <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <ArrowCounterClockwise className="size-4" />
+                Restore from <span className="font-mono">{restoreParam.name}</span>
+              </CardTitle>
+              <Button variant="outline" size="xs" onClick={restoreParam.close}>
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3">
+              <Warning className="mt-0.5 size-4 shrink-0 text-amber-600" />
+              <p className="text-xs text-foreground">
+                <span className="font-semibold">Restore overwrites a live database and is not
+                run from the console.</span>{' '}
+                Restore is destructive and irreversible — run the command(s) below on S1 during a
+                maintenance window, after confirming the target is safe to overwrite. Take a fresh
+                backup first.
+              </p>
+            </div>
+            {restoreLoading ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">Inspecting dump…</p>
+            ) : restore && !restore.ok ? (
+              <p className="py-4 text-center text-xs text-destructive">
+                {restore.error ?? 'Could not inspect this backup.'}
+              </p>
+            ) : restore && restore.plan.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">
+                No dump files found in this backup.
+              </p>
+            ) : restore ? (
+              <div className="space-y-3">
+                {restore.plan.map((item) => (
+                  <div key={item.file} className="rounded border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-foreground">{item.file}</div>
+                        <div className="text-[11px] text-muted-foreground">{item.target}</div>
+                      </div>
+                      <Badge variant="secondary" className="shrink-0 bg-muted text-muted-foreground">
+                        {formatBytes(item.sizeBytes)}
+                      </Badge>
+                    </div>
+                    {item.command ? (
+                      <div className="mt-2 flex items-start gap-2">
+                        <pre className="flex-1 overflow-x-auto rounded bg-muted/40 p-2 text-[11px] text-muted-foreground whitespace-pre-wrap">
+                          {item.command}
+                        </pre>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          className="shrink-0 gap-1"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(item.command ?? '');
+                          }}
+                        >
+                          <Copy className="size-3" />
+                          Copy
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-muted-foreground/70">
+                        Unrecognised dump — no known restore command. Restore manually.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Delete confirm */}
       <Dialog open={confirmDeleteName !== null} onOpenChange={(o) => !o && confirm.close()}>
