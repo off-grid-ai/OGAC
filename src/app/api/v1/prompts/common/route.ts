@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // normalizes + counts them to surface the org's most frequently-used prompts. These can be saved
 // into the personal/org prompt library. Falls back to available:false when OpenSearch is
 // unreachable so the UI degrades gracefully (mirrors /gateway/logs).
-const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://offgrid-s1.local:9200';
+const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
 const MAX_LEN = 500;
