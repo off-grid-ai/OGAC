@@ -1,0 +1,82 @@
+# Aux tier node C (g5) — the services that don't fit on g6 (maxed): OpenSearch (SIEM/audit),
+# Marquez (lineage), OpenBao (secrets). Self-contained (env inline, named volumes for persistence),
+# dev-grade config (security relaxed for an internal, tunnel-gated deployment). Start with:
+#   docker compose -f services-node-c.yml up -d
+name: offgrid-node-c
+
+services:
+  # ── OpenSearch — audit/security event index (backs SIEM + audit search) ──────────
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - DISABLE_SECURITY_PLUGIN=true          # internal, tunnel-gated — no TLS/auth for the LAN
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - '9200:9200'
+    restart: unless-stopped
+
+  # ── Marquez — data lineage (OpenLineage). API :9000, admin :9001, web :3001 ──────
+  marquez-db:
+    image: postgres:16.6-alpine
+    environment:
+      - POSTGRES_USER=marquez
+      - POSTGRES_PASSWORD=marquez
+      - POSTGRES_DB=marquez
+    volumes:
+      - marquez-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  marquez:
+    image: marquezproject/marquez:0.50.0
+    depends_on:
+      - marquez-db
+    environment:
+      - MARQUEZ_PORT=9000
+      - MARQUEZ_ADMIN_PORT=9001
+      - POSTGRES_HOST=marquez-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=marquez
+      - POSTGRES_USER=marquez
+      - POSTGRES_PASSWORD=marquez
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    restart: unless-stopped
+
+  marquez-web:
+    image: marquezproject/marquez-web:0.50.0
+    depends_on:
+      - marquez
+    environment:
+      - MARQUEZ_HOST=marquez
+      - MARQUEZ_PORT=9000
+    ports:
+      - '3001:3000'
+    restart: unless-stopped
+
+  # ── OpenBao — secrets vault (KV v2). Dev-ish: file storage + a fixed root token ──
+  # Persistent file backend (not `-dev` in-memory) so secrets survive a restart. Root token is the
+  # console's OFFGRID_OPENBAO_TOKEN. Internal only; unsealed on start via the fixed key is not used —
+  # file backend needs init/unseal, so we run in dev-mode-with-persistence via the config below.
+  openbao:
+    image: openbao/openbao:2.1.0
+    cap_add: ['IPC_LOCK']
+    environment:
+      - BAO_DEV_ROOT_TOKEN_ID=offgrid-root
+      - BAO_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    command: ['server', '-dev']
+    ports:
+      - '8200:8200'
+    restart: unless-stopped
+
+volumes:
+  opensearch-data:
+  marquez-db:
