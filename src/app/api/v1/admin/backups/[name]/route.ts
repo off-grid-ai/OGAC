@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { deleteBackup } from '@/lib/backups';
 
 export const dynamic = 'force-dynamic';
@@ -19,5 +21,10 @@ export async function DELETE(
     const badName = result.error?.includes('path-safety') || result.error?.includes('invalid');
     return NextResponse.json(result, { status: badName ? 400 : 500 });
   }
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'backup.run',
+    resource: `backup:${decoded}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ object: 'backup_delete', ...result });
 }

@@ -16,6 +16,8 @@ import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { emitRunTrace } from '@/lib/chat-trace';
 import { correlationIds } from '@/lib/correlation';
 import { shipRunAudit } from '@/lib/siem';
+import { recordAudit } from '@/lib/store';
+import { actorFrom, outcomeFromStatus } from '@/lib/audit-event';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { scoreInteraction } from '@/lib/qa/scoring';
@@ -296,6 +298,24 @@ export async function runAgent(
   const agent = await resolveAgent(agentId);
   if (!agent) return null;
   const runId = `run_${randomUUID().slice(0, 8)}`;
+  const runModel = agent.model || ANSWER_MODEL;
+  // Canonical attributed audit (Phase 4.11): who ran which agent, its outcome/model, correlated by
+  // runId. Emitted on EVERY terminal path (denied / blocked / done), best-effort. `caller` is the
+  // invoking user's email (undefined for system/scheduled runs → falls back to a machine actor).
+  const auditRun = (status: string, tokens = 0): void => {
+    recordAudit({
+      actor: caller
+        ? actorFrom({ email: caller })
+        : { type: 'machine', id: 'system', label: 'system' },
+      org: orgId,
+      action: 'agent.run',
+      resource: `agent:${agentId}`,
+      model: runModel,
+      tokens: tokens ? { prompt: 0, completion: 0, total: tokens } : null,
+      outcome: outcomeFromStatus(status),
+      runId,
+    });
+  };
   const steps: RunStep[] = [];
   const mark = (kind: string, label: string, detail: string, refs: string[], start: number) => {
     const step = { kind, label, detail, refs, ms: Date.now() - start };
@@ -315,6 +335,7 @@ export async function runAgent(
   const explicitDeny = !decision.allow && /deny-overrides/.test(decision.reason);
   mark('policy', decision.engine, `${explicitDeny ? 'deny' : 'allow'} — ${decision.reason}`, [], t);
   if (explicitDeny) {
+    auditRun('denied');
     return persist(runId, {
       agentId, query, answer: '', status: 'denied', steps, citations: [],
       checks: [{ name: 'policy', verdict: 'blocked' as const, detail: decision.reason }], provenance: null,
@@ -328,6 +349,7 @@ export async function runAgent(
   const preChecks = await runChecks('pre', { phase: 'pre', input: query, model: ANSWER_MODEL });
   mark('guard', 'pre', preChecks.map((c) => `${c.name}:${c.verdict}`).join(' '), [], t);
   if (outcomeFromChecks(preChecks) === 'blocked') {
+    auditRun('blocked');
     return persist(runId, {
       agentId, query, answer: '', status: 'blocked', steps, citations: [],
       checks: preChecks, provenance: null,
@@ -417,16 +439,19 @@ export async function runAgent(
     })
     .catch(() => {});
 
-  // 8b. Audit (OpenSearch offgrid-audit) — ship a governed-run doc keyed by runId (additive to the
-  //     device/gateway audit stream), so `_search?q=<runId>` hits.
+  // 8b. Audit — TWO complementary docs to offgrid-audit, both keyed/correlated by runId:
+  //   (i) the C2 governed-run doc (unchanged) so `_search?q=<runId>` and the four-plane harness hit;
+  //  (ii) the Phase-4.11 canonical ATTRIBUTED event (actor + org + action) via recordAudit, which
+  //       also lands in Postgres audit_events_v2. Both best-effort.
   shipRunAudit({
     runId,
     agentId,
     outcome: run.status,
-    model: agent.model || ANSWER_MODEL,
+    model: runModel,
     tokens: 0,
     caller,
   });
+  auditRun(run.status);
 
   // 8c. Langfuse trace — emit a run trace whose id == normalize(runId) for every run (not just the
   //     sampled QA score), so the trace plane is reliably correlated.

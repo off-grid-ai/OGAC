@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { deleteRoutingRule, setRoutingRuleEnabled } from '@/lib/store';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +13,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'enabled (boolean) required' }, { status: 400 });
   }
   await setRoutingRuleEnabled(id, b.enabled);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'routing.change',
+    resource: `routing:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -19,5 +26,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   await deleteRoutingRule(id);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'routing.change',
+    resource: `routing:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ ok: true });
 }

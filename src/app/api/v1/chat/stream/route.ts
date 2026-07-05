@@ -346,8 +346,11 @@ export async function POST(req: Request) {
         userId,
         model: effectiveModel,
         tokens: estimateTokens(String(content)) + estimateTokens(full),
+        promptTokens: estimateTokens(String(content)),
+        completionTokens: estimateTokens(full),
         outcome: full ? 'ok' : 'error',
         keyId: budget.keyId,
+        project: convo.projectId ?? null,
       });
       // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
       // Temporary chats are never added to memory.

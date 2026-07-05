@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { readRetrieval } from '@/lib/retrieval-view';
 import { createCollection, recreateCollection } from '@/lib/retrieval-writer';
 
@@ -26,5 +28,10 @@ export async function POST(req: Request) {
   const input = { name: body.name, vectorSize: body.vectorSize, distance: body.distance };
   const out = body.recreate === true ? await recreateCollection(input) : await createCollection(input);
   if (!out.ok) return NextResponse.json({ error: out.error }, { status: out.httpStatus });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'connector.create',
+    resource: `collection:${out.name}`,
+    outcome: 'ok',
+  });
   return NextResponse.json({ object: 'collection', name: out.name, ok: true }, { status: 201 });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { createGuardrailRule, listGuardrailRules, validateRule } from '@/lib/guardrails-rules';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -19,7 +20,12 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = validateRule(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-  return NextResponse.json(await createGuardrailRule(parsed.value, await currentOrgId()), {
-    status: 201,
+  const orgId = await currentOrgId();
+  const created = await createGuardrailRule(parsed.value, orgId);
+  auditFromSession(gate, orgId, {
+    action: 'guardrail.change',
+    resource: `guardrail:${(created as { id?: string }).id ?? 'rule'}`,
+    outcome: 'ok',
   });
+  return NextResponse.json(created, { status: 201 });
 }
