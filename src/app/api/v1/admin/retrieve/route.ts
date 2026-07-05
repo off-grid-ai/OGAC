@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { route } from '@/lib/retrieval/router';
 import { normalizeFilter, normalizeMode } from '@/lib/retrieval/query';
 
@@ -24,5 +26,13 @@ export async function POST(req: Request) {
   const opts = hasOpts
     ? { mode: normalizeMode(b.mode), filter: normalizeFilter(b.filter) ?? undefined }
     : undefined;
-  return NextResponse.json(await route(b.query, k, opts));
+  const result = await route(b.query, k, opts);
+  // Data action (Phase 4.11): who queried what. Resource is the detected intent(s) — never the raw
+  // query text (which may carry sensitive terms). Best-effort.
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'retrieval.query',
+    resource: `retrieval:${result.decision?.intent?.join(',') || 'query'}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(result);
 }

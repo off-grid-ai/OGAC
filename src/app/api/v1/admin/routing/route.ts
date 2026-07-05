@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
 import { createRoutingRule, listRoutingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -31,17 +32,20 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json(
-    await createRoutingRule({
-      name: b!.name as string,
-      priority: typeof b!.priority === 'number' ? (b!.priority as number) : 100,
-      attribute: b!.attribute as string,
-      operator: b!.operator as string,
-      value: b!.value as string,
-      action: b!.action as string,
-      model: (b!.model as string | undefined) ?? '',
-      fallback: (b!.fallback as string | undefined) ?? '',
-    }),
-    { status: 201 },
-  );
+  const created = await createRoutingRule({
+    name: b!.name as string,
+    priority: typeof b!.priority === 'number' ? (b!.priority as number) : 100,
+    attribute: b!.attribute as string,
+    operator: b!.operator as string,
+    value: b!.value as string,
+    action: b!.action as string,
+    model: (b!.model as string | undefined) ?? '',
+    fallback: (b!.fallback as string | undefined) ?? '',
+  });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'routing.change',
+    resource: `routing:${created.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }

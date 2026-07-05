@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { createCustomRole, listCustomRoles } from '@/lib/store';
 
 const BASE_ROLES = ['viewer', 'operator', 'admin'];
@@ -24,13 +26,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'basedOn must be viewer | operator | admin' }, { status: 400 });
   }
   const caps = Array.isArray(b?.capabilities) ? (b!.capabilities as string[]) : [];
-  return NextResponse.json(
-    await createCustomRole({
-      name,
-      description: (b?.description as string | undefined) ?? '',
-      basedOn,
-      capabilities: caps,
-    }),
-    { status: 201 },
-  );
+  const created = await createCustomRole({
+    name,
+    description: (b?.description as string | undefined) ?? '',
+    basedOn,
+    capabilities: caps,
+  });
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'access.role.change',
+    resource: `role:${created.id}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(created, { status: 201 });
 }

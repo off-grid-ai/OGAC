@@ -4,6 +4,8 @@
 // request. Read-back (searchAudit) powers the console's Audit view: full-text + filtered search
 // over the shipped stream, well beyond the 25-row Postgres slice on the Control page.
 import { correlationIds } from '@/lib/correlation';
+import { type AuditEvent, type AuditEventInput, buildAuditEvent } from '@/lib/audit-event';
+import { randomUUID } from 'crypto';
 
 const OPENSEARCH_URL = process.env.OFFGRID_OPENSEARCH_URL;
 const INDEX = process.env.OFFGRID_OPENSEARCH_INDEX ?? 'offgrid-audit';
@@ -21,6 +23,22 @@ interface Shippable {
   // Device/gateway events (the historical audit stream) leave it undefined.
   runId?: string | null;
   ts: string;
+  // ─── Canonical attribution (Phase 4.11) — ADDITIVE. Device/gateway docs leave these undefined;
+  // every attributed producer (chat, runs, governance, access, data) fills them via shipAuditEvent.
+  // The nested `actor` mirrors the canonical contract; the flat actorId/actorType/action/org/project
+  // fields exist so OpenSearch term-filters + aggregations key directly (avoids nested mapping), and
+  // the pre-4.11 device docs stay valid (all optional).
+  actor?: { type: 'user' | 'machine'; id: string; label: string };
+  actorId?: string;
+  actorType?: 'user' | 'machine';
+  action?: string;
+  org?: string;
+  project?: string;
+  resource?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  costUsd?: number;
+  ip?: string;
 }
 
 export interface RunAudit {
@@ -57,6 +75,48 @@ export function shipRunAudit(run: RunAudit): void {
   shipAudit([buildRunAuditDoc(run)]);
 }
 
+// Pure: shape a CANONICAL AuditEvent (Phase 4.11) into a shippable OpenSearch doc. The nested actor
+// is preserved AND its fields are flattened (actorId/actorType/action/…) so term filters + aggs key
+// directly. `deviceId`/`model`/`tokens`/`leftDevice` are kept populated so the SAME index/mapping
+// serves both the pre-4.11 device docs and the new attributed docs, and legacy views don't break.
+// The doc `_id` is the runId when present (so run docs de-dup + `_search?q=<runId>` hits) else a uuid.
+export function auditEventToDoc(ev: AuditEvent): Shippable {
+  const id = ev.runId ? correlationIds(ev.runId).auditId : randomUUID();
+  return {
+    id,
+    deviceId: ev.resource ?? `actor:${ev.actor.id}`,
+    model: ev.model ?? '',
+    outcome: ev.outcome,
+    tokens: ev.tokens?.total ?? 0,
+    leftDevice: false,
+    keyId: ev.actor.id,
+    runId: ev.runId ?? null,
+    ts: ev.ts,
+    actor: ev.actor,
+    actorId: ev.actor.id,
+    actorType: ev.actor.type,
+    action: ev.action,
+    org: ev.org,
+    project: ev.project,
+    resource: ev.resource,
+    promptTokens: ev.tokens?.prompt,
+    completionTokens: ev.tokens?.completion,
+    costUsd: ev.costUsd,
+    ip: ev.ip,
+  };
+}
+
+// Ship a canonical attributed audit event: normalize via the pure builder, shape to a doc, ship.
+// Best-effort / non-blocking — the single entry point every attributed producer calls. ADDITIVE to
+// both other ship paths; never throws (so it can't fail the action being audited).
+export function shipAuditEvent(input: AuditEventInput): void {
+  try {
+    shipAudit([auditEventToDoc(buildAuditEvent(input))]);
+  } catch {
+    /* audit is best-effort — never fail the action */
+  }
+}
+
 export function shipAudit(events: Shippable[]): void {
   if (!OPENSEARCH_URL || events.length === 0) return;
   // OpenSearch _bulk: alternating action + document lines, newline-delimited.
@@ -78,12 +138,19 @@ export function siemConfigured(): boolean {
   return Boolean(OPENSEARCH_URL);
 }
 
+// The read-back filter contract the Audit-log VIEW consumes (Phase 4.11): free text + exact-match
+// facets on actor / action / project / outcome + a [from,to] time window + paging. All optional.
 export interface AuditSearchParams {
-  q?: string; // free text (matched against model / outcome / deviceId / keyId)
-  outcome?: string; // exact-match filter
-  deviceId?: string; // exact-match filter
-  size?: number;
-  from?: number;
+  q?: string; // free text (matched against model / outcome / deviceId / keyId / actorId / action)
+  outcome?: string; // exact-match filter (ok | blocked | redacted | error)
+  actor?: string; // exact-match on actorId (user email or machine client-id)
+  action?: string; // exact-match on the canonical action (chat.send | policy.change | …)
+  project?: string; // exact-match on project
+  deviceId?: string; // exact-match filter (legacy device/gateway docs)
+  from?: string; // time-window lower bound (ISO) — ev.ts >= from
+  to?: string; // time-window upper bound (ISO) — ev.ts <= to
+  size?: number; // page size (default 50, max 200)
+  offset?: number; // page offset (was `from`; renamed so `from` is the time bound per the contract)
 }
 
 export interface AuditHit extends Shippable {
@@ -113,20 +180,29 @@ function buildQuery(p: AuditSearchParams): Record<string, unknown> {
     must.push({
       multi_match: {
         query: p.q.trim(),
-        fields: ['model', 'outcome', 'deviceId', 'keyId', 'runId'],
+        fields: ['model', 'outcome', 'deviceId', 'keyId', 'runId', 'actorId', 'action', 'label'],
         type: 'best_fields',
         fuzziness: 'AUTO',
       },
     });
   }
   if (p.outcome) filter.push({ term: { 'outcome.keyword': p.outcome } });
+  if (p.actor) filter.push({ term: { 'actorId.keyword': p.actor } });
+  if (p.action) filter.push({ term: { 'action.keyword': p.action } });
+  if (p.project) filter.push({ term: { 'project.keyword': p.project } });
   if (p.deviceId) filter.push({ term: { 'deviceId.keyword': p.deviceId } });
+  if (p.from || p.to) {
+    const range: Record<string, string> = {};
+    if (p.from) range.gte = p.from;
+    if (p.to) range.lte = p.to;
+    filter.push({ range: { ts: range } });
+  }
   const bool = must.length || filter.length ? { bool: { must, filter } } : { match_all: {} };
   return {
     query: bool,
     sort: [{ ts: { order: 'desc', unmapped_type: 'date' } }],
     size: Math.min(p.size ?? 50, 200),
-    from: p.from ?? 0,
+    from: p.offset ?? 0,
   };
 }
 

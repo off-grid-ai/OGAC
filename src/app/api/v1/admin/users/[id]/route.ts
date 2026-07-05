@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { isRbacRole } from '@/lib/roles';
 import { setUserRole } from '@/lib/store';
 
@@ -19,5 +21,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!updated) {
     return NextResponse.json({ error: 'unknown user' }, { status: 404 });
   }
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'access.user.change',
+    resource: `user:${id}`,
+    outcome: 'ok',
+  });
   return NextResponse.json(updated);
 }
