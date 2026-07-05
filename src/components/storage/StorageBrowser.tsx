@@ -324,7 +324,7 @@ function ShareDialog({ file, onClose }: { file: FileMeta | null; onClose: () => 
     if (!file) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/files/${file.id}/share?ttl=${ttl}`, { method: 'POST' });
+      const res = await fetch(`/api/v1/files/share/${file.id}?ttl=${ttl}`, { method: 'POST' });
       if (!res.ok) {
         toast.error('Could not create share link.');
         return;

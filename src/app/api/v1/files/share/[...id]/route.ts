@@ -4,7 +4,7 @@ import { getFileMeta, presignShareUrl } from '@/lib/files';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/v1/files/:id/share?ttl=<seconds> — mint a time-limited signed GET URL for the object.
+// POST /api/v1/files/share/:id?ttl=<seconds> — mint a time-limited signed GET URL for the object.
 // Owner or admin only (same gate as PATCH/DELETE). ttl is clamped to [60s, 7d]; default 1h.
 // Returns { url, signed, expiresAt, ttlSeconds }. `signed:false` means SeaweedFS has no IAM keypair
 // so the link can't actually expire — the UI shows this honestly rather than faking an expiry.
