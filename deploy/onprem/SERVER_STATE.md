@@ -460,3 +460,18 @@ curl -X POST $KC/admin/realms/offgrid/clients -H "Authorization: Bearer $AT" -H 
 ```
 Usage: mint at `https://auth.getoffgridai.co/realms/offgrid/protocol/openid-connect/token`
 (grant_type=client_credentials), send as `Authorization: Bearer` to `gateway.getoffgridai.co/files/*`.
+
+### Per-service service-account clients (realm `offgrid`) — Phase 4.10-A
+Five confidential, service-accounts-enabled clients the service-token broker mints from:
+`offgrid-gateway`, `offgrid-opensearch`, `offgrid-fleet`, `offgrid-temporal`, `offgrid-seaweedfs`.
+Each has an `oidc-audience-mapper` (aud = its own clientId) and a realm role `svc-<service>` assigned
+to its service-account user, so the minted access token carries a usable `aud` + role claim. All are
+declared in `deploy/keycloak/offgrid-realm.json` (roles + clients + `service-account-*` users) so a
+fresh realm import creates them with dev secrets.
+
+For an existing realm (or to rotate/sync secrets into OpenBao), run the idempotent provisioning route
+instead of hand-editing: `POST /api/v1/admin/access/service-clients/provision` (admin bearer). It
+find-or-creates each client + role via the console's Keycloak admin client, then writes each secret to
+OpenBao at `secret/<service>/client-secret`. Body `{"rotate":true}` forces new secrets; default reuses
+existing ones (no churn). `GET` the same path reports desired-state vs what exists. Does NOT touch
+`offgrid-console` / `offgrid-console-admin`. Requires live Keycloak + OpenBao.
