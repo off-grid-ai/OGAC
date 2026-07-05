@@ -10,9 +10,11 @@
 //   OFFGRID_LANGFUSE_PUBLIC_KEY / OFFGRID_LANGFUSE_SECRET_KEY  (falls back to decoding *_AUTH)
 //
 // Phase 4.10-B: the Basic-auth project keys now flow through the service-token broker
-// (`getServiceCredential('langfuse')`, an S3-style keypair = public-key:secret-key). When OpenBao has
-// the keypair provisioned it's preferred; until then the broker returns `kind:'none'` and we fall back
-// to the current env keys UNCHANGED — byte-identical to today. Selection is the pure, unit-tested
+// (`getServiceCredential('langfuse')`). The broker's per-service plan classifies langfuse as
+// 'native-basic', so it returns a `{ kind:'basic', publicKey, secretKey }` project keypair (pk:sk) —
+// NOT a Keycloak JWT (Langfuse's REST API is HTTP Basic, it doesn't validate KC tokens). When OpenBao
+// has the keypair provisioned it's preferred; until then the broker returns `kind:'none'` and we fall
+// back to the current env keys UNCHANGED — byte-identical to today. Selection is the pure, unit-tested
 // `chooseLangfuseAuth`.
 import { getServiceCredential } from './service-credentials';
 import { chooseLangfuseAuth, NO_CREDENTIAL } from './service-credentials-lib';
