@@ -344,6 +344,162 @@ export async function safeLangfuseInsights(
   }
 }
 
+// ── Prompt registry / datasets / sessions read-back ────────────────────────────────────────────
+// Langfuse also serves the prompt registry, datasets (golden-set inputs/expected), and sessions
+// (grouped multi-turn traces) over its public API. The console read only traces/cost/scores; these
+// close that gap as pure READ-BACK. Each has: a raw API-shape interface, a pure shaper (unit-tested
+// against representative JSON), a thin fetcher, and a best-effort safe wrapper that never throws.
+
+// GET /api/public/v2/prompts — the prompt registry. The list endpoint returns one meta row per
+// prompt NAME (latest version + labels), not the prompt body — that's the registry index view.
+export interface LangfusePromptMeta {
+  name?: string | null;
+  versions?: number[] | null;
+  labels?: string[] | null;
+  tags?: string[] | null;
+  lastUpdatedAt?: string | null;
+  lastConfig?: unknown;
+}
+
+export interface PromptRow {
+  name: string;
+  latestVersion: number | null;
+  versionCount: number;
+  labels: string[];
+  tags: string[];
+  updatedAt: string;
+}
+
+// Pure: shape prompt-registry rows into a stable display model, newest-updated first. Tolerant of
+// nulls — Langfuse omits labels/tags on bare prompts. `latestVersion` is the max version number.
+export function shapePrompts(rows: LangfusePromptMeta[]): PromptRow[] {
+  return rows
+    .map((r) => {
+      const versions = (r.versions ?? []).filter((v): v is number => typeof v === 'number');
+      return {
+        name: (r.name ?? '').trim() || 'unnamed',
+        latestVersion: versions.length ? Math.max(...versions) : null,
+        versionCount: versions.length,
+        labels: (r.labels ?? []).filter((l): l is string => typeof l === 'string'),
+        tags: (r.tags ?? []).filter((t): t is string => typeof t === 'string'),
+        updatedAt: (r.lastUpdatedAt ?? '').trim(),
+      };
+    })
+    .sort((a, b) =>
+      a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.name.localeCompare(b.name),
+    );
+}
+
+// GET /api/public/datasets — dataset definitions (each groups items = input/expected pairs).
+export interface LangfuseDataset {
+  name?: string | null;
+  description?: string | null;
+  metadata?: unknown;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface DatasetRow {
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Pure: shape dataset rows, newest-created first. Description is best-effort text.
+export function shapeDatasets(rows: LangfuseDataset[]): DatasetRow[] {
+  return rows
+    .map((r) => ({
+      name: (r.name ?? '').trim() || 'unnamed',
+      description: (r.description ?? '').trim(),
+      createdAt: (r.createdAt ?? '').trim(),
+      updatedAt: (r.updatedAt ?? '').trim(),
+    }))
+    .sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.name.localeCompare(b.name),
+    );
+}
+
+// GET /api/public/sessions — sessions group related traces (a multi-turn conversation / run chain).
+export interface LangfuseSession {
+  id?: string | null;
+  createdAt?: string | null;
+  projectId?: string | null;
+  countTraces?: number | null;
+  traceCount?: number | null; // some API versions use this key
+}
+
+export interface SessionRow {
+  id: string;
+  createdAt: string;
+  traces: number;
+}
+
+// Pure: shape session rows, newest-created first. Trace count reads either key the API emits.
+export function shapeSessions(rows: LangfuseSession[]): SessionRow[] {
+  return rows
+    .map((r) => ({
+      id: (r.id ?? '').trim() || 'unknown',
+      createdAt: (r.createdAt ?? '').trim(),
+      traces: r.countTraces ?? r.traceCount ?? 0,
+    }))
+    .sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id.localeCompare(b.id),
+    );
+}
+
+// Thin fetchers.
+export async function fetchPrompts(limit = 50): Promise<LangfusePromptMeta[]> {
+  const json = await lfGet<Paged<LangfusePromptMeta>>(
+    `/api/public/v2/prompts?limit=${Math.min(limit, 100)}`,
+  );
+  return json.data ?? [];
+}
+
+export async function fetchDatasets(limit = 50): Promise<LangfuseDataset[]> {
+  const json = await lfGet<Paged<LangfuseDataset>>(
+    `/api/public/datasets?limit=${Math.min(limit, 100)}`,
+  );
+  return json.data ?? [];
+}
+
+export async function fetchSessions(limit = 50): Promise<LangfuseSession[]> {
+  const json = await lfGet<Paged<LangfuseSession>>(
+    `/api/public/sessions?limit=${Math.min(limit, 100)}`,
+  );
+  return json.data ?? [];
+}
+
+// Best-effort combined read-back for the page — never throws. Real empties when unconfigured/unreachable.
+// Each source is fetched independently (Promise.allSettled) so one failing endpoint (e.g. an older
+// Langfuse without /v2/prompts) doesn't blank the others.
+export interface LangfuseRegistry {
+  configured: boolean;
+  prompts: PromptRow[];
+  datasets: DatasetRow[];
+  sessions: SessionRow[];
+  error?: string;
+}
+
+export async function safeLangfuseRegistry(limit = 50): Promise<LangfuseRegistry> {
+  if (!langfuseReadConfigured())
+    return { configured: false, prompts: [], datasets: [], sessions: [] };
+  const [p, d, s] = await Promise.allSettled([
+    fetchPrompts(limit),
+    fetchDatasets(limit),
+    fetchSessions(limit),
+  ]);
+  const errors: string[] = [];
+  for (const r of [p, d, s]) if (r.status === 'rejected') errors.push((r.reason as Error).message);
+  return {
+    configured: true,
+    prompts: p.status === 'fulfilled' ? shapePrompts(p.value) : [],
+    datasets: d.status === 'fulfilled' ? shapeDatasets(d.value) : [],
+    sessions: s.status === 'fulfilled' ? shapeSessions(s.value) : [],
+    error: errors.length ? [...new Set(errors)].join('; ') : undefined,
+  };
+}
+
 export function buildWaterfall(obs: LangfuseObservation[]): WaterfallSpan[] {
   if (!obs.length) return [];
   const times = obs.map((o) => ({
