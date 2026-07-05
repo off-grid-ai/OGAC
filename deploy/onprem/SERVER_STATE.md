@@ -337,6 +337,16 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
     mount `secret`** (`OFFGRID_OPENBAO_MOUNT` default `secret`) and the token `offgrid-dev-token` (the
     container's `BAO_DEV_ROOT_TOKEN_ID`, NOT `offgrid-root`). Enable once:
     `curl -H "X-Vault-Token: offgrid-dev-token" -XPOST 127.0.0.1:8200/v1/sys/mounts/secret -d '{"type":"kv","options":{"version":"2"}}'`.
+  - **Secrets deep ops (2026-07):** the Secrets page now drives KV v2 versioning/rotation
+    (`/api/v1/admin/secrets/versions`), seal/unseal (`/api/v1/admin/secrets/seal`, needs the operator
+    unseal key SHARES — the dev container is auto-unsealed so sealing it will require re-unsealing),
+    leases (`/api/v1/admin/secrets/leases`, via `sys/leases/lookup|revoke`), and dynamic DB creds
+    (`/api/v1/admin/secrets/dynamic-db`). Dynamic DB creds require the **`database` secrets engine**
+    enabled + a role configured against a Postgres connection; the mount defaults to `database`,
+    override with **`OFFGRID_OPENBAO_DB_MOUNT`**. Until that engine is provisioned the dynamic-DB panel
+    shows "no roles / not enabled" (graceful stub). The dev root token has these caps; a scoped token
+    in prod needs policy for `sys/seal`, `sys/unseal`, `sys/leases/*`, `<mount>/metadata|destroy|delete`,
+    and `<dbmount>/creds/*`.
   - **SIEM still empty:** the SIEM view reads `OFFGRID_SIEM_INDEX` (`offgrid-audit`) — a DIFFERENT index
     than Analytics (`offgrid-gateway`). `offgrid-audit` doesn't exist until `shipAudit()` writes to it;
     now that `OFFGRID_OPENSEARCH_URL` is set, governed activity will create+populate it. Generate a few
