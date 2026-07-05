@@ -25,6 +25,12 @@ export const regexPii: PiiPort = {
   },
 };
 
+import type {
+  AnalyzeRequest,
+  NormalizedRecognizer,
+  ThresholdConfig,
+} from '../presidio-recognizers';
+
 interface PresidioEntity {
   entity_type: string;
   start: number;
@@ -32,16 +38,42 @@ interface PresidioEntity {
   score?: number;
 }
 
-// Presidio analyzer → the detected entities WITH positions (needed to redact spans).
-async function presidioAnalyze(url: string, text: string): Promise<PresidioEntity[]> {
+// Presidio analyzer → the detected entities WITH positions (needed to redact spans). The request
+// body is built by the pure builder in presidio-recognizers.ts so custom recognizers (regex +
+// context words + deny lists) ride along as `ad_hoc_recognizers` — they take effect per-request
+// with NO server-side Presidio config — and the global score_threshold prunes low-confidence hits.
+async function presidioAnalyze(url: string, body: AnalyzeRequest): Promise<PresidioEntity[]> {
   const res = await fetch(`${url}/analyze`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text, language: 'en' }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(4000),
   });
   if (!res.ok) throw new Error(`presidio ${res.status}`);
   return (await res.json()) as PresidioEntity[];
+}
+
+// Load the org's custom recognizers + threshold config for the scan path. Best-effort: any DB
+// error (table missing on a fresh deploy, no DB) degrades to "no custom recognizers, no threshold"
+// so the base analyze still runs — the deep layer is additive, never a hard dependency.
+async function loadDeepConfig(): Promise<{
+  recognizers: NormalizedRecognizer[];
+  thresholds: ThresholdConfig;
+}> {
+  try {
+    const [{ listRecognizers, getThresholds }, { currentOrgId }] = await Promise.all([
+      import('../presidio-recognizers'),
+      import('../tenancy'),
+    ]);
+    const orgId = await currentOrgId();
+    const [recs, thresholds] = await Promise.all([listRecognizers(orgId), getThresholds(orgId)]);
+    // The stored CustomRecognizer is a superset of NormalizedRecognizer (adds id/createdAt) — the
+    // builder reads only the normalized fields, so the extra keys are harmless.
+    return { recognizers: recs as unknown as NormalizedRecognizer[], thresholds };
+  } catch {
+    const { DEFAULT_THRESHOLDS } = await import('../presidio-recognizers');
+    return { recognizers: [], thresholds: DEFAULT_THRESHOLDS };
+  }
 }
 
 // Presidio anonymizer service → redacted text. Falls back to null so the caller can synthesize.
@@ -87,7 +119,12 @@ export const presidioPii: PiiPort = {
     const url = env.OFFGRID_PRESIDIO_URL;
     if (!url) return regexScan(text);
     try {
-      const found = await presidioAnalyze(url, text);
+      // Pull the org's custom recognizers + thresholds, build the ad-hoc-recognizer request body,
+      // then filter the analyzer's results by the effective (global/per-entity) threshold locally.
+      const { recognizers, thresholds } = await loadDeepConfig();
+      const { buildAnalyzeRequest, applyThresholds } = await import('../presidio-recognizers');
+      const body = buildAnalyzeRequest(text, recognizers, thresholds);
+      const found = applyThresholds(await presidioAnalyze(url, body), thresholds);
       const entities = [...new Set(found.map((f) => f.entity_type))];
       // Prefer the real anonymizer service; else synthesize a redaction from the positions.
       const anonUrl = env.OFFGRID_PRESIDIO_ANONYMIZER_URL;
