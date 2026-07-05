@@ -12,13 +12,47 @@ import type { EvalRunResult, EvalsPort } from './types';
 // sidecar against OUR gateway; each falls back to golden if its tool is unavailable, so selecting
 // one is never a hard dependency.
 const execFileAsync = promisify(execFile);
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
+import { getServiceCredential } from '@/lib/service-credentials';
+import { chooseGatewayAuth, type ServiceCredential } from '@/lib/service-credentials-lib';
 const EVAL_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
 const RAGAS_URL = process.env.OFFGRID_RAGAS_URL;
 const PROMPTFOO_BIN = process.env.OFFGRID_PROMPTFOO_BIN ?? 'promptfoo';
+const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
 
 function iso(): string {
   return new Date().toISOString();
+}
+
+// ── Gateway auth for the promptfoo sidecar (PURE, unit-tested) ────────────────────────────────────
+// promptfoo's OpenAI-compatible provider takes `apiKey` (sent as `Authorization: Bearer <apiKey>`) and
+// optional custom `headers`. The aggregator accepts EITHER a Keycloak Bearer JWT OR the legacy static
+// key as `x-api-key`. So we drive the SAME shared auth-selection rule the gateway helper uses
+// (`chooseGatewayAuth`): a broker Bearer JWT → pass it as promptfoo's apiKey (→ Bearer, which the
+// aggregator accepts); else the legacy static key → send it verbatim as an `x-api-key` header (what the
+// aggregator wants); else no auth — byte-identical to the pre-broker `apiKey:'offgrid-local'` behavior
+// for an unprovisioned local gateway. `providerAuthFromHeaders` is the pure translation of the shared
+// header rule into promptfoo's provider-config shape, so it's unit-tested with no I/O.
+export interface PromptfooProviderAuth {
+  apiKey: string;
+  headers?: Record<string, string>;
+}
+
+export function providerAuthFromHeaders(headers: Record<string, string>): PromptfooProviderAuth {
+  const bearer = headers.authorization;
+  if (bearer?.startsWith('Bearer ')) return { apiKey: bearer.slice('Bearer '.length) };
+  if (headers['x-api-key']) return { apiKey: 'x-api-key', headers: { 'x-api-key': headers['x-api-key'] } };
+  // No broker cred and no legacy key: keep promptfoo happy with a placeholder key and send no auth,
+  // exactly as the old hard-coded `apiKey:'offgrid-local'` did against an unauthenticated local gateway.
+  return { apiKey: 'offgrid-local' };
+}
+
+/** Resolve promptfoo's provider auth from the SAME shared rule (`chooseGatewayAuth`) as the gateway. */
+export function selectPromptfooAuth(
+  cred: ServiceCredential,
+  legacyApiKey: string | undefined,
+): PromptfooProviderAuth {
+  return providerAuthFromHeaders(chooseGatewayAuth(cred, legacyApiKey));
 }
 
 // ── golden (default) ────────────────────────────────────────────────────────
@@ -51,13 +85,20 @@ interface PromptfooSummary {
   results?: { stats?: { successes?: number; failures?: number } };
 }
 
-function promptfooConfig(cases: { query: string; expected: string }[]): unknown {
+function promptfooConfig(
+  cases: { query: string; expected: string }[],
+  auth: PromptfooProviderAuth,
+): unknown {
   return {
     description: 'Off Grid console golden set',
     providers: [
       {
         id: `openai:chat:${EVAL_MODEL}`,
-        config: { apiBaseUrl: `${GATEWAY_URL}/v1`, apiKey: 'offgrid-local' },
+        config: {
+          apiBaseUrl: `${GATEWAY_URL}/v1`,
+          apiKey: auth.apiKey,
+          ...(auth.headers ? { headers: auth.headers } : {}),
+        },
       },
     ],
     prompts: ['{{query}}'],
@@ -70,11 +111,17 @@ function promptfooConfig(cases: { query: string; expected: string }[]): unknown 
 
 async function runPromptfoo(): Promise<EvalRunResult> {
   const cases = await listGoldenCases();
+  // Authenticate to the gateway through the service-credential broker (bearer JWT preferred, legacy
+  // static key fallback) — same seam as every other adapter, no hard-coded key.
+  const auth = selectPromptfooAuth(
+    await getServiceCredential('gateway'),
+    GATEWAY_API_KEY || undefined,
+  );
   const dir = await mkdtemp(join(tmpdir(), 'offgrid-pf-'));
   const cfg = join(dir, 'promptfooconfig.json');
   const out = join(dir, 'out.json');
   try {
-    await writeFile(cfg, JSON.stringify(promptfooConfig(cases)));
+    await writeFile(cfg, JSON.stringify(promptfooConfig(cases, auth)));
     await execFileAsync(PROMPTFOO_BIN, ['eval', '-c', cfg, '-o', out, '--no-progress-bar'], {
       timeout: 120_000,
     });
@@ -140,7 +187,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: gatewayHeaders({ 'content-type': 'application/json' }),
+    headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
     body: JSON.stringify({
       model: EVAL_MODEL,
       temperature: 0,
@@ -179,7 +226,7 @@ async function runRagas(): Promise<EvalRunResult> {
   const dataset = await buildDataset();
   const res = await fetch(`${RAGAS_URL}/evaluate`, {
     method: 'POST',
-    headers: gatewayHeaders({ 'content-type': 'application/json' }),
+    headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
     body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, dataset }),
     signal: AbortSignal.timeout(180_000),
   });
