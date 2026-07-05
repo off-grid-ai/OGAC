@@ -55,7 +55,7 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 ## Product/doc mismatches to reconcile (verify, then fix wording or build)
 | # | Item |
 |---|---|
-| 25 | Provenance signing — is it default on chat/agent runs, or only report export? |
+| 25 | ✅ **RESOLVED (2026-07-06)** — Provenance signing IS default-on for **agent runs**, NOT export-only. `src/lib/agentrun.ts` stage 7 signs every answered run UNCONDITIONALLY (no feature flag, no `if`) via `getSigning()` over `{runId, agentId, query, answer, refs}`, and persists the `provenance` record (signature/algorithm/publicKey/signedAt) to `agent_runs`; the runId is embedded as the correlation `provenanceRef` (C2). Report export (`/api/v1/admin/reports/[id]/export`) is a SEPARATE second layer — a detached file manifest — not the only signing path. **Nuance:** the default signing port is **native HMAC-SHA256** (`SIGNING_PORTS[0]`), not ed25519 — set `OFFGRID_ADAPTER_PROVENANCE=ed25519` for offline/public-key verification. **Chat runs (`chat-governance.ts`) are audit-only by design** (they write `audit_events`/`audit_events_v2` with actor/action/cost/outcome, but do NOT sign a per-message provenance record); provenance signing is scoped to governed agent/workflow runs, the answer-producing path. Verified by `test/provenance-default-on.test.ts` (signature round-trips + tamper-evidence + no flag gate in source) and surfaced as **provenance coverage %** on the Regulatory DPO view + DPIA activity export. |
 | 26 | Cloud routing — framework exists, no cloud provider clients wired (local-only today) |
 | 27 | Permissions-aware retrieval — real-time source-permission binding vs. project/ABAC scoping |
 | 28 | Backups restore path — verify end-to-end; DR failover not configured |
