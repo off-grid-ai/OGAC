@@ -12,7 +12,7 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 | # | Gap | What to do | Owner | Effort |
 |---|---|---|---|---|
 | 1 | ✅ **DONE (2026-07-05)** — Routing rules seeded on live console: `data_class=pii→local`, `confidential→local`, `restricted→block`, `public→cloud (fallback local)`. Verified via `/routing/evaluate` — all enforced by `decideRouting`. Demo note: egress switch is ON so `public`→cloud; flip egress OFF to show `public` leashing to block. | console | ✅ |
-| 2 | **Presidio not wired** (guardrails = regex only) | Presidio is LIVE on g6 (:5002/:5001). Add Caddy loopback proxies + `OFFGRID_ADAPTER_GUARDRAILS=presidio` + URLs → real entity-grade PII masking in Guardrails. | console + infra | S |
+| 2 | 🟡 **Presidio DEFERRED (2026-07-05)** — Presidio is live on g6 and reachable from a shell, but the launchd next-server can't reach a standalone loopback forwarder (fresh `node` can — a macOS launchd loopback quirk). Fix = add `8938→g6:5002`/`8939→g6:5001` to the **edge Caddy** (staged in Caddyfile) + set `OFFGRID_ADAPTER_GUARDRAILS=presidio`+URLs, but that needs an edge-Caddy reload (admin off, unsupervised, fronts the public tunnel → on-site/maintenance window). Guardrails runs the regex floor until then. | console + infra | S |
 | 3 | **No real knowledge to ground on** | Upload 1-2 of the org's *real* docs (not fabricated) so Chat grounding + a Studio assistant have genuine content. Needs Mac's real docs. | Mac + console | XS |
 | 4 | **Decide demo path** | From `DEMO_WALKTHROUGH.md`: lead with the 🟢 pages; skip 🔴 (SIEM/Lineage/Secrets) unless their services get started. | Mac | — |
 | 5 | **Confirm Langfuse traces render** | Langfuse is up on g6; verify Observability actually shows traces before demoing it. | console | XS |
@@ -20,9 +20,9 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 ## P1 — integration wiring (start service → set env → real data, no mocks)
 | # | Gap | What to do | Owner | Effort |
 |---|---|---|---|---|
-| 6 | **SIEM/audit search empty** | OpenSearch not running. Start it (g6?) + set `OFFGRID_OPENSEARCH_URL`; real audit events already ship there. | infra + console | S |
-| 7 | **Lineage empty** | Marquez not running. Start it + set `OFFGRID_MARQUEZ_URL`; runs already emit OpenLineage. | infra + console | S |
-| 8 | **Secrets = env adapter** | OpenBao not running. Start it + set `OFFGRID_ADAPTER_SECRETS=openbao`. | infra + console | S |
+| 6 | 🟡 **SIEM/audit search empty** — CAUSE FOUND (2026-07-05): OpenSearch IS up on S1 (`offgrid-services-a`), but the SIEM view reads `OFFGRID_SIEM_INDEX=offgrid-audit`, a DIFFERENT index than Analytics (`offgrid-gateway`). `offgrid-audit` doesn't exist until `shipAudit()` writes. `OFFGRID_OPENSEARCH_URL` now set → generate governed runs to seed `offgrid-audit`, then SIEM populates. | console | S |
+| 7 | ✅ **DONE (2026-07-05)** — Lineage wired: Marquez was already up on S1; set `OFFGRID_MARQUEZ_URL=http://127.0.0.1:9000` + `OFFGRID_ADAPTER_LINEAGE=marquez`. Connected to `default` ns; graph fills once runs emit OpenLineage. | console | ✅ |
+| 8 | ✅ **DONE (2026-07-05)** — Secrets wired: OpenBao was already up on S1; enabled KV v2 at mount `secret`, set `OFFGRID_ADAPTER_SECRETS=openbao` + URL + token `offgrid-dev-token`; seeded 3 real secrets. Page shows openbao, reachable, unsealed. | console | ✅ |
 | 9 | **Superset dashboard** | Embed wired, but no dashboard provisioned. Provision one real dashboard over the audit index. | console | M |
 
 ## P1 — UX debt (the mandates)
