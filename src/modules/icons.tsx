@@ -34,6 +34,7 @@ import {
   Archive,
   SealCheck,
   Gauge,
+  Receipt,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -55,6 +56,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   observability: Microscope,
   analytics: BarChart3,
   finops: Coins,
+  accounting: Receipt,
   reports: ScrollText,
   lineage: TreeStructure,
   regulatory: Scale,
