@@ -284,6 +284,15 @@ export interface MdmPort {
     input: Partial<import('@/lib/fleetdm').FleetPolicyInput>,
   ): Promise<import('@/lib/fleetdm').FleetPolicy>;
   deletePolicy?(id: number): Promise<void>;
+  // Destructive device commands (FleetDM MDM command endpoints). Async on Fleet's side — the
+  // returned result reports 'pending'/'requested' plus any unlock PIN / device status echo. Only a
+  // real MDM implements these; callers feature-detect the method before use. Fleet has no
+  // reboot/restart REST command, so `restartHost` is deliberately absent (feature-detected as
+  // unsupported). lock/unlock/wipe are Fleet Premium; refetch is free-tier.
+  lockHost?(hostId: number): Promise<import('@/lib/fleetdm').DeviceCommandResult>;
+  unlockHost?(hostId: number): Promise<import('@/lib/fleetdm').DeviceCommandResult>;
+  wipeHost?(hostId: number): Promise<import('@/lib/fleetdm').DeviceCommandResult>;
+  refetchHost?(hostId: number): Promise<import('@/lib/fleetdm').DeviceCommandResult>;
 }
 
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;
