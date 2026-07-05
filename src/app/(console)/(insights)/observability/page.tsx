@@ -7,6 +7,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
+import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
@@ -23,7 +24,7 @@ import {
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
-import { safeListTraces } from '@/lib/langfuse';
+import { resolveRange, safeLangfuseInsights, safeListTraces } from '@/lib/langfuse';
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { currentOrgId } from '@/lib/tenancy';
@@ -174,15 +175,23 @@ function RunTracesTable({ runs }: { runs: Trace[] }) {
   );
 }
 
-export default async function ObservabilityPage() {
+export default async function ObservabilityPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireModuleForUser('observability');
   const org = await currentOrgId();
-  const [evals, drift, runs, onlineEnabled, traces] = await Promise.all([
+  const sp = await searchParams;
+  const lfRangeRaw = Array.isArray(sp.lfRange) ? sp.lfRange[0] : sp.lfRange;
+  const { range, fromIso, toIso } = resolveRange(lfRangeRaw);
+  const [evals, drift, runs, onlineEnabled, traces, insights] = await Promise.all([
     listEvalRuns(20),
     getDrift().analyze(),
     listAgentRuns(15, org),
     getFlags().isEnabled('online-evals', true),
     safeListTraces(30),
+    safeLangfuseInsights(fromIso, toIso),
   ]);
 
   const latest = evals[0];
@@ -321,6 +330,14 @@ export default async function ObservabilityPage() {
       </div>
 
       <ThresholdManager />
+
+      <LangfuseInsightsPanel
+        configured={insights.configured}
+        cost={insights.cost}
+        trends={insights.trends}
+        error={insights.error}
+        range={range}
+      />
 
       <Card className="shadow-sm">
         <CardHeader>
