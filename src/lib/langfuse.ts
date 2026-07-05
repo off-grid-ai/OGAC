@@ -8,23 +8,44 @@
 // Read side:
 //   OFFGRID_LANGFUSE_URL       — e.g. http://offgrid-g6.local:3030
 //   OFFGRID_LANGFUSE_PUBLIC_KEY / OFFGRID_LANGFUSE_SECRET_KEY  (falls back to decoding *_AUTH)
+//
+// Phase 4.10-B: the Basic-auth project keys now flow through the service-token broker
+// (`getServiceCredential('langfuse')`, an S3-style keypair = public-key:secret-key). When OpenBao has
+// the keypair provisioned it's preferred; until then the broker returns `kind:'none'` and we fall back
+// to the current env keys UNCHANGED — byte-identical to today. Selection is the pure, unit-tested
+// `chooseLangfuseAuth`.
+import { getServiceCredential } from './service-credentials';
+import { chooseLangfuseAuth, NO_CREDENTIAL } from './service-credentials-lib';
+
 const BASE = process.env.OFFGRID_LANGFUSE_URL;
 const PK = process.env.OFFGRID_LANGFUSE_PUBLIC_KEY;
 const SK = process.env.OFFGRID_LANGFUSE_SECRET_KEY;
 
-// Derive Basic-auth header. Prefer explicit pk/sk; otherwise reuse the base64 OTLP auth blob.
-function authHeader(): string | null {
-  if (PK && SK) return `Basic ${Buffer.from(`${PK}:${SK}`).toString('base64')}`;
+const b64 = (s: string) => Buffer.from(s).toString('base64');
+
+// The legacy env-derived Basic header: explicit pk/sk, else the base64 OTLP auth blob. Kept as the
+// fallback branch; `chooseLangfuseAuth` prefers a broker keypair over this.
+function legacyAuthHeader(): string | null {
+  if (PK && SK) return `Basic ${b64(`${PK}:${SK}`)}`;
   const otlp = process.env.OFFGRID_LANGFUSE_AUTH;
   return otlp ? `Basic ${otlp}` : null;
 }
 
+// Broker-preferring Basic header (async). Broker keypair wins; else the legacy env header; else null.
+async function authHeader(): Promise<string | null> {
+  const cred = await getServiceCredential('langfuse');
+  return chooseLangfuseAuth(cred, legacyAuthHeader(), b64);
+}
+
+// Synchronous "is read-back configured?" — reflects env only (the broker is async + returns `none`
+// until provisioned, so this stays byte-identical to today: a broker keypair simply becomes usable
+// once present without flipping this gate before it's provisioned).
 export function langfuseReadConfigured(): boolean {
-  return Boolean(BASE) && authHeader() !== null;
+  return Boolean(BASE) && chooseLangfuseAuth(NO_CREDENTIAL, legacyAuthHeader(), b64) !== null;
 }
 
 async function lfGet<T>(path: string): Promise<T> {
-  const auth = authHeader();
+  const auth = await authHeader();
   if (!BASE || !auth) throw new Error('Langfuse read-back not configured');
   try {
     const res = await fetch(`${BASE}${path}`, {
