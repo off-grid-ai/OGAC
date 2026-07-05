@@ -29,13 +29,15 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-6xl gap-10 px-6 py-8">
+      <div className="mx-auto flex max-w-6xl gap-10 px-6">
         <aside className="hidden w-56 shrink-0 md:block">
-          <div className="sticky top-20">
+          {/* Own scroll region, pinned under the 3.5rem header — so a tall nav never drags the page
+              scroll on a short content page. */}
+          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-8 pr-1">
             <DocsNav />
           </div>
         </aside>
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1 py-8">{children}</main>
       </div>
     </div>
   );
