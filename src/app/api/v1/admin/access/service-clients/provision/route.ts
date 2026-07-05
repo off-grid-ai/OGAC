@@ -3,6 +3,8 @@ import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
 import {
+  audienceMapperConfig,
+  audienceMapperName,
   buildResult,
   clientCreateConfig,
   clientSecretPath,
@@ -58,17 +60,35 @@ export async function POST(req: Request) {
         clientAction = 'created';
       }
 
-      // ── 2) Ensure the realm role exists and is on the service account ────────
+      // ── 1b) Ensure the audience protocol mapper is attached ──────────────────
+      // Without this, a runtime-created client emits the DEFAULT aud ("account") — never
+      // offgrid-<svc>. Idempotent: find the mapper by name first, create only if absent. The seed
+      // realm declares the same mapper so a fresh import is already correct; this repairs clients
+      // the provisioning route created (which get no mappers by default).
+      const mapperName = audienceMapperName(def);
+      const existingMappers = await kc.listClientProtocolMappers(internalId);
+      if (!existingMappers.some((m) => m.name === mapperName)) {
+        await kc.createClientProtocolMapper(internalId, audienceMapperConfig(def));
+      }
+
+      // ── 2) Ensure the realm role(s) exist and are on the service account ─────
       // ensureRealmRole is idempotent; whether the role pre-existed tells us created vs reused.
+      // A client may also carry an OPTIONAL grant role (least-privilege: only the gateway does) that
+      // elevates its service account to a console capability — ensured and assigned the same way.
       const roleExisted = (await kc.listRealmRoles()).some((r) => r.name === def.realmRole);
       const role = await kc.ensureRealmRole(def.realmRole, `Off Grid service scope: ${def.realmRole}`);
       const roleAction: ProvisionAction = roleExisted ? 'reused' : 'created';
+      const rolesToAssign = [role];
+      if (def.grantsRole) {
+        rolesToAssign.push(
+          await kc.ensureRealmRole(def.grantsRole, `Off Grid console capability: ${def.grantsRole}`),
+        );
+      }
       const saUser = await kc.getServiceAccountUser(internalId);
       if (saUser?.id) {
         const assigned = await kc.listUserRoles(saUser.id);
-        if (!assigned.some((r) => r.name === def.realmRole)) {
-          await kc.assignRoles(saUser.id, [role]);
-        }
+        const missing = rolesToAssign.filter((r) => !assigned.some((a) => a.name === r.name));
+        if (missing.length) await kc.assignRoles(saUser.id, missing);
       }
 
       // ── 3) Read or rotate the client-secret ──────────────────────────────────
