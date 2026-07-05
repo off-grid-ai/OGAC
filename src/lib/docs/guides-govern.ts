@@ -35,6 +35,8 @@ the AI is controlled, but the evidence.`,
       body: `Control is the room a risk officer runs the platform from. It gathers the governance levers
 that decide what the platform is allowed to do, so you can set the posture and prove it in one place.
 
+![The Control center — egress leash, routing, policy, and audit search in one room](/docs-shots/control.png)
+
 ## The egress leash
 
 The master switch. Cloud egress ON or OFF decides whether any request can reach a cloud model. With
@@ -64,6 +66,8 @@ outcome. It's the fastest path from "did this happen" to the evidence.`,
       description: 'Attribute-based access control, deny by default, with policy-as-code.',
       body: `Policy decides who and what is allowed. It runs on every request, before anything else.
 
+![Policy — attribute-based rules, deny by default, as code](/docs-shots/policy.png)
+
 ## Rules
 
 A policy rule matches on an attribute (role, data class, resource) with an operator (equals, not-
@@ -86,6 +90,8 @@ is unreachable, so turning it on is never a hard dependency.`,
       title: 'Guardrails & PII',
       description: 'Detect and mask sensitive data on every prompt and answer.',
       body: `Guardrails scan every prompt before it moves and every answer before it leaves.
+
+![Guardrails — PII detection and masking on every prompt and answer](/docs-shots/guardrails.png)
 
 ## Two layers
 
@@ -172,6 +178,8 @@ only key names are listed back, never the values — so the surface can't leak w
       description: 'Sign answers and reports so they’re verifiable, tamper-evident, and yours.',
       body: `Provenance makes an output verifiable after the fact: you can prove what was produced, by
 whom, and that it wasn't altered.
+
+![Provenance — signed, tamper-evident answers and reports](/docs-shots/provenance.png)
 
 ## What gets signed
 

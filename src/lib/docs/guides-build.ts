@@ -11,6 +11,8 @@ export const buildSection: DocSection = {
       body: `Chat is your org's private assistant. It streams from your own gateways, so prompts and
 answers stay on your network.
 
+![Chat — a grounded, governed conversation answered on your own gateway](/docs-shots/chat.png)
+
 ## What it does
 
 - **Models on your hardware.** Pick a model from the picker; the answer is generated on your gateway
@@ -68,6 +70,8 @@ image is stored in your object store, so it's also visible in [Storage](/docs/gu
       description: 'Assistants that act — grounded, tool-using, and run through the governed pipeline.',
       body: `An agent is an assistant with a job and capabilities. You give it instructions, ground it in
 your knowledge, and grant it tools; every run flows through the governed pipeline.
+
+![Agents — assistants with instructions, grounding, and governed tools](/docs-shots/agents.png)
 
 ## Create one
 
@@ -149,6 +153,8 @@ still flows through the same governed pipeline as the rest of the console.`,
       body: `Retrieval is the data-plane view of grounding: the vector store your grounded answers draw
 from, and the controls to keep it healthy. [Knowledge](/docs/guides/knowledge) is where you add
 content; Retrieval is where you inspect how it's indexed and served.
+
+![Retrieval — collections, backend, and a live query against the vector store](/docs-shots/retrieval.png)
 
 ## What you do here
 
@@ -271,6 +277,8 @@ built by hand.
       description: 'Turn your documents and systems into grounded, cited answers.',
       body: `Knowledge is how your own content becomes answerable. You upload documents or connect a
 system; Off Grid indexes it on your hardware; Chat and agents answer from it with citations.
+
+![Knowledge — upload documents and index connected sources for grounded answers](/docs-shots/knowledge.png)
 
 ## Add knowledge
 
