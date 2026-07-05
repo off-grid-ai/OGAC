@@ -1,5 +1,7 @@
+import { DocPager } from '@/components/docs/DocPager';
 import { DocsMarkdown } from '@/components/docs/DocsMarkdown';
-import { findDocBySlug } from '@/lib/docs';
+import { DocToc } from '@/components/docs/DocToc';
+import { docHeadings, findDocBySlug } from '@/lib/docs';
 
 export const dynamic = 'force-static';
 
@@ -8,12 +10,16 @@ export default function DocsHome() {
   const page = findDocBySlug('');
   if (!page) return null;
   return (
-    <article>
-      <h1 className="text-2xl font-semibold text-foreground">{page.title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{page.description}</p>
-      <div className="mt-6">
-        <DocsMarkdown body={page.body} />
-      </div>
-    </article>
+    <div className="flex gap-10">
+      <article className="min-w-0 flex-1">
+        <h1 className="text-2xl font-semibold text-foreground">{page.title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{page.description}</p>
+        <div className="mt-6">
+          <DocsMarkdown body={page.body} />
+        </div>
+        <DocPager slug="" />
+      </article>
+      <DocToc headings={docHeadings(page.body)} />
+    </div>
   );
 }

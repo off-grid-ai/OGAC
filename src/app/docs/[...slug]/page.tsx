@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { DocPager } from '@/components/docs/DocPager';
 import { DocsMarkdown } from '@/components/docs/DocsMarkdown';
-import { allDocSlugs, findDocBySlug } from '@/lib/docs';
+import { DocToc } from '@/components/docs/DocToc';
+import { allDocSlugs, docHeadings, findDocBySlug } from '@/lib/docs';
 
 export const dynamic = 'force-static';
 
@@ -13,15 +15,20 @@ export function generateStaticParams() {
 
 export default async function DocPage({ params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
-  const page = findDocBySlug(slug.join('/'));
+  const key = slug.join('/');
+  const page = findDocBySlug(key);
   if (!page) notFound();
   return (
-    <article>
-      <h1 className="text-2xl font-semibold text-foreground">{page.title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{page.description}</p>
-      <div className="mt-6">
-        <DocsMarkdown body={page.body} />
-      </div>
-    </article>
+    <div className="flex gap-10">
+      <article className="min-w-0 flex-1">
+        <h1 className="text-2xl font-semibold text-foreground">{page.title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{page.description}</p>
+        <div className="mt-6">
+          <DocsMarkdown body={page.body} />
+        </div>
+        <DocPager slug={key} />
+      </article>
+      <DocToc headings={docHeadings(page.body)} />
+    </div>
   );
 }
