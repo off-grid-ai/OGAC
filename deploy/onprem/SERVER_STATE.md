@@ -53,8 +53,27 @@ After editing `.env.local`, restart the console (see DEPLOY.md).
 
 Created with the `pg` client because `drizzle-kit push` hangs over SSH. **TODO: add proper
 drizzle migrations** (`drizzle/000X_*.sql`) so a migrate-based deploy reproduces them:
-`studio_templates`, `config_settings`, `config_audit`, `gateway_client_tokens`.
+`studio_templates`, `config_settings`, `config_audit`, `gateway_client_tokens`,
+**`fleet_nodes`** (2026-07-05 — the gateway SSOT; seeded with the 9 live nodes).
 DDL for each is in `src/db/schema.ts`; the create statements used are in git history / DEPLOY.md.
+
+### Gateway fleet SSOT (2026-07-05) — how it's wired
+`fleet_nodes` is the single source of truth for the on-prem fleet. Flow + gotchas:
+- **Console** `GET /api/v1/gateway/pool` derives the aggregator POOL/IMAGE_POOL from the table;
+  `PATCH /api/v1/gateway/fleet/[name]` edits a node (validated) + pushes model/ctx to the node.
+  Editor UI: AI Gateway → **Control** tab (`GatewayFleetConfig`).
+- **Aggregator** (`scripts/gateway-aggregator.mjs`) fetches `/pool` on startup + every 30s with a
+  **hardcoded fallback** (routing can't drop if console/DB is down). `OFFGRID_POOL` env still pins.
+  - **/pool auth:** aggregator MUST send `Authorization: Bearer <key>` (the console middleware only
+    lets `/api/*` through with a Bearer header; `x-api-key` alone → 401 at middleware). /pool itself
+    is gate-less (read-only topology, behind the tunnel's Keycloak gate).
+  - **push-to-node:** `POST /nodes/:name` on the aggregator SSHes to the node (`activate` = write
+    active-model.json incl. `ctx` + kickstart; `restart`; `enable/disable` = adopt SSOT). The aggregator
+    launchd job has **no HOME**, so ssh needs an explicit `-i /Users/admin/.ssh/id_ed25519` +
+    `UserKnownHostsFile` (else "publickey denied"). Override via `OFFGRID_SSH_KEY`.
+- **Deploy caveat:** after adding/removing a route, `next build` can serve a STALE compiled route —
+  do `rm -rf .next && next build` (clean) and verify BOTH `.next/server/middleware-manifest.json`
+  and `pages-manifest.json` exist before restart.
 
 ## Docker containers (S1 OrbStack — daemon already initialised, no GUI first-run)
 
