@@ -155,6 +155,41 @@ traces to a real event — an unreachable source shows real zeros, never synthet
 Manage virtual keys and their budgets from the FinOps surface.`,
     },
     {
+      slug: 'guides/budgets',
+      title: 'Budget enforcement',
+      description: 'A spend limit that actually stops the spend — not just an alert after the fact.',
+      body: `A budget you can't enforce is a suggestion. Off Grid checks the limit **before** a call runs,
+so a team can't quietly blow past its cap and leave you to find out on the invoice.
+
+## How it works
+
+Every project has a virtual key with an optional monthly limit. Before a chat or agent completion
+runs, the platform prices the call, adds it to what the key has already spent this month, and asks a
+single question: does this stay within budget. If it doesn't, the call is refused with a clear
+reason. Local models cost zero, so on-prem work never counts against the cap.
+
+## Enforcement is on by default
+
+The governance promise is that spend limits hold by default, not by opt-in, so hard enforcement is
+**on** unless you turn it off. Two switches control it, in order of precedence:
+
+- **A deployment-wide kill-switch** (\`OFFGRID_BUDGET_ENFORCE=false\`) forces a known posture on an
+  instance regardless of database state — useful to guarantee a demo box never blocks.
+- **A per-deployment feature flag** (\`budget.enforce\`), editable in the console, for the normal case.
+
+With enforcement off, budgets become advisory: the call still runs, but the over-budget decision is
+recorded so you can alert and reconcile. It never silently changes to "no limits."
+
+## What you set
+
+- **Per-key monthly limits** — set on the [FinOps](/docs/guides/finops) surface, one per project key.
+- **Unattributed or unlimited work runs free** — a call with no key, no limit, or zero cost is always
+  allowed, so enforcement only ever bites where you've drawn a line.
+
+Budgets pair with [Accounting](/docs/guides/accounting): the limit is the guardrail, the chargeback
+report is the reconciliation.`,
+    },
+    {
       slug: 'guides/accounting',
       title: 'Accounting',
       description: 'Chargeback-grade cost, attributed to the team and use-case that spent it.',
