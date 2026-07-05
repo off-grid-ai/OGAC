@@ -511,6 +511,23 @@ worktree-isolated (nothing deploys until reviewed/merged).
 `npm run typecheck` clean, and the UI stops implying anything the code can't do. No scaffolds left
 labeled as features.
 
+> **Status (2026-07-05): all 9 deep integrations built, merged to `main`, typecheck + 428 tests +
+> production build green. NOT deployed** (holding for a reviewed deploy). Live wiring still needed:
+> Temporal worker process + `OFFGRID_QUEUE_ENABLED`; FleetDM/Presidio env; Superset provision run.
+
+## Phase 4.10 — Unified identity & the console-as-integration-bus (RESEARCH DONE, build next)
+
+**Goal:** one Keycloak credential (user OIDC or machine service-account JWT) valid across ALL services;
+inter-service calls brokered through the console API handler; stock Docker images (config/edge/console
+only, no patching). **Full research + integration-point plan: [`INTEGRATION_ARCHITECTURE.md`](INTEGRATION_ARCHITECTURE.md).**
+
+The console already has the seam (verify KC JWT · authorize · OpenBao secrets · mint service tokens).
+The work is to formalize per-service identity via one **service-token broker** helper + per-service
+Keycloak clients + OpenBao-held credentials, then edge-gate the three no-auth images. Phased A–E in the
+doc. DoD: no static keys / anon access anywhere; every no-auth image edge-gated; all cross-service
+calls carry a per-service credential from OpenBao; durable (Temporal) runs carry the same identity as
+inline runs.
+
 ---
 
 ## Phase 4.5 — AI Studio (non-technical builder)
