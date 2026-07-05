@@ -95,6 +95,75 @@ A custom agent carries no special access. It runs the same governed path as the 
 inherits every convention set on your console.`,
     },
     {
+      slug: 'guides/agent-runs',
+      title: 'Agent runs',
+      description: 'Every governed run, with its full pipeline trace — re-run, cancel, or send to review.',
+      body: `Agent runs is the history and the microscope for everything the agents did. Each run is a
+governed execution you can open and read stage by stage.
+
+## What a run shows
+
+Open any run to see the pipeline execute in order — policy, guardrails, retrieval, answer, grounding,
+provenance — with each stage's timing, guardrail verdicts, and the citations the answer drew on. A
+blocked or denied run shows exactly where and why it stopped; that's a valid governed outcome, not an
+error to hide.
+
+## Act on a run
+
+- **Re-run** a past run with the same input to reproduce or compare.
+- **Cancel** a run in flight.
+- **Send to review** — route a run through human approval when policy calls for it.
+
+## One id, four planes
+
+A run's id ties it together across the [audit ledger](/docs/guides/audit), the
+[trace store](/docs/guides/observability), [lineage](/docs/guides/lineage), and the signed
+[provenance](/docs/guides/provenance) record. Copy a run id and you can pull the same run from any of
+them.`,
+    },
+    {
+      slug: 'guides/brain',
+      title: 'Brain',
+      description: 'The power-user workbench — documents, retrieval, tools, router, and evals in one place.',
+      body: `Brain is the workbench for the person tuning the retrieval-and-reasoning core directly. Where
+[Knowledge](/docs/guides/knowledge) and [Studio](/docs/guides/studio) hide the machinery, Brain
+exposes it, so you can inspect and tune each part.
+
+## What it exposes
+
+- **Documents** — ingest and manage the corpus Brain retrieves from, and search it directly.
+- **Retrieval** — run a query and see the chunks that come back, to check what a grounded answer
+  would draw on.
+- **Grounding verifier** — check an answer against its sources on demand.
+- **Tools** — register and toggle the tools an agent can call.
+- **Router** — try a prompt against the routing rules and see where it would land.
+- **Prompts & golden cases** — manage reusable prompts and the eval golden set, and run an eval.
+
+Brain is for builders and platform operators who want the controls in the open. Everything it runs
+still flows through the same governed pipeline as the rest of the console.`,
+    },
+    {
+      slug: 'guides/retrieval',
+      title: 'Retrieval',
+      description: 'Inspect and tune the vector store behind every grounded answer.',
+      body: `Retrieval is the data-plane view of grounding: the vector store your grounded answers draw
+from, and the controls to keep it healthy. [Knowledge](/docs/guides/knowledge) is where you add
+content; Retrieval is where you inspect how it's indexed and served.
+
+## What you do here
+
+- **Inspect the store** — see collections and their document/chunk counts, and which vector backend
+  is active (an embedded store by default, or your own Qdrant at scale).
+- **Query it** — run a retrieval query and see the ranked chunks, so you can verify what a grounded
+  answer would find before an agent runs.
+- **Reindex** — rebuild the index after adding or changing content.
+
+## Permissions-aware
+
+Retrieval respects the same access rules as the rest of the console: an answer only ever draws on
+sources the asker is allowed to see, so grounding never becomes a way around policy.`,
+    },
+    {
       slug: 'guides/studio',
       title: 'Studio',
       description: 'Build a working assistant in plain language — no technical setup.',
