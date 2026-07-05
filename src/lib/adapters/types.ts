@@ -260,10 +260,30 @@ export interface MdmDevice {
   source: string;
 }
 
+// The optional "deep" surface — implemented only by a real MDM (FleetDM) that can run osquery,
+// enumerate software/CVEs, and hold policies. The first-party registry does NOT implement these
+// (it has no osquery agent), so callers must feature-detect `supportsFleet === true` before use.
+// Types come from the pure-logic module so the port stays the single contract.
 export interface MdmPort {
   meta: AdapterMeta;
   listDevices(): Promise<MdmDevice[]>;
   health(): Promise<boolean>;
+  // True when this backend can service the live-query / software / policy methods below.
+  supportsFleet?: boolean;
+  // osquery live query: run `sql` across the given host ids and poll for aggregated results.
+  liveQuery?(sql: string, hostIds: number[]): Promise<import('@/lib/fleetdm').LiveQueryResult>;
+  // Per-host installed software + known CVEs.
+  hostSoftware?(hostId: number): Promise<import('@/lib/fleetdm').SoftwareInventory>;
+  // Policy CRUD against the MDM's own policy store.
+  listPolicies?(): Promise<import('@/lib/fleetdm').FleetPolicy[]>;
+  createPolicy?(
+    input: import('@/lib/fleetdm').FleetPolicyInput,
+  ): Promise<import('@/lib/fleetdm').FleetPolicy>;
+  updatePolicy?(
+    id: number,
+    input: Partial<import('@/lib/fleetdm').FleetPolicyInput>,
+  ): Promise<import('@/lib/fleetdm').FleetPolicy>;
+  deletePolicy?(id: number): Promise<void>;
 }
 
 export type AnyAdapter = InferencePort | ObservabilityPort | SecretsPort | GroundingPort;

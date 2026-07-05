@@ -7,6 +7,7 @@ import {
 import Link from 'next/link';
 import { DeviceActions } from '@/components/fleet/DeviceActions';
 import { EnrollDeviceButton } from '@/components/fleet/EnrollDeviceButton';
+import { FleetTools } from '@/components/fleet/FleetTools';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -37,7 +38,14 @@ export default async function FleetPage() {
     listAudit({ limit: 500 }),
   ]);
   const online = devices.filter((d) => d.status === 'online').length;
-  const mdm = getMdm().meta;
+  const mdmPort = getMdm();
+  const mdm = mdmPort.meta;
+  // Host options for the live-query targeter — from the active MDM (FleetDM host ids when swapped
+  // in, first-party ids otherwise). Only FleetDM's numeric ids can be targeted by osquery.
+  const fleetSupported = mdmPort.supportsFleet === true;
+  const hostOptions = fleetSupported
+    ? (await mdmPort.listDevices()).map((d) => ({ id: d.id, name: d.name }))
+    : [];
 
   const stats: Stat[] = [
     { label: 'Devices', value: devices.length, icon: Cpu },
@@ -130,6 +138,8 @@ export default async function FleetPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <FleetTools hosts={hostOptions} supported={fleetSupported} />
     </div>
   );
 }
