@@ -134,9 +134,10 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
     pullPolicyForDevice(id),
     listAudit({ deviceId: id, limit: 25 }),
   ]);
-  // Software inventory + CVEs come from FleetDM by numeric host id — only show when the active MDM
-  // supports it and this device carries a FleetDM-style numeric id.
-  const showSoftware = getMdm().supportsFleet === true && /^\d+$/.test(id);
+  // FleetDM-backed features (software inventory + CVEs, and the real MDM device commands) come from
+  // FleetDM by numeric host id — only enable when the active MDM supports it and this device carries
+  // a FleetDM-style numeric id.
+  const fleetHost = getMdm().supportsFleet === true && /^\d+$/.test(id);
   const statusCls =
     device.status === 'online' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground';
 
@@ -171,7 +172,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <p className="mt-1 font-mono text-xs text-muted-foreground">{device.id}</p>
           </div>
         </div>
-        <DeviceActions deviceId={device.id} name={device.name} />
+        <DeviceActions deviceId={device.id} name={device.name} fleet={fleetHost} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -190,7 +191,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <PolicyCard policy={policy} />
         <ActivityCard audit={audit} />
-        {showSoftware ? <DeviceSoftware hostId={id} /> : null}
+        {fleetHost ? <DeviceSoftware hostId={id} /> : null}
       </div>
     </div>
   );

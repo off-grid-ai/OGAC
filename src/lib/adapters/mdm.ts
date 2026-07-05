@@ -1,9 +1,14 @@
 import {
+  type DeviceCommand,
+  type DeviceCommandResult,
+  deviceCommandBody,
+  deviceCommandPath,
   FLEET_API,
   type FleetPolicy,
   type FleetPolicyInput,
   fleetHeaders,
   type LiveQueryResult,
+  mapDeviceCommand,
   mapPolicies,
   mapPolicy,
   mapQueryReport,
@@ -112,6 +117,20 @@ async function fleetFetch(
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Issue one FleetDM MDM command against a host and normalize the response. Thin: path/body/mapping
+// are the pure `fleetdm.ts` helpers; only the fetch lives here.
+async function runDeviceCommand(
+  command: DeviceCommand,
+  hostId: number,
+): Promise<DeviceCommandResult> {
+  const body = deviceCommandBody(command);
+  const data = await fleetFetch(deviceCommandPath(hostId, command), {
+    method: 'POST',
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  return mapDeviceCommand(hostId, command, data);
+}
+
 export const fleetDmMdm: MdmPort = {
   meta: {
     id: 'fleetdm',
@@ -204,6 +223,14 @@ export const fleetDmMdm: MdmPort = {
       body: JSON.stringify({ ids: [id] }),
     });
   },
+
+  // Destructive MDM commands — POST to the per-host command endpoint and normalize the echo. lock,
+  // unlock and wipe carry an optional body (only wipe uses one, for a Windows wipe type); refetch is
+  // a bodyless POST. Shaping (path + body + response) is the pure `src/lib/fleetdm.ts`.
+  lockHost: (hostId) => runDeviceCommand('lock', hostId),
+  unlockHost: (hostId) => runDeviceCommand('unlock', hostId),
+  wipeHost: (hostId) => runDeviceCommand('wipe', hostId),
+  refetchHost: (hostId) => runDeviceCommand('refetch', hostId),
 
   async health() {
     if (!FLEET_URL) return false;
