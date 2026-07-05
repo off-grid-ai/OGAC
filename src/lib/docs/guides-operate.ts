@@ -171,11 +171,15 @@ reason. Local models cost zero, so on-prem work never counts against the cap.
 ## Enforcement is on by default
 
 The governance promise is that spend limits hold by default, not by opt-in, so hard enforcement is
-**on** unless you turn it off. Two switches control it, in order of precedence:
+**on** unless you turn it off. Three switches control it, in order of precedence:
 
 - **A deployment-wide kill-switch** (\`OFFGRID_BUDGET_ENFORCE=false\`) forces a known posture on an
   instance regardless of database state — useful to guarantee a demo box never blocks.
-- **A per-deployment feature flag** (\`budget.enforce\`), editable in the console, for the normal case.
+- **A per-org override** (\`budget.enforce:<org>\`), so one tenant can differ from the deployment
+  default — enforce for everyone but hold one team advisory, or the reverse — without flipping the
+  whole instance. On a shared deployment, one org's choice never changes another's.
+- **A per-deployment feature flag** (\`budget.enforce\`), editable in the console: the global default
+  every org falls back to when it has no override of its own.
 
 With enforcement off, budgets become advisory: the call still runs, but the over-budget decision is
 recorded so you can alert and reconcile. It never silently changes to "no limits."
@@ -368,13 +372,24 @@ the full list of supported sources in [Integrations](/docs/integrations/catalog)
       slug: 'guides/backups',
       title: 'Backups',
       description: 'Scheduled, restorable backups of the control plane.',
-      body: `Backups protect the control-plane state (the console database and configuration).
+      body: `Backups protect the control-plane state — the console database (every governed run, policy,
+connector, and audit record) and its configuration. It is the recovery path behind
+[data sovereignty](/docs/concepts/data-sovereignty): your record is only yours if you can restore it.
 
 ## What you can do
 
-- See backup status and history.
-- Run a backup on demand and prune old ones.
-- Restore from a prior backup within your recovery target.
+- **See status and history** — the last successful backup, its size, and the full history, read from
+  a backup manifest so the figures are real, not a claimed schedule.
+- **Run one on demand** — take a backup now, before a risky change, without waiting for the schedule.
+- **Prune** — remove backups past your retention window.
+- **Restore** — bring the control plane back from a prior backup within your recovery target.
+
+## Scheduled and restorable
+
+A scheduled job runs the backup sequence, writes a manifest row, and lets the surface show last-good
+per component. Restore is end-to-end, not display-only: the surface triggers and verifies it. On a
+[multi-tenant](/docs/concepts/multi-tenancy) deployment every org's data restores together, since
+isolation is a column and a policy on shared tables, not a separate database per org.
 
 Backups are part of running the platform, not an afterthought — the surface lets you trigger and
 verify them, not just view a schedule.`,

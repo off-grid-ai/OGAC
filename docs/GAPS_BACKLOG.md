@@ -170,4 +170,70 @@ non-S1 / forced-expiry), so `0 fail` is a genuine clean run, not masked failures
 | # | Gap | Where | Owner |
 |---|---|---|---|
 | 32 | **A4 off-host proof still owed.** The harness's A4 is a loopback bind-check run ON S1; the spec's own coverage note says the true external-unreachability test must be `curl offgrid-s1.local:9200/:8181/:9000 → refused` from a NON-S1 host. That off-host curl has never been run/recorded. Add it to the harness (or a companion script meant to run from a dev Mac) so B2/A4 stop resting on the bind-check stand-in. | `deploy/verify-integration.sh` | console + infra |
-| 33 | **Budget enforcement is global, not per-org.** `budgetEnforced(_org?)` accepts an org but ignores it — the `budget.enforce` flag store is global. For a multi-tenant deployment, one tenant's kill-switch would flip enforcement for all. Wire a per-org flag before multi-tenant. | `src/lib/budget-config.ts` | console |
+| 33 | **✅ CLOSED (2026-07-06, sweep #3)** — ~~Budget enforcement is global, not per-org.~~ `src/lib/budget-config.ts` now resolves a **per-org override** (`budget.enforce:<org>`) between the env kill-switch and the global `budget.enforce` flag: precedence env → per-org → global. A blank/whitespace org falls through to the global flag (backward compatible); the org-scoped read is a pure function (`resolveEnforced`) unit-tested. One tenant's posture no longer flips enforcement for all. | `src/lib/budget-config.ts` | console |
+
+---
+
+## Integration sweep #3 (2026-07-06) — platform-integration cadence agent (final)
+
+**Live harness result (`deploy/verify-integration.sh` on S1, read-only):** `8 pass / 0 fail / 4 skip`
+— one more SKIP than sweeps #1/#2 because the harness now carries a **C4 probe** (gap #29). Full
+line-by-line:
+
+- PASS A1 (aggregator: minted Keycloak JWT → 200, garbage → 401; cred = minted-keycloak-jwt)
+- PASS A2 (all 5 clients mint `client_credentials` JWT with `aud == offgrid-<svc>`)
+- PASS A3 (all 5 service secrets readable at `secret/<svc>/client-secret` in OpenBao)
+- PASS A4 (opensearch/opa/marquez bound to loopback, not 0.0.0.0 — with the honest off-host note)
+- PASS A5 (machine SA JWT → 200, unauth → 401 on `/api/v1/admin/agents`)
+- PASS **C1** (governed run `run_d01891dc`, agent=sop-synth, all stages: policy·guard·ground·sign)
+- PASS **C2 — the money test** (`run_d01891dc` correlated across ALL 4 planes:
+  provenance·marquez·langfuse·opensearch all HIT)
+- PASS **C3** (PII probe `run_9e0a7b46` shows a pii/guard check that blocked/redacted)
+- SKIP A7 (destructive rotate-and-reject — by design)
+- SKIP B2 (network boundary — real proof is A4 off-host)
+- SKIP B3 (transparent-refresh — needs forced expiry)
+- **SKIP C4 (NEW probe) — durable (Temporal) path not configured** (`OFFGRID_QUEUE_ENABLED` not
+  truthy / `OFFGRID_ADAPTER_AGENTRUNTIME != temporal`). Inline path is the default → nothing durable
+  to probe. This is the expected SKIP: it becomes a live PASS only once a Temporal worker is bootstrapped.
+
+**Prior gaps reconciled this sweep:**
+
+- **#29 (C4 durable-run probe) — ✅ CLOSED.** The harness now runs a C4 probe (added since sweep #2);
+  it SKIPs cleanly today because the Temporal worker is off — not a FAIL, exactly the honest
+  NOT-VERIFIED-yet state the spec calls for. C4 flips to PASS the moment the durable path is wired
+  (worker + `OFFGRID_QUEUE_ENABLED`).
+- **#30 (`adapters/evals.ts` static apiKey) — ✅ CLOSED.** Verified in code: the promptfoo adapter's
+  primary auth path is `getServiceCredential('gateway')` → shared `chooseGatewayAuth` →
+  `providerAuthFromHeaders`/`selectPromptfooAuth`. The old `apiKey:'offgrid-local'` survives ONLY as the
+  unprovisioned fallback branch (`src/lib/adapters/evals.ts:47`), byte-identical to before — it is no
+  longer the primary path. A6/B1's "static key must be fallback-only" is satisfied.
+- **#33 (per-org budget) — ✅ CLOSED** (see the inline update on the row above). `budget-config.ts`
+  resolves a per-org override between the env kill-switch and the global flag.
+- **#32 (A4 off-host curl) — CONFIRMED the honest remaining item.** This is a **manual/infra check,
+  not a code task**: the true external-unreachability proof (`curl offgrid-s1.local:9200/:8181/:9000
+  → refused` from a NON-S1 host) needs a second machine on the LAN, which no automated on-S1 run can
+  provide. The A4 loopback bind-check stands in for it and the harness prints the honest note. Leave
+  open as an on-site verification, owned console + infra.
+
+**Fresh code scan for NEW gaps (src/lib, adapters, deploy):** none found. Every load-bearing
+`TODO`/`stub`/`placeholder` hit is either (a) the already-tracked Phase-D native-OIDC TODO
+(`service-credentials-lib.ts` — services validating KC tokens directly; tracked in ROADMAP_STATUS bucket
+b), (b) legitimate OpenAPI-spec stubs for services that publish no machine spec (Keycloak/OPA/Temporal
+in `service-specs.ts`), or (c) benign string-placeholder logic (prompt variables, brain seed row). No
+scaffold is mislabeled as a shipped feature.
+
+**Docs completed this sweep (`src/lib/docs/*`):**
+
+- **Per-org budgets** — the Budget-enforcement guide now documents all three switches with precedence
+  (env kill-switch → per-org override → global flag).
+- **Multi-tenancy & isolation** — NEW concept page (`concepts/multi-tenancy`): the org-claim + `org_id`
+  filtering model, the Postgres RLS backstop (no-op until the current-org GUC + non-superuser role are
+  set), file namespacing, and "single-tenant is just one org."
+- **Backups/restore** — strengthened: manifest-backed status, end-to-end restore (not display-only),
+  and multi-tenant restore scope.
+- **Native-OIDC enable path** — added to `self-hosting/configuration`: brokered identity by default +
+  the opt-in, service-by-service flip to direct-service Keycloak token validation.
+- Studio builder, Provit, RLS, per-org budgets, native-OIDC now all covered across the doc set.
+
+**Deliverable:** `docs/ROADMAP_STATUS.md` written this sweep — the evidence-based whole-roadmap ledger
+(buckets: shipped & live-verified / code-complete needing an on-site enable / genuine polish remaining).
