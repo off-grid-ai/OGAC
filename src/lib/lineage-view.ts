@@ -133,6 +133,97 @@ function normalizeDataset(raw: RawDataset): DatasetView {
   };
 }
 
+// ── Dataset detail (single dataset read: GET /namespaces/{ns}/datasets/{ds}) ───────────────────
+// Marquez returns the dataset with its current `fields` (schema), `tags`, and a `facets` map
+// (schema / dataQualityMetrics / columnLineage / …). All optional & version-variant, so we read
+// defensively.
+export interface RawDatasetField {
+  name?: string;
+  type?: string;
+  description?: string;
+}
+
+export interface RawDatasetDetail {
+  name?: string;
+  namespace?: string;
+  type?: string;
+  physicalName?: string;
+  sourceName?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  fields?: RawDatasetField[];
+  tags?: (string | { name?: string })[];
+  facets?: Record<string, unknown> | null;
+}
+
+export interface DatasetFieldView {
+  name: string;
+  type: string | null;
+  description: string | null;
+}
+
+export interface DatasetDetailView {
+  name: string;
+  namespace: string | null;
+  type: string | null;
+  description: string | null;
+  updatedAt: string | null;
+  fields: DatasetFieldView[];
+  tags: string[];
+  // Names of the OpenLineage facets present (schema, dataQualityMetrics, columnLineage, …) so the
+  // UI can show which enrichments Marquez holds without dumping raw JSON.
+  facetNames: string[];
+  // rowCount / bytes lifted out of the dataQualityMetrics facet when present.
+  rowCount: number | null;
+  bytes: number | null;
+}
+
+function num(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+// Normalize one Marquez dataset response into the detail view. Never throws.
+export function normalizeDatasetDetail(
+  raw: RawDatasetDetail | null | undefined,
+): DatasetDetailView | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = str(raw.name);
+  if (!name) return null;
+
+  const fields: DatasetFieldView[] = (Array.isArray(raw.fields) ? raw.fields : [])
+    .map((f) => {
+      const fname = str(f?.name);
+      if (!fname) return null;
+      return { name: fname, type: str(f?.type), description: str(f?.description) };
+    })
+    .filter((f): f is DatasetFieldView => f !== null);
+
+  const tags = (Array.isArray(raw.tags) ? raw.tags : [])
+    .map((t) => (typeof t === 'string' ? str(t) : str(t?.name)))
+    .filter((t): t is string => t !== null);
+
+  const facets =
+    raw.facets && typeof raw.facets === 'object' ? (raw.facets as Record<string, unknown>) : {};
+  const facetNames = Object.keys(facets);
+  const dq = facets.dataQualityMetrics as
+    | { rowCount?: unknown; bytes?: unknown }
+    | undefined;
+
+  return {
+    name,
+    namespace: str(raw.namespace),
+    type: str(raw.type),
+    description: str(raw.description),
+    updatedAt: str(raw.updatedAt) ?? str(raw.createdAt),
+    fields,
+    tags,
+    facetNames,
+    rowCount: num(dq?.rowCount),
+    bytes: num(dq?.bytes),
+  };
+}
+
 export interface RawLineageInput {
   namespaces?: RawNamespace[] | null;
   jobs?: RawJob[] | null;
