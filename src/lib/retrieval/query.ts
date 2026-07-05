@@ -1,0 +1,165 @@
+// PURE retrieval query logic — zero I/O, zero `@/` imports, unit-testable in isolation (mirrors
+// tenancy-policy.ts). This is the "brains" that both vector backends share: it turns a typed
+// metadata filter into each store's native predicate DSL, and fuses ranked lists by Reciprocal
+// Rank Fusion for hybrid (keyword + vector) search. The I/O adapters (qdrant.ts, brain.ts) call
+// these and never re-implement the rules.
+
+// ── Public option types (threaded from the API down to the adapters) ───────────
+
+/** Retrieval mode. 'vector' = pure ANN (today's behaviour, the default). 'hybrid' = keyword
+ *  (BM25/full-text) fused with vector. Backward compatible: omit → 'vector'. */
+export type SearchMode = 'vector' | 'hybrid';
+
+/** One metadata predicate over a document payload field (title / source / text, or any indexed
+ *  key). `match` = exact equality on a string/number; `any` = value ∈ set; `text` = substring/
+ *  full-text match on a field. Kept deliberately small and closed so both stores can express it. */
+export type MetaCondition =
+  | { field: string; match: string | number }
+  | { field: string; any: Array<string | number> }
+  | { field: string; text: string };
+
+/** A conjunction of conditions (AND). Empty / absent → no filtering (byte-identical to today). */
+export interface MetaFilter {
+  must: MetaCondition[];
+}
+
+/** The full set of retrieval knobs. All optional; the empty object === today's behaviour. */
+export interface RetrievalOptions {
+  filter?: MetaFilter;
+  mode?: SearchMode;
+}
+
+// ── Guards / normalization ─────────────────────────────────────────────────────
+
+function isCondition(c: unknown): c is MetaCondition {
+  if (typeof c !== 'object' || c === null) return false;
+  const r = c as Record<string, unknown>;
+  if (typeof r.field !== 'string' || r.field.length === 0) return false;
+  if ('match' in r) return typeof r.match === 'string' || typeof r.match === 'number';
+  if ('any' in r)
+    return (
+      Array.isArray(r.any) &&
+      r.any.length > 0 &&
+      r.any.every((v) => typeof v === 'string' || typeof v === 'number')
+    );
+  if ('text' in r) return typeof r.text === 'string' && r.text.length > 0;
+  return false;
+}
+
+/**
+ * PURE: coerce arbitrary (e.g. request-body) input into a validated MetaFilter, or null when there
+ * is nothing to filter on. Never throws. Unknown/invalid conditions are dropped, so a partially
+ * malformed filter degrades gracefully rather than 500-ing.
+ */
+export function normalizeFilter(input: unknown): MetaFilter | null {
+  if (input == null) return null;
+  const rawMust = Array.isArray(input)
+    ? // Accept a bare array of conditions for ergonomics.
+      (input as unknown[])
+    : Array.isArray((input as Record<string, unknown>).must)
+      ? ((input as Record<string, unknown>).must as unknown[])
+      : null;
+  if (!rawMust) return null;
+  const must = rawMust.filter(isCondition);
+  return must.length > 0 ? { must } : null;
+}
+
+/** PURE: normalize a mode string; anything but 'hybrid' → 'vector' (the safe default). */
+export function normalizeMode(input: unknown): SearchMode {
+  return input === 'hybrid' ? 'hybrid' : 'vector';
+}
+
+// ── Qdrant filter DSL ───────────────────────────────────────────────────────────
+
+/** A Qdrant field condition, as its Query/Search API expects under `filter.must[]`. */
+export type QdrantFieldCondition =
+  | { key: string; match: { value: string | number } }
+  | { key: string; match: { any: Array<string | number> } }
+  | { key: string; match: { text: string } };
+
+export interface QdrantFilter {
+  must: QdrantFieldCondition[];
+}
+
+/**
+ * PURE: map a typed MetaFilter onto Qdrant's `filter: { must: [...] }` DSL. Returns undefined when
+ * there is nothing to filter, so callers can spread it into the request body and get byte-identical
+ * output to today when no filter is supplied.
+ */
+export function buildQdrantFilter(filter?: MetaFilter | null): QdrantFilter | undefined {
+  if (!filter || filter.must.length === 0) return undefined;
+  const must: QdrantFieldCondition[] = filter.must.map((c) => {
+    if ('match' in c) return { key: c.field, match: { value: c.match } };
+    if ('any' in c) return { key: c.field, match: { any: c.any } };
+    return { key: c.field, match: { text: c.text } };
+  });
+  return { must };
+}
+
+// ── LanceDB where clause ──────────────────────────────────────────────────────
+
+// Single-quote-escape a string literal for LanceDB's SQL-ish filter grammar.
+function sqlStr(v: string | number): string {
+  if (typeof v === 'number') return String(v);
+  return `'${v.replace(/'/g, "''")}'`;
+}
+
+// Only allow plain identifiers as column names — defends the generated SQL against injection via a
+// crafted `field`. Anything else drops the condition (safe: narrows nothing).
+const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * PURE: map a typed MetaFilter onto a LanceDB `.where(...)` SQL predicate. Returns undefined when
+ * there is nothing to filter (→ caller skips `.where`, byte-identical to today). Conjunction of
+ * conditions joined by AND. `text` becomes a case-insensitive LIKE.
+ */
+export function buildLanceWhere(filter?: MetaFilter | null): string | undefined {
+  if (!filter || filter.must.length === 0) return undefined;
+  const clauses: string[] = [];
+  for (const c of filter.must) {
+    if (!IDENT_RE.test(c.field)) continue; // reject unsafe column names
+    if ('match' in c) {
+      clauses.push(`${c.field} = ${sqlStr(c.match)}`);
+    } else if ('any' in c) {
+      clauses.push(`${c.field} IN (${c.any.map(sqlStr).join(', ')})`);
+    } else {
+      // Case-insensitive substring match; escape LIKE wildcards in the needle.
+      const needle = c.text.replace(/'/g, "''").replace(/([%_])/g, '\\$1');
+      clauses.push(`LOWER(${c.field}) LIKE LOWER('%${needle}%') ESCAPE '\\'`);
+    }
+  }
+  return clauses.length > 0 ? clauses.join(' AND ') : undefined;
+}
+
+// ── Reciprocal Rank Fusion (hybrid) ──────────────────────────────────────────────
+
+/** Standard RRF constant — dampens the weight of any single list's top ranks. */
+export const RRF_K = 60;
+
+/**
+ * PURE: fuse N ranked lists of ids into one ranked list by Reciprocal Rank Fusion. An id's fused
+ * score is Σ 1/(k + rank) across the lists it appears in (rank is 0-based). Returns ids sorted by
+ * descending fused score. Deterministic; ties broken by first-seen order. This is what makes
+ * hybrid search "hybrid": fuse the vector ranking with the keyword ranking.
+ */
+export function rrfFuse(lists: ReadonlyArray<ReadonlyArray<string>>, k = RRF_K): string[] {
+  const score = new Map<string, number>();
+  const order: string[] = [];
+  for (const list of lists) {
+    list.forEach((id, rank) => {
+      if (!score.has(id)) order.push(id);
+      score.set(id, (score.get(id) ?? 0) + 1 / (k + rank));
+    });
+  }
+  return order.sort((a, b) => (score.get(b) ?? 0) - (score.get(a) ?? 0));
+}
+
+/** The fused score for a single id, exposed so adapters can attach it to their hit objects. */
+export function rrfScore(lists: ReadonlyArray<ReadonlyArray<string>>, id: string, k = RRF_K): number {
+  let s = 0;
+  for (const list of lists) {
+    const rank = list.indexOf(id);
+    if (rank >= 0) s += 1 / (k + rank);
+  }
+  return s;
+}
