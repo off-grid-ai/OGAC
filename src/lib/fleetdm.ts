@@ -240,3 +240,71 @@ export function mapPolicies(payload: unknown): FleetPolicy[] {
   const p = payload as { policies?: FleetPolicyRaw[] };
   return (p.policies ?? []).map(mapPolicy);
 }
+
+// ── Device (MDM) commands ───────────────────────────────────────────────────────
+// FleetDM issues destructive host actions over dedicated MDM command endpoints:
+//   - lock:    POST /api/latest/fleet/hosts/{id}/lock     (Premium; macOS returns an unlock_pin)
+//   - unlock:  POST /api/latest/fleet/hosts/{id}/unlock   (Premium)
+//   - wipe:    POST /api/latest/fleet/hosts/{id}/wipe      (Premium; Windows accepts a wipe type)
+//   - refetch: POST /api/latest/fleet/hosts/{id}/refetch   (free tier — re-collect host vitals)
+// Fleet's REST API has NO reboot/restart host command, so `restart` is intentionally absent here;
+// the port's restartHost is left unimplemented (callers feature-detect it).
+export type DeviceCommand = 'lock' | 'unlock' | 'wipe' | 'refetch';
+
+export interface DeviceCommandResult {
+  hostId: number;
+  command: DeviceCommand;
+  // FleetDM's lock/unlock/wipe are asynchronous MDM commands; refetch flips a flag. We report
+  // 'pending' for the async ones and 'requested' for refetch, plus any host-status echo Fleet returns.
+  status: 'pending' | 'requested';
+  // macOS lock/unlock returns a six-digit PIN the operator types into the device to finish unlocking.
+  unlockPin?: string;
+  // Fleet's current lock/wipe state for the host, when the response echoes it.
+  deviceStatus?: string;
+  pendingAction?: string;
+}
+
+// The path segment for each command — one place so the adapter can't drift from the endpoint set.
+export function deviceCommandPath(hostId: number, command: DeviceCommand): string {
+  return `${FLEET_API}/hosts/${hostId}/${command}`;
+}
+
+// Only `wipe` carries a body (optional Windows wipe kind); the rest are bodyless POSTs. Returning
+// undefined lets the adapter send no body (and thus no content-type) for those.
+export function deviceCommandBody(
+  command: DeviceCommand,
+  opts: { windowsWipeType?: string } = {},
+): Record<string, unknown> | undefined {
+  if (command === 'wipe' && opts.windowsWipeType) {
+    return { metadata: { windows: { wipe_type: opts.windowsWipeType } } };
+  }
+  return undefined;
+}
+
+interface FleetCommandRaw {
+  unlock_pin?: string;
+  host_id?: number;
+  device_status?: string;
+  pending_action?: string;
+  host?: { mdm?: { device_status?: string; pending_action?: string } };
+}
+
+// Normalize FleetDM's command response. lock/unlock/wipe are async (status 'pending'); refetch just
+// requests a re-collect (status 'requested'). A macOS lock/unlock echoes an unlock_pin.
+export function mapDeviceCommand(
+  hostId: number,
+  command: DeviceCommand,
+  payload: unknown,
+): DeviceCommandResult {
+  const raw = (payload ?? {}) as FleetCommandRaw;
+  const deviceStatus = raw.device_status ?? raw.host?.mdm?.device_status;
+  const pendingAction = raw.pending_action ?? raw.host?.mdm?.pending_action;
+  return {
+    hostId,
+    command,
+    status: command === 'refetch' ? 'requested' : 'pending',
+    ...(raw.unlock_pin ? { unlockPin: raw.unlock_pin } : {}),
+    ...(deviceStatus ? { deviceStatus } : {}),
+    ...(pendingAction ? { pendingAction } : {}),
+  };
+}
