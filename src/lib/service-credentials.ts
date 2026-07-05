@@ -2,43 +2,50 @@
 //
 // Phase 4.10-A keystone (see docs/INTEGRATION_ARCHITECTURE.md). Instead of each adapter hard-coding
 // its own auth (static gateway key, static Fleet token, anon S3, Langfuse keys in env), they all call
-// `getServiceCredential(service)` and get back a ready-to-use credential:
+// `getServiceCredential(service)` and get back a ready-to-use credential — of the CORRECT KIND for
+// that service. That "correct kind" is the crux: a Keycloak JWT is only valid for services that
+// validate KC tokens (today just the aggregator/gateway). FleetDM wants its OWN API token, Langfuse
+// wants Basic project keys, SeaweedFS wants S3 keys, and the no-auth images want nothing. Sending a KC
+// JWT to any of those would BREAK them. So the broker is DRIVEN BY THE PURE `credentialPlan(service)`
+// map — the single source of truth for what kind of credential a service takes:
 //
-//   • `bearer`  — a Keycloak client_credentials JWT, minted from the service's client secret (stored
-//                 in OpenBao at `secret/<service>/client-secret`), cached in-memory and refreshed
-//                 before expiry. Concurrent callers share ONE in-flight refresh.
-//   • `s3`      — SeaweedFS access/secret keypair straight from OpenBao (no Keycloak), so the broker
-//                 is the one place SigV4 material comes from too.
-//   • `none`    — nothing configured / OpenBao or Keycloak unreachable. Callers keep their existing
-//                 fallback (static env key, anon loopback) so NOTHING breaks pre-migration.
+//   • `bearer`  — either a Keycloak client_credentials JWT (plan 'oidc-jwt', minted from the client
+//                 secret at `secret/<service>/client-secret`, cached + refreshed before expiry, with
+//                 concurrent callers sharing ONE in-flight refresh) OR the service's OWN native API
+//                 token (plan 'native-bearer', read verbatim from `secret/<service>/api-token`).
+//   • `basic`   — a public/secret project keypair (plan 'native-basic', Langfuse) → HTTP Basic.
+//   • `s3`      — SeaweedFS access/secret keypair (plan 's3'), so the broker is the one place SigV4
+//                 material comes from too.
+//   • `none`    — plan 'none' (no-auth image), or the secret isn't provisioned, or OpenBao/Keycloak is
+//                 unreachable. Callers keep their existing fallback (static env key, anon loopback,
+//                 legacy Basic) so NOTHING breaks pre-migration.
 //
-// SOLID split: all lifecycle math (paths, grant shaping, exp parsing, refresh-due, cache entry) lives
-// pure and unit-tested in `service-credentials-lib.ts`. This module is the thin I/O shell: it reads
-// OpenBao (reusing the secrets adapter's fetch — NOT a second copy), POSTs the grant to Keycloak, and
-// holds the cache. Real functions, no mocks.
+// SOLID split: all decisions — the per-service plan, lifecycle math (paths, grant shaping, exp
+// parsing, refresh-due, cache entry), and shape selection — live pure + unit-tested in
+// `service-credentials-lib.ts`. This module is the thin I/O shell: it reads OpenBao (reusing the
+// secrets adapter's fetch — NOT a second copy), POSTs the grant to Keycloak, and holds the cache.
 
 import { openBaoSecrets } from './adapters/secrets';
 import {
+  apiTokenKey,
   buildGrantRequest,
   clientSecretKey,
   computeCacheEntry,
+  credentialPlan,
   decodeJwtExp,
   isRefreshDue,
   normalizeService,
   NO_CREDENTIAL,
   parseGrantResponse,
+  publicKeyKey,
   resolveTokenEndpoint,
   s3AccessKeyKey,
   s3SecretKeyKey,
+  secretKeyKey,
   type CachedToken,
   type GrantResponse,
   type ServiceCredential,
 } from './service-credentials-lib';
-
-// Which broker path a service takes. SeaweedFS is S3 (keys, no Keycloak); everything else is a
-// Keycloak-brokered bearer. A service absent from here still works — it defaults to the bearer path,
-// and if it has no client secret in OpenBao it lands on the graceful `none` fallback.
-const S3_SERVICES = new Set(['seaweedfs', 's3']);
 
 // ── In-memory token cache + in-flight de-dup ──────────────────────────────────────────────────────
 // One entry per service. `inflight` collapses concurrent refreshes into a single Keycloak round-trip.
@@ -130,26 +137,64 @@ async function getS3Credential(service: string): Promise<ServiceCredential> {
   return NO_CREDENTIAL;
 }
 
+// A service's OWN native API token (FleetDM etc.), read verbatim from OpenBao — NOT a Keycloak JWT.
+async function getNativeBearer(service: string): Promise<ServiceCredential> {
+  const token = await openBaoSecrets.get(apiTokenKey(service));
+  if (token) return { kind: 'bearer', token };
+  const legacy = legacyStaticToken(service);
+  if (legacy) return { kind: 'bearer', token: legacy };
+  return NO_CREDENTIAL;
+}
+
+// A service's Basic-auth project keypair (Langfuse pk:sk), from OpenBao. Both leaves required.
+async function getNativeBasic(service: string): Promise<ServiceCredential> {
+  const [publicKey, secretKey] = await Promise.all([
+    openBaoSecrets.get(publicKeyKey(service)),
+    openBaoSecrets.get(secretKeyKey(service)),
+  ]);
+  if (publicKey && secretKey) return { kind: 'basic', publicKey, secretKey };
+  return NO_CREDENTIAL;
+}
+
+// The oidc-jwt path: mint (or reuse a cached) Keycloak client_credentials JWT.
+async function getOidcBearer(service: string): Promise<ServiceCredential> {
+  const entry = await getBearerEntry(service);
+  if (entry) return { kind: 'bearer', token: entry.token };
+  const legacy = legacyStaticToken(service);
+  if (legacy) return { kind: 'bearer', token: legacy };
+  return NO_CREDENTIAL;
+}
+
 /**
- * THE broker entry point. Return a ready-to-use credential for `service`:
- *   - SeaweedFS/S3 → `{ kind:'s3', accessKey, secretKey }` (from OpenBao, no Keycloak)
- *   - everything else → `{ kind:'bearer', token }` (Keycloak client_credentials, cached)
- *   - nothing configured / unreachable → `{ kind:'none' }` (or a legacy static token when one is set)
+ * THE broker entry point. Consults the pure `credentialPlan(service)` for the KIND of credential the
+ * service actually accepts, then produces exactly that kind:
+ *   - 'oidc-jwt'      → `{ kind:'bearer' }` from a cached Keycloak client_credentials JWT (gateway)
+ *   - 'native-bearer' → `{ kind:'bearer' }` from the service's OWN api-token in OpenBao (fleet)
+ *   - 'native-basic'  → `{ kind:'basic' }` from the pk/sk project keypair in OpenBao (langfuse)
+ *   - 's3'            → `{ kind:'s3' }` from the access/secret keypair in OpenBao (seaweedfs)
+ *   - 'none'          → `{ kind:'none' }` (no-auth image, or the secret isn't provisioned yet)
  *
- * Never throws — a broker failure degrades to `none` so callers keep working exactly as today until
- * Phase B swaps them over.
+ * CRITICAL: a Keycloak JWT is ONLY minted for 'oidc-jwt' services. No other service ever receives a
+ * KC JWT — it would break a backend that doesn't validate one. When a native secret isn't provisioned
+ * the result is `none` and the adapter falls back to its legacy env credential — byte-identical to
+ * today. Never throws — a broker failure degrades to `none`.
  */
 export async function getServiceCredential(service: string): Promise<ServiceCredential> {
   const svc = normalizeService(service);
   try {
-    if (S3_SERVICES.has(svc)) return await getS3Credential(svc);
-
-    const entry = await getBearerEntry(svc);
-    if (entry) return { kind: 'bearer', token: entry.token };
-
-    const legacy = legacyStaticToken(svc);
-    if (legacy) return { kind: 'bearer', token: legacy };
-    return NO_CREDENTIAL;
+    const plan = credentialPlan(svc);
+    switch (plan.mode) {
+      case 'oidc-jwt':
+        return await getOidcBearer(svc);
+      case 'native-bearer':
+        return await getNativeBearer(svc);
+      case 'native-basic':
+        return await getNativeBasic(svc);
+      case 's3':
+        return await getS3Credential(svc);
+      case 'none':
+        return NO_CREDENTIAL;
+    }
   } catch {
     return NO_CREDENTIAL;
   }

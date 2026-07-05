@@ -17,6 +17,7 @@ import { amzDates, signS3Request } from '../src/lib/s3-sigv4.ts';
 const NONE: ServiceCredential = { kind: 'none' };
 const bearer = (token: string): ServiceCredential => ({ kind: 'bearer', token });
 const s3 = (accessKey: string, secretKey: string): ServiceCredential => ({ kind: 's3', accessKey, secretKey });
+const basic = (publicKey: string, secretKey: string): ServiceCredential => ({ kind: 'basic', publicKey, secretKey });
 const b64 = (s: string) => Buffer.from(s).toString('base64');
 
 // ── Gateway ─────────────────────────────────────────────────────────────────────
@@ -53,12 +54,18 @@ test('fleet: none + no legacy token → undefined (→ no Authorization header, 
 });
 
 // ── Langfuse ──────────────────────────────────────────────────────────────────────
-test('langfuse: broker keypair → Basic base64(pk:sk), preferred over env', () => {
+test('langfuse: broker basic keypair → Basic base64(pk:sk), preferred over env', () => {
   const legacy = `Basic ${b64('env-pk:env-sk')}`;
   assert.equal(
-    chooseLangfuseAuth(s3('pk-lf-x', 'sk-lf-y'), legacy, b64),
+    chooseLangfuseAuth(basic('pk-lf-x', 'sk-lf-y'), legacy, b64),
     `Basic ${b64('pk-lf-x:sk-lf-y')}`,
   );
+});
+
+test('langfuse: an S3 credential is NOT accepted (wrong kind) → falls to legacy', () => {
+  const legacy = `Basic ${b64('env-pk:env-sk')}`;
+  // Guards the kind split: only a 'basic' credential feeds Langfuse; an s3 shape must not leak in.
+  assert.equal(chooseLangfuseAuth(s3('ak', 'sk'), legacy, b64), legacy);
 });
 
 test('langfuse: none → legacy env Basic header verbatim (byte-identical to today)', () => {
