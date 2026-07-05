@@ -157,8 +157,14 @@ services:
     restart: unless-stopped
     environment:
       SUPERSET_SECRET_KEY: offgrid-dev-superset-secret
+      # Phase-D READY (Keycloak OAuth login, NOT enabled): mount superset_config.py (AUTH_OAUTH block
+      # in deploy/onprem/oidc-services.md § 3) and uncomment the next line + the config volume below,
+      # then `exec superset superset init` and restart. KC client offgrid-superset is seeded.
+      # SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
     ports: ['8088:8088']
     volumes: [superset:/app/superset_home]
+    # Phase-D READY (commented): add the OAuth config mount to enable Keycloak login:
+    #   - ./oidc/superset_config.py:/app/pythonpath/superset_config.py:ro
 
   # ── MDM / device management (osquery-based) ──
   fleet-mysql:
@@ -193,6 +199,16 @@ services:
       FLEET_SERVER_ADDRESS: 0.0.0.0:8070
       FLEET_SERVER_TLS: 'false'
       FLEET_LOGGING_JSON: 'true'
+      # Phase-D READY (Keycloak OIDC SSO for the FleetDM UI, NOT enabled): uncomment the FLEET_SSO_*
+      # block below (config in deploy/onprem/oidc-services.md § 2), enable standardFlow + the SSO
+      # callback redirect on the offgrid-fleet KC client, and restart. The console keeps using its
+      # native Fleet API token (broker plan fleet: 'native-bearer') — this is UI login only.
+      # FLEET_SSO_ENABLE_SSO: 'true'
+      # FLEET_SSO_ENABLE_JIT_PROVISIONING: 'true'
+      # FLEET_SSO_IDP_NAME: 'Off Grid Keycloak'
+      # FLEET_SSO_ENTITY_ID: offgrid-fleet
+      # FLEET_SSO_ISSUER_URI: https://auth.getoffgridai.co/realms/offgrid
+      # FLEET_SSO_METADATA_URL: https://auth.getoffgridai.co/realms/offgrid/.well-known/openid-configuration
     ports: ['8070:8070']
 
 volumes:

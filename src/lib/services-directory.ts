@@ -83,6 +83,9 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     // Runs in the offgrid-services-a stack ON S1 → reached over loopback (127.0.0.1). These S1-
     // local services are loopback-bound (not LAN-reachable) for hardening; the console reaches
     // them on 127.0.0.1. (mDNS/offgrid-gN.local is for OTHER hosts, e.g. g6 via edge proxies.)
+    // AUTH: today the security plugin is DISABLED (anon loopback reads). Phase-D native-OIDC/JWT
+    // (Keycloak login for Dashboards + Bearer on the REST API) is READY to flip — see
+    // deploy/onprem/oidc-services.md § 1 + KC client offgrid-opensearch. Not enabled on the live cluster.
     url: process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200',
     healthPath: '/_cluster/health',
     auth: 'api-key',
