@@ -2,7 +2,11 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  // microphone=(self): chat voice-input (STT) uses getUserMedia, which the browser blocks entirely
+  // unless the origin is permitted here — `(self)` lets OUR page prompt for the mic (same-origin
+  // only, no third-party/iframe access), so the normal browser permission dialog appears.
+  // camera=(self) likewise for future voice/video. geolocation stays fully disabled.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   {
     key: 'Content-Security-Policy',

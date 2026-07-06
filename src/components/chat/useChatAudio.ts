@@ -131,8 +131,17 @@ export function useChatAudio(opts: {
       recorderRef.current = rec;
       rec.start();
       advanceRecord({ type: 'start' });
-    } catch {
-      notify('Microphone unavailable');
+    } catch (err) {
+      // getUserMedia IS the browser mic-permission prompt. Distinguish the outcomes so the operator
+      // knows whether to grant access (denied) vs plug in a device (none) rather than a dead-end.
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        notify('Microphone blocked — allow mic access for this site in your browser, then try again');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        notify('No microphone found — connect a mic and try again');
+      } else {
+        notify('Microphone unavailable');
+      }
     }
   }, [recordPhase, sttAvailable, advanceRecord, notify, onTranscript]);
 
