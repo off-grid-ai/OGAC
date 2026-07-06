@@ -1,11 +1,8 @@
-import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { IssueKeyButton } from '@/components/finops/IssueKeyButton';
-import { KeyToggle } from '@/components/finops/KeyToggle';
+import { KeysTable } from '@/components/finops/KeysTable';
 import { TokenBudgets } from '@/components/finops/TokenBudgets';
 import { GatewayCost } from '@/components/gateway/GatewayCost';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import {
   Table,
   TableBody,
@@ -58,49 +55,7 @@ export default async function FinOpsPage() {
           <IssueKeyButton />
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Key</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="w-40">Budget</TableHead>
-                <TableHead className="w-16">On</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {f.byKey.map((k) => (
-                <TableRow key={k.id}>
-                  <TableCell className="font-medium text-foreground">{k.label}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {k.subjectType}:{k.subject}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {usd(k.costUsd)}
-                  </TableCell>
-                  <TableCell>
-                    {k.budgetUsd ? (
-                      <div className="flex items-center gap-2">
-                        <Progress value={Math.min(k.pct ?? 0, 100)} className="flex-1" />
-                        <span className="text-xs text-muted-foreground">{k.pct}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">unlimited</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <KeyToggle id={k.id} enabled={k.enabled} label={k.label} />
-                  </TableCell>
-                  <TableCell>
-                    <DeleteRowButton url={`/api/v1/admin/keys/${k.id}`} label={k.label} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <KeysTable rows={f.byKey} />
         </CardContent>
       </Card>
 

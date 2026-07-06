@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/Pagination';
 import {
   Table,
   TableBody,
@@ -22,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePagination } from '@/lib/use-pagination';
 
 interface KcRole {
   id: string;
@@ -346,6 +348,10 @@ export function UsersList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keycloak realms can hold many users; paginate the (already search-filtered) fetched set
+  // client-side. URL-namespaced by `users` so it deep-links and Back-button steps through pages.
+  const paged = usePagination(users, { key: 'users', defaultPageSize: 25 });
+
   const fetchUsers = useCallback(async (q?: string) => {
     setLoading(true);
     setApiError(null);
@@ -465,7 +471,7 @@ export function UsersList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => {
+                  paged.pageItems.map((u) => {
                     const isOpen = expandedId === u.id;
                     return (
                       <>
@@ -527,6 +533,13 @@ export function UsersList() {
                 )}
               </TableBody>
             </Table>
+            <Pagination
+              state={paged}
+              onPageChange={paged.setPage}
+              onPageSizeChange={paged.setPageSize}
+              itemLabel="users"
+              className="mt-3"
+            />
           </div>
         )}
       </CardContent>

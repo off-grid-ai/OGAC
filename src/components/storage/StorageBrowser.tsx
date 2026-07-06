@@ -36,7 +36,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Pagination } from '@/components/ui/Pagination';
 import { Switch } from '@/components/ui/switch';
+import { usePagination } from '@/lib/use-pagination';
 
 interface FileMeta {
   id: string;
@@ -655,6 +657,12 @@ export function StorageBrowser() {
   const folders = groupByFolder(visible);
   const current = openFolder ? folders.find(([f]) => f === openFolder) : null;
 
+  // Both the folder tiles and a folder's file list can run large — object stores are unbounded.
+  // Paginate each grid client-side. Two hooks, distinct URL keys, so the folder page and the
+  // in-folder file page are independent, deep-linkable positions (only one grid renders at a time).
+  const folderPage = usePagination(folders, { key: 'folder', defaultPageSize: 24 });
+  const filePage = usePagination(current ? current[1] : [], { key: 'file', defaultPageSize: 24 });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -722,17 +730,33 @@ export function StorageBrowser() {
             <span className="font-mono text-xs text-muted-foreground">{current[1].length}</span>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {current[1].map((f) => (
+            {filePage.pageItems.map((f) => (
               <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} onShare={setShareFile} />
             ))}
           </div>
+          <Pagination
+            state={filePage}
+            onPageChange={filePage.setPage}
+            onPageSizeChange={filePage.setPageSize}
+            pageSizeOptions={[12, 24, 48, 96]}
+            itemLabel="files"
+          />
         </div>
       ) : (
         // Top level: folders only.
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {folders.map(([folder, group]) => (
-            <FolderCard key={folder} name={folder} files={group} onOpen={() => setOpenFolder(folder)} />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {folderPage.pageItems.map(([folder, group]) => (
+              <FolderCard key={folder} name={folder} files={group} onOpen={() => setOpenFolder(folder)} />
+            ))}
+          </div>
+          <Pagination
+            state={folderPage}
+            onPageChange={folderPage.setPage}
+            onPageSizeChange={folderPage.setPageSize}
+            pageSizeOptions={[12, 24, 48, 96]}
+            itemLabel="folders"
+          />
         </div>
       )}
     </div>
