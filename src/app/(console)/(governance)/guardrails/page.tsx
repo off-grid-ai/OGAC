@@ -1,14 +1,6 @@
 import { ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
 import { PresidioRecognizers } from '@/components/guardrails/PresidioRecognizers';
 import { PresidioThresholds } from '@/components/guardrails/PresidioThresholds';
@@ -60,51 +52,55 @@ export default async function GuardrailsPage({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Engine
-            <Badge variant={view.reachable ? 'default' : 'destructive'}>
-              {view.reachable ? 'reachable' : 'unreachable'}
-            </Badge>
-            {view.engine === 'presidio' && !view.configured ? (
-              <Badge variant="secondary">not configured</Badge>
-            ) : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1 text-sm text-muted-foreground">
-          <p>
-            Active engine: <span className="font-mono text-foreground">{view.engine}</span>{' '}
-            <span className="text-muted-foreground">({view.vendor})</span>
-          </p>
-          <p>
-            License: <span className="font-mono text-foreground">{view.license}</span>
-          </p>
-          {view.description ? <p>{view.description}</p> : null}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Engine
+              <Badge variant={view.reachable ? 'default' : 'destructive'}>
+                {view.reachable ? 'reachable' : 'unreachable'}
+              </Badge>
+              {view.engine === 'presidio' && !view.configured ? (
+                <Badge variant="secondary">not configured</Badge>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              Active engine: <span className="font-mono text-foreground">{view.engine}</span>{' '}
+              <span className="text-muted-foreground">({view.vendor})</span>
+            </p>
+            <p>
+              License: <span className="font-mono text-foreground">{view.license}</span>
+            </p>
+            {view.description ? <p>{view.description}</p> : null}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Supported entity types</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Entity type</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {view.entityTypes.map((t) => (
-                <TableRow key={t}>
-                  <TableCell className="font-mono">{t}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">Supported entity types</CardTitle>
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              {view.entityTypes.length}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {view.entityTypes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No entity types reported — the engine is unreachable, so only the regex floor applies.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {view.entityTypes.map((t) => (
+                  <Badge key={t} variant="outline" className="font-mono text-xs text-muted-foreground">
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
