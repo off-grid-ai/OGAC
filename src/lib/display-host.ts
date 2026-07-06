@@ -1,0 +1,183 @@
+// display-host — pure, zero-IO mapping from an internal connection address to the mDNS
+// hostname we SHOW the user. This is a DISPLAY concern ONLY: the server keeps connecting to
+// the real loopback/LAN target (unchanged). Founder directive: no `127.0.0.1`, `localhost`,
+// or raw IP may ever be EXPOSED in the UI — every rendered address is an mDNS host
+// (`offgrid-s1.local`, `offgrid-g6.local`, …).
+//
+// Why loopback maps to S1: the console (a launchd next-server on S1) reaches S1-hosted
+// services over 127.0.0.1 because of macOS Local-Network egress limits + loopback binding.
+// So 127.0.0.1 / localhost is, from the console's vantage, S1 itself.
+//
+// g6 (the aux tier) is not directly reachable by the console daemon; it's fronted by S1
+// edge-Caddy loopback proxies on ports 8931–8939. A loopback URL on one of those ports is
+// really a g6 service, so it must DISPLAY as offgrid-g6.local.
+
+const S1_HOST = 'offgrid-s1.local';
+const G6_HOST = 'offgrid-g6.local';
+
+// g6 edge-Caddy loopback-proxy port range (127.0.0.1:8931 → g6:3030, etc.). A loopback
+// address on one of these ports is a g6 service reached through the S1 proxy.
+const G6_LOOPBACK_PORT_MIN = 8931;
+const G6_LOOPBACK_PORT_MAX = 8939;
+
+// Loopback identities — from the console's vantage these ARE S1 (see header).
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '::1', '[::1]']);
+
+// Raw fleet IPs → mDNS host. Anything on the LAN that could surface in the UI is mapped so a
+// raw IP never leaks. S1 and g6 are the primary targets; the gateway inference nodes (g1–g8)
+// carry their own IPs in the aggregator's `gateways[].host`, so map those too.
+const IP_TO_HOST: Record<string, string> = {
+  '127.0.0.1': S1_HOST, // S1 — control plane + S1-local backends
+  '192.168.1.66': G6_HOST, // g6 — aux tier (server #2)
+  // Gateway inference nodes (SERVICE_MAP § node → model). Displayed in Gateway node cards.
+  '192.168.1.57': 'offgrid-g1.local',
+  '192.168.1.58': 'offgrid-g2.local',
+  '192.168.1.32': 'offgrid-g3.local',
+  '192.168.1.63': 'offgrid-g4.local',
+  '192.168.1.65': 'offgrid-g5.local',
+  '192.168.1.62': 'offgrid-g7.local',
+  '192.168.1.64': 'offgrid-g8.local',
+  '192.168.1.60': 'offgrid-s2.local', // retired, but map defensively so no IP leaks
+};
+
+// A bare host token counts as "internal" (and thus rewritable) if it is a loopback identity,
+// a known fleet IP, or any RFC-1918 / link-local private IPv4. Public hostnames (e.g.
+// getoffgridai.co) are never rewritten.
+function isPrivateIPv4(host: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true; // link-local
+  return false;
+}
+
+// Map a single hostname (no port) to its display host, given the port for g6-proxy detection.
+function mapHostname(host: string, port: string): string | null {
+  const lower = host.toLowerCase();
+  if (LOOPBACK_HOSTS.has(lower)) {
+    const p = Number(port);
+    if (p >= G6_LOOPBACK_PORT_MIN && p <= G6_LOOPBACK_PORT_MAX) return G6_HOST;
+    return S1_HOST;
+  }
+  if (IP_TO_HOST[host]) return IP_TO_HOST[host];
+  if (isPrivateIPv4(host)) return S1_HOST; // unknown private IP — never leak it
+  return null; // public / already-mDNS / anything else: leave unchanged
+}
+
+/**
+ * Map an internal address to the mDNS hostname shown in the UI, preserving scheme, port, and
+ * path. Public URLs and values already using an mDNS host pass through unchanged. Accepts a
+ * full URL (`http://127.0.0.1:6333/x`), a bare `host:port`, or a bare host.
+ *
+ * Pure and zero-IO — safe to unit-test exhaustively and to call from client components.
+ */
+export function toDisplayHost(input: string | null | undefined): string {
+  if (input == null) return '';
+  const value = String(input).trim();
+  if (!value) return value;
+
+  // Full URL form (has a scheme). Rebuild via URL so scheme/port/path/query survive.
+  const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(value);
+  if (schemeMatch) {
+    let u: URL;
+    try {
+      u = new URL(value);
+    } catch {
+      return value;
+    }
+    const port = u.port; // '' when default
+    const mapped = mapHostname(u.hostname, port);
+    if (!mapped) return value;
+    u.hostname = mapped;
+    // URL#hostname setter drops IPv6 brackets etc.; reassembling handles the rest.
+    return u.toString();
+  }
+
+  // Bare host or host:port (with optional trailing path). Split off path first.
+  const slash = value.indexOf('/');
+  const authority = slash === -1 ? value : value.slice(0, slash);
+  const rest = slash === -1 ? '' : value.slice(slash);
+
+  // IPv6 bare form like [::1]:8931
+  const v6 = /^(\[[^\]]+\])(?::(\d+))?$/.exec(authority);
+  if (v6) {
+    const mapped = mapHostname(v6[1], v6[2] ?? '');
+    if (!mapped) return value;
+    return `${mapped}${v6[2] ? `:${v6[2]}` : ''}${rest}`;
+  }
+
+  const colon = authority.lastIndexOf(':');
+  const host = colon === -1 ? authority : authority.slice(0, colon);
+  const port = colon === -1 ? '' : authority.slice(colon + 1);
+  // Only treat trailing `:digits` as a port; otherwise the whole thing is the host.
+  const portIsNumeric = port !== '' && /^\d+$/.test(port);
+  const effHost = portIsNumeric ? host : authority;
+  const effPort = portIsNumeric ? port : '';
+
+  const mapped = mapHostname(effHost, effPort);
+  if (!mapped) return value;
+  return `${mapped}${effPort ? `:${effPort}` : ''}${rest}`;
+}
+
+/**
+ * The host[:port] alone (no scheme, no path) — for compact UI chips like the services cards
+ * that already strip the scheme. Convenience over `toDisplayHost`.
+ */
+export function toDisplayHostname(input: string | null | undefined): string {
+  const mapped = toDisplayHost(input);
+  return mapped.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '').split('/')[0];
+}
+
+// Inverse of the S1 / g6 loopback mapping — used ONLY server-side, when a value we RENDERED as
+// an mDNS host comes back from the browser (e.g. the VectorDB inspector's editable URL field)
+// and must be translated back to the real connect target. The console reaches S1 backends over
+// loopback (127.0.0.1) and g6 via S1 edge-Caddy loopback proxies on the SAME port we displayed
+// (we display the proxy port, e.g. offgrid-g6.local:8931), so both invert exactly.
+const DISPLAY_HOST_TO_LOOPBACK: Record<string, string> = {
+  [S1_HOST]: '127.0.0.1',
+  [G6_HOST]: '127.0.0.1', // g6 is reached through an S1 loopback proxy on the displayed port
+};
+
+/**
+ * Reverse `toDisplayHost` for connection use: map `offgrid-s1.local` / `offgrid-g6.local` back
+ * to the loopback the server actually connects to, preserving scheme/port/path. Any other host
+ * (public URL, raw IP, already-loopback) passes through unchanged. Pure, zero-IO.
+ *
+ * Use this at the seam where a UI-supplied address is about to be used to CONNECT, so display
+ * mDNS never breaks the loopback connection constraint.
+ */
+export function toConnectHost(input: string | null | undefined): string {
+  if (input == null) return '';
+  const value = String(input).trim();
+  if (!value) return value;
+
+  const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(value);
+  if (schemeMatch) {
+    let u: URL;
+    try {
+      u = new URL(value);
+    } catch {
+      return value;
+    }
+    const target = DISPLAY_HOST_TO_LOOPBACK[u.hostname.toLowerCase()];
+    if (!target) return value;
+    u.hostname = target;
+    return u.toString();
+  }
+
+  const slash = value.indexOf('/');
+  const authority = slash === -1 ? value : value.slice(0, slash);
+  const rest = slash === -1 ? '' : value.slice(slash);
+  const colon = authority.lastIndexOf(':');
+  const host = colon === -1 ? authority : authority.slice(0, colon);
+  const port = colon === -1 ? '' : authority.slice(colon + 1);
+  const portIsNumeric = port !== '' && /^\d+$/.test(port);
+  const effHost = (portIsNumeric ? host : authority).toLowerCase();
+  const effPort = portIsNumeric ? port : '';
+  const target = DISPLAY_HOST_TO_LOOPBACK[effHost];
+  if (!target) return value;
+  return `${target}${effPort ? `:${effPort}` : ''}${rest}`;
+}

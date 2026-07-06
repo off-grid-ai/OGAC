@@ -4,6 +4,12 @@ import { Circle, Cube, Database } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toDisplayHost } from '@/lib/display-host';
+
+// The mDNS form shown to the user as the default/placeholder. The server-side vectordb proxy
+// still connects over loopback; this value only ever appears in the UI (and, when unchanged,
+// is normalized back to the real target server-side — see /api/v1/vectordb).
+const QDRANT_DISPLAY_DEFAULT = toDisplayHost('http://127.0.0.1:6333');
 
 interface CollectionInfo {
   name: string;
@@ -46,7 +52,7 @@ function normalize(points: ScatterPoint[]): Array<ScatterPoint & { cx: number; c
 // eslint-disable-next-line complexity
 export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
   const [kind, setKind] = useState<'qdrant' | 'lancedb'>('qdrant');
-  const [url, setUrl] = useState(urlHint ?? 'http://127.0.0.1:6333');
+  const [url, setUrl] = useState(toDisplayHost(urlHint) || QDRANT_DISPLAY_DEFAULT);
   const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState<'idle' | 'connecting' | 'up' | 'down'>('idle');
   const [collections, setCollections] = useState<CollectionInfo[] | null>(null);
@@ -139,7 +145,7 @@ export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="http://127.0.0.1:6333"
+              placeholder={QDRANT_DISPLAY_DEFAULT}
               className="rounded border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
             />
           </label>

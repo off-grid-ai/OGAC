@@ -5,6 +5,7 @@ import { HEALTH_META, type Health } from '@/components/gateway/GatewayTraffic';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toDisplayHost } from '@/lib/display-host';
 
 interface Node {
   name: string;
@@ -81,7 +82,7 @@ function NodeCard({
         </span>
         <span className={`font-mono text-[10px] font-medium uppercase ${h.text}`}>{h.label}</span>
       </div>
-      <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">{node.host}</div>
+      <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">{toDisplayHost(node.host)}</div>
       <div className="mt-2 flex items-center justify-between">
         <span className="font-mono text-xs text-foreground">{node.activeModel || '(none)'}</span>
         <div className="flex items-center gap-1">

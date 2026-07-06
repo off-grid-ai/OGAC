@@ -3,6 +3,7 @@
 import { ArrowSquareOut, CircleNotch } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
 import type { ServiceEntry, ServiceHealth } from '@/lib/services-directory';
 
 const AUTH_LABEL: Record<ServiceEntry['auth'], string> = {
@@ -51,12 +52,12 @@ function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
         <a
-          href={s.url}
+          href={toDisplayHost(s.url)}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
         >
-          {s.url.replace(/^https?:\/\//, '').split('/')[0]}
+          {toDisplayHostname(s.url)}
           <ArrowSquareOut className="size-3 shrink-0" />
         </a>
       </div>

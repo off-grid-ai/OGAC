@@ -9,6 +9,7 @@ import { GatewayTabs } from '@/components/gateway/GatewayTabs';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +58,7 @@ export default async function GatewayPage() {
     return (
       <ModulePlaceholder
         id="gateway"
-        note={`No gateway detected at ${GATEWAY_URL}. Start Off Grid Desktop's local model gateway, or set OFFGRID_GATEWAY_URL.`}
+        note={`No gateway detected at ${toDisplayHost(GATEWAY_URL)}. Start Off Grid Desktop's local model gateway, or set OFFGRID_GATEWAY_URL.`}
       />
     );
   }
@@ -70,7 +71,7 @@ export default async function GatewayPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
             <CardTitle className="text-sm">{info.name}</CardTitle>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{`${GATEWAY_URL}/v1`}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{`${toDisplayHost(GATEWAY_URL)}/v1`}</p>
           </div>
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             <Plug className="size-3" />
@@ -78,11 +79,11 @@ export default async function GatewayPage() {
           </Badge>
         </CardHeader>
         <CardContent className="flex gap-4 text-xs text-muted-foreground">
-          <a href={info.docs} className="flex items-center gap-1.5 hover:text-primary">
+          <a href={toDisplayHost(info.docs)} className="flex items-center gap-1.5 hover:text-primary">
             <BookOpen className="size-3.5" />
             API docs
           </a>
-          <a href={info.mcp} className="flex items-center gap-1.5 hover:text-primary">
+          <a href={toDisplayHost(info.mcp)} className="flex items-center gap-1.5 hover:text-primary">
             MCP endpoint
           </a>
         </CardContent>
