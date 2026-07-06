@@ -199,7 +199,7 @@ export function StudioBuilder({
   // Post-publish: success banner + inline governed test, no page change.
   if (created) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5">
+      <div className="space-y-5">
         <Card className="border-primary/30 bg-primary/5 shadow-sm">
           <CardContent className="flex flex-wrap items-center gap-3 py-4">
             <CheckCircle className="size-5 text-primary" weight="fill" />
@@ -241,43 +241,84 @@ export function StudioBuilder({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      {/* Stepper — click a completed/earlier step to jump back */}
-      <ol className="flex items-center gap-1.5 text-xs">
-        {STEPS.map((s, i) => {
-          const active = s.id === step;
-          const done = i < stepIndex;
-          return (
-            <li key={s.id} className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => (i <= stepIndex ? goTo(s.id) : undefined)}
-                disabled={i > stepIndex}
-                className={
-                  active
-                    ? 'flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-primary'
-                    : done
-                      ? 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-foreground hover:bg-muted'
-                      : 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground'
-                }
-              >
-                <span
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)] xl:gap-8">
+      {/* Left rail — stepper + a live setup summary that fills as you go. Sticky on desktop. */}
+      <aside className="space-y-4 lg:sticky lg:top-6">
+        {/* Stepper — vertical on desktop, click a completed/earlier step to jump back */}
+        <ol className="flex flex-wrap items-center gap-1.5 text-xs lg:flex-col lg:items-stretch lg:gap-1">
+          {STEPS.map((s, i) => {
+            const active = s.id === step;
+            const done = i < stepIndex;
+            return (
+              <li key={s.id} className="flex items-center gap-1.5 lg:w-full">
+                <button
+                  type="button"
+                  onClick={() => (i <= stepIndex ? goTo(s.id) : undefined)}
+                  disabled={i > stepIndex}
                   className={
-                    active || done
-                      ? 'flex size-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground'
-                      : 'flex size-4 items-center justify-center rounded-full bg-muted text-[10px]'
+                    active
+                      ? 'flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-primary lg:w-full lg:py-2'
+                      : done
+                        ? 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-foreground hover:bg-muted lg:w-full lg:py-2'
+                        : 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground lg:w-full lg:py-2'
                   }
                 >
-                  {i + 1}
-                </span>
-                {s.label}
-              </button>
-              {i < STEPS.length - 1 ? <span className="text-muted-foreground/40">/</span> : null}
-            </li>
-          );
-        })}
-      </ol>
+                  <span
+                    className={
+                      active || done
+                        ? 'flex size-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground'
+                        : 'flex size-4 items-center justify-center rounded-full bg-muted text-[10px]'
+                    }
+                  >
+                    {i + 1}
+                  </span>
+                  {s.label}
+                </button>
+                {i < STEPS.length - 1 ? (
+                  <span className="text-muted-foreground/40 lg:hidden">/</span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
 
+        {/* Live setup summary — uses the otherwise-dead left gutter on wide screens */}
+        <Card className="hidden shadow-sm lg:block">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground/70">
+              Setup so far
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 text-xs">
+            <SummaryRow label="Name">
+              {title.trim() || (goal.trim() ? deriveTitle(goal) : '—')}
+            </SummaryRow>
+            <SummaryRow label="Goal">
+              {goal.trim() ? (
+                <span className="line-clamp-3 text-muted-foreground">{goal.trim()}</span>
+              ) : (
+                '—'
+              )}
+            </SummaryRow>
+            <SummaryRow label="Skills">
+              {plan?.skillNames.length ? plan.skillNames.join(', ') : 'None'}
+            </SummaryRow>
+            <SummaryRow label="Knowledge">
+              {plan
+                ? plan.grounded
+                  ? plan.collectionNames.length
+                    ? plan.collectionNames.join(', ')
+                    : 'All you can access'
+                  : 'Model (not grounded)'
+                : '—'}
+            </SummaryRow>
+            <SummaryRow label="Model">{plan?.suggestedModel || 'Platform default'}</SummaryRow>
+          </CardContent>
+        </Card>
+      </aside>
+
+      {/* Right column — the active step's form + wizard nav */}
+      <div className="min-w-0 space-y-5">
       {/* STEP 1 — Goal */}
       {step === 'goal' ? (
         <div className="space-y-5">
@@ -288,7 +329,7 @@ export function StudioBuilder({
                 Pick a starting point, or start from scratch and describe your own.
               </p>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {GUIDED_TEMPLATES.map((t) => {
                 const on = templateId === t.id;
                 return (
@@ -478,6 +519,8 @@ export function StudioBuilder({
       {/* STEP 4 — Publish (review + test) */}
       {step === 'publish' ? (
         <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="space-y-5">
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm">Name it</CardTitle>
@@ -490,6 +533,37 @@ export function StudioBuilder({
               />
             </CardContent>
           </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Who can use it?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {VISIBILITY.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setVisibility(v.id)}
+                  className={
+                    visibility === v.id
+                      ? 'flex w-full items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-left'
+                      : 'flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:border-primary/40'
+                  }
+                >
+                  <div>
+                    <div className="text-sm text-foreground">{v.label}</div>
+                    <div className="text-[11px] text-muted-foreground">{v.hint}</div>
+                  </div>
+                  {visibility === v.id ? (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary">
+                      selected
+                    </Badge>
+                  ) : null}
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+          </div>
 
           <Card className="shadow-sm">
             <CardHeader>
@@ -525,36 +599,7 @@ export function StudioBuilder({
               )}
             </CardContent>
           </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm">Who can use it?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {VISIBILITY.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setVisibility(v.id)}
-                  className={
-                    visibility === v.id
-                      ? 'flex w-full items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-left'
-                      : 'flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:border-primary/40'
-                  }
-                >
-                  <div>
-                    <div className="text-sm text-foreground">{v.label}</div>
-                    <div className="text-[11px] text-muted-foreground">{v.hint}</div>
-                  </div>
-                  {visibility === v.id ? (
-                    <Badge variant="secondary" className="bg-primary/10 text-primary">
-                      selected
-                    </Badge>
-                  ) : null}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+          </div>
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -592,6 +637,16 @@ export function StudioBuilder({
           </Button>
         ) : null}
       </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>
+      <div className="break-words text-foreground">{children}</div>
     </div>
   );
 }
