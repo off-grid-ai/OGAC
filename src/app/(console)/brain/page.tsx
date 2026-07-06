@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddGoldenCaseButton } from '@/components/brain/AddGoldenCaseButton';
 import { AddPromptButton } from '@/components/brain/AddPromptButton';
 import { AddToolButton } from '@/components/brain/AddToolButton';
+import { BrainNav, normalizeBrainView } from '@/components/brain/BrainNav';
 import { BrainSearch } from '@/components/brain/BrainSearch';
 import { GroundingVerifier } from '@/components/brain/GroundingVerifier';
 import { IngestMenu } from '@/components/brain/IngestMenu';
@@ -32,8 +34,14 @@ const TOOL_TYPE: Record<string, string> = {
   mcp: 'bg-primary/10 text-primary',
 };
 
-export default async function BrainPage() {
+export default async function BrainPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   await requireModuleForUser('brain');
+  const { view: rawView } = await searchParams;
+  const view = normalizeBrainView(rawView);
   const org = await currentOrgId();
   const [docs, cases, runs, datasets, tools, promptList] = await Promise.all([
     listDocuments(),
@@ -48,6 +56,11 @@ export default async function BrainPage() {
 
   return (
     <div className="space-y-6">
+      <Suspense fallback={null}>
+        <BrainNav />
+      </Suspense>
+
+      {view === 'router' && (
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm">Retrieval router</CardTitle>
@@ -60,7 +73,9 @@ export default async function BrainPage() {
           <RouterConsole />
         </CardContent>
       </Card>
+      )}
 
+      {view === 'tools' && (
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
@@ -106,7 +121,9 @@ export default async function BrainPage() {
           </Table>
         </CardContent>
       </Card>
+      )}
 
+      {view === 'retrieval' && (
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm">Retrieval (Brain only)</CardTitle>
@@ -118,7 +135,9 @@ export default async function BrainPage() {
           <BrainSearch />
         </CardContent>
       </Card>
+      )}
 
+      {view === 'knowledge' && (
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Knowledge base · {docs.length} documents</CardTitle>
@@ -141,7 +160,9 @@ export default async function BrainPage() {
           ))}
         </CardContent>
       </Card>
+      )}
 
+      {view === 'prompts' && (
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
@@ -183,7 +204,10 @@ export default async function BrainPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
+      {view === 'evals' && (
+      <>
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
@@ -251,6 +275,8 @@ export default async function BrainPage() {
       </Card>
 
       <GroundingVerifier />
+      </>
+      )}
     </div>
   );
 }
