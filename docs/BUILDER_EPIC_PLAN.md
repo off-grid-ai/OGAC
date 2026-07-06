@@ -132,3 +132,29 @@ Owns `src/db/schema.ts` (add `apps`,`appRuns`,`dataDomains`), migration, extract
 ## 6. Phase 1 recommendation
 Phase 0 solo (schema + connector-exec). Then **Phase 1 = 1A + 1B + 1C in parallel** — fully disjoint, none
 touch store.ts/schema.ts, together landing the unified entity + connector rule engine the vision hinges on.
+
+## 7. Canonical builder UX flow (founder spec) — the 5 screens
+
+The builder-to-operate lifecycle. The AppSpec (§3.1) is the state carried across all five; the multi-step
+executor (§3.3) + durable workflow (§3.3) power screens 3–4; triggers (§3.4) can start at screen 2.
+
+1. **BUILD** — you describe the app in plain language → the NL compiler (`app-compile.ts`, §3.3/2C) carves a
+   **skeleton node graph** (AppSpec.steps) → you refine it **dual-mode: visually on the canvas AND via text**
+   (both edit the same AppSpec — the canvas nodes ARE the steps, no more decorative graph) → you OK it → it
+   "wires up" (validates the graph, resolves data-domain bindings, confirms org inheritance). Screen 3B (canvas)
+   + 3A (guided builder) are two entries into this same edit surface.
+2. **INPUT** — a generated screen to enter run inputs (from `AppSpec.inputForm`, §3.1/4A forms) / pick the
+   trigger. Hitting Run submits a governed app-run (same entry point as any trigger).
+3. **RUNNING** — a live monitoring/status screen: each step's state streams (queued→running→done/failed),
+   shows retrieval hits, connector-query results, guardrail verdicts — driven by the app-run's per-step status
+   in the `appRuns` row + durable workflow events. This is the "watch it work" screen.
+4. **REVIEW (human-in-the-loop)** — when a `human` step pauses the run (§3.3, durable signal), this screen
+   surfaces the pending decision with context (the step output + sources) → approve / reject / edit → resumes
+   the workflow. Reuses + extends the existing review-route pattern (per-step, not just final-answer).
+5. **REPORTS / ANALYTICS** — outcomes over time: runs, approvals, exceptions, throughput, cost/tokens (reuse
+   the FinOps/audit/lineage surfaces) + the `output:report` sink (§3.3, 4B) for generated reports.
+
+**Sequencing impact:** screens 1–2 are Phase 3 (builder + canvas + input form). Screen 3 (live status) rides on
+Phase 2's executor/durable events — build a status-stream view as part of Phase 3B or an early Phase 4 item.
+Screens 4–5 are Phase 4 (HITL surface + reports). The AppSpec + appRuns schema (Phase 0) must carry everything
+these screens render (per-step status, awaiting-human, inputs, outputs) — already reflected in the Phase 0 brief.
