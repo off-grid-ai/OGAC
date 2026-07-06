@@ -23,6 +23,7 @@ import {
   Paperclip,
   MagnifyingGlass,
   Microphone,
+  Pause,
   PaperPlaneRight,
   PencilSimple,
   Plus,
@@ -75,6 +76,7 @@ import { MemoryDialog } from './MemoryDialog';
 import { type Project, ProjectDialog } from './ProjectDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { SkillsDialog } from './SkillsDialog';
+import { useChatAudio } from './useChatAudio';
 
 interface Conversation {
   id: string;
@@ -231,6 +233,8 @@ function MessageBubble({
   onCopy,
   onRegenerate,
   onSpeak,
+  speakActive,
+  speakLabel,
   onEdit,
   onNavBranch,
   onViewImage,
@@ -242,7 +246,11 @@ function MessageBubble({
   onOpenArtifact: (a: Artifact) => void;
   onCopy: (text: string) => void;
   onRegenerate: () => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (id: string, text: string) => void;
+  /** Whether THIS message is the one currently speaking (playing or paused). */
+  speakActive: boolean;
+  /** Tooltip for this message's play/pause button. */
+  speakLabel: string;
   onEdit: (id: string, content: string) => void;
   onNavBranch: (id: string, delta: number) => void;
   onViewImage: (src: string) => void;
@@ -345,11 +353,18 @@ function MessageBubble({
                   <Copy className="size-3.5" />
                 </button>
                 <button
-                  onClick={() => onSpeak(m.content)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title="Play"
+                  onClick={() => m.id && onSpeak(m.id, m.content)}
+                  className={cn(
+                    'rounded p-1 hover:bg-muted hover:text-foreground',
+                    speakActive ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                  title={speakLabel}
                 >
-                  <SpeakerHigh className="size-3.5" />
+                  {speakActive ? (
+                    <Pause className="size-3.5" />
+                  ) : (
+                    <SpeakerHigh className="size-3.5" />
+                  )}
                 </button>
                 {canRegenerate ? (
                   <button
@@ -410,8 +425,6 @@ export function ChatWorkspace({
     { fn: string; toolName: string; input: string; token?: string }[]
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
-  const [recording, setRecording] = useState(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   // NAVIGATIONAL position (which conversation, which project) lives in the URL — never useState —
   // so a conversation is shareable, refresh-safe, and Back steps between conversations/projects.
@@ -453,6 +466,12 @@ export function ChatWorkspace({
   const [temporary, setTemporary] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  // Audio mode (STT voice input + TTS read-aloud). All browser/network audio I/O + the pure state
+  // machines live in useChatAudio; this component only renders from it at the mic + play buttons.
+  const audio = useChatAudio({
+    onTranscript: (merge) => setInput((prev) => merge(prev)),
+    onError: (m) => toast.error(m),
+  });
   const [images, setImages] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -890,51 +909,7 @@ export function ChatWorkspace({
     toast.success('Copied');
   }
 
-  // Voice input — record a clip, POST to the gateway transcription endpoint, drop text in composer.
-  async function toggleRecording() {
-    if (recording) {
-      recorderRef.current?.stop();
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setRecording(false);
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        const fd = new FormData();
-        fd.append('file', blob, 'audio.webm');
-        const r = await fetch('/api/v1/chat/transcribe', { method: 'POST', body: fd });
-        if (!r.ok) return toast.error('Transcription unavailable');
-        const { text } = await r.json();
-        if (text) setInput((prev) => (prev ? `${prev} ${text}` : text));
-      };
-      recorderRef.current = rec;
-      rec.start();
-      setRecording(true);
-    } catch {
-      toast.error('Microphone unavailable');
-    }
-  }
-
-  // TTS — play an answer through the gateway speech endpoint.
-  async function speak(text: string) {
-    try {
-      const r = await fetch('/api/v1/chat/speech', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input: text }),
-      });
-      if (!r.ok) return toast.error('Speech unavailable');
-      const url = URL.createObjectURL(await r.blob());
-      void new Audio(url).play();
-    } catch {
-      toast.error('Speech failed');
-    }
-  }
+  // Voice input (STT) + read-aloud (TTS) are owned by the `audio` hook — see useChatAudio.
 
   // Shared SSE loop — updates the trailing assistant placeholder. Caller adds the placeholder.
   // eslint-disable-next-line complexity
@@ -1529,7 +1504,9 @@ export function ChatWorkspace({
                 onOpenArtifact={openArtifact}
                 onCopy={copy}
                 onRegenerate={regenerate}
-                onSpeak={speak}
+                onSpeak={audio.speak}
+                speakActive={!!m.id && audio.speakingId === m.id}
+                speakLabel={audio.speakLabel(m.id ?? '')}
                 onEdit={editMessage}
                 onNavBranch={navBranch}
                 onViewImage={setLightbox}
@@ -1818,12 +1795,17 @@ export function ChatWorkspace({
                 </DropdownMenuContent>
               </DropdownMenu>
               <button
-                onClick={toggleRecording}
+                onClick={audio.toggleRecording}
+                disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
                 className={cn(
-                  'p-1.5 hover:text-foreground',
-                  recording ? 'animate-pulse text-destructive' : 'text-muted-foreground',
+                  'p-1.5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40',
+                  audio.recording
+                    ? 'animate-pulse text-destructive'
+                    : audio.recordPhase === 'transcribing'
+                      ? 'animate-pulse text-primary'
+                      : 'text-muted-foreground',
                 )}
-                title={recording ? 'Stop recording' : 'Dictate'}
+                title={audio.micLabel}
               >
                 <Microphone className="size-5" />
               </button>
