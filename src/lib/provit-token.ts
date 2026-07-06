@@ -32,8 +32,14 @@ export async function verifyToken(token: string): Promise<ProvitTokenBinding | n
 }
 
 export async function listTokens(orgId: string) {
-  return db.select({ id: provitTokens.id, label: provitTokens.label, ownerId: provitTokens.ownerId, createdAt: provitTokens.createdAt, lastUsedAt: provitTokens.lastUsedAt, revoked: provitTokens.revoked })
-    .from(provitTokens).where(eq(provitTokens.orgId, orgId)).orderBy(desc(provitTokens.createdAt)).limit(100);
+  // Graceful when the table hasn't been migrated onto a given DB yet (relation-does-not-exist) —
+  // a missing table must not 500 the page; it just means no tokens.
+  try {
+    return await db.select({ id: provitTokens.id, label: provitTokens.label, ownerId: provitTokens.ownerId, createdAt: provitTokens.createdAt, lastUsedAt: provitTokens.lastUsedAt, revoked: provitTokens.revoked })
+      .from(provitTokens).where(eq(provitTokens.orgId, orgId)).orderBy(desc(provitTokens.createdAt)).limit(100);
+  } catch {
+    return [] as { id: string; label: string; ownerId: string; createdAt: Date | null; lastUsedAt: Date | null; revoked: boolean }[];
+  }
 }
 
 export async function revokeToken(id: string, orgId: string): Promise<void> {

@@ -8,10 +8,8 @@ import {
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
-import {
-  LangfuseRegistryPanel,
-  resolveRegistryTab,
-} from '@/components/observability/LangfuseRegistryPanel';
+import { LangfuseRegistryPanel } from '@/components/observability/LangfuseRegistryPanel';
+import { resolveRegistryTab } from '@/lib/langfuse-registry';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
