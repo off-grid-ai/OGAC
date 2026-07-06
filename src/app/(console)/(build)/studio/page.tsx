@@ -9,8 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { db } from '@/db';
 import { studioTemplates } from '@/db/schema';
+import { listManagedAgents } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
-import { introspect, type Workflow } from '@/lib/studio';
+import { getOrgContext } from '@/lib/org-context';
+import { currentOrgId } from '@/lib/tenancy';
+import type { Workflow } from '@/lib/studio';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +28,10 @@ export default async function StudioPage() {
   await requireModuleForUser('studio');
   const session = await auth();
   const email = session?.user?.email ?? '';
-  const [catalog, templates] = await Promise.all([
-    introspect(),
+  const orgId = await currentOrgId();
+  const [ctx, agents, templates] = await Promise.all([
+    getOrgContext(orgId),
+    listManagedAgents().catch(() => []),
     db
       .select()
       .from(studioTemplates)
@@ -35,6 +40,12 @@ export default async function StudioPage() {
       .limit(50)
       .catch(() => []),
   ]);
+
+  // Dropdown options the canvas binds steps against (same shapes the 3A builder uses).
+  const domains = ctx.dataDomains
+    .filter((d) => d.connectorId && d.resource)
+    .map((d) => ({ id: d.id, label: d.label }));
+  const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
 
   return (
     <div className="space-y-6">
@@ -119,13 +130,13 @@ export default async function StudioPage() {
         )}
       </div>
 
-      {/* Advanced: the technical block composer, for power users */}
-      <details className="rounded-md border border-border">
+      {/* Advanced: the visual canvas builder — describe → graph → edit each node → save/run */}
+      <details className="rounded-md border border-border" open>
         <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-foreground">
-          Advanced builder (technical)
+          Visual canvas builder
         </summary>
         <div className="border-t border-border p-4">
-          <StudioCanvas catalog={catalog} userId={email || undefined} />
+          <StudioCanvas domains={domains} agents={agentOptions} />
         </div>
       </details>
     </div>
