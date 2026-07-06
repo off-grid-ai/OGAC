@@ -134,7 +134,7 @@ export default async function ConsoleHome() {
   const firstName = session?.user?.name?.split(' ')[0] ?? session?.user?.email?.split('@')[0];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto max-w-[110rem] space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-foreground">
           {firstName ? `Welcome back, ${firstName}` : 'Overview'}

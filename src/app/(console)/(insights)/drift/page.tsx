@@ -1,4 +1,5 @@
 import { Waveform } from '@phosphor-icons/react/dist/ssr';
+import { StatBand } from '@/components/insights/StatBand';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
+import { buildDriftStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -59,6 +61,17 @@ export default async function DriftPage() {
         </Card>
       ) : (
         <>
+          {/* Value-forward summary band — verdict, score, drifted-feature count, sample windows. */}
+          <StatBand
+            stats={buildDriftStats({
+              status: data.status,
+              driftScore: data.driftScore,
+              features: data.features,
+              baseline: data.baseline,
+              current: data.current,
+            })}
+          />
+
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
