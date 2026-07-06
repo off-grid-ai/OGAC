@@ -1,11 +1,19 @@
 'use client';
 
-import { ArrowCounterClockwise, Code, Eye, Play, Sparkle, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowCounterClockwise, Code, Eye, FloppyDisk, Play, Sparkle, X } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { type Artifact, buildSrcDoc, isLiveKind } from '@/lib/artifacts';
+import {
+  type Artifact,
+  artifactSavePayload,
+  buildSrcDoc,
+  canSaveArtifact,
+  isArtifactDirty,
+  isLiveKind,
+} from '@/lib/artifacts';
+import { ArtifactEditor } from './ArtifactEditor';
 import { Markdown } from './Markdown';
 
 interface RunResult {
@@ -22,7 +30,22 @@ interface RunResult {
 // (no same-origin, no top navigation); text renders as markdown; runnable code (python/node) gets a
 // Run button that executes it in the console sandbox adapter and shows stdout/stderr inline.
 // eslint-disable-next-line complexity
-export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClose: () => void }) {
+export function ArtifactView({
+  artifact,
+  onClose,
+  title,
+  conversationId,
+  onSaved,
+}: {
+  artifact: Artifact;
+  onClose: () => void;
+  // Persist context: `title` + `conversationId` key the EXISTING save route to the same logical
+  // artifact row so Save appends a NEW VERSION rather than creating a duplicate. Both optional so
+  // the viewer still works (edit + live preview) when opened without library context.
+  title?: string;
+  conversationId?: string | null;
+  onSaved?: (id: string) => void;
+}) {
   // Live kinds render in the sandboxed iframe: html/svg inline, react (Babel+UMD) and mermaid via
   // CDN libs loaded inside the frame. The AI bridge (window.offgrid.complete) is enabled so
   // generated apps can call the local model through the console proxy.
@@ -30,13 +53,54 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
   const runnable = artifact.kind === 'code';
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
-  // In-place editing: local code edits re-render the preview live. Reset restores the original.
+  // In-place editing: local code edits re-render the preview live. The baseline is the last SAVED
+  // code — Save advances it, Cancel/Reset restores it. Starts as the code we opened with.
+  const [baseline, setBaseline] = useState(artifact.code);
   const [code, setCode] = useState(artifact.code);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   // S7 refine loop: plain-language change requests re-generate the artifact and re-render.
   const [refineInput, setRefineInput] = useState('');
   const [refining, setRefining] = useState(false);
-  const dirty = code !== artifact.code;
+  const dirty = isArtifactDirty(baseline, code);
+  const savable = canSaveArtifact(baseline, code);
+
+  // Persist the edited buffer as a new version through the EXISTING artifacts route. saveArtifact
+  // versions server-side by (user, conversation, title): identical code is a no-op, changed code
+  // appends a version + advances the head. We pass the original title so the edit lands on the
+  // same logical row instead of forking a new artifact when an HTML <title> changed mid-edit.
+  async function save() {
+    if (!savable || saving) return;
+    setSaving(true);
+    try {
+      const payload = artifactSavePayload(
+        { kind: artifact.kind, code, language: artifact.language },
+        { title, conversationId },
+      );
+      const r = await fetch('/api/v1/chat/artifacts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = (await r.json()) as { id?: string; error?: string };
+      if (!r.ok || !d.id) {
+        toast.error(d.error ?? 'Save failed.');
+        return;
+      }
+      setBaseline(code); // new saved baseline — Cancel now reverts to the edited version
+      toast.success('Saved new version.');
+      onSaved?.(d.id);
+    } catch {
+      toast.error('Save failed — could not reach the console.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Cancel/Reset an in-progress edit: drop the buffer back to the last saved baseline.
+  function cancelEdit() {
+    setCode(baseline);
+  }
 
   async function refine() {
     const instruction = refineInput.trim();
@@ -87,8 +151,13 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
         </span>
         <div className="flex items-center gap-2">
           {dirty ? (
-            <Button size="sm" variant="ghost" className="h-7 gap-1.5" onClick={() => setCode(artifact.code)} title="Revert to original">
-              <ArrowCounterClockwise className="size-3.5" /> Reset
+            <Button size="sm" variant="ghost" className="h-7 gap-1.5" onClick={cancelEdit} title="Discard edits, revert to last saved">
+              <ArrowCounterClockwise className="size-3.5" /> Cancel
+            </Button>
+          ) : null}
+          {savable ? (
+            <Button size="sm" className="h-7 gap-1.5" onClick={save} disabled={saving} title="Save as a new version">
+              <FloppyDisk className="size-3.5" /> {saving ? 'Saving…' : 'Save'}
             </Button>
           ) : null}
           <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={() => setEditing((v) => !v)}>
@@ -106,12 +175,7 @@ export function ArtifactView({ artifact, onClose }: { artifact: Artifact; onClos
       </div>
       <div className="flex-1 overflow-auto">
         {editing ? (
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            spellCheck={false}
-            className="h-full w-full resize-none border-0 bg-background p-4 font-mono text-xs text-foreground focus:outline-none"
-          />
+          <ArtifactEditor value={code} onChange={setCode} onSave={save} onCancel={cancelEdit} />
         ) : live ? (
           <iframe
             title="artifact"
