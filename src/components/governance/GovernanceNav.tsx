@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
+import { SubNav } from '@/components/nav/SubNav';
 
 // Scoped secondary-nav for the Governance family — the compliance officer's job ("prove to a
 // regulator this is controlled"). Policy, access, safety, and assurance surfaces read as one
@@ -47,8 +48,9 @@ export function GovernanceNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border pb-3">
-      {GROUPS.map((group, gi) => {
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
+        {GROUPS.map((group, gi) => {
         const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
         if (tabs.length === 0) return null;
         return (
@@ -77,7 +79,8 @@ export function GovernanceNav() {
             })}
           </div>
         );
-      })}
-    </nav>
+        })}
+      </nav>
+    </SubNav>
   );
 }
