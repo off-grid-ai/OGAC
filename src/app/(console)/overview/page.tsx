@@ -13,7 +13,7 @@ import { computeFinOps } from '@/lib/finops';
 import { readGuardrailsView } from '@/lib/guardrails-view';
 import { type OperatorHomeInput, synthesizeOperatorHome } from '@/lib/overview-synthesis';
 import { readDecisions, readPolicyStatus } from '@/lib/policy-view';
-import { type ServiceHealth, getServices } from '@/lib/services-directory';
+import { type RawProbe, getServices } from '@/lib/services-directory';
 import { readSiemView } from '@/lib/siem-view';
 import { probeService } from '@/lib/status';
 import { listConnectors } from '@/lib/store';
@@ -51,7 +51,7 @@ async function probeHomeServices() {
   const entries = getServices().filter((s) => HOME_SERVICE_IDS.includes(s.id));
   return Promise.all(
     entries.map(async (s) => {
-      const h: Omit<ServiceHealth, 'id'> = await safe(
+      const h: RawProbe = await safe(
         () => probeService(s.url, s.healthPath, 3000),
         { status: 'down' as const, httpStatus: null, ms: null },
       );
