@@ -343,3 +343,52 @@ chat-epic tests pass) + IP-leak grep. Full report: `docs/PLATFORM_INTEGRATION_RE
   does NOT fake success — it 403s with the exact copy-pasteable `kcadm.sh add-roles` command
   (`federationGrantCommand`). So it self-heals when the admin client is broad enough, and degrades to
   the documented manual command otherwise.
+
+## Post-builder-epic sweep (2026-07-06)
+
+QA/integration sweep after the builder epic + evals revamp. Verified the 5-screen app lifecycle
+coheres end-to-end (see `docs/PLATFORM_INTEGRATION_REPORT.md`). Gaps below are honest seams the code
+already surfaces — not hidden defects. Ordered by impact.
+
+- **[HITL] Durable `offgrid-apps` queue/worker not confirmed enabled on the fleet.** Human-in-the-loop
+  pause/resume only works on the DURABLE path: the workflow (`src/worker/app-run.workflow.ts:145`,
+  `condition()`) suspends on a human step and resumes via `signalAppRun`
+  (`src/lib/adapters/apprun.ts:172-195`). If no Temporal worker is running the `offgrid-apps` task
+  queue (`app-run-durable.ts:28`), `submitAppRun` degrades to inline
+  (`adapters/apprun.ts:96-102`) and the paused run can't be resumed. STATUS: design-complete, not
+  verified live. FIX: stand up the app-run worker on the fleet (`OFFGRID_QUEUE_ENABLED=1` + a worker
+  process bundling `app-run.workflow.ts`/`app-run.activities.ts`), then verify a real approve→resume
+  and reject→halt against Temporal. Record the worker in `deploy/onprem/SERVER_STATE.md`.
+
+- **[HITL] Console test-run is always inline — a HITL app tested from the Input/canvas screen can't
+  be resumed.** `AppInputForm.tsx:45` and `StudioCanvas.tsx:317` POST to
+  `/api/v1/admin/apps/[id]/run`, whose handler calls `runApp` inline directly
+  (`apps/[id]/run/route.ts:32`) — it never routes through `submitAppRun`, so it never runs durably
+  even when Temporal is up. A human step returns `awaiting_human` and the Review screen honestly 409s
+  (`review/route.ts:73-84`). Only the published/trigger path (`app/[slug]/run/route.ts:78`) is
+  durable. FIX: either route the admin test-run through `submitAppRun` too (so a HITL test can pause
+  durably), or make the Input screen tell the operator up front that test-runs of HITL apps won't be
+  resumable and to run via a trigger. Documented in `docs/user/app-builder.md`.
+
+- **[BUILD/RUN] Inline agent steps (no agentId) cannot execute.** `executeAgentStep`
+  (`src/lib/app-run.ts:246-254`) returns an honest error for an agent step with no `agentId`
+  ("materialize it into a customAgent before running (deferred)"). The compiler produces inline agent
+  steps from NL (`app-compile.ts:142-154`) and the builder can create them (`app-builder.ts:57-74`),
+  so a freshly-compiled multi-step app with an inline decision step will error at that step on run.
+  FIX: on save (or on run), materialize an inline agent step into a real `customAgent` (persist the
+  systemPrompt+grounded as an agent, set `agentId`), or surface a builder-side "convert to agent"
+  action. Until then, rebind inline agent steps to an existing agent before running. Documented in
+  `docs/user/app-builder.md`.
+
+- **[REPORTS] `report`/`email`/`whatsapp` output sinks defer delivery at run time.**
+  `executeOutputStep` (`src/lib/app-run.ts:348-356`) records the sink intent with a "delivery deferred
+  to Phase 4 — outcome available, not sent" note; the step succeeds but nothing is delivered. The real
+  signed-PDF path is the separate on-demand route `GET /api/v1/admin/app-runs/[id]/report`
+  (ed25519-signed via `provenance.ts`/`signing.ts`), NOT the report sink. FIX: wire the `report` sink
+  to call the report renderer during the run (or on run completion) and attach/store the signed PDF;
+  gate `email`/`whatsapp` sinks on the same on-prem env the triggers use. Documented in
+  `docs/user/app-reports.md`.
+
+- **[BUILD] `apps/compile` route is unaudited.** `apps/compile/route.ts` has no `auditFromSession`.
+  This is acceptable (compile is a read-only NL→spec transform that persists nothing), noted for
+  completeness — if compile ever starts persisting drafts, add an audit entry then.
