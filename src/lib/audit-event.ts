@@ -59,7 +59,13 @@ export type AuditAction =
   // device fleet control — remote node lifecycle (kill switch)
   | 'device.kill'
   // data-subject rights — GDPR/DSAR right-to-erasure
-  | 'data.erasure';
+  | 'data.erasure'
+  // tenancy + org-wide config
+  | 'tenant.change'
+  | 'org.settings.change'
+  // fleet (MDM/osquery) control
+  | 'fleet.livequery'
+  | 'fleet.policy.change';
 
 export interface TokenUsage {
   prompt: number;
