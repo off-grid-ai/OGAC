@@ -9,6 +9,11 @@ export const devices = pgTable('devices', {
   status: text('status').notNull().default('offline'),
   lastSeen: text('last_seen').notNull().default('never'),
   policyVersion: integer('policy_version').notNull().default(0),
+  // Per-device data-plane secret, minted at enrollment and presented as a Bearer by the node on
+  // every /devices/[id]/{audit,policy,commands} call. Random (not the predictable dt_<id>). Nullable:
+  // devices enrolled before this hardening carry no token and fall back to the legacy dt_<id> form
+  // until they re-enroll (see src/lib/device-token.ts).
+  token: text('token'),
   enrolledAt: timestamp('enrolled_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -82,6 +87,10 @@ export const connectors = pgTable('connectors', {
 
 export const ingestJobs = pgTable('ingest_jobs', {
   id: text('id').primaryKey(),
+  // Tenant scope: jobs belong to their connector's org. Without this, listIngestJobs was global —
+  // a cross-tenant leak of ingest metadata (P1). Defaults to 'default' so pre-existing rows/backfill
+  // are safe, and set explicitly from the connector's orgId on insert.
+  orgId: text('org_id').notNull().default('default'),
   connectorId: text('connector_id').notNull(),
   connectorName: text('connector_name').notNull(),
   status: text('status').notNull().default('queued'),
