@@ -28,7 +28,10 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
   },
   {
     heading: 'Operate',
-    tabs: [{ id: 'agent-runs', label: 'Runs', route: '/agent-runs' }],
+    tabs: [
+      { id: 'agent-runs', label: 'Runs', route: '/agent-runs' },
+      { id: 'reports', label: 'Reports', route: '/apps/reports' },
+    ],
   },
 ];
 
