@@ -45,13 +45,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'build',
     label: 'Build',
-    // Studio and Agents were two sidebar rows for one job (author an assistant vs. run the agent
-    // definitions it produces), so they're consolidated under a single "Agents" umbrella row whose
-    // (build) section landing tabs across Agents / Studio / Runs via BuildNav. Brain (RAG) stays a
-    // sibling entry. Studio, run history, evals, sandbox, and visual QA are secondaries — reached
-    // from the section nav, not the sidebar — so every route still resolves without crowding it.
-    primary: ['agents', 'brain'],
-    secondary: ['studio', 'agent-runs', 'evals', 'sandbox', 'provit'],
+    // "agent and studio should become one" (founder). Studio is now the ONE build front door — it
+    // lists every app (an agent is a one-step app) and "New app" opens the guided builder; opening
+    // an app goes to its own lifecycle shell (/apps/<id>). So Studio is the sidebar primary and the
+    // old Agents roster page is a secondary (its routes still resolve). Brain (RAG) stays a sibling
+    // primary. Run history, evals, sandbox, and visual QA remain secondaries — reached from the
+    // section nav, not the sidebar — so every route resolves without crowding it.
+    primary: ['studio', 'brain'],
+    secondary: ['agents', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {
     id: 'gateway',
@@ -111,7 +112,7 @@ export function sidebarActiveIdFor(id: ModuleId): ModuleId | undefined {
 // under /apps. Map them to the module whose sidebar row should stay lit while you're on them.
 // Longest-prefix wins (checked before falling back to module-route matching).
 const PATH_ALIASES: { prefix: string; moduleId: ModuleId }[] = [
-  { prefix: '/apps', moduleId: 'agents' },
+  { prefix: '/apps', moduleId: 'studio' },
 ];
 
 // Resolve which sidebar row should be active for a URL, purely — no React, no router. First tries
