@@ -9,4 +9,10 @@ export const GET = ApiReference({
   url: '/openapi.json',
   theme: 'default',
   cdn: '/scalar.standalone.js',
+  // Brand the reference as Off Grid, not the default "Scalar API Reference" + globe favicon.
+  // pageTitle → the browser tab + the in-app document header; favicon → the header icon (self-hosted
+  // Off Grid mark in public/, air-gap-safe). metaData.title backs the document/OG title.
+  pageTitle: 'Off Grid Console API',
+  favicon: '/logo.png',
+  metaData: { title: 'Off Grid Console API' },
 });
