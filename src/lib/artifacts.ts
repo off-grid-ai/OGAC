@@ -88,6 +88,57 @@ export function artifactTitle(a: Artifact): string {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} artifact`;
 }
 
+// ─── Inline editing (task #92) ──────────────────────────────────────────────
+// Pure helpers for the in-place artifact editor. Zero I/O, unit-testable. The viewer keeps a
+// local `code` buffer while editing; these decide when it's savable and shape the persist body
+// the EXISTING `POST /api/v1/chat/artifacts` route consumes (which versions server-side by
+// (user, conversation, title) — identical code is a no-op, changed code appends a new version).
+
+// Body accepted by POST /api/v1/chat/artifacts. Matches saveArtifact()'s expected fields.
+export interface ArtifactSavePayload {
+  kind: string;
+  code: string;
+  language: string | null;
+  title: string;
+  conversationId: string | null;
+}
+
+// True when the edited buffer differs from the saved/original code (trailing whitespace ignored so
+// a stray newline doesn't count as a change).
+export function isArtifactDirty(original: string, edited: string): boolean {
+  return edited.trim() !== original.trim();
+}
+
+// Whether a Save should be allowed: there must be a real change AND non-empty content. We never
+// persist an empty artifact (a useless version) and never a no-op.
+export function canSaveArtifact(original: string, edited: string): boolean {
+  return edited.trim().length > 0 && isArtifactDirty(original, edited);
+}
+
+// Build the persist body for the edited artifact. `title` defaults to the derived title of the
+// EDITED content (via artifactTitle); callers pass the original title through to guarantee the new
+// version lands on the same logical row (saveArtifact keys on (user, conversation, title)).
+export function artifactSavePayload(
+  a: { kind: string; code: string; language?: string | null },
+  opts: { title?: string; conversationId?: string | null } = {},
+): ArtifactSavePayload {
+  const code = a.code;
+  const title =
+    opts.title?.trim() ||
+    artifactTitle({
+      kind: a.kind as ArtifactKind,
+      code,
+      language: (a.language ?? undefined) as Artifact['language'],
+    });
+  return {
+    kind: a.kind,
+    code,
+    language: a.language ?? null,
+    title,
+    conversationId: opts.conversationId ?? null,
+  };
+}
+
 export function parseArtifact(content: string): Artifact | null {
   // 1. React: combine all jsx/tsx/react fenced blocks into one scope.
   const reactBlocks = [...content.matchAll(/```(?:jsx|tsx|react)\s*\n([\s\S]*?)```/gi)].map((b) =>
