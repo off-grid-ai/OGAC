@@ -23,7 +23,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     tabs: [
       { id: 'integrations', label: 'Integrations', route: '/integrations' },
       { id: 'data', label: 'Connectors', route: '/data' },
-      { id: 'tool-catalog', label: 'Tool catalog', route: '/tool-catalog' },
+      // Tool catalog moved to Build → Tools → Catalog (#121); /tool-catalog now redirects there.
       { id: 'data-domains', label: 'Data domains', route: '/data-domains' },
     ],
   },
