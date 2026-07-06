@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { db } from '@/db';
 import { configAudit } from '@/db/schema';
-import { CONFIG_REGISTRY, type ConfigKeyDef } from '@/lib/config-registry';
+import {
+  CONFIG_REGISTRY,
+  configConnectValue,
+  configDisplayValue,
+  type ConfigKeyDef,
+} from '@/lib/config-registry';
 
 // The env file the app loads at boot — edits here take effect on restart. Override
 // with OFFGRID_ENV_FILE for non-default deployments.
@@ -46,9 +51,13 @@ export async function getConfigEntries(): Promise<ConfigEntry[]> {
     const raw = fromFile ?? fromProc ?? '';
     const source: ConfigEntry['source'] = fromFile !== undefined ? 'env-file' : fromProc !== undefined ? 'process' : 'default';
     const isSet = raw !== '';
+    // Never leak secret values. For non-secret host-bearing values, render the mDNS form so a
+    // raw 127.0.0.1 / IP never reaches the client (founder directive). configDisplayValue is a
+    // no-op for non-host values, so plain settings are unchanged.
+    const value = def.secret ? '' : configDisplayValue(def, raw);
     return {
       ...def,
-      value: def.secret ? '' : raw, // never leak secret values to the client
+      value,
       isSet,
       source,
     };
@@ -70,7 +79,12 @@ export async function setConfig(
   actor: string,
 ): Promise<{ applied: string[]; restartRequired: string[] }> {
   const known = new Map(CONFIG_REGISTRY.map((d) => [d.key, d]));
-  const entries = Object.entries(updates).filter(([k]) => known.has(k));
+  // Map any mDNS host the operator edited back to the real connect target before persisting, so
+  // what we display (mDNS) never changes the address the server actually connects to. No-op for
+  // non-host values.
+  const entries = Object.entries(updates)
+    .filter(([k]) => known.has(k))
+    .map(([k, v]): [string, string] => [k, configConnectValue(known.get(k)!, v)]);
   if (!entries.length) return { applied: [], restartRequired: [] };
 
   const fileMap = await readEnvFile();
