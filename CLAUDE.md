@@ -97,6 +97,16 @@ Service accounts use `Authorization: Bearer <OFFGRID_ADMIN_TOKEN>` — middlewar
 
 Inherit the shared Off Grid design philosophy from `../brand/DESIGN_PHILOSOPHY.md` (the source of truth — brutalist/terminal, Menlo mono, emerald accent, tokens in `@offgrid/design`). Platform specifics: this repo has no separate design doc yet — follow the shared philosophy and the tokens directly.
 
+### Use the full width — no wasted real estate (NON-NEGOTIABLE, applies to EVERY page)
+
+This is a desktop-first operator console on wide (≥1440px) screens. **Content must fill the available width.** The single most repeated piece of design feedback here is "wasted real estate / not desktop-optimised" — do NOT reintroduce it.
+
+- **Never wrap a full PAGE in `mx-auto max-w-2xl/3xl/4xl`.** That centers content in a skinny column and leaves 30–50% of a wide screen empty. Page shells fill the width (the console `<main>` already pads with `p-6`); a page's root should be full-width (`w-full`, or at most `max-w-7xl`/`max-w-[110rem]` for the very widest surfaces).
+- **Lay out with responsive grids/columns**, not one tall centered stack: `grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`. Card lists are grids. A form + its help/preview sit side-by-side on `lg+`, not stacked in a narrow column. Stat rows are multi-column bands.
+- **The ONLY thing that stays narrow is a single reading/measure column** — long prose, or one focused input (a chat composer, a single textarea) — cap those at ~`max-w-2xl`/`prose` *inside* a full-width page, never by centering the whole page.
+- Still responsive: columns stack on narrow/tablet; wide tables/diagrams scroll inside their own `overflow-x-auto`, the page body never scrolls horizontally.
+- Verify against a wide viewport: if a full-page surface leaves a large empty gutter on either side, it's a bug — fix it before calling the work done.
+
 ## Multi-agent operating model (how we build here)
 
 Substantial work is executed by a fleet of parallel subagents orchestrated by the main session — not one linear thread. The standard:
