@@ -40,7 +40,7 @@ export default async function IntegrationsPage() {
     listBindings(true),
     listConnectors(org),
     listTools(org),
-    listIngestJobs(8),
+    listIngestJobs(org, 8),
   ]);
 
   return (
