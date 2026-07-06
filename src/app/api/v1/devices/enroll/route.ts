@@ -10,9 +10,14 @@ export async function POST(req: Request) {
   if (!token || !name || !os) {
     return NextResponse.json({ error: 'token, name, os are required' }, { status: 400 });
   }
-  const device = await enrollDevice(token, name, os);
-  if (!device) {
+  const enrolled = await enrollDevice(token, name, os);
+  if (!enrolled) {
     return NextResponse.json({ error: 'invalid or already-used token' }, { status: 401 });
   }
-  return NextResponse.json({ device, deviceToken: `dt_${device.id}` }, { status: 201 });
+  // deviceToken is a RANDOM per-device secret, returned ONCE — the node must store it and present it
+  // as `Authorization: Bearer <deviceToken>` on every data-plane call. It is never retrievable again.
+  return NextResponse.json(
+    { device: enrolled.device, deviceToken: enrolled.deviceToken },
+    { status: 201 },
+  );
 }
