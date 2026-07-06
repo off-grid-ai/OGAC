@@ -1,144 +1,122 @@
-import { ArrowSquareOut, Plus, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import { Plus, Robot, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { desc, eq, or } from 'drizzle-orm';
-import { auth } from '@/auth';
-import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
-import { StudioCanvas } from '@/components/studio/StudioCanvas';
-import { Badge } from '@/components/ui/badge';
+import { AppsList } from '@/components/build/AppsList';
+import { AgentsGrid, type AgentCardModel } from '@/components/agents/AgentsGrid';
+import { CreateAgentButton } from '@/components/agents/CreateAgentButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { db } from '@/db';
-import { studioTemplates } from '@/db/schema';
-import { listManagedAgents } from '@/lib/agents';
+import { agentActivity, listManagedAgents } from '@/lib/agents';
+import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
-import { getOrgContext } from '@/lib/org-context';
+import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
-import type { Workflow } from '@/lib/studio';
+import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
 
-function agentIdOf(workflow: unknown): string | null {
-  const nodes = (workflow as Workflow)?.nodeIds ?? [];
-  return nodes.find((n) => n.startsWith('agent:'))?.replace(/^agent:/, '') ?? null;
+// ─── Studio — the ONE build front door (Builder Epic #118) ────────────────────────────────────────
+// The founder's brief: "agent and studio should become one." Studio was a separate visual-canvas
+// surface and Apps/Agents was another; they are now ONE roster. Studio lists every app you've built
+// (an agent = a one-step app, badged as such) with a single "New app" that opens the guided builder.
+// Opening an app goes to ITS OWN surface (/apps/<id>) with the five lifecycle tabs. The agent roster
+// (built-ins + your definitions) stays here, fully editable — an agent IS an app, just simpler.
+function planeLabel(id: string): string {
+  return MODULES.find((m) => m.id === id)?.label ?? id;
 }
-
-const VIS_LABEL: Record<string, string> = { private: 'Just me', org: 'My org', public: 'Shared link' };
 
 export default async function StudioPage() {
   await requireModuleForUser('studio');
-  const session = await auth();
-  const email = session?.user?.email ?? '';
   const orgId = await currentOrgId();
-  const [ctx, agents, templates] = await Promise.all([
-    getOrgContext(orgId),
-    listManagedAgents().catch(() => []),
-    db
-      .select()
-      .from(studioTemplates)
-      .where(or(eq(studioTemplates.ownerId, email), eq(studioTemplates.visibility, 'org'), eq(studioTemplates.published, true)))
-      .orderBy(desc(studioTemplates.updatedAt))
-      .limit(50)
-      .catch(() => []),
+  const [apps, agents, activity, tools] = await Promise.all([
+    listApps(orgId).catch(() => []),
+    listManagedAgents(),
+    agentActivity(),
+    listTools(orgId).catch(() => []),
   ]);
 
-  // Dropdown options the canvas binds steps against (same shapes the 3A builder uses).
-  const domains = ctx.dataDomains
-    .filter((d) => d.connectorId && d.resource)
-    .map((d) => ({ id: d.id, label: d.label }));
-  const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
+  const customCount = agents.filter((a) => a.custom).length;
+  const toolOptions = tools
+    .filter((t) => t.enabled)
+    .map((t) => ({ id: t.id, name: t.name, policy: t.policy }));
+
+  const cards: AgentCardModel[] = agents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    role: a.role,
+    description: a.description,
+    systemPrompt: a.systemPrompt,
+    model: a.model,
+    planes: a.planes,
+    planeLabels: a.planes.map(planeLabel),
+    tools: a.tools,
+    grounded: a.grounded,
+    trigger: a.trigger,
+    custom: a.custom,
+    enabled: a.enabled,
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Studio</h1>
-          <p className="text-sm text-muted-foreground">
-            Build an assistant by describing it in plain language — no technical setup. Off Grid
-            wires the model, policy, guardrails, and grounding for you.
+          <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Sparkle className="size-5 text-primary" />
+            Studio
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Build once, run everywhere. An app is anything you describe in plain language — a one-step
+            agent or a multi-step workflow, built the same way. Every app runs through the same
+            governed pipeline: policy gate, guardrails, model routing, retrieval grounding, and
+            tamper-evident provenance. Open an app to build, run, monitor, review, and report on it.
           </p>
         </div>
         <Button asChild>
           <Link href="/studio/new">
             <Plus className="size-4" />
-            New assistant
+            New app
           </Link>
         </Button>
       </div>
 
-      {/* Gallery of saved assistants */}
-      <div>
-        <h2 className="mb-2 text-sm font-medium text-foreground">Your assistants</h2>
-        {templates.length === 0 ? (
-          <Card className="shadow-sm">
-            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkle className="size-5" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                No assistants yet. Describe one in plain language and Studio builds it.
-              </p>
-              <Button asChild size="sm">
-                <Link href="/studio/new">
-                  <Plus className="size-4" />
-                  Create your first assistant
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {templates.map((t) => {
-              const agentId = agentIdOf(t.workflow);
-              return (
-                <Card key={t.id} className="shadow-sm">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm">{t.title}</CardTitle>
-                      <Badge variant="secondary" className="shrink-0 text-muted-foreground">
-                        {VIS_LABEL[t.visibility] ?? t.visibility}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="line-clamp-2 text-xs text-muted-foreground">{t.summary || '—'}</p>
-                    <div className="flex items-center gap-2">
-                      {agentId ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/agents/${agentId}`}>Open &amp; try</Link>
-                        </Button>
-                      ) : null}
-                      {t.slug ? (
-                        <a
-                          href={`/app/${t.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <ArrowSquareOut className="size-3.5" />
-                          shared link
-                        </a>
-                      ) : null}
-                      <div className="ml-auto">
-                        <DeleteRowButton url={`/api/v1/studio/templates/${t.id}`} label={t.title} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+      {/* Stat band */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Apps" value={apps.length} />
+        <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
+        <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
+        <Stat label="Grounded in the Brain" value={`${activity.groundedShare}%`} />
       </div>
 
-      {/* Advanced: the visual canvas builder — describe → graph → edit each node → save/run */}
-      <details className="rounded-md border border-border" open>
-        <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-foreground">
-          Visual canvas builder
-        </summary>
-        <div className="border-t border-border p-4">
-          <StudioCanvas domains={domains} agents={agentOptions} />
-        </div>
-      </details>
+      {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
+          workflow. One "New app" front door opens the guided builder for both. */}
+      <div>
+        <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
+        <AppsList apps={apps} />
+      </div>
+
+      {/* Agents = single-step apps: the built-in roster + your own definitions, still fully editable
+          and runnable. "New app" (top) opens the guided builder; this quick-create adds a bare agent
+          definition directly. */}
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Robot className="size-4 text-muted-foreground" />
+          Agents
+        </h2>
+        <CreateAgentButton />
+      </div>
+      <AgentsGrid agents={cards} tools={toolOptions} />
     </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-3xl font-semibold text-foreground">{value}</CardContent>
+    </Card>
   );
 }
