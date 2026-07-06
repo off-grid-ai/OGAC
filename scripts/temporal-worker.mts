@@ -16,22 +16,38 @@
 //
 // This entrypoint is run with tsx so the "@/*" tsconfig path + type-stripping work; Temporal's own
 // bundler compiles the workflow module (workflowsPath) with determinism preserved.
+//
+// ⚠️ IMPORT ORDER IS LOAD-BEARING: `./worker-env.mts` MUST be first. It loads .env.local/.env.* as a
+// module side effect so process.env (esp. DATABASE_URL) is populated BEFORE the activities import
+// below transitively evaluates `@/db` and builds its pg Pool. ESM evaluates all static imports in
+// source order before any top-level statement runs, so a dotenv call placed as a statement here
+// would run too late — the Pool would already be built with a passwordless connection string, and
+// every query would fail with `SASL: ... client password must be a string`. See worker-env.mts.
 
+import { missingRequiredEnv } from './worker-env.mts';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { config as loadEnv } from 'dotenv';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from '../src/worker/agent-run.activities.ts';
 import { durableConfigFromEnv } from '../src/lib/agent-run-durable.ts';
-
-// Load runtime config the way the console does (.env.local wins, then .env).
-loadEnv({ path: '.env.local' });
-loadEnv({ path: '.env' });
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workflowsPath = join(here, '..', 'src', 'worker', 'agent-run.workflow.ts');
 
 async function main(): Promise<void> {
+  // Fail fast with an actionable message if the env bootstrap didn't populate the essentials —
+  // far clearer than the downstream SASL/gateway errors a missing var would otherwise produce.
+  const missing = missingRequiredEnv(process.env);
+  if (missing.length) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[agent-worker] missing required env: ${missing.join(', ')}. ` +
+        `The worker loads the console's .env.local/.env.* from the console root — ensure those ` +
+        `files exist and define these keys (see scripts/worker-env.mts).`,
+    );
+    process.exit(1);
+  }
+
   const cfg = durableConfigFromEnv(process.env);
   // eslint-disable-next-line no-console
   console.log(
