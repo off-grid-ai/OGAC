@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { ShieldWarning } from '@phosphor-icons/react/dist/ssr';
 import { StatBand } from '@/components/insights/StatBand';
 import { AlertingManager } from '@/components/siem/AlertingManager';
+import { SiemEventsTable } from '@/components/siem/SiemEventsTable';
 import { SuppressionManager } from '@/components/siem/SuppressionManager';
-import { toDisplayHost } from '@/lib/display-host';
 import { buildSiemStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
 import { applySuppressions } from '@/lib/siem-suppress-policy';
 import { listSuppressions } from '@/lib/siem-suppress';
-import { filterByOutcome, readSiemView, type SiemOutcome } from '@/lib/siem-view';
+import { filterByOutcome, readSiemView } from '@/lib/siem-view';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -103,41 +103,8 @@ export default async function SiemPage({
         </div>
       )}
 
-      {/* Recent events */}
-      {view.events.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No security events recorded yet.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-2">Time</th>
-                <th className="p-2">Actor</th>
-                <th className="p-2">Action</th>
-                <th className="p-2">Outcome</th>
-                <th className="p-2">Source IP</th>
-                <th className="p-2">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.events.map((e) => (
-                <tr key={e.id} className="border-t border-border align-top">
-                  <td className="p-2 text-xs text-muted-foreground">
-                    {e.ts ? new Date(e.ts).toLocaleString() : '—'}
-                  </td>
-                  <td className="p-2">{e.actor}</td>
-                  <td className="p-2">{e.action}</td>
-                  <td className="p-2">
-                    <OutcomeBadge outcome={e.outcome} />
-                  </td>
-                  <td className="p-2 font-mono text-xs">{e.ip ? toDisplayHost(e.ip) : '—'}</td>
-                  <td className="max-w-xs truncate p-2 text-muted-foreground">{e.detail || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Recent events — paged client-side over the fetched stream (shared Pagination control). */}
+      <SiemEventsTable events={view.events} />
 
       {/* Management: suppression rules mute known-noise events (a scanner IP, a service account, a
           health-probe path) so the feed stays signal. Applied server-side to the whole view. */}
@@ -147,16 +114,5 @@ export default async function SiemPage({
           indices) + the ISM retention/rollover policy. URL-driven (?panel=alerting, ?atab=). */}
       <AlertingManager />
     </div>
-  );
-}
-
-function OutcomeBadge({ outcome }: { outcome: SiemOutcome }) {
-  const danger = outcome === 'denied' || outcome === 'blocked' || outcome === 'error';
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-xs ${danger ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground'}`}
-    >
-      {outcome}
-    </span>
   );
 }
