@@ -33,19 +33,25 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'workspace',
     label: 'Workspace',
-    // Chat is the front door; the everyday create/save surfaces sit beside it. Artifacts are
-    // reached from the chat flow (saved outputs), so they don't need their own sidebar row.
+    // Chat IS the Workspace front door — a project is just a chat context, so Projects no longer
+    // gets its own sidebar row; it's reached from Chat's project switcher and the Workspace top-tabs.
+    // Prompts (the library) and Artifacts (saved outputs) are workspace sub-surfaces, reached via
+    // the scoped WorkspaceNav top-tabs (see (workspace)/layout.tsx) rather than the sidebar — so the
+    // sidebar stays scannable. Knowledge + Storage remain first-class rows.
     // (Studio lives under Intelligence — it authors agents/workflows, not a chat surface.)
-    primary: ['chat', 'projects', 'prompts', 'knowledge', 'storage'],
-    secondary: ['artifacts'],
+    primary: ['chat', 'knowledge', 'storage'],
+    secondary: ['projects', 'prompts', 'artifacts'],
   },
   {
-    id: 'intelligence',
-    label: 'Intelligence',
-    // The build-and-run family. Agents (use cases), Studio (author), Brain (RAG) are the entries;
-    // run history, evals, sandbox, and visual QA hang off those flows.
-    primary: ['agents', 'studio', 'brain'],
-    secondary: ['agent-runs', 'evals', 'sandbox', 'provit'],
+    id: 'build',
+    label: 'Build',
+    // Studio and Agents were two sidebar rows for one job (author an assistant vs. run the agent
+    // definitions it produces), so they're consolidated under a single "Agents" umbrella row whose
+    // (build) section landing tabs across Agents / Studio / Runs via BuildNav. Brain (RAG) stays a
+    // sibling entry. Studio, run history, evals, sandbox, and visual QA are secondaries — reached
+    // from the section nav, not the sidebar — so every route still resolves without crowding it.
+    primary: ['agents', 'brain'],
+    secondary: ['studio', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {
     id: 'gateway',

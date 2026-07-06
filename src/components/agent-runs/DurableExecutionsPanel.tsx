@@ -1,17 +1,28 @@
 'use client';
 
-import { ArrowLeft, ArrowsClockwise } from '@phosphor-icons/react/dist/ssr';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  ArrowClockwise,
+  ArrowLeft,
+  ArrowsClockwise,
+  Prohibit,
+  XCircle,
+} from '@phosphor-icons/react/dist/ssr';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { workflowActionsFor, type WorkflowExecutionStatus } from '@/lib/temporal-visibility';
 
-// The Temporal-side view of durable executions — distinct from the DB run records the main table
-// shows. Self-fetches /api/v1/admin/agent-runs/workflows. Detail drill-in is URL-driven (?wf=).
+// The Jobs surface — the operator's live view of durable workflow executions (Temporal-side),
+// distinct from the recorded DB run history. Shows every job's STATE, timing, and correlated run,
+// and lets the operator RERUN a finished job or CANCEL/TERMINATE a running one. Self-fetches
+// /api/v1/admin/agent-runs/workflows and auto-refreshes while anything is still running. Detail
+// drill-in is URL-driven (?wf=). Graceful when Temporal is off — empty state + a clear note.
 
 interface ExecutionRow {
   workflowId: string;
   executionRunId?: string;
-  temporalStatus: string;
+  temporalStatus: WorkflowExecutionStatus;
   status: string;
   startTime?: string;
   closeTime?: string;
@@ -34,8 +45,50 @@ interface WorkflowDetail {
   note?: string;
 }
 
+// Poll cadence while at least one execution is still open, so "what's running now" stays live-ish.
+const LIVE_POLL_MS = 5000;
+
 function when(iso?: string): string {
   return iso ? new Date(iso).toLocaleString() : '—';
+}
+
+// Emerald/amber/red status dot vocabulary, matching the console's run-status palette.
+function StatusPill({ status, temporalStatus }: { status: string; temporalStatus: string }) {
+  const tone =
+    status === 'running' || status === 'queued'
+      ? 'text-primary border-primary/40'
+      : status === 'failed'
+        ? 'text-destructive border-destructive/40'
+        : status === 'cancelled'
+          ? 'text-muted-foreground border-border'
+          : 'text-foreground border-border';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${tone}`}>
+      {status}
+      <span className="text-[10px] text-muted-foreground">({temporalStatus})</span>
+    </span>
+  );
+}
+
+async function workflowAction(
+  workflowId: string,
+  action: 'rerun' | 'cancel' | 'terminate',
+): Promise<{ ok: boolean; message: string }> {
+  const base = `/api/v1/admin/agent-runs/workflows/${encodeURIComponent(workflowId)}`;
+  const res =
+    action === 'rerun'
+      ? await fetch(`${base}/rerun`, { method: 'POST' })
+      : await fetch(`${base}/cancel`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mode: action === 'terminate' ? 'terminate' : 'cancel' }),
+        });
+  if (res.ok) {
+    const labels = { rerun: 'Re-run dispatched', cancel: 'Cancel requested', terminate: 'Job terminated' };
+    return { ok: true, message: labels[action] };
+  }
+  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  return { ok: false, message: body.error ?? `Action failed (${res.status})` };
 }
 
 export function DurableExecutionsPanel() {
@@ -46,9 +99,10 @@ export function DurableExecutionsPanel() {
 
   const [view, setView] = useState<ExecutionsView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts: { spinner?: boolean } = { spinner: true }) => {
+    if (opts.spinner) setLoading(true);
     const r = await fetch('/api/v1/admin/agent-runs/workflows');
     setView(r.ok ? await r.json() : null);
     setLoading(false);
@@ -57,6 +111,18 @@ export function DurableExecutionsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Live-ish refresh: while any execution is still open, quietly re-poll on an interval (no spinner)
+  // so the operator sees jobs progress/close without clicking Refresh.
+  const anyOpen = !!view?.executions.some((e) => e.status === 'running' || e.status === 'queued');
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    if (!wf && anyOpen) {
+      const t = setInterval(() => void loadRef.current({ spinner: false }), LIVE_POLL_MS);
+      return () => clearInterval(t);
+    }
+  }, [wf, anyOpen]);
 
   const setWf = useCallback(
     (value?: string) => {
@@ -68,14 +134,33 @@ export function DurableExecutionsPanel() {
     [params, pathname, router],
   );
 
+  const act = useCallback(
+    async (e: ExecutionRow, action: 'rerun' | 'cancel' | 'terminate') => {
+      if (action === 'cancel' && !confirm(`Cancel job ${e.workflowId}?`)) return;
+      if (action === 'terminate' && !confirm(`Force-terminate job ${e.workflowId}? This cannot be undone.`))
+        return;
+      setBusyId(e.workflowId);
+      const r = await workflowAction(e.workflowId, action);
+      setBusyId(null);
+      if (r.ok) {
+        toast.success(r.message);
+        void load({ spinner: false });
+      } else {
+        toast.error(r.message);
+      }
+    },
+    [load],
+  );
+
   if (wf) return <ExecutionDetail workflowId={wf} onBack={() => setWf(undefined)} />;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <p className="text-sm text-muted-foreground">
-          Temporal-side workflow executions. This is the durable runtime&rsquo;s own view — separate
-          from the recorded run history above.
+          Durable jobs running on the Temporal runtime — which are running, at what state, and their
+          correlated run. Re-run a finished job or cancel a running one. Separate from the recorded
+          run history.
         </p>
         <Button size="xs" variant="outline" className="ml-auto gap-1" onClick={() => void load()}>
           <ArrowsClockwise className="size-3" /> Refresh
@@ -83,57 +168,109 @@ export function DurableExecutionsPanel() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading executions…</p>
+        <p className="text-sm text-muted-foreground">Loading jobs…</p>
       ) : !view ? (
-        <p className="text-sm text-muted-foreground">Could not load durable executions.</p>
+        <p className="text-sm text-muted-foreground">Could not load durable jobs.</p>
       ) : !view.configured ? (
-        <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          {view.note ?? 'Durable runtime not enabled.'}
+        <div className="rounded-md border border-border p-4 text-sm">
+          <p className="font-medium text-foreground">Durable runtime not enabled</p>
+          <p className="mt-1 text-muted-foreground">
+            {view.note ??
+              'Set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_AGENTRUNTIME=temporal to run agents as durable jobs. Runs still execute synchronously in-process without it.'}
+          </p>
         </div>
       ) : !view.reachable ? (
-        <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          Temporal is configured but unreachable. {view.note}
+        <div className="rounded-md border border-border p-4 text-sm">
+          <p className="font-medium text-foreground">Temporal configured but unreachable</p>
+          <p className="mt-1 text-muted-foreground">{view.note}</p>
         </div>
       ) : view.executions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No durable workflow executions yet.</p>
+        <p className="text-sm text-muted-foreground">No durable jobs yet.</p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             {Object.entries(view.statusCounts).map(([s, n]) => (
               <span key={s} className="rounded-md border border-border px-2 py-1 text-muted-foreground">
                 {s}: {n}
               </span>
             ))}
+            {anyOpen ? (
+              <span className="inline-flex items-center gap-1 text-primary">
+                <span className="size-1.5 animate-pulse rounded-full bg-primary" /> live
+              </span>
+            ) : null}
           </div>
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="p-2">Workflow</th>
-                  <th className="p-2">Status</th>
+                  <th className="p-2">Job (workflow)</th>
+                  <th className="p-2">State</th>
                   <th className="p-2">Run</th>
                   <th className="p-2">Events</th>
                   <th className="p-2">Started</th>
                   <th className="p-2">Closed</th>
+                  <th className="p-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {view.executions.map((e) => (
-                  <tr key={e.workflowId} className="border-t border-border align-top">
-                    <td className="p-2 font-mono text-xs">
-                      <button onClick={() => setWf(e.workflowId)} className="text-primary hover:underline">
-                        {e.workflowId}
-                      </button>
-                    </td>
-                    <td className="p-2">
-                      {e.status} <span className="text-xs text-muted-foreground">({e.temporalStatus})</span>
-                    </td>
-                    <td className="p-2 font-mono text-xs text-muted-foreground">{e.runId ?? '—'}</td>
-                    <td className="p-2">{e.historyLength ?? '—'}</td>
-                    <td className="p-2 text-xs text-muted-foreground">{when(e.startTime)}</td>
-                    <td className="p-2 text-xs text-muted-foreground">{when(e.closeTime)}</td>
-                  </tr>
-                ))}
+                {view.executions.map((e) => {
+                  const actions = workflowActionsFor(e.temporalStatus);
+                  const busy = busyId === e.workflowId;
+                  return (
+                    <tr key={e.workflowId} className="border-t border-border align-top">
+                      <td className="p-2 font-mono text-xs">
+                        <button onClick={() => setWf(e.workflowId)} className="text-primary hover:underline">
+                          {e.workflowId}
+                        </button>
+                      </td>
+                      <td className="p-2">
+                        <StatusPill status={e.status} temporalStatus={e.temporalStatus} />
+                      </td>
+                      <td className="p-2 font-mono text-xs text-muted-foreground">{e.runId ?? '—'}</td>
+                      <td className="p-2">{e.historyLength ?? '—'}</td>
+                      <td className="p-2 text-xs text-muted-foreground">{when(e.startTime)}</td>
+                      <td className="p-2 text-xs text-muted-foreground">{when(e.closeTime)}</td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1">
+                          {actions.rerun ? (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              className="gap-1"
+                              disabled={busy}
+                              onClick={() => void act(e, 'rerun')}
+                            >
+                              <ArrowClockwise className="size-3" /> Re-run
+                            </Button>
+                          ) : null}
+                          {actions.cancel ? (
+                            <>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="gap-1"
+                                disabled={busy}
+                                onClick={() => void act(e, 'cancel')}
+                              >
+                                <Prohibit className="size-3" /> Cancel
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="gap-1 text-destructive"
+                                disabled={busy}
+                                onClick={() => void act(e, 'terminate')}
+                              >
+                                <XCircle className="size-3" /> Terminate
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -146,44 +283,74 @@ export function DurableExecutionsPanel() {
 function ExecutionDetail({ workflowId, onBack }: { workflowId: string; onBack: () => void }) {
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const r = await fetch(`/api/v1/admin/agent-runs/workflows/${encodeURIComponent(workflowId)}`);
-      const d = r.ok ? await r.json() : null;
-      if (alive) {
-        setDetail(d);
-        setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    const r = await fetch(`/api/v1/admin/agent-runs/workflows/${encodeURIComponent(workflowId)}`);
+    setDetail(r.ok ? await r.json() : null);
+    setLoading(false);
   }, [workflowId]);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   const e = detail?.execution;
+  const actions = e ? workflowActionsFor(e.temporalStatus) : { rerun: false, cancel: false };
+
+  async function act(action: 'rerun' | 'cancel' | 'terminate') {
+    if (action === 'cancel' && !confirm(`Cancel job ${workflowId}?`)) return;
+    if (action === 'terminate' && !confirm(`Force-terminate job ${workflowId}? This cannot be undone.`)) return;
+    setBusy(true);
+    const r = await workflowAction(workflowId, action);
+    setBusy(false);
+    if (r.ok) {
+      toast.success(r.message);
+      void load();
+    } else {
+      toast.error(r.message);
+    }
+  }
 
   return (
     <div className="space-y-4">
       <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-3" /> Back to executions
+        <ArrowLeft className="size-3" /> Back to jobs
       </button>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading workflow…</p>
+        <p className="text-sm text-muted-foreground">Loading job…</p>
       ) : !detail || !detail.found ? (
-        <p className="text-sm text-muted-foreground">{detail?.note ?? 'Workflow not found.'}</p>
+        <p className="text-sm text-muted-foreground">{detail?.note ?? 'Job not found.'}</p>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-sm">{detail.workflowId}</span>
-            {e ? (
-              <span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                {e.status} ({e.temporalStatus})
-              </span>
-            ) : null}
+            {e ? <StatusPill status={e.status} temporalStatus={e.temporalStatus} /> : null}
             {e?.runId ? <span className="text-xs text-muted-foreground">run {e.runId}</span> : null}
+            <div className="ml-auto flex flex-wrap gap-1">
+              {actions.rerun ? (
+                <Button size="xs" variant="outline" className="gap-1" disabled={busy} onClick={() => void act('rerun')}>
+                  <ArrowClockwise className="size-3" /> Re-run
+                </Button>
+              ) : null}
+              {actions.cancel ? (
+                <>
+                  <Button size="xs" variant="outline" className="gap-1" disabled={busy} onClick={() => void act('cancel')}>
+                    <Prohibit className="size-3" /> Cancel
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="gap-1 text-destructive"
+                    disabled={busy}
+                    onClick={() => void act('terminate')}
+                  >
+                    <XCircle className="size-3" /> Terminate
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </div>
           {e ? (
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">

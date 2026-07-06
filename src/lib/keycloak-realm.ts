@@ -1,9 +1,44 @@
 // Pure request/response shaping for Keycloak realm-level admin — sessions, MFA/required-actions,
-// identity-provider federation, and token/session lifetimes. Zero I/O, zero imports: every function
-// takes representative Keycloak JSON and returns a normalized view (or, for edits, the merged payload
-// to PUT back). This is the unit-testable core; `keycloak-admin.ts` is the thin network adapter and
-// the routes are thin over that. Keeps realm-admin logic isolated from fetch() so it can be exercised
-// with real Keycloak JSON and no network mocks.
+// identity-provider federation, and token/session lifetimes. Zero I/O; the ONLY import is the
+// pure, zero-IO display-host mapper (so a rendered session IP is never a raw 127.0.0.1 / LAN
+// address). Every function takes representative Keycloak JSON and returns a normalized view (or,
+// for edits, the merged payload to PUT back). This is the unit-testable core; `keycloak-admin.ts`
+// is the thin network adapter and the routes are thin over that. Keeps realm-admin logic isolated
+// from fetch() so it can be exercised with real Keycloak JSON and no network mocks.
+
+import { toDisplayHost } from './display-host';
+
+// ── Error shaping (actionable admin-grant messages) ───────────────────────────────
+
+// The realm-management client role each realm-admin operation requires. Keycloak returns a bare 403
+// (empty body) when the console's admin service-account is authenticated but lacks the role, so we
+// map the failing operation to the exact role the operator must grant — no more raw "HTTP 403".
+export type KcAdminOp =
+  | 'list-identity-providers'
+  | 'manage-identity-providers'
+  | 'view-users'
+  | 'manage-users';
+
+const OP_ROLE: Record<KcAdminOp, string> = {
+  'list-identity-providers': 'view-identity-providers',
+  'manage-identity-providers': 'manage-identity-providers',
+  'view-users': 'view-users',
+  'manage-users': 'manage-users',
+};
+
+// Turn a Keycloak error into a user-facing message. On a 403 for a known operation, name the exact
+// missing `realm-management` role and that it's granted on the console's admin service-account —
+// so the message tells the operator precisely what to fix (GAP #37). Any non-403 (or an unknown op)
+// passes the original message through unchanged. Pure — unit-testable, zero-IO.
+export function forbiddenGrantMessage(op: KcAdminOp, status: number, fallback: string): string {
+  if (status !== 403) return fallback;
+  const role = OP_ROLE[op];
+  return (
+    `Keycloak denied this request (403). The console's admin service-account is missing the ` +
+    `realm-management role "${role}". Grant it to the account (client ` +
+    `OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID) on realm-management, then retry.`
+  );
+}
 
 // ── Active sessions ───────────────────────────────────────────────────────────
 
@@ -27,25 +62,47 @@ export interface KcSession {
   start: number;
   lastAccess: number;
   clients: string[]; // human clientIds the session has tokens for
+  offline: boolean; // true for an offline (refresh-backed) session, false for an online SSO session
 }
 
 // Normalize a raw Keycloak session into the shape the console renders. Tolerates missing fields
-// (Keycloak omits ipAddress for some flows; clients may be absent).
-export function normalizeSession(raw: KcRawSession): KcSession {
+// (Keycloak omits ipAddress for some flows; clients may be absent). The IP is passed through
+// toDisplayHost so a loopback/LAN address surfaces as its mDNS host — never a raw 127.0.0.1 (the
+// console reaches Keycloak over loopback, so a same-host browser login records 127.0.0.1).
+export function normalizeSession(raw: KcRawSession, offline = false): KcSession {
+  const ip = raw.ipAddress ?? '';
   return {
     id: raw.id,
     username: raw.username ?? '',
     userId: raw.userId,
-    ipAddress: raw.ipAddress ?? '',
+    ipAddress: ip ? toDisplayHost(ip) : '',
     start: raw.start ?? 0,
     lastAccess: raw.lastAccess ?? 0,
     clients: raw.clients ? Object.values(raw.clients) : [],
+    offline,
   };
 }
 
 // Normalize + sort a list of sessions, most-recently-active first.
-export function normalizeSessions(raw: KcRawSession[]): KcSession[] {
-  return raw.map(normalizeSession).sort((a, b) => b.lastAccess - a.lastAccess);
+export function normalizeSessions(raw: KcRawSession[], offline = false): KcSession[] {
+  return raw.map((r) => normalizeSession(r, offline)).sort((a, b) => b.lastAccess - a.lastAccess);
+}
+
+// Merge a user's ONLINE (browser-SSO) and OFFLINE (refresh-token-backed) sessions into one list,
+// de-duplicated by session id (Keycloak can list the same session under both), sorted most-recent
+// first. Why both: the console signs users in via Direct-Access-Grant (ROPC), whose short-lived
+// access token leaves only a fleeting online session that an idle timeout reaps — so a genuinely
+// logged-in operator often has NO online session but may still have an offline one. Listing both
+// is what makes an active login actually render (GAP #36).
+export function mergeUserSessions(
+  online: KcRawSession[],
+  offline: KcRawSession[],
+): KcSession[] {
+  const byId = new Map<string, KcSession>();
+  for (const s of normalizeSessions(online, false)) byId.set(s.id, s);
+  // Offline sessions only fill gaps — an online session for the same id wins (it's the live one).
+  for (const s of normalizeSessions(offline, true)) if (!byId.has(s.id)) byId.set(s.id, s);
+  return [...byId.values()].sort((a, b) => b.lastAccess - a.lastAccess);
 }
 
 // ── MFA / required actions ──────────────────────────────────────────────────────

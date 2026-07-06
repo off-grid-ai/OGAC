@@ -5,6 +5,16 @@
 // Override for a given deployment with OFFGRID_SERVICES (a JSON array matching
 // ServiceEntry). Unset => the default suite below.
 
+// How a service's health is determined:
+//  · 'network'  — the default: HTTP-probe the URL and report up/down (a 401/302 counts as up).
+//  · 'embedded' — an in-process/on-disk backend (e.g. LanceDB). There is no endpoint to hit;
+//                 a network probe is meaningless and would always read 'unreachable'. It runs
+//                 inside the console, so it's healthy whenever the console is.
+//  · 'optional' — a best-effort external dependency the app degrades past gracefully (e.g.
+//                 Redis: the cache falls back to an in-process store when it's absent). If it
+//                 answers it's 'up'; if not, that's the expected fallback state, NOT an outage.
+export type ProbeMode = 'network' | 'embedded' | 'optional';
+
 export interface ServiceEntry {
   id: string;
   label: string;
@@ -17,6 +27,13 @@ export interface ServiceEntry {
   auth: 'session' | 'api-key' | 'public';
   /** Grouping for the UI. */
   kind: 'console' | 'product' | 'api' | 'site' | 'gateway';
+  /** Health-probe strategy. Defaults to 'network'. */
+  probe?: ProbeMode;
+  /**
+   * For an 'optional' service, the state to SHOW when it doesn't answer — the honest name of
+   * the fallback (e.g. 'in-process cache'), rendered instead of a scary 'down'.
+   */
+  fallbackLabel?: string;
 }
 
 const DEFAULT_SERVICES: ServiceEntry[] = [
@@ -159,6 +176,29 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     auth: 'api-key',
     kind: 'api',
   },
+  {
+    id: 'lancedb',
+    label: 'LanceDB',
+    description: 'Embedded vector store — the default Brain/RAG backend, on-disk inside the console (Qdrant is the server-scale swap-in).',
+    // Embedded: runs in-process (@lancedb/lancedb on-disk). No endpoint to hit — a network probe
+    // would always read 'unreachable'. It's healthy whenever the console is, so probe = embedded.
+    url: 'embedded://lancedb',
+    auth: 'session',
+    kind: 'api',
+    probe: 'embedded',
+  },
+  {
+    id: 'redis',
+    label: 'Redis',
+    description: 'Optional response-cache backend. When absent, the cache falls back to an in-process store — no outage.',
+    // Optional dependency: the caching port degrades to in-process memory if Redis is unreachable
+    // (see src/lib/redis.ts). So "not answering" is the expected fallback, not a failure.
+    url: process.env.OFFGRID_REDIS_URL ?? 'redis://127.0.0.1:6379',
+    auth: 'api-key',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'in-process cache',
+  },
 ];
 
 export function getServices(): ServiceEntry[] {
@@ -172,10 +212,74 @@ export function getServices(): ServiceEntry[] {
   }
 }
 
+// Honest health states:
+//  · 'up'       — answered (or a gate answered 401/302).
+//  · 'down'     — a network-probed service failed (5xx / timeout / unreachable). A real outage.
+//  · 'embedded' — an in-process backend; healthy, no network probe was run.
+//  · 'optional' — an optional dependency that isn't answering; the app is on its documented
+//                 fallback. Non-alarming — NOT an outage.
+export type HealthStatus = 'up' | 'down' | 'embedded' | 'optional';
+
 export interface ServiceHealth {
   id: string;
+  status: HealthStatus;
+  httpStatus: number | null;
+  ms: number | null;
+  error?: string;
+  /** Human label for the current state — e.g. the fallback name for an 'optional' service. */
+  detail?: string;
+}
+
+// The raw outcome of a network probe (see src/lib/status.ts#probeService). Split out so the
+// state decision below stays pure and unit-testable without any I/O.
+export interface RawProbe {
   status: 'up' | 'down';
   httpStatus: number | null;
   ms: number | null;
   error?: string;
+}
+
+/**
+ * PURE health-state decision. Maps a service's probe mode + (optional) raw network result to the
+ * honest status the UI shows. Zero-IO — the caller decides whether to run a network probe.
+ *
+ *  · embedded → always 'embedded' (no probe; healthy with the console).
+ *  · optional → 'up' if it answered, else 'optional' (on the documented fallback, not down).
+ *  · network  → passes the raw up/down straight through.
+ *
+ * `raw` is omitted for embedded services (there's nothing to probe).
+ */
+export function resolveHealth(entry: ServiceEntry, raw?: RawProbe): ServiceHealth {
+  const mode: ProbeMode = entry.probe ?? 'network';
+
+  if (mode === 'embedded') {
+    return { id: entry.id, status: 'embedded', httpStatus: null, ms: null, detail: 'embedded / healthy' };
+  }
+
+  if (mode === 'optional') {
+    if (raw && raw.status === 'up') {
+      return { id: entry.id, status: 'up', httpStatus: raw.httpStatus, ms: raw.ms };
+    }
+    const fallback = entry.fallbackLabel ?? 'fallback';
+    return { id: entry.id, status: 'optional', httpStatus: null, ms: null, detail: `${fallback} (optional)` };
+  }
+
+  // network
+  return {
+    id: entry.id,
+    status: raw?.status ?? 'down',
+    httpStatus: raw?.httpStatus ?? null,
+    ms: raw?.ms ?? null,
+    error: raw?.error,
+  };
+}
+
+/** True when a service needs a real network probe (embedded ones never do). */
+export function needsNetworkProbe(entry: ServiceEntry): boolean {
+  return (entry.probe ?? 'network') !== 'embedded';
+}
+
+/** Healthy = not a real outage. Embedded backends and optional deps on fallback count as healthy. */
+export function isHealthy(status: HealthStatus): boolean {
+  return status !== 'down';
 }

@@ -4,9 +4,12 @@ import {
   agentRunListQuery,
   buildExecutionsView,
   buildWorkflowDetail,
+  canCancelWorkflow,
+  canRerunWorkflow,
   normalizeWorkflowStatus,
   runIdFromWorkflowId,
   shapeExecution,
+  workflowActionsFor,
 } from '../src/lib/temporal-visibility.ts';
 
 // Pure-logic tests for Temporal workflow-visibility shaping — no cluster, no mocks. Feeds
@@ -102,4 +105,33 @@ test('buildWorkflowDetail: found vs not-found', () => {
 
 test('agentRunListQuery: scopes visibility to AgentRunWorkflow', () => {
   assert.equal(agentRunListQuery(), "WorkflowType = 'AgentRunWorkflow'");
+});
+
+// ── Job-action gating ─────────────────────────────────────────────────────────────────────────
+
+test('canCancelWorkflow: only OPEN executions (RUNNING / CONTINUED_AS_NEW) are cancellable', () => {
+  assert.equal(canCancelWorkflow('RUNNING'), true);
+  assert.equal(canCancelWorkflow('CONTINUED_AS_NEW'), true);
+  // Closed / terminal states can't be cancelled.
+  for (const s of ['COMPLETED', 'FAILED', 'CANCELED', 'TERMINATED', 'TIMED_OUT', 'UNSPECIFIED'] as const) {
+    assert.equal(canCancelWorkflow(s), false, `${s} should not be cancellable`);
+  }
+});
+
+test('canRerunWorkflow: only CLOSED executions are rerunnable; open/unknown are not', () => {
+  for (const s of ['COMPLETED', 'FAILED', 'CANCELED', 'TERMINATED', 'TIMED_OUT'] as const) {
+    assert.equal(canRerunWorkflow(s), true, `${s} should be rerunnable`);
+  }
+  assert.equal(canRerunWorkflow('RUNNING'), false);
+  assert.equal(canRerunWorkflow('CONTINUED_AS_NEW'), false);
+  assert.equal(canRerunWorkflow('UNSPECIFIED'), false);
+});
+
+test('workflowActionsFor: rerun XOR cancel across the lifecycle (never both, running→cancel only)', () => {
+  assert.deepEqual(workflowActionsFor('RUNNING'), { rerun: false, cancel: true });
+  assert.deepEqual(workflowActionsFor('COMPLETED'), { rerun: true, cancel: false });
+  assert.deepEqual(workflowActionsFor('FAILED'), { rerun: true, cancel: false });
+  assert.deepEqual(workflowActionsFor('TERMINATED'), { rerun: true, cancel: false });
+  // An unknown/pending state offers neither, so the UI shows no dangling action.
+  assert.deepEqual(workflowActionsFor('UNSPECIFIED'), { rerun: false, cancel: false });
 });

@@ -27,8 +27,9 @@ export default async function AgentRunsPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Agent Runs</h1>
           <p className="text-sm text-muted-foreground">
-            Durable-execution history — every agent/workflow run, its pipeline timeline, and
-            outcome. Re-run, cancel, review, or delete a run. Recorded on-prem.
+            Durable jobs — which agent workflows are running now, at what state, and their outcome.
+            Re-run a finished job, cancel a running one, review the recorded timeline, or schedule
+            recurring runs. Recorded on-prem.
           </p>
         </div>
       </div>

@@ -169,3 +169,27 @@ Runtime config lives in **`.env.local`** (and `.env.production`) on the SERVER â
 is NOT in git and `push.sh` never overwrites it. To change a service URL, secret, or
 gateway address, edit those files on the server and restart. The **Integrations**
 module in the UI (`/integrations`) surfaces adapter URLs + health read from these.
+
+## Deploying when the LAN is down (cloudflared tunnel) â€” 2026-07-06
+
+If direct LAN (`192.168.1.59:22`) times out, deploy over the cloudflared SSH tunnel. Add this Host
+alias to `~/.ssh/config` once:
+
+```
+Host offgrid-tunnel
+  HostName ssh.getoffgridai.co
+  User admin
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyCommand cloudflared access ssh --hostname ssh.getoffgridai.co
+  StrictHostKeyChecking accept-new
+```
+
+Then point `push.sh` at it (it reads `SERVER`/`SSH_USER`/`SSH_KEY`):
+
+```bash
+SERVER=offgrid-tunnel SSH_USER=admin SSH_KEY=~/.ssh/id_ed25519 ./deploy/push.sh
+```
+
+The server repo lives at `/Users/admin/offgrid/console` (the aggregator runs from
+`/Users/admin/offgrid/console/scripts/gateway-aggregator.mjs`). Restart the aggregator after any
+change to that script: `sudo launchctl kickstart -k system/co.getoffgridai.aggregator`.

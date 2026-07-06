@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toDisplayHost } from '@/lib/display-host';
 
 interface InferredToken {
   provider?: string;
@@ -51,7 +52,7 @@ function IpList({ ips }: { ips: Record<string, number> }) {
     <div className="space-y-0.5">
       {entries.map(([ip, count]) => (
         <div key={ip} className="flex items-center gap-1.5 text-xs font-mono">
-          <span>{ip}</span>
+          <span>{toDisplayHost(ip)}</span>
           <span className="text-muted-foreground">×{count}</span>
         </div>
       ))}
@@ -65,9 +66,9 @@ function RoutingOverrides({ overrides }: { overrides: RoutingOverride[] }) {
     <div className="space-y-1">
       {overrides.map((o, i) => (
         <div key={i} className="text-xs font-mono flex items-center gap-1">
-          <span className="text-muted-foreground">{o.sourceIp}</span>
+          <span className="text-muted-foreground">{toDisplayHost(o.sourceIp)}</span>
           <ArrowsLeftRight size={10} className="text-muted-foreground shrink-0" />
-          <span className="text-primary">{o.targetIp ?? o.targetNode ?? '?'}</span>
+          <span className="text-primary">{o.targetIp ? toDisplayHost(o.targetIp) : (o.targetNode ?? '?')}</span>
           {o.note && <span className="text-muted-foreground ml-1 not-font-mono">({o.note})</span>}
         </div>
       ))}
@@ -118,14 +119,21 @@ export function GatewayTokens() {
 
   return (
     <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Key size={14} />
-          Enterprise Client Tokens
-        </CardTitle>
-        <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
-          {loading ? 'Loading…' : 'Refresh'}
-        </Button>
+      <CardHeader className="pb-2">
+        <div className="flex flex-row items-start justify-between gap-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Key size={14} />
+            Enterprise Client Tokens
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
+            {loading ? 'Loading…' : 'Refresh'}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Client credentials (bearer JWTs) observed in gateway traffic — read-only monitoring of who is
+          calling in. To issue new keys for your own clients, use the <span className="font-medium text-foreground">API keys</span> tab,
+          which mints <span className="font-mono">ogak_</span> keys.
+        </p>
       </CardHeader>
       <CardContent className="p-0">
         {tokens.length === 0 ? (

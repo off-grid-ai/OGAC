@@ -35,7 +35,9 @@ const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/
 const FILE_GET = /^\/api\/v1\/files\/[^/]+$/;
 
 // Marketing, docs, and auth surfaces that never require an SSO session.
-const PUBLIC_EXACT = ['/', '/docs', '/openapi.json'];
+// /scalar.standalone.js — the self-hosted Scalar bundle the public /docs/api page loads. It must be
+// public too, or the unauthenticated docs page can't load its own script (redirect → blank page).
+const PUBLIC_EXACT = ['/', '/docs', '/openapi.json', '/scalar.standalone.js'];
 const PUBLIC_PREFIX = [
   '/architecture',
   '/journey',
