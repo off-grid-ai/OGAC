@@ -34,7 +34,7 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
 import { toDisplayHost } from '@/lib/display-host';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/workspace-grid';
 import { ArtifactView } from './ArtifactView';
@@ -309,7 +310,6 @@ export function ChatWorkspace({
     { fn: string; toolName: string; input: string; token?: string }[]
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
-  const [memoryOpen, setMemoryOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -317,6 +317,7 @@ export function ChatWorkspace({
   // so a conversation is shareable, refresh-safe, and Back steps between conversations/projects.
   // Route shape: /chat/<conversationId>?project=<projectId>; /chat = new-chat landing.
   const router = useRouter();
+  const pathname = usePathname();
   const routeParams = useParams<{ conversationId?: string | string[] }>();
   const searchParams = useSearchParams();
   const selection = selectionFromParams({
@@ -333,6 +334,19 @@ export function ChatWorkspace({
       router.push(selectionToPath(next));
     },
     [router, selection],
+  );
+  // Settings / Memory are URL-driven side panels (?panel=settings|memory) — a real navigational
+  // position, so Back closes the panel and the panel is deep-linkable, per the console's URL-nav
+  // rule (never local useState for a "place").
+  const activePanel = searchParams.get('panel');
+  const settingsOpen = activePanel === 'settings';
+  const memoryOpen = activePanel === 'memory';
+  const setPanel = useCallback(
+    (p: 'settings' | 'memory' | null) => {
+      const query = withPanelParams(searchParams.toString(), { panel: p });
+      router.push(panelHref(pathname, query));
+    },
+    [router, pathname, searchParams],
   );
   // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
   // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
@@ -368,7 +382,6 @@ export function ChatWorkspace({
   const [streaming, setStreaming] = useState(false);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [dialogProject, setDialogProject] = useState<Project | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -1198,14 +1211,14 @@ export function ChatWorkspace({
               <Ghost className="size-4" />
             </button>
             <button
-              onClick={() => setMemoryOpen(true)}
+              onClick={() => setPanel('memory')}
               className="text-muted-foreground hover:text-foreground"
               title="Memory"
             >
               <Brain className="size-4" />
             </button>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setPanel('settings')}
               className="text-muted-foreground hover:text-foreground"
               title="Custom instructions"
             >
@@ -1543,8 +1556,8 @@ export function ChatWorkspace({
         onOpenChange={(o) => !o && setDialogProject(null)}
         onSaved={refreshProjects}
       />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={(o) => !o && setPanel(null)} />
+      <MemoryDialog open={memoryOpen} onOpenChange={(o) => !o && setPanel(null)} />
       <SkillsDialog
         open={skillsOpen}
         onOpenChange={setSkillsOpen}

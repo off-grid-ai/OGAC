@@ -12,8 +12,8 @@ import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -79,13 +79,13 @@ export function SettingsDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-border px-5 py-3">
-          <DialogTitle className="text-sm">Settings</DialogTitle>
-        </DialogHeader>
-        <div className="flex min-h-[26rem]">
-          <nav className="w-48 shrink-0 space-y-0.5 border-r border-border p-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-2xl">
+        <SheetHeader className="border-b border-border px-5 py-3">
+          <SheetTitle className="text-sm">Settings</SheetTitle>
+        </SheetHeader>
+        <div className="flex min-h-0 flex-1">
+          <nav className="w-44 shrink-0 space-y-0.5 overflow-y-auto border-r border-border p-2">
             {SECTIONS.map((s) => {
               const Icon = s.icon;
               return (
@@ -115,8 +115,8 @@ export function SettingsDialog({
             />
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
