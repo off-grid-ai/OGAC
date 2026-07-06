@@ -31,7 +31,7 @@ shell + the project detail page (`/projects/[id]`).
 | `/data` (Connectors) | connector | no (row + actions menu) | **YES** — config, live-query dialect, sync/ingest history, bound data-domains | **ADDED** `/data/connectors/[id]` |
 | `/knowledge` | collection | no (docs in a modal) | **YES** — documents sub-resource (upload/index/delete), access roles | **ADDED** `/knowledge/[id]` |
 | `/data-domains` | data domain | no (card + edit side-panel) | moderate — binding, bound connector, test-resolve | **ADDED** `/data-domains/[id]` (cross-links connector, scoped resolve tester) |
-| `/access` (Users) | user (Keycloak) | no (inline expandable rows) | **YES** — roles, sessions, MFA, password | **DEFERRED** — see below |
+| `/access` (Users) | user (Keycloak) | no (inline expandable rows) | **YES** — roles, sessions, MFA, password | **ADDED** `/access/[id]` (task #137) |
 | `/reports` | report template | no (card grid) | moderate — sections, frameworks, run/export | fine as card — `ReportsManager` already exposes run/export/edit/delete + URL-driven preview; not a flat row |
 | `/(governance)/secrets` | secret / lease | manager panels | **YES** — versions, leases, dynamic-db | fine — already a nested management surface (`SecretsManagerNav`, versions/leases/seal panels) |
 | `/(build)/tools` | tool | no (table, edit/delete inline) | low — flat fields | quick-edit modal ok (no sub-resources / history) |
@@ -73,15 +73,21 @@ shell + the project detail page (`/projects/[id]`).
    - Component: `src/components/data-domains/DomainDetailPanel.tsx`; reuses `getDomain` /
      `listDomains`.
 
-## Deferred
+## Deferred → resolved
 
-- **Users (`/access/[id]`)** — genuinely deep (roles, sessions, MFA, password reset) and a strong
-  future candidate. Deferred this pass because the surface is **Keycloak-backed and env-gated**
-  (renders a "not configured" card without Keycloak admin env), and the users list is fetched
-  **client-side** by `AccessTabs`/`UsersList` with inline expandable rows already exposing the
-  sub-resources. A detail route would need to replicate the env gate + move data fetching, a larger
-  change than the DB-backed surfaces done here. Recommend a follow-up task that turns each user's
-  inline expansion into `/access/[id]` (roles / sessions / MFA / activity tabs).
+- **Users — `/access/[id]` (task #137, DONE).** The inline expandable rows are gone; each user row
+  now links to a deep-linkable detail page. The page reuses the same Keycloak env gate as `/access`
+  (renders a "not configured" card without the admin env) and every call degrades gracefully on a
+  403/unreachable Keycloak (honest banner, never a 500), mirroring the Sessions/Federation panels.
+  - Route: `src/app/(console)/(governance)/access/[id]/page.tsx` (server gate) →
+    `UserDetailPanel` (`src/components/access/UserDetailPanel.tsx`, client).
+  - Shows: profile facts (username/email/verified/status), **realm roles** (add/remove via the
+    existing `users/[id]/roles` POST/DELETE), **reset password**, **MFA** (require/cancel OTP,
+    remove credential, via `users/[id]/mfa`), and **active sessions** scoped to the user (revoke one
+    / log out everywhere, via `users/[id]/sessions` — IPs mDNS'd through the existing
+    `mergeUserSessions`).
+  - Pure logic: `src/lib/user-detail.ts` (`diffRoles`, `userDisplayName`, `userSubtitle`) with
+    `test/user-detail.test.ts`.
 - **Guardrails / Policy / Regulatory** — owned by concurrent agents this round; not touched to avoid
   merge conflicts. Each has `[id]` API routes and moderate depth (rule definition + hit history) and
   is a good next candidate once those agents land.
