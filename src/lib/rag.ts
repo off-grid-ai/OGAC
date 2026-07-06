@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatChunks, chatDocuments } from '@/db/schema';
 
@@ -132,12 +132,18 @@ export interface Citation {
 
 // Retrieve the top-k most relevant chunks for a query within a project, and format the
 // <knowledge_base> block the desktop uses (with [Source: name (part n)] tags for citation).
+// `opts.docId` narrows retrieval to a single document within the project (used by an @-mention that
+// references one specific KB doc); omit it to search the whole project.
 export async function retrieve(
   projectId: string,
   query: string,
   topK = 6,
+  opts: { docId?: string } = {},
 ): Promise<{ context: string; citations: Citation[] }> {
   await ensureRagSchema();
+  const scope = opts.docId
+    ? and(eq(chatChunks.projectId, projectId), eq(chatChunks.docId, opts.docId))
+    : eq(chatChunks.projectId, projectId);
   const rows = await db
     .select({
       content: chatChunks.content,
@@ -146,7 +152,7 @@ export async function retrieve(
       docId: chatChunks.docId,
     })
     .from(chatChunks)
-    .where(eq(chatChunks.projectId, projectId));
+    .where(scope);
   if (!rows.length) return { context: '', citations: [] };
 
   const qVecs = await embed(query);
