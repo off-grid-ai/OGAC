@@ -1,144 +1,114 @@
-# Platform integration report — post-chat-epic sweep (2026-07-06)
+# Platform Integration Report — builder epic + evals sweep
 
-QA / platform-integration verification after the chat-epic batch. Method: read source + cite
-file:line, run the affected unit suites, grep for leaks. Adversarial — looking for UI actions with
-no backing route, routes that 500 when a dependency is down, and mutations with no audit.
+Date: 2026-07-06 · Method: adversarial read-and-verify with file:line citations (no live deploy).
+Scope: the 5-screen app lifecycle (build → input → running → review → reports), the connector rule
+engine, triggers, and the evals revamp.
 
-Verdict up front: **the platform coheres.** The four chat-epic features (inline citations, inline
-thinking, @-mentions, inline artifact editing) are wired end-to-end and *compose* — a referenced KB
-flows through the SAME citation numbering as project/org RAG. Gateway node control and sessions are
-real wiring with honest degradation. No raw-IP leaks in rendered surfaces. Concerns below are
-edge/robustness plus one bootstrap gap (federation role grant), not broken seams.
+## Verdict — does the builder lifecycle cohere?
 
----
+**YES, it coheres — with two honest, documented seams (both about the durable path).** One AppSpec
+threads cleanly from NL compile → dual-mode refine → save → input → run → (durable) review →
+reports. Canvas and text builders share the *same* pure reducers, so they cannot drift. Governance
+(policy/guardrails/grounding/signing) is applied per agent step verbatim. The two seams — (1) the
+console test-run is always inline (HITL only pauses/resumes on the durable path, which needs the
+`offgrid-apps` worker enabled), and (2) an inline agent step needs a materialized agent id to run —
+are both surfaced *honestly* in code and UI, not hidden. Nothing fabricates data, connectors, or
+scores.
 
-## Chat epic — inline citations · PASS
+## Per-screen / per-subsystem
 
-Full round trip verified:
+### BUILD — NL→AppSpec + dual-mode editing — PASS
+- `compileAppSpec` (`src/lib/app-compile.ts:84`) runs an LLM decompose path then re-binds/gap-checks
+  every step itself (`assembleFromPlan:121`), falling back to a deterministic heuristic
+  (`heuristicDecompose:191`). The LLM plan is treated as untrusted — every connector-query phrase is
+  re-resolved through `resolveDomain` (`bindDataPhrase:291-311`); an unbindable phrase is **dropped
+  with a gap**, never fabricated (`:302`).
+- Both editors call the SAME pure reducers: `AppBuilder.tsx:29-44` and `StudioCanvas.tsx:31-41` both
+  import from `src/lib/app-builder.ts`; edges are always re-chained (`rechainEdges:34`). No drift.
+- Both POST to `/api/v1/admin/apps/compile` and save via `/api/v1/admin/apps`
+  (`AppBuilder.tsx:137,165`; `StudioCanvas.tsx:211,256`). Save re-validates server-side
+  (`validateAppSpec`).
+- CONCERN (minor): `apps/compile` route has no audit entry — acceptable, it's a read-only transform
+  that persists nothing.
 
-- **Gather** — the stream route accumulates one `Citation[]` from every source: project RAG
-  (`stream/route.ts:180-191`), org "Ask Your Org" knowledge (`:195-207`), @-mentioned KBs
-  (`:214-232`), and executed connector tools (`:341-344`). Persisted on the assistant message
-  (`:426`, `citations`) and sent on stream close (`:471`).
-- **Number** — `citationInstruction(sourceNames(citations))` is injected AFTER all citations are
-  gathered (`:237-240`), so the model's `[n]` markers line up with the footer numbering. Both prompt
-  and render derive numbering from the same `buildSources()` (`chat-citations.ts:33`, `:116`) — they
-  cannot drift.
-- **Render** — `parseCitationMarkers` splits the answer into text/cite segments
-  (`chat-citations.ts:67`); `Markdown.tsx:62-105` linkifies `[n]` into `<CiteChip>` only when
-  `sourceCount>0 && onCiteClick` is wired, degrading to plain text otherwise (`:70`).
-- **Footer + jump** — `SourcesFooter` (`ChatWorkspace.tsx:193`) renders the deduped numbered sources
-  with best-score + matched parts; clicking a chip calls `jumpToSource` (`:262-267`) which
-  `scrollIntoView`s the registered `<li>` and applies a 1.6s highlight. Refs registered at `:333-336`.
+### INPUT — AppSpec.inputForm → run — PASS
+- `AppInputForm.tsx:33` renders `app.inputForm` (fallback single free-text field `:174`) and POSTs to
+  `/api/v1/admin/apps/[id]/run` (`:45`). The saved-app input page is deep-linkable (`studio/new/[id]`).
 
-Clean degradation confirmed: no sources → `buildSources` returns `[]` → footer returns null
-(`:199`), markers render inert. Dangling `[5]` when only 3 sources → `valid:false` → inert
-(`chat-citations.ts:84`).
+### RUNNING — live per-step trace — PASS
+- `AppRunStatus.tsx:80` polls `GET /api/v1/admin/app-runs?appId=…` (`:87`) every 2s while
+  `shouldPoll(status)` (`:101`), stopping at terminal. It renders per-step status/output/refs/detail
+  from persisted rows. Wired to real pages: `apps/runs`, `apps/runs/[id]`, `apps/reports`. The GET
+  route is admin-gated and org-scoped (`app-runs/route.ts`). The executor persists per-step state via
+  `upsertAppRunState` (`app-run.ts:174-186`).
 
-## Chat epic — inline thinking · PASS
+### REVIEW (HITL) — durable pause/resume — PASS (with the inline seam, honest)
+- The durable workflow pauses on a human step with `condition(() => pendingResumes.has(step.id))`
+  (`src/worker/app-run.workflow.ts:145`), buffers races, resolves approve→done / reject→error
+  (`resolveHumanStep:181`). Signal path: `AppReview.tsx:43` → review route
+  (`apps/runs/[id]/review/route.ts`) → `signalAppRun` (`adapters/apprun.ts:172`) →
+  `handle.signal('resumeStep', …)` (`:183`).
+- **The inline case is handled honestly.** An inline run terminates at the pause with no workflow to
+  signal; `signalAppRun` returns `not_configured`/`not_found`, the route returns **409
+  `resumable:false`** with a clear message (`review/route.ts:73-84`), and `AppReview.tsx` surfaces it.
+  The console test-run route (`apps/[id]/run/route.ts:32`) calls `runApp` inline directly — it does
+  NOT go through `submitAppRun`, so HITL resume from the console test path is never available. Only
+  the published/trigger path (`app/[slug]/run/route.ts:78` → `submitAppRun`) can run durably.
 
-- Stream relays `reasoning_content` deltas as `{ reasoning }` (`stream/route.ts:401-404`) separate
-  from `{ content }` (`:405-408`); persisted as `reasoning` on the message (`:425`).
-- `ThinkingBlock` (`ChatWorkspace.tsx:152`) drives presentation purely from `thinkingState`
-  (`chat-thinking.ts:29`): streaming+no-answer → expanded live; answer-started/done → collapsed by
-  default. Rendered ABOVE the answer body (`:308`), never mixed in. 12 unit tests pass.
+### REPORTS — rollups + signed PDF — PASS (with a sink caveat)
+- `app-reports.ts` computes outcomes, HITL approvals/rejections + rate, exceptions + rate,
+  throughput/day, avg latency, tokens/cost, per-run summary, day-buckets, step-kind breakdown, and
+  stat tiles (`computeReportMetrics`, `runCost`, `bucketByDay`, `singleRunSummary`, `buildReportStats`).
+- Real signed PDF: `GET /api/v1/admin/app-runs/[id]/report` renders via `pdf.ts` (pdf-lib, no browser)
+  and signs a manifest with **ed25519** (or HMAC fallback) via `provenance.ts`/`signing.ts`;
+  `X-Provenance-*` headers make it offline-verifiable. Signing is real, not stubbed.
+- CONCERN: the `report` output *sink* on a step only records intent (`app-run.ts:348-356` — "delivery
+  deferred") — it does not generate/deliver a PDF during a run. The download route is the real path.
+  Do not confuse the two. Documented in `docs/user/app-reports.md`.
 
-## Chat epic — @-mentions · PASS (composes with citations)
+### Connector rule engine — PASS
+- `resolveDomain` (`data-domains.ts:160`) is deterministic + no-guess: exact label/alias trusted
+  unless genuinely ambiguous (`:170-177`); fuzzy binds only above `MIN_CONFIDENT_SCORE` and beating
+  the runner-up by `AMBIGUITY_MARGIN` (`:180-183`); else null. Pure, zero-IO.
+- `connector-query.ts:48` is READ-only; a failed read returns `result:null` → the executor emits an
+  honest "No rows returned" step, never a fabricated row (`app-run.ts:300-311`). It's the 4th
+  retrieval source with the same rule.
 
-- **Detect/rank/fold** are pure (`chat-mentions.ts` `activeMention`/`matchMentions`/`buildRefsPayload`),
-  wired in the composer (`ChatWorkspace.tsx:520-522`, payload built `:1090`, sent `:1113`).
-- **Threaded into the stream** — `parseRefsPayload` at the route boundary (`stream/route.ts:81`);
-  referenced memory ids resolve to facts scoped to the caller (`memoryFactsByIds(userId, …)`,
-  `:139`) and inject a `referenced_memory` block.
-- **Access-gated** — @-mentioned KB scopes retrieve ONLY after `projectAccess(userId, projectId,
-  role)` passes (`:222`); others are silently skipped. De-dupes the already-retrieved project
-  (`:215-219`).
-- **Same citations** — @-KB hits are `citations.concat(r.citations)` (`:226`), the identical
-  `Citation` shape, and the numbering instruction runs after this branch (`:237`). So a referenced KB
-  DOES produce clickable chips + footer entries. Composition verified.
+### Triggers — PASS
+- Webhook `app/[slug]/run/route.ts` is governed, not wide open: requires a webhook token OR verified
+  principal (`:52-61`), app must be published (`:66`), funnels through `submitAppRun` (`:78`). No
+  bypass.
+- Email/WhatsApp are air-gap-gated and fail-closed: disabled unless `OFFGRID_EMAIL_IMAP_URL`
+  (+USER/PASS) / `OFFGRID_WHATSAPP_URL` are set (`trigger-dispatch.ts` config resolvers); both funnel
+  through `submitAppRun` when configured (`email-imap.ts:86`, `whatsapp-onprem.ts:87`). No trigger
+  runs an app without auth + governance.
 
-## Chat epic — inline artifact editing · PASS
+### Evals — PASS
+- `eval-templates.ts` has **12 templates** (`:51-202`), each declaring its engine (ragas / guardrails
+  / presidio / heuristic). `engineAvailability()` (`:228-266`) reports ready / degraded / unavailable
+  honestly.
+- `eval-runner.ts:127-128` makes a binary real-vs-heuristic decision and tags the result; **no code
+  path fabricates a high score** when the real engine is missing (`:23,67`). The engine tag is
+  persisted (`:152-159`) and shown in the UI.
+- Full CRUD + run backed: `eval-defs` GET/POST + `[id]` PATCH/DELETE + `[id]/run` POST; `evals` GET +
+  `evals/run` POST; `eval-templates` GET; `golden-cases` GET/POST + `[id]` PATCH/DELETE. No orphan UI
+  actions.
 
-- Edit buffer + baseline in `ArtifactView` (`ArtifactView.tsx:58-66`); dirty/savable from pure
-  `isArtifactDirty`/`canSaveArtifact` (`artifacts.ts:108`, `:114`).
-- Save posts `artifactSavePayload` (original title threaded so the new version lands on the same
-  logical row) to the EXISTING `POST /api/v1/chat/artifacts` (`ArtifactView.tsx:80`), which versions
-  server-side by (user, conversation, title). New baseline advances on success (`:90`).
-- `ArtifactEditor` is pure presentation, Cmd/Ctrl+S → save, Esc → cancel (`ArtifactEditor.tsx:22-30`).
-  8 `artifact-edit` unit tests pass.
+## Cross-cutting
 
-**CONCERN (minor):** the `ArtifactView` instance rendered at `ChatWorkspace.tsx:1865` (the
-transcript-chip open path) passes `title` + `conversationId` but NOT `onSaved`, while the
-library-context instance at `:1870` wires `onSaved={refreshProjects}`. Saving from the chip path
-works (persists a version) but the projects/library list won't refresh until the next navigation.
-Low severity — logged as a gap.
+- **Governed agent step**: an agent step runs `runAgent(...)` verbatim (`app-run.ts:256`) — full
+  policy/guardrail/budget/grounding/provenance. Prior-step outputs are threaded as context
+  (`buildAgentQuery:194`). Denied/blocked → step error → run halts (`:258-266`).
+- **Audit**: apps POST/PATCH/DELETE, data-domains POST/PATCH/DELETE, `app.run`, and `app.run.review`
+  all write `auditFromSession`. Compile is unaudited (read-only, acceptable).
+- **UI actions with no backing route**: none found in the builder/evals surfaces.
+- **IP / 127.0.0.1 leaks in new surfaces**: none (the only literal is
+  `DEFAULT_TEMPORAL_ADDRESS = '127.0.0.1:7233'` in `app-run-durable.ts:31`, an env-overridable default
+  — not a hardcoded prod endpoint).
 
-## Gateway node control · PASS
-
-`GatewayControl.tsx` → `POST /api/v1/gateway/nodes/[name]` → aggregator `POST /nodes/:name`. The
-route is admin-gated (`requireAdmin`, `[name]/route.ts:44`), validates the action set (`:49`),
-resolves the live node via `GET /nodes` (`:28-41`), and validates with pure `validateNodeAction`
-(`:56`). **Honest degradation is explicit:** a blocked action → 501 `{notActionable}` (`:59-60`),
-aggregator 404/501 → 501 `{notActionable}` (`:73-77`), unreachable aggregator → 502 (`:80-81`) —
-never a fake 200. `fetchNode` swallows errors → null → 404 (`:38`), so a down aggregator yields a
-clean 404, not a 500. Graceful.
-
-**CONCERN (audit):** node control mutations (model swap / restart / enable / disable) do NOT write an
-audit event, unlike the chat budget-deny path (`stream/route.ts:300`). A privileged, state-changing
-fleet action with no accountability trail. Logged as a gap.
-
-## Federation · CONCERN (403 handled at the message level, NOT auto-granted)
-
-The previous "bare 403 Forbidden leaks up" bug IS fixed — but by making the error *actionable*, not
-by auto-granting the role:
-
-- `keycloak-admin.ts:88-93` carries the empty-body 403 as a status; `forbiddenGrantMessage()`
-  (`keycloak-realm.ts:33-40`) turns it into an operation-specific message naming exactly which
-  `realm-management` role to grant to which client. The Access page surfaces the same guidance
-  (`access/page.tsx:59-62`).
-- **There is NO server-side `assignRoles()` call that grants `realm-management` to the console's own
-  service account.** The grant remains a MANUAL step in the Keycloak admin console. So federation
-  writes (create IdP, etc.) still 403 on a fresh realm until an operator grants the role by hand —
-  the console now *tells you how*, but doesn't self-heal. Logged as a gap (severity: medium — a
-  one-time bootstrap, well-signposted, but not "handled server-side").
-
-Routes: `admin/access/idp/route.ts` (GET/POST), `idp/[alias]/route.ts` (DELETE); UI
-`components/access/IdpList.tsx`.
-
-## Sessions · PASS
-
-- **Online + offline merge** — `mergeUserSessions()` (`keycloak-realm.ts:97-106`) merges both lists,
-  deduped by id (online wins for a shared id — it's the live one), sorted by `lastAccess` desc.
-  Called directly by the route (`admin/access/users/[id]/sessions/route.ts:39`).
-- **mDNS IP enrichment** — `normalizeSession()` (`keycloak-realm.ts:78`) runs each session's IP
-  through `toDisplayHost()`, mapping loopback/LAN/fleet IPs to `offgrid-*.local` — no raw IP reaches
-  the view.
-
-## Raw IP / host leaks · PASS
-
-Grep of `src/components` + `src/app` `*.tsx` for `127.0.0.1` / `192.168.` found three hits, ALL
-masked through `toDisplayHost` before render:
-
-- `VectorDBInspector.tsx:12,55` — default + hint both wrapped.
-- `gateway/page.tsx:35` `GATEWAY_URL` is a server-side fetch target; every UI render goes through
-  `toDisplayHost` (`:61,74,82,86`).
-- `data/page.tsx:211` passes the raw env value as `urlHint`, but `VectorDBInspector` wraps it on
-  ingest (`:55`).
-
-No raw loopback/LAN IP reaches the rendered DOM.
-
----
-
-## Coherence verdict
-
-**PASS — coheres.** The chat epic is genuinely integrated (not four bolted-on features): a single
-`Citation[]` pipeline feeds citations, @-mentions fold into it access-gated, thinking is a clean
-separate channel, and artifact editing reuses the existing versioned save route. Gateway control is
-honest about what the backend actually supports; sessions merge correctly with masked IPs. Three
-real concerns are logged as gaps: (1) artifact-chip save doesn't refresh the library, (2)
-node-control mutations aren't audited, (3) federation's realm-management grant is a manual bootstrap,
-not automatic. None is a broken seam. All 47 chat-epic unit tests pass.
-
-**Not verified live in this sweep** (read-and-verify only, no deploy): actual streaming against the
-aggregator, real Keycloak 403→grant recovery on the live realm, and the artifact save round trip in
-the browser. These need the live stack.
+## Open items (see docs/GAPS_BACKLOG.md → Post-builder-epic sweep)
+1. Durable `offgrid-apps` queue/worker not confirmed enabled on the fleet — HITL resume only works
+   durably.
+2. Console test-run (`apps/[id]/run`) is always inline — a HITL app tested there can't be resumed.
+3. Inline agent steps (no agentId) can't execute — need materialization into a customAgent.
+4. `report`/`email`/`whatsapp` output sinks defer delivery at run time.
