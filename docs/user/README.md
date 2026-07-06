@@ -16,8 +16,12 @@ The console groups its surfaces into sections (mirrors the sidebar):
 
 ## Intelligence — build and run
 - [Agents & Studio](agents-studio.md) — pre-built agents + build-your-own in plain language
+- [Build an app (plain language)](app-builder.md) — the unified builder + the 5 screens (build → input → running → review → reports) ✅ fully documented
+- [Data domains](data-domains.md) — declare where your data lives (the no-guess connector rule engine) ✅ fully documented
+- [Triggers](triggers.md) — how an app starts: on-demand / webhook / schedule / email / whatsapp ✅ fully documented
+- [App reports](app-reports.md) — run rollups + the signed per-run PDF ✅ fully documented
 - [Agent Runs & Jobs](agent-runs-jobs.md) — run history **and durable (Temporal) jobs: rerun / cancel** ✅ fully documented
-- [Evals](evals.md) — golden sets & quality gates
+- [Evals](evals.md) — golden sets, 12 templates & honest quality gates ✅ fully documented
 - [Brain](brain.md) — ingestion → retrieval (RAG)
 
 ## Gateway & Fleet
