@@ -73,30 +73,34 @@ test('Workspace consolidation: projects/prompts/artifacts are chat sub-surfaces,
   }
 });
 
-test('Build consolidation: studio + agent-runs highlight the Agents row', () => {
-  // Studio and Agents were consolidated under one "Agents" umbrella (BuildNav tabs across
-  // Agents / Studio / Runs). Studio and Agent Runs are now secondaries, so their routes must keep
-  // the Build → Agents sidebar row active rather than 404-ing or losing highlight.
-  assert.equal(sidebarActiveIdFor('studio'), 'agents');
-  assert.equal(sidebarActiveIdFor('agent-runs'), 'agents');
+test('Build consolidation: agents + agent-runs highlight the Studio row', () => {
+  // "agent and studio should become one" (founder): Studio is the ONE build front door and the
+  // sidebar primary. The old Agents roster + Agent Runs are now secondaries, so their routes keep
+  // the Build → Studio sidebar row active rather than 404-ing or losing highlight. Studio maps to
+  // itself (it's a primary).
+  assert.equal(sidebarActiveIdFor('studio'), 'studio');
+  assert.equal(sidebarActiveIdFor('agents'), 'studio');
+  assert.equal(sidebarActiveIdFor('agent-runs'), 'studio');
 });
 
-test('sidebarActiveIdForPath: the builder /apps/* surfaces keep the Build → Apps row lit', () => {
-  // /apps/runs (app-runs list) and /apps/reports (outcomes) have NO module of their own — their
-  // pages gate on studio/agents and they route under /apps. The pure path resolver must alias them
-  // to the `agents` module so the Build → Apps sidebar row stays highlighted instead of the whole
-  // sidebar un-lighting. `agents` is a Build primary, so it maps to itself.
-  assert.equal(sidebarActiveIdForPath('/apps/runs', MODULES), 'agents');
-  assert.equal(sidebarActiveIdForPath('/apps/runs/run_123', MODULES), 'agents');
-  assert.equal(sidebarActiveIdForPath('/apps/reports', MODULES), 'agents');
+test('sidebarActiveIdForPath: the builder /apps/* surfaces keep the Build → Studio row lit', () => {
+  // /apps/runs, /apps/reports, and the per-app shell /apps/<id>/* have NO module of their own —
+  // their pages gate on `studio` and they route under /apps. The pure path resolver aliases them to
+  // the `studio` module so the Build → Studio sidebar row stays highlighted instead of the whole
+  // sidebar un-lighting. `studio` is a Build primary, so it maps to itself.
+  assert.equal(sidebarActiveIdForPath('/apps/runs', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/apps/runs/run_123', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/apps/reports', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/apps/app_42', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/apps/app_42/runs', MODULES), 'studio');
 });
 
 test('sidebarActiveIdForPath: a real module route resolves via its group landing', () => {
   // Falls through the alias table to longest-matching module route, then to the group primary.
-  assert.equal(sidebarActiveIdForPath('/studio', MODULES), 'agents'); // studio → Build/Agents
-  assert.equal(sidebarActiveIdForPath('/agent-runs', MODULES), 'agents');
+  assert.equal(sidebarActiveIdForPath('/studio', MODULES), 'studio'); // studio primary → itself
+  assert.equal(sidebarActiveIdForPath('/agent-runs', MODULES), 'studio'); // secondary → Studio
   assert.equal(sidebarActiveIdForPath('/policy', MODULES), 'control'); // secondary → Governance
-  assert.equal(sidebarActiveIdForPath('/agents', MODULES), 'agents'); // primary → itself
+  assert.equal(sidebarActiveIdForPath('/agents', MODULES), 'studio'); // secondary → Studio
 });
 
 test('sidebarActiveIdForPath: an unmatched path lights nothing', () => {

@@ -60,11 +60,11 @@ export function AppsList({ apps }: { apps: AppSpec[] }) {
               </div>
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/studio/new/${encodeURIComponent(app.id)}`}
+                  href={`/apps/${encodeURIComponent(app.id)}`}
                   className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 >
                   <Play className="size-3.5" />
-                  Open &amp; run
+                  Open
                 </Link>
                 {app.published && app.slug ? (
                   <a
