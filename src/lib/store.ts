@@ -1434,6 +1434,35 @@ export async function setCustomAgentEnabled(id: string, enabled: boolean): Promi
   await db.update(customAgents).set({ enabled }).where(eq(customAgents.id, id));
 }
 
+// Edit a user-authored agent in place. Only the provided fields are written, so a partial patch
+// (e.g. just the instructions) leaves the rest untouched. Built-in agents aren't stored here.
+export async function updateCustomAgent(
+  id: string,
+  patch: Partial<{
+    name: string;
+    role: string;
+    description: string;
+    systemPrompt: string;
+    model: string;
+    tools: string[];
+    grounded: boolean;
+    trigger: string;
+  }>,
+): Promise<CustomAgent | undefined> {
+  const set: Record<string, unknown> = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.role !== undefined) set.role = patch.role;
+  if (patch.description !== undefined) set.description = patch.description;
+  if (patch.systemPrompt !== undefined) set.systemPrompt = patch.systemPrompt;
+  if (patch.model !== undefined) set.model = patch.model;
+  if (patch.tools !== undefined) set.tools = patch.tools;
+  if (patch.grounded !== undefined) set.grounded = patch.grounded;
+  if (patch.trigger !== undefined) set.trigger = patch.trigger;
+  if (Object.keys(set).length === 0) return getCustomAgent(id);
+  const [row] = await db.update(customAgents).set(set).where(eq(customAgents.id, id)).returning();
+  return row ? toCustomAgent(row) : undefined;
+}
+
 export async function deleteCustomAgent(id: string): Promise<void> {
   await db.delete(customAgents).where(eq(customAgents.id, id));
 }

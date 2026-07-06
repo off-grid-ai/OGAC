@@ -21,6 +21,10 @@ export interface AgentDef {
   custom?: boolean;
   systemPrompt?: string;
   model?: string;
+  // Management flag: whether a custom agent is currently enabled (runnable). Built-ins are always
+  // enabled. Set only by the management listing so the console can show + re-enable disabled agents;
+  // the runtime catalog (listAllAgents) excludes disabled agents entirely.
+  enabled?: boolean;
 }
 
 export const AGENTS: AgentDef[] = [
@@ -104,10 +108,22 @@ function toDef(c: CustomAgent): AgentDef {
   };
 }
 
-// The full catalog the console shows and runs: built-ins + every user-authored agent.
+// The full catalog the console shows and runs: built-ins + every ENABLED user-authored agent.
+// Used by the runtime pipeline and fleet views — disabled agents are intentionally excluded.
 export async function listAllAgents(): Promise<AgentDef[]> {
   const custom = await listCustomAgents();
   return [...AGENTS, ...custom.filter((c) => c.enabled).map(toDef)];
+}
+
+// The management listing for the Agents console: built-ins + ALL custom agents (including
+// disabled ones, tagged with `enabled`) so operators can see, edit, and re-enable them. Distinct
+// from listAllAgents, which is the runnable catalog.
+export async function listManagedAgents(): Promise<AgentDef[]> {
+  const custom = await listCustomAgents();
+  return [
+    ...AGENTS.map((a) => ({ ...a, enabled: true })),
+    ...custom.map((c) => ({ ...toDef(c), enabled: c.enabled })),
+  ];
 }
 
 // Resolve a single agent by id — built-in first, then a user-authored one from the DB. Used by

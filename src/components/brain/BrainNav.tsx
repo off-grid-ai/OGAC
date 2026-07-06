@@ -24,16 +24,6 @@ export { BRAIN_VIEWS, type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView };
 // Mirrors DataNav / InsightsNav / GovernanceNav: same band + grouped-tab treatment so it reads as
 // the same nav plane as the rest of the console.
 
-export const BRAIN_VIEWS = ['router', 'tools', 'retrieval', 'knowledge', 'prompts', 'evals'] as const;
-export type BrainView = (typeof BRAIN_VIEWS)[number];
-
-export const DEFAULT_BRAIN_VIEW: BrainView = 'router';
-
-export function normalizeBrainView(raw: string | string[] | undefined): BrainView {
-  const v = Array.isArray(raw) ? raw[0] : raw;
-  return (BRAIN_VIEWS as readonly string[]).includes(v ?? '') ? (v as BrainView) : DEFAULT_BRAIN_VIEW;
-}
-
 interface Tab {
   view: BrainView;
   label: string;
