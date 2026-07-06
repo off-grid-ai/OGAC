@@ -23,6 +23,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     tabs: [
       { id: 'integrations', label: 'Integrations', route: '/integrations' },
       { id: 'data', label: 'Connectors', route: '/data' },
+      { id: 'tool-catalog', label: 'Tool catalog', route: '/tool-catalog' },
       { id: 'data-domains', label: 'Data domains', route: '/data-domains' },
     ],
   },
