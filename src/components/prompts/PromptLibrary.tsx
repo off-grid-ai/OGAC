@@ -16,7 +16,9 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/Pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { usePagination } from '@/lib/use-pagination';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { cn } from '@/lib/utils';
@@ -124,6 +126,10 @@ export function PromptLibrary() {
     for (const p of prompts) for (const t of p.tags) s.add(t);
     return [...s].sort();
   }, [prompts]);
+
+  // The library grid grows unbounded; paginate the (search/tag-filtered) fetched set client-side.
+  // URL-namespaced by `prompts` so it deep-links alongside the ?panel edit param.
+  const paged = usePagination(prompts, { key: 'prompts', defaultPageSize: 12 });
 
   async function usePrompt(p: Prompt) {
     await navigator.clipboard.writeText(p.content);
@@ -247,16 +253,25 @@ export function PromptLibrary() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {prompts.map((p) => (
-              <PromptCard
-                key={p.id}
-                p={p}
-                onUse={() => usePrompt(p)}
-                onEdit={() => openPanel(p.id)}
-                onDelete={() => remove(p)}
-              />
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {paged.pageItems.map((p) => (
+                <PromptCard
+                  key={p.id}
+                  p={p}
+                  onUse={() => usePrompt(p)}
+                  onEdit={() => openPanel(p.id)}
+                  onDelete={() => remove(p)}
+                />
+              ))}
+            </div>
+            <Pagination
+              state={paged}
+              onPageChange={paged.setPage}
+              onPageSizeChange={paged.setPageSize}
+              pageSizeOptions={[12, 24, 48, 96]}
+              itemLabel="prompts"
+            />
           </div>
         )}
 

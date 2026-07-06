@@ -2,6 +2,8 @@
 
 import { CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import { usePagination } from '@/lib/use-pagination';
 
 interface Trace {
   id: string;
@@ -80,6 +82,9 @@ export function LangfuseTraces({
   error?: string;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  // Traces come from a server window that can be large; paginate the fetched list client-side.
+  // URL-namespaced by `traces` so it deep-links and coexists with other lists on the page.
+  const paged = usePagination(traces, { key: 'traces', defaultPageSize: 25 });
 
   if (!configured) {
     return (
@@ -94,28 +99,36 @@ export function LangfuseTraces({
     return <p className="text-xs text-muted-foreground">No traces yet — run an agent to emit spans.</p>;
 
   return (
-    <div className="divide-y divide-border rounded-md border border-border">
-      {traces.map((t) => (
-        <div key={t.id}>
-          <button
-            type="button"
-            onClick={() => setOpen(open === t.id ? null : t.id)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40"
-          >
-            <CaretRight
-              className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open === t.id ? 'rotate-90' : ''}`}
-            />
-            <span className="flex-1 truncate text-sm text-foreground">{t.name ?? t.id}</span>
-            <span className="shrink-0 font-mono text-xs text-muted-foreground">
-              {t.latency != null ? `${Math.round(t.latency)}ms` : '—'}
-            </span>
-            <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
-              {t.timestamp?.slice(11, 19) ?? ''}
-            </span>
-          </button>
-          {open === t.id ? <Waterfall traceId={t.id} /> : null}
-        </div>
-      ))}
+    <div className="space-y-3">
+      <div className="divide-y divide-border rounded-md border border-border">
+        {paged.pageItems.map((t) => (
+          <div key={t.id}>
+            <button
+              type="button"
+              onClick={() => setOpen(open === t.id ? null : t.id)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40"
+            >
+              <CaretRight
+                className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open === t.id ? 'rotate-90' : ''}`}
+              />
+              <span className="flex-1 truncate text-sm text-foreground">{t.name ?? t.id}</span>
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                {t.latency != null ? `${Math.round(t.latency)}ms` : '—'}
+              </span>
+              <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
+                {t.timestamp?.slice(11, 19) ?? ''}
+              </span>
+            </button>
+            {open === t.id ? <Waterfall traceId={t.id} /> : null}
+          </div>
+        ))}
+      </div>
+      <Pagination
+        state={paged}
+        onPageChange={paged.setPage}
+        onPageSizeChange={paged.setPageSize}
+        itemLabel="traces"
+      />
     </div>
   );
 }

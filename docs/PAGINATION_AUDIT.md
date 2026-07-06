@@ -43,6 +43,22 @@ lot of un-paged full-array renders.
 | **SIEM security events** | `src/components/siem/SiemEventsTable.tsx` (new) + `src/app/(console)/(insights)/siem/page.tsx` | `readSiemView` returns up to **500** events, all rendered in one table — clearly unbounded/data-heavy. | Extracted the table into a client component using `usePagination({key:'ev'})` + `Pagination`, client-side slicing over the fetched array. 25/page default. |
 | **SIEM full-text search hits** | `src/components/control/AuditSearch.tsx` | "queries the WHOLE stream" — result set can be large. | `usePagination({key:'auditHits'})` + `Pagination`. |
 
+### TASK #130 — applied the common component to the deferred data-heavy surfaces
+
+| Surface | File | Why | How (key · page size) |
+|---|---|---|---|
+| **Storage browser** | `src/components/storage/StorageBrowser.tsx` | Object listing is potentially large — the audit flagged it the strongest candidate. | Two hooks: folder tiles `usePagination({key:'folder'})` and in-folder files `usePagination({key:'file'})`, each 24/page (only one grid renders at a time). Filters (`applyFilter`) run first, then paginate the filtered set. |
+| **Langfuse traces** | `src/components/observability/LangfuseTraces.tsx` | Server-windowed trace list can be large. | `usePagination({key:'traces'})` + `Pagination`, 25/page. |
+| **Users (Keycloak)** | `src/components/access/UsersList.tsx` | Realms can hold many users. | `usePagination({key:'users'})` + `Pagination`, 25/page. Paginates the already search-filtered fetched set. |
+| **Backups** | `src/components/backups/BackupsManager.tsx` | Long retention windows accumulate many dumps. | `usePagination({key:'backups'})` + `Pagination`, 25/page (over `data.rows`). |
+| **FinOps by-key** | `src/components/finops/KeysTable.tsx` (new) + `src/app/(console)/(insights)/finops/page.tsx` | One row per issued virtual key — grows unbounded. | Extracted the by-key `<Table>` into a client leaf (`KeysTable`) using `usePagination({key:'keys'})` + `Pagination`, 25/page. Page stays a thin server component. |
+| **Prompts library** | `src/components/prompts/PromptLibrary.tsx` | Card grid grows unbounded. | `usePagination({key:'prompts'})` + `Pagination`, 12/page (options 12/24/48/96). Paginates the search/tag-filtered set. |
+| **Artifacts library** | `src/components/artifacts/ArtifactsBrowser.tsx` | Card grid grows unbounded. | `usePagination({key:'arts'})` + `Pagination`, 12/page (options 12/24/48/96). Paginates the search-filtered set. |
+
+All seven slice client-side over the already-fetched array (no store/query signature changes), keep
+existing search/filters working (paginate the FILTERED set), and namespace their URL key so they
+deep-link and coexist with the surfaces' other `?panel`/`?folder`/`?artifact` params.
+
 ---
 
 ## DEEP-CHECK INVENTORY — every list/table/card-grid surface
@@ -55,7 +71,7 @@ pagination today · **Needs?**: does it need pagination · **Action**: what was/
 |---|---|---|---|---|---|---|
 | Audit log (main) | `app/(console)/(insights)/audit/page.tsx` | OpenSearch, **server-paged** (`readAuditPage`, size/page) | server-paged | **Yes** (Prev/Next links) | has it | Keep — already paged server-side. |
 | SIEM full-text search | `components/control/AuditSearch.tsx` | `/api/v1/admin/audit-search` (whole stream) | No | **Now yes** | Yes | **APPLIED** (client). |
-| Users (Keycloak) | `components/access/UsersList.tsx` | `/api/…/access/users?search=` | medium; Keycloak-bounded, search-filtered | No | Low/maybe | Defer — bounded, search narrows it. Candidate if user counts grow. |
+| Users (Keycloak) | `components/access/UsersList.tsx` | `/api/…/access/users?search=` | medium; Keycloak-bounded, search-filtered | **Now yes** | Yes | **APPLIED (#130)** — `key:'users'`, 25/page over the search-filtered set. |
 | Roles | `components/access/RolesList.tsx` | `/api/…/access/roles` | Small | No | No | None. |
 | Identity providers | `components/access/IdpList.tsx` | `/api/…/access/idp` | Small (1–10) | No | No | None. |
 | Sessions | `components/access/SessionsPanel.tsx` | `/api/…/access/sessions` | Small–medium | No | Low | Defer. |
@@ -72,14 +88,14 @@ pagination today · **Needs?**: does it need pagination · **Action**: what was/
 | SIEM events | `components/siem/SiemEventsTable.tsx` | `readSiemView` (≤500) | No | **Now yes** | Yes | **APPLIED** (client). |
 | SIEM monitors | `components/siem/AlertingManager.tsx` | OpenSearch monitors | Small–medium | No | Low | Defer. |
 | SIEM suppressions | `components/siem/SuppressionManager.tsx` | suppression API | Small–medium | No | Low | Defer. |
-| Langfuse traces | `components/observability/LangfuseTraces.tsx` | SSR props (server window) | server-windowed | No | Low | Defer — bounded by server fetch limit. Candidate. |
+| Langfuse traces | `components/observability/LangfuseTraces.tsx` | SSR props (server window) | server-windowed | **Now yes** | Yes | **APPLIED (#130)** — `key:'traces'`, 25/page. |
 | Langfuse insights | `components/observability/LangfuseInsightsPanel.tsx` | `/api/…/traces/insights` | Small | No | No | None. |
 | Langfuse registry | `components/observability/LangfuseRegistryPanel.tsx` | Langfuse API | medium | No | Low | Defer. |
 | Analytics alerts/views | `components/analytics/AnalyticsAlerts.tsx` | `/api/…/analytics/*` | Small (≤50) | No | No | None. |
 | Threshold rules | `components/observability/ThresholdManager.tsx` | `/api/…/thresholds` | Small–medium | No | No | None. |
 | Drift | `app/(console)/(insights)/drift/page.tsx` | rollup, capped slices | Yes | No | No | None. |
 | Accounting rows | `app/(console)/(insights)/accounting/page.tsx` | `computeAccounting` aggregations (by actor/project/model) | bounded by distinct dims | No | No | None — aggregation rollups, not raw rows. |
-| FinOps by-key/model/subject | `app/(console)/(insights)/finops/page.tsx` | `computeFinOps` rollups | bounded by distinct keys/models/subjects | No | Low | Defer — rollup rows; candidate only if virtual-key count is large. |
+| FinOps by-key/model/subject | `app/(console)/(insights)/finops/page.tsx` + `components/finops/KeysTable.tsx` | `computeFinOps` rollups | by-key: **now yes** | by-key **Now yes** | by-key Yes | **APPLIED (#130)** to by-key (`KeysTable`, `key:'keys'`, 25/page). by-model/by-subject left — bounded by distinct model/subject count. |
 | Token budgets | `components/finops/TokenBudgets.tsx` | `/api/v1/finops/budgets` (poll) | Small–medium | No | Low | Defer. |
 
 ### Gateway
@@ -95,7 +111,7 @@ pagination today · **Needs?**: does it need pagination · **Action**: what was/
 |---|---|---|---|---|---|---|
 | Lineage | `app/(console)/(data)/lineage/page.tsx` | rollup rows | Small–medium | No | Low | Defer. |
 | Retrieval collections | `components/retrieval/RetrievalManager.tsx` | `/api/…/retrieval` | Small–medium | No | No | None. |
-| Storage browser | `components/storage/StorageBrowser.tsx` | object listing | **potentially large** | No | **Yes (candidate)** | Defer — data-heavy; a strong follow-up target. Left this round to keep the file-set disjoint & scope bounded. |
+| Storage browser | `components/storage/StorageBrowser.tsx` | object listing | **potentially large** | **Now yes** | **Yes** | **APPLIED (#130)** — folder tiles (`key:'folder'`) + in-folder files (`key:'file'`), 24/page each, over the filtered set. |
 
 ### Build / studio / agents / apps  — **OWNED ELSEWHERE, DO NOT EDIT (deferred)**
 | Surface | Component | Needs? | Action |
@@ -115,10 +131,10 @@ pagination today · **Needs?**: does it need pagination · **Action**: what was/
 | Secrets | `components/secrets/SecretsManager.tsx` | `/api/…/secrets` | Small–medium | No | Low | Defer. |
 | Leases | `components/secrets/LeasesPanel.tsx` | per-prefix | Small–medium | No | Low | Defer. |
 | Feature flags | `components/config/FlagManager.tsx` | `/api/…/flags` | Small (≤50) | No | No | None. |
-| Backups | `components/backups/BackupsManager.tsx` | props + fetch | retention-bounded | No | Low | Defer — retention caps row count. Candidate if retention is long. |
+| Backups | `components/backups/BackupsManager.tsx` | props + fetch | retention-bounded | **Now yes** | Yes | **APPLIED (#130)** — `key:'backups'`, 25/page. |
 | Fleet tools / device software | `components/fleet/*` | fleet API | Small | No | No | None. |
-| Prompts library | `components/prompts/PromptLibrary.tsx` | `/api/v1/prompts` (search) | search-filtered | No | Low | Defer. |
-| Artifacts browser | `components/artifacts/ArtifactsBrowser.tsx` | `/api/v1/chat/artifacts` | client grid | No | Low | Defer. |
+| Prompts library | `components/prompts/PromptLibrary.tsx` | `/api/v1/prompts` (search) | search-filtered | **Now yes** | Yes | **APPLIED (#130)** — `key:'prompts'`, 12/page over the search/tag-filtered set. |
+| Artifacts browser | `components/artifacts/ArtifactsBrowser.tsx` | `/api/v1/chat/artifacts` | client grid | **Now yes** | Yes | **APPLIED (#130)** — `key:'arts'`, 12/page over the search-filtered set. |
 | Chat conversations | `components/chat/ChatWorkspace.tsx` | `.slice(0,9)` capped sidebar | Yes (capped) | capped-slice | Low | Defer — sidebar already capped. |
 
 ---
@@ -127,7 +143,7 @@ pagination today · **Needs?**: does it need pagination · **Action**: what was/
 
 - **Surfaces inventoried:** ~40 across governance, insights, gateway, data, build/studio, admin, chat, prompts, artifacts, fleet, finops, siem.
 - **Already had pagination (kept):** 2 — audit log (server link-pager), gateway logs (server cursor "load more").
-- **Applied the common control this task:** 2 — SIEM events (≤500 rows), SIEM full-text search hits.
+- **Applied the common control (TASK #123):** 2 — SIEM events (≤500 rows), SIEM full-text search hits.
+- **Applied the common control (TASK #130):** 7 — Storage browser (folder + file grids), Langfuse traces, Users list, Backups, FinOps by-key, Prompts library, Artifacts library. All client-side slices over the fetched array, namespaced URL keys, filters preserved.
 - **Needs pagination — deferred (owned elsewhere):** 8 (agent-runs ×2, app-run status/reports, agents grid, apps list, evals ×, tool/mcp catalog, studio gallery). Logged for the owning agents.
-- **Follow-up candidates (safe but out of this round's scope):** Storage browser (data-heavy — strongest), Langfuse traces, Users list, Backups, FinOps by-key, Prompts, Artifacts.
 - **No pagination needed (bounded/rollup/capped/live-tail):** the majority — roles, IdP, policy/rego/guardrail/presidio rules, thresholds, analytics alerts, accounting & finops rollups, gateway token/cost/usage, gateway traffic live-tail, feature flags, fleet, regulatory/drift/chat capped slices.
