@@ -64,6 +64,11 @@ class EvalRequest(BaseModel):
     gateway: str
     model: str = "gemma-local"
     dataset: List[Sample] = []
+    # OPTIONAL metric filter: the console asks for only the metric(s) its eval definition needs. Each
+    # ragas metric is a chain of gateway LLM calls (~30–90s on local hardware), so scoring only the
+    # requested metric keeps a real run inside the client timeout instead of falling back to the
+    # heuristic. Absent/empty → score the full METRIC_ORDER (back-compat with the frozen contract).
+    metrics: Optional[List[str]] = None
 
 
 @app.get("/health")
@@ -159,8 +164,13 @@ def evaluate(req: EvalRequest) -> dict:
         api_key=GATEWAY_API_KEY,
     )
 
+    # Honor the optional metric filter: score only the requested metrics (validated against the known
+    # set) in the canonical order. Unknown/empty filter → the full set (frozen-contract back-compat).
+    requested = [m for m in (req.metrics or []) if m in metric_objs]
+    names_to_score = requested or METRIC_ORDER
+
     metrics: Dict[str, float] = {}
-    for name in METRIC_ORDER:
+    for name in names_to_score:
         obj = metric_objs.get(name)
         if obj is None:
             continue

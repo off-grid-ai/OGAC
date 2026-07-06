@@ -80,7 +80,10 @@ async function buildSamples(): Promise<Sample[]> {
 
 // Ask the ragas sidecar for per-metric scores over the dataset. Returns the metric map (0..1) or
 // null if the sidecar is unset/unreachable — the caller then degrades to the heuristic honestly.
-async function ragasMetrics(samples: Sample[]): Promise<Record<string, number> | null> {
+async function ragasMetrics(
+  samples: Sample[],
+  metrics?: string[],
+): Promise<Record<string, number> | null> {
   if (!RAGAS_URL) return null;
   try {
     const dataset = samples.map((s) => ({
@@ -89,11 +92,19 @@ async function ragasMetrics(samples: Sample[]): Promise<Record<string, number> |
       contexts: s.contexts,
       ground_truth: s.groundTruth,
     }));
+    // Only ask ragas for the metric(s) this eval actually needs — each metric is a chain of gateway
+    // LLM calls (~30–90s on local hardware), so running all 5 blows past the timeout and the caller
+    // falls back to the heuristic. Scoping to the requested metric keeps a real ragas run in budget.
     const res = await fetch(`${RAGAS_URL}/evaluate`, {
       method: 'POST',
       headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
-      body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, dataset }),
-      signal: AbortSignal.timeout(180_000),
+      body: JSON.stringify({
+        model: EVAL_MODEL,
+        gateway: `${GATEWAY_URL}/v1`,
+        dataset,
+        ...(metrics && metrics.length ? { metrics } : {}),
+      }),
+      signal: AbortSignal.timeout(600_000),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { metrics?: Record<string, number> };
@@ -209,7 +220,7 @@ export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
   }
 
   // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
-  const ragas = usesRagas(def) ? await ragasMetrics(samples) : null;
+  const ragas = usesRagas(def) ? await ragasMetrics(samples, [def.metric]) : null;
   const computedBy: EvalEngine | 'heuristic' =
     ragas && ragas[def.metric] !== undefined ? 'ragas' : 'heuristic';
 
