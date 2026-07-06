@@ -1,13 +1,7 @@
 'use client';
 
-import {
-  Check,
-  Eye,
-  EyeSlash,
-  Plus,
-  Trash,
-  UsersThree,
-} from '@phosphor-icons/react/dist/ssr';
+import { CaretRight, Check, Plus, Trash, UsersThree } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -170,172 +164,6 @@ function AddUserForm({
   );
 }
 
-// ─── Expanded row: roles + reset password ────────────────────────────────────
-
-function ExpandedUser({
-  user,
-  allRoles,
-  onRefresh,
-}: {
-  user: KcUser;
-  allRoles: KcRole[];
-  onRefresh: () => void;
-}) {
-  const assigned = new Set(user.realmRoles ?? []);
-  const [checked, setChecked] = useState<Set<string>>(new Set(assigned));
-  const [savingRoles, setSavingRoles] = useState(false);
-
-  const [newPassword, setNewPassword] = useState('');
-  const [tempPw, setTempPw] = useState(true);
-  const [showPw, setShowPw] = useState(false);
-  const [savingPw, setSavingPw] = useState(false);
-
-  const toggleChecked = (name: string) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
-
-  const saveRoles = async () => {
-    setSavingRoles(true);
-    try {
-      // Determine which to add and which to remove
-      const toAdd = allRoles.filter((r) => checked.has(r.name) && !assigned.has(r.name));
-      const toRemove = allRoles.filter((r) => !checked.has(r.name) && assigned.has(r.name));
-
-      if (toAdd.length > 0) {
-        const res = await fetch(`/api/v1/admin/access/users/${user.id}/roles`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roles: toAdd }),
-        });
-        if (!res.ok) {
-          const d = (await res.json()) as { error?: string };
-          throw new Error(d.error ?? 'Failed to assign roles.');
-        }
-      }
-      if (toRemove.length > 0) {
-        const res = await fetch(`/api/v1/admin/access/users/${user.id}/roles`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roles: toRemove }),
-        });
-        if (!res.ok) {
-          const d = (await res.json()) as { error?: string };
-          throw new Error(d.error ?? 'Failed to remove roles.');
-        }
-      }
-      toast.success('Roles updated.');
-      onRefresh();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSavingRoles(false);
-    }
-  };
-
-  const resetPassword = async () => {
-    if (!newPassword.trim()) {
-      toast.error('Password is required.');
-      return;
-    }
-    setSavingPw(true);
-    try {
-      const res = await fetch(`/api/v1/admin/access/users/${user.id}/password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword, temporary: tempPw }),
-      });
-      const d = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(d.error ?? 'Failed to reset password.');
-      toast.success('Password reset.');
-      setNewPassword('');
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSavingPw(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4 py-2">
-      {/* Roles */}
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Realm roles
-        </p>
-        {allRoles.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No realm roles defined.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {allRoles.map((r) => {
-              const on = checked.has(r.name);
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => toggleChecked(r.name)}
-                  className={`rounded border px-2 py-0.5 text-xs font-mono transition-colors ${
-                    on
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/60'
-                  }`}
-                >
-                  {on && <Check className="inline-block size-3 mr-1" />}
-                  {r.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <Button size="sm" className="mt-2" onClick={saveRoles} disabled={savingRoles}>
-          {savingRoles ? 'Saving…' : 'Save roles'}
-        </Button>
-      </div>
-
-      {/* Reset password */}
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Reset password
-        </p>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Input
-              type={showPw ? 'text' : 'password'}
-              placeholder="New password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="pr-8 font-mono text-sm w-56"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              {showPw ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
-            </button>
-          </div>
-          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={tempPw}
-              onChange={(e) => setTempPw(e.target.checked)}
-              className="accent-primary"
-            />
-            Temporary
-          </label>
-          <Button size="sm" onClick={resetPassword} disabled={savingPw}>
-            {savingPw ? 'Resetting…' : 'Reset'}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function UsersList() {
@@ -345,7 +173,6 @@ export function UsersList() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keycloak realms can hold many users; paginate the (already search-filtered) fetched set
@@ -471,65 +298,47 @@ export function UsersList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paged.pageItems.map((u) => {
-                    const isOpen = expandedId === u.id;
-                    return (
-                      <>
-                        <TableRow
-                          key={u.id}
-                          className="cursor-pointer"
-                          onClick={() => setExpandedId(isOpen ? null : u.id)}
+                  paged.pageItems.map((u) => (
+                    <TableRow key={u.id} className="group">
+                      <TableCell className="font-mono text-xs">
+                        <Link
+                          href={`/access/${u.id}`}
+                          className="inline-flex items-center gap-1 text-foreground hover:text-primary hover:underline"
                         >
-                          <TableCell className="font-mono text-xs">
-                            {isOpen ? '▾ ' : '▸ '}
-                            {u.email ?? u.username}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={u.enabled ? 'default' : 'destructive'} className="text-xs">
-                              {u.enabled ? 'enabled' : 'disabled'}
+                          <CaretRight className="size-3 text-muted-foreground group-hover:text-primary" />
+                          {u.email ?? u.username}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={u.enabled ? 'default' : 'destructive'} className="text-xs">
+                          {u.enabled ? 'enabled' : 'disabled'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {(u.realmRoles ?? []).map((r) => (
+                            <Badge key={r} variant="secondary" className="font-mono text-xs">
+                              {r}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {(u.realmRoles ?? []).map((r) => (
-                                <Badge key={r} variant="secondary" className="font-mono text-xs">
-                                  {r}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void deleteUser(u);
-                              }}
-                              title="Delete user"
-                            >
-                              <Trash className="size-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        {isOpen && (
-                          <TableRow key={`${u.id}-expanded`}>
-                            <TableCell colSpan={5} className="bg-muted/30">
-                              <ExpandedUser
-                                user={u}
-                                allRoles={allRoles}
-                                onRefresh={() => fetchUsers(search)}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    );
-                  })
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => void deleteUser(u)}
+                          title="Delete user"
+                        >
+                          <Trash className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
