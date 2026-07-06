@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Pagination } from '@/components/ui/Pagination';
@@ -486,14 +487,19 @@ function BucketPanel({ open, onClose }: { open: boolean; onClose: () => void }) 
   }, [rules, access, load]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Bucket settings</DialogTitle>
-          <DialogDescription>Object-expiry lifecycle rules and the bucket's public/private access policy.</DialogDescription>
-        </DialogHeader>
-
-        {loading ? (
+    <FormSheet
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      size="lg"
+      title="Bucket settings"
+      description="Object-expiry lifecycle rules and the bucket's public/private access policy."
+      footer={
+        <Button onClick={() => void save()} disabled={saving || loading}>
+          {saving ? 'Saving…' : 'Save settings'}
+        </Button>
+      }
+    >
+      {loading ? (
           <p className="py-8 text-center text-xs text-muted-foreground">Loading…</p>
         ) : (
           <div className="space-y-6">
@@ -564,16 +570,9 @@ function BucketPanel({ open, onClose }: { open: boolean; onClose: () => void }) 
                 </div>
               )}
             </section>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button onClick={() => void save()} disabled={saving || loading}>
-            {saving ? 'Saving…' : 'Save settings'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      )}
+    </FormSheet>
   );
 }
 
