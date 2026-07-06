@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 import {
   GATEWAY_URL,
   gatewayHeaders,
@@ -76,7 +78,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ nam
         { status: 501 },
       );
     }
-    return NextResponse.json(await r.json().catch(() => ({ ok: r.ok })), { status: r.status });
+    const payload = (await r.json().catch(() => ({ ok: r.ok }))) as unknown;
+    // Audit only a REAL applied control action (the aggregator accepted + forwarded to the node).
+    // Skip the not-actionable 404/501 above (no state change) and record a failed outcome when the
+    // aggregator itself rejected it — a privileged fleet mutation must leave an accountability trail.
+    auditFromSession(gate, await currentOrgId(), {
+      action: `gateway.node.${parsed.action}`,
+      resource: `node:${name}`,
+      outcome: r.ok ? 'ok' : 'error',
+    });
+    return NextResponse.json(payload, { status: r.status });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }

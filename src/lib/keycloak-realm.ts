@@ -40,6 +40,39 @@ export function forbiddenGrantMessage(op: KcAdminOp, status: number, fallback: s
   );
 }
 
+// ── Federation self-heal (GAP #40) ───────────────────────────────────────────────
+// The console's own admin service-account needs these `realm-management` CLIENT roles to read + write
+// identity-provider federation. On a fresh realm they are unassigned, so the first federation call
+// 403s. The provision route grants exactly these to the SA — a one-click self-heal instead of a
+// manual bootstrap. The name of the client whose roles these are, and the SA username derivation, are
+// pure so they're unit-testable without a Keycloak.
+
+// The Keycloak client that owns the fine-grained realm-admin roles.
+export const REALM_MANAGEMENT_CLIENT = 'realm-management';
+
+// The realm-management client roles federation read+write require. Kept in sync with OP_ROLE above
+// (the two federation ops). Returned as a fresh array so a caller can't mutate the source of truth.
+export function federationGrantRoleNames(): string[] {
+  return [OP_ROLE['list-identity-providers'], OP_ROLE['manage-identity-providers']];
+}
+
+// Keycloak names a client's service-account user `service-account-<clientId>` (lower-cased). This is
+// the user we assign the realm-management roles to — derive it purely from the admin client id.
+export function serviceAccountUsername(clientId: string): string {
+  return `service-account-${clientId.trim().toLowerCase()}`;
+}
+
+// The exact kcadm command an operator can run by hand if the console's own SA lacks the rights to
+// self-grant (it needs manage-users + view/manage-clients on realm-management to grant to itself).
+// Surfaced in the provision route's failure body so the fallback is copy-pasteable, never a bare 403.
+export function federationGrantCommand(clientId: string): string {
+  const roles = federationGrantRoleNames().join(' --rolename ');
+  return (
+    `kcadm.sh add-roles -r <realm> --uusername ${serviceAccountUsername(clientId)} ` +
+    `--cclientid ${REALM_MANAGEMENT_CLIENT} --rolename ${roles}`
+  );
+}
+
 // ── Active sessions ───────────────────────────────────────────────────────────
 
 // A Keycloak user session as returned by GET /users/{id}/sessions or
