@@ -1,6 +1,7 @@
 import { Scales } from '@phosphor-icons/react/dist/ssr';
 import { Suspense } from 'react';
 import { PolicyRulesManager } from '@/components/policy/PolicyRulesManager';
+import { PolicyTemplatesPanel } from '@/components/policy/PolicyTemplatesPanel';
 import { RegoModulesManager } from '@/components/policy/RegoModulesManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,8 +115,12 @@ export default async function PolicyPage() {
           <Tabs defaultValue="abac">
             <TabsList>
               <TabsTrigger value="abac">ABAC rules (default)</TabsTrigger>
+              <TabsTrigger value="templates">Starter templates</TabsTrigger>
               <TabsTrigger value="rego">Rego modules (advanced)</TabsTrigger>
             </TabsList>
+            <TabsContent value="templates" className="pt-4">
+              <PolicyTemplatesPanel />
+            </TabsContent>
             <TabsContent value="abac" className="pt-4">
               <Suspense
                 fallback={<p className="text-sm text-muted-foreground">Loading rules…</p>}
