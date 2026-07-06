@@ -1,9 +1,11 @@
 'use client';
 
-import { Plus } from '@phosphor-icons/react/dist/ssr';
+import { Plus, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { ModelBrowser, useModelCatalog } from '@/components/gateway/ModelPicker';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -16,6 +18,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { ModelSpec } from '@/lib/model-catalog';
 
 const ACTIONS = ['local', 'cloud', 'block'] as const;
 
@@ -41,6 +44,12 @@ export function AddRoutingRuleButton() {
   const [action, setAction] = useState<(typeof ACTIONS)[number]>('local');
   const [model, setModel] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // The model comes from the curated catalog (reconciled against the live fleet), not free text —
+  // so a rule can only target a real, known model id. `block` needs no model, so the picker only
+  // shows for local/cloud.
+  const { models, loading, error } = useModelCatalog();
+  const picked: ModelSpec | undefined = models.find((m) => m.id === model);
 
   async function create() {
     if (!name.trim() || !value.trim()) return;
@@ -122,15 +131,62 @@ export function AddRoutingRuleButton() {
                   ))}
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="r-model">Model (optional)</Label>
-                <Input
-                  id="r-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gemma-local | cloud-claude"
-                />
-              </div>
+
+              {action !== 'block' ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label>Model</Label>
+                    {picked ? (
+                      <button
+                        type="button"
+                        onClick={() => setModel('')}
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                        clear
+                      </button>
+                    ) : null}
+                  </div>
+                  {picked ? (
+                    <div className="flex items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2">
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs text-foreground">{picked.id}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {picked.family} · {picked.modality}
+                          {picked.contextWindow != null
+                            ? ` · ${Math.round(picked.contextWindow / 1024)}K ctx`
+                            : ' · ctx unknown'}
+                        </span>
+                      </div>
+                      {picked.servedOnFleet ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 font-mono text-[10px] text-primary"
+                        >
+                          live
+                        </Badge>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Pick a model from the catalog below. Fleet-served models are badged{' '}
+                      <span className="font-mono text-primary">live</span>.
+                    </p>
+                  )}
+                  <ModelBrowser
+                    models={models}
+                    loading={loading}
+                    error={error}
+                    selectedId={model}
+                    onPick={(m) => setModel(m.id)}
+                  />
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  A <span className="font-mono">block</span> rule refuses the request — no model
+                  needed.
+                </p>
+              )}
             </div>
           </SheetBody>
           <SheetFooter>
