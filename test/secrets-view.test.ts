@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildSecretsView,
+  readSecretsView,
   type SecretsViewInput,
 } from '../src/lib/secrets-view.ts';
 
@@ -157,4 +158,60 @@ test('version falls back to seal-status when health has none', () => {
     baseInput({ health: { sealed: false }, sealStatus: { sealed: false, version: '1.16.1' } }),
   );
   assert.equal(view.version, '1.16.1');
+});
+
+// ── Reader-level: the configured OpenBao URL must be display-mapped (no raw loopback/LAN leaks). ──
+// Founder directive: 127.0.0.1 / localhost / raw IPs may never surface in the UI. The reader
+// connects to the real URL but exposes only the mDNS host in baoUrl + the error banner.
+
+async function withBaoReader(
+  env: { url: string },
+  fetchImpl: typeof fetch,
+  run: (r: Awaited<ReturnType<typeof readSecretsView>>) => void | Promise<void>,
+): Promise<void> {
+  const origFetch = globalThis.fetch;
+  const origUrl = process.env.OFFGRID_OPENBAO_URL;
+  const origAlias = process.env.OFFGRID_BAO_URL;
+  process.env.OFFGRID_OPENBAO_URL = env.url;
+  delete process.env.OFFGRID_BAO_URL;
+  globalThis.fetch = fetchImpl;
+  try {
+    await run(await readSecretsView());
+  } finally {
+    globalThis.fetch = origFetch;
+    if (origUrl === undefined) delete process.env.OFFGRID_OPENBAO_URL;
+    else process.env.OFFGRID_OPENBAO_URL = origUrl;
+    if (origAlias !== undefined) process.env.OFFGRID_BAO_URL = origAlias;
+  }
+}
+
+test('reader display-maps a loopback OpenBao URL to the mDNS host (reachable)', async () => {
+  const reachable: typeof fetch = async (input) => {
+    const u = String(input);
+    const body = u.includes('seal-status')
+      ? { sealed: false, t: 1, n: 1, progress: 0, version: '1.15.0' }
+      : u.includes('health')
+        ? { initialized: true, sealed: false, version: '1.15.0' }
+        : { 'secret/': { type: 'kv' } };
+    return new Response(JSON.stringify(body), { status: 200 });
+  };
+  await withBaoReader({ url: 'http://127.0.0.1:8200' }, reachable, ({ data, error }) => {
+    assert.equal(error, null);
+    assert.equal(data.reachable, true);
+    // The raw loopback address must NOT appear; it maps to S1's mDNS host.
+    assert.equal(data.baoUrl, 'http://offgrid-s1.local:8200/');
+    assert.ok(!(data.baoUrl ?? '').includes('127.0.0.1'));
+  });
+});
+
+test('reader display-maps the URL inside the unreachable error banner', async () => {
+  const down: typeof fetch = async () => {
+    throw new Error('ECONNREFUSED');
+  };
+  await withBaoReader({ url: 'http://127.0.0.1:8200' }, down, ({ data, error }) => {
+    assert.equal(data.reachable, false);
+    assert.ok(error);
+    assert.ok(!error.includes('127.0.0.1'), `error leaked a raw IP: ${error}`);
+    assert.ok(error.includes('offgrid-s1.local'), `error should name the mDNS host: ${error}`);
+  });
 });
