@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 // Graceful-degradation wrapper for route handlers (P2 #129).
 //
 // A route body that touches Postgres / an external service throws on outage, and Next turns the
@@ -10,7 +8,8 @@ import { NextResponse } from 'next/server';
 // Response untouched — zero behavior change.
 //
 // SOLID: the pure error→message mapping is `degradeMessage` (below), unit-testable with no I/O; the
-// wrapper is the only piece that touches NextResponse.
+// wrapper is the only piece that builds a Response. (Uses the standard web `Response.json`, which
+// NextResponse.json extends — same body+status behavior, and keeps this helper import-free/testable.)
 
 // Pure: turn an unknown thrown value into a stable, non-leaky user-facing message.
 export function degradeMessage(err: unknown): string {
@@ -23,6 +22,6 @@ export async function degradeOn503(body: () => Promise<Response>): Promise<Respo
   try {
     return await body();
   } catch (err) {
-    return NextResponse.json({ error: degradeMessage(err) }, { status: 503 });
+    return Response.json({ error: degradeMessage(err) }, { status: 503 });
   }
 }

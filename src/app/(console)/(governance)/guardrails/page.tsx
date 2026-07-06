@@ -31,7 +31,8 @@ export default async function GuardrailsPage({
     ? await readGuardrailsView(await getPii().scan(probe), probe)
     : await readGuardrailsView();
   const orgId = await currentOrgId();
-  const rules = await listGuardrailRules(orgId);
+  // Degrade gracefully (consistent with the DEEP-layer .catch below): DB down → no rules, page renders.
+  const rules = await listGuardrailRules(orgId).catch(() => []);
   // The DEEP layer — best-effort so a missing DB never breaks the page.
   const [recognizers, thresholds] = await Promise.all([
     listRecognizers(orgId).catch(() => []),
