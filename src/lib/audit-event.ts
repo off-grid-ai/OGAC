@@ -55,7 +55,11 @@ export type AuditAction =
   | 'gateway.node.model'
   | 'gateway.node.restart'
   | 'gateway.node.enable'
-  | 'gateway.node.disable';
+  | 'gateway.node.disable'
+  // device fleet control — remote node lifecycle (kill switch)
+  | 'device.kill'
+  // data-subject rights — GDPR/DSAR right-to-erasure
+  | 'data.erasure';
 
 export interface TokenUsage {
   prompt: number;

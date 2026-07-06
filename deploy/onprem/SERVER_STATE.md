@@ -65,6 +65,18 @@ DDL for each is in `src/db/schema.ts`; the create statements used are in git his
 
 Self-creating tables (via `CREATE TABLE IF NOT EXISTS` on first use — no manual/migration step, deploy over SSH just works): `guardrails_rules`, and (2026-07-05, DEEP Presidio guardrails) **`presidio_recognizers`** (org-scoped custom recognizers: regex-pattern + context words, or deny-list terms — pushed to Presidio `/analyze` as `ad_hoc_recognizers`) and **`presidio_thresholds`** (per-org global + per-entity `score_threshold`). DDL in `src/lib/presidio-recognizers.ts` (`ensureRecognizersSchema`).
 
+**Self-healing additive columns (2026-07-06, hardening wave 2 / TASK #139)** — added by `ensureOrgSchema()` in `src/lib/store.ts` on first use (idempotent `ADD COLUMN IF NOT EXISTS`, so a normal deploy applies them with no migration step). If you want to apply them eagerly on the server via psql (`docker exec -i <pg> psql -U offgrid -d offgrid`):
+
+```sql
+-- Tenant-scope ingest jobs (was a cross-tenant leak: listIngestJobs was global).
+ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+-- Random per-device data-plane secret (replaces the predictable dt_<id>). Nullable: devices
+-- enrolled before this fall back to the legacy dt_<id> form until they re-enroll.
+ALTER TABLE devices     ADD COLUMN IF NOT EXISTS token  text;
+```
+
+**Re-enroll note:** devices enrolled BEFORE this deploy have `token = NULL` and keep authenticating with the legacy `dt_<id>` bearer (backward-tolerant — see `src/lib/device-token.ts`). New enrollments get a random secret returned ONCE at `POST /api/v1/devices/enroll` (`deviceToken` field). To close the legacy form on an existing node, re-enroll it (issue a fresh enrollment token, enroll again) so its row gets a random `token`.
+
 ### Gateway fleet SSOT (2026-07-05) — how it's wired
 `fleet_nodes` is the single source of truth for the on-prem fleet. Flow + gotchas:
 - **Console** `GET /api/v1/gateway/pool` derives the aggregator POOL/IMAGE_POOL from the table;
