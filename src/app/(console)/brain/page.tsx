@@ -172,21 +172,26 @@ export default async function BrainPage({
           </div>
           <IngestMenu datasets={datasetOpts} />
         </CardHeader>
-        <CardContent className="space-y-2">
-          {docs.map((d) => (
-            <div key={d.id} className="rounded-md border border-border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <Link href={`/brain/docs/${d.id}`} className="text-sm font-medium text-foreground hover:text-primary">
-                  {d.title}
-                </Link>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{d.source}</Badge>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {docs.map((d) => (
+              <div key={d.id} className="flex flex-col rounded-md border border-border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <Link
+                    href={`/brain/docs/${d.id}`}
+                    className="text-sm font-medium text-foreground hover:text-primary"
+                  >
+                    {d.title}
+                  </Link>
                   <DeleteRowButton url={`/api/v1/admin/brain/documents/${d.id}`} label={d.title} />
                 </div>
+                <Badge variant="secondary" className="mt-1.5 w-fit">
+                  {d.source}
+                </Badge>
+                <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{d.text}</p>
               </div>
-              <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{d.text}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </CardContent>
       </Card>
       )}
