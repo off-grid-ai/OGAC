@@ -1474,7 +1474,7 @@ export function ChatWorkspace({
         </div>
       </section>
 
-      {artifact ? <ArtifactView artifact={artifact} onClose={() => setArtifact(null)} /> : null}
+      {artifact ? <ArtifactView artifact={artifact} onClose={() => setArtifact(null)} title={artifactTitle(artifact)} conversationId={activeId ?? null} /> : null}
       <ProjectDialog
         project={dialogProject}
         open={!!dialogProject}
