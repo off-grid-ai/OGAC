@@ -33,6 +33,7 @@ export interface KcClient {
   publicClient: boolean;
   serviceAccountsEnabled: boolean;
   secret?: string;
+  attributes?: Record<string, string[] | string>;
 }
 
 export interface KcProtocolMapper {
@@ -285,6 +286,9 @@ export class KeycloakAdminClient {
     description?: string;
     serviceAccountsEnabled?: boolean;
     directAccessGrantsEnabled?: boolean;
+    // Free-form client attributes (Keycloak stores these on the client rep). Used to carry a gateway
+    // API key's label/owner/createdAt/scope alongside the client itself — no separate store needed.
+    attributes?: Record<string, string>;
   }): Promise<{ id: string }> {
     const res = await this.fetch('/clients', {
       method: 'POST',
@@ -296,6 +300,18 @@ export class KeycloakAdminClient {
     const newId = location.split('/').pop() ?? '';
     if (!newId) throw new Error('Client created but ID could not be determined');
     return { id: newId };
+  }
+
+  // Partial update of a client rep (PUT merges scalars; arrays/objects are replaced). Used to
+  // enable/disable a client (revoke a gateway key = { enabled:false }) without deleting it.
+  async updateClient(
+    id: string,
+    data: Partial<{ enabled: boolean; name: string; description: string; attributes: Record<string, string> }>,
+  ): Promise<void> {
+    await this.fetchJson<void>(`/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   async deleteClient(id: string): Promise<void> {
