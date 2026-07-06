@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { provitRepos, provitRuns, provitVerdicts } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
 import { canDeleteRow } from '@/lib/provit-policy';
+import { degradeOn503 } from '@/lib/route-degrade';
 import { currentPrincipal, provitAbacAllows, resolvePushPrincipal, visibilityFilter } from '@/lib/provit-access';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +13,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request): Promise<Response> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const p = await currentPrincipal();
-  if (!(await provitAbacAllows(p, 'read'))) return NextResponse.json({ repos: [] });
-  const rows = await db.select().from(provitRepos).where(visibilityFilter(provitRepos, p)).orderBy(desc(provitRepos.mappedAt)).limit(200);
-  return NextResponse.json({ repos: rows }, { headers: { 'cache-control': 'no-store' } });
+  return degradeOn503(async () => {
+    const p = await currentPrincipal();
+    if (!(await provitAbacAllows(p, 'read'))) return NextResponse.json({ repos: [] });
+    const rows = await db.select().from(provitRepos).where(visibilityFilter(provitRepos, p)).orderBy(desc(provitRepos.mappedAt)).limit(200);
+    return NextResponse.json({ repos: rows }, { headers: { 'cache-control': 'no-store' } });
+  });
 }
 
 // POST /api/v1/provit/repos — Provit pushes a mapped repo. A pvt_ integration token attributes it
@@ -36,11 +39,13 @@ export async function POST(req: Request): Promise<Response> {
     features: c.features ?? 0, testFiles: c.testFiles ?? 0, screens: c.screens ?? 0, cases: c.cases ?? 0,
     plan: (b.plan ?? b.features ?? null) as object | null, mappedBy: who.ownerId, mappedAt: new Date(),
   };
-  await db.insert(provitRepos).values(row).onConflictDoUpdate({
-    target: provitRepos.id,
-    set: { url: row.url, orgId: row.orgId, ownerId: row.ownerId, visibility: row.visibility, features: row.features, testFiles: row.testFiles, screens: row.screens, cases: row.cases, plan: row.plan, mappedBy: row.mappedBy, mappedAt: row.mappedAt },
+  return degradeOn503(async () => {
+    await db.insert(provitRepos).values(row).onConflictDoUpdate({
+      target: provitRepos.id,
+      set: { url: row.url, orgId: row.orgId, ownerId: row.ownerId, visibility: row.visibility, features: row.features, testFiles: row.testFiles, screens: row.screens, cases: row.cases, plan: row.plan, mappedBy: row.mappedBy, mappedAt: row.mappedAt },
+    });
+    return NextResponse.json({ ok: true, id: b.id, scope: who.visibility });
   });
-  return NextResponse.json({ ok: true, id: b.id, scope: who.visibility });
 }
 
 // DELETE /api/v1/provit/repos?id=… — remove a mapped repo the caller owns/administers (a
@@ -49,20 +54,22 @@ export async function POST(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const p = await currentPrincipal();
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  const [repo] = await db.select().from(provitRepos).where(eq(provitRepos.id, id)).limit(1);
-  if (!repo) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  if (!canDeleteRow(repo, { orgId: p.orgId, email: p.email, isAdmin: p.role === 'admin' })) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  }
+  return degradeOn503(async () => {
+    const p = await currentPrincipal();
+    const [repo] = await db.select().from(provitRepos).where(eq(provitRepos.id, id)).limit(1);
+    if (!repo) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    if (!canDeleteRow(repo, { orgId: p.orgId, email: p.email, isAdmin: p.role === 'admin' })) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
 
-  // Cascade: verdicts of this repo's runs, then the runs, then the repo.
-  const runs = await db.select({ id: provitRuns.id }).from(provitRuns).where(eq(provitRuns.repoId, id));
-  for (const r of runs) await db.delete(provitVerdicts).where(eq(provitVerdicts.runId, r.id));
-  await db.delete(provitRuns).where(eq(provitRuns.repoId, id));
-  await db.delete(provitRepos).where(eq(provitRepos.id, id));
-  return NextResponse.json({ deleted: true, id, runs: runs.length });
+    // Cascade: verdicts of this repo's runs, then the runs, then the repo.
+    const runs = await db.select({ id: provitRuns.id }).from(provitRuns).where(eq(provitRuns.repoId, id));
+    for (const r of runs) await db.delete(provitVerdicts).where(eq(provitVerdicts.runId, r.id));
+    await db.delete(provitRuns).where(eq(provitRuns.repoId, id));
+    await db.delete(provitRepos).where(eq(provitRepos.id, id));
+    return NextResponse.json({ deleted: true, id, runs: runs.length });
+  });
 }

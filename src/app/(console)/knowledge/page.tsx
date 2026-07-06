@@ -26,8 +26,11 @@ export default async function KnowledgePage() {
   const role = session?.user?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
-  const collections = await listCollections(role);
-  const docCounts = await Promise.all(collections.map((c) => listDocuments(c.id)));
+  // Degrade gracefully: DB/store down → empty collection list rather than the whole-page error boundary.
+  const collections = await listCollections(role).catch(() => []);
+  const docCounts = await Promise.all(
+    collections.map((c) => listDocuments(c.id).catch(() => [])),
+  );
 
   return (
     <div className="space-y-6">

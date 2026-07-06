@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 // templates compose the same live section renderers so they can't drift from the dashboards.
 export default async function ReportsPage() {
   await requireModuleForUser('reports');
-  const templates = await listReportTemplates();
+  // Degrade gracefully: DB down → empty template list rather than the whole-page error boundary.
+  const templates = await listReportTemplates().catch(() => []);
   return <ReportsManager initial={templates} />;
 }
