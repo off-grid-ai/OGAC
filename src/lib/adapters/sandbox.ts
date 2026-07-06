@@ -95,10 +95,15 @@ function runProc(engine: string, bin: string, args: string[], timeoutMs: number)
 
 // Locked-down container flags: no network, capped memory/CPU/PIDs, read-only FS, dropped caps,
 // non-root, auto-removed. The code is passed via the interpreter's -c (no host mounts).
+// `--pull never`: the run image is pre-provisioned INFRA (pre-pulled on the sandbox host — see
+// deploy/onprem/SERVER_STATE.md). A container with `--network none` can't pull anyway, and folding
+// a registry pull into the run's timeout is what caused the "Unable to find image … / exit 143"
+// timeout. So we never attempt a pull at run time: if the image is missing docker fails instantly
+// with a clear "No such image" message instead of hanging until the runner SIGTERMs it.
 function dockerArgs(language: SandboxLanguage, code: string): string[] {
   const interp = language === 'python' ? ['python3', '-c', code] : ['node', '-e', code];
   return [
-    'run', '--rm', '--network', 'none',
+    'run', '--rm', '--pull', 'never', '--network', 'none',
     '--memory', '256m', '--cpus', '1', '--pids-limit', '128',
     '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
     '-u', '65534', // nobody

@@ -19,7 +19,7 @@ import { verifierFromEnv } from './lib/keycloak-verify.mjs';
 import { gatewayKeyVerifierFromEnv, isGatewayKey } from './lib/gateway-key-verify.mjs';
 
 // DEPRECATED (task #74): the single static gateway key. Retained ONLY as a backward-compat fallback
-// so an unmigrated deploy keeps working; new keys are the Keycloak-backed `ogk_…` API keys minted in
+// so an unmigrated deploy keeps working; new keys are the Keycloak-backed `ogak_…` API keys minted in
 // the console (Gateway → API keys tab), verified via `keyVerifier` below. Remove once every consumer
 // has moved to a minted key.
 const API_KEY = process.env.OFFGRID_GATEWAY_API_KEY || '';
@@ -102,11 +102,11 @@ function captureToken(req) {
   e.ips[ip] = (e.ips[ip] || 0) + 1;
 }
 const kc = verifierFromEnv();
-const keyVerifier = gatewayKeyVerifierFromEnv(); // Keycloak-backed ogk_ API-key verifier (task #74)
+const keyVerifier = gatewayKeyVerifierFromEnv(); // Keycloak-backed ogak_ API-key verifier (task #74)
 const AUTH_ON = Boolean(API_KEY || kc || keyVerifier);
 
 // Returns true if the request may proceed. /healthz is always open (liveness probe).
-// Accepts, in order: a Keycloak-backed `ogk_` API key (many, revocable — the preferred path); the
+// Accepts, in order: a Keycloak-backed `ogak_` API key (many, revocable — the preferred path); the
 // DEPRECATED static key (Bearer or x-api-key, backward-compat only); or a Keycloak service JWT.
 async function authOK(req, url) {
   if (url === '/healthz') return true;
