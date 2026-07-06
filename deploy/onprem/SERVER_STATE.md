@@ -643,3 +643,6 @@ Multi-step apps with a human step now run durably (Temporal) so HITL review can 
 - **Verified:** the seeded "Reimbursement Approval" app (`app_bdd24eab`) POST /run → `mode: durable`,
   workflow executed the connector-query + agent steps and advances toward the human pause. `submitAppRun`
   degrades to inline if Temporal/worker is unreachable (graceful).
+
+### Self-creating table: compliance_adoption (2026-07-06)
+Regulatory framework adoption + per-control status (ISO42001/NIST-AI-RMF/EU-AI-Act). CREATE TABLE IF NOT EXISTS in `ensureComplianceSchema()` (like guardrails_rules) — no migration step. Cols: org_id, framework_id, control_id, status(new|in-progress|met), updated_at; PK (org_id, control_id).
