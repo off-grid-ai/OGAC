@@ -226,10 +226,20 @@ export interface DriftReadResult {
   error: string | null;
 }
 
-export async function readDriftView(): Promise<DriftReadResult> {
+// Options forwarded to the drift run — a selection from the standard drift catalog (preset /
+// per-column method / drift-share threshold). Kept structural (not importing the adapter type) so
+// this file's pure core stays import-free at module load.
+export interface ReadDriftOptions {
+  preset?: string | null;
+  method?: string | null;
+  columnMethods?: Record<string, string>;
+  driftShareThreshold?: number;
+}
+
+export async function readDriftView(options?: ReadDriftOptions): Promise<DriftReadResult> {
   try {
     const { getDrift } = await import('@/lib/adapters/registry');
-    const report = await getDrift().analyze();
+    const report = await getDrift().analyze(options);
     return { data: normalizeDrift(report as RawDriftInput), error: null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : 'drift analysis failed' };
