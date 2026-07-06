@@ -37,6 +37,7 @@ import {
   Receipt,
   ClipboardText,
   Toolbox,
+  Wrench,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -55,6 +56,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   brain: Brain,
   agents: Bot,
   studio: Graph,
+  tools: Wrench,
   observability: Microscope,
   analytics: BarChart3,
   finops: Coins,

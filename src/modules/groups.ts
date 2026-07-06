@@ -51,8 +51,12 @@ export const NAV_GROUPS: NavGroup[] = [
     // old Agents roster page is a secondary (its routes still resolve). Brain (RAG) stays a sibling
     // primary. Run history, evals, sandbox, and visual QA remain secondaries — reached from the
     // section nav, not the sidebar — so every route resolves without crowding it.
+    // Tools (#121) is the ONE home for the tools apps call — registered registry + MCP catalog +
+    // built-in primitives — reached from the Build nav. The old standalone `tool-catalog` route now
+    // redirects into Tools→Catalog, so it stays a Build secondary (resolves, keeps highlight sane)
+    // rather than lingering under Data.
     primary: ['studio', 'brain'],
-    secondary: ['agents', 'agent-runs', 'evals', 'sandbox', 'provit'],
+    secondary: ['agents', 'tools', 'tool-catalog', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {
     id: 'gateway',
@@ -68,7 +72,8 @@ export const NAV_GROUPS: NavGroup[] = [
     // One sidebar row → the Data section landing, which tabs across sources, retrieval, and
     // lineage via DataNav (already rendered by src/app/(console)/(data)/layout.tsx).
     primary: ['data'],
-    secondary: ['integrations', 'tool-catalog', 'data-domains', 'retrieval', 'lineage'],
+    // `tool-catalog` moved to Build (Tools→Catalog is its home now; the old route redirects there).
+    secondary: ['integrations', 'data-domains', 'retrieval', 'lineage'],
   },
   {
     id: 'governance',

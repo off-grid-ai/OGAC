@@ -1218,6 +1218,22 @@ export async function setToolEnabled(id: string, enabled: boolean): Promise<void
   await db.update(tools).set({ enabled }).where(eq(tools.id, id));
 }
 
+// Edit a registered tool's editable fields (name / endpoint / description). Only the provided keys
+// are written, so a partial PATCH (e.g. just the description) leaves the rest untouched. Additive to
+// the existing create/delete/enable/policy CRUD — the Tools surface needs field-level edit.
+export async function updateTool(
+  id: string,
+  patch: { name?: string; endpoint?: string; description?: string },
+): Promise<void> {
+  await ensureOrgSchema();
+  const set: Record<string, string> = {};
+  if (typeof patch.name === 'string' && patch.name.trim()) set.name = patch.name.trim();
+  if (typeof patch.endpoint === 'string') set.endpoint = patch.endpoint;
+  if (typeof patch.description === 'string') set.description = patch.description;
+  if (Object.keys(set).length === 0) return;
+  await db.update(tools).set(set).where(eq(tools.id, id));
+}
+
 const TOOL_POLICIES: ToolPolicy[] = ['allow', 'approval', 'blocked'];
 export async function setToolPolicy(id: string, policy: ToolPolicy): Promise<void> {
   await ensureOrgSchema();
