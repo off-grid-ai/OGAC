@@ -18,6 +18,10 @@ export interface CheckContext {
   input?: string;
   output?: string;
   model?: string;
+  // Explicit org for tenant-scoped checks (PII deep config). Supplied on the durable/worker path
+  // where there is no request scope for `headers()`-based org resolution (gap #121); omitted on the
+  // request path, where the PII adapter resolves the org from the session. Optional = back-compat.
+  orgId?: string;
 }
 
 export interface CheckAdapter {
@@ -34,7 +38,8 @@ export const piiCheck: CheckAdapter = {
   name: 'pii',
   phase: 'pre',
   async run(ctx) {
-    const result = await getPii().scan(ctx.input ?? '');
+    // Thread the explicit orgId (worker path) into the port; undefined → session resolution.
+    const result = await getPii().scan(ctx.input ?? '', ctx.orgId);
     return {
       name: 'pii',
       verdict: result.hits ? 'redacted' : 'pass',

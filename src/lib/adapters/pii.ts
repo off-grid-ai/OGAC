@@ -18,6 +18,7 @@ function metaOf(id: string) {
 export const regexPii: PiiPort = {
   meta: metaOf('checks'),
   async scan(text) {
+    // The regex floor is org-agnostic (no custom recognizers), so it ignores any orgId.
     return regexScan(text);
   },
   async health() {
@@ -69,17 +70,24 @@ async function presidioAnalyze(url: string, body: AnalyzeRequest): Promise<Presi
 // MUST degrade to "no custom recognizers, plain thresholds" and let the base Presidio analyze run
 // — it must NEVER bubble up and force the whole scan onto the regex floor. The deep layer is
 // additive; a broken deep layer is still Presidio, not regex. We log the reason so it's diagnosable.
-async function loadDeepConfig(): Promise<{
+//
+// `explicitOrgId` is the durable/worker path: the app-run executor threads its `ctx.orgId` in, so
+// the deep config resolves WITHOUT `headers()` (which throws outside a request scope — gap #121).
+// When omitted (the request path) we resolve the org from the session via `currentOrgId()`. This
+// makes worker + request behave identically instead of the worker silently dropping org recognizers.
+async function loadDeepConfig(explicitOrgId?: string): Promise<{
   recognizers: NormalizedRecognizer[];
   thresholds: ThresholdConfig;
 }> {
   const { DEFAULT_THRESHOLDS } = await import('../presidio-recognizers');
   try {
-    const [{ listRecognizers, getThresholds }, { currentOrgId }] = await Promise.all([
-      import('../presidio-recognizers'),
-      import('../tenancy'),
-    ]);
-    const orgId = await currentOrgId();
+    const { listRecognizers, getThresholds } = await import('../presidio-recognizers');
+    // Prefer the explicit orgId (worker path); only touch `headers()` (via currentOrgId) when not
+    // supplied. A blank/whitespace explicit value falls through to the session resolver.
+    const orgId =
+      explicitOrgId && explicitOrgId.trim()
+        ? explicitOrgId.trim()
+        : await (await import('../tenancy')).currentOrgId();
     const [recs, thresholds] = await Promise.all([listRecognizers(orgId), getThresholds(orgId)]);
     // The stored CustomRecognizer is a superset of NormalizedRecognizer (adds id/createdAt) — the
     // builder reads only the normalized fields, so the extra keys are harmless.
@@ -143,14 +151,16 @@ function redactSpans(text: string, results: PresidioEntity[]): string {
 
 export const presidioPii: PiiPort = {
   meta: metaOf('presidio'),
-  async scan(text) {
+  async scan(text, orgId) {
     const url = env.OFFGRID_PRESIDIO_URL;
     if (!url) return regexScan(text);
 
     // Deep-config load is best-effort and CANNOT throw here (loadDeepConfig swallows + logs), so a
     // broken DB/auth context yields a PLAIN analyze — not a regex fallback. Build the request body
-    // outside the network try so a config problem can't be mistaken for a Presidio outage.
-    const { recognizers, thresholds } = await loadDeepConfig();
+    // outside the network try so a config problem can't be mistaken for a Presidio outage. `orgId`,
+    // when supplied by the caller (the durable app-worker path), scopes the deep config without
+    // `headers()`; when absent the loader resolves the org from the session (the request path).
+    const { recognizers, thresholds } = await loadDeepConfig(orgId);
     const { buildAnalyzeRequest, applyThresholds } = await import('../presidio-recognizers');
     const body = buildAnalyzeRequest(text, recognizers, thresholds);
 
