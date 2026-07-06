@@ -7,15 +7,24 @@ import { DurableExecutionsPanel } from '@/components/agent-runs/DurableExecution
 import { SchedulesPanel } from '@/components/agent-runs/SchedulesPanel';
 import type { RunSummaryRow, RunsSummary } from '@/lib/agent-runs';
 
-// URL-driven panel switcher (?panel=runs|executions|schedules). The recorded run history is the
-// default; the durable-executions + schedules panels are the Temporal-side surfaces. Navigation
-// lives in the URL so Back steps between panels and each is deep-linkable.
-type Panel = 'runs' | 'executions' | 'schedules';
+// URL-driven panel switcher (?panel=jobs|runs|schedules). The Jobs (durable-executions) surface is
+// the DEFAULT + first tab — the operator's live view of what's running now, at what state, and
+// where rerun/cancel live. Run history is the recorded DB timeline; Schedules are recurring fires.
+// Navigation lives in the URL so Back steps between panels and each is deep-linkable.
+//
+// `panel=executions` stays accepted as a legacy alias for `jobs` so old deep links don't break.
+type Panel = 'jobs' | 'runs' | 'schedules';
 const PANELS: { id: Panel; label: string }[] = [
+  { id: 'jobs', label: 'Jobs' },
   { id: 'runs', label: 'Run history' },
-  { id: 'executions', label: 'Durable executions' },
   { id: 'schedules', label: 'Schedules' },
 ];
+
+function resolvePanel(raw: string | null): Panel {
+  if (raw === 'runs' || raw === 'schedules') return raw;
+  // 'executions' is the legacy alias for the Jobs panel; empty/unknown → Jobs (the default).
+  return 'jobs';
+}
 
 export function AgentRunsTabs({
   runs,
@@ -29,13 +38,12 @@ export function AgentRunsTabs({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const raw = params.get('panel');
-  const panel: Panel = raw === 'executions' || raw === 'schedules' ? raw : 'runs';
+  const panel = resolvePanel(params.get('panel'));
 
   const select = useCallback(
     (id: Panel) => {
       const next = new URLSearchParams(params.toString());
-      if (id === 'runs') next.delete('panel');
+      if (id === 'jobs') next.delete('panel');
       else next.set('panel', id);
       // Switching panels resets panel-local nav params so we don't carry a stale detail id across.
       for (const k of ['run', 'wf', 'new', 'status']) next.delete(k);
@@ -62,10 +70,10 @@ export function AgentRunsTabs({
         ))}
       </div>
 
-      {panel === 'runs' ? (
-        <AgentRunsManager runs={runs} statusCounts={statusCounts} totalRuns={totalRuns} />
-      ) : panel === 'executions' ? (
+      {panel === 'jobs' ? (
         <DurableExecutionsPanel />
+      ) : panel === 'runs' ? (
+        <AgentRunsManager runs={runs} statusCounts={statusCounts} totalRuns={totalRuns} />
       ) : (
         <SchedulesPanel />
       )}
