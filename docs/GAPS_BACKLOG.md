@@ -418,3 +418,10 @@ already surfaces — not hidden defects. Ordered by impact.
   domain", "returns null for an unknown ref (no-guess)", and "executeStep(connector-query) reads via
   a domain ID (the compiler convention)". Existing `reimbursement-e2e.test.ts` label-binding test
   still passes. `typecheck` clean, `npm test` 0 fail, `npm run build` exit 0.
+
+## Autonomous-run tail (2026-07-06)
+- **#121 (P2) — PII deep-config unavailable in the durable app-worker.** A guardrail step running inside
+  the `offgrid-apps` Temporal worker logs `[pii] deep-config load failed ... headers() outside request
+  scope` and falls back to plain Presidio analyze. Non-fatal (degrades), but org-scoped custom PII
+  recognizers/thresholds won't apply on the durable path. Fix: pass org context into the guardrail
+  adapter explicitly (don't rely on `headers()`) so worker + request paths behave identically.
