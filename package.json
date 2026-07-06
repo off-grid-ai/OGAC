@@ -15,6 +15,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:api": "node scripts/smoke.mjs --api",
     "worker:agents": "tsx scripts/temporal-worker.mts",
+    "worker:apps": "tsx scripts/app-worker.mts",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
     "test": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
