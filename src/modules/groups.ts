@@ -43,12 +43,15 @@ export const NAV_GROUPS: NavGroup[] = [
     secondary: ['projects', 'prompts', 'artifacts'],
   },
   {
-    id: 'intelligence',
-    label: 'Intelligence',
-    // The build-and-run family. Agents (use cases), Studio (author), Brain (RAG) are the entries;
-    // run history, evals, sandbox, and visual QA hang off those flows.
-    primary: ['agents', 'studio', 'brain'],
-    secondary: ['agent-runs', 'evals', 'sandbox', 'provit'],
+    id: 'build',
+    label: 'Build',
+    // Studio and Agents were two sidebar rows for one job (author an assistant vs. run the agent
+    // definitions it produces), so they're consolidated under a single "Agents" umbrella row whose
+    // (build) section landing tabs across Agents / Studio / Runs via BuildNav. Brain (RAG) stays a
+    // sibling entry. Studio, run history, evals, sandbox, and visual QA are secondaries — reached
+    // from the section nav, not the sidebar — so every route still resolves without crowding it.
+    primary: ['agents', 'brain'],
+    secondary: ['studio', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {
     id: 'gateway',
