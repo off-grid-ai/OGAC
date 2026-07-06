@@ -4,7 +4,7 @@ import { ArrowSquareOut, CircleNotch } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
-import type { ServiceEntry, ServiceHealth } from '@/lib/services-directory';
+import { isHealthy, type ServiceEntry, type ServiceHealth } from '@/lib/services-directory';
 
 const AUTH_LABEL: Record<ServiceEntry['auth'], string> = {
   session: 'Login',
@@ -20,6 +20,15 @@ const KIND_GROUPS: { kind: ServiceEntry['kind']; label: string }[] = [
   { kind: 'site', label: 'Sites' },
 ];
 
+// Presentation for each honest health state. Embedded backends and optional deps on their
+// fallback are healthy (emerald/muted) — never the alarming red reserved for a real outage.
+const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
+  up: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
+  down: { dot: 'bg-red-500', text: 'text-red-500', label: 'Down' },
+  embedded: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Embedded' },
+  optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
+};
+
 function HealthDot({ h }: { h: ServiceHealth | undefined }) {
   if (!h) {
     return (
@@ -28,15 +37,15 @@ function HealthDot({ h }: { h: ServiceHealth | undefined }) {
       </span>
     );
   }
-  const up = h.status === 'up';
+  const ui = HEALTH_UI[h.status];
+  const down = h.status === 'down';
   return (
     <span className="flex items-center gap-1.5 text-xs">
-      <span className={`size-2 shrink-0 rounded-full ${up ? 'bg-emerald-500' : 'bg-red-500'}`} />
-      <span className={up ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}>
-        {up ? 'Up' : 'Down'}
-      </span>
+      <span className={`size-2 shrink-0 rounded-full ${ui.dot}`} />
+      <span className={ui.text}>{ui.label}</span>
       {h.ms != null && <span className="text-muted-foreground">{h.ms}ms</span>}
-      {!up && h.error && <span className="truncate text-muted-foreground" title={h.error}>{h.error}</span>}
+      {h.detail && <span className="truncate text-muted-foreground" title={h.detail}>{h.detail}</span>}
+      {down && h.error && <span className="truncate text-muted-foreground" title={h.error}>{h.error}</span>}
     </span>
   );
 }
@@ -51,15 +60,20 @@ function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }
       <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
-        <a
-          href={toDisplayHost(s.url)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
-        >
-          {toDisplayHostname(s.url)}
-          <ArrowSquareOut className="size-3 shrink-0" />
-        </a>
+        {/^https?:\/\//i.test(s.url) ? (
+          <a
+            href={toDisplayHost(s.url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
+          >
+            {toDisplayHostname(s.url)}
+            <ArrowSquareOut className="size-3 shrink-0" />
+          </a>
+        ) : (
+          // Embedded/in-process backend — no external URL to open.
+          <span className="truncate font-mono text-[11px] text-muted-foreground">in-process</span>
+        )}
       </div>
     </div>
   );
@@ -85,7 +99,7 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  const upCount = Object.values(health).filter((h) => h.status === 'up').length;
+  const upCount = Object.values(health).filter((h) => isHealthy(h.status)).length;
   const checkedCount = Object.keys(health).length;
 
   return (
@@ -101,7 +115,7 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
         {checkedAt && (
           <div className="text-right font-mono text-xs text-muted-foreground">
             <span className={upCount === checkedCount ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}>
-              {upCount}/{checkedCount} up
+              {upCount}/{checkedCount} healthy
             </span>
             <div className="text-[10px] text-muted-foreground">checked {new Date(checkedAt).toLocaleTimeString()}</div>
           </div>
@@ -112,7 +126,7 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
       {KIND_GROUPS.map(({ kind, label }) => {
         const group = services.filter((s) => s.kind === kind);
         if (group.length === 0) return null;
-        const groupUp = group.filter((s) => health[s.id]?.status === 'up').length;
+        const groupUp = group.filter((s) => { const st = health[s.id]?.status; return st != null && isHealthy(st); }).length;
         const groupChecked = group.filter((s) => health[s.id]).length;
         return (
           <div key={kind} className="rounded-lg border border-border bg-card shadow-sm">
