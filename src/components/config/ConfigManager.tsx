@@ -26,6 +26,10 @@ interface ConfigEntry {
   value: string;
   isSet: boolean;
   source: 'env-file' | 'process' | 'default';
+  /** Suggested mDNS default, shown as a placeholder when the key is unset. */
+  default?: string;
+  /** Host-bearing value — displayed/edited in mDNS form. */
+  hostValue?: boolean;
 }
 
 const SECRET_SENTINEL = '••••••••';
@@ -63,13 +67,15 @@ function Field({
   // For secrets: masked until revealed. Once revealed (or edited), show the text.
   const showText = !entry.secret || dirty || revealed !== undefined;
   const display = pending ?? (entry.secret ? (revealed ?? (entry.isSet ? SECRET_SENTINEL : '')) : entry.value);
+  // When unset, hint the mDNS default (never a raw IP). Secrets just say "not set".
+  const placeholder = entry.secret && !entry.isSet ? 'not set' : (!entry.isSet ? (entry.default ?? '') : '');
 
   return (
     <div className="relative w-full">
       <Input
         type={showText ? 'text' : 'password'}
         value={display}
-        placeholder={entry.secret && !entry.isSet ? 'not set' : ''}
+        placeholder={placeholder}
         onChange={(e) => onChange(entry.key, e.target.value)}
         className={`h-8 font-mono text-xs ${entry.secret ? 'pr-8' : ''} ${dirty ? 'border-amber-400' : ''}`}
       />
