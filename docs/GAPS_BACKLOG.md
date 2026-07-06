@@ -361,24 +361,30 @@ already surfaces — not hidden defects. Ordered by impact.
   and reject→halt against Temporal. Record the worker in `deploy/onprem/SERVER_STATE.md`.
 
 - **[HITL] Console test-run is always inline — a HITL app tested from the Input/canvas screen can't
-  be resumed.** `AppInputForm.tsx:45` and `StudioCanvas.tsx:317` POST to
-  `/api/v1/admin/apps/[id]/run`, whose handler calls `runApp` inline directly
-  (`apps/[id]/run/route.ts:32`) — it never routes through `submitAppRun`, so it never runs durably
-  even when Temporal is up. A human step returns `awaiting_human` and the Review screen honestly 409s
-  (`review/route.ts:73-84`). Only the published/trigger path (`app/[slug]/run/route.ts:78`) is
-  durable. FIX: either route the admin test-run through `submitAppRun` too (so a HITL test can pause
-  durably), or make the Input screen tell the operator up front that test-runs of HITL apps won't be
-  resumable and to run via a trigger. Documented in `docs/user/app-builder.md`.
+  be resumed. — RESOLVED (#114, 2026-07-06).** `apps/[id]/run/route.ts` now routes through
+  `submitAppRun` (`src/lib/adapters/apprun.ts`) instead of calling `runApp` directly. A spec that
+  `shouldRunDurably` (multi-step OR has a human step) goes on the DURABLE Temporal path and can be
+  resumed from the Review screen; simple specs still run inline. When the durable worker/Temporal is
+  off, `submitAppRun` degrades gracefully to inline and the route surfaces that honestly in the
+  response (`mode: 'inline'` + a `note`), so an operator knows a HITL test-run that fell back to
+  inline won't be resumable. *Evidence:* route rewritten (thin handler, delegates to the adapter);
+  the adapter's durable-vs-inline decision + off-fallback are covered in `test/app-run-durable.test.ts`
+  and the adapter tests; `npm run typecheck`/`npm test` (0 fail)/`npm run build` (exit 0) all green.
+  NOTE: standing up the actual `offgrid-apps` worker on the fleet (first HITL bullet above) is still
+  its own infra task — this fix makes the console USE the durable path when the worker is present.
 
-- **[BUILD/RUN] Inline agent steps (no agentId) cannot execute.** `executeAgentStep`
-  (`src/lib/app-run.ts:246-254`) returns an honest error for an agent step with no `agentId`
-  ("materialize it into a customAgent before running (deferred)"). The compiler produces inline agent
-  steps from NL (`app-compile.ts:142-154`) and the builder can create them (`app-builder.ts:57-74`),
-  so a freshly-compiled multi-step app with an inline decision step will error at that step on run.
-  FIX: on save (or on run), materialize an inline agent step into a real `customAgent` (persist the
-  systemPrompt+grounded as an agent, set `agentId`), or surface a builder-side "convert to agent"
-  action. Until then, rebind inline agent steps to an existing agent before running. Documented in
-  `docs/user/app-builder.md`.
+- **[BUILD/RUN] Inline agent steps (no agentId) cannot execute. — RESOLVED (#113, 2026-07-06).**
+  `executeAgentStep` (`src/lib/app-run.ts`) now MATERIALIZES an agent step that has an `inlineAgent`
+  (systemPrompt/model/grounded/tools) but no `agentId`: on first run it creates a real `customAgent`
+  via `createCustomAgent` (`store.ts`), caches the new id back onto the step, and persists it to the
+  app via `updateApp` — then runs it through `runAgent` normally. Idempotent: the cached/persisted
+  `agentId` means a re-run reuses the SAME agent (no duplicates); persistence is best-effort so a
+  draft/unsaved spec still runs (in-memory id serves that run). Wired behind a `materializeAgent`
+  DI seam so it's testable without a live DB. *Evidence:* `test/app-run.test.ts` — "executeStep(agent)
+  materializes an inline agent then runs it (idempotent)" (asserts the create fn is called ONCE across
+  two runs) + "runApp runs a compiled-shaped app: connector(id)→inline-agent→human"; and
+  `test/reimbursement-e2e.test.ts` — "GAP #113: the seeded app's INLINE agent step now materializes +
+  runs (no pre-wiring)". All gates green.
 
 - **[REPORTS] `report`/`email`/`whatsapp` output sinks defer delivery at run time.**
   `executeOutputStep` (`src/lib/app-run.ts:348-356`) records the sink intent with a "delivery deferred
@@ -395,19 +401,20 @@ already surfaces — not hidden defects. Ordered by impact.
 ## Reimbursement demo-seed + e2e (task #106) — 2026-07-06
 
 - **#106-a (P1) — Compiled AppSpec connector-query steps bind by domain ID, but the runtime resolves
-  by LABEL — a compiled spec's data reads MISS at run time. — OPEN.**
-  *Where:* `src/lib/app-compile.ts` `bindDataPhrase` sets `step.domain = domain.id` (e.g. `dom_inv`),
-  but `src/lib/app-run.ts` `executeConnectorStep` calls `resolveDomain(step.domain, domains)` which
-  matches on LABEL/ALIAS, not id — so `resolveDomain('dom_inv', …)` returns null and the read errors
-  as "no data-domain binds ...". Verified directly: `resolveDomain('dom_inv', doms)` → null;
-  `resolveDomain('Invoices', doms)` → the domain.
-  *Effect:* an app built via the NL compiler + saved verbatim would fail its connector reads at run
-  time. The demo path is unaffected because the **seeded sample app**
-  (`buildReimbursementAppSpec`, `src/lib/data-domains-demo-seed.ts`) deliberately stores the domain
-  **LABEL** in `step.domain`, which resolves in both the compiler binder and the runtime resolver —
-  and `test/reimbursement-e2e.test.ts` asserts the full compile+run path with that convention.
-  *Fix (small, owned by the app-compile/app-run owner — NOT this agent's files):* either (a) make
-  `executeConnectorStep` resolve `step.domain` by id first (look up the domain by id, fall back to
-  `resolveDomain` for label), or (b) have the compiler emit the domain **label** in `step.domain`.
-  Option (a) is cleaner (ids are stable; labels can be renamed). Until fixed, builder-compiled apps
-  must be saved with label-form `step.domain` (as the seed does).
+  by LABEL — a compiled spec's data reads MISS at run time. — RESOLVED (2026-07-06).**
+  *Was:* `app-compile.ts` `bindDataPhrase` sets `step.domain = domain.id` (e.g. `dom_inv`), but
+  `app-run.ts` `executeConnectorStep` called `resolveDomain(step.domain, domains)` which matches on
+  LABEL/ALIAS, not id — so `resolveDomain('dom_inv', …)` returned null and the read errored as "no
+  data-domain binds ...".
+  *Fix (option (a) — the cleaner one):* `executeConnectorStep` now resolves `step.domain` via a new
+  pure helper `resolveDomainByIdOrLabel(ref, domains, resolveDomain)` (`src/lib/app-run.ts`) that
+  tries an EXACT domain-id match FIRST (what the compiler emits — ids are stable + unique), then
+  falls back to the label/alias rule engine (`resolveDomain`) for a human label/phrase. So a saved
+  compiled spec with `step.domain = <id>` AND a seed/label spec with `step.domain = <label>` both
+  resolve to the same domain. The compiler was left emitting ids (no change needed there); the
+  seeded reimbursement app's LABEL convention still works (label branch), so nothing broke.
+  *Evidence:* `test/app-run.test.ts` — "resolveDomainByIdOrLabel resolves a compiler-emitted domain
+  ID", "resolves a human label to the same domain", "id form and label form resolve to the SAME
+  domain", "returns null for an unknown ref (no-guess)", and "executeStep(connector-query) reads via
+  a domain ID (the compiler convention)". Existing `reimbursement-e2e.test.ts` label-binding test
+  still passes. `typecheck` clean, `npm test` 0 fail, `npm run build` exit 0.
