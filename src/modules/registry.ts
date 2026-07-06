@@ -23,6 +23,7 @@ export type ModuleId =
   | 'lineage'
   | 'regulatory'
   | 'integrations'
+  | 'tool-catalog'
   | 'data-domains'
   | 'knowledge'
   | 'access'
@@ -222,6 +223,15 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Integrations',
     description: 'Configure every underlying service (adapters, URLs, secrets, health) from the UI.',
     route: '/integrations',
+    service: 'integrations',
+    internal: true,
+  },
+  {
+    id: 'tool-catalog',
+    label: 'Tool catalog',
+    description:
+      'A curated catalog of open-source MCP servers (Model Context Protocol) — one-click add a tool from the ecosystem as a registered MCP tool your apps can use.',
+    route: '/tool-catalog',
     service: 'integrations',
     internal: true,
   },

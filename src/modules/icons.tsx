@@ -36,6 +36,7 @@ import {
   Gauge,
   Receipt,
   ClipboardText,
+  Toolbox,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -62,6 +63,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   lineage: TreeStructure,
   regulatory: Scale,
   integrations: Vault,
+  'tool-catalog': Toolbox,
   'data-domains': TreeStructure,
   knowledge: BookOpenText,
   access: UsersThree,
