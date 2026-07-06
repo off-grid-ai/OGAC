@@ -28,6 +28,15 @@ import {
   users,
 } from '@/db/schema';
 import type { CheckResult } from '@/lib/checks';
+// The live connector query path lives in connector-exec.ts (Builder Epic Phase 0). `recordCount`
+// backs realRecordCount below; execConnectorQuery is re-exported so callers keep one import site.
+import { recordCount } from '@/lib/connector-exec';
+export { execConnectorQuery, recordCount } from '@/lib/connector-exec';
+export type {
+  ConnectorTarget,
+  ConnectorQuery,
+  ConnectorQueryResult,
+} from '@/lib/connector-exec';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
@@ -578,69 +587,12 @@ export interface Dataset {
 
 // Real record count for a database connector — connects to its endpoint and sums live rows.
 // Returns null for non-DB connectors or unreachable endpoints (caller records 0, never fakes).
+//
+// The live-query implementation moved to lib/connector-exec.ts (Builder Epic Phase 0) so the
+// sync path here AND the connector rule engine share ONE query path. This thin wrapper preserves
+// the original signature so `syncConnector` and any other caller behave identically.
 async function realRecordCount(type: string, endpoint: string): Promise<number | null> {
-  const t = type.toLowerCase();
-  // Postgres: sum live rows across user tables.
-  if ((t.includes('postgres') || t === 'database') && endpoint.startsWith('postgres')) {
-    const { Pool } = await import('pg');
-    const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
-    try {
-      const r = await pool.query('SELECT COALESCE(SUM(n_live_tup),0)::bigint AS n FROM pg_stat_user_tables');
-      return Number(r.rows[0]?.n ?? 0);
-    } catch { return null; } finally { await pool.end().catch(() => undefined); }
-  }
-  // MySQL: sum table rows from information_schema.
-  if (t.includes('mysql') && endpoint.startsWith('mysql')) {
-    try {
-      const mysql = await import('mysql2/promise');
-      const conn = await mysql.createConnection(endpoint);
-      try {
-        const [rows] = await conn.query(
-          'SELECT COALESCE(SUM(table_rows),0) AS n FROM information_schema.tables WHERE table_schema = DATABASE()',
-        );
-        return Number((rows as { n: number }[])[0]?.n ?? 0);
-      } finally { await conn.end(); }
-    } catch { return null; }
-  }
-  // MSSQL: sum row counts across user tables (sys.dm_db_partition_stats).
-  if (t.includes('mssql') && endpoint.startsWith('mssql')) {
-    try {
-      const mssqlMod = await import('mssql');
-      const mssql = mssqlMod.default ?? mssqlMod;
-      // Parse mssql://user:pass@host:port/db into a config (URL form is unreliable for mssql).
-      const u = new URL(endpoint);
-      const pool = await mssql.connect({
-        server: u.hostname,
-        port: Number(u.port || 1433),
-        user: decodeURIComponent(u.username) || 'sa',
-        password: decodeURIComponent(u.password) || process.env.OFFGRID_ERP_PASSWORD || '',
-        database: u.pathname.replace(/^\//, '') || 'master',
-        options: { encrypt: false, trustServerCertificate: true },
-        connectionTimeout: 4000,
-      });
-      try {
-        const res = await pool.request().query(
-          'SELECT COALESCE(SUM(row_count),0) AS n FROM sys.dm_db_partition_stats WHERE index_id IN (0,1)',
-        );
-        return Number(res.recordset?.[0]?.n ?? 0);
-      } finally { await pool.close(); }
-    } catch { return null; }
-  }
-  // REST/HTTP (e.g. CRM): GET the endpoint and count records. Supports a top-level array,
-  // or an object of arrays (json-server style: {accounts:[…], contacts:[…]}) → sum of lengths.
-  if ((t.includes('rest') || t.includes('http') || t.includes('api') || t.includes('crm')) && /^https?:/.test(endpoint)) {
-    try {
-      const r = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
-      if (!r.ok) return null;
-      const body = await r.json();
-      if (Array.isArray(body)) return body.length;
-      if (body && typeof body === 'object') {
-        return Object.values(body).reduce<number>((sum, v) => sum + (Array.isArray(v) ? v.length : 0), 0);
-      }
-      return 0;
-    } catch { return null; }
-  }
-  return null;
+  return recordCount(type, endpoint);
 }
 
 function toConnector(r: typeof connectors.$inferSelect): Connector {
