@@ -15,6 +15,7 @@ export type ModuleId =
   | 'brain'
   | 'agents'
   | 'studio'
+  | 'tools'
   | 'observability'
   | 'analytics'
   | 'finops'
@@ -165,6 +166,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Build agents & workflows in plain language — wired to your connectors, data, tools, guardrails.',
     route: '/studio',
     service: 'agents',
+  },
+  {
+    id: 'tools',
+    label: 'Tools',
+    description:
+      'The one home for the tools your apps can call — the registered HTTP/MCP tool registry, the curated MCP catalog to add from, and the built-in primitives (web search, read URL, HTTP) with their air-gap state.',
+    route: '/tools',
+    service: 'agents',
+    internal: true,
   },
   {
     id: 'observability',
