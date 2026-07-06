@@ -67,7 +67,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // One sidebar row → the Data section landing, which tabs across sources, retrieval, and
     // lineage via DataNav (already rendered by src/app/(console)/(data)/layout.tsx).
     primary: ['data'],
-    secondary: ['integrations', 'retrieval', 'lineage'],
+    secondary: ['integrations', 'data-domains', 'retrieval', 'lineage'],
   },
   {
     id: 'governance',

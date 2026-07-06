@@ -22,7 +22,8 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     heading: 'Sources',
     tabs: [
       { id: 'integrations', label: 'Integrations', route: '/integrations' },
-      { id: 'data', label: 'Data', route: '/data' },
+      { id: 'data', label: 'Connectors', route: '/data' },
+      { id: 'data-domains', label: 'Data domains', route: '/data-domains' },
     ],
   },
   {
