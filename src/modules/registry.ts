@@ -23,6 +23,7 @@ export type ModuleId =
   | 'lineage'
   | 'regulatory'
   | 'integrations'
+  | 'data-domains'
   | 'knowledge'
   | 'access'
   | 'admin'
@@ -221,6 +222,14 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Integrations',
     description: 'Configure every underlying service (adapters, URLs, secrets, health) from the UI.',
     route: '/integrations',
+    service: 'integrations',
+    internal: true,
+  },
+  {
+    id: 'data-domains',
+    label: 'Data domains',
+    description: 'Declare where data lives (customer→Salesforce, transactions→Postgres) — the rule engine agents route by.',
+    route: '/data-domains',
     service: 'integrations',
     internal: true,
   },
