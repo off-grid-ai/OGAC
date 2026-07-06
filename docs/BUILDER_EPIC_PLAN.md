@@ -1,5 +1,31 @@
 # Off Grid Console — Unified Builder Epic: Implementation Plan
 
+## North star — WHO this is for (the acceptance bar for ALL builder work)
+
+The user is a **non-technical department person — taxation, accounting, HR, ops** — who has never
+written code. They describe a chunk of their job in plain language ("reimbursement approval: read the
+invoice, check the employee's quota, decide eligibility, have a manager approve") and get back a
+**real, governed, running workflow** that makes them better at their job or frees their time. That's
+the entire point of this product.
+
+Consequences that are NON-NEGOTIABLE for every builder change:
+- **Usability is the acceptance test.** If that non-technical person can't build AND run the app
+  without help, the work is not done — no matter how powerful the internals. "Powerful but baffling"
+  (e.g. a raw node canvas as the front door) is a FAILURE. The default flow must *walk* them:
+  describe → see the steps → unresolved bits become obvious "wire this" buttons → name inputs → run.
+  The visual canvas is an advanced escape hatch, never the front door.
+- **An app is the one unit.** An agent is the simplest app (one step). Apps are **composable** — a
+  built app can be a *tool* inside another app, alongside primitives (web_search, read_url, http).
+- **Every app inherits the same lifecycle as its OWN structure:** Build → Input → Run (live
+  monitoring) → Review (human-in-the-loop) → Reports. Opening an app gives it its own tabbed surface
+  scoped to that app — not global console areas.
+- **One surface: Studio.** No Agents-vs-Studio split.
+- Everything the app does is governed automatically (policy, guardrails, routing, grounding,
+  provenance) and inherits the org's connectors/data-domains/tools/Brain — the builder never starts
+  from zero.
+
+
+
 Architecture + phased, worktree-isolated decomposition for tasks #101–#108. Execute phase by phase;
 each parallel agent owns a DISJOINT file-set. Read before launching any epic agent.
 
