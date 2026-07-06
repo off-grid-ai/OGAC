@@ -1,5 +1,6 @@
 import { searchDocuments } from '@/lib/brain';
 import { listDatasets, listTools } from '@/lib/store';
+import { connectorSource } from './connector-source';
 import type { RetrievalHit, RetrievalSource } from './types';
 
 // The three retrieval destinations the router can route to. Each is independent and pluggable —
@@ -81,4 +82,7 @@ export const toolSource: RetrievalSource = {
   },
 };
 
-export const SOURCES: RetrievalSource[] = [kbSource, databaseSource, toolSource];
+// CONNECTOR → declared data-domains routed to their bound connector, read live (Builder Epic 1B).
+// Appended by the connector rule engine phase; contributes nothing unless a query names/implies a
+// declared domain (deterministic, no-guess) — see connector-source.ts.
+export const SOURCES: RetrievalSource[] = [kbSource, databaseSource, toolSource, connectorSource];
