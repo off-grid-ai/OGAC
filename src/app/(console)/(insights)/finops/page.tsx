@@ -92,7 +92,7 @@ export default async function FinOpsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <KeyToggle id={k.id} enabled={k.enabled} />
+                    <KeyToggle id={k.id} enabled={k.enabled} label={k.label} />
                   </TableCell>
                   <TableCell>
                     <DeleteRowButton url={`/api/v1/admin/keys/${k.id}`} label={k.label} />
