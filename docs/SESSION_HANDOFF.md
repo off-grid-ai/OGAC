@@ -124,3 +124,11 @@ Everything from the founder-away run shipped, gated (1291 tests), pushed to orig
 - Open: #88 (device-enroll docs, parked for founder); #121 (worker PII deep-config, P2); app-worker needs a
   launchd plist to survive reboot (SERVER_STATE noted).
 Nothing in flight. Task list #81–120 done except the parked/noted items above.
+
+## Catalog + IA initiative — COMPLETE (2026-07-06)
+All "bundle the ecosystem catalog" tasks shipped (grounded in real libraries, air-gap-safe, honest degradation, deployed live, 1436 tests):
+- Evals (24 templates + G-Eval), Tools/MCP (18 servers), Guardrails (Presidio recognizers + Guardrails-AI validators), Compliance (ISO42001/NIST-AI-RMF/EU-AI-Act + cross-map), Drift (Evidently methods+presets), Connectors (18 types), Model spec catalog (fleet-reconciled), Prompt starters + Policy templates.
+- Unified Tools home under Build; catalog search/filter/sort; common Pagination component + applied broadly; list→detail views (connector/knowledge/data-domain) + audit (docs/LIST_DETAIL_AUDIT.md).
+- P0 fixes: ChunkLoadError (clean rebuild + push.sh now `rm -rf .next` before build); Evals/Sandbox/Visual-QA nav orphans surfaced (+ reachability regression test).
+Standing rules now in CLAUDE.md: full-width · full-CRUD · list→detail · nav-in-URL. Brand rule #9 (fill-the-width) in brand/DESIGN_PHILOSOPHY.md.
+Open: #88 device-enroll docs (parked for founder); #121 worker PII deep-config (P2); app-worker launchd plist (reboot durability); Users list→detail (top list→detail follow-up per LIST_DETAIL_AUDIT.md).
