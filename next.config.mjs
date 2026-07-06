@@ -14,7 +14,9 @@ const securityHeaders = [
       // knowledge-base files, artifacts) — allow it as an image/media/fetch source.
       "img-src 'self' data: blob: https://gateway.getoffgridai.co https://us.i.posthog.com https://us-assets.i.posthog.com",
       "media-src 'self' blob: https://gateway.getoffgridai.co",
-      "font-src 'self'",
+      // data: — fonts are embedded as base64 data: URIs (woff/woff2); without this they're CSP-blocked
+      // and text falls back to system fonts console-wide.
+      "font-src 'self' data:",
       "connect-src 'self' https://gateway.getoffgridai.co https://us.i.posthog.com https://us-assets.i.posthog.com",
       // cal.com booking widget embedded (iframe only) in the sign-in "Book a call" modal. No cal
       // script is loaded — script-src stays tight; this only permits framing cal.com's booking page.
