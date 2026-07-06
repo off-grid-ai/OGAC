@@ -11,6 +11,10 @@
 
 import { statusFromWorkflow, type WorkflowExecutionStatus } from './agent-run-durable';
 
+// Re-export so the read-side consumers (routes, the Jobs UI) get the status union + action gating
+// from one module without reaching into agent-run-durable's execution-policy surface.
+export type { WorkflowExecutionStatus };
+
 // ── Input shapes (the subset of the Temporal client responses we consume) ─────────────────────
 // Declared locally so this module imports nothing from @temporalio. The adapter maps the real
 // client objects onto these before calling in — a thin seam that keeps the pure part cluster-free.
@@ -198,4 +202,46 @@ export function buildWorkflowDetail(
  */
 export function agentRunListQuery(): string {
   return `WorkflowType = 'AgentRunWorkflow'`;
+}
+
+// ── Job-action gating (pure predicates over Temporal status) ───────────────────────────────────
+// The console's Jobs surface offers rerun + cancel on a durable execution. These pure predicates
+// decide which action a given workflow status admits, so the route and UI agree without either
+// reaching into a cluster. Mirrors agent-run-actions' state-machine, but over Temporal states.
+
+/**
+ * A workflow execution can be CANCELLED/TERMINATED only while it is still open (RUNNING /
+ * CONTINUED_AS_NEW). Closed workflows (completed/failed/canceled/terminated/timed-out) are already
+ * terminal — cancelling them is a no-op the UI shouldn't offer.
+ */
+export function canCancelWorkflow(status: WorkflowExecutionStatus): boolean {
+  return status === 'RUNNING' || status === 'CONTINUED_AS_NEW';
+}
+
+/**
+ * A workflow can be RE-RUN only once it has CLOSED — rerunning a still-running job would double up.
+ * Any terminal Temporal state (COMPLETED / FAILED / CANCELED / TERMINATED / TIMED_OUT) is rerunnable;
+ * an open or unknown state is not.
+ */
+export function canRerunWorkflow(status: WorkflowExecutionStatus): boolean {
+  switch (status) {
+    case 'COMPLETED':
+    case 'FAILED':
+    case 'CANCELED':
+    case 'TERMINATED':
+    case 'TIMED_OUT':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** The set of actions a durable execution row admits, given its Temporal status. Pure — drives
+ *  both the UI button visibility and the route's guard. */
+export interface WorkflowActions {
+  rerun: boolean;
+  cancel: boolean;
+}
+export function workflowActionsFor(status: WorkflowExecutionStatus): WorkflowActions {
+  return { rerun: canRerunWorkflow(status), cancel: canCancelWorkflow(status) };
 }
