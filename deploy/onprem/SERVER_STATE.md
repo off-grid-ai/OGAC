@@ -31,6 +31,11 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_SUPERSET_URL` | `http://127.0.0.1:8933` | via localhost Caddy proxy → S2. |
 | `OFFGRID_FLEET_URL` | `http://127.0.0.1:8934` | via localhost Caddy proxy → S2. |
 | `OFFGRID_SUPERSET_DB_URI` | _(unset — falls back to `DATABASE_URL`)_ | SQLAlchemy URI Superset uses to reach the console Postgres when **provisioning** the starter dashboard (`POST /api/v1/admin/superset/provision`). Set this if Superset runs on a different host than the console DB (localhost won't route). |
+| `OFFGRID_TOOL_EGRESS` | _(unset → OFF)_ | **Composable-tool air-gap master switch (task #117).** The built-in internet-reaching tool PRIMITIVES (`web_search`, `read_url`, `http_fetch`) are OFF by default — the on-prem "nothing leaves the network" default. Set truthy (`1`/`true`/`yes`/`on`) to opt the whole org IN to every internet primitive. Per-tool opt-in below overrides per primitive. Gated purely in `src/lib/tool-primitives.ts` (`isPrimitiveEnabled`). |
+| `OFFGRID_TOOL_WEB_SEARCH` | _(unset → OFF)_ | Per-tool opt-in for the `web_search` primitive only (no need for the master flag). Requires `OFFGRID_WEB_SEARCH_URL` to point at an org-run search endpoint (e.g. SearXNG) so egress stays through a controlled proxy. |
+| `OFFGRID_TOOL_READ_URL` | _(unset → OFF)_ | Per-tool opt-in for the `read_url` primitive only. |
+| `OFFGRID_TOOL_HTTP_FETCH` | _(unset → OFF)_ | Per-tool opt-in for the `http_fetch` primitive only. |
+| `OFFGRID_WEB_SEARCH_URL` | _(unset)_ | The search endpoint `web_search` calls (JSON `?q=…&format=json`, e.g. an org-run SearXNG). Required when `web_search` is enabled; without it `web_search` degrades honestly to a "not configured" error. |
 
 > **⚠️ Console can't egress to the LAN (root cause of every S2 "unreachable"/Langfuse "fetch
 > failed"):** the `next-server` process gets `EHOSTUNREACH` connecting to any `192.168.1.x` host,
