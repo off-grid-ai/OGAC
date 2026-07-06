@@ -1,38 +1,34 @@
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { auth } from '@/auth';
-import { StudioBuilder } from '@/components/studio/StudioBuilder';
+import { AppBuilder } from '@/components/build/AppBuilder';
+import { listManagedAgents } from '@/lib/agents';
+import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { requireModuleForUser } from '@/lib/module-access';
-import { listCollections } from '@/lib/org-knowledge';
-import { getOrgPolicy, listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-// Non-technical assistant builder (Phase 4.5). Loads the org's enabled tools (skills), the knowledge
-// collections the user's role may draw on (data), and the org's allowed models — the guided 4-step
-// wizard turns a plain-language goal into a governed agent + template behind the scenes.
+// ─── Full-screen guided builder (Builder Epic Phase 3A) ───────────────────────────────────────────
+// The founder's "creating an agent is a screen of its own" surface. Loads the org context ONCE
+// (connectors, data domains, tools, guardrails, policy) so the builder can (a) show the inheritance
+// banner, and (b) populate the data-domain + existing-agent dropdowns the step editors use to rebind.
+// Everything downstream is client-side (AppBuilder): describe → compile → refine → save → run.
 export default async function StudioNewPage() {
   await requireModuleForUser('studio');
-  const session = await auth();
-  const role = session?.user?.role ?? 'viewer';
   const orgId = await currentOrgId();
 
-  const [tools, collections, policy] = await Promise.all([
-    listTools(orgId).catch(() => []),
-    listCollections(role).catch(() => []),
-    getOrgPolicy().catch(() => ({ allowedModels: [] as string[] })),
+  const [ctx, agents] = await Promise.all([
+    getOrgContext(orgId),
+    listManagedAgents().catch(() => []),
   ]);
 
-  const toolOptions = tools
-    .filter((t) => t.enabled)
-    .map((t) => ({ id: t.id, name: t.name, description: t.description }));
-  const collectionOptions = collections.map((c) => ({
-    id: c.id,
-    name: c.name,
-    description: c.description,
-  }));
+  const summary = summarizeOrgContext(ctx);
+  // Only data domains with a real connector binding are usable to bind a connector-query step.
+  const domains = ctx.dataDomains
+    .filter((d) => d.connectorId && d.resource)
+    .map((d) => ({ id: d.id, label: d.label }));
+  const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
 
   return (
     <div className="space-y-5">
@@ -44,18 +40,9 @@ export default async function StudioNewPage() {
           <ArrowLeft className="size-3.5" />
           Studio
         </Link>
-        <h1 className="mt-2 text-lg font-semibold text-foreground">New assistant</h1>
-        <p className="text-sm text-muted-foreground">
-          Four plain questions — goal, skills, data, publish. Off Grid wires the model, policy,
-          guardrails, and grounding for you, then you test it live before publishing.
-        </p>
       </div>
       <Suspense fallback={null}>
-        <StudioBuilder
-          tools={toolOptions}
-          collections={collectionOptions}
-          allowedModels={policy.allowedModels ?? []}
-        />
+        <AppBuilder summary={summary} domains={domains} agents={agentOptions} />
       </Suspense>
     </div>
   );
