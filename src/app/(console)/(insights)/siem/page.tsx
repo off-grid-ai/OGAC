@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { ShieldWarning } from '@phosphor-icons/react/dist/ssr';
+import { StatBand } from '@/components/insights/StatBand';
 import { AlertingManager } from '@/components/siem/AlertingManager';
 import { SuppressionManager } from '@/components/siem/SuppressionManager';
+import { toDisplayHost } from '@/lib/display-host';
+import { buildSiemStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
 import { applySuppressions } from '@/lib/siem-suppress-policy';
 import { listSuppressions } from '@/lib/siem-suppress';
@@ -57,25 +60,15 @@ export default async function SiemPage({
         </p>
       )}
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-md border border-border p-3">
-          <div className="text-xs text-muted-foreground">Events</div>
-          <div className="text-lg font-semibold text-foreground">{data.total}</div>
-        </div>
-        <div className="rounded-md border border-border p-3">
-          <div className="text-xs text-muted-foreground">Blocked / denied</div>
-          <div className="text-lg font-semibold text-foreground">{data.blockedDenied}</div>
-        </div>
-        <div className="rounded-md border border-border p-3">
-          <div className="text-xs text-muted-foreground">Distinct actors</div>
-          <div className="text-lg font-semibold text-foreground">{data.topActors.length}</div>
-        </div>
-        <div className="rounded-md border border-border p-3">
-          <div className="text-xs text-muted-foreground">Outcomes</div>
-          <div className="text-lg font-semibold text-foreground">{data.byOutcome.length}</div>
-        </div>
-      </div>
+      {/* Summary tiles — value-forward stat band shared across the Insights surfaces. */}
+      <StatBand
+        stats={buildSiemStats({
+          total: data.total,
+          blockedDenied: data.blockedDenied,
+          distinctActors: data.topActors.length,
+          distinctOutcomes: data.byOutcome.length,
+        })}
+      />
 
       {/* Outcome filter — URL driven */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -137,7 +130,7 @@ export default async function SiemPage({
                   <td className="p-2">
                     <OutcomeBadge outcome={e.outcome} />
                   </td>
-                  <td className="p-2 font-mono text-xs">{e.ip || '—'}</td>
+                  <td className="p-2 font-mono text-xs">{e.ip ? toDisplayHost(e.ip) : '—'}</td>
                   <td className="max-w-xs truncate p-2 text-muted-foreground">{e.detail || '—'}</td>
                 </tr>
               ))}
