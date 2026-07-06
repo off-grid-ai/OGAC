@@ -27,6 +27,7 @@ import { actorFrom } from '@/lib/audit-event';
 import { costForTokens } from '@/lib/finops';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
+import { citationInstruction, sourceNames } from '@/lib/chat-citations';
 import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -184,6 +185,14 @@ export async function POST(req: Request) {
     } catch {
       /* org knowledge optional — chat still answers without it */
     }
+  }
+  // Inline-citation numbering: tell the model to cite with bracketed numbers ([1], [2] …) keyed to
+  // the retrieved sources, in the SAME order buildSources()/the transcript footer number them (via
+  // shared sourceNames). This is what lets the answer stream `Revenue rose [1].` and the renderer
+  // turn [1] into a clickable chip that jumps to source 1. No sources → no instruction (no-op).
+  if (citations.length) {
+    const instruction = citationInstruction(sourceNames(citations));
+    if (instruction) messages.push({ role: 'system', content: instruction });
   }
   // Cap history to the most recent turns so we don't overflow the model context (and, on this
   // hardware, don't pay for prefill of a huge transcript every turn). OpenWebUI-style trim.
