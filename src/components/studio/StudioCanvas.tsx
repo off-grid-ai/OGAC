@@ -4,539 +4,627 @@ import {
   Background,
   Controls,
   type Edge,
+  Handle,
   MarkerType,
   type Node,
+  type NodeProps,
+  Position,
   ReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  BookOpen,
+  ArrowSquareOut,
   FloppyDisk,
-  Globe,
-  Lock,
   Play,
+  Plus,
   Sparkle,
-  Trash,
+  Warning,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import type { Block, Catalog, Workflow } from '@/lib/studio';
+import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
+import type { BindingNames } from '@/lib/app-builder';
+import {
+  addStep,
+  moveStep,
+  rebindAgent,
+  rebindDomain,
+  relabelStep,
+  removeStep,
+  setAgentPrompt,
+  setOutputSink,
+  toggleGrounding,
+} from '@/lib/app-builder';
+import {
+  type AppSpec,
+  type AppStepKind,
+  type OutputStep,
+  validateAppSpec,
+} from '@/lib/app-model';
+import {
+  KIND_LABEL,
+  emptySpec,
+  graphSummary,
+  specToGraph,
+  stepById,
+} from '@/lib/canvas-graph';
+import type { StepResult } from '@/lib/app-run';
 
-const COLS: Block['group'][] = ['Input', 'Connector', 'Data', 'Guardrail', 'Tool', 'Agent', 'Human', 'Model', 'Output'];
-const COLOR: Record<Block['group'], string> = {
-  Input: '#0ea5e9', Connector: '#2563eb', Data: '#7c3aed', Guardrail: '#dc2626',
-  Tool: '#0891b2', Agent: '#059669', Human: '#ca8a04', Model: '#d97706', Output: '#db2777',
-};
+// ─── StudioCanvas (Builder Epic Phase 3B) — the WORKING visual editor of an AppSpec ──────────────
+//
+// This is the visual half of the dual-mode builder (screen 1, §7 of the plan). It is NO LONGER
+// decorative: every node the operator sees IS an `AppStep`, every edge IS an `AppEdge`, and every
+// structural/binding edit goes through the SAME pure reducers in `app-builder.ts` that the text
+// builder (3A `AppBuilder.tsx`) uses. So canvas-mode and text-mode are two views of ONE AppSpec —
+// they can never drift.
+//
+// FLOW:
+//   • Seed — describe a process → POST /api/v1/admin/apps/compile → an AppSpec skeleton renders as a
+//     node graph. OR start from a blank single-agent app ("Start blank") and add steps visually.
+//   • Edit — click a node → the SAME AppStepEditor the text builder uses opens in the side panel; all
+//     its controls call app-builder reducers on the spec. Add a step from the palette; reorder/remove
+//     from the node card. The graph re-derives from the spec via canvas-graph.specToGraph.
+//   • Save — POST /api/v1/admin/apps (the 3A CRUD route) → the spec is persisted + re-validated
+//     server-side by validateAppSpec. Publish flips a slug via PATCH { publish:true }.
+//   • Run — POST /api/v1/admin/apps/[id]/run → the Phase 2A multi-step executor (runApp) actually
+//     walks the graph, each step governed. We render the per-step trace it returns. (We do NOT import
+//     worker files — the inline run route owns that.)
+//
+// SOLID: this component holds the AppSpec in state and is a thin caller. Graph geometry + the spec↔RF
+// mapping are pure in `canvas-graph.ts`; edit rules are pure in `app-builder.ts`; validity is
+// `validateAppSpec`. Nothing here re-implements a rule.
 
-function layout(blocks: Block[]): Node[] {
-  const perCol: Record<string, number> = {};
-  return blocks.map((b) => {
-    const col = COLS.indexOf(b.group);
-    const row = (perCol[b.group] = (perCol[b.group] ?? 0) + 1) - 1;
-    const soon = b.comingSoon;
-    return {
-      id: b.id,
-      position: { x: col * 200, y: 70 + row * 76 },
-      data: { label: `${b.label}${soon ? '  · soon' : ''}${b.sub ? `\n${b.sub}` : ''}` },
-      style: {
-        width: 168, fontSize: 11, fontFamily: 'Menlo, monospace', borderRadius: 10,
-        border: soon ? '1px dashed #cbd5e1' : '1px solid #e5e7eb',
-        borderLeft: `4px ${soon ? 'dashed' : 'solid'} ${COLOR[b.group]}`,
-        background: soon ? '#f8fafc' : '#fff',
-        opacity: soon ? 0.55 : 1,
-        whiteSpace: 'pre-line', textAlign: 'left', padding: '7px 9px',
-      },
-    } as Node;
-  });
-}
+// ─── The custom React-Flow node — renders an AppStep as a labeled, colored card ──────────────────
+type StepNodeData = ReturnType<typeof specToGraph>['nodes'][number]['data'] & { selected?: boolean };
 
-const EXAMPLES = [
-  'When a claim email comes in, mask PII and have the FNOL agent draft a first-notice-of-loss grounded in the claims SOP, with a human review before it sends.',
-  'On a schedule, summarize top-performer sessions into an onboarding SOP and export a signed report.',
-  'On an advisor call, transcribe on-device and surface the objection playbook to the console.',
-  'Every morning, pull the top 5 support tickets from Zendesk, categorise them, and post a summary to Slack.',
-];
-
-interface SavedTemplate {
-  id: string;
-  title: string;
-  summary: string;
-  prompt: string;
-  workflow: Workflow;
-  visibility: string;
-  ownerId: string;
-  createdAt: string;
-  slug?: string | null;
-  published?: boolean;
-}
-
-// ── Gallery ───────────────────────────────────────────────────────────────────
-
-function Gallery({
-  onLoad,
-  currentUserId,
-}: {
-  onLoad: (t: SavedTemplate) => void;
-  currentUserId?: string;
-}) {
-  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch('/api/v1/studio/templates');
-      if (r.ok) setTemplates(((await r.json()) as { templates: SavedTemplate[] }).templates);
-    } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { void refresh(); }, [refresh]);
-
-  const del = async (id: string) => {
-    if (!confirm('Delete this template?')) return;
-    await fetch(`/api/v1/studio/templates/${id}`, { method: 'DELETE' });
-    void refresh();
-    toast.success('Template deleted.');
-  };
-
-  const toggleVisibility = async (t: SavedTemplate) => {
-    const next = t.visibility === 'org' ? 'private' : 'org';
-    await fetch(`/api/v1/studio/templates/${t.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ visibility: next }),
-    });
-    void refresh();
-    toast.success(next === 'org' ? 'Shared with org.' : 'Made private.');
-  };
-
-  if (loading) return <p className="py-4 text-center text-xs text-muted-foreground">Loading…</p>;
-  if (templates.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-8 text-center">
-        <BookOpen className="size-7 text-muted-foreground/40" />
-        <p className="text-xs text-muted-foreground">No saved workflows yet.<br />Compose one and hit Save.</p>
-      </div>
-    );
-  }
-
+function StepNode({ data }: NodeProps) {
+  const d = data as unknown as StepNodeData;
   return (
-    <div className="space-y-2">
-      {templates.map((t) => (
-        <div
-          key={t.id}
-          className="group cursor-pointer rounded-lg border border-border bg-background p-3 hover:border-primary/50 hover:bg-muted/30"
-          onClick={() => onLoad(t)}
+    <div
+      className="w-[188px] rounded-lg border bg-white px-3 py-2 shadow-sm dark:bg-neutral-900"
+      style={{
+        borderColor: d.selected ? d.color : '#e5e7eb',
+        borderLeft: `4px solid ${d.color}`,
+        boxShadow: d.selected ? `0 0 0 2px ${d.color}` : undefined,
+      }}
+    >
+      <Handle type="target" position={Position.Top} style={{ background: d.color }} />
+      <div className="flex items-center justify-between gap-1">
+        <span
+          className="flex size-4 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+          style={{ background: d.color }}
         >
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-xs font-medium text-foreground leading-snug">{t.title}</p>
-            <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
-              {t.ownerId === currentUserId && (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void toggleVisibility(t); }}
-                    title={t.visibility === 'org' ? 'Make private' : 'Share with org'}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {t.visibility === 'org'
-                      ? <Globe className="size-3.5" />
-                      : <Lock className="size-3.5" />}
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void del(t.id); }}
-                    className="text-destructive hover:text-destructive/80"
-                  >
-                    <Trash className="size-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{t.summary}</p>
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <Badge variant="secondary" className="px-1 py-0 text-[10px]">
-              {t.workflow.nodeIds.length} blocks
-            </Badge>
-            {t.visibility === 'org' && (
-              <Badge variant="outline" className="gap-1 px-1 py-0 text-[10px]">
-                <Globe className="size-2.5" /> shared
-              </Badge>
-            )}
-            {t.published && t.slug && (
-              <a
-                href={`/app/${t.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary hover:bg-primary/20"
-                title={`/app/${t.slug}`}
-              >
-                <Sparkle className="size-2.5" /> live app ↗
-              </a>
-            )}
-          </div>
-        </div>
-      ))}
+          {d.index}
+        </span>
+        <span className="text-[9px] font-medium uppercase tracking-wide" style={{ color: d.color }}>
+          {KIND_LABEL[d.kind]}
+        </span>
+        {d.incomplete ? <Warning className="size-3 text-amber-500" /> : <span className="w-3" />}
+      </div>
+      <p className="mt-1 truncate font-mono text-[11px] font-medium text-foreground" title={d.label}>
+        {d.label}
+      </p>
+      <p className="truncate text-[10px] text-muted-foreground" title={d.binding}>
+        {d.binding}
+      </p>
+      <Handle type="source" position={Position.Bottom} style={{ background: d.color }} />
     </div>
   );
 }
 
-// ── Main canvas ───────────────────────────────────────────────────────────────
+const NODE_TYPES = { step: StepNode };
 
-// eslint-disable-next-line complexity
-export function StudioCanvas({ catalog, userId }: { catalog: Catalog; userId?: string }) {
-  const allNodes = useMemo(() => layout(catalog.blocks), [catalog]);
-  const byId = useMemo(() => new Map(catalog.blocks.map((b) => [b.id, b])), [catalog]);
+const STEP_KINDS: { kind: AppStepKind; label: string }[] = [
+  { kind: 'connector-query', label: 'Read data' },
+  { kind: 'agent', label: 'Agent' },
+  { kind: 'guardrail', label: 'Guardrail' },
+  { kind: 'human', label: 'Human review' },
+  { kind: 'output', label: 'Output' },
+];
 
-  const [nodes, setNodes] = useState<Node[]>([]);    // empty until composed
-  const [edges, setEdges] = useState<Edge[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [wf, setWf] = useState<Workflow | null>(null);
-  const [tab, setTab] = useState<'build' | 'gallery'>('build');
+const EXAMPLES = [
+  'Reimbursement approval — read the invoice, check the employee\'s quota, decide if they\'re eligible, then have a manager approve or reject.',
+  'Read the customer\'s recent tickets, classify the issue and urgency, draft a reply grounded in our policies, then email it.',
+  'Answer employee questions about our HR policies and always cite the policy document you used.',
+];
+
+export function StudioCanvas({
+  domains = [],
+  agents = [],
+}: {
+  domains?: { id: string; label: string }[];
+  agents?: { id: string; name: string }[];
+}) {
+  // The AppSpec is the single source of truth. Null until seeded (compile or blank).
+  const [spec, setSpec] = useState<AppSpec | null>(null);
+  const [gaps, setGaps] = useState<string[]>([]);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+
+  const [description, setDescription] = useState('');
+  const [compiling, setCompiling] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Run-as-app state
-  const [appOpen, setAppOpen] = useState(false);
+  // Persisted-app state (set after a save; enables Run + Publish).
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+
+  // Run state.
+  const [running, setRunning] = useState(false);
   const [runInput, setRunInput] = useState('');
-  const [phase, setPhase] = useState<'idle' | 'running' | 'approve' | 'done'>('idle');
-  const [output, setOutput] = useState('');
-  const [governed, setGoverned] = useState<string | null>(null);
-  const [steps, setSteps] = useState<{ kind: string; label: string; detail: string }[]>([]);
-  const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
+  const [runSteps, setRunSteps] = useState<StepResult[]>([]);
+  const [runOutcome, setRunOutcome] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<string | null>(null);
 
-  async function reviewRun(decision: 'approve' | 'reject') {
-    if (!runId) { setPhase('done'); return; }
-    try {
-      const r = await fetch(`/api/v1/admin/agents/runs/${runId}/review`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ decision }),
-      });
-      if (r.ok) {
-        toast.success(decision === 'approve' ? 'Approved — released.' : 'Rejected — withheld.');
-        setPhase('done');
-        if (decision === 'reject') setOutput('(withheld by reviewer)');
-      } else {
-        toast.error('Review action failed.');
-      }
-    } catch { toast.error('Review action failed.'); }
-  }
+  const names: BindingNames = useMemo(() => ({ domains, agents }), [domains, agents]);
+  const validation = useMemo(() => (spec ? validateAppSpec(spec) : null), [spec]);
+  const summary = useMemo(() => (spec ? graphSummary(spec) : null), [spec]);
 
-  const trigger = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Input');
-  const human   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Human');
-  const sink    = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Output');
-  const agent   = wf?.nodeIds.map((id) => byId.get(id)).find((b) => b?.group === 'Agent');
-
-  function applyWorkflow(workflow: Workflow) {
-    const active = new Set(workflow.nodeIds);
-    setNodes(allNodes.map((n) => ({
-      ...n,
-      style: {
-        ...n.style,
-        opacity: active.has(n.id) ? 1 : 0.12,
-        boxShadow: active.has(n.id) ? '0 0 0 2px #059669' : 'none',
-      },
-    })));
-    setEdges(workflow.edges.map((e, i) => ({
-      id: `e${i}`, source: e.from, target: e.to, label: e.label, animated: true,
+  // Derive the React-Flow graph from the spec. Mark the selected node so the card highlights.
+  const { nodes, edges } = useMemo(() => {
+    if (!spec) return { nodes: [] as Node[], edges: [] as Edge[] };
+    const g = specToGraph(spec, names);
+    const rfNodes: Node[] = g.nodes.map((n) => ({
+      id: n.id,
+      type: 'step',
+      position: n.position,
+      data: { ...n.data, selected: n.id === selectedStepId },
+      draggable: false,
+    }));
+    const rfEdges: Edge[] = g.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.label,
+      animated: true,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#059669' },
       style: { stroke: '#059669', strokeWidth: 2 },
-      labelStyle: { fontFamily: 'Menlo, monospace', fontSize: 10 },
-    })));
-    setWf(workflow);
-  }
+    }));
+    return { nodes: rfNodes, edges: rfEdges };
+  }, [spec, names, selectedStepId]);
 
-  async function compose() {
-    if (!prompt.trim()) return;
-    setBusy(true);
+  // A structural/binding edit invalidates the persisted-run affordances (the saved copy is stale).
+  const markDirty = useCallback(() => {
+    setSavedId(null);
+    setPublishedUrl(null);
+    setRunSteps([]);
+    setRunOutcome(null);
+    setRunStatus(null);
+  }, []);
+
+  const edit = useCallback(
+    (fn: (s: AppSpec) => AppSpec) => {
+      setSpec((s) => (s ? fn(s) : s));
+      markDirty();
+    },
+    [markDirty],
+  );
+
+  // ─── Seed: compile a description → AppSpec skeleton ──────────────────────────────────────────
+  async function compile() {
+    if (description.trim().length < 8 || compiling) return;
+    setCompiling(true);
     try {
-      const r = await fetch('/api/v1/admin/compose', {
+      const res = await fetch('/api/v1/admin/apps/compile', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ description }),
       });
-      if (!r.ok) { toast.error('Compose failed — gateway may be offline.'); return; }
-      const { workflow } = (await r.json()) as { workflow: Workflow };
-      applyWorkflow(workflow);
+      if (!res.ok) throw new Error('Compile failed — the gateway may be offline.');
+      const data = (await res.json()) as { spec: AppSpec; gaps: string[] };
+      setSpec(data.spec);
+      setGaps(data.gaps ?? []);
+      setSelectedStepId(data.spec.steps[0]?.id ?? null);
+      markDirty();
+      toast.success('Carved a step graph — click a node to edit it, then Save.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Compile failed');
     } finally {
-      setBusy(false);
+      setCompiling(false);
     }
   }
 
-  async function save(visibility: 'private' | 'org', deploy = false) {
-    if (!wf) return;
-    setSaving(true);
-    try {
-      const r = await fetch('/api/v1/studio/templates', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: wf.title, summary: wf.summary, prompt, workflow: wf, visibility, deploy }),
-      });
-      const d = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
-      if (r.ok) {
-        if (deploy && d.url) {
-          setDeployedUrl(d.url);
-          toast.success('Deployed! Your app has a shareable URL.');
-        } else {
-          toast.success(visibility === 'org' ? 'Shared with your org.' : 'Saved to your gallery.');
-          setTab('gallery');
-        }
-      } else {
-        toast.error(d.error ?? 'Save failed.');
-      }
-    } finally { setSaving(false); }
+  function startBlank() {
+    const s = emptySpec();
+    setSpec(s);
+    setGaps([]);
+    setSelectedStepId(s.steps[0].id);
+    markDirty();
   }
 
-  async function runApp() {
-    setPhase('running');
-    setOutput('');
-    setGoverned(null);
-    setSteps([]);
+  function clear() {
+    setSpec(null);
+    setGaps([]);
+    setSelectedStepId(null);
+    setDescription('');
+    markDirty();
+  }
+
+  // ─── Save: persist the spec via the 3A CRUD route (re-validated server-side) ─────────────────
+  async function save(): Promise<string | null> {
+    if (!spec) return null;
+    const check = validateAppSpec(spec);
+    if (!check.ok) {
+      toast.error(check.errors[0] ?? 'Fix the flagged steps first');
+      return null;
+    }
+    setSaving(true);
     try {
-      const r = await fetch('/api/v1/admin/run', {
+      const res = await fetch('/api/v1/admin/apps', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          input: runInput || prompt,
-          // Pass the composed Agent block so the run goes through the governed pipeline
-          // (ABAC + guardrails + grounding + Temporal), not a bare model call.
-          agentId: agent?.id,
-          // Human block → the answer is HELD server-side as pending_review until approved.
-          requireReview: !!human,
-          system: agent ? `You are the ${agent.label}. ${wf?.summary ?? ''}` : '',
+          title: spec.title,
+          summary: spec.summary,
+          visibility: spec.visibility,
+          trigger: spec.trigger,
+          inputForm: spec.inputForm,
+          steps: spec.steps,
+          edges: spec.edges,
         }),
       });
-      const d = await r.json() as { output: string; governed?: boolean; status?: string; runId?: string; error?: string; steps?: { kind: string; label: string; detail: string }[] };
-      setOutput(d.output || d.error || '(no output)');
-      if (d.governed) setGoverned(d.status ?? 'ok');
-      setSteps(d.steps ?? []);
-      setRunId(d.runId ?? null);
-    } catch {
-      setOutput('(run failed — gateway unavailable)');
+      if (res.status === 422) {
+        const body = (await res.json().catch(() => ({}))) as { errors?: string[] };
+        throw new Error(body.errors?.[0] ?? 'The app spec did not validate');
+      }
+      if (!res.ok) throw new Error('Could not save the app');
+      const app = (await res.json()) as { id: string };
+      setSavedId(app.id);
+      toast.success(`"${spec.title}" saved — you can run or publish it now.`);
+      return app.id;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Save failed');
+      return null;
+    } finally {
+      setSaving(false);
     }
-    setPhase(human ? 'approve' : 'done');
   }
 
-  const isEmpty = nodes.length === 0;
+  // ─── Publish: mint a shareable /app/<slug> ────────────────────────────────────────────────────
+  async function publish() {
+    const id = savedId ?? (await save());
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/v1/admin/apps/${id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ publish: true }),
+      });
+      if (!res.ok) throw new Error('Publish failed');
+      const app = (await res.json()) as { slug?: string };
+      if (app.slug) {
+        setPublishedUrl(`/app/${app.slug}`);
+        toast.success('Published — shareable app URL is ready.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Publish failed');
+    }
+  }
+
+  // ─── Run: save (if needed) then hit the inline executor route ────────────────────────────────
+  async function run() {
+    if (running) return;
+    const id = savedId ?? (await save());
+    if (!id) return;
+    setRunning(true);
+    setRunSteps([]);
+    setRunOutcome(null);
+    setRunStatus(null);
+    try {
+      const res = await fetch(`/api/v1/admin/apps/${id}/run`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ input: runInput.trim() ? { input: runInput.trim() } : {} }),
+      });
+      if (!res.ok) throw new Error('Run failed');
+      const data = (await res.json()) as {
+        status: string;
+        steps: StepResult[];
+        outcome: string;
+      };
+      setRunStatus(data.status);
+      setRunSteps(data.steps ?? []);
+      setRunOutcome(data.outcome ?? '');
+      if (data.status === 'awaiting_human') {
+        toast.info('Run paused at a human-review step — resume it from the Review screen.');
+      } else if (data.status === 'error') {
+        toast.error('A step failed — see the trace.');
+      } else {
+        toast.success('Run complete.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Run failed');
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  // Per-step handlers — each wraps a PURE app-builder reducer (identical to AppBuilder 3A).
+  function handlersFor(stepId: string): StepEditorHandlers {
+    return {
+      onRelabel: (label) => edit((s) => relabelStep(s, stepId, label)),
+      onMoveUp: () => edit((s) => moveStep(s, stepId, -1)),
+      onMoveDown: () => edit((s) => moveStep(s, stepId, 1)),
+      onRemove: () => {
+        edit((s) => removeStep(s, stepId));
+        setSelectedStepId((cur) => (cur === stepId ? null : cur));
+      },
+      onRebindDomain: (d) => edit((s) => rebindDomain(s, stepId, d)),
+      onRebindAgent: (a) => edit((s) => rebindAgent(s, stepId, a)),
+      onSetPrompt: (p) => edit((s) => setAgentPrompt(s, stepId, p)),
+      onToggleGrounding: (g) => edit((s) => toggleGrounding(s, stepId, g)),
+      onSetSink: (sink: OutputStep['sink']) => edit((s) => setOutputSink(s, stepId, sink)),
+    };
+  }
+
+  const selectedStep = spec && selectedStepId ? stepById(spec, selectedStepId) : undefined;
+  const selectedIndex =
+    spec && selectedStepId ? spec.steps.findIndex((s) => s.id === selectedStepId) : -1;
 
   return (
-    <div className="flex h-[calc(100vh-160px)] gap-4">
-      {/* ── Left panel ── */}
-      <div className="flex w-[340px] shrink-0 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          {(['build', 'gallery'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors ${
-                tab === t ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t === 'gallery' ? 'Saved' : 'Build'}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3">
-          {tab === 'build' ? (
-            <div className="space-y-3">
+    <div className="flex h-[calc(100vh-220px)] min-h-[560px] gap-3">
+      {/* ── Left: describe / seed / save-run ── */}
+      <div className="flex w-[320px] shrink-0 flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-3">
+        {!spec ? (
+          <>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground">Describe the process</p>
               <Textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what you want in plain English — what triggers it, what it does, where the result goes…"
-                className="min-h-[120px] resize-none font-mono text-sm"
-                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void compose(); }}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what triggers it, what it reads/decides, and where the result goes…"
+                className="min-h-[110px] resize-none font-mono text-xs"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void compile();
+                }}
               />
-              <Button onClick={compose} disabled={busy || !prompt.trim()} className="w-full gap-2">
+              <Button
+                onClick={compile}
+                disabled={compiling || description.trim().length < 8}
+                className="w-full gap-2"
+              >
                 <Sparkle className="size-4" />
-                {busy ? 'Building…' : 'Build workflow'}
+                {compiling ? 'Carving steps…' : 'Build the graph'}
               </Button>
-
-              {/* Examples */}
-              {!wf && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Examples</p>
-                  {EXAMPLES.map((ex) => (
-                    <button
-                      key={ex}
-                      onClick={() => setPrompt(ex)}
-                      className="block w-full rounded-md border border-border p-2 text-left text-[11px] text-muted-foreground hover:border-primary/50 hover:bg-muted/30 hover:text-foreground"
-                    >
-                      {ex}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Workflow summary */}
-              {wf && (
-                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                  <p className="text-sm font-semibold text-foreground">{wf.title}</p>
-                  <p className="text-xs text-muted-foreground">{wf.summary}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-primary">
-                    {wf.nodeIds.length} steps · {wf.edges.length} connections{human ? ' · human review' : ''}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1 pt-0.5 text-[10px]">
-                    {trigger && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700">in: {trigger.label}</span>}
-                    {human   && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700">⏸ {human.label}</span>}
-                    {sink    && <span className="rounded bg-pink-100 px-1.5 py-0.5 text-pink-700">out: {sink.label}</span>}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    <Button size="sm" className="gap-1.5" onClick={() => { setAppOpen(true); setPhase('idle'); setOutput(''); }}>
-                      <Play className="size-3.5" /> Try it
-                    </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void save('private')} disabled={saving}>
-                      <Lock className="size-3.5" /> Save
-                    </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void save('org')} disabled={saving}>
-                      <Globe className="size-3.5" /> Share
-                    </Button>
-                    <Button size="sm" className="gap-1.5" onClick={() => void save('private', true)} disabled={saving}>
-                      <Sparkle className="size-3.5" /> Deploy
-                    </Button>
-                  </div>
-                  {deployedUrl && (
-                    <div className="rounded-md border border-primary/40 bg-primary/5 p-2 text-xs">
-                      <p className="font-medium text-primary">🚀 Deployed — shareable app URL:</p>
-                      <a href={deployedUrl} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[11px] text-primary underline">
-                        {typeof window !== 'undefined' ? window.location.origin : ''}{deployedUrl}
-                      </a>
-                    </div>
-                  )}
-                </div>
+              <Button onClick={startBlank} variant="outline" className="w-full gap-2">
+                <Plus className="size-4" />
+                Start blank
+              </Button>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Examples</p>
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => setDescription(ex)}
+                  className="block w-full rounded-md border border-border p-2 text-left text-[11px] text-muted-foreground hover:border-primary/50 hover:bg-muted/30 hover:text-foreground"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Graph summary */}
+            <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+              <p className="truncate text-sm font-semibold text-foreground">{spec.title}</p>
+              <p className="text-[10px] uppercase tracking-wide text-primary">
+                {summary?.stepCount} steps · {summary?.edgeCount} edges
+                {summary?.hasHuman ? ' · human review' : ''}
+              </p>
+              {validation && !validation.ok ? (
+                <p className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500">
+                  <Warning className="size-3" /> {validation.errors[0]}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Ready to save + run.</p>
               )}
             </div>
-          ) : (
-            <Gallery
-              onLoad={(t) => {
-                setPrompt(t.prompt);
-                applyWorkflow(t.workflow);
-                setTab('build');
-              }}
-              currentUserId={userId}
-            />
-          )}
-        </div>
+
+            {/* Add-step palette */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Add a step</p>
+              <div className="flex flex-wrap gap-1.5">
+                {STEP_KINDS.map((k) => (
+                  <Button
+                    key={k.kind}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-[11px]"
+                    onClick={() => {
+                      let newId = '';
+                      setSpec((s) => {
+                        if (!s) return s;
+                        const next = addStep(s, k.kind);
+                        newId = next.steps[next.steps.length - 1].id;
+                        return next;
+                      });
+                      markDirty();
+                      if (newId) setSelectedStepId(newId);
+                    }}
+                  >
+                    <Plus className="size-3" />
+                    {k.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {gaps.length > 0 ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.06] p-2">
+                <p className="flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                  <Warning className="size-3" /> {gaps.length} thing{gaps.length === 1 ? '' : 's'} to
+                  resolve
+                </p>
+                <ul className="mt-1 space-y-0.5 text-[10px] text-amber-800 dark:text-amber-300/90">
+                  {gaps.map((g, i) => (
+                    <li key={i}>• {g}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* Run */}
+            <div className="space-y-1.5 border-t border-border pt-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Try it</p>
+              <Textarea
+                value={runInput}
+                onChange={(e) => setRunInput(e.target.value)}
+                placeholder="Sample input (optional)…"
+                className="min-h-[54px] resize-none font-mono text-[11px]"
+              />
+              <div className="flex gap-1.5">
+                <Button
+                  onClick={run}
+                  disabled={running || !validation?.ok}
+                  size="sm"
+                  className="flex-1 gap-1.5"
+                >
+                  <Play className="size-3.5" />
+                  {running ? 'Running…' : 'Run'}
+                </Button>
+                <Button
+                  onClick={() => void save()}
+                  disabled={saving}
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                >
+                  <FloppyDisk className="size-3.5" />
+                  Save
+                </Button>
+              </div>
+              <Button
+                onClick={publish}
+                disabled={saving}
+                size="sm"
+                variant="ghost"
+                className="w-full gap-1.5"
+              >
+                <ArrowSquareOut className="size-3.5" /> Publish shareable app
+              </Button>
+              {publishedUrl ? (
+                <a
+                  href={publishedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block break-all rounded border border-primary/40 bg-primary/5 p-1.5 font-mono text-[10px] text-primary underline"
+                >
+                  {publishedUrl}
+                </a>
+              ) : null}
+            </div>
+
+            {/* Run trace */}
+            {runSteps.length > 0 || runOutcome !== null ? (
+              <div className="space-y-1.5 rounded-md border border-border bg-muted/40 p-2">
+                <p className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Result
+                  {runStatus ? (
+                    <Badge
+                      variant="secondary"
+                      className={
+                        runStatus === 'done'
+                          ? 'bg-primary/10 text-primary'
+                          : runStatus === 'awaiting_human'
+                            ? 'bg-amber-500/10 text-amber-600'
+                            : 'bg-destructive/10 text-destructive'
+                      }
+                    >
+                      {runStatus}
+                    </Badge>
+                  ) : null}
+                </p>
+                {runOutcome ? (
+                  <p className="whitespace-pre-wrap text-[11px] text-foreground">{runOutcome}</p>
+                ) : null}
+                <ol className="space-y-0.5 border-l border-border pl-2">
+                  {runSteps.map((s, i) => (
+                    <li key={i} className="text-[10px] text-muted-foreground">
+                      <span
+                        className={
+                          s.status === 'error'
+                            ? 'font-mono text-destructive'
+                            : s.status === 'awaiting_human'
+                              ? 'font-mono text-amber-600'
+                              : 'font-mono text-foreground'
+                        }
+                      >
+                        {s.kind}
+                      </span>
+                      {s.detail ? ` — ${s.detail}` : ''}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
-      {/* ── Canvas ── */}
-      <div className="relative flex-1 overflow-hidden rounded-xl border border-border bg-[#fafafa]">
-        {isEmpty ? (
+      {/* ── Center: the React-Flow graph ── */}
+      <div className="relative flex-1 overflow-hidden rounded-xl border border-border bg-[#fafafa] dark:bg-neutral-950">
+        {!spec ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Sparkle className="size-10 text-muted-foreground/30" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              Describe your workflow on the left and hit <strong>Build workflow</strong>.
-              <br />
-              <span className="text-xs">No technical knowledge needed.</span>
+              Describe your process on the left, or start blank. Every node is a real step — click one
+              to configure it, and Run to execute the whole governed graph.
             </p>
           </div>
         ) : (
-          <ReactFlow nodes={nodes} edges={edges} fitView proOptions={{ hideAttribution: true }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={NODE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+            minZoom={0.3}
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_, n) => setSelectedStepId(n.id)}
+            onPaneClick={() => setSelectedStepId(null)}
+          >
             <Background gap={20} color="#e5e7eb" />
             <Controls showInteractive={false} />
           </ReactFlow>
         )}
-
-        {/* Clear button when workflow is shown */}
-        {!isEmpty && (
+        {spec ? (
           <button
-            onClick={() => { setNodes([]); setEdges([]); setWf(null); }}
+            onClick={clear}
             className="absolute right-3 top-3 rounded-md border border-border bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:text-foreground"
             title="Clear canvas"
           >
             <X className="size-3.5" />
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* ── Run-as-app dialog ── */}
-      <Dialog open={appOpen} onOpenChange={setAppOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{wf?.title ?? 'Try your workflow'}</DialogTitle>
-            <DialogDescription>
-              {trigger?.label ?? 'Manual'} → {sink?.label ?? 'Console'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            {trigger && trigger.id !== 'input:manual' && (
-              <p className="rounded-md border border-dashed border-border p-2 text-xs text-muted-foreground">
-                Trigger: <strong>{trigger.label}</strong> — fires automatically in production. Enter a sample to preview:
-              </p>
-            )}
-            <Textarea
-              value={runInput}
-              onChange={(e) => setRunInput(e.target.value)}
-              placeholder="Type the input (e.g. the claim details, the question, the document content)…"
-              className="min-h-[90px] font-mono text-sm"
-            />
-            <Button onClick={runApp} disabled={phase === 'running'} className="w-full gap-2">
-              <Play className="size-4" />
-              {phase === 'running' ? 'Running…' : 'Run'}
-            </Button>
-
-            {phase === 'approve' && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
-                <p className="text-sm font-medium text-amber-800">⏸ {human?.label ?? 'Human review'} required</p>
-                <p className="mt-1 text-xs text-amber-700">
-                  The answer is <strong>held server-side</strong> (pending_review, run <code className="font-mono">{runId?.slice(0, 12)}</code>) until approved — it hasn&apos;t reached {sink?.label ?? 'the output'} yet.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <Button size="sm" onClick={() => void reviewRun('approve')}>Approve &amp; deliver</Button>
-                  <Button size="sm" variant="outline" onClick={() => void reviewRun('reject')}>Reject</Button>
-                </div>
-              </div>
-            )}
-
-            {output && (phase === 'approve' || phase === 'done') && (
-              <div className="rounded-md border border-border bg-muted/40 p-3">
-                <p className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Result{phase === 'done' && sink ? ` → ${sink.label}` : ' (pending approval)'}
-                  {governed && (
-                    <span className={`rounded px-1.5 py-0.5 text-[9px] normal-case ${
-                      governed === 'ok' ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
-                    }`}>
-                      {governed === 'ok' ? '✓ governed — policy + guardrails passed' : `⚠ ${governed} by governance`}
-                    </span>
-                  )}
-                </p>
-                <p className="whitespace-pre-wrap text-sm">{output}</p>
-                {steps.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Governance trace ({steps.length} steps)
-                    </summary>
-                    <ol className="mt-1 space-y-0.5 border-l border-border pl-3">
-                      {steps.map((s, i) => (
-                        <li key={i} className="text-[11px] text-muted-foreground">
-                          <span className="font-mono text-foreground">{s.kind}</span>
-                          {s.label ? ` · ${s.label}` : ''}{s.detail ? ` — ${s.detail}` : ''}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                )}
-              </div>
-            )}
+      {/* ── Right: the selected node's config (the SAME AppStepEditor the text builder uses) ── */}
+      {spec && selectedStep && selectedIndex >= 0 ? (
+        <div className="w-[320px] shrink-0 overflow-y-auto rounded-xl border border-border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-foreground">Configure step</p>
+            <button
+              onClick={() => setSelectedStepId(null)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Close config"
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
-        </DialogContent>
-      </Dialog>
+          <AppStepEditor
+            step={selectedStep}
+            index={selectedIndex}
+            total={spec.steps.length}
+            names={names}
+            handlers={handlersFor(selectedStep.id)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
