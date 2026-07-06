@@ -8,12 +8,15 @@ import {
   getSkill,
   listMessages,
   memoryBlock,
+  memoryFactsByIds,
   prepareRegenerate,
+  projectAccess,
   projectMemoryBlock,
   projectSystemPrompt,
   renameConversation,
 } from '@/lib/chat';
 import { attachmentBlock } from '@/lib/chat-attach';
+import { parseRefsPayload, referencedMemoryBlock } from '@/lib/chat-mentions';
 import {
   estimateTokens,
   isDenied,
@@ -71,7 +74,11 @@ export async function POST(req: Request) {
     // Ad-hoc file attachments already extracted to text by /api/v1/chat/attach — injected as a
     // system context block for this turn only (not persisted, not embedded).
     attachments = [],
+    // @-mention references for THIS turn only: explicit memory ids to inject as context + KB scopes
+    // (project / project+doc) to ground retrieval on. Parsed/validated by the pure helper.
+    refs = null,
   } = await req.json().catch(() => ({}));
+  const mentionRefs = parseRefsPayload(refs);
   // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
   // pipeline (system prompt, budget, tools) works unchanged. projectId/skillId stay null.
   const convo = temporary
@@ -124,6 +131,18 @@ export async function POST(req: Request) {
   if (ci.trim()) messages.push({ role: 'system', content: ci });
   const mem = await memoryBlock(userId);
   if (mem) messages.push({ role: 'system', content: mem });
+  // @-mentioned memories: the user explicitly referenced specific stored facts for this turn — pull
+  // them (scoped to the caller so you can only reference your own) and inject as a dedicated block,
+  // additive to the whole-memory block above. Best-effort; degrades to no block when none resolve.
+  if (mentionRefs?.memoryIds.length) {
+    try {
+      const facts = await memoryFactsByIds(userId, mentionRefs.memoryIds);
+      const block = referencedMemoryBlock(facts);
+      if (block) messages.push({ role: 'system', content: block });
+    } catch {
+      /* referenced memory optional — chat still answers without it */
+    }
+  }
   const sys = await projectSystemPrompt(convo.projectId ?? null);
   if (sys) messages.push({ role: 'system', content: sys });
   // Per-project memory: inject facts scoped to this conversation's project (additive to user memory).
@@ -186,10 +205,35 @@ export async function POST(req: Request) {
       /* org knowledge optional — chat still answers without it */
     }
   }
+  // @-mentioned knowledge: the user referenced one or more KBs (whole project) or specific KB docs
+  // for this turn. Ground retrieval on each scope and fold the hits into `citations` — the SAME
+  // Citation shape the project/org RAG branches use, so inline [n] chips + the Sources footer keep
+  // working (phase-1 consistency). Access is enforced: retrieval only runs for a project the caller
+  // owns / is a member of / is admin over (projectAccess); others are silently skipped. De-dupe the
+  // project we already retrieved above (ragProjectId) to avoid double-injecting the same KB.
+  if (mentionRefs?.kb.length) {
+    const alreadyRetrieved = new Set<string>(ragProjectId ? [`${ragProjectId}::`] : []);
+    for (const scope of mentionRefs.kb) {
+      const key = `${scope.projectId}::${scope.docId ?? ''}`;
+      if (alreadyRetrieved.has(key)) continue;
+      alreadyRetrieved.add(key);
+      try {
+        // Access gate — you can only reference a project you can read.
+        if (!(await projectAccess(userId, scope.projectId, session?.user?.role ?? 'viewer'))) continue;
+        const r = await retrieve(scope.projectId, String(content), 6, { docId: scope.docId });
+        if (r.context) {
+          messages.push({ role: 'system', content: r.context });
+          citations = citations.concat(r.citations);
+        }
+      } catch {
+        /* referenced KB optional — chat still answers without it */
+      }
+    }
+  }
   // Inline-citation numbering: tell the model to cite with bracketed numbers ([1], [2] …) keyed to
   // the retrieved sources, in the SAME order buildSources()/the transcript footer number them (via
-  // shared sourceNames). This is what lets the answer stream `Revenue rose [1].` and the renderer
-  // turn [1] into a clickable chip that jumps to source 1. No sources → no instruction (no-op).
+  // shared sourceNames). MUST run after ALL citations are gathered (org + project + @-KB) so the
+  // numbering covers referenced KBs too. No sources → no instruction (no-op).
   if (citations.length) {
     const instruction = citationInstruction(sourceNames(citations));
     if (instruction) messages.push({ role: 'system', content: instruction });
