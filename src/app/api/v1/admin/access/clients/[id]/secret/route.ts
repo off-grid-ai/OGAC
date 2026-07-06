@@ -16,6 +16,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     const secret = await kc.getClientSecret(id);
+    // Reading a live client secret in plaintext is a privileged, repeatable action — audit every
+    // retrieval so there's an accountability trail of who viewed which client's secret when.
+    // (P0 — HARDENING_AUDIT.md; the POST/rotate path already audited, the GET did not.)
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'access.machine.secret.read',
+      resource: `client:${id}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ configured: true, secret });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
