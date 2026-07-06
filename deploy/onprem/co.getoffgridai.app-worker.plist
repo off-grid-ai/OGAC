@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Off Grid durable APP-RUN WORKER — the drain for the `offgrid-apps` Temporal task queue.
+     Long-lived process that polls Temporal (:7233 on S1) and runs the AppRunWorkflow: the multi-step
+     app executor with mid-workflow human-in-the-loop pause/resume (Temporal signals/condition()).
+     Sibling of co.getoffgridai.agent-worker (that drains `offgrid-agents` / single agent runs).
+     A worker crash mid-run is retried/resumed by Temporal; a HITL pause survives a restart.
+
+     gui-domain LaunchAgent (same as the agent-worker) — reuses @/lib/app-run + runAgent, hits the DB
+     and gateway, so it needs the console's user runtime. ENV: loaded in-process from the console's
+     .env.local/.env.* via scripts/worker-env.mts (imported first in scripts/app-worker.mts), which
+     is why DATABASE_URL/OFFGRID_GATEWAY_* are populated before @/db builds its pg Pool.
+
+     Install (on S1, gui domain — no sudo):
+       cp deploy/onprem/co.getoffgridai.app-worker.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.getoffgridai.app-worker.plist
+     Verify:  launchctl list co.getoffgridai.app-worker
+     Restart now: launchctl kickstart -k gui/$(id -u)/co.getoffgridai.app-worker
+     Tail log: tail -f /Users/admin/offgrid/console/app-worker.log
+     Uninstall: launchctl bootout gui/$(id -u)/co.getoffgridai.app-worker
+
+     LIVE: the console dispatches to this queue when OFFGRID_ADAPTER_APPRUNTIME=temporal (already set
+     in .env.local — see SERVER_STATE.md). Without the worker OR the flag, multi-step apps run inline
+     (safe), but a `human` step can only PAUSE durably — so HITL apps need this worker running. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>co.getoffgridai.app-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/admin/offgrid/console/node_modules/.bin/tsx</string>
+    <string>scripts/app-worker.mts</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/admin/offgrid/console</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>OFFGRID_TEMPORAL_ADDRESS</key><string>127.0.0.1:7233</string>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/admin/offgrid/console/app-worker.log</string>
+  <key>StandardErrorPath</key><string>/Users/admin/offgrid/console/app-worker.log</string>
+</dict>
+</plist>

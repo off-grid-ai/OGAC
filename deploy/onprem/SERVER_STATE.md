@@ -646,3 +646,6 @@ Multi-step apps with a human step now run durably (Temporal) so HITL review can 
 
 ### Self-creating table: compliance_adoption (2026-07-06)
 Regulatory framework adoption + per-control status (ISO42001/NIST-AI-RMF/EU-AI-Act). CREATE TABLE IF NOT EXISTS in `ensureComplianceSchema()` (like guardrails_rules) — no migration step. Cols: org_id, framework_id, control_id, status(new|in-progress|met), updated_at; PK (org_id, control_id).
+
+### app-worker now a launchd job (2026-07-06)
+The `offgrid-apps` worker is now a gui-domain LaunchAgent `co.getoffgridai.app-worker` (plist: `deploy/onprem/co.getoffgridai.app-worker.plist`) — RunAtLoad + KeepAlive, survives reboot. Bootstrapped on S1; log `/Users/admin/offgrid/console/app-worker.log`; restart `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.app-worker`. Supersedes the earlier "not yet a launchd job" note.
