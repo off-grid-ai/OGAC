@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { messagesUpToInclusive } from '@/lib/chat-policy';
 import { getObjectText, putObject } from '@/lib/files';
@@ -177,6 +177,20 @@ export async function addMemory(userId: string, fact: string, source = 'chat') {
 export async function deleteMemory(userId: string, id: string) {
   await ensureChatSchema();
   await db.delete(chatMemory).where(and(eq(chatMemory.id, id), eq(chatMemory.userId, userId)));
+}
+
+// Resolve a set of memory fact ids → their text, SCOPED to the owning user (an @-mention can only
+// reference the caller's own memories — the WHERE userId guard prevents referencing someone else's
+// facts by id). Returns the fact strings in no particular order; unknown/other-user ids are dropped.
+export async function memoryFactsByIds(userId: string, ids: string[]): Promise<string[]> {
+  const clean = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.length > 0)));
+  if (!clean.length) return [];
+  await ensureChatSchema();
+  const rows = await db
+    .select({ fact: chatMemory.fact })
+    .from(chatMemory)
+    .where(and(eq(chatMemory.userId, userId), inArray(chatMemory.id, clean)));
+  return rows.map((r) => r.fact);
 }
 
 // Format the user's memories as a system block injected into every chat.

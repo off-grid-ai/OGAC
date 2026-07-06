@@ -2,6 +2,8 @@
 
 import {
   ArrowsClockwise,
+  At,
+  Books,
   Warning,
   CaretLeft,
   CaretRight,
@@ -48,6 +50,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
+import {
+  type MentionCandidate,
+  type MentionRef,
+  activeMention,
+  buildRefsPayload,
+  candidateToRef,
+  matchMentions,
+} from '@/lib/chat-mentions';
 import { toDisplayHost } from '@/lib/display-host';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
@@ -356,6 +366,18 @@ export function ChatWorkspace({
   const [turnSkill, setTurnSkill] = useState<{ id: string; name: string } | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
+  // @-mentions: reference stored memories + knowledge (projects/KBs, specific docs) as grounding
+  // context for THIS turn. `refs` are the chosen chips (removable); the picker opens on an `@token`
+  // at the caret, filters `mentionCands`, and inserting adds a chip. Threaded into the request as
+  // `refs` (memory ids + KB scopes) so the answer is grounded on them. Turn-scoped: cleared on send.
+  const [refs, setRefs] = useState<MentionRef[]>([]);
+  const [mentionCands, setMentionCands] = useState<MentionCandidate[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  // Caret position in the composer — the pure activeMention() detector needs it to find the token
+  // under the cursor. Tracked from the textarea's selectionStart on every change/select/keyup.
+  const caretRef = useRef(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [gatewayError, setGatewayError] = useState<{ url: string } | null>(null);
@@ -383,6 +405,12 @@ export function ChatWorkspace({
     ? skillList
         .filter((s) => s.name.toLowerCase().replace(/\s+/g, '-').includes(slashQuery))
         .slice(0, 6)
+    : [];
+  // The @token under the caret (null when not in a mention). Slash + @ are mutually exclusive: a
+  // leading `/` is a skill, `@` anywhere is a mention. `mention` drives the picker's query.
+  const mention = !slashMatch ? activeMention(input, caretRef.current) : null;
+  const mentionMatches = mention
+    ? matchMentions(mentionCands, mention.query, { exclude: refs, limit: 8 })
     : [];
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const visibleConversations = conversations
@@ -451,6 +479,49 @@ export function ChatWorkspace({
     setSlashIndex(0);
   }, [slashMatches.length, input]);
 
+  // Open the @-mention picker whenever the caret sits inside an @token that has matches; reset the
+  // highlighted row. Keyed on input (typing) so it re-evaluates as the query changes.
+  useEffect(() => {
+    setMentionOpen(!!mention && mentionMatches.length > 0);
+    setMentionIndex(0);
+  }, [mention?.query, mention?.start, mentionMatches.length]);
+
+  // Build the @-mention candidate list once: the user's memories + their projects (whole-KB refs) +
+  // every document across those projects (specific-doc refs). Fetched lazily; degrades to whatever
+  // resolves (a project with no docs just contributes a project ref).
+  const loadMentionCandidates = useCallback(async () => {
+    const out: MentionCandidate[] = [];
+    try {
+      const mr = await fetch('/api/v1/chat/memory');
+      if (mr.ok) {
+        const rows = (await mr.json()).memory ?? [];
+        for (const m of rows as { id: string; fact: string }[]) {
+          out.push({ kind: 'memory', id: m.id, label: m.fact });
+        }
+      }
+    } catch { /* memory optional */ }
+    const projs = projects.length
+      ? projects
+      : await fetch('/api/v1/chat/projects').then((r) => (r.ok ? r.json() : { projects: [] })).then((b) => b.projects ?? []).catch(() => []);
+    for (const p of projs as Project[]) {
+      out.push({ kind: 'project', id: p.id, label: p.name, hint: 'Knowledge base' });
+      try {
+        const dr = await fetch(`/api/v1/chat/projects/${p.id}/documents`);
+        if (dr.ok) {
+          const docs = (await dr.json()).documents ?? [];
+          for (const d of docs as { id: string; name: string }[]) {
+            out.push({ kind: 'doc', id: d.id, label: d.name, projectId: p.id, hint: p.name });
+          }
+        }
+      } catch { /* project docs optional */ }
+    }
+    setMentionCands(out);
+  }, [projects]);
+  // Populate candidates once projects are known (and refresh when they change).
+  useEffect(() => {
+    void loadMentionCandidates();
+  }, [loadMentionCandidates]);
+
   // Pick a slash-style skill: tag the turn with it and clear the /query from the composer.
   function pickSkill(s: { id: string; name: string }) {
     setTurnSkill({ id: s.id, name: s.name });
@@ -458,9 +529,54 @@ export function ChatWorkspace({
     setSlashOpen(false);
   }
 
+  // Pick a @-mention candidate: add it as a removable chip and strip the @token from the composer
+  // (so the reference lives in `refs`, not as literal text). De-dupe by kind+id. The caret is left
+  // where the token started so the reader keeps typing naturally.
+  function pickMention(c: MentionCandidate) {
+    if (!mention) return;
+    const before = input.slice(0, mention.start);
+    const after = input.slice(mention.end);
+    // Collapse the token to nothing; keep a single trailing space if we're mid-sentence.
+    const next = `${before}${after}`;
+    setInput(next);
+    setRefs((prev) =>
+      prev.some((r) => r.kind === c.kind && r.id === c.id) ? prev : [...prev, candidateToRef(c)],
+    );
+    setMentionOpen(false);
+    // Restore focus + caret to the strip point on the next tick.
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        const pos = before.length;
+        el.setSelectionRange(pos, pos);
+        caretRef.current = pos;
+      }
+    });
+  }
+
   // Composer keydown: drive the slash picker (arrows/enter/tab/escape) when open, else send.
   // eslint-disable-next-line complexity
   function onComposerKey(e: React.KeyboardEvent) {
+    // @-mention picker takes the arrow/enter/tab/escape keys while open (same interaction as slash).
+    if (mentionOpen && mentionMatches.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        return setMentionIndex((i) => (i + 1) % mentionMatches.length);
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        return setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        return pickMention(mentionMatches[mentionIndex]);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return setMentionOpen(false);
+      }
+    }
     if (slashOpen && slashMatches.length) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -861,6 +977,8 @@ export function ChatWorkspace({
     }
     const sentFiles = files.map((f) => ({ name: f.name, text: f.text }));
     const sentSkill = turnSkill?.id ?? null;
+    // @-mention grounding refs for this turn (memory ids + KB scopes); null when nothing referenced.
+    const sentRefs = buildRefsPayload(refs);
     // Incognito: no DB row; the server gets the client-held transcript + a temporary flag.
     if (temporary) {
       const sentImages = images;
@@ -869,6 +987,7 @@ export function ChatWorkspace({
       setImages([]);
       setFiles([]);
       setTurnSkill(null);
+      setRefs([]);
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: text, images: sentImages.length ? sentImages : null },
@@ -882,6 +1001,7 @@ export function ChatWorkspace({
         images: sentImages,
         attachments: sentFiles,
         skillId: sentSkill,
+        refs: sentRefs,
       });
       return;
     }
@@ -904,6 +1024,7 @@ export function ChatWorkspace({
     setImages([]);
     setFiles([]);
     setTurnSkill(null);
+    setRefs([]);
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: text, images: sentImages.length ? sentImages : null },
@@ -916,6 +1037,7 @@ export function ChatWorkspace({
       images: sentImages,
       attachments: sentFiles,
       skillId: sentSkill,
+      refs: sentRefs,
     });
   }
 
@@ -1346,6 +1468,81 @@ export function ChatWorkspace({
                 <span className="text-[10px] text-muted-foreground">applied to your next message</span>
               </div>
             ) : null}
+            {/* @-mention reference chips — memories + KBs/docs pulled into this turn as context. */}
+            {refs.length ? (
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                {refs.map((r) => (
+                  <span
+                    key={`${r.kind}:${r.id}`}
+                    className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-primary"
+                    title={r.label}
+                  >
+                    {r.kind === 'memory' ? (
+                      <Brain className="size-3.5 shrink-0" />
+                    ) : r.kind === 'doc' ? (
+                      <FileText className="size-3.5 shrink-0" />
+                    ) : (
+                      <Books className="size-3.5 shrink-0" />
+                    )}
+                    <span className="max-w-[180px] truncate">{r.label}</span>
+                    <button
+                      onClick={() => setRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))}
+                      className="hover:text-destructive"
+                      aria-label={`Remove reference ${r.label}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+                <span className="text-[10px] text-muted-foreground">referenced for your next message</span>
+              </div>
+            ) : null}
+            {/* @-mention picker — two sections (Memories, Knowledge). Same interaction as slash. */}
+            {mentionOpen ? (
+              <div className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                {(() => {
+                  const memRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind === 'memory');
+                  const kbRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind !== 'memory');
+                  return [
+                    { key: 'memory', heading: 'Memories', rows: memRows },
+                    { key: 'knowledge', heading: 'Knowledge', rows: kbRows },
+                  ];
+                })().map((section) => {
+                  const rows = section.rows;
+                  if (!rows.length) return null;
+                  return (
+                    <div key={section.key}>
+                      <div className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+                        {section.heading}
+                      </div>
+                      {rows.map(({ c, gi }) => (
+                        <button
+                          key={`${c.kind}:${c.id}`}
+                          onMouseEnter={() => setMentionIndex(gi)}
+                          onClick={() => pickMention(c)}
+                          className={cn(
+                            'flex w-full items-center gap-2 px-3 py-2 text-left',
+                            gi === mentionIndex ? 'bg-primary/10' : 'hover:bg-muted',
+                          )}
+                        >
+                          {c.kind === 'memory' ? (
+                            <Brain className="size-3.5 shrink-0 text-primary" />
+                          ) : c.kind === 'doc' ? (
+                            <FileText className="size-3.5 shrink-0 text-primary" />
+                          ) : (
+                            <Books className="size-3.5 shrink-0 text-primary" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{c.label}</span>
+                          {c.hint ? (
+                            <span className="shrink-0 text-[10px] text-muted-foreground">{c.hint}</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
             {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
             {slashOpen ? (
               <div className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
@@ -1430,6 +1627,23 @@ export function ChatWorkspace({
                     <Lightning className="mr-2 size-4" /> Extended thinking
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      // Insert an `@` and focus the composer so the mention picker opens.
+                      const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
+                      setInput(next);
+                      requestAnimationFrame(() => {
+                        const el = textareaRef.current;
+                        if (el) {
+                          el.focus();
+                          el.setSelectionRange(next.length, next.length);
+                          caretRef.current = next.length;
+                        }
+                      });
+                    }}
+                  >
+                    <At className="mr-2 size-4" /> Reference memory or knowledge…
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
                     <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
                   </DropdownMenuItem>
@@ -1446,14 +1660,20 @@ export function ChatWorkspace({
                 <Microphone className="size-5" />
               </button>
               <textarea
+                ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  caretRef.current = e.target.selectionStart ?? e.target.value.length;
+                  setInput(e.target.value);
+                }}
+                onKeyUp={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
+                onClick={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
                 onKeyDown={onComposerKey}
                 rows={1}
                 placeholder={
                   activeModel?.image
                     ? 'Describe an image to generate…'
-                    : 'Message the model…  (type / for skills)'
+                    : 'Message the model…  (/ for skills, @ to reference memory or knowledge)'
                 }
                 className="max-h-40 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none"
               />
