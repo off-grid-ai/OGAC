@@ -69,7 +69,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'chat',
     label: 'Chat',
     description:
-      'Your own ChatGPT — chat, projects, and knowledge, answered by the on-prem gateways. No per-seat cost.',
+      'Your team’s private AI — answers grounded in your own docs and data, run on your gateways. Nothing leaves your network; no per-seat cost.',
     route: '/chat',
     service: 'gateway',
   },
