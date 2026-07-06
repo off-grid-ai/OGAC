@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getMdm } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { validateOsquery } from '@/lib/fleetdm';
 
 export const dynamic = 'force-dynamic';
@@ -32,8 +34,18 @@ export async function POST(req: Request) {
   }
   try {
     const result = await mdm.liveQuery(sql, hostIds);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.livequery',
+      resource: `fleet:hosts:${hostIds.length}`,
+      outcome: 'ok',
+    });
     return NextResponse.json(result);
   } catch (err) {
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.livequery',
+      resource: `fleet:hosts:${hostIds.length}`,
+      outcome: 'error',
+    });
     return NextResponse.json(
       { error: `live query failed: ${(err as Error).message}` },
       { status: 502 },

@@ -2,6 +2,7 @@ import { createInspector, project2DFromPoints, type VectorDBConfig, type VectorD
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { toConnectHost } from '@/lib/display-host';
+import { isAllowedVectorDbUrl } from '@/lib/vectordb-allowlist';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,13 @@ export async function POST(req: Request) {
   // host back to the real loopback target before connecting — the server always reaches Qdrant
   // over 127.0.0.1. A user-supplied external URL passes through untouched.
   const url = toConnectHost(body.url) || process.env.OFFGRID_QDRANT_URL || 'http://127.0.0.1:6333';
+  // SSRF defense-in-depth: the admin gate is not enough — a request-supplied url is still an
+  // arbitrary-host probe. Restrict the connect target to loopback / the configured store unless the
+  // OFFGRID_VECTORDB_ALLOW_EXTERNAL opt-in is set. Pure check (vectordb-allowlist.ts).
+  const gateUrl = isAllowedVectorDbUrl(url, process.env);
+  if (!gateUrl.allowed) {
+    return NextResponse.json({ error: `vector-db url rejected: ${gateUrl.reason}` }, { status: 400 });
+  }
   const apiKey = body.apiKey ?? process.env.OFFGRID_QDRANT_API_KEY;
   const action = body.action ?? 'ping';
   const cfg: VectorDBConfig = { apiKey, collection: body.collection, kind, url };

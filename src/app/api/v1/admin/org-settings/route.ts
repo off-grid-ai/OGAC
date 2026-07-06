@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { getOrgSystemPrompt, setOrgSystemPrompt } from '@/lib/store';
 
 // Org-wide system prompt — the highest-precedence instruction injected into every chat.
@@ -22,5 +24,10 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'systemPrompt (string) required' }, { status: 400 });
   }
   await setOrgSystemPrompt(b.systemPrompt, session.user.email ?? 'admin');
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'org.settings.change',
+    resource: 'org:system-prompt',
+    outcome: 'ok',
+  });
   return NextResponse.json({ ok: true });
 }
