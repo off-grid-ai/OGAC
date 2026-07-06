@@ -1,8 +1,13 @@
+import { Plus } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { AgentsGrid, type AgentCardModel } from '@/components/agents/AgentsGrid';
 import { CreateAgentButton } from '@/components/agents/CreateAgentButton';
 import { SandboxRunner } from '@/components/agents/SandboxRunner';
+import { AppsList } from '@/components/build/AppsList';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { agentActivity, listManagedAgents } from '@/lib/agents';
+import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -16,10 +21,12 @@ function planeLabel(id: string): string {
 
 export default async function AgentsPage() {
   await requireModuleForUser('agents');
-  const [agents, activity, tools] = await Promise.all([
+  const orgId = await currentOrgId();
+  const [agents, activity, tools, apps] = await Promise.all([
     listManagedAgents(),
     agentActivity(),
-    listTools(await currentOrgId()).catch(() => []),
+    listTools(orgId).catch(() => []),
+    listApps(orgId).catch(() => []),
   ]);
   const customCount = agents.filter((a) => a.custom).length;
   const toolOptions = tools
@@ -46,14 +53,28 @@ export default async function AgentsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Agents</h1>
+          <h1 className="text-lg font-semibold text-foreground">Apps</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Author an agent in plain language. Every agent — built-in or yours — runs through the
+            Build once, run everywhere. An app is anything you describe in plain language — a
+            one-step agent or a multi-step workflow, built the same way. Every app runs through the
             same governed pipeline: policy gate, guardrails, model routing, retrieval grounding, and
-            tamper-evident provenance. No agent can opt out of the conventions set on this console.
+            tamper-evident provenance. Nothing you build can opt out of the conventions set on this
+            console.
           </p>
         </div>
-        <CreateAgentButton />
+        <Button asChild>
+          <Link href="/studio/new">
+            <Plus className="size-4" />
+            New app
+          </Link>
+        </Button>
+      </div>
+
+      {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
+          workflow. One "New app" front door (above) opens the guided builder for both. */}
+      <div>
+        <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
+        <AppsList apps={apps} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -85,6 +106,14 @@ export default async function AgentsPage() {
             {activity.groundedShare}%
           </CardContent>
         </Card>
+      </div>
+
+      {/* Agents = single-step apps: the built-in roster + your own definitions, still fully editable
+          and runnable. "New app" (top) opens the same guided builder; this quick-create adds a bare
+          agent definition directly. */}
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-sm font-medium text-foreground">Agents</h2>
+        <CreateAgentButton />
       </div>
 
       <AgentsGrid agents={cards} tools={toolOptions} />
