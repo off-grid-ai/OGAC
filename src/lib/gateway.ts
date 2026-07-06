@@ -61,24 +61,22 @@ export async function gatewayFetch(path: string, init: RequestInit = {}): Promis
 // action is even legal for a node's current state / the control plane's
 // capabilities.
 //
-// HONESTY CONTRACT — read this before adding an action:
-//   The aggregator (`scripts/gateway-aggregator.mjs`) is a ROUTER. It exposes
-//   GET /nodes (read-only inventory) and per-node /v1/models, but it does NOT
-//   currently expose any node CONTROL endpoint (no POST /nodes/[name], no model
-//   swap, no restart, no enable/disable). Those require on-host execution the
-//   aggregator does not front today.
+// CONTROL CONTRACT (confirmed live — SERVER_STATE.md § Gateway fleet SSOT):
+//   The aggregator (`scripts/gateway-aggregator.mjs`) exposes `POST /nodes/:name`,
+//   which SSHes to the node from S1 and performs real on-host execution:
+//     - `activate`         → write active-model.json (incl. `ctx`) + `launchctl kickstart`
+//     - `restart`          → kickstart the node's gateway process
+//     - `enable`/`disable` → re-adopt the SSOT pool membership
+//   The `fleet/[name]` PATCH route already drives this endpoint successfully, so
+//   these actions are BACKED — the console can execute them, not just describe them.
 //
-//   So every write action here is classified by `nodeActionSupport`:
-//     - 'model-swap'   → needs the node's own model-load API behind the
-//                        aggregator's POST /nodes/[name]. NOT exposed yet ⇒ blocked.
-//     - 'restart'      → needs host/process control (launchd/pkill). NOT exposed
-//                        ⇒ blocked.
-//     - 'enable'/'disable' → needs the aggregator to persist the pool `enabled`
-//                        flag. NOT exposed ⇒ blocked.
-//   The UI renders blocked actions DISABLED with the returned reason as a
-//   tooltip. It must never POST-and-pretend. The route double-checks: if the
-//   aggregator answers a control POST with 404/501, the route surfaces
-//   `notActionable` rather than a fake success.
+//   Each write action is classified by `nodeActionSupport`:
+//     - 'model'   → activate a different installed model on the node.
+//     - 'restart' → kickstart the node's gateway.
+//     - 'enable'/'disable' → toggle the node's routing-pool membership.
+//   The route still double-checks the wire: if a future/older aggregator answers a
+//   control POST with 404/501, the route surfaces `notActionable` rather than a
+//   fake success — we forward the truth, never POST-and-pretend.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Raw node record as returned by the aggregator's GET /nodes. */
@@ -282,20 +280,21 @@ export function shapeGatewayTuning(cfg: AggregatorConfig | null): GatewayTuningV
 
 export type NodeAction = 'model' | 'restart' | 'enable' | 'disable';
 
-/** Which host capability an action needs — drives the honesty gate. */
+/** How an action is executed — drives the tooltip. All are backed by the
+ *  aggregator's `POST /nodes/:name` (SSH-to-node from S1); see the CONTROL CONTRACT. */
 export function nodeActionSupport(action: NodeAction): {
   needs: string;
-  /** True only when a real aggregator control endpoint backs this action. */
+  /** True when a real aggregator control endpoint backs this action. */
   backed: boolean;
 } {
   switch (action) {
     case 'model':
-      return { needs: "the aggregator to front the node's model-load API (POST /nodes/[name])", backed: false };
+      return { needs: "activates the model on the node (writes active-model.json + restart, via the aggregator)", backed: true };
     case 'restart':
-      return { needs: 'host/process control on the node (launchd / pkill), not exposed by the aggregator', backed: false };
+      return { needs: "restarts the node's gateway process (launchctl kickstart, via the aggregator)", backed: true };
     case 'enable':
     case 'disable':
-      return { needs: 'the aggregator to persist the pool `enabled` flag', backed: false };
+      return { needs: 're-adopts the node in/out of the routing pool (via the aggregator)', backed: true };
   }
 }
 
