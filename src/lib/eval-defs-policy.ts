@@ -72,10 +72,11 @@ export function validateEvalDef(input: EvalDefInput | null | undefined): EvalDef
   }
   const direction = dirRaw as MetricDirection;
 
-  const threshold =
-    src.threshold === undefined || src.threshold === null || trimStr(src.threshold) === ''
-      ? (tpl?.defaultThreshold ?? 0.7)
-      : num01(src.threshold);
+  const thresholdOmitted =
+    src.threshold === undefined ||
+    src.threshold === null ||
+    (typeof src.threshold === 'string' && src.threshold.trim() === '');
+  const threshold = thresholdOmitted ? (tpl?.defaultThreshold ?? 0.7) : num01(src.threshold);
   if (threshold === null) return { ok: false, error: 'threshold must be a number between 0 and 1' };
 
   const suite = trimStr(src.suite) || 'golden';
