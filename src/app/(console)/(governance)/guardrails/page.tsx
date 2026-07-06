@@ -1,6 +1,7 @@
 import { ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GuardrailCatalog } from '@/components/guardrails/GuardrailCatalog';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
 import { PresidioRecognizers } from '@/components/guardrails/PresidioRecognizers';
 import { PresidioThresholds } from '@/components/guardrails/PresidioThresholds';
@@ -36,6 +37,14 @@ export default async function GuardrailsPage({
     listRecognizers(orgId).catch(() => []),
     getThresholds(orgId).catch(() => ({ global: 0, perEntity: {} })),
   ]);
+
+  // Honest engine status for the catalog's per-item availability badges: Presidio is "ready" only
+  // when it's the active engine AND configured AND reachable; else entities degrade to the regex
+  // floor / stored intent. No Guardrails-AI runtime is wired yet, so validators are stored intent.
+  const engineStatus = {
+    presidioReady: view.engine === 'presidio' && view.configured && view.reachable,
+    guardrailsAiReady: false,
+  };
 
   return (
     <div className="space-y-6">
@@ -101,6 +110,18 @@ export default async function GuardrailsPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Turn on standard protections</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GuardrailCatalog
+            engineStatus={engineStatus}
+            enabledRules={rules.map((r) => ({ matcher: r.matcher, pattern: r.pattern }))}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
