@@ -258,6 +258,31 @@ export class KeycloakAdminClient {
     });
   }
 
+  // ── User client-role mappings ───────────────────────────────────────────────
+  // Realm roles (above) live on /realm; a CLIENT's roles (e.g. realm-management's fine-grained
+  // view-/manage-identity-providers) live under /clients/{internalClientId}. Used by the federation
+  // self-heal to grant the console's own service-account the realm-management roles it needs.
+
+  // The roles the given client defines. GET /clients/{internalClientId}/roles.
+  async listClientRoles(internalClientId: string): Promise<KcRole[]> {
+    return this.fetchJson<KcRole[]>(`/clients/${internalClientId}/roles`);
+  }
+
+  // A user's currently-assigned roles FROM a specific client. GET
+  // /users/{id}/role-mappings/clients/{internalClientId}.
+  async listUserClientRoles(userId: string, internalClientId: string): Promise<KcRole[]> {
+    return this.fetchJson<KcRole[]>(`/users/${userId}/role-mappings/clients/${internalClientId}`);
+  }
+
+  // Grant a user client roles. POST /users/{id}/role-mappings/clients/{internalClientId}. Idempotent
+  // in Keycloak (re-granting an already-held role is a no-op 204).
+  async assignClientRoles(userId: string, internalClientId: string, roles: KcRole[]): Promise<void> {
+    await this.fetchJson<void>(`/users/${userId}/role-mappings/clients/${internalClientId}`, {
+      method: 'POST',
+      body: JSON.stringify(roles),
+    });
+  }
+
   // ── Realm roles ───────────────────────────────────────────────────────────
 
   async listRealmRoles(): Promise<KcRole[]> {

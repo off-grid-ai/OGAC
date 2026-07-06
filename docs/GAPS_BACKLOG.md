@@ -302,25 +302,44 @@ QA/platform-integration sweep after the chat-epic batch (citations, thinking, @-
 editing) + gateway node control + federation/sessions. Verified by code read + unit suites (47
 chat-epic tests pass) + IP-leak grep. Full report: `docs/PLATFORM_INTEGRATION_REPORT.md`. New gaps:
 
-- **#38 (P2) — Artifact save from the chat transcript chip does NOT refresh the library.**
+- **#38 (P2) — Artifact save from the chat transcript chip does NOT refresh the library. — RESOLVED (2026-07-06)**
   *Where:* `src/components/chat/ChatWorkspace.tsx:1865` — the transcript-chip `ArtifactView` is
   rendered with `title`+`conversationId` but WITHOUT `onSaved`, while the library-context instance at
   `:1870` wires `onSaved={refreshProjects}`. *Effect:* saving a new version from the chip works
-  (persists) but the projects/library list is stale until the next navigation. *Fix:* pass
-  `onSaved={refreshProjects}` (or a lighter refresh) to the `:1865` instance too.
+  (persists) but the projects/library list is stale until the next navigation.
+  *Resolution:* `src/components/chat/ChatWorkspace.tsx:1847` now passes
+  `onSaved={() => void refreshProjects()}` to the transcript-chip `ArtifactView` — the same refresh
+  `ProjectDialog` uses (`:1852`), so a chip-saved version refreshes the library immediately. Typecheck
+  clean, build green.
 
-- **#39 (P1) — Gateway node-control mutations are not audited.**
+- **#39 (P1) — Gateway node-control mutations are not audited. — RESOLVED (2026-07-06)**
   *Where:* `src/app/api/v1/gateway/nodes/[name]/route.ts` — POST performs privileged, state-changing
-  fleet actions (model swap / restart / enable / disable) but writes no audit event, unlike the chat
-  budget-deny path (`src/app/api/v1/chat/stream/route.ts:300`). *Effect:* a privileged action with no
-  accountability trail — weakens "we can prove who changed the fleet." *Fix:* `recordAudit({ action:
-  'gateway.node.<action>', resource: 'node:<name>', actor, outcome })` after a successful forward.
+  fleet actions (model swap / restart / enable / disable) but writes no audit event.
+  *Resolution:* the POST handler now calls `auditFromSession(gate, orgId, { action:
+  'gateway.node.<action>', resource: 'node:<name>', outcome })` after the forward to the aggregator
+  (`src/app/api/v1/gateway/nodes/[name]/route.ts:80-88`) — outcome `ok` on a real applied action,
+  `error` if the aggregator rejected it. The not-actionable 404/501 path (no state change) is NOT
+  audited. Actor is derived from the existing `requireAdmin` gate, mirroring the Temporal
+  cancel route. The four `gateway.node.*` actions were added to the `AuditAction` taxonomy in
+  `src/lib/audit-event.ts` (no allowlist elsewhere — `action` is a free string union).
 
-- **#40 (P2) — Federation realm-management grant is a manual bootstrap, not server-side.**
+- **#40 (P2) — Federation realm-management grant is a manual bootstrap, not server-side. — RESOLVED (self-heal, 2026-07-06)**
   *Where:* `src/lib/keycloak-admin.ts:88-93` + `keycloak-realm.ts:33-40` (`forbiddenGrantMessage`).
-  The empty-body 403 is correctly turned into an ACTIONABLE message (this is the real improvement),
-  but there is NO server-side `assignRoles()` that grants `realm-management` to the console's own SA
-  — on a fresh realm the first federation write still 403s until an operator grants the role by hand.
-  Gap #37 was resolved on the LIVE server by granting the role (infra), which matches: the code does
-  not self-heal. *Fix (optional):* a provision route that grants the SA the needed realm-management
-  client roles, or accept the documented manual bootstrap (now covered in `docs/user/access-api-keys.md`).
+  The empty-body 403 is turned into an ACTIONABLE message, but there was NO server-side grant of
+  `realm-management` roles to the console's own SA — a fresh realm 403s until an operator grants by hand.
+  *Resolution:* added a real self-heal.
+  New route `POST /api/v1/admin/access/federation/provision`
+  (`src/app/api/v1/admin/access/federation/provision/route.ts`) finds the console's own service-account
+  user (`service-account-<OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID>`), resolves the `realm-management` client's
+  `view-identity-providers` + `manage-identity-providers` role objects, and assigns them to the SA via
+  the Keycloak Admin API (idempotent — returns `{ alreadyGranted: true }` when already held, which is
+  the live-server case). Pure bits isolated + tested in `keycloak-realm.ts`
+  (`federationGrantRoleNames`, `serviceAccountUsername`, `federationGrantCommand`,
+  `REALM_MANAGEMENT_CLIENT`; tests in `test/keycloak-realm.test.ts`). New I/O methods
+  `listClientRoles`/`listUserClientRoles`/`assignClientRoles` in `keycloak-admin.ts`. UI: a "Grant
+  access" button appears on the Federation panel (`src/components/access/IdpList.tsx`) when the IdP
+  list 403s → calls provision → retries. HONESTY: if the console's admin client itself lacks the rights
+  to grant its own roles (needs `manage-users` + view/manage-clients on `realm-management`), the route
+  does NOT fake success — it 403s with the exact copy-pasteable `kcadm.sh add-roles` command
+  (`federationGrantCommand`). So it self-heals when the admin client is broad enough, and degrades to
+  the documented manual command otherwise.
