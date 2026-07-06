@@ -32,7 +32,14 @@ export type EvalDefValidation =
   | { ok: true; value: EvalDefDraft }
   | { ok: false; error: string };
 
-const ENGINES: readonly EvalEngine[] = ['ragas', 'evidently', 'guardrails', 'presidio', 'heuristic'];
+const ENGINES: readonly EvalEngine[] = [
+  'ragas',
+  'evidently',
+  'guardrails',
+  'presidio',
+  'deepeval',
+  'heuristic',
+];
 const DIRECTIONS: readonly MetricDirection[] = ['higher-better', 'lower-better'];
 
 function trimStr(v: unknown): string {
