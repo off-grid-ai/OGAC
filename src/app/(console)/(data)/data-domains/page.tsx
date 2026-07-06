@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 // RULE (deterministic, no-guess). This surface is the full CRUD over those rules, plus a
 // "test resolve" box so the operator can confirm a phrase binds where they expect.
 export default async function DataDomainsPage() {
-  await requireModuleForUser('integrations');
+  await requireModuleForUser('data-domains');
   const org = await currentOrgId();
   const [domains, connectors] = await Promise.all([listDomains(org), listConnectors(org)]);
 
