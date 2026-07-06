@@ -21,6 +21,7 @@ export async function GET(req: Request) {
     evidentlyUrl: process.env.OFFGRID_EVIDENTLY_URL,
     guardrailsUrl: process.env.OFFGRID_GUARDRAILS_URL,
     presidioUrl: process.env.OFFGRID_PRESIDIO_URL,
+    gatewayUrl: process.env.OFFGRID_GATEWAY_URL,
   };
 
   const templates = EVAL_TEMPLATES.map((t) => {
