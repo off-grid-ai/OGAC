@@ -18,17 +18,17 @@ import {
 
 // ── format / parse round-trip ──────────────────────────────────────────────────
 
-test('formatApiKey composes ogk_<clientId>.<secret>', () => {
-  assert.equal(formatApiKey('ogk-mobile-ab12', 's3cr3t'), 'ogk_ogk-mobile-ab12.s3cr3t');
+test('formatApiKey composes ogak_<clientId>.<secret>', () => {
+  assert.equal(formatApiKey('ogak-mobile-ab12', 's3cr3t'), 'ogak_ogak-mobile-ab12.s3cr3t');
 });
 
 test('parseApiKey round-trips a formatted key', () => {
-  const raw = formatApiKey('ogk-mobile-ab12', 'abc.def.ghi'); // secret may contain dots
-  assert.deepEqual(parseApiKey(raw), { clientId: 'ogk-mobile-ab12', secret: 'abc.def.ghi' });
+  const raw = formatApiKey('ogak-mobile-ab12', 'abc.def.ghi'); // secret may contain dots
+  assert.deepEqual(parseApiKey(raw), { clientId: 'ogak-mobile-ab12', secret: 'abc.def.ghi' });
 });
 
 test('parseApiKey splits on the FIRST dot only (secret keeps later dots)', () => {
-  assert.deepEqual(parseApiKey('ogk_ogk-x.a.b.c'), { clientId: 'ogk-x', secret: 'a.b.c' });
+  assert.deepEqual(parseApiKey('ogak_ogak-x.a.b.c'), { clientId: 'ogak-x', secret: 'a.b.c' });
 });
 
 test('parseApiKey rejects malformed / foreign tokens', () => {
@@ -37,28 +37,28 @@ test('parseApiKey rejects malformed / foreign tokens', () => {
     undefined,
     '',
     'sk-ant-123',
-    'ogk_nodot', // no dot
-    'ogk_.secret', // empty clientId
-    'ogk_ogk-x.', // empty secret
-    'ogk_notprefixed.secret', // clientId lacks ogk- prefix
-    'Bearer ogk_ogk-x.y',
+    'ogak_nodot', // no dot
+    'ogak_.secret', // empty clientId
+    'ogak_ogak-x.', // empty secret
+    'ogak_notprefixed.secret', // clientId lacks ogak- prefix
+    'Bearer ogak_ogak-x.y',
   ]) {
     assert.equal(parseApiKey(bad as string), null, `should reject: ${String(bad)}`);
   }
 });
 
 test('isGatewayApiKey matches only prefixed, dotted values', () => {
-  assert.equal(isGatewayApiKey('ogk_ogk-x.y'), true);
-  assert.equal(isGatewayApiKey('ogk_nodot'), false);
+  assert.equal(isGatewayApiKey('ogak_ogak-x.y'), true);
+  assert.equal(isGatewayApiKey('ogak_nodot'), false);
   assert.equal(isGatewayApiKey('sk-123.abc'), false);
   assert.equal(isGatewayApiKey(null), false);
 });
 
 test('keyPreview masks the secret and never leaks it', () => {
-  const raw = formatApiKey('ogk-mobile-ab12', 'supersecretvalue');
+  const raw = formatApiKey('ogak-mobile-ab12', 'supersecretvalue');
   const preview = keyPreview(raw);
   assert.ok(!preview.includes('supersecretvalue'));
-  assert.equal(preview, 'ogk_ogk-mobile-ab12.••••');
+  assert.equal(preview, 'ogak_ogak-mobile-ab12.••••');
 });
 
 // ── name validation + clientId derivation ──────────────────────────────────────
@@ -78,10 +78,10 @@ test('slugifyKeyName produces a dns-safe fragment', () => {
   assert.equal(slugifyKeyName('@@@'), 'key'); // unsluggable → fallback
 });
 
-test('deriveKeyClientId always carries the ogk- prefix and includes the random suffix', () => {
+test('deriveKeyClientId always carries the ogak- prefix and includes the random suffix', () => {
   const id = deriveKeyClientId('Mobile App', 'ABCD1234efgh');
   assert.ok(id.startsWith(GATEWAY_KEY_CLIENT_PREFIX));
-  assert.match(id, /^ogk-mobile-app-[a-z0-9]{1,8}$/);
+  assert.match(id, /^ogak-mobile-app-[a-z0-9]{1,8}$/);
 });
 
 test('deriveKeyClientId with two different rands yields two different ids (uniqueness)', () => {
@@ -90,8 +90,8 @@ test('deriveKeyClientId with two different rands yields two different ids (uniqu
 
 // ── view shaping ────────────────────────────────────────────────────────────────
 
-test('isGatewayKeyClient only matches ogk- clients', () => {
-  assert.equal(isGatewayKeyClient({ id: '1', clientId: 'ogk-mobile-ab12' }), true);
+test('isGatewayKeyClient only matches ogak- clients', () => {
+  assert.equal(isGatewayKeyClient({ id: '1', clientId: 'ogak-mobile-ab12' }), true);
   assert.equal(isGatewayKeyClient({ id: '2', clientId: 'offgrid-gateway' }), false);
   assert.equal(isGatewayKeyClient({ id: '3', clientId: 'offgrid-console' }), false);
 });
@@ -100,7 +100,7 @@ test('mapKeyClient shapes attributes into a key view; disabled → revoked', () 
   const view = mapKeyClient(
     {
       id: 'kc-1',
-      clientId: 'ogk-mobile-ab12',
+      clientId: 'ogak-mobile-ab12',
       name: 'Mobile',
       enabled: false,
       attributes: { ownerOrg: ['acme'], scope: ['gateway'], createdAt: ['2026-01-01T00:00:00.000Z'] },
@@ -117,23 +117,23 @@ test('mapKeyClient shapes attributes into a key view; disabled → revoked', () 
 });
 
 test('mapKeyClient defaults owner/scope and treats missing enabled as active', () => {
-  const view = mapKeyClient({ id: 'kc-2', clientId: 'ogk-x-1' });
+  const view = mapKeyClient({ id: 'kc-2', clientId: 'ogak-x-1' });
   assert.equal(view.status, 'active');
   assert.equal(view.owner, 'default');
   assert.equal(view.scope, GATEWAY_KEY_SCOPE);
-  assert.equal(view.name, 'ogk-x-1'); // falls back to clientId
+  assert.equal(view.name, 'ogak-x-1'); // falls back to clientId
 });
 
 test('sortKeyViews orders newest-first, nulls last, stable by clientId', () => {
   const rows = sortKeyViews([
-    { id: '1', clientId: 'ogk-c', name: '', owner: '', scope: '', status: 'active', createdAt: null, lastUsedAt: null },
-    { id: '2', clientId: 'ogk-a', name: '', owner: '', scope: '', status: 'active', createdAt: '2026-02-01T00:00:00Z', lastUsedAt: null },
-    { id: '3', clientId: 'ogk-b', name: '', owner: '', scope: '', status: 'active', createdAt: '2026-03-01T00:00:00Z', lastUsedAt: null },
+    { id: '1', clientId: 'ogak-c', name: '', owner: '', scope: '', status: 'active', createdAt: null, lastUsedAt: null },
+    { id: '2', clientId: 'ogak-a', name: '', owner: '', scope: '', status: 'active', createdAt: '2026-02-01T00:00:00Z', lastUsedAt: null },
+    { id: '3', clientId: 'ogak-b', name: '', owner: '', scope: '', status: 'active', createdAt: '2026-03-01T00:00:00Z', lastUsedAt: null },
   ]);
-  assert.deepEqual(rows.map((r) => r.clientId), ['ogk-b', 'ogk-a', 'ogk-c']);
+  assert.deepEqual(rows.map((r) => r.clientId), ['ogak-b', 'ogak-a', 'ogak-c']);
 });
 
 test('GATEWAY_KEY_PREFIX / client prefix are the stable contract with the aggregator', () => {
-  assert.equal(GATEWAY_KEY_PREFIX, 'ogk_');
-  assert.equal(GATEWAY_KEY_CLIENT_PREFIX, 'ogk-');
+  assert.equal(GATEWAY_KEY_PREFIX, 'ogak_');
+  assert.equal(GATEWAY_KEY_CLIENT_PREFIX, 'ogak-');
 });

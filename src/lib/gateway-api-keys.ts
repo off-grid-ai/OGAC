@@ -23,12 +23,12 @@ export type MaybeUnconfigured<T> = T | typeof KEYCLOAK_UNCONFIGURED;
 
 export interface CreatedKey {
   view: GatewayKeyView;
-  // The opaque `ogk_<clientId>.<secret>` — returned ONCE, never stored in cleartext (Keycloak holds
+  // The opaque `ogak_<clientId>.<secret>` — returned ONCE, never stored in cleartext (Keycloak holds
   // the hashed secret; we never persist the plaintext).
   apiKey: string;
 }
 
-// List every gateway API key in the realm (clients with the `ogk-` prefix), newest first. Never
+// List every gateway API key in the realm (clients with the `ogak-` prefix), newest first. Never
 // returns secrets. Best-effort last-used: pulled from each client's active sessions if available.
 export async function listGatewayKeys(kc: KeycloakAdminClient = requireKc()): Promise<GatewayKeyView[]> {
   // Keycloak's ?clientId= filter is an EXACT match, so we can't prefix-filter server-side; list all
@@ -65,11 +65,11 @@ async function lastUsed(kc: KeycloakAdminClient, internalClientId: string): Prom
 }
 
 // Create a new Keycloak-backed gateway API key. Steps (all Keycloak):
-//   1. derive a unique `ogk-<slug>-<rand>` clientId
+//   1. derive a unique `ogak-<slug>-<rand>` clientId
 //   2. create a confidential, service-accounts-enabled client carrying the label/owner/scope as
 //      client attributes (so no separate store is needed)
 //   3. read its generated client secret
-//   4. compose the opaque `ogk_<clientId>.<secret>` returned ONCE
+//   4. compose the opaque `ogak_<clientId>.<secret>` returned ONCE
 export async function createGatewayKey(input: {
   name: string;
   ownerOrg?: string;

@@ -489,6 +489,21 @@ The `/backups` module is a full management surface (routes under `/api/v1/admin/
 - `co.getoffgridai.agent-worker` — durable agent-run worker (gui-domain LaunchAgent, `tsx scripts/temporal-worker.mts`; drains the `offgrid-agents` queue). Restart: `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker`. See § Durable agent-run worker below.
 - Console + cloudflared run as backgrounded processes (not launchd) — see DEPLOY.md.
 
+### Sandbox runner images (code-exec) — MUST be pre-pulled on S1
+
+The Sandbox (`src/lib/adapters/sandbox.ts`, `docker` engine) runs each snippet in an ephemeral
+`docker run --pull never --network none …` container, so the run image must already be present on
+the host — the runner never pulls at run time (a pull folded into the run timeout is what caused the
+old "Unable to find image 'python:3.11-slim' … / exit 143"). Pre-pull once (done 2026-07-06):
+
+```bash
+docker pull python:3.11-slim   # OFFGRID_SANDBOX_PY_IMAGE default
+docker pull node:20-slim       # OFFGRID_SANDBOX_NODE_IMAGE default
+```
+
+Override the tags via `OFFGRID_SANDBOX_PY_IMAGE` / `OFFGRID_SANDBOX_NODE_IMAGE` (and the Firecracker
+`OFFGRID_FC_*_IMAGE`); whatever tag is configured must be pulled on the host.
+
 ### Durable agent-run worker (Temporal, task queue `offgrid-agents`)
 
 Agent runs (`POST /api/v1/admin/agents/runs`) can now execute DURABLY on Temporal (`:7233`,
