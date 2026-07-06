@@ -5,12 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,11 +66,16 @@ export function AddMaskingRuleButton() {
         <Plus className="size-4" />
         Add rule
       </Button>
-      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Add a masking rule</SheetTitle>
-          </SheetHeader>
+      <FormSheet
+        open={open}
+        onOpenChange={(o) => !o && setPanel(null)}
+        title="Add a masking rule"
+        footer={
+          <Button onClick={create} className="w-full">
+            Add rule
+          </Button>
+        }
+      >
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="rule-kind">PII type</Label>
@@ -104,12 +104,8 @@ export function AddMaskingRuleButton() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <Button onClick={create} className="w-full">
-              Add rule
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+      </FormSheet>
     </>
   );
 }

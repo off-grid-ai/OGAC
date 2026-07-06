@@ -3,13 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,13 +94,18 @@ export function DomainFormPanel({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4">
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      footer={
+        <Button onClick={save} disabled={busy} className="w-full">
+          {submitLabel}
+        </Button>
+      }
+    >
+      <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="dom-label">Label</Label>
             <Input
@@ -162,11 +161,7 @@ export function DomainFormPanel({
             </p>
             {errors.resource ? <p className="text-xs text-destructive">{errors.resource}</p> : null}
           </div>
-          <Button onClick={save} disabled={busy} className="w-full">
-            {submitLabel}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </FormSheet>
   );
 }
