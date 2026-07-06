@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { GatewayApiKeys } from '@/components/gateway/GatewayApiKeys';
 import { GatewayControl } from '@/components/gateway/GatewayControl';
 import { GatewayFleetConfig } from '@/components/gateway/GatewayFleetConfig';
 import { GatewayLogs } from '@/components/gateway/GatewayLogs';
@@ -11,7 +12,7 @@ import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { GatewayTuning } from '@/components/gateway/GatewayTuning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TABS = ['overview', 'traffic', 'logs', 'control', 'tuning', 'tokens', 'settings'] as const;
+const TABS = ['overview', 'traffic', 'logs', 'control', 'tuning', 'keys', 'tokens', 'settings'] as const;
 type TabValue = (typeof TABS)[number];
 
 // The gateway page's tabs, with the active tab reflected in the `?tab=` query string
@@ -38,6 +39,7 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
         <TabsTrigger value="logs">Logs</TabsTrigger>
         <TabsTrigger value="control">Control</TabsTrigger>
         <TabsTrigger value="tuning">Tuning</TabsTrigger>
+        <TabsTrigger value="keys">API keys</TabsTrigger>
         <TabsTrigger value="tokens">Tokens</TabsTrigger>
         <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
@@ -56,6 +58,9 @@ export function GatewayTabs({ overview }: { overview: ReactNode }) {
       </TabsContent>
       <TabsContent value="tuning" className="space-y-4">
         <GatewayTuning />
+      </TabsContent>
+      <TabsContent value="keys" className="space-y-6">
+        <GatewayApiKeys />
       </TabsContent>
       <TabsContent value="tokens" className="space-y-6">
         <GatewayTokens />
