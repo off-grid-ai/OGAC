@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { buildAnalyzeRequest, DEFAULT_THRESHOLDS } from '../src/lib/presidio-recognizers.ts';
-import { presidioPii } from '../src/lib/adapters/pii.ts';
+import { presidioPii, resolveDeepConfigOrgId } from '../src/lib/adapters/pii.ts';
 
 // Adapter-level regression guard for the Presidio PII scan. The bug this locks down: with Presidio
 // reachable, the scan was silently degrading to the regex floor (result.engine === 'regex') even
@@ -104,6 +104,49 @@ test('scan: no OFFGRID_PRESIDIO_URL configured → regex floor without any netwo
   const r = await presidioPii.scan('mail me at bob@corp.io');
   assert.equal(r.engine, 'regex');
   assert.equal(called, false, 'must not touch the network when Presidio is unconfigured');
+});
+
+// ── Gap #121: org deep-config resolves via an EXPLICIT orgId on the worker path, no headers() ──────
+
+test('resolveDeepConfigOrgId: an explicit orgId is used verbatim and the session resolver is NEVER called (worker path)', async () => {
+  let resolverCalled = false;
+  const sessionResolver = async () => {
+    resolverCalled = true;
+    // On the durable worker there is no request scope, so a real currentOrgId() would throw here.
+    throw new Error('headers() called outside a request scope');
+  };
+  const orgId = await resolveDeepConfigOrgId('acme-corp', sessionResolver);
+  assert.equal(orgId, 'acme-corp');
+  assert.equal(resolverCalled, false, 'explicit orgId must bypass the session/headers() path entirely');
+});
+
+test('resolveDeepConfigOrgId: a blank/whitespace explicit org falls through to the session resolver (request path)', async () => {
+  const sessionResolver = async () => 'session-org';
+  assert.equal(await resolveDeepConfigOrgId(undefined, sessionResolver), 'session-org');
+  assert.equal(await resolveDeepConfigOrgId('', sessionResolver), 'session-org');
+  assert.equal(await resolveDeepConfigOrgId('   ', sessionResolver), 'session-org');
+});
+
+test('resolveDeepConfigOrgId: an explicit orgId is trimmed', async () => {
+  const orgId = await resolveDeepConfigOrgId('  team-7  ', async () => 'unused');
+  assert.equal(orgId, 'team-7');
+});
+
+test('scan(text, orgId): passing an explicit orgId scans as presidio without needing a request scope', async () => {
+  // The worker path: an explicit orgId means the deep-config resolver never calls headers(). Under
+  // node --test there is no request scope AND no DB, so this proves the scan completes as presidio
+  // (deep-config load degrades to plain analyze on the missing DB, but NOT to the regex floor and
+  // NOT via a headers() throw). This is the end-to-end shape the app-worker guardrail step relies on.
+  process.env.OFFGRID_PRESIDIO_URL = PRESIDIO_URL;
+  const seen = stubAnalyze([{ entity_type: 'EMAIL_ADDRESS', start: 11, end: 27, score: 0.9 }]);
+
+  const r = await presidioPii.scan('mail me at jane@example.com', 'explicit-org');
+
+  assert.equal(r.engine, 'presidio', 'explicit-org worker path must still reach Presidio');
+  assert.equal(r.hits, true);
+  assert.deepEqual(r.entities, ['EMAIL_ADDRESS']);
+  assert.equal(seen.length, 1);
+  assert.equal((seen[0].body as Record<string, unknown>).text, 'mail me at jane@example.com');
 });
 
 // Pure-builder guard (also lives in presidio-recognizers.test.ts, restated here as the load-bearing
