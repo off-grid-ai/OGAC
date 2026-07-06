@@ -1,5 +1,6 @@
 import { createInspector, project2DFromPoints, type VectorDBConfig, type VectorDBKind } from '@offgrid/vectordb';
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { toConnectHost } from '@/lib/display-host';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,12 @@ function payloadPreview(payload?: Record<string, unknown>): string {
 // so the console panel can degrade gracefully when a store is unreachable.
 // eslint-disable-next-line complexity
 export async function POST(req: Request) {
+  // ADMIN-ONLY. This inspector connects to a vector store from a request-supplied url+apiKey — an
+  // unauthenticated caller could both read the on-prem Qdrant (env defaults) and use it as an SSRF
+  // probe against arbitrary hosts. Gate it. (P0 — HARDENING_AUDIT.md.)
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+
   let body: Body = {};
   try {
     body = (await req.json()) as Body;

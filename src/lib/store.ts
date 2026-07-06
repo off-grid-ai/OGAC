@@ -718,10 +718,16 @@ export async function listMaskingRules(orgId: string = DEFAULT_ORG): Promise<Mas
   return rows.map((r) => ({ id: r.id, kind: r.kind, action: r.action, enabled: r.enabled }));
 }
 
-export async function createMaskingRule(kind: string, action: string): Promise<MaskingRule> {
+export async function createMaskingRule(
+  kind: string,
+  action: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<MaskingRule> {
+  // orgId MUST be set on insert — else a non-default org's rule silently lands in 'default' and is
+  // invisible to its creator (listMaskingRules filters by orgId). Cross-tenant scoping bug — P1.
   const [row] = await db
     .insert(maskingRules)
-    .values({ id: `msk_${randomUUID().slice(0, 6)}`, kind, action })
+    .values({ id: `msk_${randomUUID().slice(0, 6)}`, kind, action, orgId })
     .returning();
   return { id: row.id, kind: row.kind, action: row.action, enabled: row.enabled };
 }

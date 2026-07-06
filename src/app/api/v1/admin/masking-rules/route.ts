@@ -24,8 +24,9 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const created = await createMaskingRule(kind, action);
-  auditFromSession(gate, await currentOrgId(), {
+  const orgId = await currentOrgId();
+  const created = await createMaskingRule(kind, action, orgId); // org-scoped (P1 tenant fix)
+  auditFromSession(gate, orgId, {
     action: 'masking.change',
     resource: `masking:${created.id}`,
     outcome: 'ok',
