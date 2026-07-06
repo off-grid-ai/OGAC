@@ -5,7 +5,6 @@ import { getAppBySlug } from '@/lib/apps-store';
 import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { buildTriggerInput } from '@/lib/trigger-dispatch';
-import { isGatewayApiKey } from '@/lib/gateway-api-key';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,12 +16,13 @@ export const dynamic = 'force-dynamic';
 // other trigger uses — submitAppRun (policy / guardrails / grounding / signing all apply). There is
 // NO governance bypass and no cloud dependency: the payload arrives on our own inbound route.
 //
-// GOVERNED, NOT WIDE OPEN. A webhook that runs a governed app must still be authorized. We accept, in
-// order: (1) a per-app WEBHOOK TOKEN — the shared secret OFFGRID_WEBHOOK_TOKEN, supplied as the
-// `X-Webhook-Token` header or `?token=` query param (this is the token an operator pastes into an
-// external system's webhook config); (2) an authenticated principal — a gateway `ogak_` key, a
-// Keycloak service-account JWT, the break-glass admin token, or a console session (via requireUser).
-// If neither is satisfied → 401. The app must exist AND be published (a draft is not webhook-callable).
+// GOVERNED, NOT WIDE OPEN. A webhook that runs a governed app must still be authorized. We accept:
+// (1) a per-app WEBHOOK TOKEN — the shared secret OFFGRID_WEBHOOK_TOKEN, supplied as the
+// `X-Webhook-Token` header or `?token=` query param (the token an operator pastes into an external
+// system's webhook config); (2) a fully-verified authenticated principal via requireUser — a Keycloak
+// service-account JWT, the break-glass admin token, or a console session. A gateway `ogak_` key is
+// NOT accepted by string shape here (it is verified by the aggregator via client_credentials, not by
+// shape). If neither proof is satisfied → 401. The app must exist AND be published.
 //
 // SOLID: thin handler. Auth + load + normalize-input (pure) + delegate to submitAppRun. All run
 // logic lives in app-run.ts / apprun.ts; all payload shaping in trigger-dispatch.ts.
@@ -43,19 +43,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const url = new URL(req.url);
 
   // ── Authorize (governed, not wide open) ──────────────────────────────────────────────────────
+  // Two accepted proofs: (1) the per-app WEBHOOK TOKEN secret (X-Webhook-Token / ?token=) — this is
+  // what an operator pastes into an external system's webhook config; (2) a fully-VERIFIED principal
+  // via requireUser (a Keycloak service-account JWT, the break-glass admin token, or a console
+  // session). We do NOT accept a shape-only ogak_ key here: that string is verified by the aggregator
+  // via a Keycloak client_credentials exchange, not by string shape — trusting the shape would be an
+  // auth bypass. Neither proof satisfied → 401.
   const suppliedToken = tokenFromRequest(req, url);
-  const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-  let authorized = webhookTokenOk(suppliedToken) || isGatewayApiKey(bearer);
-  if (!authorized) {
-    // Fall back to a full authenticated principal (service JWT / break-glass / console session).
+  if (!webhookTokenOk(suppliedToken)) {
     const gate = await requireUser(req);
     if (gate instanceof NextResponse) {
       return NextResponse.json(
-        { error: 'unauthorized — supply X-Webhook-Token, an ogak_ key, or a valid session' },
+        { error: 'unauthorized — supply a valid X-Webhook-Token, service token, or session' },
         { status: 401 },
       );
     }
-    authorized = true;
   }
 
   // ── Load the published app by slug ────────────────────────────────────────────────────────────
