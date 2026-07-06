@@ -20,6 +20,20 @@ The LLM gateway — model routing (local + leashed cloud), providers, an OpenAI-
 
 Add a routing rule (attribute, operator, value, action local/cloud/block, optional model), test it with the evaluator, manage providers and cache. See `docs/HOWTO.md` § routing for exact steps.
 
-> This page is a skeleton written during the post-merge docs sweep. It covers what/why/when/how at a
-> working level; deepen with screenshots and per-field detail in a later pass. See `docs/HOWTO.md`
-> for step-by-step recipes that touch this surface, and `/docs/api` for the API contract.
+### Node control (per-node fleet actions)
+
+The gateway page lists the pool of model nodes (node → model map). For each node, an **admin** can
+trigger control actions that the cluster gateway executes over SSH from the S1 aggregator:
+
+- **Swap model** — set the active model on that node.
+- **Restart** — restart the node's model server.
+- **Enable / Disable** — add or remove the node from the routing pool.
+
+These are **honest about backing support**: if the aggregator doesn't implement an action (or is an
+older build), the console reports it as *not actionable* (501) rather than faking success; if the
+aggregator is unreachable you get a clear error, never a silent no-op. Node control is admin-only.
+
+> Note: node-control actions are not yet written to the Audit Log (tracked as a gap). Model-routing
+> rule changes and chat completions are audited.
+
+See `docs/HOWTO.md` for step-by-step recipes and `/docs/api` for the API contract.

@@ -295,3 +295,32 @@ MUST include live vision verification, not just build/typecheck/test. Logged for
   merge before "done", and run the QA/platform-integration+docs sweep after every 3 merges.
 
 _Resolved 2026-07-06: #36 (Sessions online+offline merge + mDNS IP, deployed) and #37 (Federation — Keycloak IdP roles granted to the console admin SA, /idp now 200) — see git + SERVER_STATE._
+
+## Post-chat-epic sweep (2026-07-06)
+
+QA/platform-integration sweep after the chat-epic batch (citations, thinking, @-mentions, artifact
+editing) + gateway node control + federation/sessions. Verified by code read + unit suites (47
+chat-epic tests pass) + IP-leak grep. Full report: `docs/PLATFORM_INTEGRATION_REPORT.md`. New gaps:
+
+- **#38 (P2) — Artifact save from the chat transcript chip does NOT refresh the library.**
+  *Where:* `src/components/chat/ChatWorkspace.tsx:1865` — the transcript-chip `ArtifactView` is
+  rendered with `title`+`conversationId` but WITHOUT `onSaved`, while the library-context instance at
+  `:1870` wires `onSaved={refreshProjects}`. *Effect:* saving a new version from the chip works
+  (persists) but the projects/library list is stale until the next navigation. *Fix:* pass
+  `onSaved={refreshProjects}` (or a lighter refresh) to the `:1865` instance too.
+
+- **#39 (P1) — Gateway node-control mutations are not audited.**
+  *Where:* `src/app/api/v1/gateway/nodes/[name]/route.ts` — POST performs privileged, state-changing
+  fleet actions (model swap / restart / enable / disable) but writes no audit event, unlike the chat
+  budget-deny path (`src/app/api/v1/chat/stream/route.ts:300`). *Effect:* a privileged action with no
+  accountability trail — weakens "we can prove who changed the fleet." *Fix:* `recordAudit({ action:
+  'gateway.node.<action>', resource: 'node:<name>', actor, outcome })` after a successful forward.
+
+- **#40 (P2) — Federation realm-management grant is a manual bootstrap, not server-side.**
+  *Where:* `src/lib/keycloak-admin.ts:88-93` + `keycloak-realm.ts:33-40` (`forbiddenGrantMessage`).
+  The empty-body 403 is correctly turned into an ACTIONABLE message (this is the real improvement),
+  but there is NO server-side `assignRoles()` that grants `realm-management` to the console's own SA
+  — on a fresh realm the first federation write still 403s until an operator grants the role by hand.
+  Gap #37 was resolved on the LIVE server by granting the role (infra), which matches: the code does
+  not self-heal. *Fix (optional):* a provision route that grants the SA the needed realm-management
+  client roles, or accept the documented manual bootstrap (now covered in `docs/user/access-api-keys.md`).

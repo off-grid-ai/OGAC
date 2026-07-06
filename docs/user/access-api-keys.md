@@ -20,6 +20,22 @@
 
 In **Access**, create/edit/delete users, roles, and machine clients. To issue a virtual key: FinOps → Issue key (name, scope, subject, optional budget) → copy the `ogk_…` token (shown once). Revoke by toggling it off. See `docs/HOWTO.md`.
 
-> This page is a skeleton written during the post-merge docs sweep. It covers what/why/when/how at a
-> working level; deepen with screenshots and per-field detail in a later pass. See `docs/HOWTO.md`
-> for step-by-step recipes that touch this surface, and `/docs/api` for the API contract.
+### Sessions (who's signed in)
+
+Per user, Access shows active **sessions** — merging Keycloak's online (live) and offline
+(refresh-token) sessions, deduped so a live session wins, sorted most-recent first. Each session's IP
+is shown as a friendly mDNS host (`offgrid-*.local`), never a raw internal IP. You can **revoke** a
+session to sign that device out.
+
+### Identity federation (external IdPs)
+
+Under Access you can add/remove identity providers (OIDC/SAML) so users sign in with your existing
+IdP.
+
+> **Bootstrap note:** creating/managing an IdP requires the console's Keycloak service-account to
+> hold the `realm-management` role. On a fresh realm this is **not** granted automatically — the
+> first federation write returns a 403 with an **actionable message** naming exactly which role to
+> grant, to which client (`OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID`), in the Keycloak admin console. Grant
+> it once, then retry. (Auto-granting this on provision is tracked as a gap.)
+
+See `docs/HOWTO.md` for step-by-step recipes and `/docs/api` for the API contract.
