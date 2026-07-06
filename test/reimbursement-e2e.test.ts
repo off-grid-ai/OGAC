@@ -127,6 +127,11 @@ function fakeRunDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       return { blocked: false, detail: 'ok' };
     },
     async persist() {},
+    async materializeAgent(_spec, step) {
+      order.push(`materialize:${step.id}`);
+      step.agentId = `ag_mat_${step.id}`;
+      return step.agentId;
+    },
     ...over,
   };
   (deps as unknown as { _order: string[] })._order = order;
@@ -181,6 +186,23 @@ test("seeded app's connector-query steps resolve by LABEL against the seeded dom
   // Specifically the two flagship domains.
   assert.equal(resolveDomain('invoices', domains)?.label, 'invoices');
   assert.equal(resolveDomain('reimbursement quota', domains)?.label, 'reimbursement quota');
+});
+
+test("GAP #113: the seeded app's INLINE agent step now materializes + runs (no pre-wiring)", async () => {
+  // Run the seeded app VERBATIM — its decision step is an inline agent with NO agentId. Before the
+  // #113 fix this errored at that step; now runApp materializes it (via deps.materializeAgent) and
+  // runs it, then pauses at the human gate.
+  const spec = buildReimbursementAppSpec(CTX.orgId, CTX.ownerId);
+  const deps = fakeRunDeps();
+  const outcome = await runApp(spec, { invoiceId: 'INV-1' }, { orgId: CTX.orgId, runId: 'run_e2e_inline' }, deps);
+
+  assert.equal(outcome.status, 'awaiting_human', `expected awaiting_human, got ${outcome.status}`);
+  const agentStep = outcome.steps.find((s) => s.kind === 'agent');
+  assert.ok(agentStep, 'the inline agent step executed');
+  assert.equal(agentStep!.status, 'done', 'the inline agent step ran (materialized), not errored');
+
+  const order = (deps as unknown as { _order: string[] })._order;
+  assert.ok(order.some((o) => o.startsWith('materialize:')), 'the inline agent was materialized');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
