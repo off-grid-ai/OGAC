@@ -1,144 +1,144 @@
-# Platform integration report — post-merge audit (workspace / temporal / config batch)
+# Platform integration report — post-chat-epic sweep (2026-07-06)
 
-**Date:** 2026-07-06 · **Method:** code read + grep against `main` (no deploy). **Scope:** the 3
-just-merged surfaces (Workspace revamp #75, Temporal Jobs #76, Config mDNS + honest health #78) plus
-the CSP/Scalar fix, traced for *integration coherence* — not "does each file compile" but "do the
-seams connect end-to-end."
+QA / platform-integration verification after the chat-epic batch. Method: read source + cite
+file:line, run the affected unit suites, grep for leaks. Adversarial — looking for UI actions with
+no backing route, routes that 500 when a dependency is down, and mutations with no audit.
 
-The live harness (`deploy/verify-integration.sh`, per `INTEGRATION_SUCCESS_SPEC.md`) stood at
-**8 pass / 0 fail / 3 skip** on S1 (A1–A5, C1–C3 VERIFIED; A7/B2/B3 SKIP-by-design; C4 SKIPs cleanly
-until the Temporal worker is wired). This report does not re-run that harness (S1-only); it verifies
-the *newly-merged code* integrates with those seams.
-
----
-
-## Overall verdict: THE PLATFORM COHERES — with two real seams to close
-
-Every newly-merged UI action has a backing route, every route degrades gracefully when its dependency
-is off, and the pure/IO split holds throughout (`temporal-visibility.ts`, `display-host.ts`,
-`services-directory.ts` resolvers are zero-IO and testable; the adapters do the I/O). The workspace
-consolidation resolves all routes, Artifacts is reachable again, and the self-hosted Scalar closes the
-air-gap hole.
-
-**Two concerns worth fixing (details below):**
-1. **`workflows/[wf]/cancel` emits no audit event** — an operator cancelling/terminating a durable
-   job leaves no accountability record. Mutation-without-audit violates the audit mandate. (Gap #34)
-2. **`runIdFromWorkflowId` is fragile to runIds containing `-`** — it slices after the *last* `-`,
-   but `workflowIdFor` is `agentrun-<agent>-<runId>`. Safe for today's hyphen-free runIds, latent
-   otherwise. (Gap #35)
+Verdict up front: **the platform coheres.** The four chat-epic features (inline citations, inline
+thinking, @-mentions, inline artifact editing) are wired end-to-end and *compose* — a referenced KB
+flows through the SAME citation numbering as project/org RAG. Gateway node control and sessions are
+real wiring with honest degradation. No raw-IP leaks in rendered surfaces. Concerns below are
+edge/robustness plus one bootstrap gap (federation role grant), not broken seams.
 
 ---
 
-## Per-surface findings
+## Chat epic — inline citations · PASS
 
-### 1. Temporal Jobs surface — PASS (with 2 concerns)
+Full round trip verified:
 
-**Flow traced:** `DurableExecutionsPanel.tsx` → `GET /workflows` (list) → per-row `workflowActionsFor`
-gates buttons → `POST /workflows/[wf]/rerun` | `/cancel` → `agentruntime.ts` adapter → Temporal.
+- **Gather** — the stream route accumulates one `Citation[]` from every source: project RAG
+  (`stream/route.ts:180-191`), org "Ask Your Org" knowledge (`:195-207`), @-mentioned KBs
+  (`:214-232`), and executed connector tools (`:341-344`). Persisted on the assistant message
+  (`:426`, `citations`) and sent on stream close (`:471`).
+- **Number** — `citationInstruction(sourceNames(citations))` is injected AFTER all citations are
+  gathered (`:237-240`), so the model's `[n]` markers line up with the footer numbering. Both prompt
+  and render derive numbering from the same `buildSources()` (`chat-citations.ts:33`, `:116`) — they
+  cannot drift.
+- **Render** — `parseCitationMarkers` splits the answer into text/cite segments
+  (`chat-citations.ts:67`); `Markdown.tsx:62-105` linkifies `[n]` into `<CiteChip>` only when
+  `sourceCount>0 && onCiteClick` is wired, degrading to plain text otherwise (`:70`).
+- **Footer + jump** — `SourcesFooter` (`ChatWorkspace.tsx:193`) renders the deduped numbered sources
+  with best-score + matched parts; clicking a chip calls `jumpToSource` (`:262-267`) which
+  `scrollIntoView`s the registered `<li>` and applies a 1.6s highlight. Refs registered at `:333-336`.
 
-- **PASS — graceful degradation when Temporal is off.**
-  `src/app/api/v1/admin/agent-runs/workflows/route.ts:14` calls `listWorkflowExecutions`, which
-  returns a `{configured, reachable, note, executions:[]}` view rather than throwing. The panel
-  branches on `!view.configured` / `!view.reachable` and shows the "Durable runtime not enabled" /
-  "configured but unreachable" empty states (`DurableExecutionsPanel.tsx:158-174`). No 5xx path.
-- **PASS — rerun correlates workflowId → recorded runId → re-dispatch.**
-  `rerun/route.ts:29` parses the console runId out of the workflowId via `runIdFromWorkflowId`, loads
-  the prior run (`getAgentRun`), and re-submits through `runAgent(prior.agentId, prior.query, …)`
-  (`rerun/route.ts:44`). This is the correct seam: rerun re-enters durable dispatch when enabled or
-  runs inline otherwise, so "rerun a job" works regardless of runtime — and does NOT require Temporal
-  to be reachable (the source run is in the DB). 400 when the workflow isn't an agent-run; 404 when no
-  recorded run correlates. Solid.
-- **PASS — rerun is audited via `runAgent`.** The new run goes through `runAgent`, which emits the
-  canonical attributed audit (`agentrun.ts:326-329,361,375`) and the full correlation fan-out
-  (`correlation.ts`). So the rerun *result* is a first-class governed run in the audit trail.
-- **PASS — action gating agrees between UI and route.** Both the panel
-  (`DurableExecutionsPanel.tsx:220 workflowActionsFor`) and the pure predicates
-  (`temporal-visibility.ts` `canRerunWorkflow`/`canCancelWorkflow`) derive from the same Temporal
-  status union — rerun only on closed, cancel only on open. No divergence.
-- **PASS — cancel maps failure modes to honest HTTP codes.** `cancel/route.ts:26` →
-  `not_found`→404, `not_configured`→409, else 502. Never an unhandled 5xx.
-- **CONCERN (Gap #34) — cancel/terminate emits NO audit.** `grep` for `audit` across
-  `workflows/**` returns nothing. Unlike rerun (audited through `runAgent`), a
-  `POST /workflows/[wf]/cancel` (esp. `mode:terminate`, which force-kills irreversibly) writes no
-  accountability record. The route even captures `gate.user.email` into the response `by` field but
-  never persists it. This is a mutation with no audit — the exact seam the operating model flags.
-- **CONCERN (Gap #35) — `runIdFromWorkflowId` fragile to hyphenated runIds.**
-  `temporal-visibility.ts:runIdFromWorkflowId` slices after the *last* `-`; `workflowIdFor`
-  (`agent-run-durable.ts:74`) builds `agentrun-<safeAgent>-<runId>`. If a runId ever contains `-`
-  (e.g. a UUID), rerun would resolve the wrong runId or 404. Today's runIds (`run_2c0d55c7`) are
-  hyphen-free so it's correct now — latent, not live.
+Clean degradation confirmed: no sources → `buildSources` returns `[]` → footer returns null
+(`:199`), markers render inert. Dangling `[5]` when only 3 sources → `valid:false` → inert
+(`chat-citations.ts:84`).
 
-### 2. Config mDNS — PASS
+## Chat epic — inline thinking · PASS
 
-**Flow traced:** `config-registry.ts` (declares `hostValue` keys, mDNS defaults) →
-`config.ts` `getConfigEntries` renders through `configDisplayValue` → operator edits → `setConfig`
-maps back through `configConnectValue` before persisting.
+- Stream relays `reasoning_content` deltas as `{ reasoning }` (`stream/route.ts:401-404`) separate
+  from `{ content }` (`:405-408`); persisted as `reasoning` on the message (`:425`).
+- `ThinkingBlock` (`ChatWorkspace.tsx:152`) drives presentation purely from `thinkingState`
+  (`chat-thinking.ts:29`): streaming+no-answer → expanded live; answer-started/done → collapsed by
+  default. Rendered ABOVE the answer body (`:308`), never mixed in. 12 unit tests pass.
 
-- **PASS — no raw IP / loopback can reach the client.** `config.ts:57` renders every non-secret value
-  through `configDisplayValue` → `toDisplayHost`, which rewrites loopback (`127.0.0.1`/`localhost`/
-  `0.0.0.0`/`::1`), every known fleet IP, AND *any* unknown private RFC-1918 / link-local IPv4 to an
-  mDNS host (`display-host.ts` `mapHostname`/`isPrivateIPv4`). An unknown private IP falls back to
-  `offgrid-s1.local` rather than leaking. Only public hostnames pass through. Founder directive holds.
-- **PASS — display↔connect round-trip preserves the real target.** `toDisplayHost` and `toConnectHost`
-  are exact inverses for the S1/g6 loopback mapping (`display-host.ts` `DISPLAY_HOST_TO_LOOPBACK`),
-  preserving scheme/port/path. `setConfig` (`config.ts:87`) applies `configConnectValue` on the
-  write path, so an operator who sees `offgrid-s1.local:6333` and saves it persists `127.0.0.1:6333`
-  — connectivity never breaks. g6 inverts on the *displayed proxy port* (8931–8939), which matches
-  how it's shown. Both URL-form and bare `host:port` (and IPv6, and `redis://` scheme) are handled.
-- **PASS — mDNS defaults everywhere.** Every `hostValue:true` key in `CONFIG_REGISTRY` defaults to an
-  `offgrid-*.local` form (gateway/keycloak/qdrant/opensearch/langfuse/temporal/redis), never a raw
-  IP. Verified across the registry.
+## Chat epic — @-mentions · PASS (composes with citations)
 
-### 3. Honest health — PASS
+- **Detect/rank/fold** are pure (`chat-mentions.ts` `activeMention`/`matchMentions`/`buildRefsPayload`),
+  wired in the composer (`ChatWorkspace.tsx:520-522`, payload built `:1090`, sent `:1113`).
+- **Threaded into the stream** — `parseRefsPayload` at the route boundary (`stream/route.ts:81`);
+  referenced memory ids resolve to facts scoped to the caller (`memoryFactsByIds(userId, …)`,
+  `:139`) and inject a `referenced_memory` block.
+- **Access-gated** — @-mentioned KB scopes retrieve ONLY after `projectAccess(userId, projectId,
+  role)` passes (`:222`); others are silently skipped. De-dupes the already-retrieved project
+  (`:215-219`).
+- **Same citations** — @-KB hits are `citations.concat(r.citations)` (`:226`), the identical
+  `Citation` shape, and the numbering instruction runs after this branch (`:237`). So a referenced KB
+  DOES produce clickable chips + footer entries. Composition verified.
 
-**Flow traced:** `services-directory.ts` (declares `probe: embedded|optional|network`) →
-`status.ts` `probeEntry`/`resolveHealth` → `GET /api/v1/services/health`.
+## Chat epic — inline artifact editing · PASS
 
-- **PASS — LanceDB (embedded) never reports false "down".** `services-directory.ts:180-189` marks
-  LanceDB `probe:'embedded'` with `url:'embedded://lancedb'`; `status.ts:31-33` skips the network
-  probe for `embedded://`/`redis://` schemes; `resolveHealth` (`services-directory.ts:255`) returns
-  `'embedded'` (healthy) with no probe. Correct — an in-process on-disk store has no endpoint to hit.
-- **PASS — Redis (optional) reports its fallback, not "down".** `services-directory.ts:191-199` marks
-  Redis `probe:'optional'`; when it doesn't answer, `resolveHealth` returns `'optional'` (on the
-  documented in-process-cache fallback) not `'down'`. The rollup (`status.ts:81-87`) counts anything
-  `!== 'down'` as healthy, so an absent Redis doesn't drag the platform to "degraded".
-- **PASS — both the authenticated Services sweep and public `/status` share one probe.**
-  `services/health/route.ts:12` uses the same `probeEntry` as the public status API, so the two
-  cannot disagree.
+- Edit buffer + baseline in `ArtifactView` (`ArtifactView.tsx:58-66`); dirty/savable from pure
+  `isArtifactDirty`/`canSaveArtifact` (`artifacts.ts:108`, `:114`).
+- Save posts `artifactSavePayload` (original title threaded so the new version lands on the same
+  logical row) to the EXISTING `POST /api/v1/chat/artifacts` (`ArtifactView.tsx:80`), which versions
+  server-side by (user, conversation, title). New baseline advances on success (`:90`).
+- `ArtifactEditor` is pure presentation, Cmd/Ctrl+S → save, Esc → cancel (`ArtifactEditor.tsx:22-30`).
+  8 `artifact-edit` unit tests pass.
 
-### 4. Workspace consolidation — PASS
+**CONCERN (minor):** the `ArtifactView` instance rendered at `ChatWorkspace.tsx:1865` (the
+transcript-chip open path) passes `title` + `conversationId` but NOT `onSaved`, while the
+library-context instance at `:1870` wires `onSaved={refreshProjects}`. Saving from the chip path
+works (persists a version) but the projects/library list won't refresh until the next navigation.
+Low severity — logged as a gap.
 
-- **PASS — /projects /prompts /artifacts still resolve; Artifacts reachable again.** All three live
-  under the `(workspace)` route group (`src/app/(console)/(workspace)/{projects,prompts,artifacts}`),
-  sharing `layout.tsx` which renders `WorkspaceNav` top-tabs. The routes are the group's `secondary`
-  members in `groups.ts` (Workspace: primary `chat/knowledge/storage`, secondary
-  `projects/prompts/artifacts`) — they keep their routes (nothing 404s) but are reached via the scoped
-  nav, not the sidebar, per the two-level nav design.
-- **PASS — sidebar highlight stays coherent on secondary routes.** `sidebarActiveIdFor` maps a
-  secondary route (e.g. `/artifacts`) back to its group's primary so the sidebar row stays active —
-  matches the navigation-in-URL mandate.
+## Gateway node control · PASS
 
-### 5. Self-hosted Scalar (`/docs/api`) — PASS
+`GatewayControl.tsx` → `POST /api/v1/gateway/nodes/[name]` → aggregator `POST /nodes/:name`. The
+route is admin-gated (`requireAdmin`, `[name]/route.ts:44`), validates the action set (`:49`),
+resolves the live node via `GET /nodes` (`:28-41`), and validates with pure `validateNodeAction`
+(`:56`). **Honest degradation is explicit:** a blocked action → 501 `{notActionable}` (`:59-60`),
+aggregator 404/501 → 501 `{notActionable}` (`:73-77`), unreachable aggregator → 502 (`:80-81`) —
+never a fake 200. `fetchNode` swallows errors → null → 404 (`:38`), so a down aggregator yields a
+clean 404, not a 500. Graceful.
 
-- **PASS — air-gap hole closed.** `docs/api/route.ts` sets Scalar `cdn:'/scalar.standalone.js'`
-  instead of jsdelivr; the 3.7M vendored bundle is present at `public/scalar.standalone.js`;
-  `middleware.ts:40` lists `/scalar.standalone.js` in `PUBLIC_EXACT` so the unauthenticated docs page
-  can load it. CSP `script-src 'self' 'unsafe-inline' 'unsafe-eval'` (`next.config.mjs:11`) permits
-  the same-origin bundle. The page renders fully on-prem with no external fetch.
+**CONCERN (audit):** node control mutations (model swap / restart / enable / disable) do NOT write an
+audit event, unlike the chat budget-deny path (`stream/route.ts:300`). A privileged, state-changing
+fleet action with no accountability trail. Logged as a gap.
+
+## Federation · CONCERN (403 handled at the message level, NOT auto-granted)
+
+The previous "bare 403 Forbidden leaks up" bug IS fixed — but by making the error *actionable*, not
+by auto-granting the role:
+
+- `keycloak-admin.ts:88-93` carries the empty-body 403 as a status; `forbiddenGrantMessage()`
+  (`keycloak-realm.ts:33-40`) turns it into an operation-specific message naming exactly which
+  `realm-management` role to grant to which client. The Access page surfaces the same guidance
+  (`access/page.tsx:59-62`).
+- **There is NO server-side `assignRoles()` call that grants `realm-management` to the console's own
+  service account.** The grant remains a MANUAL step in the Keycloak admin console. So federation
+  writes (create IdP, etc.) still 403 on a fresh realm until an operator grants the role by hand —
+  the console now *tells you how*, but doesn't self-heal. Logged as a gap (severity: medium — a
+  one-time bootstrap, well-signposted, but not "handled server-side").
+
+Routes: `admin/access/idp/route.ts` (GET/POST), `idp/[alias]/route.ts` (DELETE); UI
+`components/access/IdpList.tsx`.
+
+## Sessions · PASS
+
+- **Online + offline merge** — `mergeUserSessions()` (`keycloak-realm.ts:97-106`) merges both lists,
+  deduped by id (online wins for a shared id — it's the live one), sorted by `lastAccess` desc.
+  Called directly by the route (`admin/access/users/[id]/sessions/route.ts:39`).
+- **mDNS IP enrichment** — `normalizeSession()` (`keycloak-realm.ts:78`) runs each session's IP
+  through `toDisplayHost()`, mapping loopback/LAN/fleet IPs to `offgrid-*.local` — no raw IP reaches
+  the view.
+
+## Raw IP / host leaks · PASS
+
+Grep of `src/components` + `src/app` `*.tsx` for `127.0.0.1` / `192.168.` found three hits, ALL
+masked through `toDisplayHost` before render:
+
+- `VectorDBInspector.tsx:12,55` — default + hint both wrapped.
+- `gateway/page.tsx:35` `GATEWAY_URL` is a server-side fetch target; every UI render goes through
+  `toDisplayHost` (`:61,74,82,86`).
+- `data/page.tsx:211` passes the raw env value as `urlHint`, but `VectorDBInspector` wraps it on
+  ingest (`:55`).
+
+No raw loopback/LAN IP reaches the rendered DOM.
 
 ---
 
-## Seams checked and found sound (adversarial pass)
+## Coherence verdict
 
-- **UI action → backing route:** every button in `DurableExecutionsPanel` (Refresh/Re-run/Cancel/
-  Terminate/detail drill-in) maps to a real route. No dangling action.
-- **Route → dep-down behaviour:** workflows list/detail/cancel all return typed graceful states, not
-  5xx, when Temporal is off. Config renders defaults when `.env` keys are absent. Health resolves
-  embedded/optional without a probe.
-- **Correlation:** rerun re-enters `runAgent`, which owns the single-runId fan-out — so a rerun is as
-  correlated as any inline run.
+**PASS — coheres.** The chat epic is genuinely integrated (not four bolted-on features): a single
+`Citation[]` pipeline feeds citations, @-mentions fold into it access-gated, thinking is a clean
+separate channel, and artifact editing reuses the existing versioned save route. Gateway control is
+honest about what the backend actually supports; sessions merge correctly with masked IPs. Three
+real concerns are logged as gaps: (1) artifact-chip save doesn't refresh the library, (2)
+node-control mutations aren't audited, (3) federation's realm-management grant is a manual bootstrap,
+not automatic. None is a broken seam. All 47 chat-epic unit tests pass.
 
-## Seams that DON'T fully connect (→ gaps filed)
-
-- Cancel/terminate mutation has no audit emission (Gap #34).
-- `runIdFromWorkflowId` last-hyphen parse is latent-fragile (Gap #35).
+**Not verified live in this sweep** (read-and-verify only, no deploy): actual streaming against the
+aggregator, real Keycloak 403→grant recovery on the live realm, and the artifact save round trip in
+the browser. These need the live stack.

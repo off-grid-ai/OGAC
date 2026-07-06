@@ -7,10 +7,10 @@ operator running the platform — not a developer. Each page answers the same fo
 The console groups its surfaces into sections (mirrors the sidebar):
 
 ## Workspace — the everyday-create plane
-- [Chat](chat.md) — your on-prem ChatGPT
+- [Chat](chat.md) — your on-prem ChatGPT (citations, thinking, @-mentions, artifacts, voice) ✅ fully documented
 - [Projects](projects.md) — grouped chats + shared instructions + a knowledgebase
 - [Prompts](prompts.md) — reusable prompt library
-- [Artifacts](artifacts.md) — saved generated outputs (HTML/SVG/React/code)
+- [Artifacts](artifacts.md) — saved generated outputs, editable + versioned ✅ fully documented
 - [Knowledge](knowledge.md) — the org-wide curated knowledge base
 - [Storage](storage.md) — on-prem file storage & sharing
 
@@ -43,7 +43,8 @@ The console groups its surfaces into sections (mirrors the sidebar):
 
 ---
 
-**Fully documented (this sweep):** Agent Runs & Jobs, Configuration, Services (the 3 just-merged
-surfaces). **Skeleton (how/what/why/when, to be deepened):** all others — marked at the top of each
-file. See `docs/HOWTO.md` for cross-surface step-by-step recipes and the OpenAPI spec at `/docs/api`
+**Fully documented (post-chat-epic sweep, 2026-07-06):** Chat, Artifacts, plus node control in
+AI Gateway and sessions/federation in Access & API keys. **Earlier sweep:** Agent Runs & Jobs,
+Configuration, Services. **Skeleton (how/what/why/when, to be deepened):** all others — marked at
+the top of each file. See `docs/HOWTO.md` for cross-surface step-by-step recipes and the OpenAPI spec at `/docs/api`
 for the API contract.
