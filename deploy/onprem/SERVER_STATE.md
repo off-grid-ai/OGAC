@@ -629,3 +629,17 @@ docker exec offgrid-console-keycloak-1 /opt/keycloak/bin/kcadm.sh add-roles -r o
 ```
 
 Takes effect immediately (no restart). Covers list + Add/Delete OIDC provider.
+
+### Durable app-runs (offgrid-apps queue) — ENABLED (2026-07-06)
+
+Multi-step apps with a human step now run durably (Temporal) so HITL review can resume mid-workflow.
+- **Worker:** `scripts/app-worker.mts` (`npm run worker:apps`) drains the **`offgrid-apps`** queue. Started
+  backgrounded on S1 (mirrors the agent-runs `temporal-worker.mts` process). Uses the same
+  `worker-env.mts` bootstrap (loads `.env.local` before `@/db` builds its Pool).
+  ⚠️ **Not yet a launchd job** — won't survive reboot; add a plist (like `co.getoffgridai.agent-worker`)
+  to make it durable across restarts. Restart for now: `pkill -f app-worker.mts` then relaunch.
+- **Console env** (`.env.local`): `OFFGRID_ADAPTER_APPRUNTIME=temporal` + `OFFGRID_TEMPORAL_ADDRESS=127.0.0.1:7233`.
+  App-only flag — deliberately NOT the global `OFFGRID_QUEUE_ENABLED`, so agent-runs dispatch is unchanged.
+- **Verified:** the seeded "Reimbursement Approval" app (`app_bdd24eab`) POST /run → `mode: durable`,
+  workflow executed the connector-query + agent steps and advances toward the human pause. `submitAppRun`
+  degrades to inline if Temporal/worker is unreachable (graceful).
