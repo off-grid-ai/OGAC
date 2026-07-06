@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getMdm } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { type FleetPolicyInput, validatePolicyInput } from '@/lib/fleetdm';
 
 export const dynamic = 'force-dynamic';
@@ -34,8 +36,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const mdm = getMdm();
   if (!mdm.supportsFleet || !mdm.updatePolicy) return unsupported();
   try {
-    return NextResponse.json(await mdm.updatePolicy(policyId, body));
+    const updated = await mdm.updatePolicy(policyId, body);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.policy.change',
+      resource: `fleet-policy:${policyId}`,
+      outcome: 'ok',
+    });
+    return NextResponse.json(updated);
   } catch (err) {
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.policy.change',
+      resource: `fleet-policy:${policyId}`,
+      outcome: 'error',
+    });
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 }
@@ -53,8 +66,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!mdm.supportsFleet || !mdm.deletePolicy) return unsupported();
   try {
     await mdm.deletePolicy(policyId);
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.policy.change',
+      resource: `fleet-policy:${policyId}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
+    auditFromSession(gate, await currentOrgId(), {
+      action: 'fleet.policy.change',
+      resource: `fleet-policy:${policyId}`,
+      outcome: 'error',
+    });
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 }
