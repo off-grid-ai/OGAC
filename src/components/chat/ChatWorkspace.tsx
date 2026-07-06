@@ -48,6 +48,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
+import { buildSources } from '@/lib/chat-citations';
+import { thinkingLabel, thinkingState } from '@/lib/chat-thinking';
 import { toDisplayHost } from '@/lib/display-host';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
@@ -125,6 +127,86 @@ function BranchNav({
   );
 }
 
+// Inline extended-thinking block — reasoning tokens rendered ABOVE the answer, never mixed into the
+// body. While the model is still thinking (no answer yet) it's expanded and streams live; once the
+// answer starts it collapses to a one-line header the reader can re-open. Presentation state is the
+// pure `thinkingState` decision (task rule: "collapsed by default once the answer starts"); the only
+// local state is the reader's manual open/close override, seeded from that default.
+function ThinkingBlock({ reasoning, content, streaming }: {
+  reasoning: string;
+  content: string;
+  streaming: boolean;
+}) {
+  const state = thinkingState(reasoning, content, streaming);
+  const [override, setOverride] = useState<boolean | null>(null);
+  // Follow the phase-driven default until the reader intervenes; a manual toggle sticks.
+  const open = override ?? state.defaultOpen;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Keep the newest reasoning in view while it streams (transform/opacity-only motion elsewhere).
+  useEffect(() => {
+    if (open && state.phase === 'streaming') scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [reasoning, open, state.phase]);
+  if (!state.hasReasoning) return null;
+  return (
+    <div className="mb-2 rounded-md border border-border/60 bg-muted/40">
+      <button
+        type="button"
+        onClick={() => setOverride(!open)}
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
+      >
+        <Brain className={cn('size-3.5 shrink-0 text-primary', state.phase === 'streaming' && 'animate-pulse')} />
+        <span>{thinkingLabel(state.phase)}</span>
+        <CaretRight className={cn('ml-auto size-3 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+      </button>
+      {open ? (
+        <div
+          ref={scrollRef}
+          className="max-h-64 overflow-y-auto whitespace-pre-wrap border-t border-border/60 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground"
+        >
+          {reasoning}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
+// [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
+// briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
+function SourcesFooter({ citations, activeIndex, registerRef }: {
+  citations: Citation[];
+  activeIndex: number | null;
+  registerRef: (index: number, el: HTMLLIElement | null) => void;
+}) {
+  const sources = buildSources(citations);
+  if (!sources.length) return null;
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+        <Quotes className="size-3" /> Sources
+      </div>
+      <ol className="space-y-0.5">
+        {sources.map((s) => (
+          <li
+            key={s.index}
+            ref={(el) => registerRef(s.index, el)}
+            className={cn(
+              'flex items-baseline gap-1.5 rounded px-1 py-0.5 text-[11px] transition-colors duration-300',
+              activeIndex === s.index ? 'bg-primary/10' : 'bg-transparent',
+            )}
+          >
+            <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
+            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>{s.name}</span>
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} · {(s.score * 100).toFixed(0)}%
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // eslint-disable-next-line complexity
 function MessageBubble({
   message: m,
@@ -137,6 +219,7 @@ function MessageBubble({
   onViewImage,
   canRegenerate,
   canEdit,
+  streaming,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
@@ -148,10 +231,24 @@ function MessageBubble({
   onViewImage: (src: string) => void;
   canRegenerate: boolean;
   canEdit: boolean;
+  streaming: boolean;
 }) {
   const isAssistant = m.role === 'assistant';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.content);
+  // Inline-citation ↔ Sources-footer wiring: clicking a [n] chip scrolls to source n and highlights
+  // it briefly. Refs are registered by the footer; activeIndex drives the transient highlight.
+  const sourceRefs = useRef(new Map<number, HTMLLIElement>());
+  const [activeSource, setActiveSource] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceCount = buildSources(m.citations).length;
+  const jumpToSource = useCallback((n: number) => {
+    sourceRefs.current.get(n)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setActiveSource(n);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setActiveSource(null), 1600);
+  }, []);
+  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
   if (!isAssistant && editing) {
     return (
       <div className="flex justify-end">
@@ -190,11 +287,8 @@ function MessageBubble({
           m.role === 'user' ? 'bg-primary/10 text-foreground' : 'border border-border bg-card',
         )}
       >
-        {m.reasoning ? (
-          <details className="mb-2 text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none">Reasoning</summary>
-            <div className="mt-1 whitespace-pre-wrap border-l-2 border-border pl-2">{m.reasoning}</div>
-          </details>
+        {isAssistant ? (
+          <ThinkingBlock reasoning={m.reasoning ?? ''} content={m.content} streaming={streaming} />
         ) : null}
         {m.images?.length ? (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -213,21 +307,17 @@ function MessageBubble({
         {isAssistant ? (
           m.content ? (
             <>
-              <Markdown>{m.content}</Markdown>
+              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>{m.content}</Markdown>
               <ArtifactChip content={m.content} onOpen={onOpenArtifact} />
               {m.citations?.length ? (
-                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border pt-2">
-                  {m.citations.map((c, k) => (
-                    <span
-                      key={k}
-                      className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                      title={`relevance ${(c.score * 100).toFixed(0)}%`}
-                    >
-                      <Quotes className="size-3" />
-                      {c.name} · part {c.position + 1}
-                    </span>
-                  ))}
-                </div>
+                <SourcesFooter
+                  citations={m.citations}
+                  activeIndex={activeSource}
+                  registerRef={(index, el) => {
+                    if (el) sourceRefs.current.set(index, el);
+                    else sourceRefs.current.delete(index);
+                  }}
+                />
               ) : null}
               <div className="mt-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
@@ -1248,6 +1338,9 @@ export function ChatWorkspace({
                 onViewImage={setLightbox}
                 canRegenerate={!streaming && i === messages.length - 1}
                 canEdit={!streaming && !temporary}
+                // Only the trailing assistant turn is actively generating — that's the one whose
+                // thinking block streams live before collapsing.
+                streaming={streaming && i === messages.length - 1}
               />
             ))}
           </div>
