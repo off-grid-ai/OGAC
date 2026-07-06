@@ -1,0 +1,8 @@
+# Off Grid RAGAS sidecar — pinned deps. Air-gap-safe: ragas + langchain-openai speak only to the
+# gateway base_url passed in the request; nothing here reaches api.openai.com.
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+ragas==0.2.6
+langchain-openai==0.2.10
+datasets==3.1.0
+pandas==2.2.3
