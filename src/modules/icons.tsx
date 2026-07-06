@@ -62,6 +62,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   lineage: TreeStructure,
   regulatory: Scale,
   integrations: Vault,
+  'data-domains': TreeStructure,
   knowledge: BookOpenText,
   access: UsersThree,
   admin: Building2,
