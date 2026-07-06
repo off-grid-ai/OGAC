@@ -293,3 +293,5 @@ MUST include live vision verification, not just build/typecheck/test. Logged for
 - **PROCESS — merge gate drifted:** UI merges were build-gated but NOT vision-verified live, so the
   founder found the layout/interaction issues instead of us. Reinstate: screenshot-verify every UI
   merge before "done", and run the QA/platform-integration+docs sweep after every 3 merges.
+
+_Resolved 2026-07-06: #36 (Sessions online+offline merge + mDNS IP, deployed) and #37 (Federation — Keycloak IdP roles granted to the console admin SA, /idp now 200) — see git + SERVER_STATE._
