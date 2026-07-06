@@ -392,3 +392,22 @@ already surfaces — not hidden defects. Ordered by impact.
 - **[BUILD] `apps/compile` route is unaudited.** `apps/compile/route.ts` has no `auditFromSession`.
   This is acceptable (compile is a read-only NL→spec transform that persists nothing), noted for
   completeness — if compile ever starts persisting drafts, add an audit entry then.
+## Reimbursement demo-seed + e2e (task #106) — 2026-07-06
+
+- **#106-a (P1) — Compiled AppSpec connector-query steps bind by domain ID, but the runtime resolves
+  by LABEL — a compiled spec's data reads MISS at run time. — OPEN.**
+  *Where:* `src/lib/app-compile.ts` `bindDataPhrase` sets `step.domain = domain.id` (e.g. `dom_inv`),
+  but `src/lib/app-run.ts` `executeConnectorStep` calls `resolveDomain(step.domain, domains)` which
+  matches on LABEL/ALIAS, not id — so `resolveDomain('dom_inv', …)` returns null and the read errors
+  as "no data-domain binds ...". Verified directly: `resolveDomain('dom_inv', doms)` → null;
+  `resolveDomain('Invoices', doms)` → the domain.
+  *Effect:* an app built via the NL compiler + saved verbatim would fail its connector reads at run
+  time. The demo path is unaffected because the **seeded sample app**
+  (`buildReimbursementAppSpec`, `src/lib/data-domains-demo-seed.ts`) deliberately stores the domain
+  **LABEL** in `step.domain`, which resolves in both the compiler binder and the runtime resolver —
+  and `test/reimbursement-e2e.test.ts` asserts the full compile+run path with that convention.
+  *Fix (small, owned by the app-compile/app-run owner — NOT this agent's files):* either (a) make
+  `executeConnectorStep` resolve `step.domain` by id first (look up the domain by id, fall back to
+  `resolveDomain` for label), or (b) have the compiler emit the domain **label** in `step.domain`.
+  Option (a) is cleaner (ids are stable; labels can be renamed). Until fixed, builder-compiled apps
+  must be saved with label-form `step.domain` (as the seed does).
