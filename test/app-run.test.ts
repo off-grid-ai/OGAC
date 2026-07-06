@@ -8,7 +8,15 @@ import {
   nextRunnableSteps,
   topoOrder,
 } from '@/lib/app-run-plan';
-import { type AppRunDeps, buildAgentQuery, executeStep, runApp, type StepResult } from '@/lib/app-run';
+import {
+  type AppRunDeps,
+  buildAgentQuery,
+  executeStep,
+  resolveDomainByIdOrLabel,
+  runApp,
+  type StepResult,
+} from '@/lib/app-run';
+import { resolveDomain } from '@/lib/data-domains';
 
 // A 3-step reimbursement-shaped spec: connector-query (quota) → agent (decide) → output.
 function spec(steps: AppSpec['steps'], edges: AppSpec['edges'] = []): AppSpec {
@@ -46,6 +54,11 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       return { blocked: false, detail: 'ok' };
     },
     async persist() {},
+    async materializeAgent(_spec, step) {
+      // Fake materialization: mint a stable id from the step and cache it back (as prod does).
+      step.agentId = `ag_mat_${step.id}`;
+      return step.agentId;
+    },
     ...over,
   };
 }
@@ -118,4 +131,100 @@ test('runApp stops at awaiting_human when a human step is hit', async () => {
   assert.equal(out.status, 'awaiting_human');
   // the output step must NOT have run yet
   assert.equal(out.steps.find((s) => s.stepId === 's3'), undefined);
+});
+
+// ─── GAP #106-a — resolve step.domain by ID first, then LABEL/alias ───────────────────────────────
+
+const DOMS = [
+  { id: 'dom_inv', label: 'Invoices', connectorId: 'con_s3', resource: 'invoices' },
+  { id: 'dom_hr', label: 'Reimbursement Quota', connectorId: 'con_hr', resource: 'employee_quota' },
+];
+
+test('resolveDomainByIdOrLabel resolves a compiler-emitted domain ID', () => {
+  const r = resolveDomainByIdOrLabel('dom_inv', DOMS, resolveDomain as never);
+  assert.equal(r?.id, 'dom_inv');
+  assert.equal(r?.label, 'Invoices');
+});
+
+test('resolveDomainByIdOrLabel resolves a human label to the same domain', () => {
+  const r = resolveDomainByIdOrLabel('Invoices', DOMS, resolveDomain as never);
+  assert.equal(r?.id, 'dom_inv');
+});
+
+test('resolveDomainByIdOrLabel: id form and label form resolve to the SAME domain', () => {
+  const byId = resolveDomainByIdOrLabel('dom_hr', DOMS, resolveDomain as never);
+  const byLabel = resolveDomainByIdOrLabel('reimbursement quota', DOMS, resolveDomain as never);
+  assert.ok(byId && byLabel);
+  assert.equal(byId!.id, byLabel!.id);
+  assert.equal(byId!.id, 'dom_hr');
+});
+
+test('resolveDomainByIdOrLabel returns null for an unknown ref (no-guess)', () => {
+  assert.equal(resolveDomainByIdOrLabel('nope_xyz', DOMS, resolveDomain as never), null);
+  assert.equal(resolveDomainByIdOrLabel('', DOMS, resolveDomain as never), null);
+});
+
+test('executeStep(connector-query) reads via a domain ID (the compiler convention)', async () => {
+  const deps = fakeDeps({
+    async listDomains() {
+      return DOMS;
+    },
+    async queryDomain() {
+      return { result: { rows: [{ id: 1 }], count: 1, dialect: 'sql' }, detail: 'read 1 row' };
+    },
+  });
+  const s = spec([{ id: 'q', label: 'read invoices', kind: 'connector-query', domain: 'dom_inv' }]);
+  const r = await executeStep(s, s.steps[0], [], { orgId: 'default', runId: 'r6' }, deps);
+  assert.equal(r.status, 'done');
+  assert.match(r.output ?? '', /Invoices/);
+});
+
+// ─── GAP #113 — an inline agent step (no agentId) materializes + runs ─────────────────────────────
+
+test('executeStep(agent) materializes an inline agent then runs it (idempotent)', async () => {
+  let created = 0;
+  const deps = fakeDeps({
+    async materializeAgent(_spec, step) {
+      created += 1;
+      step.agentId = 'ag_new';
+      return 'ag_new';
+    },
+    async runAgent(agentId, query) {
+      return { id: `run_${agentId}`, answer: `inline decided from: ${query}`, status: 'done', citations: [] };
+    },
+  });
+  const s = spec([
+    { id: 's1', label: 'decide', kind: 'agent', inlineAgent: { systemPrompt: 'Decide eligibility.', grounded: true } },
+  ]);
+  const r1 = await executeStep(s, s.steps[0], [], { orgId: 'default', runId: 'r7' }, deps);
+  assert.equal(r1.status, 'done');
+  assert.match(r1.output ?? '', /inline decided from:/);
+  assert.equal(created, 1);
+  // Idempotent: the id was cached back onto the step, so a re-run does NOT materialize again.
+  const r2 = await executeStep(s, s.steps[0], [], { orgId: 'default', runId: 'r7' }, deps);
+  assert.equal(r2.status, 'done');
+  assert.equal(created, 1);
+  assert.equal((s.steps[0] as { agentId?: string }).agentId, 'ag_new');
+});
+
+test('runApp runs a compiled-shaped app: connector(id)→inline-agent→human (materializes, pauses)', async () => {
+  const deps = fakeDeps({
+    async listDomains() {
+      return DOMS;
+    },
+  });
+  const s = spec(
+    [
+      { id: 's1', label: 'read invoices', kind: 'connector-query', domain: 'dom_inv' },
+      { id: 's2', label: 'decide', kind: 'agent', inlineAgent: { systemPrompt: 'Decide.', grounded: true } },
+      { id: 's3', label: 'review', kind: 'human' },
+      { id: 's4', label: 'Output', kind: 'output', sink: 'console' },
+    ],
+    [{ from: 's1', to: 's2' }, { from: 's2', to: 's3' }, { from: 's3', to: 's4' }],
+  );
+  const out = await runApp(s, {}, { orgId: 'default', runId: 'r8' }, deps);
+  assert.equal(out.status, 'awaiting_human');
+  // The inline decision step actually ran (materialized) before the human pause.
+  assert.equal(out.steps.find((x) => x.stepId === 's2')?.status, 'done');
+  assert.equal((s.steps[1] as { agentId?: string }).agentId, 'ag_mat_s2');
 });

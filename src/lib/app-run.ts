@@ -117,6 +117,13 @@ export interface AppRunDeps {
   ) => Promise<{ blocked: boolean; detail: string }>;
   /** Persist the live app-run state (create on start, update per step). No-op sink is allowed. */
   persist: (state: AppRunState, input: Record<string, unknown>) => Promise<void>;
+  /**
+   * Materialize an inline agent (systemPrompt/model/grounded/tools, no agentId) into a real
+   * customAgent and return its id. Used by an agent step that has an `inlineAgent` but no `agentId`
+   * (GAP #113) so a freshly-compiled multi-step app's decision step can run through runAgent. The
+   * created agent id is cached back onto the step + persisted to the app so re-runs don't duplicate.
+   */
+  materializeAgent: (spec: AppSpec, step: Extract<AppStep, { kind: 'agent' }>, orgId: string) => Promise<string>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -183,6 +190,34 @@ export function defaultDeps(): AppRunDeps {
         /* app-run-store not present or DB unreachable — degrade to no-op */
       }
     },
+    async materializeAgent(spec, step, orgId) {
+      // Create a real customAgent from the inline def, then cache its id back onto the step + persist
+      // it to the app so a re-run reuses the SAME agent (idempotent — no duplicates). Lazy imports
+      // keep this off the default bundle. If persistence fails (unsaved/draft spec, DB down) we still
+      // return the fresh id so the run proceeds — only the cross-run dedup is best-effort.
+      const inline = step.inlineAgent!;
+      const { createCustomAgent } = await import('@/lib/store');
+      const created = await createCustomAgent({
+        name: `${spec.title || 'App'} · ${step.label || step.id}`,
+        role: 'App step',
+        description: `Inline agent materialized for app "${spec.title}" step "${step.id}".`,
+        systemPrompt: inline.systemPrompt,
+        model: inline.model,
+        tools: inline.tools,
+        grounded: inline.grounded,
+      });
+      // Cache back in-memory (this-run reuse) and persist (cross-run dedup).
+      step.agentId = created.id;
+      if (spec.id) {
+        try {
+          const { updateApp } = await import('@/lib/apps-store');
+          await updateApp(spec.id, orgId, { steps: spec.steps });
+        } catch {
+          /* draft/unsaved spec or DB down — the in-memory agentId still serves this run */
+        }
+      }
+      return created.id;
+    },
   };
 }
 
@@ -200,6 +235,27 @@ export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): stri
   return `CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}\n\nTASK: ${label}`;
 }
 
+// ─── resolveDomainByIdOrLabel — GAP #106-a: id FIRST, then label/alias (pure) ─────────────────────
+// The compiler emits `step.domain = <domain id>` (e.g. `dom_inv`), but the label/alias rule engine
+// (`resolveDomain`) matches human phrases, not ids — so a saved compiled spec's reads returned null
+// at run time. Fix: try an EXACT id hit against the declared domains first (ids are stable + unique,
+// so this is a safe deterministic bind), and only fall back to the phrase resolver for a label/alias.
+// Kept pure (resolver injected) so it's unit-testable without the DB. Both a spec with `domain=<id>`
+// and one with `domain=<label>` now resolve to the same domain.
+export function resolveDomainByIdOrLabel(
+  domainRef: string,
+  domains: DomainLike[],
+  resolveByPhrase: (phrase: string, doms: never) => { id: string; label: string; connectorId: string; resource: string; opHints?: Record<string, unknown> } | null,
+): DomainLike | null {
+  const ref = (domainRef ?? '').trim();
+  if (!ref) return null;
+  // 1. Exact domain-id match (what the compiler emits) — stable + unambiguous.
+  const byId = domains.find((d) => d.id === ref);
+  if (byId) return byId;
+  // 2. Fall back to the label/alias rule engine (no-guess) for a human phrase / label form.
+  return (resolveByPhrase(ref, domains as never) as DomainLike | null) ?? null;
+}
+
 // ─── executeStep — run ONE step, return its StepResult ────────────────────────────────────────────
 // Pure-ish dispatch: it selects the handler by kind and calls the injected boundary. It never
 // advances run state itself — the caller (runApp / the durable workflow) folds the StepResult into
@@ -214,7 +270,7 @@ export async function executeStep(
   try {
     switch (step.kind) {
       case 'agent':
-        return await executeAgentStep(step, priorResults, ctx, deps);
+        return await executeAgentStep(spec, step, priorResults, ctx, deps);
       case 'connector-query':
         return await executeConnectorStep(step, ctx, deps);
       case 'guardrail':
@@ -238,23 +294,26 @@ export async function executeStep(
 }
 
 async function executeAgentStep(
+  spec: AppSpec,
   step: Extract<AppStep, { kind: 'agent' }>,
   priorResults: StepResult[],
   ctx: AppRunContext,
   deps: AppRunDeps,
 ): Promise<StepResult> {
-  if (!step.agentId) {
-    // Inline agents (no agentId) can't reuse runAgent (which resolves by id). Surfaced as a gap,
-    // never faked — the compiler/builder is expected to materialize an inline agent into a real
-    // customAgent id before run. See FINAL report "deferred".
-    return errorResult(
-      step,
-      'inline agent step has no agentId — materialize it into a customAgent before running (deferred)',
-    );
+  // GAP #113: an agent step with an inline def (systemPrompt/model/grounded/tools) but no agentId
+  // can't reuse runAgent (which resolves by id). Materialize the inline agent into a real
+  // customAgent on first run — idempotently (the id is cached back onto the step + persisted to the
+  // app so a re-run reuses it), then run it through runAgent normally.
+  let agentId = step.agentId;
+  if (!agentId) {
+    if (!step.inlineAgent?.systemPrompt?.trim()) {
+      return errorResult(step, 'agent step has neither an agentId nor a usable inlineAgent');
+    }
+    agentId = await deps.materializeAgent(spec, step, ctx.orgId);
   }
   const query = buildAgentQuery(step, priorResults);
-  const run = await deps.runAgent(step.agentId, query, ctx.actor, false, ctx.orgId);
-  if (!run) return errorResult(step, `unknown agent: ${step.agentId}`);
+  const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId);
+  if (!run) return errorResult(step, `unknown agent: ${agentId}`);
   if (run.status === 'denied' || run.status === 'blocked') {
     return {
       stepId: step.id,
@@ -271,7 +330,7 @@ async function executeAgentStep(
     output: run.answer,
     childRunId: run.id,
     refs: (run.citations ?? []).map((c, i) => ({ name: c.title || c.ref, position: i + 1 })),
-    detail: `agent ${step.agentId} → ${run.status}`,
+    detail: `agent ${agentId} → ${run.status}`,
   };
 }
 
@@ -281,11 +340,11 @@ async function executeConnectorStep(
   deps: AppRunDeps,
 ): Promise<StepResult> {
   // Resolve the step's declared domain against the org's domains. The step carries `domain` (id or
-  // label); we resolve it deterministically via the rule engine (no-guess) then fetch the bound
-  // connector and run the declared READ.
+  // label); we resolve it deterministically — BY ID FIRST (a compiled spec emits the domain id),
+  // then by LABEL/ALIAS via the rule engine (no-guess). See resolveDomainByIdOrLabel (GAP #106-a).
   const domains = await deps.listDomains(ctx.orgId);
   const { resolveDomain } = await import('@/lib/data-domains');
-  const resolved = resolveDomain(step.domain, domains as never) as DomainLike | null;
+  const resolved = resolveDomainByIdOrLabel(step.domain, domains, resolveDomain);
   if (!resolved) {
     return errorResult(step, `no data-domain binds "${step.domain}" (unbound — not guessed)`);
   }
