@@ -486,6 +486,7 @@ The `/backups` module is a full management surface (routes under `/api/v1/admin/
 - `co.getoffgridai.edge` — Caddy (`deploy/Caddyfile`). Restart: `sudo launchctl kickstart -k system/co.getoffgridai.edge`.
 - `co.getoffgridai.aggregator` — gateway aggregator (`scripts/gateway-aggregator.mjs`, holds `OFFGRID_GATEWAY_API_KEY` + upstream timeout). Restart: `sudo launchctl kickstart -k system/co.getoffgridai.aggregator`.
 - `co.getoffgridai.metrics` — metrics.
+- `co.getoffgridai.agent-worker` — durable agent-run worker (gui-domain LaunchAgent, `tsx scripts/temporal-worker.mts`; drains the `offgrid-agents` queue). Restart: `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker`. See § Durable agent-run worker below.
 - Console + cloudflared run as backgrounded processes (not launchd) — see DEPLOY.md.
 
 ### Durable agent-run worker (Temporal, task queue `offgrid-agents`)
@@ -496,17 +497,34 @@ existing `runAgent` pipeline (policy → guardrails → retrieval → LLM → gr
 persist), so a worker crash mid-run is retried/resumed, not lost. This is SEPARATE from the
 inference queue (`offgrid-inference`): this queue is `offgrid-agents`.
 
-- **To go live it needs a running worker process** (not yet launchd-managed): from the console dir,
-  `npm run worker:agents` (`tsx scripts/temporal-worker.mts`). It needs the same runtime env as the
-  console (`DATABASE_URL`, gateway creds, adapter config) — it loads `.env.local`.
-- **Enable dispatch** by setting `OFFGRID_QUEUE_ENABLED=1` (or `OFFGRID_ADAPTER_AGENTRUNTIME=temporal`)
-  in the console's `.env.local`. Without the flag OR without a reachable worker, the console
-  gracefully runs agent runs synchronously in-process (unchanged behaviour).
-- Env: `OFFGRID_TEMPORAL_ADDRESS` (default `offgrid-s1.local:7233` → use `127.0.0.1:7233` on S1),
+- **The worker loads its own env** (`scripts/worker-env.mts`, imported FIRST in
+  `scripts/temporal-worker.mts`): `@next/env` `loadEnvConfig` against the console root, resolved
+  ABSOLUTELY from the script path (not CWD). This runs as a module side effect BEFORE the activities
+  import evaluates `@/db` and builds its pg Pool — ESM evaluates all static imports in source order
+  before any top-level statement, so a dotenv *statement* would be too late (Pool already built
+  passwordless). **Bug fixed this session:** the worker was crashing every DB query with
+  `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string` because `DATABASE_URL` was
+  never loaded → the pg client fell back to the passwordless default. The worker now also fails fast
+  with a clear message if `DATABASE_URL` / `OFFGRID_GATEWAY_URL` / `OFFGRID_GATEWAY_API_KEY` are
+  missing (`missingRequiredEnv`), instead of dying deep in the pipeline.
+- **launchd-managed** (durable across reboots): gui-domain LaunchAgent
+  `co.getoffgridai.agent-worker` (RunAtLoad+KeepAlive), plist committed at
+  `deploy/onprem/co.getoffgridai.agent-worker.plist`. Install/verify/kickstart/uninstall steps are
+  in the plist header. Runs `/usr/local/bin/node <console>/node_modules/.bin/tsx
+  scripts/temporal-worker.mts` with `WorkingDirectory=/Users/admin/offgrid/console`; logs to
+  `/Users/admin/offgrid/console/agent-worker.log`.
+- **THE FLIP — enabling durable runs (do this AFTER the worker is up + "draining"):** set
+  `OFFGRID_QUEUE_ENABLED=1` (or `OFFGRID_ADAPTER_AGENTRUNTIME=temporal`) in the console's `.env.local`
+  and restart the console. Without the flag OR without a reachable worker, the console gracefully
+  runs agent runs synchronously in-process (unchanged, safe default). Order: bootstrap the worker →
+  confirm the log shows `ready — draining agent runs` → flip `OFFGRID_QUEUE_ENABLED=1` on the console.
+- Env the worker reads (from `.env.local`, plus the plist override): `OFFGRID_TEMPORAL_ADDRESS`
+  (default `offgrid-s1.local:7233`; the plist pins `127.0.0.1:7233` on S1),
   `OFFGRID_TEMPORAL_NAMESPACE=default`, `OFFGRID_AGENT_TASK_QUEUE=offgrid-agents`,
   `OFFGRID_AGENT_MAX_ATTEMPTS`, `OFFGRID_AGENT_AWAIT_MS`, `OFFGRID_AGENT_MAX_CONCURRENT`.
-- TODO: add a launchd job `co.getoffgridai.agent-worker` (RunAtLoad+KeepAlive) once validated, so the
-  drain survives reboots like the aggregator does.
+- **Still needs a live check on S1** (cannot be confirmed off-box): with Temporal + Postgres up,
+  bootstrap the plist, confirm the log reaches `ready — draining agent runs`, submit an agent run
+  with `OFFGRID_QUEUE_ENABLED=1`, and confirm it persists (no SASL error) end-to-end.
 
 ## Public file store (SeaweedFS, internet-exposed via the gateway)
 
