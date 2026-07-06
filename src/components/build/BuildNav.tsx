@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +36,8 @@ export function BuildNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border pb-3">
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
       {GROUPS.map((group, gi) => {
         const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
         if (tabs.length === 0) return null;
@@ -66,6 +68,7 @@ export function BuildNav() {
           </div>
         );
       })}
-    </nav>
+      </nav>
+    </SubNav>
   );
 }
