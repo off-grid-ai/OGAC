@@ -49,28 +49,33 @@ export default async function PolicyPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Engine
-            <Badge variant={status.reachable ? 'default' : 'destructive'}>
-              {status.reachable ? 'reachable' : 'unreachable'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1 text-sm text-muted-foreground">
-          <p>
-            Active engine: <span className="font-mono text-foreground">{status.engine}</span>
-          </p>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Engine
+              <Badge variant={status.reachable ? 'default' : 'destructive'}>
+                {status.reachable ? 'reachable' : 'unreachable'}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              Active engine: <span className="font-mono text-foreground">{status.engine}</span>
+            </p>
+            <p>
+              Policy adapters:{' '}
+              <span className="font-mono text-foreground">{status.policies.length}</span>
+            </p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Active policy set</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Active policy set</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Adapter</TableHead>
@@ -95,10 +100,11 @@ export default async function PolicyPage() {
                   <TableCell className="text-muted-foreground">{p.description}</TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
