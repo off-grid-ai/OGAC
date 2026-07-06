@@ -58,6 +58,20 @@ test('sidebarActiveIdFor: a secondary route highlights its group primary', () =>
   assert.equal(sidebarActiveIdFor('integrations'), 'data');
 });
 
+test('Workspace consolidation: projects/prompts/artifacts are chat sub-surfaces, not sidebar rows', () => {
+  // The founder brief: a project IS a chat context; Chat is the Workspace front door and
+  // Projects/Prompts/Artifacts are reached from its top-tabs, so they highlight the Chat row and
+  // never appear as their own sidebar entries.
+  for (const id of ['projects', 'prompts', 'artifacts'] as const) {
+    assert.equal(sidebarActiveIdFor(id), 'chat', `${id} should highlight the Chat row`);
+  }
+  const shown = new Set(sidebarSections(ALL).flatMap((s) => s.items.map((i) => i.id)));
+  assert.ok(shown.has('chat'), 'Chat must be a sidebar row');
+  for (const id of ['projects', 'prompts', 'artifacts'] as const) {
+    assert.ok(!shown.has(id), `${id} must not be a sidebar row`);
+  }
+});
+
 test('sidebarActiveIdFor: a primary maps to itself', () => {
   assert.equal(sidebarActiveIdFor('chat'), 'chat');
   assert.equal(sidebarActiveIdFor('overview'), 'overview');
