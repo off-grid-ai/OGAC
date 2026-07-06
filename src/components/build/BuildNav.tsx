@@ -48,6 +48,18 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
       { gate: 'studio', label: 'Reports', route: '/apps/reports' },
     ],
   },
+  {
+    // Test/QA surfaces for the apps you build: score behaviour against a golden set (Evals), poke a
+    // live model in a scratch prompt (Sandbox), and catch visual regressions (Visual QA / Provit).
+    // Each is a real route that was previously reachable ONLY by typing its URL — no nav linked to it
+    // (task #132). Surfaced here so the Build group owns its own secondaries and nothing is orphaned.
+    heading: 'Test',
+    tabs: [
+      { gate: 'evals', label: 'Evals', route: '/evals' },
+      { gate: 'sandbox', label: 'Sandbox', route: '/sandbox' },
+      { gate: 'provit', label: 'Visual QA', route: '/provit' },
+    ],
+  },
 ];
 
 // A per-app detail shell path — /apps/<id> or /apps/<id>/<tab> — where <id> is an app id (NOT one of
