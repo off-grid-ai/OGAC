@@ -14,7 +14,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/Pagination';
 import { buildSrcDoc, isLiveKind } from '@/lib/artifacts';
+import { usePagination } from '@/lib/use-pagination';
 import { accentHue, relativeTime } from '@/lib/workspace-grid';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
@@ -104,6 +106,10 @@ export function ArtifactsBrowser() {
     );
   }, [artifacts, q]);
 
+  // The library grows unbounded; paginate the (search-filtered) set client-side. URL-namespaced by
+  // `arts` so it deep-links alongside the ?artifact side-panel param.
+  const paged = usePagination(filtered, { key: 'arts', defaultPageSize: 12 });
+
   async function remove(id: string) {
     await fetch(`/api/v1/chat/artifacts/${id}`, { method: 'DELETE' });
     if (activeId === id) close();
@@ -178,15 +184,24 @@ export function ArtifactsBrowser() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((a) => (
-              <ArtifactCard
-                key={a.id}
-                a={a}
-                onOpen={() => open(a.id)}
-                onDelete={() => remove(a.id)}
-              />
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {paged.pageItems.map((a) => (
+                <ArtifactCard
+                  key={a.id}
+                  a={a}
+                  onOpen={() => open(a.id)}
+                  onDelete={() => remove(a.id)}
+                />
+              ))}
+            </div>
+            <Pagination
+              state={paged}
+              onPageChange={paged.setPage}
+              onPageSizeChange={paged.setPageSize}
+              pageSizeOptions={[12, 24, 48, 96]}
+              itemLabel="artifacts"
+            />
           </div>
         )}
       </div>

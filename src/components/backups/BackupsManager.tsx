@@ -24,7 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Pagination } from '@/components/ui/Pagination';
 import { formatAge, formatBytes } from '@/lib/backups-view';
+import { usePagination } from '@/lib/use-pagination';
 
 interface BackupRow {
   name: string;
@@ -244,6 +246,10 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
   const { config, latest, schedule } = data;
   const prunableCount = data.rows.filter((r) => r.timestampMs !== null && !r.withinRetention).length;
 
+  // Retention caps row count, but a long retention window can still accumulate many dumps —
+  // paginate the fetched rows client-side. URL-namespaced by `backups` for deep-linking.
+  const paged = usePagination(data.rows, { key: 'backups', defaultPageSize: 25 });
+
   const confirmDeleteName = confirm.value?.startsWith('delete:')
     ? confirm.value.slice('delete:'.length)
     : null;
@@ -424,7 +430,7 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((r) => (
+                  {paged.pageItems.map((r) => (
                     <tr key={r.name} className="border-b border-border/50 last:border-0">
                       <td className="py-2 pr-4 font-mono text-foreground">{r.name}</td>
                       <td className="py-2 pr-4 text-muted-foreground">{formatAge(r.ageMs)}</td>
@@ -468,6 +474,13 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                state={paged}
+                onPageChange={paged.setPage}
+                onPageSizeChange={paged.setPageSize}
+                itemLabel="backups"
+                className="mt-3"
+              />
             </div>
           )}
         </CardContent>
