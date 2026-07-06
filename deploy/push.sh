@@ -64,7 +64,12 @@ rsync -az --delete -e "ssh -i $SSH_KEY" \
 
 # ── 4. Install deps (only if package.json changed), build, restart ──
 say "Building on the server"
-$SSH "cd $REMOTE/console && $NODE node_modules/.bin/next build" 2>&1 | tail -8
+# ALWAYS clean .next first. Incremental builds leave STALE chunk hashes when routes/chunks change:
+# the manifest references chunk files that no longer exist on disk → the browser 400s on
+# /_next/static/chunks/* → ChunkLoadError / "Something went wrong here" on navigation. A clean build
+# regenerates a self-consistent manifest+chunks. (Cost: ~30s longer build; worth it — this trap has
+# broken prod twice.)
+$SSH "cd $REMOTE/console && rm -rf .next && $NODE node_modules/.bin/next build" 2>&1 | tail -8
 
 say "Restarting console (no pm2 — plain backgrounded next start)"
 $SSH "pkill -f 'next-server' 2>/dev/null; pkill -f 'next start' 2>/dev/null; sleep 2; \
