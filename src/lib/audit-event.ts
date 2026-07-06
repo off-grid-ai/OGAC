@@ -45,9 +45,17 @@ export type AuditAction =
   // access events
   | 'access.machine.issue'
   | 'access.machine.rotate'
+  | 'access.idp.create'
+  | 'access.idp.delete'
+  | 'access.federation.provision'
   // data actions
   | 'connector.sync'
-  | 'retrieval.query';
+  | 'retrieval.query'
+  // gateway fleet control — privileged, state-changing node mutations
+  | 'gateway.node.model'
+  | 'gateway.node.restart'
+  | 'gateway.node.enable'
+  | 'gateway.node.disable';
 
 export interface TokenUsage {
   prompt: number;
