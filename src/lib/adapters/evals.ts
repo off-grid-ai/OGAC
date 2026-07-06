@@ -20,6 +20,17 @@ const RAGAS_URL = process.env.OFFGRID_RAGAS_URL;
 const PROMPTFOO_BIN = process.env.OFFGRID_PROMPTFOO_BIN ?? 'promptfoo';
 const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
 
+// promptfoo's provider config REQUIRES a non-empty `apiKey` field to be valid, even when the
+// gateway is unauthenticated (a local dev box). When neither a broker JWT nor a legacy static key
+// is provisioned we therefore need SOME placeholder string — but it must not be a hard-coded key
+// baked into source (gap #30). Source it from env (`OFFGRID_EVAL_GATEWAY_API_KEY`, falling back to
+// `OFFGRID_GATEWAY_API_KEY`), and only if BOTH are unset use a self-describing, obviously-inert
+// literal that is NOT a real credential and carries no auth header — so an unconfigured eval never
+// fabricates a call with a bogus real-looking key; it degrades honestly. Operators who want the
+// promptfoo path to actually authenticate set one of the env vars (see SERVER_STATE).
+const EVAL_GATEWAY_PLACEHOLDER =
+  process.env.OFFGRID_EVAL_GATEWAY_API_KEY ?? process.env.OFFGRID_GATEWAY_API_KEY ?? 'unauthenticated-local-gateway';
+
 function iso(): string {
   return new Date().toISOString();
 }
@@ -38,21 +49,29 @@ export interface PromptfooProviderAuth {
   headers?: Record<string, string>;
 }
 
-export function providerAuthFromHeaders(headers: Record<string, string>): PromptfooProviderAuth {
+export function providerAuthFromHeaders(
+  headers: Record<string, string>,
+  // The placeholder used ONLY when neither a broker JWT nor a legacy static key is present — a
+  // config-time env value (never a hard-coded credential), injected so this function stays pure.
+  unauthenticatedPlaceholder: string,
+): PromptfooProviderAuth {
   const bearer = headers.authorization;
   if (bearer?.startsWith('Bearer ')) return { apiKey: bearer.slice('Bearer '.length) };
   if (headers['x-api-key']) return { apiKey: 'x-api-key', headers: { 'x-api-key': headers['x-api-key'] } };
-  // No broker cred and no legacy key: keep promptfoo happy with a placeholder key and send no auth,
-  // exactly as the old hard-coded `apiKey:'offgrid-local'` did against an unauthenticated local gateway.
-  return { apiKey: 'offgrid-local' };
+  // No broker cred and no legacy key: keep promptfoo's config valid with a placeholder key and send
+  // NO auth header — degrading honestly against an unauthenticated local gateway (the placeholder is
+  // env-sourced, not a baked-in key). If the gateway is actually authed, this scan simply won't pass
+  // auth — it does not fabricate a real-looking credential.
+  return { apiKey: unauthenticatedPlaceholder };
 }
 
 /** Resolve promptfoo's provider auth from the SAME shared rule (`chooseGatewayAuth`) as the gateway. */
 export function selectPromptfooAuth(
   cred: ServiceCredential,
   legacyApiKey: string | undefined,
+  unauthenticatedPlaceholder: string = EVAL_GATEWAY_PLACEHOLDER,
 ): PromptfooProviderAuth {
-  return providerAuthFromHeaders(chooseGatewayAuth(cred, legacyApiKey));
+  return providerAuthFromHeaders(chooseGatewayAuth(cred, legacyApiKey), unauthenticatedPlaceholder);
 }
 
 // ── golden (default) ────────────────────────────────────────────────────────
