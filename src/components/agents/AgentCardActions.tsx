@@ -1,9 +1,10 @@
 'use client';
 
-import { Play, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { PencilSimple, Play, Power, Trash } from '@phosphor-icons/react/dist/ssr';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,14 +108,45 @@ function RunTrace({ run }: { run: Run }) {
 }
 
 // Run an agent through the full governed pipeline and show the trace — proof that policy,
-// guardrails, retrieval/routing, grounding and provenance all fired in-path. Delete is offered
-// only for user-authored agents (the built-ins aren't stored).
-export function AgentCardActions({ agentId, custom }: { agentId: string; custom?: boolean }) {
+// guardrails, retrieval/routing, grounding and provenance all fired in-path. Edit / enable-disable
+// / delete are offered only for user-authored agents (the built-ins aren't stored). Edit opens the
+// URL-driven form panel (?panel=edit:<id>); enable/disable and delete hit the admin routes.
+export function AgentCardActions({
+  agentId,
+  custom,
+  enabled = true,
+}: {
+  agentId: string;
+  custom?: boolean;
+  enabled?: boolean;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
+
+  function edit() {
+    const qs = withPanelParams(params.toString(), { panel: `edit:${agentId}` });
+    router.replace(panelHref(pathname, qs), { scroll: false });
+  }
+
+  async function toggleEnabled() {
+    try {
+      const res = await fetch(`/api/v1/admin/agents/${agentId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (!res.ok) throw new Error('failed');
+      toast.success(enabled ? 'Agent disabled' : 'Agent enabled');
+      router.refresh();
+    } catch {
+      toast.error('Failed to update');
+    }
+  }
 
   async function execute() {
     if (!query.trim()) return;
@@ -181,15 +213,39 @@ export function AgentCardActions({ agentId, custom }: { agentId: string; custom?
       </Dialog>
 
       {custom ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={remove}
-          aria-label="Delete agent"
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash className="size-3.5" />
-        </Button>
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={edit}
+            aria-label="Edit agent"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <PencilSimple className="size-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={toggleEnabled}
+            aria-label={enabled ? 'Disable agent' : 'Enable agent'}
+            className={
+              enabled
+                ? 'text-primary hover:text-muted-foreground'
+                : 'text-muted-foreground hover:text-primary'
+            }
+          >
+            <Power className="size-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={remove}
+            aria-label="Delete agent"
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash className="size-3.5" />
+          </Button>
+        </>
       ) : null}
     </div>
   );

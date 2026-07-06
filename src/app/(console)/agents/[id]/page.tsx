@@ -2,6 +2,7 @@ import { ArrowLeft, Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
+import { AgentFormPanel } from '@/components/agents/AgentFormPanel';
 import { AgentRunner } from '@/components/agents/AgentRunner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,8 @@ import {
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
@@ -80,6 +83,25 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   if (!agent) notFound();
   const runs = await listAgentRunsByAgent(id, 8);
   const done = runs.filter((r) => r.status === 'done').length;
+  const tools = agent.custom
+    ? (await listTools(await currentOrgId()).catch(() => []))
+        .filter((t) => t.enabled)
+        .map((t) => ({ id: t.id, name: t.name, policy: t.policy }))
+    : [];
+  const editable = agent.custom
+    ? [
+        {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          systemPrompt: agent.systemPrompt,
+          model: agent.model,
+          grounded: agent.grounded,
+          trigger: agent.trigger,
+          tools: agent.tools,
+        },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -107,8 +129,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agent.description}</p>
           </div>
         </div>
-        <AgentCardActions agentId={agent.id} custom={agent.custom} />
+        <AgentCardActions agentId={agent.id} custom={agent.custom} enabled />
       </div>
+
+      {agent.custom ? <AgentFormPanel tools={tools} editable={editable} /> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="shadow-sm lg:col-span-2">
