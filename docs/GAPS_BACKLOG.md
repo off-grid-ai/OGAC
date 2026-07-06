@@ -275,3 +275,21 @@ coherent sidebar highlight; self-hosted Scalar closes the `/docs/api` air-gap ho
 merged surfaces — the Temporal Jobs surface offers rerun + cancel + terminate (the write actions
 that make sense for externally-owned Temporal executions; create is `runAgent`, delete is N/A for
 Temporal-managed history).
+
+## Live-review gaps (founder UX pass 2026-07-06) — discovered by the founder, not by our own verify
+
+These were caught by the founder clicking through the live console — a reminder that the merge gate
+MUST include live vision verification, not just build/typecheck/test. Logged for the gap agent.
+
+- **#36 (P1) — Access → Sessions shows "No active sessions" while the user IS logged in.**
+  *Where:* `src/components/access/SessionsPanel.tsx` + `src/lib/keycloak-realm.ts` (session lookup).
+  *Why:* the active-session query returns empty for `mac@wednesday.is` despite a live session — likely
+  wrong Keycloak endpoint (user-sessions vs client-sessions) or missing admin scope. Fix + verify a
+  live session renders (IP mDNS'd), and "Log out everywhere" works.
+- **#37 (P1) — Access → Federation: "Keycloak error: HTTP 403 Forbidden" listing identity providers.**
+  *Where:* `src/lib/keycloak-admin.ts` IdP calls. The console admin service-account lacks the
+  `realm-management` role (view/manage-identity-providers). Grant the role (record in SERVER_STATE)
+  and verify list + Add OIDC provider. Infra (Keycloak role) + code.
+- **PROCESS — merge gate drifted:** UI merges were build-gated but NOT vision-verified live, so the
+  founder found the layout/interaction issues instead of us. Reinstate: screenshot-verify every UI
+  merge before "done", and run the QA/platform-integration+docs sweep after every 3 merges.
