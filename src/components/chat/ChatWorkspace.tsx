@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
+import { toDisplayHost } from '@/lib/display-host';
 import { cn } from '@/lib/utils';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
@@ -1182,7 +1183,7 @@ export function ChatWorkspace({
             {gatewayError ? (
               <a
                 href="/gateway"
-                title={`AI Gateway unreachable at ${gatewayError.url} — set OFFGRID_GATEWAY_URL`}
+                title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — set OFFGRID_GATEWAY_URL`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >
                 <span>⚠ gateway offline</span>

@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { toDisplayHost } from '@/lib/display-host';
 
 // The fleet_nodes SSOT editor — the authoritative place to configure a node: which
 // model it serves (id + gguf + mmproj), its context size, role/kind, and whether it's
@@ -235,7 +236,7 @@ export function GatewayFleetConfig() {
                   {n.model}{n.contextSize ? ` · ${n.contextSize} ctx` : ''}
                 </span>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">{n.host}</span>
+                <span className="font-mono text-xs text-muted-foreground">{toDisplayHost(n.host)}</span>
               )}
               {!n.enabled && n.role !== 'server' ? <Badge variant="outline" className="text-[10px]">disabled</Badge> : null}
             </div>
