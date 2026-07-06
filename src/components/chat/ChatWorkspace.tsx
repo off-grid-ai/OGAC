@@ -6,8 +6,11 @@ import {
   CaretLeft,
   CaretRight,
   Check,
+  ClockCounterClockwise,
   Copy,
+  Cube,
   FileText,
+  FolderOpen,
   FolderSimplePlus,
   GearSix,
   Brain,
@@ -26,9 +29,11 @@ import {
   Sparkle,
   SpeakerHigh,
   Stop,
+  TextAlignLeft,
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -50,6 +55,7 @@ import {
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
 import { toDisplayHost } from '@/lib/display-host';
 import { cn } from '@/lib/utils';
+import { relativeTime } from '@/lib/workspace-grid';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
 import { MemoryDialog } from './MemoryDialog';
@@ -1156,6 +1162,31 @@ export function ChatWorkspace({
             {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}
           </div>
           <div className="flex items-center gap-2">
+            {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
+                from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
+            <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
+              <Link
+                href="/projects"
+                title="Projects"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <FolderOpen className="size-4" />
+              </Link>
+              <Link
+                href="/prompts"
+                title="Prompts library"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <TextAlignLeft className="size-4" />
+              </Link>
+              <Link
+                href="/artifacts"
+                title="Artifacts"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Cube className="size-4" />
+              </Link>
+            </div>
             <button
               onClick={toggleTemporary}
               className={cn(
@@ -1207,9 +1238,9 @@ export function ChatWorkspace({
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
+          <div className={cn('space-y-5 px-4 py-6', messages.length === 0 && !temporary && !activeStarters.length ? 'mx-auto max-w-5xl' : 'mx-auto max-w-3xl')}>
             {messages.length === 0 ? (
-              <div className="pt-24 text-center text-sm text-muted-foreground">
+              <div className="pt-16 text-center text-sm text-muted-foreground">
                 <p className="text-base text-foreground">
                   {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Your own private AI'}
                 </p>
@@ -1231,6 +1262,37 @@ export function ChatWorkspace({
                         {s}
                       </button>
                     ))}
+                  </div>
+                ) : null}
+                {/* Recent-chats grid — the new-chat landing surfaces recent conversations as
+                    scannable cards (grid, full width) instead of leaving the space empty. Not
+                    shown for temporary chats or skill starters. */}
+                {!temporary && !activeStarters.length && visibleConversations.length ? (
+                  <div className="mt-10 text-left">
+                    <div className="mb-3 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+                      <ClockCounterClockwise className="size-3.5" />
+                      {activeProject ? `Recent in ${activeProject.name}` : 'Recent chats'}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {visibleConversations.slice(0, 9).map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => openConversation(c.id)}
+                          className="group flex flex-col gap-2 rounded-lg border border-border bg-card p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+                        >
+                          <div className="flex items-start gap-2">
+                            <Sparkle className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                            <span className="line-clamp-2 flex-1 text-sm font-medium text-foreground">
+                              {c.title}
+                            </span>
+                          </div>
+                          <div className="mt-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <span className="truncate">{c.model}</span>
+                            {c.updatedAt ? <span>· {relativeTime(c.updatedAt)}</span> : null}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </div>

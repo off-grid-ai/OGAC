@@ -33,11 +33,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'workspace',
     label: 'Workspace',
-    // Chat is the front door; the everyday create/save surfaces sit beside it. Artifacts are
-    // reached from the chat flow (saved outputs), so they don't need their own sidebar row.
+    // Chat IS the Workspace front door — a project is just a chat context, so Projects no longer
+    // gets its own sidebar row; it's reached from Chat's project switcher and the Workspace top-tabs.
+    // Prompts (the library) and Artifacts (saved outputs) are workspace sub-surfaces, reached via
+    // the scoped WorkspaceNav top-tabs (see (workspace)/layout.tsx) rather than the sidebar — so the
+    // sidebar stays scannable. Knowledge + Storage remain first-class rows.
     // (Studio lives under Intelligence — it authors agents/workflows, not a chat surface.)
-    primary: ['chat', 'projects', 'prompts', 'knowledge', 'storage'],
-    secondary: ['artifacts'],
+    primary: ['chat', 'knowledge', 'storage'],
+    secondary: ['projects', 'prompts', 'artifacts'],
   },
   {
     id: 'intelligence',
