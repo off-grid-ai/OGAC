@@ -1,4 +1,5 @@
 import { Waveform } from '@phosphor-icons/react/dist/ssr';
+import { DriftCatalog } from '@/components/drift/DriftCatalog';
 import { StatBand } from '@/components/insights/StatBand';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getDrift } from '@/lib/adapters/registry';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { buildDriftStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -30,6 +32,15 @@ function fmtScore(score: number | null): string {
 export default async function DriftPage() {
   await requireModuleForUser('drift');
   const { data, error } = await readDriftView();
+
+  // Honest engine status for the catalog's per-item availability: Evidently is "ready" only when
+  // it's the ACTIVE drift adapter AND its collector URL is configured (embedUrl carries
+  // OFFGRID_EVIDENTLY_URL). Otherwise items degrade to the built-in PSI fallback.
+  const driftMeta = getDrift().meta;
+  const driftEngineStatus = {
+    evidentlySelected: driftMeta.id === 'evidently',
+    evidentlyConfigured: Boolean(driftMeta.embedUrl),
+  };
 
   return (
     <div className="space-y-6">
@@ -138,6 +149,22 @@ export default async function DriftPage() {
           </Card>
         </>
       )}
+
+      {/* Standard drift catalog (Evidently presets + per-column methods). Pick a test, set the
+          drift-share threshold, and run it through the same drift path — Evidently when configured,
+          the built-in PSI heuristic otherwise. */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Drift test catalog</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The standard Evidently presets and per-column stat tests — the common drift methods,
+            bundled so you don’t hand-configure them.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <DriftCatalog engineStatus={driftEngineStatus} />
+        </CardContent>
+      </Card>
 
       {/* Management: alert thresholds + baseline reset live here so an operator tunes drift where
           they observe it (the same console-owned settings surfaced on Observability). */}

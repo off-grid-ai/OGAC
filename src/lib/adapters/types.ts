@@ -207,9 +207,19 @@ export interface DriftReport {
   note?: string;
 }
 
+// Optional run config produced by the standard drift catalog (src/lib/drift-catalog.ts). A selected
+// Evidently preset / per-column method + drift-share threshold flows through analyze() to the
+// collector body; the first-party fallback honors `driftShareThreshold` when banding its PSI verdict.
+export interface DriftRunOptions {
+  preset?: string | null;
+  method?: string | null;
+  columnMethods?: Record<string, string>;
+  driftShareThreshold?: number;
+}
+
 export interface DriftPort {
   meta: AdapterMeta;
-  analyze(): Promise<DriftReport>;
+  analyze(options?: DriftRunOptions): Promise<DriftReport>;
   health(): Promise<boolean>;
 }
 
