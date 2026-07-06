@@ -1,4 +1,10 @@
-// PURE OpenBao secrets STATUS display-model builder — ZERO imports, ZERO I/O, fully unit-testable.
+import { toDisplayHost } from '@/lib/display-host';
+
+// PURE OpenBao secrets STATUS display-model builder — ZERO I/O, fully unit-testable.
+//
+// The only import (below) is the pure, zero-IO mDNS display-host mapper, used by the thin reader
+// so the OpenBao URL we render is never a raw loopback/LAN address. `buildSecretsView` itself takes
+// whatever string it is handed and stays pure — the reader is responsible for display-mapping first.
 //
 // This surface is STATUS/METADATA ONLY. It renders whether the secrets store is reachable, whether
 // it is sealed, its version, its mount paths (type + path), and which secrets adapter is active.
@@ -199,17 +205,21 @@ export async function readSecretsView(): Promise<{ data: SecretsView; error: str
     getJson(`${url}/v1/sys/mounts`, authHeaders),
   ]);
 
+  // Display-map the configured URL so no raw loopback/LAN address ever surfaces in the tile or the
+  // error banner. The server still connected to the real `url` above — this is display-only.
+  const displayUrl = toDisplayHost(url);
+
   const data = buildSecretsView({
     activeAdapterId,
     activeAdapterVendor,
     configured: true,
-    baoUrl: url,
+    baoUrl: displayUrl,
     mount,
     health: health as RawHealth | null,
     sealStatus: sealStatus as RawSealStatus | null,
     mounts: mounts as RawMounts | null,
   });
 
-  const error = data.reachable ? null : `OpenBao unreachable at ${url}`;
+  const error = data.reachable ? null : `OpenBao unreachable at ${displayUrl}`;
   return { data, error };
 }
