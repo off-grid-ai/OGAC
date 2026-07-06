@@ -63,6 +63,9 @@ export async function ensureOrgSchema(): Promise<void> {
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`);
+    // Wave-2 hardening: ingest jobs get a tenant scope, devices get a random data-plane secret.
+    await db.execute(sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`);
+    await db.execute(sql`ALTER TABLE devices ADD COLUMN IF NOT EXISTS token text;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS org_settings (
         id text PRIMARY KEY DEFAULT 'org', system_prompt text NOT NULL DEFAULT '',
@@ -234,6 +237,7 @@ export async function enrollDevice(
   name: string,
   os: DeviceOS,
 ): Promise<{ device: Device; deviceToken: string } | null> {
+  await ensureOrgSchema();
   const [rec] = await db
     .select()
     .from(enrollmentTokens)
@@ -263,6 +267,7 @@ export async function enrollDevice(
 // stored token). The data-plane routes pass this to the pure verifyDeviceToken(). Never surfaced to
 // the UI — devices are listed via toDevice() which omits the token.
 export async function getDeviceToken(id: string): Promise<string | null> {
+  await ensureOrgSchema();
   const [row] = await db
     .select({ token: devices.token })
     .from(devices)
@@ -694,6 +699,7 @@ export async function deleteConnector(id: string): Promise<void> {
 }
 
 export async function syncConnector(id: string): Promise<IngestJob | null> {
+  await ensureOrgSchema();
   const [con] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
   if (!con) return null;
   // Real count from the source; null (unreachable/non-DB) records 0 and marks the connector
@@ -732,6 +738,7 @@ export async function listIngestJobs(
   orgId: string = DEFAULT_ORG,
   limit = 20,
 ): Promise<IngestJob[]> {
+  await ensureOrgSchema();
   const rows = await db
     .select()
     .from(ingestJobs)
