@@ -425,3 +425,57 @@ already surfaces — not hidden defects. Ordered by impact.
   scope` and falls back to plain Presidio analyze. Non-fatal (degrades), but org-scoped custom PII
   recognizers/thresholds won't apply on the durable path. Fix: pass org context into the guardrail
   adapter explicitly (don't rely on `headers()`) so worker + request paths behave identically.
+
+## Hardening audit (2026-07-06)
+
+Full report: `docs/HARDENING_AUDIT.md`. 20 findings (3 P0, 8 P1, 9 P2). Ranked; fix P0 first.
+
+**P0 — live vulns / secret leak**
+- **#122 (P0) — Unauthenticated vector-DB inspector = SSRF + data read.** `src/app/api/v1/vectordb/route.ts:32`
+  `POST` has NO auth gate; body supplies `url` + `apiKey` and the handler connects and returns
+  `collections`/`sample` (raw payload previews). Unauthenticated read of the on-prem Qdrant (env
+  defaults when body omits creds) AND an SSRF primitive. Fix: `requireAdmin` + restrict `url` to an
+  allowlist (or drop body `url`, env only). **Single most urgent item.**
+- **#123 (P0) — Unauthenticated audit-event injection.** `src/app/api/v1/devices/[id]/audit/route.ts:7`
+  `POST` accepts audit events for any device id with no auth (only `getDevice` existence). Forged
+  records poison the tamper-evidence store. Fix: verify the device token (`dt_<id>` from enroll)
+  before `appendAudit`. (Broader: the whole `/devices/[id]/*` data-plane is unauthenticated — P1
+  systemic — introduce a device-token verifier.)
+- **#124 (P0) — Live Keycloak client secret retrievable via GET, un-audited.**
+  `src/app/api/v1/admin/access/clients/[id]/secret/route.ts:19` GET returns the raw client secret on
+  demand (not a one-time create reveal) and does not audit the read. Fix: remove the GET (reveal only
+  on create/rotate), or step-up + audit each reveal.
+
+**P1 — real holes**
+- **#125 (P1) — Privileged mutations with NO audit event** (accountability gap; all are admin-gated).
+  The canonical taxonomy already has the actions; these routes just don't emit: KC password reset
+  (`access/users/[id]/password:21`), KC user create/update/delete (`access/users/route.ts:52`,
+  `[id]:29,48`), machine-credential provision/rotate into OpenBao (`access/service-clients/provision:30`),
+  KC client delete + role create/delete (`access/clients/[id]:24`, `access/roles/route.ts:22`,
+  `roles/[name]:7`), device kill-switch (`devices/[id]/kill:10`), GDPR erasure (`erasure:15`), OPA
+  policy push (`policy/push:12`). Fix: `auditFromSession(gate, org, {...})` mirroring
+  `connectors/route.ts:39`.
+- **#126 (P1) — `listIngestJobs` not org-scoped.** `src/lib/store.ts:704` returns all ingest jobs
+  globally (no `orgId` column on the table). Callers `data/page.tsx:46`, `integrations/page.tsx:43`,
+  `admin/ingest-jobs/route.ts:8` leak cross-org ingest metadata. Fix: add `orgId` (backfill from the
+  connector), filter, pass `currentOrgId()`.
+- **#127 (P1) — `createMaskingRule` drops `orgId`.** `src/lib/store.ts:721` insert omits `orgId` →
+  defaults to `'default'`, while `listMaskingRules(orgId)` filters by org. A non-default org creates a
+  rule it can never see, silently landing in `default`. Fix: `createMaskingRule(orgId, kind, action)`
+  + pass `currentOrgId()` from `masking-rules/route.ts:27`.
+
+**P2 — robustness / weaknesses** (see report for the full table)
+- **#128 (P2) — Unguarded RSC DB calls crash a whole page** (an `error.tsx` boundary catches it, but
+  no partial degradation): `lineage/page.tsx:23` (`listAgentRuns`), `agents/[id]/page.tsx:84` +
+  `agents/[id]/runs/page.tsx:31` (`listAgentRunsByAgent`). Fix: `.catch(() => [])` (the same file
+  already does this for `listTools`).
+- **#129 (P2) — Route DB calls with no try/catch → opaque 500 instead of `{error}` 503:**
+  guardrails `recognizers/route.ts:13,22`, `recognizers/[id]:23,31,40`, `thresholds:14,21`;
+  observability `thresholds/route.ts:11,18`, `[id]:13,22`; provit `repos`/`runs` `db.insert`.
+- **#130 (P2) — Input-validation gaps:** `vectordb` url allowlist (SSRF, ties to #122); password no
+  length/complexity check (`access/users/[id]/password:16`); `body.modules` capabilities unvalidated
+  (`access/clients/route.ts:73`); `gateway/tokens/route.ts:72` `req.json()` missing `.catch`.
+- **#131 (P2) — Fleet/tenant/org-settings/backup-prune mutations un-audited** (see report Dim 2 table).
+- **#132 (P2) — `data/page.tsx:219` passes raw `127.0.0.1` `urlHint` across the server→client
+  boundary** (currently safe — `VectorDBInspector` maps it via `toDisplayHost` before render — but
+  wrap server-side for defense in depth).
