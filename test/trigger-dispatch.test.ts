@@ -170,3 +170,44 @@ test('whatsappConfigFromEnv: accepts an on-prem http(s) gateway, strips trailing
 test('whatsappConfigFromEnv: rejects a non-URL', () => {
   assert.equal(whatsappConfigFromEnv({ OFFGRID_WHATSAPP_URL: 'not a url' } as NodeJS.ProcessEnv).ok, false);
 });
+
+// ─── adapter-level pure routing/parse helpers ─────────────────────────────────────────────────────
+test('email appSlugForMessage: plus-addressing and subject tag', async () => {
+  const { appSlugForMessage } = await import('@/lib/adapters/triggers/email-imap');
+  assert.equal(appSlugForMessage({ to: 'bot+my-app@corp.internal' }), 'my-app');
+  assert.equal(appSlugForMessage({ subject: 'hello [app:triage] there' }), 'triage');
+  assert.equal(appSlugForMessage({ to: 'bot@corp', subject: 'no tag' }), null);
+});
+
+test('email parseFetched: pulls headers + body from a raw FETCH dump', async () => {
+  const { parseFetched } = await import('@/lib/adapters/triggers/email-imap');
+  const raw = [
+    'From: alice@corp.internal',
+    'To: bot+triage@corp.internal',
+    'Subject: Need help',
+    'Message-Id: <42@corp>',
+    '',
+    'This is the body text.',
+    ')',
+  ].join('\r\n');
+  const msg = parseFetched(raw);
+  assert.equal(msg.from, 'alice@corp.internal');
+  assert.equal(msg.subject, 'Need help');
+  assert.equal(msg.messageId, '<42@corp>');
+  assert.match(msg.text ?? '', /This is the body text\./);
+});
+
+test('whatsapp appSlugForWhatsApp: explicit app field and #slug tag', async () => {
+  const { appSlugForWhatsApp } = await import('@/lib/adapters/triggers/whatsapp-onprem');
+  assert.equal(appSlugForWhatsApp({ app: 'My-App' }), 'my-app');
+  assert.equal(appSlugForWhatsApp({ text: '#triage please look' }), 'triage');
+  assert.equal(appSlugForWhatsApp({ text: 'no tag here' }), null);
+});
+
+test('whatsappTriggerStatus: coming-soon by default, available with gateway', async () => {
+  const { whatsappTriggerStatus } = await import('@/lib/adapters/triggers/whatsapp-onprem');
+  assert.equal(whatsappTriggerStatus({}).comingSoon, true);
+  const s = whatsappTriggerStatus({ OFFGRID_WHATSAPP_URL: 'https://wa.internal.corp' } as NodeJS.ProcessEnv);
+  assert.equal(s.available, true);
+  assert.equal(s.gateway, 'https://wa.internal.corp');
+});
