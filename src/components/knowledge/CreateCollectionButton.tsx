@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetFooter,
@@ -86,7 +87,7 @@ export function CreateCollectionButton() {
               A curated, permission-aware corpus. Leave roles blank to allow everyone.
             </SheetDescription>
           </SheetHeader>
-          <div className="space-y-3">
+          <SheetBody className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="kc-name">Name</Label>
               <Input id="kc-name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -108,7 +109,7 @@ export function CreateCollectionButton() {
                 onChange={(e) => setRoles(e.target.value)}
               />
             </div>
-          </div>
+          </SheetBody>
           <SheetFooter>
             <Button onClick={create} disabled={busy || !name.trim()}>
               {busy ? 'Creating…' : 'Create'}
