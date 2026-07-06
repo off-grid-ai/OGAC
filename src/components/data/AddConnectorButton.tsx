@@ -5,13 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,12 +71,17 @@ export function AddConnectorButton() {
         <Plus className="size-4" />
         Add connector
       </Button>
-      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Add a connector</SheetTitle>
-            <SheetDescription>Connect a database, warehouse, or SaaS source.</SheetDescription>
-          </SheetHeader>
+      <FormSheet
+        open={open}
+        onOpenChange={(o) => !o && setPanel(null)}
+        title="Add a connector"
+        description="Connect a database, warehouse, or SaaS source."
+        footer={
+          <Button onClick={create} disabled={busy} className="w-full">
+            {busy ? 'Adding…' : 'Add connector'}
+          </Button>
+        }
+      >
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="con-name">Name</Label>
@@ -111,12 +110,8 @@ export function AddConnectorButton() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <Button onClick={create} disabled={busy} className="w-full">
-              {busy ? 'Adding…' : 'Add connector'}
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+      </FormSheet>
     </>
   );
 }

@@ -20,13 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -169,12 +163,17 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
       </DropdownMenu>
 
       {/* Edit panel — URL-driven side panel (?panel=edit-connector&id=<id>) */}
-      <Sheet open={editOpen} onOpenChange={(o) => !o && setEditPanel(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Edit connector</SheetTitle>
-            <SheetDescription>Update how this connector reaches its source.</SheetDescription>
-          </SheetHeader>
+      <FormSheet
+        open={editOpen}
+        onOpenChange={(o) => !o && setEditPanel(null)}
+        title="Edit connector"
+        description="Update how this connector reaches its source."
+        footer={
+          <Button onClick={save} disabled={busy} className="w-full">
+            Save changes
+          </Button>
+        }
+      >
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-name">Name</Label>
@@ -211,12 +210,8 @@ export function ConnectorRowActions({ connector }: { connector: ConnectorLite })
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
-            <Button onClick={save} disabled={busy} className="w-full">
-              Save changes
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+      </FormSheet>
 
       {/* Delete confirm — stays a confirmation modal per the NO-MODALS delete carve-out */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>

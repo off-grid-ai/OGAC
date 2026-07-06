@@ -5,13 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
@@ -69,14 +63,17 @@ export function EnrollDeviceButton() {
         <Plus className="size-4" />
         Enroll device
       </Button>
-      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Enroll a device</SheetTitle>
-            <SheetDescription>
-              Issue a one-time token for a role. A node uses it once to register itself.
-            </SheetDescription>
-          </SheetHeader>
+      <FormSheet
+        open={open}
+        onOpenChange={(o) => !o && setPanel(null)}
+        title="Enroll a device"
+        description="Issue a one-time token for a role. A node uses it once to register itself."
+        footer={
+          <Button onClick={issue} disabled={loading} className="w-full">
+            {loading ? 'Issuing…' : 'Issue token'}
+          </Button>
+        }
+      >
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="role">Role</Label>
@@ -103,12 +100,8 @@ export function EnrollDeviceButton() {
                 </div>
               </div>
             ) : null}
-            <Button onClick={issue} disabled={loading} className="w-full">
-              {loading ? 'Issuing…' : 'Issue token'}
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+      </FormSheet>
     </>
   );
 }
