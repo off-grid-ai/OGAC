@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import {
   NAV_GROUPS,
@@ -8,6 +10,20 @@ import {
   sidebarSections,
 } from '../src/modules/groups.ts';
 import { MODULES, type ModuleId } from '../src/modules/registry.ts';
+
+// Read a scoped nav component's source and pull out every module id it gates a tab on. The nav
+// components are 'use client' React files (they import next/link, etc.), so we can't import them in
+// a node test — but their tab tables are literal `gate: 'x'` / `id: 'x'` fields, so scraping the
+// source is a faithful check that a real tab links to each id. Keeps this test honest against the
+// ACTUAL navs instead of a hand-maintained mirror that can drift.
+function navTabIds(relPath: string): Set<ModuleId> {
+  const src = readFileSync(fileURLToPath(new URL(`../${relPath}`, import.meta.url)), 'utf8');
+  const ids = new Set<ModuleId>();
+  for (const m of src.matchAll(/\b(?:gate|id):\s*'([a-z0-9-]+)'/g)) {
+    ids.add(m[1] as ModuleId);
+  }
+  return ids;
+}
 
 // Unit tests for the pure sidebar-grouping logic — no React, no router, no I/O. This is the
 // decision that keeps the sidebar at ~20 scannable rows (primaries only) while every module still
@@ -139,6 +155,62 @@ test('groupModules preserves the existing behavior (full membership + More fallb
   const gov = sections.find((s) => s.label === 'Governance');
   assert.deepEqual(home?.items, [{ id: 'overview' }]);
   assert.deepEqual(gov?.items, [{ id: 'policy' }]); // secondary still grouped under its section
+});
+
+test('every secondary module id is REACHABLE — a scoped-nav tab links it, or it is a documented exception (task #132)', () => {
+  // A secondary keeps its route (nothing 404s) but is hidden from the sidebar — so the ONLY way to
+  // it is a tab in its group's scoped in-page nav. A secondary with no tab is URL-only / orphaned:
+  // the founder couldn't find Evals for exactly this reason. This test locks the invariant so it
+  // can't regress: for each group, every secondary either has a tab in the matching nav component,
+  // or is listed as an intentional exception below (reached from a DIFFERENT surface, by design).
+
+  // group id → the scoped nav that renders that group's secondary tabs.
+  const NAV_BY_GROUP: Record<string, string> = {
+    build: 'src/components/build/BuildNav.tsx',
+    data: 'src/components/data/DataNav.tsx',
+    insights: 'src/components/insights/InsightsNav.tsx',
+    governance: 'src/components/governance/GovernanceNav.tsx',
+  };
+
+  // Secondaries deliberately reached somewhere OTHER than their group's scoped nav. Each is a design
+  // decision, not an oversight — documented here so an intentional exception never looks like a gap.
+  const EXCEPTIONS: Partial<Record<ModuleId, string>> = {
+    // Workspace group has no scoped-nav file in this test's scope; these are Chat sub-surfaces
+    // reached from WorkspaceNav's top-tabs / the chat project switcher (see (workspace)/layout.tsx).
+    projects: 'reached from WorkspaceNav / chat project switcher',
+    prompts: 'reached from WorkspaceNav top-tabs',
+    artifacts: 'reached from WorkspaceNav top-tabs',
+    // "agent and studio should become one" — the Studio tab IS the agents home (an agent is a
+    // 1-step app); the /agents roster route still resolves and highlights the Studio row.
+    agents: 'subsumed into the Studio tab (ONE build front door)',
+    // The old standalone tool-catalog route now redirects into Tools→Catalog (the Tools tab).
+    'tool-catalog': 'redirects into the Tools tab (#121)',
+    // The Caddy edge is an internal detail of the published surface, reached under Services.
+    edge: 'reached under Services',
+  };
+
+  const orphans: string[] = [];
+  for (const g of NAV_GROUPS) {
+    const secondaries = g.secondary ?? [];
+    if (secondaries.length === 0) continue;
+    const navPath = NAV_BY_GROUP[g.id];
+    const tabIds = navPath ? navTabIds(navPath) : new Set<ModuleId>();
+    for (const id of secondaries) {
+      if (tabIds.has(id)) continue; // a real tab links it
+      if (id in EXCEPTIONS) continue; // documented, reached elsewhere by design
+      orphans.push(`${g.id} → ${id}`);
+    }
+  }
+  assert.deepEqual(orphans, [], `orphaned secondaries (no tab, no documented exception): ${orphans.join(', ')}`);
+});
+
+test('Build Test tab: evals/sandbox/provit are reachable via BuildNav (the #132 headline fix)', () => {
+  // Evals was a real page listed as a Build secondary but linked by no nav — URL-only. It now has a
+  // tab, alongside Sandbox and Visual QA (provit), which were orphaned the same way.
+  const buildTabs = navTabIds('src/components/build/BuildNav.tsx');
+  for (const id of ['evals', 'sandbox', 'provit'] as const) {
+    assert.ok(buildTabs.has(id), `${id} must have a tab in BuildNav`);
+  }
 });
 
 test('unclaimed module falls into "More" for both views', () => {
