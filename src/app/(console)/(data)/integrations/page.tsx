@@ -1,6 +1,7 @@
 import { AdapterCatalog } from '@/components/integrations/AdapterCatalog';
 import { AddConnectorButton } from '@/components/integrations/AddConnectorButton';
 import { CachePanel } from '@/components/integrations/CachePanel';
+import { ConnectorCatalog } from '@/components/integrations/ConnectorCatalog';
 import { ConnectorCard } from '@/components/integrations/ConnectorCard';
 import { GatewayIntegrations } from '@/components/integrations/GatewayIntegrations';
 import { ToolPolicySelect } from '@/components/integrations/ToolPolicySelect';
@@ -49,6 +50,10 @@ export default async function IntegrationsPage() {
         one environment variable, no code change. This is the single place to see what&apos;s wired,
         whether it&apos;s reachable, and what you can swap it for.
       </p>
+
+      {/* Catalog: browse a curated list of connector types + one-click add. Feeds the directory
+          below and the data-domains rule engine. */}
+      <ConnectorCatalog />
 
       {/* Connector directory — a card grid, not a flat list. Density scales with width:
           2-up on tablets, 3-up on lg, 4-up on xl. Each card keeps the full row actions. */}
