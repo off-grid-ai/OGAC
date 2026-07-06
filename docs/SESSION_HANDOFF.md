@@ -1,8 +1,26 @@
-# Session handoff — console UX pass (live as of 2026-07-06)
+# Session handoff — console UX pass + BUILDER EPIC (live as of 2026-07-06)
 
 Read this first if you're a fresh session continuing the console work. The git log is the source of
 truth for code; this file captures the **state that isn't in code**: the live task queue, in-flight
 agents, the deploy workaround, and the operating cadence.
+
+## Git trunk (IMPORTANT)
+Work is on **`main`**, pushed to `origin` (github.com/off-grid-ai/console). Commit small + meaningful
+(one per feature) and **push `main` after each merge** — the founder wants this. NOTE: git works
+LOCALLY (only the on-prem SERVERS have broken git — deploys are rsync, never git). Earlier this
+session ~19 commits drifted onto a `task-89-*` feature branch while `main` sat stale; reconciled by
+fast-forwarding main + pushing. Stay on `main`; don't let a worktree checkout strand HEAD on a branch.
+
+## THE BUILDER EPIC (the founder's current priority — #101-108)
+Studio + Agents unify into ONE governed builder where a non-technical dept head describes a
+multi-step business process in plain language (canonical: reimbursement approval — read invoice →
+check quota → check eligibility → approve) and gets a RUNNING, GOVERNED app. It inherits org
+connectors/data-sources/tools/guardrails/policy/Brain; connectors act as a SEMANTIC RULE ENGINE
+(declared data→source map: "customer data → Salesforce", "transactions → Postgres"); real input
+triggers (email/WhatsApp/reports/webhook/schedule); human-in-the-loop + input forms + reports; the
+React-node canvas must actually work. **The architecture + phased disjoint-agent decomposition is
+being written to `docs/BUILDER_EPIC_PLAN.md`** — read it before launching epic agents (execute phase
+by phase, ~3 disjoint agents at a time; foundation model + connector rule engine BEFORE surface).
 
 ## How to deploy RIGHT NOW (LAN is down — use the tunnel)
 
