@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { readEvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -42,11 +43,15 @@ export default async function EvalsPage({
         <div>
           <h1 className="text-lg font-semibold text-foreground">Evals</h1>
           <p className="text-sm text-muted-foreground">
-            Golden sets and quality gates — pass-rates per suite (Promptfoo / Ragas / DeepEval /
-            golden), scored offline against the gateway. {view.goldenCases} golden case(s).
+            Apply a prebuilt evaluator (bias, toxicity, hallucination, PII, and more), build a golden
+            set, and run it — scored offline against the gateway with per-metric results.{' '}
+            {view.goldenCases} golden case(s).
           </p>
         </div>
       </div>
+
+      {/* HEADLINE: prebuilt evaluator templates + your saved evals (apply → run → per-metric). */}
+      <EvalsWorkbench />
 
       {/* Aggregate quality gate. */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
