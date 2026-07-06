@@ -50,11 +50,11 @@ export async function POST(req: Request): Promise<Response> {
     const verdicts = Array.isArray(b.verdicts) ? b.verdicts : [];
     for (let i = 0; i < verdicts.length; i++) {
       const v = verdicts[i];
-      const row = { id: `${b.id}:${i}`, runId: b.id, idx: i, frameRange: v.range ?? null, bad: !!v.bad, note: v.note ?? null };
+      const row = { id: `${run.id}:${i}`, runId: run.id, idx: i, frameRange: v.range ?? null, bad: !!v.bad, note: v.note ?? null };
       await db.insert(provitVerdicts).values(row).onConflictDoUpdate({
         target: provitVerdicts.id, set: { frameRange: row.frameRange, bad: row.bad, note: row.note },
       });
     }
-    return NextResponse.json({ ok: true, id: b.id, verdicts: verdicts.length, scope: who.visibility });
+    return NextResponse.json({ ok: true, id: run.id, verdicts: verdicts.length, scope: who.visibility });
   });
 }
