@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { ClipboardText, DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import { AuditFilterBar } from '@/components/audit/AuditFilterBar';
+import { StatBand } from '@/components/insights/StatBand';
 import { readAuditPage } from '@/lib/audit-log-reader';
 import {
   auditFiltersToQuery,
   parseAuditFilters,
   type AuditOutcome,
 } from '@/lib/audit-log-view';
+import { buildAuditStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -73,6 +75,16 @@ export default async function AuditLogPage({
           Could not reach the audit index: {error}
         </p>
       )}
+
+      {/* Value-forward summary band — total matches + distinct actors/actions/projects in view. */}
+      <StatBand
+        stats={buildAuditStats({
+          total,
+          distinctActors: facets.actors.length,
+          distinctActions: facets.actions.length,
+          distinctProjects: facets.projects.length,
+        })}
+      />
 
       <AuditFilterBar
         actors={facets.actors}
