@@ -13,16 +13,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { DatasetRow, PromptRow, SessionRow } from '@/lib/langfuse';
+import {
+  DEFAULT_REGISTRY_TAB,
+  type RegistryTab,
+  REGISTRY_TABS,
+  resolveRegistryTab,
+} from '@/lib/langfuse-registry';
 
-// Which Langfuse registry sub-view is showing. URL-driven via ?lfReg so the position is deep-linkable
-// and Back-coherent (nav-in-URL, not client state). Defaults to prompts.
-const TABS = ['prompts', 'datasets', 'sessions'] as const;
-export type RegistryTab = (typeof TABS)[number];
-export const DEFAULT_REGISTRY_TAB: RegistryTab = 'prompts';
-
-export function resolveRegistryTab(raw: string | undefined): RegistryTab {
-  return TABS.includes(raw as RegistryTab) ? (raw as RegistryTab) : DEFAULT_REGISTRY_TAB;
-}
+// Tab types/helpers now live in the server-safe @/lib/langfuse-registry so the server page can import
+// resolveRegistryTab without crossing the RSC boundary. Re-exported for existing importers.
+export { DEFAULT_REGISTRY_TAB, type RegistryTab, resolveRegistryTab };
+const TABS = REGISTRY_TABS;
 
 function fmtTs(ts: string): string {
   if (!ts) return '—';
