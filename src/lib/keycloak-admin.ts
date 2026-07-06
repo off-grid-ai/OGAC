@@ -84,6 +84,13 @@ async function parseKcError(res: Response): Promise<Error> {
   if (res.status === 409) {
     return new KeycloakError('Already exists — pick a different ID (that one is taken).', 409);
   }
+  // 403 = the console's admin service-account is authenticated but LACKS the realm-management role
+  // for this operation. Keycloak's 403 body is empty, so a bare "HTTP 403 Forbidden" leaks up (GAP
+  // #37). Carry the status; routes turn it into an operation-specific, actionable message via
+  // forbiddenGrantMessage() in keycloak-realm.ts.
+  if (res.status === 403) {
+    return new KeycloakError('Forbidden — the console admin account is missing a Keycloak role.', 403);
+  }
   try {
     const body = (await res.json()) as { error?: string; error_description?: string; errorMessage?: string };
     return new KeycloakError(
@@ -353,9 +360,30 @@ export class KeycloakAdminClient {
   // Additive — realm-level operational admin. Raw Keycloak JSON is shaped by the pure
   // helpers in keycloak-realm.ts; these methods only do I/O.
 
-  // List a single user's active sessions. GET /users/{id}/sessions returns UserSessionRepresentation[].
+  // List a single user's active (online, browser-SSO) sessions.
+  // GET /users/{id}/sessions returns UserSessionRepresentation[].
   async listUserSessions(userId: string): Promise<unknown[]> {
     return this.fetchJson<unknown[]>(`/users/${userId}/sessions`);
+  }
+
+  // List a user's OFFLINE sessions (refresh-token-backed) across the given internal client ids.
+  // Keycloak exposes offline sessions only per-client (GET /users/{id}/offline-sessions/{clientId}),
+  // so the caller supplies which clients to check — normally the realm's standard-flow clients, of
+  // which there are only a handful. Best-effort: a client with no offline session (or a transient
+  // per-client error) contributes nothing; results are flattened. Used alongside the online list so
+  // a logged-in operator still renders when the short-lived online session has been reaped by the
+  // idle timeout (see mergeUserSessions in keycloak-realm.ts, GAP #36).
+  async listUserOfflineSessions(userId: string, internalClientIds: string[]): Promise<unknown[]> {
+    const out: unknown[] = [];
+    for (const cid of internalClientIds) {
+      try {
+        const rows = await this.fetchJson<unknown[]>(`/users/${userId}/offline-sessions/${cid}`);
+        if (Array.isArray(rows)) out.push(...rows);
+      } catch {
+        // A single client's offline-session lookup failing must not sink the whole listing.
+      }
+    }
+    return out;
   }
 
   // List active sessions for a client (realm-wide sessions are only exposed per-client in Keycloak's
