@@ -1,5 +1,11 @@
 import { listEvalRuns } from '@/lib/evals';
-import type { DriftMetric, DriftPort, DriftReport, DriftStatus } from './types';
+import type {
+  DriftMetric,
+  DriftPort,
+  DriftReport,
+  DriftRunOptions,
+  DriftStatus,
+} from './types';
 
 // Drift / degradation detection. The signal is the eval-score history: we split it into a baseline
 // window (older runs) and a current window (recent runs) and ask two questions — has the score
@@ -56,7 +62,22 @@ function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0;
 }
 
-function analyzeFirstParty(scores: number[]): DriftReport {
+// When a drift-share threshold is supplied (from the standard drift catalog), band the OVERALL
+// verdict by the share of drifted metrics against that threshold — mirroring Evidently's dataset
+// drift = share-of-drifted-columns rule. The per-metric statuses (PSI, mean-delta) are unchanged;
+// only the roll-up verdict responds to the operator's chosen threshold.
+function overallStatus(metrics: DriftMetric[], driftShareThreshold?: number): DriftStatus {
+  const stat = metrics.reduce<DriftStatus>((acc, m) => worst(acc, m.status), 'stable');
+  if (driftShareThreshold === undefined || metrics.length === 0) return stat;
+  const share = metrics.filter((m) => m.status === 'drift').length / metrics.length;
+  const t = Math.min(1, Math.max(0, driftShareThreshold));
+  if (t === 0) return share > 0 ? 'drift' : stat;
+  if (share >= t) return 'drift';
+  if (share >= t / 2) return worst('warning', stat);
+  return stat;
+}
+
+function analyzeFirstParty(scores: number[], options?: DriftRunOptions): DriftReport {
   if (scores.length < 4) {
     return {
       engine: 'native',
@@ -77,16 +98,20 @@ function analyzeFirstParty(scores: number[]): DriftReport {
     { name: 'score_psi', value: psiValue, status: statusFromPsi(psiValue) },
     { name: 'mean_delta', value: delta, status: statusFromDelta(delta) },
   ];
+  const selected = options?.preset ?? options?.method;
   return {
     engine: 'native',
-    status: metrics.reduce<DriftStatus>((acc, m) => worst(acc, m.status), 'stable'),
+    status: overallStatus(metrics, options?.driftShareThreshold),
     metrics,
     baseline: baseline.length,
     current: current.length,
     note:
-      delta < 0
+      (selected
+        ? `Evidently not configured — ran the built-in PSI heuristic for "${selected}". `
+        : '') +
+      (delta < 0
         ? `Mean eval score down ${Math.abs(delta)} pts vs the prior window.`
-        : 'No degradation detected in the eval-score history.',
+        : 'No degradation detected in the eval-score history.'),
   };
 }
 
@@ -105,8 +130,8 @@ export const nativeDrift: DriftPort = {
     description:
       'Population Stability Index + mean-degradation over the eval-score history (always on).',
   },
-  async analyze() {
-    return analyzeFirstParty(await scoreHistory());
+  async analyze(options?: DriftRunOptions) {
+    return analyzeFirstParty(await scoreHistory(), options);
   },
   health: () => Promise.resolve(true),
 };
@@ -130,30 +155,61 @@ export const evidentlyDrift: DriftPort = {
     description:
       'Data / embedding / output drift test suites + degradation monitoring. Runs the bundled Evidently sidecar (compose `qa` profile); falls back to first-party PSI if unreachable.',
   },
-  async analyze() {
+  async analyze(options?: DriftRunOptions) {
     const scores = await scoreHistory();
-    if (!EVIDENTLY_URL) return analyzeFirstParty(scores);
+    if (!EVIDENTLY_URL) return analyzeFirstParty(scores, options);
     try {
       const n = Math.min(WINDOW, Math.floor(scores.length / 2));
+      // Forward the standard-catalog selection (preset / per-column method / threshold) to the
+      // collector. The collector maps `preset`→the Evidently preset class, `method`/`columnMethods`
+      // →per-column stat tests, and `drift_share_threshold`→the dataset-drift rule.
       const res = await fetch(`${EVIDENTLY_URL}/iterate/offgrid`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ reference: scores.slice(n, n * 2), current: scores.slice(0, n) }),
+        body: JSON.stringify({
+          reference: scores.slice(n, n * 2),
+          current: scores.slice(0, n),
+          ...(options?.preset ? { preset: options.preset } : {}),
+          ...(options?.method ? { method: options.method } : {}),
+          ...(options?.columnMethods && Object.keys(options.columnMethods).length
+            ? { column_methods: options.columnMethods }
+            : {}),
+          ...(options?.driftShareThreshold !== undefined
+            ? { drift_share_threshold: options.driftShareThreshold }
+            : {}),
+        }),
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) throw new Error('evidently collector error');
       const data = (await res.json()) as EvidentlyResponse;
       const share = data.share_drifted ?? 0;
-      const status: DriftStatus = data.drift_detected ? 'drift' : share > 0.1 ? 'warning' : 'stable';
+      // Honor the operator's drift-share threshold for the verdict when supplied; else Evidently's
+      // own drift_detected flag / the default 0.1 warning band.
+      const t = options?.driftShareThreshold;
+      const status: DriftStatus = data.drift_detected
+        ? 'drift'
+        : t !== undefined
+          ? share >= t && t > 0
+            ? 'drift'
+            : share >= t / 2 && t > 0
+              ? 'warning'
+              : t === 0 && share > 0
+                ? 'drift'
+                : 'stable'
+          : share > 0.1
+            ? 'warning'
+            : 'stable';
+      const selected = options?.preset ?? options?.method;
       return {
         engine: 'evidently',
         status,
         metrics: [{ name: 'share_drifted', value: Number(share.toFixed(3)), status }],
         baseline: scores.slice(n, n * 2).length,
         current: scores.slice(0, n).length,
+        ...(selected ? { note: `Evidently ran "${selected}".` } : {}),
       };
     } catch {
-      return analyzeFirstParty(scores);
+      return analyzeFirstParty(scores, options);
     }
   },
   async health() {
