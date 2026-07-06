@@ -4,6 +4,7 @@ import { ArrowClockwise } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toDisplayHost } from '@/lib/display-host';
 
 interface Node {
   name: string;
@@ -73,7 +74,7 @@ export function GatewayNodesCard({ initial }: { initial: Node[] }) {
                   <span className="text-sm font-medium text-foreground">{g.name}</span>
                   {g.vision ? <Badge variant="secondary" className="px-1 py-0 text-[10px]">vision</Badge> : null}
                 </div>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">{g.model} · {g.host}</p>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">{g.model} · {toDisplayHost(g.host)}</p>
               </div>
               <span className="flex shrink-0 items-center gap-1 text-xs">
                 <span className={`size-2 rounded-full ${isUp ? 'bg-emerald-500' : degraded ? 'bg-amber-500' : 'bg-red-500'}`} />
