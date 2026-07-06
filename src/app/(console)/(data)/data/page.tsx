@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AddConnectorButton } from '@/components/data/AddConnectorButton';
 import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
@@ -70,7 +71,14 @@ export default async function DataPage() {
             <TableBody>
               {connectors.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium text-foreground">{c.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    <Link
+                      href={`/data/connectors/${c.id}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{c.type}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={STATUS[c.status]}>

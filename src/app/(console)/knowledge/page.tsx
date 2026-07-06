@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
 import { ManageCollection } from '@/components/knowledge/ManageCollection';
@@ -62,10 +63,12 @@ export default async function KnowledgePage() {
                 {collections.map((c, i) => (
                   <TableRow key={c.id}>
                     <TableCell>
-                      <div className="font-medium">{c.name}</div>
-                      {c.description && (
-                        <div className="text-xs text-muted-foreground">{c.description}</div>
-                      )}
+                      <Link href={`/knowledge/${c.id}`} className="hover:text-primary hover:underline">
+                        <div className="font-medium">{c.name}</div>
+                        {c.description && (
+                          <div className="text-xs text-muted-foreground">{c.description}</div>
+                        )}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       {c.allowedRoles.length === 0 ? (

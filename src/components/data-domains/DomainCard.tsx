@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -82,7 +83,11 @@ export function DomainCard({
     <>
       <Card className="flex h-full flex-col shadow-sm">
         <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-          <CardTitle className="text-sm font-semibold text-foreground">{domain.label}</CardTitle>
+          <CardTitle className="text-sm font-semibold text-foreground">
+            <Link href={`/data-domains/${domain.id}`} className="hover:text-primary hover:underline">
+              {domain.label}
+            </Link>
+          </CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="-mr-1 -mt-1 size-8" aria-label="Domain actions">
