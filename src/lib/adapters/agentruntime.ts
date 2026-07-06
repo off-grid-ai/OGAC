@@ -273,6 +273,47 @@ export async function describeWorkflow(workflowId: string): Promise<WorkflowDeta
   }
 }
 
+// ── Workflow control (cancel / terminate) ──────────────────────────────────────────────────────
+// The write side of durable execution: stop an in-flight job. `cancel` requests a graceful
+// cancellation (the workflow observes it and can run cleanup); `terminate` force-kills it. Both
+// return { ok, error? } so the thin route maps success/failure without either throwing.
+
+export interface WorkflowMutationResult {
+  ok: boolean;
+  workflowId?: string;
+  /** 'not_found' when the workflow id doesn't exist (route → 404), else undefined. */
+  reason?: 'not_found' | 'unreachable' | 'not_configured';
+  error?: string;
+}
+
+/**
+ * Cancel or terminate a running workflow by id. `mode: 'terminate'` force-kills; the default
+ * `'cancel'` requests graceful cancellation. NEVER throws — Temporal unconfigured/unreachable or a
+ * missing workflow is reported in the result for the route to translate to a status code.
+ */
+export async function cancelWorkflow(
+  workflowId: string,
+  mode: 'cancel' | 'terminate' = 'cancel',
+): Promise<WorkflowMutationResult> {
+  if (!durableEnabled(process.env)) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const handle = client.workflow.getHandle(workflowId);
+    if (mode === 'terminate') await handle.terminate('terminated from console');
+    else await handle.cancel();
+    return { ok: true, workflowId };
+  } catch (e) {
+    const msg = (e as Error).message ?? '';
+    const notFound = /not found|no execution|WorkflowNotFound/i.test(msg);
+    return {
+      ok: false,
+      reason: notFound ? 'not_found' : 'unreachable',
+      error: notFound ? 'workflow not found' : `Temporal unreachable: ${msg}`,
+    };
+  }
+}
+
 // ── Schedules (recurring agent runs) ──────────────────────────────────────────────────────────
 // I/O bridge over @temporalio/client ScheduleClient. Create/list/pause/unpause/delete Temporal
 // Schedules that fire AgentRunWorkflow on a cron spec. All shaping/validation is pure (see
