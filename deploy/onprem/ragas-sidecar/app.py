@@ -140,7 +140,13 @@ def evaluate(req: EvalRequest) -> dict:
 
     # Point ragas's judge LLM + embeddings at the ON-PREM gateway. `base_url` is the request's
     # `gateway` (OpenAI-compatible, already /v1). No external host is ever contacted.
-    base_url = req.gateway
+    # CONTAINER→HOST: the console runs on the host and sends its own loopback gateway URL
+    # (http://127.0.0.1:8800). Inside this container 127.0.0.1 is the container itself, so rewrite a
+    # loopback host to host.docker.internal (Docker Desktop's host gateway) so we reach the aggregator
+    # on the host. Override the target host via OFFGRID_RAGAS_GATEWAY_HOST if the deploy differs.
+    import os, re
+    _host = os.environ.get("OFFGRID_RAGAS_GATEWAY_HOST", "host.docker.internal")
+    base_url = re.sub(r"^(https?://)(127\.0\.0\.1|localhost)(:|/|$)", rf"\1{_host}\3", req.gateway)
     llm = ChatOpenAI(
         model=req.model,
         base_url=base_url,
