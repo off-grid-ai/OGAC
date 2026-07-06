@@ -24,6 +24,7 @@ interface Session {
   start: number;
   lastAccess: number;
   clients: string[];
+  offline: boolean;
 }
 
 function fmt(ms: number): string {
@@ -142,6 +143,7 @@ export function SessionsPanel() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>IP address</TableHead>
+                      <TableHead>Kind</TableHead>
                       <TableHead>Started</TableHead>
                       <TableHead>Last access</TableHead>
                       <TableHead>Clients</TableHead>
@@ -151,14 +153,21 @@ export function SessionsPanel() {
                   <TableBody>
                     {sessions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
-                          No active sessions.
+                        <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                          No active Keycloak sessions for this user. The console signs in with
+                          short-lived direct-grant tokens, so an idle online session may have already
+                          expired even though the operator is still signed into the console.
                         </TableCell>
                       </TableRow>
                     ) : (
                       sessions.map((s) => (
                         <TableRow key={s.id}>
                           <TableCell className="font-mono text-xs">{s.ipAddress || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant={s.offline ? 'secondary' : 'default'} className="text-xs">
+                              {s.offline ? 'offline' : 'online'}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{fmt(s.start)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {fmt(s.lastAccess)}
