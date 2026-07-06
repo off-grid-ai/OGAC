@@ -54,7 +54,8 @@ export default async function ToolsPage({
   const { tab: rawTab, q = '', cat } = await searchParams;
   const tab = normalizeToolsTab(rawTab);
   const org = await currentOrgId();
-  const tools = await listTools(org);
+  // Degrade gracefully: DB down → empty tools list, page still renders (create/import still reachable).
+  const tools = await listTools(org).catch(() => []);
 
   return (
     <div className="w-full space-y-6">

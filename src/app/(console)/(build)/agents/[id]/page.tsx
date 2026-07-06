@@ -81,7 +81,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const agent = await resolveAgent(id);
   if (!agent) notFound();
-  const runs = await listAgentRunsByAgent(id, 8);
+  // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
+  const runs = await listAgentRunsByAgent(id, 8).catch(() => []);
   const done = runs.filter((r) => r.status === 'done').length;
   const tools = agent.custom
     ? (await listTools(await currentOrgId()).catch(() => []))
