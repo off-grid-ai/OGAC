@@ -1,5 +1,6 @@
 import { createInspector, project2DFromPoints, type VectorDBConfig, type VectorDBKind } from '@offgrid/vectordb';
 import { NextResponse } from 'next/server';
+import { toConnectHost } from '@/lib/display-host';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,10 @@ export async function POST(req: Request) {
   }
 
   const kind = body.kind ?? 'qdrant';
-  const url = body.url ?? process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333';
+  // The UI shows the store URL as an mDNS host (offgrid-s1.local). Translate any such display
+  // host back to the real loopback target before connecting — the server always reaches Qdrant
+  // over 127.0.0.1. A user-supplied external URL passes through untouched.
+  const url = toConnectHost(body.url) || process.env.OFFGRID_QDRANT_URL || 'http://127.0.0.1:6333';
   const apiKey = body.apiKey ?? process.env.OFFGRID_QDRANT_API_KEY;
   const action = body.action ?? 'ping';
   const cfg: VectorDBConfig = { apiKey, collection: body.collection, kind, url };
