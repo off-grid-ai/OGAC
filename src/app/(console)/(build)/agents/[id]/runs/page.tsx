@@ -28,7 +28,8 @@ export default async function AgentRunsPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const agent = await resolveAgent(id);
   if (!agent) notFound();
-  const runs = await listAgentRunsByAgent(id, 100);
+  // Degrade gracefully: DB down → empty run history ("No runs yet.") not the whole-page error boundary.
+  const runs = await listAgentRunsByAgent(id, 100).catch(() => []);
 
   return (
     <div className="space-y-6">
