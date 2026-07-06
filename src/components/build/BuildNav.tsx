@@ -6,17 +6,18 @@ import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
 
-// Scoped secondary-nav for the Build family — ONE builder, not two surfaces. The founder's brief:
-// "agent and studio should become one" — a Studio app can do everything an agent can, and an agent
-// is just a one-step app. So the IA reads as a single builder: you author/manage APPS (the front
-// door lists apps + agents together; "New" always opens the guided builder at /studio/new), then
-// you OPERATE them — watch multi-step app runs (screens 3–4), inspect durable jobs, and read
-// outcomes (screen 5).
+// ─── BuildNav — the Build family's scoped secondary-nav (Builder Epic #118: ONE Studio) ───────────
+//
+// The founder's brief: "agent and studio should become one." There is now ONE front door — Studio —
+// that lists every app (an agent is just a 1-step app). "New app" always opens the guided builder.
+// You then OPERATE apps: watch app runs (screens 3–4) or read outcomes (screen 5). Individual apps
+// open their OWN surface (/apps/<id>) with the five lifecycle tabs rendered by AppLifecycleNav — so
+// on those paths this global band is suppressed to avoid two stacked nav bands.
 //
 // Each tab is a real route (URL-driven, deep-linkable) and disabled modules drop out. The app
 // surfaces (/studio, /apps/runs, /apps/reports) have no module id of their own — their pages gate on
-// `studio` — so their tabs are shown iff `studio` is enabled, and the nav never links to a 404.
-// Mirrors DataNav / InsightsNav.
+// `studio`/`agents` — so their tabs show iff those modules are enabled, and the nav never links to a
+// 404. Mirrors DataNav / InsightsNav.
 
 interface Tab {
   gate: Parameters<typeof isModuleEnabled>[0];
@@ -27,29 +28,36 @@ interface Tab {
 const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Build',
+    // ONE Studio front door — lists all apps + agents; "New app" opens the guided builder.
     tabs: [
-      // The front door: apps + agents, one roster, one "New" → the guided builder.
-      { gate: 'agents', label: 'Apps', route: '/agents' },
-      // The advanced authoring surface: visual canvas + saved assistant templates.
       { gate: 'studio', label: 'Studio', route: '/studio' },
+      { gate: 'brain', label: 'Brain', route: '/brain' },
     ],
   },
   {
     heading: 'Operate',
     tabs: [
-      // Multi-step app runs — watch one execute live (screen 3) or open one paused for review (4).
+      // Global app runs — every app's runs in one list; open one to watch it (3) or review it (4).
       { gate: 'studio', label: 'App runs', route: '/apps/runs' },
       // Durable agent jobs (Temporal) — re-run / cancel / schedule.
       { gate: 'agent-runs', label: 'Jobs', route: '/agent-runs' },
-      // Outcomes over time across app runs (screen 5).
+      // Outcomes over time across all app runs (screen 5).
       { gate: 'studio', label: 'Reports', route: '/apps/reports' },
     ],
   },
 ];
 
-// Longest-prefix match so /apps/runs highlights "App runs" (not a shorter tab) and /apps/reports
-// highlights "Reports" — both live under /apps but are distinct tabs. Falls back to exact match or a
-// `${route}/` prefix per tab.
+// A per-app detail shell path — /apps/<id> or /apps/<id>/<tab> — where <id> is an app id (NOT one of
+// the global-list segments `runs` / `reports`). On these paths AppLifecycleNav owns the band, so the
+// global Build band suppresses itself.
+function isAppShellPath(pathname: string): boolean {
+  const m = pathname.match(/^\/apps\/([^/]+)/);
+  if (!m) return false;
+  const seg = m[1];
+  return seg !== 'runs' && seg !== 'reports';
+}
+
+// Longest-prefix match so /apps/runs highlights "App runs" and /apps/reports highlights "Reports".
 function activeRoute(pathname: string): string | null {
   let best: string | null = null;
   for (const g of GROUPS) {
@@ -64,6 +72,10 @@ function activeRoute(pathname: string): string | null {
 
 export function BuildNav() {
   const pathname = usePathname();
+
+  // Per-app surfaces render their own scoped band (AppLifecycleNav); don't double up.
+  if (isAppShellPath(pathname)) return null;
+
   const active = activeRoute(pathname);
 
   return (
