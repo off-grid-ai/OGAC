@@ -107,6 +107,15 @@ This is a desktop-first operator console on wide (≥1440px) screens. **Content 
 - Still responsive: columns stack on narrow/tablet; wide tables/diagrams scroll inside their own `overflow-x-auto`, the page body never scrolls horizontally.
 - Verify against a wide viewport: if a full-page surface leaves a large empty gutter on either side, it's a bug — fix it before calling the work done.
 
+### List → detail everywhere (default IA for every entity collection)
+
+A list is a way *in*, not the whole story. **Wherever the console shows a collection of entities, an item should open a real, deep-linkable DETAIL view** — its own route/URL (`/thing/[id]`), not a flat table row you can't drill into and not a cramped modal for something that's actually a "place." Apply this as much as possible.
+
+- **Master → detail.** Row/card click → a dedicated detail page showing the full entity + all its actions (edit, delete, the entity's sub-resources, its history/runs, related items). The per-app lifecycle shell (`/apps/[id]` with Build/Input/Runs/Review/Reports) and the project detail page are the reference pattern — generalize it.
+- **URL-driven** (per the nav rule): the detail is a route, shareable and Back-coherent — never client-only `useState` for "which item is open."
+- A **modal/side-panel is fine for a quick create/edit form**, but not as the only way to see an entity that has depth. If it has sub-resources, status over time, or its own actions, it's a detail *page*.
+- When you build or touch a list surface, give it (or wire it to) a detail view. A pure list/table with nowhere to click through is the bare minimum, not finished — same bar as the full-CRUD rule above.
+
 ## Multi-agent operating model (how we build here)
 
 Substantial work is executed by a fleet of parallel subagents orchestrated by the main session — not one linear thread. The standard:
