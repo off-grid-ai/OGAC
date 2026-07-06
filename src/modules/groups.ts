@@ -104,6 +104,36 @@ export function sidebarActiveIdFor(id: ModuleId): ModuleId | undefined {
   return undefined;
 }
 
+// Route-prefix aliases for pages that live under a route group but have NO module of their own, so
+// their URL matches no module route (and the sidebar would light nothing). The unified builder's
+// app surfaces (/apps/runs = app-runs list, /apps/reports = app outcomes) are exactly this: they
+// belong to the Build surface and their pages gate on the `studio`/`agents` modules, but they route
+// under /apps. Map them to the module whose sidebar row should stay lit while you're on them.
+// Longest-prefix wins (checked before falling back to module-route matching).
+const PATH_ALIASES: { prefix: string; moduleId: ModuleId }[] = [
+  { prefix: '/apps', moduleId: 'agents' },
+];
+
+// Resolve which sidebar row should be active for a URL, purely — no React, no router. First tries
+// the /apps-style route aliases (build surfaces without their own module), then the enabled modules
+// by longest matching route, then maps the resolved module to its group's landing row via
+// sidebarActiveIdFor. This is the single source of truth for sidebar highlighting, so /apps/runs and
+// /apps/reports keep the Build → Apps row lit instead of un-highlighting the whole sidebar.
+export function sidebarActiveIdForPath<T extends { id: ModuleId; route: string }>(
+  pathname: string,
+  modules: T[],
+): ModuleId | undefined {
+  const alias = PATH_ALIASES
+    .filter((a) => pathname === a.prefix || pathname.startsWith(`${a.prefix}/`))
+    .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+  if (alias) return sidebarActiveIdFor(alias.moduleId);
+
+  const current = modules
+    .filter((m) => pathname === m.route || pathname.startsWith(`${m.route}/`))
+    .sort((a, b) => b.route.length - a.route.length)[0];
+  return current ? sidebarActiveIdFor(current.id) : undefined;
+}
+
 // Every module that a group claims — primary OR secondary. Used to decide what falls into "More".
 function claimedIds(): Set<ModuleId> {
   const claimed = new Set<ModuleId>();

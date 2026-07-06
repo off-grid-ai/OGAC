@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getEnabledModules } from '@/lib/modules';
 import { cn } from '@/lib/utils';
-import { sidebarActiveIdFor, sidebarSections } from '@/modules/groups';
+import { sidebarActiveIdForPath, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 
 export function Sidebar() {
@@ -14,13 +14,11 @@ export function Sidebar() {
   const modules = getEnabledModules();
   const sections = sidebarSections(modules);
 
-  // Resolve which module the current URL belongs to (longest-matching route wins so /agents/x
+  // Resolve which sidebar row the current URL should light (longest-matching route wins so /agents/x
   // beats /a), then highlight that module's group landing — so being on a secondary route (e.g.
-  // /policy) keeps its section's primary row (Control) active in the sidebar.
-  const current = modules
-    .filter((m) => pathname === m.route || pathname.startsWith(`${m.route}/`))
-    .sort((a, b) => b.route.length - a.route.length)[0];
-  const activeId = current ? sidebarActiveIdFor(current.id) : undefined;
+  // /policy) keeps its section's primary row (Control) active, and the builder's /apps/* surfaces
+  // (which have no module of their own) keep the Build → Apps row lit. Pure resolution in groups.ts.
+  const activeId = sidebarActiveIdForPath(pathname, modules);
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
