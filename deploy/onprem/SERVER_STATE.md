@@ -114,6 +114,25 @@ Data sources — replay with `docker compose -f data-sources.yml up -d` (docker 
 
 > S1's Docker Hub link is flaky — image pulls may need retries; `compose up -d` resumes. Re-run until all six are Up.
 
+### RAGAS eval sidecar — `offgrid-ragas` (S1, added 2026-07-06)
+
+The real ragas library, wrapped in a FastAPI service the console's eval-runner calls. Bound
+**loopback-only** `127.0.0.1:8002`. Source + compose in `deploy/onprem/ragas-sidecar/`.
+- **Build + run (reproducible):** `cd deploy/onprem/ragas-sidecar && docker compose up -d --build`
+  (docker at `/usr/local/bin/docker`; compose is the v2 plugin). `restart: unless-stopped` → survives reboot.
+- **Gateway auth (the gotcha):** the sidecar forwards `OFFGRID_GATEWAY_API_KEY` to the aggregator
+  (`host.docker.internal:8800`) as a **Bearer** when it runs ragas's judge LLM + embeddings. The
+  built-in default `offgrid-local` is **rejected 401** → every eval silently degrades to the
+  first-party heuristic. The **real** key lives in `ragas-sidecar/.env` on the server (gitignored;
+  same `oglb_…` value as console `.env.local`'s `OFFGRID_GATEWAY_API_KEY`) — compose auto-loads it.
+  Replay: `cp .env.example .env`, paste the real key, `docker compose up -d --build`.
+- **Container→host:** `extra_hosts: host.docker.internal:host-gateway`; app.py rewrites a loopback
+  gateway URL (127.0.0.1) → `host.docker.internal` so it reaches the on-host aggregator.
+- **Metric scoping:** the console passes `metrics:[def.metric]` so ragas scores only the ONE metric
+  the eval def needs (each metric ≈ 30–90s of gateway calls; all 5 blew past the client timeout).
+  Client timeout is 600s. **VERIFIED live 2026-07-06:** faithfulness eval → `computedBy:ragas`,
+  score 1.0, gateway 200 OK, 88s — no heuristic fallback.
+
 ## Registered connectors (rows in console DB `connectors`)
 
 - `con_corebank` → **Core Banking (Postgres)**, `postgres`, endpoint `postgres://corebank:corebank@127.0.0.1:5433/corebank`. Sync reports **real** row counts (16,850 seeded). Replay:
