@@ -18,6 +18,7 @@
     "worker:apps": "tsx scripts/app-worker.mts",
     "trigger:email": "tsx scripts/email-trigger.mts",
     "db:seed": "tsx src/db/seed.ts",
+    "seed:domains": "tsx scripts/seed-data-domains.mts",
     "db:studio": "drizzle-kit studio",
     "test": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "test:integration": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.integration.test.ts"
