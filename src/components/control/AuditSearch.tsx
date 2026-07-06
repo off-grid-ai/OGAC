@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/Pagination';
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePagination } from '@/lib/use-pagination';
 
 interface Hit {
   id: string;
@@ -48,8 +50,17 @@ export function AuditSearch({ configured }: { configured: boolean }) {
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // The SIEM search can return a large hit set — page it client-side over the returned array with
+  // the shared URL-driven control (?auditHitsPage). Page resets to 1 on every new search.
+  const hits = result?.hits ?? [];
+  const { pageItems, setPage, ...pageState } = usePagination(hits, {
+    key: 'auditHits',
+    defaultPageSize: 25,
+  });
+
   async function search() {
     setLoading(true);
+    setPage(1);
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     if (outcome) params.set('outcome', outcome);
@@ -123,7 +134,7 @@ export function AuditSearch({ configured }: { configured: boolean }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {result.hits.map((h) => (
+            {pageItems.map((h) => (
               <TableRow key={h.id}>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
                   {h.ts?.slice(0, 19).replace('T', ' ')}
@@ -143,7 +154,18 @@ export function AuditSearch({ configured }: { configured: boolean }) {
             ))}
           </TableBody>
         </Table>
-      ) : result && !result.error ? (
+      ) : null}
+
+      {result && result.hits.length > 0 ? (
+        <Pagination
+          state={pageState}
+          onPageChange={setPage}
+          onPageSizeChange={pageState.setPageSize}
+          itemLabel="events"
+        />
+      ) : null}
+
+      {result && result.hits.length === 0 && !result.error ? (
         <p className="py-4 text-center text-xs text-muted-foreground">No matches.</p>
       ) : null}
     </div>
