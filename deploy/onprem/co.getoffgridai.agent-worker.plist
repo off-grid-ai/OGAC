@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Off Grid durable agent-run WORKER — the drain for the `offgrid-agents` Temporal task queue.
+     Long-lived process that polls Temporal (:7233 on S1) and runs the AgentRunWorkflow +
+     runAgentPipeline activity (the real runAgent pipeline: policy → guardrails → retrieval → LLM →
+     grounding → provenance → persist). A worker crash mid-run is retried/resumed by Temporal.
+
+     This is a gui-domain LaunchAgent (like co.getoffgridai.sdserver), NOT a system LaunchDaemon —
+     the worker needs the SAME user runtime as the console (it reuses @/lib/agentrun, hits the DB and
+     gateway) and the console itself runs as a user process, so we keep them in the same domain.
+
+     ENV: the worker loads the console's .env.local/.env.* itself, at process start, via
+     scripts/worker-env.mts (@next/env loadEnvConfig against the console root — resolved ABSOLUTELY
+     from the script path, NOT from CWD). That is what populates DATABASE_URL + OFFGRID_GATEWAY_* in
+     the worker; WorkingDirectory below is belt-and-suspenders, the load no longer depends on it.
+     History: before that fix the worker connected to Postgres with no password and every query died
+     with `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string`.
+
+     Install (on S1, gui domain — no sudo):
+       cp deploy/onprem/co.getoffgridai.agent-worker.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.getoffgridai.agent-worker.plist
+     Verify:  launchctl list co.getoffgridai.agent-worker        (exit 0 = loaded; check the log)
+     Run/restart now: launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker
+     Tail log: tail -f /Users/admin/offgrid/console/agent-worker.log
+     Uninstall (bootout is async — verify it's gone before re-bootstrap or you get error 5/EIO):
+       launchctl bootout gui/$(id -u)/co.getoffgridai.agent-worker
+
+     TO GO LIVE the console must ALSO dispatch to the queue: set OFFGRID_QUEUE_ENABLED=1 (or
+     OFFGRID_ADAPTER_AGENTRUNTIME=temporal) in the console's .env.local and restart the console.
+     Without that flag OR without this worker running, the console runs agent runs synchronously
+     in-process (unchanged, safe default). So: install+bootstrap this worker FIRST, confirm it's
+     "ready — draining agent runs" in the log, THEN flip OFFGRID_QUEUE_ENABLED=1 on the console. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>co.getoffgridai.agent-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/admin/offgrid/console/node_modules/.bin/tsx</string>
+    <string>scripts/temporal-worker.mts</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/admin/offgrid/console</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <!-- Non-interactive launchd has a minimal PATH; give node + the local bins an explicit one.
+       The worker gets DATABASE_URL / OFFGRID_GATEWAY_* from .env.local (loaded in-process), not
+       from here — keep app config in .env.local, not the plist. Override the Temporal address on S1
+       (offgrid-s1.local can be flaky from a launchd context; 127.0.0.1 is the reliable local hop). -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>OFFGRID_TEMPORAL_ADDRESS</key><string>127.0.0.1:7233</string>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/admin/offgrid/console/agent-worker.log</string>
+  <key>StandardErrorPath</key><string>/Users/admin/offgrid/console/agent-worker.log</string>
+</dict>
+</plist>
