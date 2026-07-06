@@ -5,13 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -79,15 +73,17 @@ export function AddConnectorButton() {
         <Plus className="size-4" />
         Add custom connector
       </Button>
-      <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Add a custom connector</SheetTitle>
-            <SheetDescription>
-              Point at an MCP server or an HTTP endpoint. It joins the connector directory and can be
-              exposed to chat as a governed tool.
-            </SheetDescription>
-          </SheetHeader>
+      <FormSheet
+        open={open}
+        onOpenChange={(o) => !o && setPanel(null)}
+        title="Add a custom connector"
+        description="Point at an MCP server or an HTTP endpoint. It joins the connector directory and can be exposed to chat as a governed tool."
+        footer={
+          <Button onClick={create} disabled={busy} className="w-full">
+            Add connector
+          </Button>
+        }
+      >
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="con-name">Name</Label>
@@ -140,12 +136,8 @@ export function AddConnectorButton() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
-            <Button onClick={create} disabled={busy} className="w-full">
-              Add connector
-            </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+      </FormSheet>
     </>
   );
 }
