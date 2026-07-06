@@ -4,10 +4,13 @@ import {
   buildOidcIdpRep,
   deriveMfaStatus,
   extractLifetimes,
+  forbiddenGrantMessage,
   formatDuration,
   mergeRealmLifetimes,
+  mergeUserSessions,
   normalizeIdps,
   normalizeRequiredActions,
+  normalizeSession,
   normalizeSessions,
   validateLifetimesPatch,
   withConfigureOtp,
@@ -34,6 +37,59 @@ test('normalizeSessions: shapes raw sessions, sorts most-recent first, flattens 
   // Missing fields tolerated.
   assert.equal(out[0].ipAddress, '');
   assert.deepEqual(out[0].clients, []);
+  // online sessions are tagged offline:false by default.
+  assert.equal(out[0].offline, false);
+  assert.equal(out[1].offline, false);
+});
+
+test('normalizeSession: mDNS-maps the session IP — never leaks a raw loopback/LAN address', () => {
+  // Loopback → S1 (the console reaches Keycloak over loopback, so a same-host login logs 127.0.0.1).
+  assert.equal(normalizeSession({ id: 's', ipAddress: '127.0.0.1' }).ipAddress, 'offgrid-s1.local');
+  // Known fleet IP → its mDNS host.
+  assert.equal(normalizeSession({ id: 's', ipAddress: '192.168.1.66' }).ipAddress, 'offgrid-g6.local');
+  // Unknown private IP → S1 (defensive: still no raw IP leaks).
+  assert.equal(normalizeSession({ id: 's', ipAddress: '10.0.0.5' }).ipAddress, 'offgrid-s1.local');
+  // A public/real address is left untouched.
+  assert.equal(normalizeSession({ id: 's', ipAddress: '203.0.113.9' }).ipAddress, '203.0.113.9');
+  // Empty stays empty (no spurious mapping).
+  assert.equal(normalizeSession({ id: 's' }).ipAddress, '');
+});
+
+test('mergeUserSessions: unions online + offline, dedupes by id (online wins), sorts recent-first', () => {
+  const online = [
+    { id: 'a', username: 'mac', ipAddress: '127.0.0.1', start: 1000, lastAccess: 3000 },
+  ];
+  const offline = [
+    // same id as an online session — must NOT duplicate; the online (live) one wins.
+    { id: 'a', username: 'mac', ipAddress: '127.0.0.1', start: 1000, lastAccess: 1500 },
+    // an offline-only session — this is what surfaces a logged-in operator whose online session expired.
+    { id: 'b', username: 'mac', ipAddress: '192.168.1.66', start: 500, lastAccess: 4000 },
+  ];
+  const out = mergeUserSessions(online, offline);
+  assert.equal(out.length, 2); // deduped
+  assert.equal(out[0].id, 'b'); // higher lastAccess first
+  assert.equal(out[0].offline, true);
+  assert.equal(out[0].ipAddress, 'offgrid-g6.local'); // mDNS'd
+  assert.equal(out[1].id, 'a');
+  assert.equal(out[1].offline, false); // online wins for the shared id
+  assert.equal(out[1].lastAccess, 3000);
+});
+
+// ── Forbidden-grant messaging (actionable 403) ────────────────────────────────
+
+test('forbiddenGrantMessage: names the exact realm-management role on a 403', () => {
+  const msg = forbiddenGrantMessage('list-identity-providers', 403, 'HTTP 403');
+  assert.match(msg, /view-identity-providers/);
+  assert.match(msg, /realm-management/);
+  assert.match(msg, /OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID/);
+
+  assert.match(forbiddenGrantMessage('manage-identity-providers', 403, 'x'), /manage-identity-providers/);
+  assert.match(forbiddenGrantMessage('manage-users', 403, 'x'), /manage-users/);
+});
+
+test('forbiddenGrantMessage: passes the original message through for non-403 statuses', () => {
+  assert.equal(forbiddenGrantMessage('list-identity-providers', 500, 'boom'), 'boom');
+  assert.equal(forbiddenGrantMessage('view-users', 404, 'not found'), 'not found');
 });
 
 // ── MFA / required actions ──────────────────────────────────────────────────
