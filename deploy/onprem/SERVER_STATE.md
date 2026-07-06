@@ -607,3 +607,20 @@ reads it anonymously over loopback — turning the security plugin on without th
 would 401 every console analytics/audit read. FleetDM/Superset OIDC are login-only and safe to add, but
 still need the on-site config mount + restart. The deliverable is a **one-flag enable** with the config
 staged, not a live cutover.
+
+### Keycloak: identity-provider roles for the console admin SA (2026-07-06)
+
+Federation tab (Access → Federation) was 403 because the console's admin service-account
+(`service-account-offgrid-console-admin`, realm `offgrid`, client id from `OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID`)
+lacked the `realm-management` IdP roles. Granted (kcadm inside `offgrid-console-keycloak-1`, bootstrap
+admin `admin`/`offgrid-dev`):
+
+```bash
+docker exec offgrid-console-keycloak-1 /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080 --realm master --user admin --password offgrid-dev
+docker exec offgrid-console-keycloak-1 /opt/keycloak/bin/kcadm.sh add-roles -r offgrid \
+  --uusername service-account-offgrid-console-admin --cclientid realm-management \
+  --rolename view-identity-providers --rolename manage-identity-providers
+```
+
+Takes effect immediately (no restart). Covers list + Add/Delete OIDC provider.
