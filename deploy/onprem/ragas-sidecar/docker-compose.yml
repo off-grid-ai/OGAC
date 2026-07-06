@@ -16,8 +16,10 @@ services:
     # Loopback-only: the console calls it at http://127.0.0.1:8002 on the same host.
     ports: ['127.0.0.1:8002:8002']
     environment:
-      # Fallback gateway key ragas forwards as a Bearer if the request doesn't carry its own.
-      # Set the real static gateway key here if the aggregator requires one.
+      # Gateway key ragas forwards to the aggregator as a Bearer to run its judge LLM + embeddings.
+      # The aggregator REJECTS the `offgrid-local` default with 401 → evals silently degrade to the
+      # heuristic. Put the REAL key (same as console .env.local OFFGRID_GATEWAY_API_KEY) in a local
+      # `.env` (gitignored; see .env.example) — compose auto-loads it. Default only for a smoke run.
       OFFGRID_GATEWAY_API_KEY: ${OFFGRID_GATEWAY_API_KEY:-offgrid-local}
     # Container talks to the gateway on the host (127.0.0.1:8800 on S1) — map host loopback in.
     extra_hosts:

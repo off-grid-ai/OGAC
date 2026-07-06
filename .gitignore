@@ -24,3 +24,6 @@ npm-debug.log*
 /.lancedb/
 .claude/worktrees/
 deploy/onprem/CREDENTIALS.md
+
+# ragas sidecar compose secret (real gateway key)
+deploy/onprem/ragas-sidecar/.env
