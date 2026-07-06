@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { auditFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { createTenant, listTenants } from '@/lib/store';
 
 export async function GET(req: Request) {
@@ -18,5 +20,11 @@ export async function POST(req: Request) {
   if (!name) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
-  return NextResponse.json(await createTenant(name, plan, enabledModules), { status: 201 });
+  const tenant = await createTenant(name, plan, enabledModules);
+  auditFromSession(gate, await currentOrgId(), {
+    action: 'tenant.change',
+    resource: `tenant:${tenant.id ?? name}`,
+    outcome: 'ok',
+  });
+  return NextResponse.json(tenant, { status: 201 });
 }

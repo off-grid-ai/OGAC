@@ -4,6 +4,7 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
 import { createCustomRole, getCustomRoleByName } from '@/lib/store';
+import { validateModules } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'clientId is required' }, { status: 400 });
   }
 
+  // Validate the requested capabilities against the known module set before they become role
+  // grants — an unvalidated body.modules would let a caller mint a role for arbitrary strings.
+  const modules = validateModules(body.modules);
+  if (modules.unknown.length) {
+    return NextResponse.json(
+      { error: `unknown module(s): ${modules.unknown.join(', ')}` },
+      { status: 400 },
+    );
+  }
+
   try {
     const { id } = await kc.createClient({
       clientId: body.clientId,
@@ -63,14 +74,14 @@ export async function POST(req: Request) {
     // custom role (name → module grants) + a matching Keycloak realm role, and
     // assign it to the client's service account so its JWT carries the scope.
     let scopedRole: string | null = null;
-    if (body.modules?.length) {
+    if (modules.valid.length) {
       scopedRole = `svc-${body.clientId}`;
       if (!(await getCustomRoleByName(scopedRole))) {
         await createCustomRole({
           name: scopedRole,
           description: `Service scope for ${body.clientId}`,
           basedOn: 'viewer',
-          capabilities: body.modules,
+          capabilities: modules.valid,
         });
       }
     } else if (body.roleName) {

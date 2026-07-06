@@ -16,6 +16,32 @@ export function allModuleIds(): ModuleId[] {
   return MODULES.map((m) => m.id);
 }
 
+// Is `value` a known module id? Pure guard — used to validate untrusted module lists (e.g. a
+// service-client's requested capabilities) before they're persisted as role grants.
+export function isModuleId(value: unknown): value is ModuleId {
+  return typeof value === 'string' && (allModuleIds() as string[]).includes(value);
+}
+
+/**
+ * Validate an untrusted `modules` payload (from a request body) against the known module set.
+ * Returns the de-duplicated valid list plus any unknown ids. PURE — no IO. A non-array input
+ * yields an empty valid list. Callers reject when `unknown.length > 0`.
+ */
+export function validateModules(input: unknown): { valid: ModuleId[]; unknown: string[] } {
+  if (!Array.isArray(input)) return { valid: [], unknown: [] };
+  const valid: ModuleId[] = [];
+  const unknown: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    const v = typeof raw === 'string' ? raw.trim() : '';
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    if (isModuleId(v)) valid.push(v);
+    else unknown.push(v);
+  }
+  return { valid, unknown };
+}
+
 // Baseline module access for each built-in role. Built-in role sessions keep their historic
 // behavior — full access to every enabled module — so nothing regresses. These baselines are only
 // consulted to seed a *custom* role's inherited access via its `based_on`. Pure (no DB) so this

@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
+import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
@@ -216,7 +217,9 @@ export default async function DataPage() {
         </CardContent>
       </Card>
 
-      <VectorDBInspector urlHint={process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333'} />
+      <VectorDBInspector
+        urlHint={toDisplayHost(process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333')}
+      />
 
       <PiiScanner />
     </div>
