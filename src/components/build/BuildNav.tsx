@@ -28,10 +28,13 @@ interface Tab {
 const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Build',
-    // ONE Studio front door — lists all apps + agents; "New app" opens the guided builder.
+    // ONE Studio front door — lists all apps + agents; "New app" opens the guided builder. Tools
+    // (#121) is the ONE home for the tools apps can call — registered registry + MCP catalog +
+    // built-in primitives.
     tabs: [
       { gate: 'studio', label: 'Studio', route: '/studio' },
       { gate: 'brain', label: 'Brain', route: '/brain' },
+      { gate: 'tools', label: 'Tools', route: '/tools' },
     ],
   },
   {
