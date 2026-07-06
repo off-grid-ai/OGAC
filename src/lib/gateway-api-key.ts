@@ -5,9 +5,9 @@
 // own key store: every API key IS a dedicated Keycloak service-account client
 // (client_credentials). The opaque key string an operator receives is:
 //
-//     ogk_<clientId>.<clientSecret>
+//     ogak_<clientId>.<clientSecret>
 //
-// where `<clientId>` is itself prefixed `ogk-` so gateway keys are trivially separable from the
+// where `<clientId>` is itself prefixed `ogak-` so gateway keys are trivially separable from the
 // broker's own service clients (offgrid-gateway, offgrid-fleet, …) and from the console's OIDC
 // clients. The gateway aggregator verifies a key by parsing it and performing a client_credentials
 // token exchange against Keycloak — success means the secret matches AND the client is enabled, so
@@ -17,9 +17,9 @@
 // The IO (create/list/delete via the Keycloak Admin API) lives in gateway-api-keys.ts.
 
 // The opaque-key prefix an operator pastes into `x-api-key`.
-export const GATEWAY_KEY_PREFIX = 'ogk_';
+export const GATEWAY_KEY_PREFIX = 'ogak_';
 // The Keycloak clientId prefix that marks a client as a gateway API key (vs a service/OIDC client).
-export const GATEWAY_KEY_CLIENT_PREFIX = 'ogk-';
+export const GATEWAY_KEY_CLIENT_PREFIX = 'ogak-';
 
 // ── Key string format ───────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ export interface ParsedApiKey {
   secret: string;
 }
 
-// Compose the opaque key handed to the operator once, on creation. `ogk_<clientId>.<secret>`.
+// Compose the opaque key handed to the operator once, on creation. `ogak_<clientId>.<secret>`.
 export function formatApiKey(clientId: string, secret: string): string {
   return `${GATEWAY_KEY_PREFIX}${clientId}.${secret}`;
 }
@@ -39,11 +39,11 @@ export function isGatewayApiKey(raw: string | null | undefined): boolean {
   return typeof raw === 'string' && raw.startsWith(GATEWAY_KEY_PREFIX) && raw.includes('.');
 }
 
-// Parse `ogk_<clientId>.<secret>` back into its parts. Returns null for anything malformed. The
-// clientId is everything between the `ogk_` prefix and the FIRST dot; the secret is the remainder
+// Parse `ogak_<clientId>.<secret>` back into its parts. Returns null for anything malformed. The
+// clientId is everything between the `ogak_` prefix and the FIRST dot; the secret is the remainder
 // (secrets are base64url/uuid and never contain a dot in the clientId, but may in the secret — so we
 // split on the first dot only). Both parts must be non-empty and the clientId must carry the
-// `ogk-` client prefix, so a stray `ogk_` on some other token can never be mistaken for a key.
+// `ogak-` client prefix, so a stray `ogak_` on some other token can never be mistaken for a key.
 export function parseApiKey(raw: string | null | undefined): ParsedApiKey | null {
   if (!isGatewayApiKey(raw)) return null;
   const body = (raw as string).slice(GATEWAY_KEY_PREFIX.length);
@@ -95,8 +95,8 @@ export function slugifyKeyName(name: string): string {
   return slug || 'key';
 }
 
-// Derive a unique Keycloak clientId for a new key: `ogk-<slug>-<rand>`. `rand` is supplied by the
-// caller (crypto in the adapter) so this stays pure/testable. Guarantees the `ogk-` prefix.
+// Derive a unique Keycloak clientId for a new key: `ogak-<slug>-<rand>`. `rand` is supplied by the
+// caller (crypto in the adapter) so this stays pure/testable. Guarantees the `ogak-` prefix.
 export function deriveKeyClientId(name: string, rand: string): string {
   const slug = slugifyKeyName(name);
   const suffix = (rand || '').replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 8) || 'x';
@@ -125,7 +125,7 @@ export interface RawKeyClient {
 // The row the management UI renders. No secret ever appears here.
 export interface GatewayKeyView {
   id: string; // Keycloak internal client id (for delete/secret routes)
-  clientId: string; // ogk-… (the key's identity)
+  clientId: string; // ogak-… (the key's identity)
   name: string; // human label
   owner: string; // org/owner label, from attributes (best-effort)
   scope: string;

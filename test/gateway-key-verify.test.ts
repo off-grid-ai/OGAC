@@ -8,11 +8,11 @@ import { formatApiKey, parseApiKey } from '../src/lib/gateway-api-key.ts';
 
 test('parseGatewayKey (.mjs) matches parseApiKey (.ts) on valid and invalid inputs', () => {
   const cases = [
-    formatApiKey('ogk-mobile-ab12', 'secret'),
-    formatApiKey('ogk-x', 'a.b.c'),
-    'ogk_nodot',
-    'ogk_.secret',
-    'ogk_notprefixed.secret',
+    formatApiKey('ogak-mobile-ab12', 'secret'),
+    formatApiKey('ogak-x', 'a.b.c'),
+    'ogak_nodot',
+    'ogak_.secret',
+    'ogak_notprefixed.secret',
     'sk-ant-123',
     '',
   ];
@@ -22,8 +22,8 @@ test('parseGatewayKey (.mjs) matches parseApiKey (.ts) on valid and invalid inpu
 });
 
 test('isGatewayKey matches the prefix contract', () => {
-  assert.equal(isGatewayKey('ogk_ogk-x.y'), true);
-  assert.equal(isGatewayKey('ogk_bad'), false);
+  assert.equal(isGatewayKey('ogak_ogak-x.y'), true);
+  assert.equal(isGatewayKey('ogak_bad'), false);
   assert.equal(isGatewayKey('bearer-jwt.aaa.bbb'), false);
 });
 
@@ -63,17 +63,17 @@ async function withFakeKeycloak(
 }
 
 test('verify() accepts a valid key and rejects a wrong secret / unknown client', async () => {
-  await withFakeKeycloak('ogk-mobile-ab12', 'good-secret', async (v) => {
-    assert.equal(await v.verify(formatApiKey('ogk-mobile-ab12', 'good-secret')), true);
-    assert.equal(await v.verify(formatApiKey('ogk-mobile-ab12', 'wrong-secret')), false);
-    assert.equal(await v.verify(formatApiKey('ogk-unknown-1', 'good-secret')), false);
+  await withFakeKeycloak('ogak-mobile-ab12', 'good-secret', async (v) => {
+    assert.equal(await v.verify(formatApiKey('ogak-mobile-ab12', 'good-secret')), true);
+    assert.equal(await v.verify(formatApiKey('ogak-mobile-ab12', 'wrong-secret')), false);
+    assert.equal(await v.verify(formatApiKey('ogak-unknown-1', 'good-secret')), false);
   });
 });
 
 test('verify() rejects a non-gateway-key string without any network call', async () => {
-  await withFakeKeycloak('ogk-x', 's', async (v) => {
+  await withFakeKeycloak('ogak-x', 's', async (v) => {
     assert.equal(await v.verify('sk-ant-123'), false);
-    assert.equal(await v.verify('ogk_malformed'), false);
+    assert.equal(await v.verify('ogak_malformed'), false);
   });
 });
 
@@ -92,7 +92,7 @@ test('verify() caches a positive result (revoke takes effect within the TTL, not
   const addr = server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
   const v = new GatewayKeyVerifier({ url: `http://127.0.0.1:${port}`, realm: 'offgrid' });
-  const key = formatApiKey('ogk-cache-1', 'sekret');
+  const key = formatApiKey('ogak-cache-1', 'sekret');
   try {
     assert.equal(await v.verify(key), true);
     assert.equal(await v.verify(key), true);

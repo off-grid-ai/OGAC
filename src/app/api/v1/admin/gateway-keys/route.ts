@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/v1/admin/gateway-keys — mint a new Keycloak-backed gateway API key. The opaque key
-// (`ogk_<clientId>.<secret>`) is returned ONCE and never stored in cleartext.
+// (`ogak_<clientId>.<secret>`) is returned ONCE and never stored in cleartext.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;

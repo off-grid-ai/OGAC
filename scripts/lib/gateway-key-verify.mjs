@@ -1,4 +1,4 @@
-// Verify Keycloak-backed gateway API keys (`ogk_<clientId>.<secret>`) — dependency-free, ESM.
+// Verify Keycloak-backed gateway API keys (`ogak_<clientId>.<secret>`) — dependency-free, ESM.
 //
 // Task #74: the gateway must accept MANY named x-api-keys, each backed by Keycloak, retiring the
 // single static OFFGRID_GATEWAY_API_KEY. Each key is a Keycloak service-account client
@@ -10,11 +10,11 @@
 // Results are cached briefly (positive + negative) so a burst of requests on one key doesn't hammer
 // the token endpoint. The cache TTL is short enough that a revoke takes effect within ~KEY_CACHE_MS.
 
-const KEY_PREFIX = 'ogk_';
-const KEY_CLIENT_PREFIX = 'ogk-';
+const KEY_PREFIX = 'ogak_';
+const KEY_CLIENT_PREFIX = 'ogak-';
 const KEY_CACHE_MS = 60 * 1000; // a revoke takes effect within a minute
 
-// Parse `ogk_<clientId>.<secret>` → { clientId, secret } or null. Mirrors src/lib/gateway-api-key.ts
+// Parse `ogak_<clientId>.<secret>` → { clientId, secret } or null. Mirrors src/lib/gateway-api-key.ts
 // parseApiKey (kept in lockstep — the raw .mjs can't import the TS module).
 export function parseGatewayKey(raw) {
   if (typeof raw !== 'string' || !raw.startsWith(KEY_PREFIX) || !raw.includes('.')) return null;
