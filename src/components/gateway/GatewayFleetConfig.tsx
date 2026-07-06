@@ -222,40 +222,52 @@ export function GatewayFleetConfig() {
           push to the node — routing and the status page follow automatically.
         </p>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent>
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
         {nodes === null && !err ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
         {nodes?.length === 0 ? <p className="text-xs text-muted-foreground">No fleet_nodes rows.</p> : null}
-        {nodes?.map((n) => (
-          <div key={n.name} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="font-mono text-sm font-semibold">{n.name}</span>
-              <Badge variant="secondary" className="text-[10px]">{n.role}</Badge>
-              {n.role !== 'server' ? (
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {n.model}{n.contextSize ? ` · ${n.contextSize} ctx` : ''}
-                </span>
-              ) : (
-                <span className="font-mono text-xs text-muted-foreground">{toDisplayHost(n.host)}</span>
-              )}
-              {!n.enabled && n.role !== 'server' ? <Badge variant="outline" className="text-[10px]">disabled</Badge> : null}
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              onClick={() => setConfiguring(n.name)}
-            >
-              Configure
-            </Button>
-            <EditDialog
-              node={n}
-              open={configuring === n.name}
-              onOpenChange={(o) => setConfiguring(o ? n.name : null)}
-              onSaved={load}
-            />
+        {nodes?.length ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {nodes.map((n) => (
+              <div
+                key={n.name}
+                className="flex flex-col justify-between gap-3 rounded-md border border-border px-3 py-2.5"
+              >
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-semibold">{n.name}</span>
+                    <Badge variant="secondary" className="text-[10px]">{n.role}</Badge>
+                    {!n.enabled && n.role !== 'server' ? (
+                      <Badge variant="outline" className="text-[10px]">disabled</Badge>
+                    ) : null}
+                  </div>
+                  {n.role !== 'server' ? (
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {n.model || '(no model)'}
+                      {n.contextSize ? ` · ${n.contextSize} ctx` : ''}
+                    </p>
+                  ) : (
+                    <p className="truncate font-mono text-xs text-muted-foreground">{toDisplayHost(n.host)}</p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-full text-xs"
+                  onClick={() => setConfiguring(n.name)}
+                >
+                  Configure
+                </Button>
+                <EditDialog
+                  node={n}
+                  open={configuring === n.name}
+                  onOpenChange={(o) => setConfiguring(o ? n.name : null)}
+                  onSaved={load}
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        ) : null}
       </CardContent>
     </Card>
   );
