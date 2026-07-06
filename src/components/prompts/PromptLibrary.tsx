@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/Pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { PromptStarterLibrary } from '@/components/prompts/PromptStarterLibrary';
 import { usePagination } from '@/lib/use-pagination';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
@@ -274,6 +275,8 @@ export function PromptLibrary() {
             />
           </div>
         )}
+
+        <PromptStarterLibrary onAdded={load} />
 
         <CommonPromptsPanel common={common} available={commonAvailable} onSave={saveCommon} />
       </div>
