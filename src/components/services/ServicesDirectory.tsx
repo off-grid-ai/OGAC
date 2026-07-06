@@ -108,15 +108,17 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
         )}
       </div>
 
-      {/* Grouped sections */}
+      {/* Grouped sections — each group is a quiet header + one consistent responsive grid,
+          so a single-card group (Console, Gateway) fills exactly one cell instead of a
+          wasteful full-width row. */}
       {KIND_GROUPS.map(({ kind, label }) => {
         const group = services.filter((s) => s.kind === kind);
         if (group.length === 0) return null;
         const groupUp = group.filter((s) => health[s.id]?.status === 'up').length;
         const groupChecked = group.filter((s) => health[s.id]).length;
         return (
-          <div key={kind} className="rounded-lg border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+          <section key={kind} className="space-y-3">
+            <div className="flex items-center justify-between border-b border-border pb-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
               {groupChecked > 0 && (
                 <span className={`font-mono text-[11px] ${groupUp === groupChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
@@ -124,12 +126,12 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
                 </span>
               )}
             </div>
-            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {group.map((s) => (
                 <ServiceCard key={s.id} s={s} h={health[s.id]} />
               ))}
             </div>
-          </div>
+          </section>
         );
       })}
     </div>
