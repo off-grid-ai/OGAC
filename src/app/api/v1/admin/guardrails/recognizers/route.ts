@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { createRecognizer, listRecognizers, validateRecognizer } from '@/lib/presidio-recognizers';
+import { degradeOn503 } from '@/lib/route-degrade';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Custom Presidio recognizers collection. GET lists the org's recognizers; POST creates one after
@@ -10,7 +11,9 @@ import { currentOrgId } from '@/lib/tenancy';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listRecognizers(await currentOrgId()) });
+  return degradeOn503(async () =>
+    NextResponse.json({ object: 'list', data: await listRecognizers(await currentOrgId()) }),
+  );
 }
 
 export async function POST(req: Request) {
@@ -19,7 +22,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = validateRecognizer(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-  return NextResponse.json(await createRecognizer(parsed.value, await currentOrgId()), {
-    status: 201,
-  });
+  return degradeOn503(async () =>
+    NextResponse.json(await createRecognizer(parsed.value, await currentOrgId()), { status: 201 }),
+  );
 }

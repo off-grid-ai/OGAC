@@ -6,6 +6,7 @@ import {
   updateRecognizer,
   validateRecognizer,
 } from '@/lib/presidio-recognizers';
+import { degradeOn503 } from '@/lib/route-degrade';
 import { currentOrgId } from '@/lib/tenancy';
 
 // A single custom recognizer. PATCH either flips the enabled toggle ({ enabled }) or edits the
@@ -20,24 +21,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Toggle-only PATCH: just an `enabled` boolean, no other recognizer fields.
   if (body && typeof body.enabled === 'boolean' && body.kind === undefined) {
-    const updated = await setRecognizerEnabled(id, body.enabled, orgId);
-    if (!updated) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
-    return NextResponse.json(updated);
+    return degradeOn503(async () => {
+      const updated = await setRecognizerEnabled(id, body.enabled as boolean, orgId);
+      if (!updated) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
+      return NextResponse.json(updated);
+    });
   }
 
   // Full edit: re-validate the whole draft.
   const parsed = validateRecognizer(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-  const updated = await updateRecognizer(id, parsed.value, orgId);
-  if (!updated) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
-  return NextResponse.json(updated);
+  return degradeOn503(async () => {
+    const updated = await updateRecognizer(id, parsed.value, orgId);
+    if (!updated) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
+    return NextResponse.json(updated);
+  });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const deleted = await deleteRecognizer(id, await currentOrgId());
-  if (!deleted) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
-  return NextResponse.json({ deleted: true });
+  return degradeOn503(async () => {
+    const deleted = await deleteRecognizer(id, await currentOrgId());
+    if (!deleted) return NextResponse.json({ error: 'recognizer not found' }, { status: 404 });
+    return NextResponse.json({ deleted: true });
+  });
 }

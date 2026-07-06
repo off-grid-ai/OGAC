@@ -20,7 +20,12 @@ export const dynamic = 'force-dynamic';
 export default async function LineagePage() {
   await requireModuleForUser('lineage');
   const org = await currentOrgId();
-  const [runs, lineage] = await Promise.all([listAgentRuns(25, org), readLineageView()]);
+  // Degrade gracefully: readLineageView() never throws (returns {configured,error}); guard the
+  // sibling DB call so Postgres being down renders a partial page (empty runs) not the error boundary.
+  const [runs, lineage] = await Promise.all([
+    listAgentRuns(25, org).catch(() => []),
+    readLineageView(),
+  ]);
   const engine = getLineage().meta;
   const withSources = runs.filter((r) => r.citations.length > 0);
   const { configured, data, error } = lineage;
