@@ -10,6 +10,7 @@ import {
   getSandbox,
   getSigning,
 } from '@/lib/adapters/registry';
+import { maybeRunComposableTool } from '@/lib/adapters/tool-primitives';
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { estimateTokens, projectBudget } from '@/lib/chat-governance';
@@ -425,6 +426,9 @@ export async function runAgent(
   if (toolHit) {
     mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
     await maybeRunSandboxTool(toolHit.ref, mark);
+    // Composable tools: primitives (prim:web_search/read_url/http) + apps-as-tools (app:<id>).
+    // No-ops for tool:<id> (sandbox path above owns those) + unknown refs; governed + cycle-safe.
+    await maybeRunComposableTool(toolHit.ref, { orgId, actor: caller, callerAppId: agent.id }, mark, query);
   }
 
   // 4. Answer — composed from the retrieved sources (cached).
