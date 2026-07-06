@@ -111,9 +111,15 @@ export interface AppRunDeps {
     connector: ConnectorLike,
     opts: { op?: 'read' | 'count'; limit?: number; params?: Record<string, unknown> },
   ) => Promise<{ result: { rows: unknown[]; count: number; dialect: string } | null; detail: string }>;
-  /** Guardrail check path (reuse of the existing runChecks + outcomeFromChecks). */
+  /**
+   * Guardrail check path (reuse of the existing runChecks + outcomeFromChecks). `orgId` is threaded
+   * EXPLICITLY (gap #121) so the PII deep config (org custom recognizers + thresholds) resolves on
+   * the durable worker path, which has no request scope for `headers()`-based org resolution — the
+   * worker then behaves identically to a request. Optional (2nd arg) keeps the seam back-compat.
+   */
   runGuardrail: (
     text: string,
+    orgId?: string,
   ) => Promise<{ blocked: boolean; detail: string }>;
   /** Persist the live app-run state (create on start, update per step). No-op sink is allowed. */
   persist: (state: AppRunState, input: Record<string, unknown>) => Promise<void>;
@@ -169,9 +175,11 @@ export function defaultDeps(): AppRunDeps {
         detail: describeDecision(decision),
       };
     },
-    async runGuardrail(text) {
+    async runGuardrail(text, orgId) {
       const { runChecks, outcomeFromChecks } = await import('@/lib/checks');
-      const checks = await runChecks('pre', { phase: 'pre', input: text });
+      // Pass the explicit orgId into the check context so the PII port scopes its deep config
+      // without `headers()` on the worker path (gap #121).
+      const checks = await runChecks('pre', { phase: 'pre', input: text, orgId });
       const outcome = outcomeFromChecks(checks);
       return {
         blocked: outcome === 'blocked',
@@ -274,7 +282,7 @@ export async function executeStep(
       case 'connector-query':
         return await executeConnectorStep(step, ctx, deps);
       case 'guardrail':
-        return await executeGuardrailStep(step, priorResults, deps);
+        return await executeGuardrailStep(step, priorResults, ctx, deps);
       case 'human':
         // Do NOT block here — the durable workflow (2B) owns the wait/resume. Signal the pause.
         return {
@@ -381,15 +389,17 @@ async function executeConnectorStep(
 async function executeGuardrailStep(
   step: Extract<AppStep, { kind: 'guardrail' }>,
   priorResults: StepResult[],
+  ctx: AppRunContext,
   deps: AppRunDeps,
 ): Promise<StepResult> {
   // Apply the guardrail over the accumulated prior-step output (what would flow onward). Reuses the
   // existing runChecks path via deps.runGuardrail. A 'blocked' verdict fails the step → halts the run.
+  // ctx.orgId is threaded through so the PII deep config applies on the worker path (gap #121).
   const text = priorResults
     .map((r) => r.output ?? '')
     .filter(Boolean)
     .join('\n');
-  const { blocked, detail } = await deps.runGuardrail(text || step.label);
+  const { blocked, detail } = await deps.runGuardrail(text || step.label, ctx.orgId);
   if (blocked) {
     return { stepId: step.id, kind: 'guardrail', status: 'error', detail: `guardrail blocked: ${detail}` };
   }
