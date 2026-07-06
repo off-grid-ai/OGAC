@@ -118,15 +118,19 @@ export function GatewayTuning() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">{g.group}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2.5 pt-0">
+          <CardContent className="grid grid-cols-1 gap-2 pt-0 sm:grid-cols-2 lg:grid-cols-3">
             {g.rows.map((row) => (
-              <div key={row.key} className="grid grid-cols-[1fr_auto] items-start gap-4">
-                <div className="min-w-0">
-                  <span className="text-xs font-medium">{row.label}</span>
-                  <p className="text-[11px] leading-snug text-muted-foreground">{row.description}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground/60">Change via: {row.changeVia}</p>
-                </div>
-                <span className="pt-0.5 font-mono text-xs text-primary">{row.value}</span>
+              <div
+                key={row.key}
+                className="flex flex-col rounded-md border border-border bg-muted/20 px-3 py-2.5"
+                title={`Change via: ${row.changeVia}`}
+              >
+                <span className="font-mono text-lg font-light leading-none text-primary">{row.value}</span>
+                <span className="mt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {row.label}
+                </span>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">{row.description}</p>
+                <p className="mt-auto pt-1.5 text-[10px] text-muted-foreground/50">Change via: {row.changeVia}</p>
               </div>
             ))}
           </CardContent>
