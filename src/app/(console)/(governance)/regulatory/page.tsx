@@ -3,6 +3,7 @@ import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { ProvenancePanel } from '@/components/provenance/ProvenancePanel';
 import { ActivityRangeControls } from '@/components/regulatory/ActivityRangeControls';
 import { AddGovernanceButton } from '@/components/regulatory/AddGovernanceButton';
+import { ComplianceCatalog } from '@/components/regulatory/ComplianceCatalog';
 import { EditGovernanceButton } from '@/components/regulatory/EditGovernanceButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { frameworkOverview, statusMap } from '@/lib/compliance-adoption';
+import { buildCrossMap, CATALOG } from '@/lib/compliance-catalog';
 import { computeCompliance } from '@/lib/compliance';
 import { buildComplianceActivity } from '@/lib/compliance-activity';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -55,12 +58,15 @@ export default async function RegulatoryPage({
   // Turn the date-only inputs into an inclusive instant range for the ledger read.
   const q = { from: `${fromDate}T00:00:00.000Z`, to: `${toDate}T23:59:59.999Z`, org };
 
-  const [c, governance, activityData] = await Promise.all([
+  const [c, governance, activityData, overview, statuses] = await Promise.all([
     computeCompliance(),
     listGovernance(org),
     readComplianceActivity(q),
+    frameworkOverview(org),
+    statusMap(org),
   ]);
   const activity = buildComplianceActivity(activityData.rows, activityData.coverage, q);
+  const crossMap = buildCrossMap();
 
   return (
     <div className="space-y-6">
@@ -124,6 +130,13 @@ export default async function RegulatoryPage({
           </Card>
         ))}
       </div>
+
+      <ComplianceCatalog
+        catalog={CATALOG}
+        overview={overview}
+        statuses={statuses}
+        crossMap={crossMap}
+      />
 
       <Card className="shadow-sm">
         <CardHeader className="space-y-3">
