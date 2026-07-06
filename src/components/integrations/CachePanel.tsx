@@ -31,7 +31,7 @@ export function CachePanel() {
   ];
 
   return (
-    <Card className="shadow-sm">
+    <Card className="h-full shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
           <Lightning className="size-4 text-primary" />
@@ -41,13 +41,15 @@ export function CachePanel() {
           Exact + semantic cache in front of the gateway. Higher hit rate → lower cost and latency.
         </p>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <CardContent className="grid grid-cols-2 gap-3">
         {cells.map((c) => (
-          <div key={c.label}>
+          <div key={c.label} className="rounded-lg border border-border bg-muted/30 p-3">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               {c.label}
             </div>
-            <div className="text-2xl font-semibold text-foreground">{c.value}</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+              {c.value}
+            </div>
           </div>
         ))}
       </CardContent>
