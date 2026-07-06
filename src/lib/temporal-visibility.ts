@@ -111,16 +111,51 @@ function toNum(v: number | bigint | null | undefined): number | undefined {
 }
 
 /**
- * Parse the console runId out of an agent-run workflowId. The id is `agentrun-<agent>-<runId>`
- * (see workflowIdFor). Since the agent segment can itself contain '-', we anchor on the known
- * prefix and take everything after the LAST '-' as the runId, matching how workflowIdFor appends
- * it. Returns undefined for non-agent-run workflows.
+ * Parse the console runId out of an agent-run (or app-run) workflowId. The id is
+ * `agentrun-<agent>-<runId>` (see `workflowIdFor`) / `apprun-<app>-<runId>` (see `appWorkflowIdFor`).
+ *
+ * The naive "everything after the LAST '-'" was FRAGILE (gap #35): both the sanitized agent/app
+ * segment AND the runId can contain '-' (the sanitizer keeps '-', and a UUID runId is dash-heavy),
+ * so slicing at the last '-' returned only the final UUID group for a UUID runId, and could split a
+ * hyphenated agentId wrong. Instead we anchor on the KNOWN runId shapes the minters produce, scanning
+ * left-to-right AFTER the prefix for the FIRST boundary where a recognized runId begins — so the
+ * whole runId (including internal '-') round-trips:
+ *   • prefixed:  `run_…` / `apprun_…`  (minted by agentrun/app-run — `run_<hex>`)
+ *   • UUID:      `8-4-4-4-12` hex       (a UUID-style runId, dashes and all)
+ * Anything left of that boundary is the agent/app segment (which we discard). Returns undefined for
+ * a non-run workflow or a malformed tail.
  */
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+function looksLikeRunId(candidate: string): boolean {
+  if (!candidate) return false;
+  // Prefixed console runIds (agentrun mints `run_…`; app-runs mint `apprun_…`).
+  if (candidate.startsWith('run_') || candidate.startsWith('apprun_')) return true;
+  // A bare UUID runId (dash-heavy — the case the old last-'-' slice broke on).
+  return UUID_RE.test(candidate);
+}
+
 export function runIdFromWorkflowId(workflowId: string): string | undefined {
-  if (!workflowId.startsWith('agentrun-')) return undefined;
-  const idx = workflowId.lastIndexOf('-');
-  if (idx < 0 || idx === workflowId.length - 1) return undefined;
-  return workflowId.slice(idx + 1);
+  const prefix = workflowId.startsWith('agentrun-')
+    ? 'agentrun-'
+    : workflowId.startsWith('apprun-')
+      ? 'apprun-'
+      : undefined;
+  if (!prefix) return undefined;
+  const rest = workflowId.slice(prefix.length); // <agent-or-app>-<runId>
+  // Scan each '-' boundary; the runId is the FIRST suffix that matches a known runId shape. The
+  // agent/app segment is sanitized to [A-Za-z0-9_.-], so a prefixed/UUID runId is unambiguous
+  // against it (an agentId would have to itself be `run_…`/a UUID to collide — not a real case).
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] !== '-') continue;
+    const candidate = rest.slice(i + 1);
+    if (looksLikeRunId(candidate)) return candidate;
+  }
+  // No embedded-hyphen runId matched. Fall back to the last '-' token (covers a bare runId with no
+  // recognized prefix and no internal '-', e.g. the `run_x` test fixture) — but never a trailing '-'.
+  const idx = rest.lastIndexOf('-');
+  if (idx < 0 || idx === rest.length - 1) return undefined;
+  return rest.slice(idx + 1);
 }
 
 /** Shape one raw execution-info record into a JSON-safe row. */

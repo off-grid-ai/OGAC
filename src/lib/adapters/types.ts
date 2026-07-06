@@ -127,7 +127,10 @@ export interface PiiResult {
 
 export interface PiiPort {
   meta: AdapterMeta;
-  scan(text: string): Promise<PiiResult>;
+  // `orgId` scopes the deep config (org custom recognizers + thresholds). Pass it EXPLICITLY on the
+  // durable/worker path (no request scope, so `headers()`-based org resolution would throw); omit it
+  // on the request path to resolve the org from the session. Optional keeps existing callers valid.
+  scan(text: string, orgId?: string): Promise<PiiResult>;
   health(): Promise<boolean>;
 }
 

@@ -11,6 +11,8 @@ import {
   shapeExecution,
   workflowActionsFor,
 } from '../src/lib/temporal-visibility.ts';
+import { workflowIdFor } from '../src/lib/agent-run-durable.ts';
+import { appWorkflowIdFor } from '../src/lib/app-run-durable.ts';
 
 // Pure-logic tests for Temporal workflow-visibility shaping — no cluster, no mocks. Feeds
 // representative raw client shapes through the normalization/derivation and asserts the JSON-safe
@@ -27,12 +29,49 @@ test('normalizeWorkflowStatus: coerces names, tolerates casing/separators, defau
 
 test('runIdFromWorkflowId: extracts runId from agentrun workflow ids, else undefined', () => {
   assert.equal(runIdFromWorkflowId('agentrun-support-run_abcd1234'), 'run_abcd1234');
-  // Agent segment containing '-' — runId is still the last dash-delimited token.
+  // Agent segment containing '-' — the prefixed runId (run_x) is anchored on, not the last token.
   assert.equal(runIdFromWorkflowId('agentrun-multi-word-agent-run_x'), 'run_x');
   // Non-agent-run workflows correlate to no console run.
   assert.equal(runIdFromWorkflowId('someOtherWorkflow-123'), undefined);
   // Malformed (trailing dash) → undefined.
   assert.equal(runIdFromWorkflowId('agentrun-agent-'), undefined);
+});
+
+// ── Gap #35: hyphenated (UUID) runIds must round-trip through workflowIdFor → runIdFromWorkflowId ──
+
+test('runIdFromWorkflowId: a UUID-style runId round-trips (the fragility the old last-dash slice broke)', () => {
+  const runId = '550e8400-e29b-41d4-a716-446655440000';
+  // Direct: even with a hyphenated agentId, the UUID runId is recovered WHOLE (not just its last group).
+  assert.equal(runIdFromWorkflowId(`agentrun-support-${runId}`), runId);
+  assert.equal(runIdFromWorkflowId(`agentrun-multi-word-agent-${runId}`), runId);
+  // Old behavior would have returned only '446655440000' — assert we do NOT.
+  assert.notEqual(runIdFromWorkflowId(`agentrun-support-${runId}`), '446655440000');
+});
+
+test('runIdFromWorkflowId ∘ workflowIdFor: round-trips for hyphen-free AND UUID runIds, incl. hyphenated agentIds', () => {
+  const cases: Array<[agentId: string, runId: string]> = [
+    ['support', 'run_abcd1234'],
+    ['multi-word-agent', 'run_x'],
+    ['support', '550e8400-e29b-41d4-a716-446655440000'],
+    ['multi-word-agent', 'a1b2c3d4-0000-4000-8000-abcdefabcdef'],
+    ['agent.v2_final', 'run_deadbeef'],
+  ];
+  for (const [agentId, runId] of cases) {
+    const wf = workflowIdFor(agentId, runId);
+    assert.equal(runIdFromWorkflowId(wf), runId, `round-trip failed for ${agentId} / ${runId} (wf=${wf})`);
+  }
+});
+
+test('runIdFromWorkflowId ∘ appWorkflowIdFor: app-run workflows round-trip too (apprun- prefix + apprun_ runId)', () => {
+  const cases: Array<[appId: string, runId: string]> = [
+    ['reimbursement', 'apprun_12ab34cd'],
+    ['multi-part-app', 'apprun_ffee0011'],
+    ['expenses', '7c9e6679-7425-40de-944b-e07fc1f90ae7'],
+  ];
+  for (const [appId, runId] of cases) {
+    const wf = appWorkflowIdFor(appId, runId);
+    assert.equal(runIdFromWorkflowId(wf), runId, `app round-trip failed for ${appId} / ${runId} (wf=${wf})`);
+  }
 });
 
 test('shapeExecution: maps raw info → row with mapped status + timestamps + correlated runId', () => {
