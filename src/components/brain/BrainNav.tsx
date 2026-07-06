@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { SubNav } from '@/components/nav/SubNav';
 import { cn } from '@/lib/utils';
 
 // Scoped secondary-nav for Brain — the "ingestion → retrieval (RAG)" plane. Brain is ONE page
@@ -56,7 +57,8 @@ export function BrainNav() {
   const active = normalizeBrainView(searchParams.get('view') ?? undefined);
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border pb-3">
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
       {GROUPS.map((group, gi) => (
           <div key={group.heading} className="flex items-center gap-1">
             {gi > 0 ? <span className="mx-1.5 h-4 w-px bg-border" aria-hidden /> : null}
@@ -86,6 +88,7 @@ export function BrainNav() {
             })}
           </div>
         ))}
-    </nav>
+      </nav>
+    </SubNav>
   );
 }
