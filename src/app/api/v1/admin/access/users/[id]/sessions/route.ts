@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
-import { keycloakAdmin } from '@/lib/keycloak-admin';
-import { normalizeSessions, type KcRawSession } from '@/lib/keycloak-realm';
+import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
+import { forbiddenGrantMessage, mergeUserSessions, type KcRawSession } from '@/lib/keycloak-realm';
 
 export const dynamic = 'force-dynamic';
 
-// GET → a user's active Keycloak sessions (normalized + sorted).
+// GET → a user's active Keycloak sessions (online + offline, normalized + sorted, IPs mDNS'd).
+//
+// Why both online AND offline: the console signs operators in via Keycloak's Direct-Access-Grant
+// (ROPC) flow, not the browser SSO redirect (auth.config.ts deliberately owns the login form). That
+// leaves only a short-lived ONLINE user session that the realm's idle timeout soon reaps — so a
+// genuinely logged-in operator frequently shows zero online sessions ("No active sessions" while
+// logged in — GAP #36). Merging in the OFFLINE (refresh-backed) sessions surfaces the live login.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const gate = await requireAdmin(req);
@@ -17,10 +23,24 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!kc) return NextResponse.json({ configured: false });
 
   try {
-    const raw = (await kc.listUserSessions(id)) as KcRawSession[];
-    return NextResponse.json({ configured: true, sessions: normalizeSessions(raw) });
+    const online = (await kc.listUserSessions(id)) as KcRawSession[];
+
+    // Offline sessions are exposed only per-client; fan out over the realm's clients (a small set).
+    // Best-effort — a failure here must never sink the online listing.
+    let offline: KcRawSession[] = [];
+    try {
+      const clients = await kc.listClients();
+      const internalIds = clients.map((c) => c.id).filter(Boolean);
+      offline = (await kc.listUserOfflineSessions(id, internalIds)) as KcRawSession[];
+    } catch {
+      offline = [];
+    }
+
+    return NextResponse.json({ configured: true, sessions: mergeUserSessions(online, offline) });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const status = err instanceof KeycloakError ? err.status : 500;
+    const message = forbiddenGrantMessage('view-users', status, (err as Error).message);
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -42,6 +62,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     });
     return NextResponse.json({ configured: true, ok: true });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const status = err instanceof KeycloakError ? err.status : 500;
+    const message = forbiddenGrantMessage('manage-users', status, (err as Error).message);
+    return NextResponse.json({ error: message }, { status });
   }
 }

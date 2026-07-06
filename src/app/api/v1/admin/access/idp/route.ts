@@ -3,7 +3,8 @@ import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
-import { buildOidcIdpRep, normalizeIdps, type KcRawIdp } from '@/lib/keycloak-realm';
+import { KeycloakError } from '@/lib/keycloak-admin';
+import { buildOidcIdpRep, forbiddenGrantMessage, normalizeIdps, type KcRawIdp } from '@/lib/keycloak-realm';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,9 @@ export async function GET(req: Request) {
     const raw = (await kc.listIdentityProviders()) as KcRawIdp[];
     return NextResponse.json({ configured: true, providers: normalizeIdps(raw) });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const status = err instanceof KeycloakError ? err.status : 500;
+    const message = forbiddenGrantMessage('list-identity-providers', status, (err as Error).message);
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -54,6 +57,8 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ configured: true, ok: true }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const status = err instanceof KeycloakError ? err.status : 500;
+    const message = forbiddenGrantMessage('manage-identity-providers', status, (err as Error).message);
+    return NextResponse.json({ error: message }, { status });
   }
 }

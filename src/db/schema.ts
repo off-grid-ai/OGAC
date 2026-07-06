@@ -40,7 +40,7 @@ export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
-  prefix: text('prefix').notNull(), // display token prefix, e.g. ogk_ab12…
+  prefix: text('prefix').notNull(), // display token prefix, e.g. ogak_ab12…
   subjectType: text('subject_type').notNull().default('user'), // user | project
   subject: text('subject').notNull(),
   budgetUsd: integer('budget_usd'), // monthly budget in whole USD; null = unlimited

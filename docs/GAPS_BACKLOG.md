@@ -237,3 +237,61 @@ scaffold is mislabeled as a shipped feature.
 
 **Deliverable:** `docs/ROADMAP_STATUS.md` written this sweep — the evidence-based whole-roadmap ledger
 (buckets: shipped & live-verified / code-complete needing an on-site enable / genuine polish remaining).
+
+## Post-merge audit (workspace/temporal/config batch) — 2026-07-06 QA+docs sweep agent
+
+Findings from an adversarial code-read of the 3 just-merged surfaces (Workspace revamp #75, Temporal
+Jobs #76, Config mDNS + honest health #78) + the CSP/Scalar fix. Full trace in
+`docs/PLATFORM_INTEGRATION_REPORT.md`. Verdict: the platform coheres; two real seams below, both in
+the Temporal Jobs surface.
+
+- **#34 (Temporal cancel/terminate emits no audit) — OPEN, P1.**
+  *What:* `POST /api/v1/admin/agent-runs/workflows/[wf]/cancel` (and its `mode:terminate`
+  force-kill) mutates live state but writes NO audit event. `grep audit` across `workflows/**`
+  returns nothing. The route captures `gate.user.email` into the response `by` field but never
+  persists it, so a force-terminate of a durable job leaves zero accountability record.
+  *Where:* `src/app/api/v1/admin/agent-runs/workflows/[wf]/cancel/route.ts:23-30`.
+  *Why it matters:* violates the audit-every-mutation mandate; terminate is irreversible and the
+  most audit-worthy action on the surface. Rerun is fine (it's audited through `runAgent`).
+  *Fix:* emit an attributed audit event (`workflow.cancel` / `workflow.terminate`, actor =
+  `gate.user.email`, target = workflowId + correlated runId, outcome) via the same audit seam
+  `agentrun.ts` uses (`shipAudit`/`audit-event`), on the success path of the cancel route.
+
+- **#35 (`runIdFromWorkflowId` fragile to hyphenated runIds) — OPEN, P2 (latent, not live).**
+  *What:* `runIdFromWorkflowId` slices the runId after the LAST `-`, but `workflowIdFor` builds
+  `agentrun-<agent>-<runId>`. A runId containing `-` (e.g. a UUID) would resolve wrong or 404 on
+  rerun. Today's runIds (`run_2c0d55c7`) are hyphen-free, so it is correct now.
+  *Where:* `src/lib/temporal-visibility.ts` `runIdFromWorkflowId` vs `src/lib/agent-run-durable.ts:74`.
+  *Fix:* anchor the parse on the known `agentrun-` prefix and a delimiter that can't appear in the
+  agentId, or encode a fixed-position separator; add a unit test round-tripping `workflowIdFor` →
+  `runIdFromWorkflowId` including a hyphenated runId.
+
+**Verified clean this sweep (no gap):** Config mDNS display↔connect round-trip (exact inverses,
+`setConfig` applies `configConnectValue` on write); no raw IP/loopback reaches the client (unknown
+private IPs fall back to mDNS); honest health (LanceDB→embedded, Redis→optional, never false "down",
+shared probe with public `/status`); workspace routes all resolve under `(workspace)` group with
+coherent sidebar highlight; self-hosted Scalar closes the `/docs/api` air-gap hole (bundle present,
+`PUBLIC_EXACT` allows it, CSP permits same-origin). No new CRUD-mandate violations found in the
+merged surfaces — the Temporal Jobs surface offers rerun + cancel + terminate (the write actions
+that make sense for externally-owned Temporal executions; create is `runAgent`, delete is N/A for
+Temporal-managed history).
+
+## Live-review gaps (founder UX pass 2026-07-06) — discovered by the founder, not by our own verify
+
+These were caught by the founder clicking through the live console — a reminder that the merge gate
+MUST include live vision verification, not just build/typecheck/test. Logged for the gap agent.
+
+- **#36 (P1) — Access → Sessions shows "No active sessions" while the user IS logged in.**
+  *Where:* `src/components/access/SessionsPanel.tsx` + `src/lib/keycloak-realm.ts` (session lookup).
+  *Why:* the active-session query returns empty for `mac@example.com` despite a live session — likely
+  wrong Keycloak endpoint (user-sessions vs client-sessions) or missing admin scope. Fix + verify a
+  live session renders (IP mDNS'd), and "Log out everywhere" works.
+- **#37 (P1) — Access → Federation: "Keycloak error: HTTP 403 Forbidden" listing identity providers.**
+  *Where:* `src/lib/keycloak-admin.ts` IdP calls. The console admin service-account lacks the
+  `realm-management` role (view/manage-identity-providers). Grant the role (record in SERVER_STATE)
+  and verify list + Add OIDC provider. Infra (Keycloak role) + code.
+- **PROCESS — merge gate drifted:** UI merges were build-gated but NOT vision-verified live, so the
+  founder found the layout/interaction issues instead of us. Reinstate: screenshot-verify every UI
+  merge before "done", and run the QA/platform-integration+docs sweep after every 3 merges.
+
+_Resolved 2026-07-06: #36 (Sessions online+offline merge + mDNS IP, deployed) and #37 (Federation — Keycloak IdP roles granted to the console admin SA, /idp now 200) — see git + SERVER_STATE._

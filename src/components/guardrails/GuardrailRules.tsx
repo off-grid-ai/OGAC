@@ -4,6 +4,7 @@ import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -146,6 +147,7 @@ export function GuardrailRules({ rules }: { rules: Rule[] }) {
       body: JSON.stringify({ enabled }),
     });
     if (res.ok) {
+      toast.success(toggleMessage(r.label || r.pattern, enabled, 'Rule'));
       router.refresh();
     } else {
       toast.error('Failed to toggle rule');

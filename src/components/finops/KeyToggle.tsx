@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { toggleMessage } from '@/lib/toast-messages';
 import { Switch } from '@/components/ui/switch';
 
-export function KeyToggle({ id, enabled }: { id: string; enabled: boolean }) {
+export function KeyToggle({ id, enabled, label }: { id: string; enabled: boolean; label?: string }) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);
@@ -20,6 +21,7 @@ export function KeyToggle({ id, enabled }: { id: string; enabled: boolean }) {
         body: JSON.stringify({ enabled: next }),
       });
       if (!res.ok) throw new Error('failed');
+      toast.success(toggleMessage(label, next, 'Key'));
       router.refresh();
     } catch {
       setOn(!next);

@@ -14,7 +14,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | Key | Value | Why |
 |---|---|---|
 | `OFFGRID_GATEWAY_URL` | `http://127.0.0.1:8800` | Point console at the aggregator (was dead localhost:7878) |
-| `OFFGRID_GATEWAY_API_KEY` | *(matches aggregator plist)* | `/v1/*` auth — see `co.getoffgridai.aggregator` plist |
+| `OFFGRID_GATEWAY_API_KEY` | *(matches aggregator plist)* | **DEPRECATED (task #74)** — the single static `/v1/*` key. Still honored as a backward-compat fallback, but new keys are the Keycloak-backed `ogk_…` API keys minted in the console (Gateway → **API keys** tab). Each key is a Keycloak service-account client (clientId prefix `ogk-`); the aggregator verifies via `client_credentials` (`scripts/lib/gateway-key-verify.mjs`) using the SAME `OFFGRID_KEYCLOAK_URL` + `OFFGRID_KEYCLOAK_REALM` — **no new env var**. Revoke a key = disable/delete its `ogk-` client in Keycloak (aggregator picks it up within ~60s). |
 | `OFFGRID_ADMIN_EMAILS` | `mac@example.com` | Founder admin override (Keycloak role is chicken-and-egg) |
 | `OFFGRID_KEYCLOAK_ISSUERS` | `http://127.0.0.1:8080,https://auth.getoffgridai.co,http://auth.getoffgridai.co` | Accept LAN + public Keycloak issuers. **Added `http://auth.getoffgridai.co`**: Keycloak behind the tunnel stamps `iss` with scheme `http` (tunnel forwards to :8080 over http), so public-issuer service tokens were 401'ing until this host was accepted. |
 | `AUTH_COOKIE_DOMAIN` | `.getoffgridai.co` | Cross-subdomain SSO (provit/status/landing share the session) |
@@ -489,6 +489,21 @@ The `/backups` module is a full management surface (routes under `/api/v1/admin/
 - `co.getoffgridai.agent-worker` — durable agent-run worker (gui-domain LaunchAgent, `tsx scripts/temporal-worker.mts`; drains the `offgrid-agents` queue). Restart: `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker`. See § Durable agent-run worker below.
 - Console + cloudflared run as backgrounded processes (not launchd) — see DEPLOY.md.
 
+### Sandbox runner images (code-exec) — MUST be pre-pulled on S1
+
+The Sandbox (`src/lib/adapters/sandbox.ts`, `docker` engine) runs each snippet in an ephemeral
+`docker run --pull never --network none …` container, so the run image must already be present on
+the host — the runner never pulls at run time (a pull folded into the run timeout is what caused the
+old "Unable to find image 'python:3.11-slim' … / exit 143"). Pre-pull once (done 2026-07-06):
+
+```bash
+docker pull python:3.11-slim   # OFFGRID_SANDBOX_PY_IMAGE default
+docker pull node:20-slim       # OFFGRID_SANDBOX_NODE_IMAGE default
+```
+
+Override the tags via `OFFGRID_SANDBOX_PY_IMAGE` / `OFFGRID_SANDBOX_NODE_IMAGE` (and the Firecracker
+`OFFGRID_FC_*_IMAGE`); whatever tag is configured must be pulled on the host.
+
 ### Durable agent-run worker (Temporal, task queue `offgrid-agents`)
 
 Agent runs (`POST /api/v1/admin/agents/runs`) can now execute DURABLY on Temporal (`:7233`,
@@ -592,3 +607,20 @@ reads it anonymously over loopback — turning the security plugin on without th
 would 401 every console analytics/audit read. FleetDM/Superset OIDC are login-only and safe to add, but
 still need the on-site config mount + restart. The deliverable is a **one-flag enable** with the config
 staged, not a live cutover.
+
+### Keycloak: identity-provider roles for the console admin SA (2026-07-06)
+
+Federation tab (Access → Federation) was 403 because the console's admin service-account
+(`service-account-offgrid-console-admin`, realm `offgrid`, client id from `OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID`)
+lacked the `realm-management` IdP roles. Granted (kcadm inside `offgrid-console-keycloak-1`, bootstrap
+admin `admin`/`offgrid-dev`):
+
+```bash
+docker exec offgrid-console-keycloak-1 /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080 --realm master --user admin --password offgrid-dev
+docker exec offgrid-console-keycloak-1 /opt/keycloak/bin/kcadm.sh add-roles -r offgrid \
+  --uusername service-account-offgrid-console-admin --cclientid realm-management \
+  --rolename view-identity-providers --rolename manage-identity-providers
+```
+
+Takes effect immediately (no restart). Covers list + Add/Delete OIDC provider.

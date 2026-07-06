@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
-import { keycloakAdmin } from '@/lib/keycloak-admin';
+import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
+import { forbiddenGrantMessage } from '@/lib/keycloak-realm';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ alias
     });
     return NextResponse.json({ configured: true, ok: true });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const status = err instanceof KeycloakError ? err.status : 500;
+    const message = forbiddenGrantMessage('manage-identity-providers', status, (err as Error).message);
+    return NextResponse.json({ error: message }, { status });
   }
 }

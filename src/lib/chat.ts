@@ -532,11 +532,23 @@ export async function deleteConversation(userId: string, id: string) {
 // ─── Projects (containers with a system prompt; group conversations) ──────────
 export async function listProjects(userId: string) {
   await ensureChatSchema();
-  return db
+  const rows = await db
     .select()
     .from(chatProjects)
     .where(eq(chatProjects.userId, userId))
     .orderBy(desc(chatProjects.updatedAt));
+  // Enrich each project with its conversation count so the Workspace grid can show "N chats"
+  // without an N+1 fetch. One grouped count query over the user's conversations.
+  const counts = await db
+    .select({
+      projectId: chatConversations.projectId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(chatConversations)
+    .where(eq(chatConversations.userId, userId))
+    .groupBy(chatConversations.projectId);
+  const byProject = new Map(counts.map((c) => [c.projectId, Number(c.n)]));
+  return rows.map((p) => ({ ...p, chatCount: byProject.get(p.id) ?? 0 }));
 }
 
 export async function createProject(userId: string, name: string, systemPrompt = '') {

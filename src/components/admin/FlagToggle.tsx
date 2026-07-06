@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { toggleMessage } from '@/lib/toast-messages';
 import { Switch } from '@/components/ui/switch';
 
 export function FlagToggle({ flagKey, enabled }: { flagKey: string; enabled: boolean }) {
@@ -20,6 +21,7 @@ export function FlagToggle({ flagKey, enabled }: { flagKey: string; enabled: boo
         body: JSON.stringify({ key: flagKey, enabled: next }),
       });
       if (!res.ok) throw new Error('failed');
+      toast.success(toggleMessage(flagKey, next, 'Flag'));
       router.refresh();
     } catch {
       setOn(!next);

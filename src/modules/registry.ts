@@ -138,7 +138,7 @@ export const MODULES: readonly ModuleDef[] = [
   },
   {
     id: 'data',
-    label: 'Data',
+    label: 'Connectors',
     description: 'Connectors, ingestion, PII masking, data catalog.',
     route: '/data',
     service: 'ingest',

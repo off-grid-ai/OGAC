@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
+import { SubNav } from '@/components/nav/SubNav';
 
 // Scoped secondary-nav for the Data family — the "harness your internal intelligence" plane
 // (the builder/data persona). Reads in the flow order data actually moves: connect a source →
@@ -38,8 +39,9 @@ export function DataNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border pb-3">
-      {GROUPS.map((group, gi) => {
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
+        {GROUPS.map((group, gi) => {
         const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
         if (tabs.length === 0) return null;
         return (
@@ -68,7 +70,8 @@ export function DataNav() {
             })}
           </div>
         );
-      })}
-    </nav>
+        })}
+      </nav>
+    </SubNav>
   );
 }

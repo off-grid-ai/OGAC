@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { accentHue, initials } from '@/lib/workspace-grid';
 import { ShareDialog } from './ShareDialog';
 
 interface Doc {
@@ -156,20 +157,55 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     await loadDocs();
   }
 
+  const hue = accentHue(projectId);
+  const displayName = loaded ? name || 'Project' : 'Loading…';
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/projects"
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Back to projects"
+    <div className="mx-auto w-full max-w-6xl space-y-6">
+      <Link
+        href="/projects"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" /> All projects
+      </Link>
+
+      {/* Hero header — accent tile + name + meta chips + primary actions */}
+      <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className="flex size-14 shrink-0 items-center justify-center rounded-xl text-lg font-semibold"
+            style={{
+              backgroundColor: `hsl(${hue} 70% 92%)`,
+              color: `hsl(${hue} 60% 32%)`,
+            }}
           >
-            <ArrowLeft className="size-4" />
-          </Link>
-          <h1 className="text-lg font-semibold">{loaded ? name || 'Project' : 'Loading…'}</h1>
+            {initials(displayName)}
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{displayName}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {chats.length} chat{chats.length === 1 ? '' : 's'}
+              </span>
+              <span aria-hidden>·</span>
+              <span>
+                {docs.length} doc{docs.length === 1 ? '' : 's'}
+              </span>
+              <span aria-hidden>·</span>
+              <span
+                className={
+                  retrievalMode === 'full-context'
+                    ? 'rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-medium text-primary'
+                    : 'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600'
+                }
+              >
+                retrieval: {retrievalMode}
+              </span>
+              <span className="rounded border border-border px-1.5 py-0.5">{visibility}</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {canManage ? (
             <Button
               size="sm"
@@ -181,7 +217,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               <span className="text-[10px] text-muted-foreground">({visibility})</span>
             </Button>
           ) : null}
-          <Button asChild size="sm" variant="outline" className="gap-1.5">
+          <Button asChild size="sm" className="gap-1.5">
             <Link href={`/chat?project=${projectId}`}>
               <ChatCircleDots className="size-4" /> New chat in project
             </Link>
@@ -199,188 +235,197 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         />
       ) : null}
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Instructions</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Applied as the system prompt for every chat in this project.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">System prompt</Label>
-            <Textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              rows={5}
-              placeholder="How should the model behave in this project? e.g. 'You are our support agent. Cite policy docs.'"
-              className="text-sm"
-            />
-          </div>
-          <div className="flex justify-end">
-            <Button size="sm" onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-sm">Knowledge ({docs.length})</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Text/markdown files, embedded so project chats retrieve and cite them.
-            </p>
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".txt,.md,.markdown,.csv,.json,text/*"
-            multiple
-            hidden
-            onChange={(e) => upload(e.target.files)}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className="gap-1.5"
-          >
-            <UploadSimple className="size-3.5" />
-            {busy ? 'Embedding…' : 'Add files'}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                ~{usedTokens.toLocaleString()} / {FULL_CONTEXT_TOKENS.toLocaleString()} tokens
-              </span>
-              <span
-                className={
-                  retrievalMode === 'full-context'
-                    ? 'rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'
-                    : 'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600'
-                }
-                title={
-                  retrievalMode === 'full-context'
-                    ? 'The whole knowledge base fits in context each turn.'
-                    : 'Knowledge base exceeds the window; chats retrieve relevant chunks (RAG).'
-                }
-              >
-                retrieval: {retrievalMode}
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={pct >= 100 ? 'h-full bg-amber-500' : 'h-full bg-primary'}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-          <div className="space-y-1 rounded-md border border-border p-1.5">
-            {docs.length === 0 ? (
-              <p className="px-1 py-3 text-center text-xs text-muted-foreground">
-                No documents. Add text/markdown files to ground answers.
+      {/* Two-column workspace: instructions + chats on the left, knowledge + memory on the right */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Instructions</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Applied as the system prompt for every chat in this project.
               </p>
-            ) : (
-              docs.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
-                >
-                  <FileText className="size-3.5 text-muted-foreground" />
-                  <span className="flex-1 truncate">{d.name}</span>
-                  <Trash
-                    onClick={() => removeDoc(d.id)}
-                    className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">System prompt</Label>
+                <Textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={8}
+                  placeholder="How should the model behave in this project? e.g. 'You are our support agent. Cite policy docs.'"
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={save} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Chats ({chats.length})</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Conversations grouped under this project.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {chats.length === 0 ? (
+                  <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                    No chats yet — start one with “New chat in project”.
+                  </p>
+                ) : (
+                  chats.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/chat?c=${c.id}`}
+                      className="flex items-center gap-2 rounded px-1.5 py-1.5 text-xs hover:bg-muted"
+                    >
+                      <ChatCircleDots className="size-3.5 text-muted-foreground" />
+                      <span className="flex-1 truncate">{c.title}</span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <CardTitle className="text-sm">Knowledge ({docs.length})</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Text/markdown files, embedded so project chats retrieve and cite them.
+                </p>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".txt,.md,.markdown,.csv,.json,text/*"
+                multiple
+                hidden
+                onChange={(e) => upload(e.target.files)}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+                className="shrink-0 gap-1.5"
+              >
+                <UploadSimple className="size-3.5" />
+                {busy ? 'Embedding…' : 'Add files'}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    ~{usedTokens.toLocaleString()} / {FULL_CONTEXT_TOKENS.toLocaleString()} tokens
+                  </span>
+                  <span
+                    className={
+                      retrievalMode === 'full-context'
+                        ? 'rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'
+                        : 'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600'
+                    }
+                    title={
+                      retrievalMode === 'full-context'
+                        ? 'The whole knowledge base fits in context each turn.'
+                        : 'Knowledge base exceeds the window; chats retrieve relevant chunks (RAG).'
+                    }
+                  >
+                    retrieval: {retrievalMode}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={pct >= 100 ? 'h-full bg-amber-500' : 'h-full bg-primary'}
+                    style={{ width: `${pct}%` }}
                   />
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+              <div className="space-y-1 rounded-md border border-border p-1.5">
+                {docs.length === 0 ? (
+                  <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+                    No documents. Add text/markdown files to ground answers.
+                  </p>
+                ) : (
+                  docs.map((d) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
+                    >
+                      <FileText className="size-3.5 text-muted-foreground" />
+                      <span className="flex-1 truncate">{d.name}</span>
+                      <Trash
+                        onClick={() => removeDoc(d.id)}
+                        className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Project memory ({memory.length})</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Facts remembered for this project and injected into its chats. Captured automatically or
-            added here.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {canEdit ? (
-            <div className="flex items-center gap-1.5">
-              <Input
-                value={newFact}
-                placeholder="Add a fact the project should remember…"
-                onChange={(e) => setNewFact(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addFact()}
-              />
-              <Button size="sm" className="shrink-0" onClick={addFact}>
-                Add
-              </Button>
-            </div>
-          ) : null}
-          <div className="space-y-1 rounded-md border border-border p-1.5">
-            {memory.length === 0 ? (
-              <p className="px-1 py-3 text-center text-xs text-muted-foreground">
-                No project memory yet.
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Project memory ({memory.length})</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Facts remembered for this project and injected into its chats. Captured automatically
+                or added here.
               </p>
-            ) : (
-              memory.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
-                >
-                  <span className="flex-1">{m.fact}</span>
-                  {canEdit ? (
-                    <Trash
-                      onClick={() => removeFact(m.id)}
-                      className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
-                    />
-                  ) : null}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {canEdit ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    value={newFact}
+                    placeholder="Add a fact the project should remember…"
+                    onChange={(e) => setNewFact(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addFact()}
+                  />
+                  <Button size="sm" className="shrink-0" onClick={addFact}>
+                    Add
+                  </Button>
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Chats ({chats.length})</CardTitle>
-          <p className="text-xs text-muted-foreground">Conversations grouped under this project.</p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {chats.length === 0 ? (
-              <p className="px-1 py-3 text-center text-xs text-muted-foreground">
-                No chats yet — start one with “New chat in project”.
-              </p>
-            ) : (
-              chats.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/chat?c=${c.id}`}
-                  className="flex items-center gap-2 rounded px-1.5 py-1.5 text-xs hover:bg-muted"
-                >
-                  <ChatCircleDots className="size-3.5 text-muted-foreground" />
-                  <span className="flex-1 truncate">{c.title}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              ) : null}
+              <div className="space-y-1 rounded-md border border-border p-1.5">
+                {memory.length === 0 ? (
+                  <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+                    No project memory yet.
+                  </p>
+                ) : (
+                  memory.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
+                    >
+                      <span className="flex-1">{m.fact}</span>
+                      {canEdit ? (
+                        <Trash
+                          onClick={() => removeFact(m.id)}
+                          className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
+                        />
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
