@@ -98,3 +98,20 @@ deploy over tunnel, restart aggregator if scripts changed, **vision-verify live*
 ## Systems of record (keep updated with any infra change)
 
 `deploy/onprem/SERVER_STATE.md`, `SERVICE_MAP.md`, `deploy/DEPLOY.md`, `docs/GAPS_BACKLOG.md`.
+
+## Live status — autonomous run (2026-07-06, founder away)
+
+Founder stepped away; drive the tools/MCP + evals work to fully-integrated, no stopping.
+
+**Running now (background agents, commit-early):**
+- #117 tools — apps-as-tools + primitives (web_search/read_url/http) + 3-group step picker.
+- #120 evals — expand template catalog to full ragas+deepeval set + G-Eval custom LLM-judge.
+
+**Chain (MUST follow, not parallel — shares tool surface):**
+- #119 MCP-server catalog — one-click add curated MCP servers (Fetch/Filesystem/Git/Memory/Sequential-Thinking + popular community) from registry.modelcontextprotocol.io; operator points at an on-prem server endpoint (air-gap-safe). Launch AFTER #117 merges.
+
+**Also still open:**
+- #114 — enable the durable `offgrid-apps` Temporal worker live on the fleet (worker:apps registered; console uses submitAppRun; queue not yet confirmed running) so HITL resume works durably in prod.
+- #88 — device enrollment docs (PARKED for founder).
+
+**Loop for each landing:** merge --no-ff → resolve conflicts (keep both) → rm -rf .next → typecheck+test+build gate → push origin main → deploy over tunnel (SERVER=offgrid-tunnel) → prune worktree. Then chain the next. North star: `docs/BUILDER_EPIC_PLAN.md` §North star — a non-technical tax/accounting person must be able to build+run a workflow unaided.
