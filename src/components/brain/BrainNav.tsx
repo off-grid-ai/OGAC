@@ -41,7 +41,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     heading: 'Knowledge',
     tabs: [
       { view: 'retrieval', label: 'Retrieval' },
-      { view: 'knowledge', label: 'Knowledge base' },
+      { view: 'knowledge', label: 'Agent knowledge base' },
       { view: 'prompts', label: 'Prompts' },
     ],
   },
