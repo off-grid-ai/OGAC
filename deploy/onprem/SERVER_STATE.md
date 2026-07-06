@@ -14,7 +14,7 @@ Set/changed this session (values below; secrets marked — real values live on t
 | Key | Value | Why |
 |---|---|---|
 | `OFFGRID_GATEWAY_URL` | `http://127.0.0.1:8800` | Point console at the aggregator (was dead localhost:7878) |
-| `OFFGRID_GATEWAY_API_KEY` | *(matches aggregator plist)* | `/v1/*` auth — see `co.getoffgridai.aggregator` plist |
+| `OFFGRID_GATEWAY_API_KEY` | *(matches aggregator plist)* | **DEPRECATED (task #74)** — the single static `/v1/*` key. Still honored as a backward-compat fallback, but new keys are the Keycloak-backed `ogk_…` API keys minted in the console (Gateway → **API keys** tab). Each key is a Keycloak service-account client (clientId prefix `ogk-`); the aggregator verifies via `client_credentials` (`scripts/lib/gateway-key-verify.mjs`) using the SAME `OFFGRID_KEYCLOAK_URL` + `OFFGRID_KEYCLOAK_REALM` — **no new env var**. Revoke a key = disable/delete its `ogk-` client in Keycloak (aggregator picks it up within ~60s). |
 | `OFFGRID_ADMIN_EMAILS` | `mac@wednesday.is` | Founder admin override (Keycloak role is chicken-and-egg) |
 | `OFFGRID_KEYCLOAK_ISSUERS` | `http://127.0.0.1:8080,https://auth.getoffgridai.co,http://auth.getoffgridai.co` | Accept LAN + public Keycloak issuers. **Added `http://auth.getoffgridai.co`**: Keycloak behind the tunnel stamps `iss` with scheme `http` (tunnel forwards to :8080 over http), so public-issuer service tokens were 401'ing until this host was accepted. |
 | `AUTH_COOKIE_DOMAIN` | `.getoffgridai.co` | Cross-subdomain SSO (provit/status/landing share the session) |
