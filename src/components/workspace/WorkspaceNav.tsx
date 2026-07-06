@@ -4,6 +4,7 @@ import { ChatCircleDots, Cube, FolderOpen, TextAlignLeft } from '@phosphor-icons
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Icon } from '@phosphor-icons/react';
+import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +34,8 @@ export function WorkspaceNav() {
   const tabs = TABS.filter((t) => isModuleEnabled(t.id));
 
   return (
-    <nav className="flex flex-wrap items-center gap-1 border-b border-border pb-3">
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-1">
       <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground/50">
         Workspace
       </span>
@@ -56,6 +58,7 @@ export function WorkspaceNav() {
           </Link>
         );
       })}
-    </nav>
+      </nav>
+    </SubNav>
   );
 }
