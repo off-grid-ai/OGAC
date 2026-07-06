@@ -7,6 +7,12 @@ import {
   scoreMetric,
   type MetricScore,
 } from '@/lib/eval-metrics';
+import {
+  buildGEvalPrompt,
+  gEvalUnavailable,
+  parseGEvalScore,
+  type GEvalResult,
+} from '@/lib/eval-geval';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
@@ -110,25 +116,102 @@ function usesRagas(def: EvalDef): boolean {
   return def.engine === 'ragas' && RAGAS_METRICS.has(def.metric);
 }
 
+// Is a gateway judge configured? The gateway URL always has a localhost default, so "configured"
+// means the operator explicitly set OFFGRID_GATEWAY_URL. Without it, G-Eval can't run honestly.
+function gatewayJudgeConfigured(): boolean {
+  return Boolean(process.env.OFFGRID_GATEWAY_URL);
+}
+
+// G-EVAL judge (I/O): send the operator's plain-English criteria + one sample to the gateway as an
+// LLM-as-judge, parse a 1..5 verdict back to 0..1. NEVER fabricates: on no-gateway/failure/unparseable
+// text it returns a `parsed:false` result so the caller records no score and surfaces the reason.
+async function gEvalJudge(criteria: string, s: Sample): Promise<GEvalResult> {
+  if (!gatewayJudgeConfigured()) {
+    return gEvalUnavailable('No gateway judge configured (set OFFGRID_GATEWAY_URL) — G-Eval needs one.');
+  }
+  const prompt = buildGEvalPrompt(criteria, {
+    question: s.question,
+    answer: s.answer,
+    contexts: s.contexts,
+    groundTruth: s.groundTruth,
+  });
+  try {
+    const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
+      body: JSON.stringify({
+        model: EVAL_MODEL,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: prompt.system },
+          { role: 'user', content: prompt.user },
+        ],
+        chat_template_kwargs: { enable_thinking: false },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) return gEvalUnavailable('Gateway judge returned an error — no score recorded.');
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    return parseGEvalScore(data.choices?.[0]?.message?.content ?? '');
+  } catch {
+    return gEvalUnavailable('Gateway judge unreachable — no score recorded.');
+  }
+}
+
 export interface EvalDefRunResult {
   run: EvalRun;
   metrics: MetricScore[];
-  // The engine that actually computed the metric — 'ragas' when the sidecar answered, else
-  // 'heuristic' (honest degradation).
-  computedBy: EvalEngine | 'heuristic';
+  // The engine that actually computed the metric — 'ragas' when the sidecar answered, 'deepeval' when
+  // the gateway judge scored G-Eval, 'unavailable' when a judge-only metric couldn't run (honest — no
+  // fabricated score), else 'heuristic' (honest first-party degradation).
+  computedBy: EvalEngine | 'heuristic' | 'unavailable';
+  // For judge-only metrics that couldn't run: the honest reason (surfaced in the UI). Undefined otherwise.
+  unavailableReason?: string;
 }
 
 // Run one eval definition end-to-end and persist the scored run.
 export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
   const samples = await buildSamples();
+  const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
+  const perSample: MetricScore[] = [];
 
-  // Try ragas once for the whole dataset when the def uses it; else heuristic per-sample.
+  // ── G-Eval (custom LLM-as-judge over the operator's plain-English criteria) ──────────────────────
+  // Judge-only: there is no honest heuristic for arbitrary criteria. If no gateway judge is
+  // configured (or every judge call fails), we record NOTHING and surface the reason — never a
+  // fabricated score. The criteria is the def's description (what the operator wrote when applying).
+  if (def.metric === 'g_eval') {
+    const criteria = def.description || def.name;
+    let anyParsed = false;
+    let reason = '';
+    for (const s of samples) {
+      const r = await gEvalJudge(criteria, s);
+      if (r.parsed) {
+        anyParsed = true;
+        perSample.push(scoreMetric(tpl, r.score, 'deepeval', def.threshold));
+      } else {
+        reason = r.rationale || reason;
+      }
+    }
+    if (!anyParsed) {
+      // Honest unavailable: persist a 0/0 run tagged unavailable so the surface shows it ran but
+      // could not score, with the reason — not a fake pass/fail.
+      const id = `ed_run_${randomUUID().slice(0, 6)}`;
+      const engineTag = `${def.metric}:unavailable`;
+      await recordEvalRun({ id, engine: engineTag, score: 0, total: 0, passed: 0 });
+      return {
+        run: { id, engine: engineTag, score: 0, total: 0, passed: 0, startedAt: new Date().toISOString() },
+        metrics: [],
+        computedBy: 'unavailable',
+        unavailableReason: reason || 'G-Eval judge unavailable — no score recorded.',
+      };
+    }
+    return persistRun(def, perSample, 'deepeval');
+  }
+
+  // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
   const ragas = usesRagas(def) ? await ragasMetrics(samples) : null;
   const computedBy: EvalEngine | 'heuristic' =
     ragas && ragas[def.metric] !== undefined ? 'ragas' : 'heuristic';
-
-  const perSample: MetricScore[] = [];
-  const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
 
   if (computedBy === 'ragas' && ragas) {
     // Ragas returns dataset-level aggregate per metric — score the whole run once against it.
@@ -147,6 +230,16 @@ export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
     }
   }
 
+  return persistRun(def, perSample, computedBy);
+}
+
+// Roll up + persist a scored run, tagged with the engine that actually computed it. Shared by the
+// G-Eval and ragas/heuristic paths so the persistence shape stays identical.
+async function persistRun(
+  def: EvalDef,
+  perSample: MetricScore[],
+  computedBy: EvalEngine | 'heuristic',
+): Promise<EvalDefRunResult> {
   const rollup = rollupMetrics(perSample);
   const id = `ed_run_${randomUUID().slice(0, 6)}`;
   const engineTag = `${def.metric}:${computedBy}`;
