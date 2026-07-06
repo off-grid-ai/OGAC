@@ -3,19 +3,20 @@ import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { getApp } from '@/lib/apps-store';
-import { newAppRunId, runApp } from '@/lib/app-run';
+import { newAppRunId } from '@/lib/app-run';
+import { submitAppRun } from '@/lib/adapters/apprun';
 
 export const dynamic = 'force-dynamic';
 
 // ─── App test-run route (Builder Epic Phase 3A — the INPUT screen's "Run") ────────────────────────
-// POST /api/v1/admin/apps/[id]/run { input } → runs the saved AppSpec inline via the Phase 2A
-// executor (runApp), collecting the per-step trace and the final outcome. This is the INLINE path
-// the brief specifies: it calls runApp directly (does NOT import worker files); durable submit +
-// the live-status screen land in later phases (2B/3-5). A `human` step pauses the inline run and it
-// returns status 'awaiting_human' — the REVIEW screen (Phase 4) owns the resume.
+// POST /api/v1/admin/apps/[id]/run { input } → submits the saved AppSpec through submitAppRun, which
+// routes DURABLY (Temporal) when the spec shouldRunDurably (multi-step OR has a human step) so a
+// paused human step can be RESUMED from the Review screen, and INLINE otherwise (GAP #114). When the
+// durable worker/Temporal is off, submitAppRun degrades gracefully to inline — we surface that
+// honestly in the response (mode + note) so the operator knows a HITL test-run won't be resumable.
 //
-// SOLID: thin handler — auth, org, load the spec, mint a run id, delegate to runApp. All execution
-// logic is in app-run.ts (governed per-step pipeline).
+// SOLID: thin handler — auth, org, load the spec, mint a run id, delegate to submitAppRun. All
+// execution + routing logic lives behind the adapter/app-run.ts (governed per-step pipeline).
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -29,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const input = body.input && typeof body.input === 'object' ? body.input : {};
 
   const runId = newAppRunId();
-  const outcome = await runApp(app, input, {
+  const handle = await submitAppRun(app, input, {
     orgId,
     actor: gate.user.email ?? undefined,
     runId,
@@ -38,8 +39,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   auditFromSession(gate, orgId, {
     action: 'app.run',
     resource: `app:${id}`,
-    outcome: outcome.status === 'error' ? 'error' : 'ok',
+    outcome: handle.status === 'error' ? 'error' : 'ok',
   });
 
-  return NextResponse.json({ object: 'app_run', ...outcome });
+  // Shape the response so the console gets a consistent app_run body regardless of path:
+  //   • durable → the started handle (runId/workflowId/mode/status/note); poll for live status.
+  //   • inline  → the full outcome (steps + aggregate) spread in, as before, plus the mode/note so a
+  //     HITL app that fell back to inline is honestly flagged (its human step returns awaiting_human
+  //     and can't be resumed on the inline path).
+  const base = { object: 'app_run', runId: handle.runId, mode: handle.mode, note: handle.note };
+  if (handle.outcome) {
+    return NextResponse.json({ ...base, ...handle.outcome });
+  }
+  return NextResponse.json({
+    ...base,
+    workflowId: handle.workflowId,
+    status: handle.status ?? 'running',
+    steps: [],
+    outcome: '',
+  });
 }
