@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
+import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
+import { currentOrgId } from '@/lib/tenancy';
 import {
   audienceMapperConfig,
   audienceMapperName,
@@ -110,6 +112,24 @@ export async function POST(req: Request) {
     } catch (err) {
       failures.push({ service: def.service, clientId: def.clientId, error: (err as Error).message });
     }
+  }
+
+  // Audit each machine credential that landed (issue vs rotate from the secret action) and each
+  // failure — a governed, secret-writing action must leave an accountability trail per service.
+  const org = await currentOrgId();
+  for (const r of results) {
+    auditFromSession(gate, org, {
+      action: r.secret === 'rotated' ? 'access.machine.rotate' : 'access.machine.issue',
+      resource: `client:${r.clientId}`,
+      outcome: 'ok',
+    });
+  }
+  for (const f of failures) {
+    auditFromSession(gate, org, {
+      action: rotate ? 'access.machine.rotate' : 'access.machine.issue',
+      resource: `client:${f.clientId}`,
+      outcome: 'error',
+    });
   }
 
   // Secret VALUES are never returned — only the action + the OpenBao path they landed at.

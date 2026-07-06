@@ -63,6 +63,9 @@ export async function ensureOrgSchema(): Promise<void> {
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`);
+    // Wave-2 hardening: ingest jobs get a tenant scope, devices get a random data-plane secret.
+    await db.execute(sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`);
+    await db.execute(sql`ALTER TABLE devices ADD COLUMN IF NOT EXISTS token text;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS org_settings (
         id text PRIMARY KEY DEFAULT 'org', system_prompt text NOT NULL DEFAULT '',
@@ -220,11 +223,21 @@ export async function createEnrollmentToken(role: string): Promise<EnrollmentTok
   return { token: row.token, role: row.role, createdAt: iso(row.createdAt), used: row.used };
 }
 
+// The one-time device secret returned to a node at enrollment. Random per device, stored on the row,
+// verified on every data-plane call. `dt_` prefix keeps it recognizable in logs; the entropy is the
+// UUID, not the id (unlike the legacy predictable dt_<id>).
+function mintDeviceToken(): string {
+  return `dt_${randomUUID()}${randomUUID()}`.replace(/-/g, '');
+}
+
+// Enroll a node. Returns the Device AND its freshly-minted data-plane token (shown ONCE — the node
+// stores it and presents it as a Bearer on every /devices/[id]/* call). Null on invalid/used token.
 export async function enrollDevice(
   token: string,
   name: string,
   os: DeviceOS,
-): Promise<Device | null> {
+): Promise<{ device: Device; deviceToken: string } | null> {
+  await ensureOrgSchema();
   const [rec] = await db
     .select()
     .from(enrollmentTokens)
@@ -233,6 +246,7 @@ export async function enrollDevice(
   if (!rec || rec.used) return null;
   await db.update(enrollmentTokens).set({ used: true }).where(eq(enrollmentTokens.token, token));
   const policy = await getOrgPolicy();
+  const deviceToken = mintDeviceToken();
   const [row] = await db
     .insert(devices)
     .values({
@@ -243,9 +257,23 @@ export async function enrollDevice(
       status: 'online',
       lastSeen: 'just now',
       policyVersion: policy.version,
+      token: deviceToken,
     })
     .returning();
-  return toDevice(row);
+  return { device: toDevice(row), deviceToken };
+}
+
+// The stored per-device data-plane secret (or null when the device is unknown / pre-hardening with no
+// stored token). The data-plane routes pass this to the pure verifyDeviceToken(). Never surfaced to
+// the UI — devices are listed via toDevice() which omits the token.
+export async function getDeviceToken(id: string): Promise<string | null> {
+  await ensureOrgSchema();
+  const [row] = await db
+    .select({ token: devices.token })
+    .from(devices)
+    .where(eq(devices.id, id))
+    .limit(1);
+  return row ? (row.token ?? null) : null;
 }
 
 export async function getOrgPolicy(): Promise<PolicyBundle> {
@@ -671,6 +699,7 @@ export async function deleteConnector(id: string): Promise<void> {
 }
 
 export async function syncConnector(id: string): Promise<IngestJob | null> {
+  await ensureOrgSchema();
   const [con] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
   if (!con) return null;
   // Real count from the source; null (unreachable/non-DB) records 0 and marks the connector
@@ -685,6 +714,8 @@ export async function syncConnector(id: string): Promise<IngestJob | null> {
     .insert(ingestJobs)
     .values({
       id: `job_${randomUUID().slice(0, 6)}`,
+      // Inherit the connector's org so listIngestJobs(orgId) can scope by tenant (P1 fix).
+      orgId: con.orgId ?? DEFAULT_ORG,
       connectorId: id,
       connectorName: con.name,
       status: 'completed',
@@ -701,8 +732,19 @@ export async function syncConnector(id: string): Promise<IngestJob | null> {
   };
 }
 
-export async function listIngestJobs(limit = 20): Promise<IngestJob[]> {
-  const rows = await db.select().from(ingestJobs).orderBy(desc(ingestJobs.startedAt)).limit(limit);
+// Tenant-scoped: only returns ingest jobs for `orgId` (defaults to DEFAULT_ORG). Without the filter
+// this listed ALL orgs' jobs — a cross-tenant leak of ingest metadata (P1 — HARDENING_AUDIT.md).
+export async function listIngestJobs(
+  orgId: string = DEFAULT_ORG,
+  limit = 20,
+): Promise<IngestJob[]> {
+  await ensureOrgSchema();
+  const rows = await db
+    .select()
+    .from(ingestJobs)
+    .where(eq(ingestJobs.orgId, orgId))
+    .orderBy(desc(ingestJobs.startedAt))
+    .limit(limit);
   return rows.map((r) => ({
     id: r.id,
     connectorId: r.connectorId,
