@@ -29,9 +29,11 @@ export default async function StudioNewPage() {
     .filter((d) => d.connectorId && d.resource)
     .map((d) => ({ id: d.id, label: d.label }));
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
+  // Connectors power the inline "Wire a data source" fix-it (create a data-domain without leaving).
+  const connectorOptions = ctx.connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
 
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <Link
           href="/studio"
@@ -42,7 +44,12 @@ export default async function StudioNewPage() {
         </Link>
       </div>
       <Suspense fallback={null}>
-        <AppBuilder summary={summary} domains={domains} agents={agentOptions} />
+        <AppBuilder
+          summary={summary}
+          domains={domains}
+          agents={agentOptions}
+          connectors={connectorOptions}
+        />
       </Suspense>
     </div>
   );
