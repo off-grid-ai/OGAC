@@ -104,16 +104,22 @@ export function IdpList() {
   const [providers, setProviders] = useState<Idp[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // A 403 whose message names the missing realm-management role → the console's SA lacks the grant.
+  // Offer a one-click self-heal (GAP #40) instead of leaving the operator to run kcadm by hand.
+  const [grantable, setGrantable] = useState(false);
+  const [granting, setGranting] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
   const fetchIdps = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setGrantable(false);
     try {
       const res = await fetch('/api/v1/admin/access/idp');
       const data = (await res.json()) as { providers?: Idp[]; error?: string };
       if (!res.ok) {
         setError(data.error ?? `HTTP ${res.status}`);
+        setGrantable(res.status === 403 || /realm-management/i.test(data.error ?? ''));
         return;
       }
       setProviders(data.providers ?? []);
@@ -123,6 +129,24 @@ export function IdpList() {
       setLoading(false);
     }
   }, []);
+
+  const grantAccess = useCallback(async () => {
+    setGranting(true);
+    try {
+      const res = await fetch('/api/v1/admin/access/federation/provision', { method: 'POST' });
+      const d = (await res.json()) as { ok?: boolean; manualCommand?: string; error?: string };
+      if (!res.ok || !d.ok) {
+        const msg = d.manualCommand ? `${d.error ?? 'Could not grant access.'}\n\n${d.manualCommand}` : d.error;
+        throw new Error(msg ?? 'Could not grant access.');
+      }
+      toast.success('Federation access granted to the console service-account.');
+      await fetchIdps();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setGranting(false);
+    }
+  }, [fetchIdps]);
 
   useEffect(() => {
     void fetchIdps();
@@ -169,7 +193,20 @@ export function IdpList() {
 
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-            <span className="font-medium">Keycloak error:</span> {error}
+            <div>
+              <span className="font-medium">Keycloak error:</span> {error}
+            </div>
+            {grantable && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => void grantAccess()}
+                disabled={granting}
+              >
+                {granting ? 'Granting…' : 'Grant access'}
+              </Button>
+            )}
           </div>
         )}
 

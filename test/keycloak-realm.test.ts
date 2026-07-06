@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  REALM_MANAGEMENT_CLIENT,
   buildOidcIdpRep,
   deriveMfaStatus,
   extractLifetimes,
+  federationGrantCommand,
+  federationGrantRoleNames,
   forbiddenGrantMessage,
+  serviceAccountUsername,
   formatDuration,
   mergeRealmLifetimes,
   mergeUserSessions,
@@ -90,6 +94,30 @@ test('forbiddenGrantMessage: names the exact realm-management role on a 403', ()
 test('forbiddenGrantMessage: passes the original message through for non-403 statuses', () => {
   assert.equal(forbiddenGrantMessage('list-identity-providers', 500, 'boom'), 'boom');
   assert.equal(forbiddenGrantMessage('view-users', 404, 'not found'), 'not found');
+});
+
+// ── Federation self-heal (GAP #40) ────────────────────────────────────────────
+
+test('federationGrantRoleNames: exactly the two IdP realm-management roles, fresh array each call', () => {
+  assert.deepEqual(federationGrantRoleNames(), ['view-identity-providers', 'manage-identity-providers']);
+  const a = federationGrantRoleNames();
+  a.push('mutated');
+  // Source of truth is not mutated by a caller pushing into the returned array.
+  assert.deepEqual(federationGrantRoleNames(), ['view-identity-providers', 'manage-identity-providers']);
+});
+
+test('serviceAccountUsername: Keycloak service-account naming, lower-cased and trimmed', () => {
+  assert.equal(serviceAccountUsername('console-admin'), 'service-account-console-admin');
+  assert.equal(serviceAccountUsername('  Console-Admin  '), 'service-account-console-admin');
+});
+
+test('federationGrantCommand: copy-pasteable kcadm add-roles for both roles on realm-management', () => {
+  const cmd = federationGrantCommand('console-admin');
+  assert.match(cmd, /add-roles/);
+  assert.match(cmd, /service-account-console-admin/);
+  assert.match(cmd, new RegExp(REALM_MANAGEMENT_CLIENT));
+  assert.match(cmd, /view-identity-providers/);
+  assert.match(cmd, /manage-identity-providers/);
 });
 
 // ── MFA / required actions ──────────────────────────────────────────────────
