@@ -36,8 +36,12 @@ export default async function KnowledgePage() {
           <div>
             <CardTitle>Organization Knowledge</CardTitle>
             <CardDescription>
-              An admin-curated shared corpus, indexed on-prem via the gateway and retrieved
-              permission-aware with citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.
+              The org-shared corpus retrieved in <strong>chat</strong>: an admin-curated set of
+              collections, indexed on-prem via the gateway and retrieved permission-aware with
+              citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.{' '}
+              <Link href="/brain?view=knowledge" className="text-primary underline-offset-4 hover:underline">
+                Managing the docs your agents/router retrieve from? → Brain → Agent knowledge base
+              </Link>
             </CardDescription>
           </div>
           {isAdmin && <CreateCollectionButton />}

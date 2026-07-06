@@ -160,8 +160,16 @@ export default async function BrainPage({
 
       {view === 'knowledge' && (
       <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">Knowledge base · {docs.length} documents</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div>
+            <CardTitle className="text-sm">Agent knowledge base · {docs.length} documents</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The document corpus (SOPs, playbooks) your agents and the retrieval router pull from — LanceDB RAG.{' '}
+              <Link href="/knowledge" className="text-primary underline-offset-4 hover:underline">
+                Curating a shared corpus for chat? → Organization Knowledge
+              </Link>
+            </p>
+          </div>
           <IngestMenu datasets={datasetOpts} />
         </CardHeader>
         <CardContent className="space-y-2">
