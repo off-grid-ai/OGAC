@@ -7,8 +7,10 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -46,6 +48,7 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   const [trigger, setTrigger] = useState<(typeof TRIGGERS)[number]>('on-demand');
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   const setPanel = useCallback(
     (value: string | null) => {
@@ -63,6 +66,7 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
     setGrounded(true);
     setTrigger('on-demand');
     setSelectedTools([]);
+    setTouched(false);
   }
 
   // Reset the form each time the panel opens so a stale draft never lingers.
@@ -75,7 +79,11 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
   }
 
   async function create() {
-    if (!name.trim() || !systemPrompt.trim()) return;
+    setTouched(true);
+    if (!name.trim() || !systemPrompt.trim()) {
+      toast.error('Name and instructions are required');
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch('/api/v1/admin/agents', {
@@ -118,16 +126,22 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
               automatically.
             </SheetDescription>
           </SheetHeader>
-          <div className="space-y-4">
+          <SheetBody>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="agent-name">Name</Label>
+              <Label htmlFor="agent-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="agent-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Renewals Assistant"
+                aria-invalid={touched && !name.trim() ? true : undefined}
               />
+              {touched && !name.trim() ? (
+                <p className="text-[11px] text-destructive">A name is required.</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="agent-role">Role / team</Label>
@@ -140,14 +154,20 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="agent-prompt">Instructions</Label>
+            <Label htmlFor="agent-prompt">
+              Instructions <span className="text-destructive">*</span>
+            </Label>
             <Textarea
               id="agent-prompt"
               rows={6}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="You help the renewals team. Given an account, summarize its usage trend and draft a renewal talking-points list. Be concise and cite the source docs."
+              aria-invalid={touched && !systemPrompt.trim() ? true : undefined}
             />
+            {touched && !systemPrompt.trim() ? (
+              <p className="text-[11px] text-destructive">Instructions are required.</p>
+            ) : null}
             <p className="text-[11px] text-muted-foreground">
               This becomes the agent&apos;s system prompt. Grounding is enforced on top — it can&apos;t
               invent facts beyond the retrieved sources.
@@ -232,14 +252,12 @@ export function CreateAgentButton({ tools = [] }: { tools?: ToolOption[] }) {
             )}
           </div>
 
-          <Button
-            onClick={create}
-            disabled={busy || !name.trim() || !systemPrompt.trim()}
-            className="w-full"
-          >
-            {busy ? 'Creating…' : 'Create agent'}
-          </Button>
-          </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button onClick={create} disabled={busy} className="w-full">
+              {busy ? 'Creating…' : 'Create agent'}
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </>

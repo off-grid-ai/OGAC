@@ -72,6 +72,14 @@ test('Workspace consolidation: projects/prompts/artifacts are chat sub-surfaces,
   }
 });
 
+test('Build consolidation: studio + agent-runs highlight the Agents row', () => {
+  // Studio and Agents were consolidated under one "Agents" umbrella (BuildNav tabs across
+  // Agents / Studio / Runs). Studio and Agent Runs are now secondaries, so their routes must keep
+  // the Build → Agents sidebar row active rather than 404-ing or losing highlight.
+  assert.equal(sidebarActiveIdFor('studio'), 'agents');
+  assert.equal(sidebarActiveIdFor('agent-runs'), 'agents');
+});
+
 test('sidebarActiveIdFor: a primary maps to itself', () => {
   assert.equal(sidebarActiveIdFor('chat'), 'chat');
   assert.equal(sidebarActiveIdFor('overview'), 'overview');
