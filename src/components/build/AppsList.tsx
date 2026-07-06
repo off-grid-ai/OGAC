@@ -9,7 +9,7 @@ import { isSimpleAgent, type AppSpec } from '@/lib/app-model';
 // The unified builder front door renders APPS alongside agents. An "app" is the one entity the
 // builder produces — a single-step app IS an agent (isSimpleAgent), a multi-step app is a workflow.
 // This component is the apps half of that grid: each saved app links to its run/input surface
-// (/studio/new/<id>), shows its shape (agent vs N steps) + trigger + visibility, exposes its shared
+// (/apps/<id> — its lifecycle shell), shows its shape (agent vs N steps) + trigger + visibility, exposes its shared
 // link when published, and offers a scoped delete (DELETE /api/v1/admin/apps/<id>). Pure presentation
 // over the AppSpec[] the server page reads from listApps — no I/O of its own.
 
@@ -60,11 +60,11 @@ export function AppsList({ apps }: { apps: AppSpec[] }) {
               </div>
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/studio/new/${encodeURIComponent(app.id)}`}
+                  href={`/apps/${encodeURIComponent(app.id)}`}
                   className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 >
                   <Play className="size-3.5" />
-                  Open &amp; run
+                  Open
                 </Link>
                 {app.published && app.slug ? (
                   <a
