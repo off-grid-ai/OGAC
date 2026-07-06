@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin, type KcRole } from '@/lib/keycloak-admin';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +47,7 @@ export async function POST(req: Request) {
   if (!email) return NextResponse.json({ error: 'email is required' }, { status: 400 });
   if (!password) return NextResponse.json({ error: 'password is required' }, { status: 400 });
 
+  const org = await currentOrgId();
   try {
     const user = await kc.createUser({
       username: email,
@@ -59,8 +62,18 @@ export async function POST(req: Request) {
       await kc.assignRoles(user.id, roles);
     }
 
+    auditFromSession(gate, org, {
+      action: 'access.user.change',
+      resource: `user:${email}`,
+      outcome: 'ok',
+    });
     return NextResponse.json({ configured: true, user }, { status: 201 });
   } catch (err) {
+    auditFromSession(gate, org, {
+      action: 'access.user.change',
+      resource: `user:${email}`,
+      outcome: 'error',
+    });
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }
