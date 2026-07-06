@@ -748,6 +748,125 @@ export const provitVerdicts = pgTable('provit_verdicts', {
   note: text('note'),
 }, (t) => ({ runIdx: index('provit_verdicts_run_idx').on(t.runId) }));
 
+// ─── Unified App model (Builder Epic #108) — the one "app" entity ─────────────
+// AppSpec supersedes customAgent + studioTemplate as the single build artifact: an app is a
+// triggered, multi-step workflow. A simple agent is just an app with one agent step. ADDITIVE:
+// customAgents/studioTemplates are NOT dropped — a Phase-1A compat shim maps old templates to
+// AppSpec so /app/<slug> keeps working. Org-scoped + timestamped like the other build tables.
+//   trigger   — TriggerSpec: how the app is invoked (on-demand | schedule | webhook | email | …).
+//   inputForm — optional FormField[] collected before the run (null = no form).
+//   steps     — AppStep[]: agent | connector-query | guardrail | human | output nodes.
+//   edges     — {from,to,when?}[]: the directed graph wiring steps together.
+export const apps = pgTable('apps', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull(),
+  title: text('title').notNull(),
+  summary: text('summary').notNull().default(''),
+  visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+  // Deployed-app slug: when published, the app is served at /app/<slug>.
+  slug: text('slug'),
+  published: boolean('published').notNull().default(false),
+  // How the app is triggered — TriggerSpec envelope, shape owned by lib/triggers.ts (Phase 2B).
+  trigger: jsonb('trigger')
+    .$type<{ kind: string; config?: Record<string, unknown> }>()
+    .notNull()
+    .default({ kind: 'on-demand' }),
+  // Optional input form collected before the run starts (null = no form).
+  inputForm: jsonb('input_form').$type<
+    { id: string; label: string; type: string; required?: boolean; options?: string[] }[]
+  >(),
+  // The workflow steps. Shape owned by lib/app-model.ts (Phase 1A); jsonb here keeps it flexible.
+  steps: jsonb('steps')
+    .$type<{ id: string; kind: string; label: string; config: Record<string, unknown> }[]>()
+    .notNull()
+    .default([]),
+  // Directed edges wiring steps; `when` is an optional guard expression on the transition.
+  edges: jsonb('edges')
+    .$type<{ from: string; to: string; when?: string }[]>()
+    .notNull()
+    .default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)]);
+
+// ─── App runs (Builder Epic #106) — a run of an app, parallel to agentRuns ─────
+// Mirrors agentRuns (org-scope, status, provenance, timestamps) so the lineage/audit/trace
+// fan-out reuses the same patterns. Where agentRuns is a single-shot trace, appRuns represents a
+// MULTI-STEP run: `steps` holds per-step status + results, and status supports a mid-workflow
+// 'awaiting_human' pause (released by a step-review route in Phase 4A).
+//   status  — queued | running | awaiting_human | done | error | cancelled
+//   trigger — how this run was fired (mirrors the app's TriggerSpec kind + payload snapshot).
+//   input   — resolved input-form values / trigger payload for this run.
+//   steps   — per-step results: {id,kind,status,outcome,refs,startedAt,finishedAt,detail}.
+//   outcome — the aggregated final output/answer of the app run.
+export const appRuns = pgTable('app_runs', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  appId: text('app_id').notNull(),
+  status: text('status').notNull().default('queued'), // queued|running|awaiting_human|done|error|cancelled
+  // How this run was fired + a snapshot of the trigger payload.
+  trigger: jsonb('trigger')
+    .$type<{ kind: string; payload?: Record<string, unknown> }>()
+    .notNull()
+    .default({ kind: 'on-demand' }),
+  // Resolved input-form values / trigger input for this run.
+  input: jsonb('input').$type<Record<string, unknown>>().notNull().default({}),
+  // Per-step results/status — the multi-step trace, incl. mid-workflow 'awaiting_human'.
+  steps: jsonb('steps').$type<
+    {
+      id: string;
+      kind: string;
+      label: string;
+      status: string; // pending | running | awaiting_human | done | error | skipped
+      outcome?: string;
+      refs?: string[];
+      detail?: string;
+      childRunId?: string; // agent-step child agentRuns.id, for lineage
+      startedAt?: string;
+      finishedAt?: string;
+    }[]
+  >().notNull().default([]),
+  // Aggregated final output of the app run.
+  outcome: text('outcome').notNull().default(''),
+  // Detached provenance signature over the outcome — same shape as agentRuns.provenance.
+  provenance: jsonb('provenance').$type<{
+    signature: string;
+    algorithm: string;
+    publicKey: string | null;
+    signedAt: string;
+  }>(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, (t) => [index('app_runs_app_idx').on(t.appId), index('app_runs_org_idx').on(t.orgId)]);
+
+// ─── Data domains (Builder Epic #107) — the connector rule-engine binding ──────
+// A semantic map: a human phrase (e.g. "reimbursement quota") → a specific connector + resource
+// (table / path / object). This is what turns the inert connector canvas nodes into a deterministic
+// rule engine: resolveDomain(phrase) (lib/data-domains.ts, Phase 1B) matches label/aliases and
+// returns the bound connector to query — a rule, never a guess.
+//   aliases  — alternate phrases that resolve to this domain.
+//   resource — the table/path/object within the connector to read.
+//   opHints  — optional query hints (default columns, filters, limits) for the resolver.
+export const dataDomains = pgTable('data_domains', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  label: text('label').notNull(),
+  aliases: jsonb('aliases').$type<string[]>().notNull().default([]),
+  connectorId: text('connector_id').notNull(),
+  resource: text('resource').notNull(), // table / path / object within the connector
+  opHints: jsonb('op_hints').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);
+
+export type App = typeof apps.$inferSelect;
+export type NewApp = typeof apps.$inferInsert;
+export type AppRun = typeof appRuns.$inferSelect;
+export type NewAppRun = typeof appRuns.$inferInsert;
+export type DataDomain = typeof dataDomains.$inferSelect;
+export type NewDataDomain = typeof dataDomains.$inferInsert;
+
 // ─── Fleet nodes — SINGLE SOURCE OF TRUTH for the on-prem fleet topology ───────
 // The aggregator's routing POOL, the status page's node list, and each node's
 // served model all derive from this table. Editing a row here (via the AI Gateway
