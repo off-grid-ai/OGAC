@@ -6,8 +6,11 @@ import {
   CaretLeft,
   CaretRight,
   Check,
+  ClockCounterClockwise,
   Copy,
+  Cube,
   FileText,
+  FolderOpen,
   FolderSimplePlus,
   GearSix,
   Brain,
@@ -26,10 +29,12 @@ import {
   Sparkle,
   SpeakerHigh,
   Stop,
+  TextAlignLeft,
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -48,8 +53,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
+import { buildSources } from '@/lib/chat-citations';
+import { thinkingLabel, thinkingState } from '@/lib/chat-thinking';
 import { toDisplayHost } from '@/lib/display-host';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { cn } from '@/lib/utils';
+import { relativeTime } from '@/lib/workspace-grid';
 import { ArtifactView } from './ArtifactView';
 import { Markdown } from './Markdown';
 import { MemoryDialog } from './MemoryDialog';
@@ -125,6 +134,86 @@ function BranchNav({
   );
 }
 
+// Inline extended-thinking block — reasoning tokens rendered ABOVE the answer, never mixed into the
+// body. While the model is still thinking (no answer yet) it's expanded and streams live; once the
+// answer starts it collapses to a one-line header the reader can re-open. Presentation state is the
+// pure `thinkingState` decision (task rule: "collapsed by default once the answer starts"); the only
+// local state is the reader's manual open/close override, seeded from that default.
+function ThinkingBlock({ reasoning, content, streaming }: {
+  reasoning: string;
+  content: string;
+  streaming: boolean;
+}) {
+  const state = thinkingState(reasoning, content, streaming);
+  const [override, setOverride] = useState<boolean | null>(null);
+  // Follow the phase-driven default until the reader intervenes; a manual toggle sticks.
+  const open = override ?? state.defaultOpen;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Keep the newest reasoning in view while it streams (transform/opacity-only motion elsewhere).
+  useEffect(() => {
+    if (open && state.phase === 'streaming') scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [reasoning, open, state.phase]);
+  if (!state.hasReasoning) return null;
+  return (
+    <div className="mb-2 rounded-md border border-border/60 bg-muted/40">
+      <button
+        type="button"
+        onClick={() => setOverride(!open)}
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
+      >
+        <Brain className={cn('size-3.5 shrink-0 text-primary', state.phase === 'streaming' && 'animate-pulse')} />
+        <span>{thinkingLabel(state.phase)}</span>
+        <CaretRight className={cn('ml-auto size-3 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+      </button>
+      {open ? (
+        <div
+          ref={scrollRef}
+          className="max-h-64 overflow-y-auto whitespace-pre-wrap border-t border-border/60 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground"
+        >
+          {reasoning}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
+// [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
+// briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
+function SourcesFooter({ citations, activeIndex, registerRef }: {
+  citations: Citation[];
+  activeIndex: number | null;
+  registerRef: (index: number, el: HTMLLIElement | null) => void;
+}) {
+  const sources = buildSources(citations);
+  if (!sources.length) return null;
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+        <Quotes className="size-3" /> Sources
+      </div>
+      <ol className="space-y-0.5">
+        {sources.map((s) => (
+          <li
+            key={s.index}
+            ref={(el) => registerRef(s.index, el)}
+            className={cn(
+              'flex items-baseline gap-1.5 rounded px-1 py-0.5 text-[11px] transition-colors duration-300',
+              activeIndex === s.index ? 'bg-primary/10' : 'bg-transparent',
+            )}
+          >
+            <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
+            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>{s.name}</span>
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} · {(s.score * 100).toFixed(0)}%
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // eslint-disable-next-line complexity
 function MessageBubble({
   message: m,
@@ -137,6 +226,7 @@ function MessageBubble({
   onViewImage,
   canRegenerate,
   canEdit,
+  streaming,
 }: {
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
@@ -148,10 +238,24 @@ function MessageBubble({
   onViewImage: (src: string) => void;
   canRegenerate: boolean;
   canEdit: boolean;
+  streaming: boolean;
 }) {
   const isAssistant = m.role === 'assistant';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.content);
+  // Inline-citation ↔ Sources-footer wiring: clicking a [n] chip scrolls to source n and highlights
+  // it briefly. Refs are registered by the footer; activeIndex drives the transient highlight.
+  const sourceRefs = useRef(new Map<number, HTMLLIElement>());
+  const [activeSource, setActiveSource] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceCount = buildSources(m.citations).length;
+  const jumpToSource = useCallback((n: number) => {
+    sourceRefs.current.get(n)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setActiveSource(n);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setActiveSource(null), 1600);
+  }, []);
+  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
   if (!isAssistant && editing) {
     return (
       <div className="flex justify-end">
@@ -190,11 +294,8 @@ function MessageBubble({
           m.role === 'user' ? 'bg-primary/10 text-foreground' : 'border border-border bg-card',
         )}
       >
-        {m.reasoning ? (
-          <details className="mb-2 text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none">Reasoning</summary>
-            <div className="mt-1 whitespace-pre-wrap border-l-2 border-border pl-2">{m.reasoning}</div>
-          </details>
+        {isAssistant ? (
+          <ThinkingBlock reasoning={m.reasoning ?? ''} content={m.content} streaming={streaming} />
         ) : null}
         {m.images?.length ? (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -213,21 +314,17 @@ function MessageBubble({
         {isAssistant ? (
           m.content ? (
             <>
-              <Markdown>{m.content}</Markdown>
+              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>{m.content}</Markdown>
               <ArtifactChip content={m.content} onOpen={onOpenArtifact} />
               {m.citations?.length ? (
-                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border pt-2">
-                  {m.citations.map((c, k) => (
-                    <span
-                      key={k}
-                      className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                      title={`relevance ${(c.score * 100).toFixed(0)}%`}
-                    >
-                      <Quotes className="size-3" />
-                      {c.name} · part {c.position + 1}
-                    </span>
-                  ))}
-                </div>
+                <SourcesFooter
+                  citations={m.citations}
+                  activeIndex={activeSource}
+                  registerRef={(index, el) => {
+                    if (el) sourceRefs.current.set(index, el);
+                    else sourceRefs.current.delete(index);
+                  }}
+                />
               ) : null}
               <div className="mt-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
@@ -303,7 +400,6 @@ export function ChatWorkspace({
     { fn: string; toolName: string; input: string; token?: string }[]
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
-  const [memoryOpen, setMemoryOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -311,6 +407,7 @@ export function ChatWorkspace({
   // so a conversation is shareable, refresh-safe, and Back steps between conversations/projects.
   // Route shape: /chat/<conversationId>?project=<projectId>; /chat = new-chat landing.
   const router = useRouter();
+  const pathname = usePathname();
   const routeParams = useParams<{ conversationId?: string | string[] }>();
   const searchParams = useSearchParams();
   const selection = selectionFromParams({
@@ -327,6 +424,19 @@ export function ChatWorkspace({
       router.push(selectionToPath(next));
     },
     [router, selection],
+  );
+  // Settings / Memory are URL-driven side panels (?panel=settings|memory) — a real navigational
+  // position, so Back closes the panel and the panel is deep-linkable, per the console's URL-nav
+  // rule (never local useState for a "place").
+  const activePanel = searchParams.get('panel');
+  const settingsOpen = activePanel === 'settings';
+  const memoryOpen = activePanel === 'memory';
+  const setPanel = useCallback(
+    (p: 'settings' | 'memory' | null) => {
+      const query = withPanelParams(searchParams.toString(), { panel: p });
+      router.push(panelHref(pathname, query));
+    },
+    [router, pathname, searchParams],
   );
   // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
   // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
@@ -362,7 +472,6 @@ export function ChatWorkspace({
   const [streaming, setStreaming] = useState(false);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [dialogProject, setDialogProject] = useState<Project | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -1156,6 +1265,31 @@ export function ChatWorkspace({
             {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}
           </div>
           <div className="flex items-center gap-2">
+            {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
+                from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
+            <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
+              <Link
+                href="/projects"
+                title="Projects"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <FolderOpen className="size-4" />
+              </Link>
+              <Link
+                href="/prompts"
+                title="Prompts library"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <TextAlignLeft className="size-4" />
+              </Link>
+              <Link
+                href="/artifacts"
+                title="Artifacts"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Cube className="size-4" />
+              </Link>
+            </div>
             <button
               onClick={toggleTemporary}
               className={cn(
@@ -1167,14 +1301,14 @@ export function ChatWorkspace({
               <Ghost className="size-4" />
             </button>
             <button
-              onClick={() => setMemoryOpen(true)}
+              onClick={() => setPanel('memory')}
               className="text-muted-foreground hover:text-foreground"
               title="Memory"
             >
               <Brain className="size-4" />
             </button>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setPanel('settings')}
               className="text-muted-foreground hover:text-foreground"
               title="Custom instructions"
             >
@@ -1207,9 +1341,9 @@ export function ChatWorkspace({
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl space-y-5 px-4 py-6">
+          <div className={cn('space-y-5 px-4 py-6', messages.length === 0 && !temporary && !activeStarters.length ? 'mx-auto max-w-5xl' : 'mx-auto max-w-3xl')}>
             {messages.length === 0 ? (
-              <div className="pt-24 text-center text-sm text-muted-foreground">
+              <div className="pt-16 text-center text-sm text-muted-foreground">
                 <p className="text-base text-foreground">
                   {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Your own private AI'}
                 </p>
@@ -1233,6 +1367,37 @@ export function ChatWorkspace({
                     ))}
                   </div>
                 ) : null}
+                {/* Recent-chats grid — the new-chat landing surfaces recent conversations as
+                    scannable cards (grid, full width) instead of leaving the space empty. Not
+                    shown for temporary chats or skill starters. */}
+                {!temporary && !activeStarters.length && visibleConversations.length ? (
+                  <div className="mt-10 text-left">
+                    <div className="mb-3 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+                      <ClockCounterClockwise className="size-3.5" />
+                      {activeProject ? `Recent in ${activeProject.name}` : 'Recent chats'}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {visibleConversations.slice(0, 9).map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => openConversation(c.id)}
+                          className="group flex flex-col gap-2 rounded-lg border border-border bg-card p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+                        >
+                          <div className="flex items-start gap-2">
+                            <Sparkle className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                            <span className="line-clamp-2 flex-1 text-sm font-medium text-foreground">
+                              {c.title}
+                            </span>
+                          </div>
+                          <div className="mt-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <span className="truncate">{c.model}</span>
+                            {c.updatedAt ? <span>· {relativeTime(c.updatedAt)}</span> : null}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {messages.map((m, i) => (
@@ -1248,6 +1413,9 @@ export function ChatWorkspace({
                 onViewImage={setLightbox}
                 canRegenerate={!streaming && i === messages.length - 1}
                 canEdit={!streaming && !temporary}
+                // Only the trailing assistant turn is actively generating — that's the one whose
+                // thinking block streams live before collapsing.
+                streaming={streaming && i === messages.length - 1}
               />
             ))}
           </div>
@@ -1481,8 +1649,8 @@ export function ChatWorkspace({
         onOpenChange={(o) => !o && setDialogProject(null)}
         onSaved={refreshProjects}
       />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={(o) => !o && setPanel(null)} />
+      <MemoryDialog open={memoryOpen} onOpenChange={(o) => !o && setPanel(null)} />
       <SkillsDialog
         open={skillsOpen}
         onOpenChange={setSkillsOpen}

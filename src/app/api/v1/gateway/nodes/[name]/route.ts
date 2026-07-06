@@ -17,10 +17,11 @@ export const dynamic = 'force-dynamic';
 // to the cluster gateway (the console can't reach LAN nodes directly under macOS
 // Local Network privacy).
 //
-// HONESTY: the aggregator is a router and does not front node control today
-// (see src/lib/gateway.ts). `validateNodeAction` returns `blocked:true` for those
-// actions and we answer 501 { notActionable } — never a fake 200. If a future
-// aggregator DOES accept the POST but replies 404/501, we surface that too.
+// The aggregator fronts real control at POST /nodes/:name (SSH-to-node from S1):
+// activate = write active-model.json + kickstart; restart; enable/disable = adopt
+// the SSOT pool (see src/lib/gateway.ts CONTROL CONTRACT + SERVER_STATE.md).
+// HONESTY: we still forward the truth of the wire — if the aggregator replies
+// 404/501 (older/absent endpoint) we answer 501 { notActionable }, never a fake 200.
 
 const VALID_ACTIONS = new Set<NodeAction>(['model', 'restart', 'enable', 'disable']);
 

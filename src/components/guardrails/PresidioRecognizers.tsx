@@ -4,6 +4,7 @@ import { PencilSimple, Plus, Trash, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -131,8 +132,10 @@ export function PresidioRecognizers({ recognizers }: { recognizers: Recognizer[]
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),
     });
-    if (res.ok) router.refresh();
-    else toast.error('Failed to toggle recognizer');
+    if (res.ok) {
+      toast.success(toggleMessage(r.name || r.entity, enabled, 'Recognizer'));
+      router.refresh();
+    } else toast.error('Failed to toggle recognizer');
   }
 
   async function remove(r: Recognizer) {

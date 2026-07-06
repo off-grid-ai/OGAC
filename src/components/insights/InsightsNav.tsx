@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
+import { SubNav } from '@/components/nav/SubNav';
 
 // Scoped secondary-nav for the Insights family — observability, analytics, drift, finops, reports,
 // and security events are one operator job ("is my AI healthy, safe, and what's it costing?").
@@ -50,8 +51,9 @@ export function InsightsNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 border-b border-border pb-3">
-      {GROUPS.map((group, gi) => {
+    <SubNav>
+      <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
+        {GROUPS.map((group, gi) => {
         const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
         if (tabs.length === 0) return null;
         return (
@@ -80,7 +82,8 @@ export function InsightsNav() {
             })}
           </div>
         );
-      })}
-    </nav>
+        })}
+      </nav>
+    </SubNav>
   );
 }

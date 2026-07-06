@@ -355,7 +355,7 @@ async function seedFinops(): Promise<void> {
     SEED_KEYS.map((k) => ({
       id: k[0],
       name: k[1],
-      prefix: `ogk_${k[0].slice(4, 10)}…`,
+      prefix: `ogak_${k[0].slice(4, 10)}…`,
       subjectType: k[2],
       subject: k[3],
       budgetUsd: k[4],

@@ -52,12 +52,12 @@ test('installed model ids drop non-string / empty entries', () => {
   assert.deepEqual(v.installed, ['a', 'b']);
 });
 
-// ── nodeActionSupport (honesty gate) ───────────────────────────────────────────
+// ── nodeActionSupport (control contract) ───────────────────────────────────────
 
-test('no node action has a real backend against the current aggregator', () => {
+test('every node action is backed by the aggregator control endpoint (POST /nodes/:name)', () => {
   for (const a of ['model', 'restart', 'enable', 'disable'] as const) {
-    assert.equal(nodeActionSupport(a).backed, false, `${a} must be surfaced as blocked, not faked`);
-    assert.ok(nodeActionSupport(a).needs.length > 0, `${a} must explain what it needs`);
+    assert.equal(nodeActionSupport(a).backed, true, `${a} is executed via the aggregator, not faked`);
+    assert.ok(nodeActionSupport(a).needs.length > 0, `${a} must describe what it does`);
   }
 });
 
@@ -94,17 +94,20 @@ test('model swap: rejects a no-op (already active)', () => {
   assert.match((r as { reason: string }).reason, /already serves/);
 });
 
-test('model swap: a valid installed target is blocked (no backend) — not faked', () => {
+test('model swap: a valid installed target is accepted and shaped as an activate body', () => {
   const r = validateNodeAction(base, { action: 'model', model: 'qwythos-9b' });
-  assert.equal(r.ok, false);
-  assert.equal((r as { blocked?: boolean }).blocked, true);
+  assert.equal(r.ok, true);
+  assert.deepEqual((r as { body: Record<string, unknown> }).body, {
+    action: 'activate',
+    id: 'qwythos-9b',
+    kind: 'text',
+  });
 });
 
-test('restart: blocked with an explanation, never ok', () => {
+test('restart: accepted and shaped as a restart body', () => {
   const r = validateNodeAction(base, { action: 'restart' });
-  assert.equal(r.ok, false);
-  assert.equal((r as { blocked?: boolean }).blocked, true);
-  assert.match((r as { reason: string }).reason, /host\/process control|Restart needs/);
+  assert.equal(r.ok, true);
+  assert.deepEqual((r as { body: Record<string, unknown> }).body, { action: 'restart' });
 });
 
 test('disable: no-op when already disabled short-circuits before the block gate', () => {
@@ -115,9 +118,15 @@ test('disable: no-op when already disabled short-circuits before the block gate'
   assert.match((r as { reason: string }).reason, /already disabled/);
 });
 
-test('enable: a real state change is blocked (no backend)', () => {
+test('enable: a real state change is accepted and shaped as an enable body', () => {
   const disabled = { ...base, enabled: false };
   const r = validateNodeAction(disabled, { action: 'enable' });
-  assert.equal(r.ok, false);
-  assert.equal((r as { blocked?: boolean }).blocked, true);
+  assert.equal(r.ok, true);
+  assert.deepEqual((r as { body: Record<string, unknown> }).body, { action: 'enable' });
+});
+
+test('disable: a real state change is accepted and shaped as a disable body', () => {
+  const r = validateNodeAction(base, { action: 'disable' });
+  assert.equal(r.ok, true);
+  assert.deepEqual((r as { body: Record<string, unknown> }).body, { action: 'disable' });
 });

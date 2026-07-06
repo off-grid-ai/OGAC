@@ -1187,8 +1187,8 @@ export async function createApiKey(input: {
 }): Promise<{ key: ApiKey; token: string }> {
   const id = `key_${randomUUID().slice(0, 8)}`;
   const secret = randomUUID().replace(/-/g, '');
-  const token = `ogk_${secret}`;
-  const prefix = `ogk_${secret.slice(0, 6)}…`;
+  const token = `ogak_${secret}`;
+  const prefix = `ogak_${secret.slice(0, 6)}…`;
   const [row] = await db
     .insert(apiKeys)
     .values({
