@@ -30,37 +30,45 @@ export async function GET(req: Request) {
     /* gateway unreachable — fall through to DB-only view */
   }
 
-  // Upsert live entries into DB
-  if (live.length) {
-    await Promise.all(
-      live.map((t) =>
-        db
-          .insert(gatewayClientTokens)
-          .values({
-            fingerprint: t.fingerprint,
-            preview: t.preview,
-            kind: t.kind,
-            inferred: t.inferred ?? {},
-            ips: t.ips ?? {},
-            uses: t.uses,
-            firstSeen: new Date(t.firstSeen),
-            lastSeen: new Date(t.lastSeen),
-          })
-          .onConflictDoUpdate({
-            target: gatewayClientTokens.fingerprint,
-            set: {
+  // Upsert live entries into DB + read the merged view. Wrap so a DB outage returns the graceful
+  // { available:false, error } shape (503) the console can degrade on — not an opaque 500.
+  try {
+    if (live.length) {
+      await Promise.all(
+        live.map((t) =>
+          db
+            .insert(gatewayClientTokens)
+            .values({
+              fingerprint: t.fingerprint,
+              preview: t.preview,
+              kind: t.kind,
+              inferred: t.inferred ?? {},
               ips: t.ips ?? {},
               uses: t.uses,
+              firstSeen: new Date(t.firstSeen),
               lastSeen: new Date(t.lastSeen),
-              inferred: t.inferred ?? {},
-            },
-          }),
-      ),
+            })
+            .onConflictDoUpdate({
+              target: gatewayClientTokens.fingerprint,
+              set: {
+                ips: t.ips ?? {},
+                uses: t.uses,
+                lastSeen: new Date(t.lastSeen),
+                inferred: t.inferred ?? {},
+              },
+            }),
+        ),
+      );
+    }
+
+    const rows = await db.select().from(gatewayClientTokens).orderBy(gatewayClientTokens.lastSeen);
+    return NextResponse.json({ available: true, tokens: rows.reverse() });
+  } catch (e) {
+    return NextResponse.json(
+      { available: false, tokens: [], error: e instanceof Error ? e.message : 'token store unavailable' },
+      { status: 503 },
     );
   }
-
-  const rows = await db.select().from(gatewayClientTokens).orderBy(gatewayClientTokens.lastSeen);
-  return NextResponse.json({ available: true, tokens: rows.reverse() });
 }
 
 // ── PATCH /api/v1/gateway/tokens/:fingerprint ─────────────────────────────────
@@ -69,13 +77,13 @@ export async function PATCH(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
 
-  const body = (await req.json()) as {
-    fingerprint: string;
+  const body = (await req.json().catch(() => null)) as {
+    fingerprint?: string;
     meta?: Record<string, unknown>;
     routingOverrides?: { sourceIp: string; targetIp?: string; targetNode?: string; note?: string }[];
-  };
+  } | null;
 
-  if (!body.fingerprint) {
+  if (!body?.fingerprint) {
     return NextResponse.json({ error: 'fingerprint required' }, { status: 400 });
   }
 
@@ -87,10 +95,17 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   }
 
-  await db
-    .update(gatewayClientTokens)
-    .set(update)
-    .where(eq(gatewayClientTokens.fingerprint, body.fingerprint));
+  try {
+    await db
+      .update(gatewayClientTokens)
+      .set(update)
+      .where(eq(gatewayClientTokens.fingerprint, body.fingerprint));
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'token store unavailable' },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
