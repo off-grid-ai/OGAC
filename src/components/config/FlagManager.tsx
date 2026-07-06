@@ -4,6 +4,7 @@ import { Plus, SlidersHorizontal, Trash } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,7 +86,9 @@ export function FlagManager({ forcedOpen = false }: { forcedOpen?: boolean }) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ key, enabled }),
     });
-    if (!res.ok) {
+    if (res.ok) {
+      toast.success(toggleMessage(key, enabled, 'Flag'));
+    } else {
       toast.error('Toggle failed');
       load();
     }
