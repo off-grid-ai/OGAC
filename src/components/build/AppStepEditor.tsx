@@ -1,10 +1,15 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
+  AppWindow,
   CaretDown,
   CaretUp,
   Database,
   FileText,
+  Globe,
+  Plugs,
+  PuzzlePiece,
   Robot,
   ShieldCheck,
   Trash,
@@ -17,6 +22,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+
+// ─── Tool catalog shape (mirrors GET /api/v1/admin/tool-catalog) ──────────────────────────────────
+interface AppToolEntry { id: string; ref: string; name: string; description: string; cyclic: boolean }
+interface PrimitiveEntry {
+  id: string; ref: string; name: string; description: string; enabled: boolean;
+  reachesInternet: boolean; airgapNote: string;
+}
+interface RegisteredEntry { id: string; ref: string; name: string; description: string; type: string; policy: string }
+interface ToolCatalog { apps: AppToolEntry[]; primitives: PrimitiveEntry[]; registered: RegisteredEntry[] }
 
 // ─── AppStepEditor (Builder Epic Phase 3A) ────────────────────────────────────────────────────────
 // One card in the ordered step skeleton. Renders the step's kind icon + label + a per-kind binding
@@ -36,6 +50,9 @@ export interface StepEditorHandlers {
   onSetPrompt: (prompt: string) => void;
   onToggleGrounding: (grounded: boolean) => void;
   onSetSink: (sink: OutputStep['sink']) => void;
+  /** Set the tool refs an inline agent step may call (#117 composable tools). Optional: when absent
+   *  the tool picker is hidden (a host that hasn't wired tool-setting yet). */
+  onSetTools?: (toolRefs: string[]) => void;
 }
 
 const KIND_META: Record<AppStepKind, { icon: React.ReactNode; noun: string }> = {
@@ -54,12 +71,15 @@ export function AppStepEditor({
   total,
   names,
   handlers,
+  appId,
 }: {
   step: AppStep;
   index: number;
   total: number;
   names: BindingNames;
   handlers: StepEditorHandlers;
+  /** The id of the app being edited — so the tool picker can flag apps-as-tools that would cycle. */
+  appId?: string;
 }) {
   const meta = KIND_META[step.kind];
   const binding = describeStepBinding(step, names);
@@ -130,7 +150,7 @@ export function AppStepEditor({
       {/* Per-kind binding editor */}
       <div className="space-y-3 px-3 py-3">
         {step.kind === 'agent' ? (
-          <AgentBinding step={step} names={names} handlers={handlers} />
+          <AgentBinding step={step} names={names} handlers={handlers} appId={appId} />
         ) : null}
         {step.kind === 'connector-query' ? (
           <ConnectorBinding step={step} names={names} handlers={handlers} />
@@ -176,10 +196,12 @@ function AgentBinding({
   step,
   names,
   handlers,
+  appId,
 }: {
   step: Extract<AppStep, { kind: 'agent' }>;
   names: BindingNames;
   handlers: StepEditorHandlers;
+  appId?: string;
 }) {
   const agents = names.agents ?? [];
   return (
@@ -221,6 +243,13 @@ function AgentBinding({
               onCheckedChange={(v) => handlers.onToggleGrounding(v)}
             />
           </div>
+          {handlers.onSetTools ? (
+            <ToolPicker
+              selected={step.inlineAgent?.tools ?? []}
+              onChange={handlers.onSetTools}
+              appId={appId}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -261,4 +290,203 @@ function ConnectorBinding({
       )}
     </div>
   );
+}
+
+// ─── ToolPicker (Builder Epic #117) — the dead-simple, 3-group tool picker ────────────────────────
+// The founder's ask: "picking a tool must be dead simple (a labeled picker), and everything stays
+// governed." Three CLEARLY LABELED sources, each a list of checkbox rows with a name + a plain-language
+// description — never raw ids. (1) Your apps — published apps as tools (an app that would create a
+// cycle is disabled + labeled). (2) Primitives — web_search / read_url / http_fetch, each showing its
+// enabled/off state (internet tools are OFF on an air-gapped deployment until the org opts in). (3)
+// Registered tools — the org's existing http/mcp tools. Governed-by-default messaging up top.
+function ToolPicker({
+  selected,
+  onChange,
+  appId,
+}: {
+  selected: string[];
+  onChange: (refs: string[]) => void;
+  appId?: string;
+}) {
+  const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    const qs = appId ? `?appId=${encodeURIComponent(appId)}` : '';
+    fetch(`/api/v1/admin/tool-catalog${qs}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('load'))))
+      .then((data: ToolCatalog) => {
+        if (live) { setCatalog(data); setError(false); }
+      })
+      .catch(() => { if (live) setError(true); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [appId]);
+
+  const toggle = (ref: string) => {
+    onChange(selected.includes(ref) ? selected.filter((r) => r !== ref) : [...selected, ref]);
+  };
+
+  const selectedCount = selected.length;
+
+  return (
+    <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Tools this step can use</Label>
+        {selectedCount > 0 ? (
+          <span className="text-[10px] text-muted-foreground">{selectedCount} selected</span>
+        ) : null}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Grant this decision the ability to call your other apps, a built-in like web search, or a
+        registered service. Every call stays governed by your org&apos;s policy.
+      </p>
+
+      {loading ? (
+        <p className="text-[11px] text-muted-foreground">Loading tools…</p>
+      ) : error ? (
+        <p className="text-[11px] text-amber-600 dark:text-amber-500">
+          Couldn&apos;t load the tool catalog — try again.
+        </p>
+      ) : catalog ? (
+        <div className="space-y-3 pt-1">
+          {/* 1. Your apps */}
+          <ToolGroup icon={<AppWindow className="size-3.5" />} title="Your apps" hint="Published apps, used as building blocks.">
+            {catalog.apps.length === 0 ? (
+              <EmptyRow text="No published apps yet — publish one to reuse it here." />
+            ) : (
+              catalog.apps.map((a) => (
+                <ToolRow
+                  key={a.ref}
+                  name={a.name}
+                  description={a.cyclic ? 'Would create a loop with this app — not allowed.' : a.description}
+                  checked={selected.includes(a.ref)}
+                  disabled={a.cyclic}
+                  onToggle={() => toggle(a.ref)}
+                />
+              ))
+            )}
+          </ToolGroup>
+
+          {/* 2. Primitives */}
+          <ToolGroup icon={<PuzzlePiece className="size-3.5" />} title="Primitives" hint="Small built-in tools.">
+            {catalog.primitives.map((p) => (
+              <ToolRow
+                key={p.ref}
+                name={p.name}
+                description={p.enabled ? p.description : `${p.airgapNote}`}
+                checked={selected.includes(p.ref)}
+                disabled={!p.enabled}
+                badge={
+                  p.reachesInternet ? (
+                    <span
+                      className={
+                        p.enabled
+                          ? 'inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-500'
+                          : 'inline-flex items-center gap-0.5 text-[9px] text-muted-foreground'
+                      }
+                      title={p.airgapNote}
+                    >
+                      <Globe className="size-2.5" />
+                      {p.enabled ? 'online' : 'off (air-gapped)'}
+                    </span>
+                  ) : null
+                }
+                onToggle={() => toggle(p.ref)}
+              />
+            ))}
+          </ToolGroup>
+
+          {/* 3. Registered tools */}
+          <ToolGroup icon={<Plugs className="size-3.5" />} title="Registered tools" hint="HTTP / MCP tools your org set up.">
+            {catalog.registered.length === 0 ? (
+              <EmptyRow text="No registered tools — add one under Tools." />
+            ) : (
+              catalog.registered.map((t) => (
+                <ToolRow
+                  key={t.ref}
+                  name={t.name}
+                  description={`${t.description} · ${t.type} · policy: ${t.policy}`}
+                  checked={selected.includes(t.ref)}
+                  disabled={t.policy === 'blocked'}
+                  onToggle={() => toggle(t.ref)}
+                />
+              ))
+            )}
+          </ToolGroup>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ToolGroup({
+  icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+        <span className="text-primary">{icon}</span>
+        {title}
+        <span className="font-normal text-muted-foreground">· {hint}</span>
+      </div>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function ToolRow({
+  name,
+  description,
+  checked,
+  disabled,
+  badge,
+  onToggle,
+}: {
+  name: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  badge?: React.ReactNode;
+  onToggle: () => void;
+}) {
+  return (
+    <label
+      className={
+        disabled
+          ? 'flex cursor-not-allowed items-start gap-2 rounded px-1.5 py-1 opacity-55'
+          : 'flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-muted/50'
+      }
+    >
+      <input
+        type="checkbox"
+        className="mt-0.5 size-3.5 shrink-0 accent-primary"
+        checked={checked}
+        disabled={disabled}
+        onChange={onToggle}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-foreground">{name}</span>
+          {badge}
+        </span>
+        <span className="block truncate text-[11px] text-muted-foreground">{description}</span>
+      </span>
+    </label>
+  );
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return <p className="px-1.5 text-[11px] text-muted-foreground">{text}</p>;
 }
