@@ -83,6 +83,26 @@ test('Build consolidation: agents + agent-runs highlight the Studio row', () => 
   assert.equal(sidebarActiveIdFor('agent-runs'), 'studio');
 });
 
+test('Tools home (#121): tools + tool-catalog are Build secondaries under the Studio row', () => {
+  // The three scattered tool surfaces are unified under ONE Tools home in the Build group. `tools`
+  // is the new home and `tool-catalog` (the old orphaned catalog, now a redirect into Tools→Catalog)
+  // both live under Build, so their routes keep the Build → Studio sidebar row lit. `tool-catalog`
+  // must NO LONGER be claimed by Data.
+  assert.equal(sidebarActiveIdFor('tools'), 'studio');
+  assert.equal(sidebarActiveIdFor('tool-catalog'), 'studio');
+
+  const build = NAV_GROUPS.find((g) => g.id === 'build');
+  const data = NAV_GROUPS.find((g) => g.id === 'data');
+  assert.ok(build?.secondary?.includes('tools'), 'tools must be a Build secondary');
+  assert.ok(build?.secondary?.includes('tool-catalog'), 'tool-catalog must move to Build');
+  assert.ok(!data?.secondary?.includes('tool-catalog'), 'tool-catalog must leave Data');
+
+  // Neither is a sidebar primary (Build stays scannable: Studio + Brain only).
+  const shown = new Set(sidebarSections(ALL).flatMap((s) => s.items.map((i) => i.id)));
+  assert.ok(!shown.has('tools'), 'tools must not be a sidebar row');
+  assert.ok(!shown.has('tool-catalog'), 'tool-catalog must not be a sidebar row');
+});
+
 test('sidebarActiveIdForPath: the builder /apps/* surfaces keep the Build → Studio row lit', () => {
   // /apps/runs, /apps/reports, and the per-app shell /apps/<id>/* have NO module of their own —
   // their pages gate on `studio` and they route under /apps. The pure path resolver aliases them to

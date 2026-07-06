@@ -20,8 +20,11 @@ import { Textarea } from '@/components/ui/textarea';
 
 const TYPES = ['http', 'mcp'] as const;
 
-// Open/close state lives in the URL (?panel=new-tool) so Back closes the panel.
-export function AddToolButton() {
+// ─── RegisterToolButton (#121) — register a new HTTP/MCP tool in the registry ─────────────────────
+// The tool-create path, brought to the Tools home (adapted from the old Brain AddToolButton). POSTs
+// the EXACT same body to the EXISTING /api/v1/admin/tools route (createTool) — no new storage. Open/
+// close state lives in the URL (?panel=new-tool) so Back closes the panel.
+export function RegisterToolButton() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,7 +72,7 @@ export function AddToolButton() {
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)}>
         <Plus className="size-4" />
         Register tool
       </Button>
@@ -79,7 +82,8 @@ export function AddToolButton() {
             <SheetTitle>Register a tool</SheetTitle>
             <SheetDescription>
               The router invokes it when a query&apos;s intent matches the &quot;when to use&quot;
-              description.
+              description. Point an HTTP tool at your service URL, or an MCP tool at a server on your
+              network.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
@@ -124,7 +128,7 @@ export function AddToolButton() {
             </div>
           </SheetBody>
           <SheetFooter>
-            <Button onClick={create} disabled={busy || !name} className="w-full">
+            <Button onClick={create} disabled={busy || !name.trim()} className="w-full">
               {busy ? 'Registering…' : 'Register tool'}
             </Button>
           </SheetFooter>

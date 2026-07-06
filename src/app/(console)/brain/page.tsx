@@ -3,7 +3,6 @@ import { Suspense } from 'react';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { AddGoldenCaseButton } from '@/components/brain/AddGoldenCaseButton';
 import { AddPromptButton } from '@/components/brain/AddPromptButton';
-import { AddToolButton } from '@/components/brain/AddToolButton';
 import { BrainNav } from '@/components/brain/BrainNav';
 import { normalizeBrainView } from '@/lib/brain-view';
 import { BrainSearch } from '@/components/brain/BrainSearch';
@@ -83,43 +82,64 @@ export default async function BrainPage({
             <CardTitle className="text-sm">Tools &amp; services · {tools.length}</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               The router&apos;s <code>tool</code> source — HTTP / MCP tools matched to query intent.
+              This reads the same registry managed under Build → Tools.
             </p>
           </div>
-          <AddToolButton />
+          <Link
+            href="/tools"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Manage tools →
+          </Link>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tool</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>When to use</TableHead>
-                <TableHead className="w-16">Enabled</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tools.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium text-foreground">{t.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={TOOL_TYPE[t.type]}>
-                      {t.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-sm truncate text-muted-foreground">
-                    {t.description || t.endpoint}
-                  </TableCell>
-                  <TableCell>
-                    <ToolToggle id={t.id} enabled={t.enabled} />
-                  </TableCell>
-                  <TableCell>
-                    <DeleteRowButton url={`/api/v1/admin/tools/${t.id}`} label={t.name} />
-                  </TableCell>
+          {tools.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No tools registered yet. Add one from the{' '}
+                <Link
+                  href="/tools?tab=catalog"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  tool catalog
+                </Link>{' '}
+                or{' '}
+                <Link href="/tools" className="text-primary underline-offset-4 hover:underline">
+                  register your own
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tool</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>When to use</TableHead>
+                  <TableHead className="w-16">Enabled</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {tools.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium text-foreground">{t.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={TOOL_TYPE[t.type]}>
+                        {t.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-sm truncate text-muted-foreground">
+                      {t.description || t.endpoint}
+                    </TableCell>
+                    <TableCell>
+                      <ToolToggle id={t.id} enabled={t.enabled} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       )}
