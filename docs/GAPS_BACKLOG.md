@@ -479,3 +479,34 @@ Full report: `docs/HARDENING_AUDIT.md`. 20 findings (3 P0, 8 P1, 9 P2). Ranked; 
 - **#132 (P2) — `data/page.tsx:219` passes raw `127.0.0.1` `urlHint` across the server→client
   boundary** (currently safe — `VectorDBInspector` maps it via `toDisplayHost` before render — but
   wrap server-side for defense in depth).
+
+### Wave-2 resolutions (2026-07-06, TASK #139)
+
+- **#123 (P1 systemic device data-plane) — RESOLVED.** All three node data-plane routes
+  (`devices/[id]/{audit,policy,commands}`) now gate through the shared `gateDeviceRequest()` seam
+  (`src/lib/device-auth.ts`), which verifies a per-device Bearer via the PURE `verifyDeviceToken()`
+  (`src/lib/device-token.ts`, unit-tested). The predictable `dt_<id>` is replaced by a RANDOM secret
+  minted at enroll (`enrollDevice` → `devices.token`), returned once, and required thereafter;
+  legacy `dt_<id>` still works ONLY for pre-hardening devices with no stored token (backward-tolerant,
+  closes on re-enroll). Evidence: `test/device-token.test.ts` (9 cases) + `test/ingest-jobs-scope.integration.test.ts`
+  (enroll→verify), typecheck + build clean.
+- **#125 (P1 audit-emit) — RESOLVED.** `auditFromSession` wired on: KC password reset
+  (`access.user.change`), KC user create/update/delete (`access.user.change`), machine-cred
+  provision/rotate (`access.machine.issue`/`rotate`, per-service), KC client delete + role
+  create/delete (`access.role.change`), device kill (`device.kill` — new action), GDPR erasure
+  (`data.erasure` — new action), OPA policy push (`policy.change`, outcome from push result). Only
+  successes (`ok`) + real failures (`error`) are emitted — never gate rejections. New actions added
+  to `src/lib/audit-event.ts` taxonomy.
+- **#126 (P1 ingest scope) — RESOLVED.** `ingest_jobs.org_id` column added (schema.ts + self-healing
+  `ensureOrgSchema` DDL); set from the connector's org on insert (`syncConnector`); `listIngestJobs(orgId)`
+  filters and all three callers pass the org. Evidence: `test/ingest-jobs-scope.integration.test.ts`
+  (cross-tenant leak test, passes against live DB).
+- **#127 (P1 masking-rule org) — was ALREADY FIXED** before this wave (`createMaskingRule` sets `orgId`
+  on insert). Verified, no change needed.
+- **#130 (P2, partial) — password min-length** now enforced (8-char) on `access/users/[id]/password`
+  for a clean 400. The other #130 items (vectordb allowlist, clients `body.modules`, gateway/tokens
+  `.catch`) are outside this wave's file-set — DEFERRED to the owning agent.
+- **DEFERRED (out of file-set):** #128 (lineage/agents RSC guards — wave-1 files), #129 (guardrails/
+  observability/provit route try-catch — other concerns), #131 (fleet/tenant/org-settings/backup-prune
+  audit — not in the named audit list + outside owned set), #132 (urlHint — vectordb concern), #122/#124
+  (P0s, already fixed + deployed per task brief).
