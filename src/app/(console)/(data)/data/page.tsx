@@ -43,7 +43,7 @@ export default async function DataPage() {
   const org = await currentOrgId();
   const [connectors, jobs, rules, datasets, brainDocs, qCount] = await Promise.all([
     listConnectors(org),
-    listIngestJobs(),
+    listIngestJobs(org),
     listMaskingRules(org),
     listDatasets(org),
     listDocuments(),
