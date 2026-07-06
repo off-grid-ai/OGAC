@@ -75,6 +75,22 @@ async function presidioAnalyze(url: string, body: AnalyzeRequest): Promise<Presi
 // the deep config resolves WITHOUT `headers()` (which throws outside a request scope — gap #121).
 // When omitted (the request path) we resolve the org from the session via `currentOrgId()`. This
 // makes worker + request behave identically instead of the worker silently dropping org recognizers.
+
+/**
+ * Decide which org the deep config should load for, WITHOUT touching a request scope when an
+ * explicit org was supplied (gap #121). Pure + unit-testable: a non-blank `explicitOrgId` is used
+ * verbatim (trimmed) and `sessionResolver` is NEVER called (so no `headers()` on the worker path);
+ * a blank/absent explicit value falls through to the session resolver (the request path). Keeping
+ * this a separate function makes the "worker doesn't call headers()" invariant assertable directly.
+ */
+export async function resolveDeepConfigOrgId(
+  explicitOrgId: string | undefined,
+  sessionResolver: () => Promise<string>,
+): Promise<string> {
+  if (explicitOrgId && explicitOrgId.trim()) return explicitOrgId.trim();
+  return sessionResolver();
+}
+
 async function loadDeepConfig(explicitOrgId?: string): Promise<{
   recognizers: NormalizedRecognizer[];
   thresholds: ThresholdConfig;
@@ -84,10 +100,10 @@ async function loadDeepConfig(explicitOrgId?: string): Promise<{
     const { listRecognizers, getThresholds } = await import('../presidio-recognizers');
     // Prefer the explicit orgId (worker path); only touch `headers()` (via currentOrgId) when not
     // supplied. A blank/whitespace explicit value falls through to the session resolver.
-    const orgId =
-      explicitOrgId && explicitOrgId.trim()
-        ? explicitOrgId.trim()
-        : await (await import('../tenancy')).currentOrgId();
+    const orgId = await resolveDeepConfigOrgId(
+      explicitOrgId,
+      async () => (await import('../tenancy')).currentOrgId(),
+    );
     const [recs, thresholds] = await Promise.all([listRecognizers(orgId), getThresholds(orgId)]);
     // The stored CustomRecognizer is a superset of NormalizedRecognizer (adds id/createdAt) — the
     // builder reads only the normalized fields, so the extra keys are harmless.
