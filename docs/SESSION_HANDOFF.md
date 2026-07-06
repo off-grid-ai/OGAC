@@ -115,3 +115,12 @@ Founder stepped away; drive the tools/MCP + evals work to fully-integrated, no s
 - #88 — device enrollment docs (PARKED for founder).
 
 **Loop for each landing:** merge --no-ff → resolve conflicts (keep both) → rm -rf .next → typecheck+test+build gate → push origin main → deploy over tunnel (SERVER=offgrid-tunnel) → prune worktree. Then chain the next. North star: `docs/BUILDER_EPIC_PLAN.md` §North star — a non-technical tax/accounting person must be able to build+run a workflow unaided.
+
+## Autonomous run — COMPLETE (2026-07-06)
+Everything from the founder-away run shipped, gated (1291 tests), pushed to origin/main, deployed live:
+- Evals 12→24 templates + G-Eval custom judge (#120); Tools = apps-as-tools + primitives + executor hook (#117);
+  MCP-server catalog /tool-catalog, 18 servers one-click-add (#119); durable HITL live — offgrid-apps worker
+  running, reimbursement app verified running durably (#114).
+- Open: #88 (device-enroll docs, parked for founder); #121 (worker PII deep-config, P2); app-worker needs a
+  launchd plist to survive reboot (SERVER_STATE noted).
+Nothing in flight. Task list #81–120 done except the parked/noted items above.
