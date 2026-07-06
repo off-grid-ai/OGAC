@@ -21,7 +21,7 @@ import {
   Warning,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -135,12 +135,21 @@ const EXAMPLES = [
 export function StudioCanvas({
   domains = [],
   agents = [],
+  initialSpec,
+  onSpecChange,
 }: {
   domains?: { id: string; label: string }[];
   agents?: { id: string; name: string }[];
+  /** CONTROLLED MODE (Builder Epic #115): when the parent (AppBuilder) owns the spec and only wants
+   *  the canvas as an editing VIEW, it passes the current spec here + a change callback below. In
+   *  that mode the canvas seeds from this spec and mirrors every edit up, so guided + visual edit ONE
+   *  AppSpec. The canvas's own describe/save/publish/run chrome is hidden (the parent owns it). */
+  initialSpec?: AppSpec | null;
+  onSpecChange?: (spec: AppSpec) => void;
 }) {
-  // The AppSpec is the single source of truth. Null until seeded (compile or blank).
-  const [spec, setSpec] = useState<AppSpec | null>(null);
+  const controlled = onSpecChange !== undefined;
+  // The AppSpec is the single source of truth. In controlled mode we seed from initialSpec.
+  const [spec, setSpec] = useState<AppSpec | null>(initialSpec ?? null);
   const [gaps, setGaps] = useState<string[]>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
@@ -202,6 +211,26 @@ export function StudioCanvas({
     },
     [markDirty],
   );
+
+  // ── Controlled mode: mirror every spec change up to the parent (AppBuilder). Guard against loops
+  //    by only propagating when the spec object identity actually changed here. ──
+  const lastSent = useRef<AppSpec | null>(initialSpec ?? null);
+  useEffect(() => {
+    if (!controlled || !onSpecChange || !spec) return;
+    if (spec === lastSent.current) return;
+    lastSent.current = spec;
+    onSpecChange(spec);
+  }, [controlled, onSpecChange, spec]);
+
+  // If the parent seeds/replaces the spec (e.g. a fresh compile), adopt it — but ignore the
+  // parent's echo of a spec we ourselves just emitted (identity match) so edits aren't clobbered.
+  useEffect(() => {
+    if (!controlled || initialSpec == null) return;
+    if (initialSpec === lastSent.current) return;
+    lastSent.current = initialSpec;
+    setSpec(initialSpec);
+    setSelectedStepId(initialSpec.steps[0]?.id ?? null);
+  }, [controlled, initialSpec]);
 
   // ─── Seed: compile a description → AppSpec skeleton ──────────────────────────────────────────
   async function compile() {
@@ -366,9 +395,14 @@ export function StudioCanvas({
 
   return (
     <div className="flex h-[calc(100vh-220px)] min-h-[560px] gap-3">
-      {/* ── Left: describe / seed / save-run ── */}
-      <div className="flex w-[320px] shrink-0 flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-3">
-        {!spec ? (
+      {/* ── Left: describe / seed / save-run.  In CONTROLLED mode the parent (AppBuilder) owns the
+             describe/save/publish/run chrome, so we render only the graph summary + add-step palette. ── */}
+      <div className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-3">
+        {!spec && controlled ? (
+          <p className="text-xs text-muted-foreground">
+            Add a step from the palette once the app has been described.
+          </p>
+        ) : !spec ? (
           <>
             <div className="space-y-2">
               <p className="text-xs font-medium text-foreground">Describe the process</p>
@@ -454,7 +488,7 @@ export function StudioCanvas({
               </div>
             </div>
 
-            {gaps.length > 0 ? (
+            {!controlled && gaps.length > 0 ? (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.06] p-2">
                 <p className="flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   <Warning className="size-3" /> {gaps.length} thing{gaps.length === 1 ? '' : 's'} to
@@ -468,7 +502,8 @@ export function StudioCanvas({
               </div>
             ) : null}
 
-            {/* Run */}
+            {/* Run — hidden in controlled mode (the parent AppBuilder owns save/run/publish). */}
+            {!controlled ? (
             <div className="space-y-1.5 border-t border-border pt-2">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Try it</p>
               <Textarea
@@ -518,6 +553,7 @@ export function StudioCanvas({
                 </a>
               ) : null}
             </div>
+            ) : null}
 
             {/* Run trace */}
             {runSteps.length > 0 || runOutcome !== null ? (
@@ -592,7 +628,7 @@ export function StudioCanvas({
             <Controls showInteractive={false} />
           </ReactFlow>
         )}
-        {spec ? (
+        {spec && !controlled ? (
           <button
             onClick={clear}
             className="absolute right-3 top-3 rounded-md border border-border bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:text-foreground"
