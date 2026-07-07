@@ -41,3 +41,32 @@ APPS · AGENTS · EXTERNAL 3rd-PARTIES     via the pipeline's own provisioned AP
 
 ## Done already (this session)
 Evals + golden set are pipeline-owned (`app_id`) with a per-pipeline **Quality** tab + run-in-context (#154, partial #158). Cloud gateways (OpenAI/Anthropic/OpenRouter) wired + OpenRouter live-verified. Sample BFSI pipelines seeded on the Bharat tenant.
+
+---
+
+## Component & linkage model (canonical)
+
+### Gateway components
+Identity (name + kind: on-prem|openai|anthropic|compat) · base URL + auth · model catalog (context
+window, modality, family) · node pool (on-prem, round-robin) · health/reachability probe · **egress
+class** (on-prem = data stays; cloud = data leaves — the routing leash keys off this) · cost/pricing
+(→ FinOps) · rate/concurrency limits. A gateway is SHARED: many pipelines run on one gateway.
+
+### Pipeline components (the peripheries that DEFINE it)
+- **Does:** flow/steps (agent·connector-query·guardrail·human·output) + edges · trigger
+  (on-demand/webhook/schedule/email) · input form.
+- **Runs on (→gateway):** gateway+model binding · routing (fallback + egress leash, data_class→local/cloud/block).
+- **Data it may touch:** connectors/integrations/data-domains · knowledge collections (RAG).
+- **Governed by:** policy (ABAC/OPA) · guardrails (PII/injection/grounding) — scoped to it, inherit org.
+- **Quality bar:** evals + golden set (run in its context, gate releases) · drift (its history).
+- **Telemetry (per-pipeline lenses):** observability (traces/latency) · audit (its events) · finops
+  (its cost) · provenance (signed run manifests).
+- **Consumed as:** provisioned API key/endpoint · composable (pipeline-as-tool) · owner/org/visibility.
+
+### Linkages
+- ORG/TENANT defines defaults (policy, guardrails, available gateways) that pipelines INHERIT.
+- GATEWAY : PIPELINE = 1 : many (a pipeline picks a gateway; routing can span gateways w/ fallback).
+- Connectors/knowledge/policy/guardrails/evals/drift attach TO a pipeline (org = inherited default).
+- **A RUN is the join key:** every run is tagged with pipeline + gateway, and emits an observability
+  trace + audit events + finops cost + provenance. So those "systems" are just that run-data filtered
+  by pipeline → the per-pipeline lenses. GLOBAL pages = cross-pipeline roll-up + attach-from library.
