@@ -34,6 +34,12 @@ import {
   nextRunnableSteps,
   type AppRunState,
 } from '@/lib/app-run-plan';
+import {
+  type PipelineContract,
+  enforceDataAccess,
+  enforceModelCall,
+} from '@/lib/pipeline-enforcement';
+import { auditEnforcement } from '@/lib/pipeline-contract';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 
@@ -41,6 +47,13 @@ export interface AppRunContext {
   orgId: string;
   actor?: string;
   runId: string;
+  /**
+   * PA-16 — the resolved bound-pipeline contract this run enforces (data allowlist + egress leash +
+   * policy/guardrail overlay). OPTIONAL + ADDITIVE: absent/null ⇒ legacy behaviour (no extra gate).
+   * The route resolves it once (resolveContract) and threads it here; the step handlers call the PURE
+   * enforcement decisions (enforceDataAccess / enforceModelCall) and perform the deny/route/audit I/O.
+   */
+  contract?: PipelineContract | null;
 }
 
 export interface StepResult {
@@ -319,6 +332,25 @@ async function executeAgentStep(
     }
     agentId = await deps.materializeAgent(spec, step, ctx.orgId);
   }
+  // PA-16 — egress leash + policy/guardrail overlay on the MODEL call. Before the governed agent
+  // pipeline runs (which makes the gateway call), apply the bound pipeline's routing leash for this
+  // run's data-class (pure enforceModelCall). A `block` verdict stops the call (audited, governed
+  // error); the pipeline can only be MORE restrictive than the leash, never less. No pipeline ⇒ the
+  // noPipeline verdict allows it (legacy routing). The data-class is derived from whether an upstream
+  // step read a connector (real data flowing to the model → 'general'; else 'none' — a pure prompt).
+  const dataClass = priorResults.some((r) => r.kind === 'connector-query') ? 'general' : 'none';
+  const modelVerdict = enforceModelCall(ctx.contract ?? null, dataClass);
+  if (!modelVerdict.allow) {
+    auditEnforcement(
+      { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+      'pipeline.egress.block',
+      `model:agent:${agentId}`,
+      'blocked',
+      modelVerdict.reason,
+    );
+    return errorResult(step, `model call blocked by pipeline egress leash: ${modelVerdict.reason}`);
+  }
+
   const query = buildAgentQuery(step, priorResults);
   const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId);
   if (!run) return errorResult(step, `unknown agent: ${agentId}`);
@@ -355,6 +387,20 @@ async function executeConnectorStep(
   const resolved = resolveDomainByIdOrLabel(step.domain, domains, resolveDomain);
   if (!resolved) {
     return errorResult(step, `no data-domain binds "${step.domain}" (unbound — not guessed)`);
+  }
+  // PA-16 — HARD data-allowlist ceiling. Before the connector is HIT, check the resolved data-domain
+  // against the bound pipeline's allowlist (pure enforceDataAccess). Outside the ceiling ⇒ deny +
+  // audit (a governed error, never a crash). No pipeline ⇒ noPipeline verdict allows it (legacy).
+  const dataVerdict = enforceDataAccess(ctx.contract ?? null, resolved.id);
+  if (!dataVerdict.allow) {
+    auditEnforcement(
+      { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+      'pipeline.data.deny',
+      `data:${resolved.id}`,
+      'blocked',
+      dataVerdict.reason,
+    );
+    return errorResult(step, `data access denied by pipeline: ${dataVerdict.reason}`);
   }
   const connector = await deps.getConnector(resolved.connectorId, ctx.orgId);
   if (!connector) {

@@ -557,3 +557,24 @@ typed `locked|default`; pipeline may only tighten a locked one).
 |---|-----|-----------|-------|--------|
 | PA-15 | **Per-tenant gateway URLs** — `<slug5><rand5>-gateway.getoffgridai.co` per provisioned tenant gateway (mirrors `gateway.getoffgridai.co`). | Pure host helper (done) + store the host on the gateway; add `*-gateway.getoffgridai.co → :8800` tunnel ingress above the wildcard (verify cloudflared pattern support); aggregator resolves tenant from Host. Supervised tunnel edit. | console + infra | M |
 | PA-16 | **Consumer-run governance ENFORCEMENT** — apps/agents/chat now BIND + run-tag a pipeline, but the executor doesn't yet gate each run against the bound pipeline's policy/guardrails/data-allowlist. | Wire the resolved pipeline contract into the app/agent/chat run path (deeper run-path integration). | console | M |
+
+### PA-16 — PARTIAL RESOLUTION (2026-07-08): APP-RUN inline path enforced
+
+**Done + verified (typecheck + full suite 1676✓ + clean build):** the bound pipeline's contract is now
+ENFORCED at run time on the **app-run inline path**. New PURE decision lib `src/lib/pipeline-enforcement.ts`
+(`enforceDataAccess` = HARD data-allowlist ceiling via `canReachData`; `enforceModelCall` = egress leash via
+`deriveEgress` + `maxEgress` policy-ceiling tighten + guardrail/policy overlay flags via `effectiveGovernance`)
+— reuses the existing pure primitives, zero-IO, unit-tested (12 cases). I/O seam `src/lib/pipeline-contract.ts`
+(`resolveContract` loads the pipeline + org governance defaults → a DB-free contract; `auditEnforcement` emits
+a pipeline-tagged audit event). The app-run route resolves the contract once and threads it onto `AppRunContext`;
+`executeConnectorStep` denies a read outside the allowlist (audited, governed error), `executeAgentStep` blocks a
+model call the egress leash refuses (audited). **Additive: a run with NO bound pipeline behaves exactly as before**
+(integration test proves no-pipeline runs are unchanged + a restrictive pipeline gates as expected — 5 cases).
+
+**Deferred sub-gaps (honest — NOT wired this round):**
+
+| # | Gap | What to do | Owner | Effort |
+|---|-----|-----------|-------|--------|
+| PA-16a | **Durable (Temporal) app-run path not enforced.** `submitAppRun`'s durable branch serializes only `{appId,runId,input,orgId,caller}` to the workflow — the resolved contract isn't carried, so a durable run isn't gated. (Inline path IS enforced; durable is off by default, so the common path is covered.) | Resolve the contract inside the durable activity/worker (it already has orgId+appId), or serialize a contract ref into `AppRunWorkflowInput`, then call the same pure `enforceDataAccess`/`enforceModelCall`. | console | M |
+| PA-16b | **Agent-run + chat run paths not gated by the contract.** `runAgent` (agentrun.ts) + the chat run path run their OWN governance (policy/guardrails/budget) but don't yet consult the bound-pipeline contract's data-allowlist / egress leash / overlay. `resolveChatPipeline` resolves the binding; the enforcement seam isn't called there yet. | Thread a `PipelineContract` into `runAgent`/chat and call the same pure decisions before retrieval + the gateway call (data-class from the request). Reuse `pipeline-enforcement.ts` + `pipeline-contract.ts` (already built). | console | M |
+| PA-16c | **PII-masking flag not yet forced from the overlay.** `enforceModelCall` returns `requirePiiMasking`/`blockPromptInjection`, but the app-run path relies on the existing `runChecks` guardrail floor rather than escalating masking when the pipeline overlay tightens it on. | Have the run path raise the guardrail phase to enforce masking when `verdict.requirePiiMasking` is set (currently the org-locked floor already masks; the overlay-tighten escalation is the delta). | console | S |
