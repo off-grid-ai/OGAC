@@ -72,3 +72,42 @@ export function activeTabForPath(pathname: string, pipelineId: string): Pipeline
   if (!seg) return 'overview';
   return (KNOWN as string[]).includes(seg) ? (seg as PipelineTab) : 'overview';
 }
+
+// ─── lifecycle transitions — PURE, zero-IO (drives the Overview status actions) ───────────────────
+//
+// A pipeline moves draft → published → archived and back. The Overview exposes exactly the actions
+// legal from the current status; this pure resolver decides them so the UI can never offer an illegal
+// transition and it stays unit-testable. Publishing freezes an immutable version snapshot.
+
+export type PipelineLifecycleAction = 'publish' | 'archive' | 'unarchive';
+
+export interface PipelineTransition {
+  action: PipelineLifecycleAction;
+  /** The status the pipeline lands in. */
+  to: 'draft' | 'published' | 'archived';
+  label: string;
+  /** One-line confirmation/intent copy for the button + toast. */
+  hint: string;
+}
+
+// The transitions legal from each status. `publish` freezes a version (POST .../publish); `archive`
+// and `unarchive` are status PATCHes.
+export function pipelineTransitions(status: string): PipelineTransition[] {
+  switch (status) {
+    case 'draft':
+      return [
+        { action: 'publish', to: 'published', label: 'Publish', hint: 'Freeze this version and make it consumable' },
+        { action: 'archive', to: 'archived', label: 'Archive', hint: 'Retire this pipeline — consumers fall back to the org default' },
+      ];
+    case 'published':
+      return [
+        { action: 'archive', to: 'archived', label: 'Archive', hint: 'Retire this pipeline — consumers fall back to the org default' },
+      ];
+    case 'archived':
+      return [
+        { action: 'unarchive', to: 'draft', label: 'Restore', hint: 'Bring this pipeline back as a draft to edit and re-publish' },
+      ];
+    default:
+      return [];
+  }
+}
