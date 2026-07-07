@@ -90,8 +90,25 @@ function withCors(res: NextResponse, pathname: string): NextResponse {
   return res;
 }
 
+// A tenant's own subdomain is "<slug>-onprem-console.<apex>". Parse the slug from the TRUSTED Host
+// (set by Cloudflare) and forward it downstream as x-offgrid-tenant-slug so currentOrgId() can
+// hard-bind the request to that tenant's org. We ALWAYS strip any client-supplied value first, then
+// set it only from the host — so the header can't be spoofed to reach another tenant's data.
+const TENANT_HOST_RE = /^([a-z0-9]+)-onprem-console\./;
+function tenantScopedHeaders(req: { headers: Headers; nextUrl: { hostname: string } }): Headers {
+  const h = new Headers(req.headers);
+  h.delete('x-offgrid-tenant-slug');
+  const host = (req.headers.get('host') ?? req.nextUrl.hostname).toLowerCase();
+  const m = TENANT_HOST_RE.exec(host);
+  if (m) h.set('x-offgrid-tenant-slug', m[1]);
+  return h;
+}
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  // Downstream requests carry the (spoof-proof) tenant slug parsed from the host.
+  const reqHeaders = tenantScopedHeaders(req);
+  const pass = () => NextResponse.next({ request: { headers: reqHeaders } });
 
   // CORS preflight — answer before auth/rate-limit so a browser can probe the public API.
   if (req.method === 'OPTIONS' && isPublicApi(pathname)) {
@@ -103,9 +120,9 @@ export default auth((req) => {
       pathname,
     );
   }
-  if (isPublic(pathname)) return withCors(NextResponse.next(), pathname);
-  if (req.method === 'GET' && FILE_GET.test(pathname)) return NextResponse.next();
-  if (isApiBearer(req)) return withCors(NextResponse.next(), pathname);
+  if (isPublic(pathname)) return withCors(pass(), pathname);
+  if (req.method === 'GET' && FILE_GET.test(pathname)) return pass();
+  if (isApiBearer(req)) return withCors(pass(), pathname);
   if (!req.auth) {
     // API clients get a clean 401 (not an HTML login redirect); browsers get sent to
     // /signin with a callbackUrl so they return to where they were headed.
@@ -116,7 +133,7 @@ export default auth((req) => {
     signin.searchParams.set('callbackUrl', pathname + req.nextUrl.search);
     return NextResponse.redirect(signin);
   }
-  return withCors(NextResponse.next(), pathname);
+  return withCors(pass(), pathname);
 });
 
 export const config = {
