@@ -24,12 +24,23 @@ mandatory-locked + hard-ceiling `canReachData`, versioning, CRUD, 6 BFSI seed pi
 pipeline_id`, `eval_definitions.pipeline_id`, `pipeline_api_keys` table (so tab agents don't touch
 schema.ts).
 
-**IN FLIGHT — 4 disjoint worktree agents (launched 2026-07-08, gate=typecheck+tests+build, commit-not-
-merge). Process SEQUENTIALLY as they land (token budget). File ownership is STRICT/disjoint:**
-- **FANOUT-G** (task #162): Gateways full CRUD + detail view (the founder's "no way to edit gateway"). Owns `gateways*` lib/policy/routes/components/pages.
-- **FANOUT-A** (task #163): Pipeline mgmt UX — fix card overflow, make pipeline EDITABLE, comprehensive Overview dashboard. Owns pipelines Manager/Overview/RoutingEditor/DetailNav + Overview/routing/versions pages + `pipeline-detail.ts`.
-- **FANOUT-B** (task #164): Governance+Quality tabs (Policy/Guardrails/Quality/Drift) scoped+editable; re-point evals/golden/drift → pipeline_id. Owns those tab pages + `components/pipelines/governance/**` + eval-defs.ts/evals.ts.
-- **FANOUT-C** (task #165): Per-pipeline API keys (mint/revoke/verify) + Integrate tab + public run route + telemetry tabs (Observability/Audit/Cost lenses). Owns api/observability/audit/cost tab pages + `components/pipelines/telemetry/**` + `pipeline-api-keys.ts` + keys routes.
+**FAN-OUT COMPLETE + VERIFIED LIVE (2026-07-08)** — all 4 disjoint agents landed, gated, merged,
+deployed, and LIVE-AUDITED (real write flows + screenshots):
+- **FANOUT-G** ✅ Gateways full CRUD + detail. Verified: full-body edit persists live, egress re-derived,
+  detail page shows pipelines-on-gateway + node pool + Edit/Delete. (partial-PATCH edge = gap PA-10.)
+- **FANOUT-A** ✅ Pipeline editable + comprehensive Overview. Verified: edit persists + versions (v1→v2
+  live), Overview is a real dashboard (Binding/Routing/Ceiling/Policy/Guardrails/Quality/Consumers/
+  Versions + Edit/Publish/Archive). Card overflow fixed.
+- **FANOUT-B** ✅ Governance+Quality tabs. Verified: Policy tab renders effective-ABAC w/ org-locked vs
+  org-default badges + tighten-only; overlay tighten persists live; eval scoped to pipeline_id +
+  cross-pipeline isolation holds (leak test = 0). Re-point to pipeline_id done (appId back-compat kept).
+- **FANOUT-C** ✅ API keys + telemetry lenses. Verified: mint shows plaintext once (og_pl_…), no hash
+  leak on record/list, revoke works; Integrate tab shows endpoint+curl+keys table; Cost/Audit/Obs tabs
+  render as pipeline-filtered lenses.
+Screenshot harness: `scripts/shoot-pipelines.mjs` (logs in via username/password form, wide+light).
+
+**IN FLIGHT NOW:** CONSUMERS-BIND (task #166) — apps/agents/chat bind a pipeline; makes the Overview
+Consumers section live. Single background agent (sequential, token-safe).
 
 **THE MERGE GATE IS A LIVE USABILITY AUDIT (founder: "don't give me half-assed stuff", "make sure it's
 actually usable", "audit it"):** do NOT merge on green build alone. For each agent: exercise the real
