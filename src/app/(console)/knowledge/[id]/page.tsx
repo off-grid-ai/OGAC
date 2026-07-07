@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getCollection, listCollections, listDocuments } from '@/lib/org-knowledge';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,18 +21,19 @@ export default async function CollectionDetailPage({ params }: { params: Promise
   const session = await auth();
   const role = session?.user?.role ?? 'viewer';
   const isAdmin = role === 'admin';
+  const orgId = await currentOrgId();
 
-  const collection = await getCollection(id);
+  const collection = await getCollection(id, orgId);
   if (!collection) notFound();
 
   // Enforce the same permission-aware visibility as the list — a non-admin can only view a
   // collection their role is allowed to retrieve.
   if (!isAdmin) {
-    const visible = await listCollections(role);
+    const visible = await listCollections(role, orgId);
     if (!visible.some((c) => c.id === id)) notFound();
   }
 
-  const docs = await listDocuments(id);
+  const docs = await listDocuments(id, orgId);
   const documents = docs.map((d) => ({
     id: d.id,
     name: d.name,

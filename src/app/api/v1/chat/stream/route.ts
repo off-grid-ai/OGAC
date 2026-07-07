@@ -32,6 +32,7 @@ import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
 import { citationInstruction, sourceNames } from '@/lib/chat-citations';
 import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
   const session = await auth();
   const userId = session?.user?.email;
   if (!userId) return new Response('unauthorized', { status: 401 });
+  // Resolve the caller's org ONCE — org-knowledge grounding must only ever search this tenant's
+  // collections, never another org's.
+  const orgId = await currentOrgId();
 
   const {
     conversationId,
@@ -194,7 +198,12 @@ export async function POST(req: Request) {
   // project RAG branch above. Retrieval only ever returns collections the role may access.
   if (orgKnowledge) {
     try {
-      const r = await retrieveOrgKnowledge(String(content), session?.user?.role ?? 'viewer');
+      const r = await retrieveOrgKnowledge(
+        String(content),
+        session?.user?.role ?? 'viewer',
+        6,
+        orgId,
+      );
       if (r.context) {
         messages.push({ role: 'system', content: r.context });
         citations = citations.concat(

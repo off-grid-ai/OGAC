@@ -84,8 +84,8 @@ export const goldenEvals: EvalsPort = {
     render: 'native',
     description: 'Recall-scored golden query→expected-doc set over the Brain (always on).',
   },
-  async run() {
-    const r = await runEval();
+  async run(orgId?: string) {
+    const r = await runEval(orgId);
     return {
       id: r.id,
       engine: 'golden',
@@ -170,11 +170,11 @@ export const promptfooEvals: EvalsPort = {
     render: 'headless',
     description: 'Assertion-matrix evals across providers (Node CLI), run against the gateway.',
   },
-  async run() {
+  async run(orgId?: string) {
     try {
       return await runPromptfoo();
     } catch {
-      return goldenEvals.run(); // promptfoo not installed / failed — never a hard dependency
+      return goldenEvals.run(orgId); // promptfoo not installed / failed — never a hard dependency
     }
   },
   async health() {
@@ -281,12 +281,12 @@ export const ragasEvals: EvalsPort = {
     description:
       'RAG metrics — faithfulness, answer relevancy, context recall. Runs the bundled Ragas sidecar (compose `qa` profile) with the gateway as judge + embeddings; falls back to golden.',
   },
-  async run() {
-    if (!RAGAS_URL) return goldenEvals.run();
+  async run(orgId?: string) {
+    if (!RAGAS_URL) return goldenEvals.run(orgId);
     try {
       return await runRagas();
     } catch {
-      return goldenEvals.run();
+      return goldenEvals.run(orgId);
     }
   },
   async health() {

@@ -195,8 +195,8 @@ export default async function ObservabilityPage({
   const regTab = resolveRegistryTab(lfRegRaw);
   const { range, fromIso, toIso } = resolveRange(lfRangeRaw);
   const [evals, drift, runs, onlineEnabled, traces, insights, registry] = await Promise.all([
-    listEvalRuns(20),
-    getDrift().analyze(),
+    listEvalRuns(20, org),
+    getDrift().analyze({ orgId: org }),
     listAgentRuns(15, org),
     getFlags().isEnabled('online-evals', true),
     safeListTraces(30),

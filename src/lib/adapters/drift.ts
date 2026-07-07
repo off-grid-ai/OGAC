@@ -115,8 +115,8 @@ function analyzeFirstParty(scores: number[], options?: DriftRunOptions): DriftRe
   };
 }
 
-async function scoreHistory(): Promise<number[]> {
-  const runs = await listEvalRuns(WINDOW * 2);
+async function scoreHistory(orgId?: string): Promise<number[]> {
+  const runs = await listEvalRuns(WINDOW * 2, orgId);
   return runs.map((r) => r.score);
 }
 
@@ -131,7 +131,7 @@ export const nativeDrift: DriftPort = {
       'Population Stability Index + mean-degradation over the eval-score history (always on).',
   },
   async analyze(options?: DriftRunOptions) {
-    return analyzeFirstParty(await scoreHistory(), options);
+    return analyzeFirstParty(await scoreHistory(options?.orgId), options);
   },
   health: () => Promise.resolve(true),
 };
@@ -156,7 +156,7 @@ export const evidentlyDrift: DriftPort = {
       'Data / embedding / output drift test suites + degradation monitoring. Runs the bundled Evidently sidecar (compose `qa` profile); falls back to first-party PSI if unreachable.',
   },
   async analyze(options?: DriftRunOptions) {
-    const scores = await scoreHistory();
+    const scores = await scoreHistory(options?.orgId);
     if (!EVIDENTLY_URL) return analyzeFirstParty(scores, options);
     try {
       const n = Math.min(WINDOW, Math.floor(scores.length / 2));

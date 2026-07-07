@@ -29,8 +29,8 @@ export default async function StudioPage() {
   const orgId = await currentOrgId();
   const [apps, agents, activity, tools] = await Promise.all([
     listApps(orgId).catch(() => []),
-    listManagedAgents(),
-    agentActivity(),
+    listManagedAgents(orgId),
+    agentActivity(orgId),
     listTools(orgId).catch(() => []),
   ]);
 
