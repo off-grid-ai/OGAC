@@ -564,11 +564,19 @@ Override the tags via `OFFGRID_SANDBOX_PY_IMAGE` / `OFFGRID_SANDBOX_NODE_IMAGE` 
 
 ### Durable agent-run worker (Temporal, task queue `offgrid-agents`)
 
-Agent runs (`POST /api/v1/admin/agents/runs`) can now execute DURABLY on Temporal (`:7233`,
-already up on S1) via the `AgentRunWorkflow` + `runAgentPipeline` activity — the workflow wraps the
-existing `runAgent` pipeline (policy → guardrails → retrieval → LLM → grounding → provenance →
-persist), so a worker crash mid-run is retried/resumed, not lost. This is SEPARATE from the
-inference queue (`offgrid-inference`): this queue is `offgrid-agents`.
+Agent runs can now execute DURABLY on Temporal (`:7233`, already up on S1) via the
+`AgentRunWorkflow` + `runAgentPipeline` activity — the workflow wraps the existing `runAgent`
+pipeline (policy → guardrails → retrieval → LLM → grounding → provenance → persist), so a worker
+crash mid-run is retried/resumed, not lost. This is SEPARATE from the inference queue
+(`offgrid-inference`): this queue is `offgrid-agents`.
+
+- **Which routes go through the durable seam (`dispatchAgentRun`):** as of `feat/temporal-durable`,
+  ALL agent-run trigger routes route through `dispatchAgentRun` (durable when enabled, else inline):
+  `POST /admin/agents/runs`, `POST /admin/run` (Studio "run as app" test-run),
+  `POST /admin/agent-runs/[id]/rerun`, and `POST /admin/agent-runs/workflows/[wf]/rerun`. Each
+  response surfaces the mode honestly (`durable` | `sync` | `pending`); a `pending` durable submit
+  returns 202 + workflowId/runId to poll. Multi-step app runs use the sibling `submitAppRun` seam
+  (`offgrid-apps` queue, app-worker). No new queue/worker/launchd wiring — reuses `offgrid-agents`.
 
 - **The worker loads its own env** (`scripts/worker-env.mts`, imported FIRST in
   `scripts/temporal-worker.mts`): `@next/env` `loadEnvConfig` against the console root, resolved
@@ -595,9 +603,20 @@ inference queue (`offgrid-inference`): this queue is `offgrid-agents`.
   (default `offgrid-s1.local:7233`; the plist pins `127.0.0.1:7233` on S1),
   `OFFGRID_TEMPORAL_NAMESPACE=default`, `OFFGRID_AGENT_TASK_QUEUE=offgrid-agents`,
   `OFFGRID_AGENT_MAX_ATTEMPTS`, `OFFGRID_AGENT_AWAIT_MS`, `OFFGRID_AGENT_MAX_CONCURRENT`.
-- **Still needs a live check on S1** (cannot be confirmed off-box): with Temporal + Postgres up,
-  bootstrap the plist, confirm the log reaches `ready — draining agent runs`, submit an agent run
-  with `OFFGRID_QUEUE_ENABLED=1`, and confirm it persists (no SASL error) end-to-end.
+- **Live durable run VERIFIED end-to-end on S1 (2026-07-07).** With Temporal (`:7233`) + Postgres up,
+  the agent-worker was started manually (`OFFGRID_ADAPTER_AGENTRUNTIME=temporal`), reached
+  `ready — draining agent runs`, and a run submitted through the real `dispatchAgentRun` executed
+  DURABLY: `mode: durable`, workflow `agentrun-sop-synth-run_b453c78f` (`AgentRunWorkflow`,
+  `temporalStatus: COMPLETED`, `historyLength: 11`, queue `offgrid-agents`), the run persisted to
+  `agent_runs` (status `done`, 8 pipeline steps, provenance signed), and it is queryable via the
+  visibility store (`describeWorkflow` / `listWorkflowExecutions`). No SASL error.
+- **CURRENT PROD POSTURE (as of that check): durable dispatch is OFF.** The console `.env.*` has
+  `OFFGRID_QUEUE_ENABLED=` (empty) and `OFFGRID_ADAPTER_AGENTRUNTIME=` (empty), and the
+  `co.getoffgridai.agent-worker` LaunchAgent is NOT bootstrapped (`launchctl list` shows only
+  `co.getoffgridai.app-worker`). So today every agent run executes SYNCHRONOUSLY in-process (the safe
+  honest default). To turn durability ON: bootstrap the agent-worker plist → confirm
+  `ready — draining agent runs` → flip `OFFGRID_QUEUE_ENABLED=1` (or `OFFGRID_ADAPTER_AGENTRUNTIME=temporal`)
+  and restart the console. (The `app-worker` for multi-step app runs IS loaded.)
 
 ## Public file store (SeaweedFS, internet-exposed via the gateway)
 
