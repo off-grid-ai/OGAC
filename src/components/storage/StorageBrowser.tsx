@@ -26,18 +26,11 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Pagination } from '@/components/ui/Pagination';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -344,16 +337,20 @@ function ShareDialog({ file, onClose }: { file: FileMeta | null; onClose: () => 
   }, [file, ttl]);
 
   return (
-    <Dialog open={!!file} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Share {file?.name}</DialogTitle>
-          <DialogDescription>
-            Generate a time-limited link that grants read access, then expires — no login required to open it.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
+    <FormSheet
+      open={!!file}
+      onOpenChange={(o) => !o && onClose()}
+      title={`Share ${file?.name ?? ''}`}
+      description="Generate a time-limited link that grants read access, then expires — no login required to open it."
+      size="md"
+      footer={
+        <Button onClick={() => void mint()} disabled={loading} className="w-full gap-1.5">
+          {loading ? <Spinner /> : null}
+          {loading ? 'Generating…' : link ? 'Regenerate' : 'Create link'}
+        </Button>
+      }
+    >
+      <div className="space-y-3">
           <Label className="text-xs">Link expires after</Label>
           <div className="flex flex-wrap gap-1.5">
             {TTL_CHOICES.map((c) => (
@@ -399,14 +396,7 @@ function ShareDialog({ file, onClose }: { file: FileMeta | null; onClose: () => 
             </div>
           )}
         </div>
-
-        <DialogFooter>
-          <Button onClick={() => void mint()} disabled={loading}>
-            {loading ? 'Generating…' : link ? 'Regenerate' : 'Create link'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormSheet>
   );
 }
 
@@ -500,7 +490,7 @@ function BucketPanel({ open, onClose }: { open: boolean; onClose: () => void }) 
       }
     >
       {loading ? (
-          <p className="py-8 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <div className="space-y-6">
             {/* Access policy */}
@@ -608,8 +598,19 @@ export function StorageBrowser() {
     [router, pathname, search],
   );
 
-  // Share dialog is transient (not a navigational place) — the file being shared is local state.
-  const [shareFile, setShareFile] = useState<FileMeta | null>(null);
+  // Share panel is a URL place (?share=<fileId>) so it's deep-linkable and Back closes it — the
+  // panel holds state (chosen TTL, the minted link), so it's a "place", not a transient popup.
+  const shareId = search.get('share');
+  const setShareId = useCallback(
+    (id: string | null) => {
+      const q = new URLSearchParams(search.toString());
+      if (id) q.set('share', id);
+      else q.delete('share');
+      const qs = q.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname, search],
+  );
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
@@ -673,7 +674,7 @@ export function StorageBrowser() {
 
       <UploadZone onUploaded={fetchFiles} />
 
-      <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />
+      <ShareDialog file={files.find((f) => f.id === shareId) ?? null} onClose={() => setShareId(null)} />
       <BucketPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
 
       {/* Stats row */}
@@ -705,7 +706,7 @@ export function StorageBrowser() {
 
       {/* Grid: top level shows FOLDERS only; opening one reveals its files. */}
       {loading ? (
-        <p className="py-12 text-center text-xs text-muted-foreground">Loading…</p>
+        <LoadingBlock />
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-16">
           <X className="size-8 text-muted-foreground/40" />
@@ -730,7 +731,7 @@ export function StorageBrowser() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filePage.pageItems.map((f) => (
-              <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} onShare={setShareFile} />
+              <FileCard key={f.id} file={f} onDelete={deleteFile} onToggleVisibility={toggleVisibility} onShare={(file) => setShareId(file.id)} />
             ))}
           </div>
           <Pagination

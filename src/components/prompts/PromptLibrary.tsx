@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/Pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import { PromptStarterLibrary } from '@/components/prompts/PromptStarterLibrary';
 import { usePagination } from '@/lib/use-pagination';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
@@ -429,7 +430,8 @@ function PromptEditPanel({
           <Button size="sm" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button size="sm" onClick={onSave} disabled={saving || !draft.content.trim()}>
+          <Button size="sm" onClick={onSave} disabled={saving || !draft.content.trim()} className="gap-1.5">
+            {saving ? <Spinner className="size-4" /> : null}
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
@@ -467,7 +469,7 @@ function CommonPromptsPanel({
         </p>
       </div>
       {common === null ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <LoadingBlock />
       ) : !available ? (
         <p className="text-xs text-muted-foreground">
           Usage history unavailable (OpenSearch unreachable).

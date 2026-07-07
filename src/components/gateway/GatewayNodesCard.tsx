@@ -4,6 +4,7 @@ import { ArrowClockwise } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHost } from '@/lib/display-host';
 
 interface Node {
@@ -59,7 +60,7 @@ export function GatewayNodesCard({ initial }: { initial: Node[] }) {
             title="Refresh now"
             className="text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowClockwise className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? <Spinner className="size-4" /> : <ArrowClockwise className="size-4" />}
           </button>
         </div>
       </CardHeader>

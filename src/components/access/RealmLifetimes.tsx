@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 
 interface Lifetimes {
   realm: string;
@@ -134,7 +135,7 @@ export function RealmLifetimes() {
         )}
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
@@ -162,8 +163,14 @@ export function RealmLifetimes() {
                 </div>
               ))}
             </div>
-            <Button size="sm" onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save lifetimes'}
+            <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner /> Saving…
+                </>
+              ) : (
+                'Save lifetimes'
+              )}
             </Button>
           </>
         )}

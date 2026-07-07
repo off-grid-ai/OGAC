@@ -8,6 +8,7 @@ import { UserPicker, type PickableUser } from '@/components/access/UserPicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingBlock } from '@/components/ui/spinner';
 
 interface Credential {
   id: string;
@@ -166,7 +167,7 @@ export function MfaPanel() {
               <span className="font-medium">Keycloak error:</span> {error}
             </div>
           ) : loading ? (
-            <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+            <LoadingBlock />
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 
 // Temporal Schedules management — recurring/cron agent runs. Self-fetches
 // /api/v1/admin/agent-runs/schedules. The create form is a URL-driven panel (?new=1), not a modal;
@@ -119,7 +120,7 @@ export function SchedulesPanel() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading schedules…</p>
+        <LoadingBlock label="Loading schedules…" />
       ) : !view ? (
         <p className="text-sm text-muted-foreground">Could not load schedules.</p>
       ) : !view.configured ? (
@@ -265,7 +266,13 @@ function CreateScheduleForm({ onCancel, onCreated }: { onCancel: () => void; onC
       </div>
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Create schedule'}
+          {submitting ? (
+            <>
+              <Spinner /> Creating…
+            </>
+          ) : (
+            'Create schedule'
+          )}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>
           Cancel

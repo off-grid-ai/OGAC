@@ -4,6 +4,7 @@ import { ArrowsClockwise } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 
 // Qdrant activation: push existing Brain docs' embeddings into the Qdrant collection so switching
 // OFFGRID_ADAPTER_RETRIEVAL=qdrant isn't an empty store.
@@ -41,7 +42,11 @@ export function ReindexQdrantButton({
         {count == null ? 'unreachable' : `${count} indexed`} · {sourceDocs} source doc(s)
       </div>
       <Button size="sm" variant="outline" onClick={() => void reindex()} disabled={busy}>
-        <ArrowsClockwise className={`mr-1.5 size-4 ${busy ? 'animate-spin' : ''}`} />
+        {busy ? (
+          <Spinner className="mr-1.5 size-4" />
+        ) : (
+          <ArrowsClockwise className="mr-1.5 size-4" />
+        )}
         {busy ? 'Reindexing…' : 'Reindex Brain → Qdrant'}
       </Button>
     </div>
