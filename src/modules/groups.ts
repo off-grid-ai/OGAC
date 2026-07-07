@@ -63,7 +63,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Gateway & Fleet',
     // The network + LLM edge and the device fleet. The Caddy edge is an internal detail of the
     // published surface, so it sits under Services rather than as its own row.
-    primary: ['services', 'gateway', 'fleet'],
+    primary: ['services', 'gateway', 'gateways', 'fleet'],
     secondary: ['edge'],
   },
   {
