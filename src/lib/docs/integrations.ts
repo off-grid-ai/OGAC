@@ -12,6 +12,8 @@ export const integrationsSection: DocSection = {
 and **platform services** that back the capabilities. Every one runs on your infrastructure or your
 own accounts.
 
+![Integrations — every data source and swappable platform service Off Grid AI connects to](/docs-shots/integrations.png)
+
 ## Data source connectors
 
 Add these on the **Integrations** page — point at an endpoint, choose an auth scheme, sync.
@@ -30,6 +32,8 @@ Sync reports real row/document counts from the live source. See [Data](/docs/gui
 
 Each capability is reached through a port, so you can swap the implementation with one environment
 variable. Defaults run first-party; these are the production swap-ins:
+
+![Swap any backend through a capability port — one environment variable, first-party fallback always ready](/docs-shots/connectors.png)
 
 - **Keycloak** — identity / SSO.
 - **Qdrant** — vector store for retrieval (embedded store is the default).

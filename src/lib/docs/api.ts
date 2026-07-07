@@ -11,6 +11,8 @@ export const apiSection: DocSection = {
       body: `Everything the console does is available through one authed API surface, so you can build
 on the platform without touching the UI. There are three families:
 
+![The gateway — one OpenAI-compatible endpoint every model call flows through, on your own nodes](/docs-shots/gateway.png)
+
 - **Model API** (\`/v1/*\`) — OpenAI-compatible chat, embeddings, and images, served by your gateway.
 - **Console API** (\`/api/v1/*\`) — the platform's own routes (connectors, agents, policy, flags,
   and everything else the console manages).

@@ -13,6 +13,9 @@ export const selfHostingSection: DocSection = {
 - **Control plane** — the console, identity, database, object storage, and the model aggregator.
 - **Gateway nodes** — the machines that run the models (chat, vision, and image). Add or drain nodes
   from the [Fleet](/docs/guides/fleet) surface.
+
+![Fleet — the nodes that serve your models, their roles, and enable or drain each one](/docs-shots/fleet.png)
+
 - **Auxiliary services** — observability, feature flags, PII detection, and BI, each swappable behind
   a capability port.
 
@@ -76,6 +79,8 @@ exact per-service settings.`,
       body: `Scale the model tier by adding gateway nodes. The aggregator round-robins across the
 enabled nodes for a given model, so more nodes means more throughput without config changes beyond
 registering them in [Fleet](/docs/guides/fleet).
+
+![Scale by adding nodes — the aggregator round-robins the enabled nodes for a model](/docs-shots/fleet.png)
 
 - **Add capacity** — register a node, assign it a model, enable it. It joins the routing pool.
 - **Drain** — disable a node to take it out of rotation for maintenance without removing it.

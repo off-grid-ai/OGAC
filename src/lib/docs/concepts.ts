@@ -42,6 +42,8 @@ one identity model, one record.`,
       body: `Every governed request — a chat turn, an agent run — runs the same path. You can watch it
 happen on any agent run.
 
+![An agent run trace — policy, guardrails, retrieval, answer, grounding, and provenance, stage by stage](/docs-shots/app-runs.png)
+
 1. **Policy** — an attribute-based check decides whether the request is allowed. A matching deny
    rule stops it here.
 2. **Guardrails (input)** — the prompt is scanned for PII and injection before it moves. A blocked
@@ -65,6 +67,8 @@ was checked, what was retrieved, and where the answer came from.`,
       description: 'The console is modular — adopt the whole control plane or just one part.',
       body: `Off Grid AI is organized into modules, each an independently adoptable capability. A
 deployment enables the set you bought; the console shows only those.
+
+![The console modules, grouped by job — workspace, intelligence, gateway, data, governance, and insights](/docs-shots/overview.png)
 
 ## Grouped by job
 
@@ -138,6 +142,8 @@ The one way data can leave is a cloud-model call, and that is gated. Egress is o
 routing rule can only send a request to a cloud model when egress is on, and a rule like
 \`data_class = PII → block\` forces sensitive data to stay regardless. Every allowed egress is
 logged and attributable.
+
+![The egress leash — cloud access off by default, so sensitive data physically cannot leave the box](/docs-shots/control.png)
 
 ## Air-gapped
 

@@ -17,6 +17,8 @@ removes the trade-off. The intelligence *inside* your org (your documents, syste
 and the intelligence *outside* it (open-weight and, when you permit it, cloud models) meet on one
 control plane that you own.
 
+![The Off Grid AI Console home — health, governance posture, spend, and activity at a glance](/docs-shots/overview.png)
+
 ## What you get
 
 - **A private AI, everywhere.** Chat, projects, and knowledge, answered by models running on
@@ -64,17 +66,23 @@ Open **Chat**, pick a model, and ask a question. The answer is generated on your
 footer confirms it: *runs on your on-prem gateways, nothing leaves your network*. This is your
 private AI, everywhere.
 
+![Chat — a private, grounded answer generated on your own gateway](/docs-shots/chat.png)
+
 ## 3. Give it your knowledge
 
 Go to **Knowledge** and upload a document (a policy PDF, an SOP, a spec). Off Grid AI chunks and indexes
 it on your own hardware. Back in Chat, ask a question the document answers; the reply now cites the
 source, and it won't invent facts beyond what it retrieved.
 
+![Knowledge — upload a document and Off Grid AI indexes it on your own hardware for cited answers](/docs-shots/knowledge.png)
+
 ## 4. Build an assistant
 
 Open **Studio → New assistant**. Describe what you want in plain language ("answer HR policy
 questions and cite the policy"). Off Grid AI suggests the setup, you pick any skills, and you try it
 right there. Publish it to your team.
+
+![Studio — describe an assistant in plain language and publish it to your team](/docs-shots/studio.png)
 
 ## 5. Generate an image
 
@@ -135,6 +143,8 @@ data. Each is SaaS. Each holds a copy of your prompts and often your data. Each 
 and one more seam where governance leaks.
 
 Off Grid AI Console is one platform instead of that pile, running on your own hardware.
+
+![One control plane — routing, policy, egress, and audit search governed from a single room](/docs-shots/control.png)
 
 ## The moat is the integration
 
