@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
+import { isPublicFileGet, isPublicPath, tenantSlugFromHost } from '@/lib/route-access';
 
 // Sliding-window rate limiter — 60 req/min per IP on /api/* routes.
 // Keyed on CF-Connecting-IP (set by Cloudflare Tunnel) then x-forwarded-for fallback.
@@ -26,41 +27,8 @@ function checkRateLimit(req: { headers: Headers; nextUrl: { pathname: string } }
 
 const { auth } = NextAuth(authConfig);
 
-// Node endpoints authenticate with device/enrollment tokens, not user SSO — left public here.
-const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/;
-
-// GET of a single file is allowed through unauthenticated — the handler serves it only
-// if the file is public and returns 404 for private ones. Upload/list/patch/delete
-// (POST/GET-list/PATCH/DELETE) are NOT here and still require auth.
-// The key can be NESTED (e.g. media/2026/report.png) — object-store keys have slashes — so match
-// any non-empty tail, not just a single path segment. The catch-all [...id] handler still enforces
-// public-vs-private per file, so this only widens which GETs reach that gate, never what it serves.
-const FILE_GET = /^\/api\/v1\/files\/.+$/;
-
-// Marketing, docs, and auth surfaces that never require an SSO session.
-// /scalar.standalone.js — the self-hosted Scalar bundle the public /docs/api page loads. It must be
-// public too, or the unauthenticated docs page can't load its own script (redirect → blank page).
-const PUBLIC_EXACT = ['/', '/docs', '/openapi.json', '/scalar.standalone.js'];
-const PUBLIC_PREFIX = [
-  '/architecture',
-  '/journey',
-  '/features',
-  '/fleet-control',
-  '/handbook',
-  '/docs', // the product documentation site (public, like any docs site) — /docs, /docs/*, /docs/api
-  '/signin',
-  '/api/auth',
-  '/api/waitlist', // public request-access capture from the signin page (no session needed)
-  '/app/', // deployed Studio apps (S2) — public shareable surfaces
-  '/api/v1/app/', // their public run endpoint
-  '/api/v1/status', // public service status (uptime monitors)
-];
-
-function isPublic(pathname: string): boolean {
-  if (PUBLIC_EXACT.includes(pathname)) return true;
-  if (PUBLIC_PREFIX.some((p) => pathname.startsWith(p))) return true;
-  return NODE_API.test(pathname);
-}
+// The public-path / file-GET / tenant-slug rules are PURE and live in lib/route-access.ts so they're
+// unit-testable without the edge runtime, and shared (DRY) between here and the tests.
 
 // Machine key flow: any /api/* request carrying `Authorization: Bearer <token>` is let
 // through here and AUTHENTICATED IN THE HANDLER via the IdentityVerifier seam (authz.ts).
@@ -97,13 +65,11 @@ function withCors(res: NextResponse, pathname: string): NextResponse {
 // (set by Cloudflare) and forward it downstream as x-offgrid-tenant-slug so currentOrgId() can
 // hard-bind the request to that tenant's org. We ALWAYS strip any client-supplied value first, then
 // set it only from the host — so the header can't be spoofed to reach another tenant's data.
-const TENANT_HOST_RE = /^([a-z0-9]+)-onprem-console\./;
 function tenantScopedHeaders(req: { headers: Headers; nextUrl: { hostname: string } }): Headers {
   const h = new Headers(req.headers);
   h.delete('x-offgrid-tenant-slug');
-  const host = (req.headers.get('host') ?? req.nextUrl.hostname).toLowerCase();
-  const m = TENANT_HOST_RE.exec(host);
-  if (m) h.set('x-offgrid-tenant-slug', m[1]);
+  const slug = tenantSlugFromHost(req.headers.get('host') ?? req.nextUrl.hostname);
+  if (slug) h.set('x-offgrid-tenant-slug', slug);
   return h;
 }
 
@@ -123,8 +89,8 @@ export default auth((req) => {
       pathname,
     );
   }
-  if (isPublic(pathname)) return withCors(pass(), pathname);
-  if (req.method === 'GET' && FILE_GET.test(pathname)) return pass();
+  if (isPublicPath(pathname)) return withCors(pass(), pathname);
+  if (isPublicFileGet(req.method, pathname)) return pass();
   if (isApiBearer(req)) return withCors(pass(), pathname);
   if (!req.auth) {
     // API clients get a clean 401 (not an HTML login redirect); browsers get sent to
