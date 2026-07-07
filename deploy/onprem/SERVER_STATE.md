@@ -88,7 +88,18 @@ pipeline runs on. Applied live via `deploy/onprem/2026-gateways.sql`; ALSO self-
 Cluster / OpenAI / Anthropic / OpenRouter — for org `default` AND `org_bharat` (stable ids
 `gw_seed_<org>_<key>`, `ON CONFLICT DO NOTHING`). `egress_class` derived from `kind`
 (on-prem⇒on-prem, cloud kinds⇒cloud). Availability is NOT stored — merged live from the aggregator
-+ cloud-providers probe at read time).
++ cloud-providers probe at read time),
+**`pipelines`** + **`pipeline_versions`** (2026-07-08 — Gateways × Pipelines, the PIPELINE tier: the
+reusable, GOVERNED model-access contract that binds a gateway, fixes a HARD data allowlist ceiling,
+carries routing/egress leash + policy/guardrail overlays, and is consumed by apps/agents/chat.
+`pipelines` holds the live config + a `version` int + `status` (draft|published|archived);
+`pipeline_versions` is the append-only immutable snapshot per publish/edit. Applied live via
+`deploy/onprem/2026-pipelines.sql`; ALSO self-creates via `ensurePipelinesSchema()` in
+`src/lib/pipelines.ts` (CREATE TABLE IF NOT EXISTS + ALTER ADD COLUMN IF NOT EXISTS). Seeded with 6
+sample Indian-BFSI templates — Reimbursement Governance / Motor-Claim FNOL / Loan Underwriting / KYC
+Verification / Fraud Screening / Cross-Sell Advisor — for org `default` AND `org_bharat` (stable ids
+`pl_seed_<org>_<key>`, `ON CONFLICT DO NOTHING`), each bound to that org's seeded on-prem gateway.
+Seed both via `POST /api/v1/admin/gateways/seed` then `POST /api/v1/admin/pipelines/seed`).
 DDL for each is in `src/db/schema.ts`; the create statements used are in git history / DEPLOY.md.
 
 Self-creating tables (via `CREATE TABLE IF NOT EXISTS` on first use — no manual/migration step, deploy over SSH just works): `guardrails_rules`, and (2026-07-05, DEEP Presidio guardrails) **`presidio_recognizers`** (org-scoped custom recognizers: regex-pattern + context words, or deny-list terms — pushed to Presidio `/analyze` as `ad_hoc_recognizers`) and **`presidio_thresholds`** (per-org global + per-entity `score_threshold`). DDL in `src/lib/presidio-recognizers.ts` (`ensureRecognizersSchema`).
