@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
-import { runAgent } from '@/lib/agentrun';
+import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { actorFromSession } from '@/lib/audit-actor';
+import { currentOrgId } from '@/lib/tenancy';
 import { requireUser } from '@/lib/authz';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 
-// Studio "run as app". When the composed workflow includes an Agent block, we run it
-// through the REAL governed pipeline (runAgent): ABAC/policy gate → input guardrails →
-// retrieval/grounding → answer → output guardrails → provenance signing → persistence →
-// lineage → QA, and the Temporal queue when enabled. This is what makes Studio inherit the
-// console's rule engine + workflow rather than just calling the model. Without an agent
-// (e.g. a bare prompt preview), it falls back to a plain gateway completion.
+// Studio "run as app". When the composed workflow includes an Agent block, we run it through the
+// REAL governed pipeline via dispatchAgentRun: ABAC/policy gate → input guardrails →
+// retrieval/grounding → answer → output guardrails → provenance signing → persistence → lineage →
+// QA. Dispatch selects the DURABLE Temporal path when OFFGRID_QUEUE_ENABLED=1 /
+// OFFGRID_ADAPTER_AGENTRUNTIME=temporal and the cluster is reachable — so a Studio test-run survives
+// a restart and is resumable/cancelable — or degrades gracefully to the synchronous in-process path.
+// This is what makes Studio inherit the console's rule engine + workflow rather than just calling the
+// model. Without an agent (e.g. a bare prompt preview), it falls back to a plain gateway completion.
 // eslint-disable-next-line complexity
 export async function POST(req: Request) {
   const gate = await requireUser(req);
@@ -22,11 +26,28 @@ export async function POST(req: Request) {
   const agentId = typeof rawAgentId === 'string' ? rawAgentId.replace(/^agent:/, '') : '';
   if (agentId) {
     try {
-      const run = await runAgent(agentId, String(input), caller, !!requireReview);
+      const d = await dispatchAgentRun({
+        agentId,
+        query: String(input),
+        caller,
+        requireReview: !!requireReview,
+        orgId: await currentOrgId(),
+        actor: actorFromSession(gate),
+      });
+      // Durable submit accepted but the pipeline is still executing in the worker — surface the ids
+      // + mode honestly so the Studio UI can poll for the run rather than assume a synchronous answer.
+      if (d.mode === 'pending') {
+        return NextResponse.json(
+          { output: '', governed: true, mode: 'durable', status: 'running', runId: d.runId, workflowId: d.workflowId },
+          { status: 202 },
+        );
+      }
+      const run = d.run;
       if (!run) return NextResponse.json({ output: '', error: `unknown agent "${agentId}"` }, { status: 404 });
       return NextResponse.json({
         output: run.answer,
         governed: true,
+        mode: d.mode,                     // 'durable' (ran on the worker) | 'sync' (in-process) — honest
         runId: run.id,                    // for the human-review approve/reject endpoint
         status: run.status,               // done | pending_review | blocked | denied
         steps: run.steps,                 // policy / guard / retrieve / answer / ground / sign …
