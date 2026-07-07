@@ -166,8 +166,10 @@ export function normalizeEvals(input: NormalizeEvalsInput | null | undefined): E
 // Pulls from the existing evals store and hands the raw records to the pure normalizer above.
 // The store (`@/lib/evals` → `@/db`) is imported lazily so the top of this module stays import-free
 // and the pure normalizer can be unit-tested without a DB. Best-effort: never throws.
-export async function readEvalsView(limit = 25): Promise<EvalsView> {
+export async function readEvalsView(limit = 25, orgId?: string): Promise<EvalsView> {
   const { listEvalRuns, listGoldenCases } = await import('@/lib/evals');
-  const [runs, goldenCases] = await Promise.all([listEvalRuns(limit), listGoldenCases()]);
+  // Scope the runs to the caller's org (undefined → DEFAULT_ORG in the store) so one tenant's
+  // pass-rate rollup never surfaces another org's runs.
+  const [runs, goldenCases] = await Promise.all([listEvalRuns(limit, orgId), listGoldenCases()]);
   return normalizeEvals({ runs, goldenCases });
 }

@@ -1,4 +1,5 @@
 import { type CustomAgent, getCustomAgent, listAudit, listCustomAgents } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Pre-built agent use cases. These are the "democratized intelligence at the frontline" and
 // "SOPs from observed work" cases the product ships with — adoptable standalone, with or
@@ -110,16 +111,16 @@ function toDef(c: CustomAgent): AgentDef {
 
 // The full catalog the console shows and runs: built-ins + every ENABLED user-authored agent.
 // Used by the runtime pipeline and fleet views — disabled agents are intentionally excluded.
-export async function listAllAgents(): Promise<AgentDef[]> {
-  const custom = await listCustomAgents();
+export async function listAllAgents(orgId: string = DEFAULT_ORG): Promise<AgentDef[]> {
+  const custom = await listCustomAgents(orgId);
   return [...AGENTS, ...custom.filter((c) => c.enabled).map(toDef)];
 }
 
 // The management listing for the Agents console: built-ins + ALL custom agents (including
 // disabled ones, tagged with `enabled`) so operators can see, edit, and re-enable them. Distinct
 // from listAllAgents, which is the runnable catalog.
-export async function listManagedAgents(): Promise<AgentDef[]> {
-  const custom = await listCustomAgents();
+export async function listManagedAgents(orgId: string = DEFAULT_ORG): Promise<AgentDef[]> {
+  const custom = await listCustomAgents(orgId);
   return [
     ...AGENTS.map((a) => ({ ...a, enabled: true })),
     ...custom.map((c) => ({ ...toDef(c), enabled: c.enabled })),
@@ -128,10 +129,13 @@ export async function listManagedAgents(): Promise<AgentDef[]> {
 
 // Resolve a single agent by id — built-in first, then a user-authored one from the DB. Used by
 // the interaction pipeline so a custom agent runs through exactly the same governed path.
-export async function resolveAgent(id: string): Promise<AgentDef | undefined> {
+export async function resolveAgent(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AgentDef | undefined> {
   const builtin = AGENTS.find((a) => a.id === id);
   if (builtin) return builtin;
-  const custom = await getCustomAgent(id);
+  const custom = await getCustomAgent(id, orgId);
   return custom && custom.enabled ? toDef(custom) : undefined;
 }
 
@@ -142,8 +146,8 @@ export interface AgentActivity {
 
 // Honest, derived activity: the audit store is the only real signal we have today, so we
 // report fleet-wide events and the share of agents (built-in + custom) that are grounded.
-export async function agentActivity(): Promise<AgentActivity> {
-  const [audit, all] = await Promise.all([listAudit({ limit: 5000 }), listAllAgents()]);
+export async function agentActivity(orgId: string = DEFAULT_ORG): Promise<AgentActivity> {
+  const [audit, all] = await Promise.all([listAudit({ limit: 5000 }), listAllAgents(orgId)]);
   const grounded = all.filter((a) => a.grounded).length;
   return {
     totalRuns: audit.length,

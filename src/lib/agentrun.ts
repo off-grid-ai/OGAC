@@ -310,7 +310,9 @@ export async function runAgent(
   // `caller`, org from the orgId param, no project.
   context?: RunContext,
 ): Promise<AgentRun | null> {
-  const agent = await resolveAgent(agentId);
+  // Resolve within the run's org (context wins, else the orgId param) so a custom agent authored
+  // in another tenant can never be invoked here.
+  const agent = await resolveAgent(agentId, context?.org ?? orgId);
   if (!agent) return null;
   // Honor a context-supplied runId (durable: the id the workflow/dispatch already tracks) so the
   // persisted run + all four planes share the one correlation key; else mint one (inline).

@@ -23,8 +23,8 @@ export default async function AgentsPage() {
   await requireModuleForUser('agents');
   const orgId = await currentOrgId();
   const [agents, activity, tools, apps] = await Promise.all([
-    listManagedAgents(),
-    agentActivity(),
+    listManagedAgents(orgId),
+    agentActivity(orgId),
     listTools(orgId).catch(() => []),
     listApps(orgId).catch(() => []),
   ]);
