@@ -1,8 +1,9 @@
 'use client';
 
-import { ArrowSquareOut, CircleNotch } from '@phosphor-icons/react/dist/ssr';
+import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
 import { isHealthy, type ServiceEntry, type ServiceHealth } from '@/lib/services-directory';
 
@@ -33,7 +34,7 @@ function HealthDot({ h }: { h: ServiceHealth | undefined }) {
   if (!h) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <CircleNotch className="size-3 animate-spin" /> checking
+        <Spinner className="size-3" /> checking
       </span>
     );
   }

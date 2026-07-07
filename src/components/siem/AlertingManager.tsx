@@ -15,8 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -152,6 +154,8 @@ export function AlertingManager() {
 // ── Monitors ─────────────────────────────────────────────────────────────────────────────────────
 
 function MonitorsTab() {
+  const router = useRouter();
+  const params = useSearchParams();
   const [monitors, setMonitors] = useState<MonitorSummary[]>([]);
   const [supported, setSupported] = useState(true);
   const [note, setNote] = useState<string | null>(null);
@@ -160,6 +164,30 @@ function MonitorsTab() {
   const [editing, setEditing] = useState<MonitorForm | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MonitorSummary | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // The monitor create/edit panel is a "place" — driven by `?monitor=new|<id>` so it's
+  // deep-linkable and Back-coherent (nav-in-URL rule). `editing` holds the form draft.
+  const monitorParam = params.get('monitor');
+  const setMonitorParam = useCallback(
+    (value: string | null) => {
+      const next = new URLSearchParams(params.toString());
+      if (value == null) next.delete('monitor');
+      else next.set('monitor', value);
+      router.push(`?${next.toString()}`, { scroll: false });
+    },
+    [params, router],
+  );
+  const openEditor = useCallback(
+    (form: MonitorForm) => {
+      setEditing(form);
+      setMonitorParam(form.id ?? 'new');
+    },
+    [setMonitorParam],
+  );
+  const closeEditor = useCallback(() => {
+    setEditing(null);
+    setMonitorParam(null);
+  }, [setMonitorParam]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -181,8 +209,8 @@ function MonitorsTab() {
     void load();
   }, [load]);
 
-  function startEdit(m: MonitorSummary) {
-    setEditing({
+  const toForm = useCallback(
+    (m: MonitorSummary): MonitorForm => ({
       id: m.id,
       name: m.name,
       index: m.index || 'offgrid-audit',
@@ -192,7 +220,24 @@ function MonitorsTab() {
       threshold: m.threshold ?? 1,
       op: m.op ?? 'gt',
       enabled: m.enabled,
-    });
+    }),
+    [],
+  );
+
+  // Deep-link: if the URL asks for a monitor panel but we have no draft yet (e.g. page loaded
+  // straight to `?monitor=<id>`), reconstruct the draft once monitors are loaded.
+  useEffect(() => {
+    if (!monitorParam || editing) return;
+    if (monitorParam === 'new') {
+      setEditing({ ...BLANK_MONITOR });
+      return;
+    }
+    const m = monitors.find((x) => x.id === monitorParam);
+    if (m) setEditing(toForm(m));
+  }, [monitorParam, editing, monitors, toForm]);
+
+  function startEdit(m: MonitorSummary) {
+    openEditor(toForm(m));
   }
 
   async function save(form: MonitorForm) {
@@ -234,7 +279,7 @@ function MonitorsTab() {
     }
   }
 
-  if (loading) return <p className="text-xs text-muted-foreground">Loading monitors…</p>;
+  if (loading) return <LoadingBlock label="Loading monitors…" />;
 
   return (
     <div className="space-y-4">
@@ -249,7 +294,7 @@ function MonitorsTab() {
 
       {supported && (
         <div className="flex justify-end">
-          <Button size="sm" className="gap-1.5" onClick={() => setEditing({ ...BLANK_MONITOR })}>
+          <Button size="sm" className="gap-1.5" onClick={() => openEditor({ ...BLANK_MONITOR })}>
             <Plus className="size-4" />
             New monitor
           </Button>
@@ -319,7 +364,7 @@ function MonitorsTab() {
       <MonitorEditor
         form={editing}
         busy={busy}
-        onClose={() => setEditing(null)}
+        onClose={closeEditor}
         onSave={save}
       />
 
@@ -341,7 +386,9 @@ function MonitorsTab() {
               variant="destructive"
               onClick={() => confirmDelete && doDelete(confirmDelete)}
               disabled={busy}
+              className="gap-1.5"
             >
+              {busy ? <Spinner /> : null}
               Delete
             </Button>
           </DialogFooter>
@@ -371,15 +418,29 @@ function MonitorEditor({
     setDraft((d) => ({ ...d, [k]: v }));
 
   return (
-    <Dialog open={!!form} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{draft.id ? 'Edit monitor' : 'New monitor'}</DialogTitle>
-          <DialogDescription>
-            Alert when matching audit docs cross a threshold within a look-back window.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
+    <FormSheet
+      open={!!form}
+      onOpenChange={(o) => !o && onClose()}
+      title={draft.id ? 'Edit monitor' : 'New monitor'}
+      description="Alert when matching audit docs cross a threshold within a look-back window."
+      size="md"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            className="gap-1.5"
+            onClick={() => onSave(draft)}
+            disabled={busy || !draft.name.trim() || !draft.index.trim()}
+          >
+            {busy ? <Spinner /> : <FloppyDisk className="size-4" />}
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 space-y-1">
             <Label className="text-xs">Name</Label>
             <Input value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="blocked-spike" />
@@ -442,21 +503,7 @@ function MonitorEditor({
             Enabled
           </label>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button
-            className="gap-1.5"
-            onClick={() => onSave(draft)}
-            disabled={busy || !draft.name.trim() || !draft.index.trim()}
-          >
-            <FloppyDisk className="size-4" />
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormSheet>
   );
 }
 
@@ -549,7 +596,7 @@ function IsmTab() {
 
   const set = <K extends keyof IsmForm>(k: K, v: IsmForm[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-  if (loading) return <p className="text-xs text-muted-foreground">Loading retention policy…</p>;
+  if (loading) return <LoadingBlock label="Loading retention policy…" />;
 
   return (
     <div className="space-y-4">
@@ -633,7 +680,7 @@ function IsmTab() {
           Delete policy
         </Button>
         <Button className="gap-1.5" onClick={save} disabled={busy || !supported || !form.policyId.trim()}>
-          <FloppyDisk className="size-4" />
+          {busy ? <Spinner /> : <FloppyDisk className="size-4" />}
           Save retention policy
         </Button>
       </div>
@@ -652,7 +699,8 @@ function IsmTab() {
             <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={doDelete} disabled={busy}>
+            <Button variant="destructive" onClick={doDelete} disabled={busy} className="gap-1.5">
+              {busy ? <Spinner /> : null}
               Delete
             </Button>
           </DialogFooter>

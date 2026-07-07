@@ -3,13 +3,13 @@
 import {
   ArrowClockwise,
   CheckCircle,
-  CircleNotch,
   Clock,
   UserCircle,
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   type AppRunView,
@@ -61,7 +61,7 @@ function StatusIcon({ status }: { status: string }) {
   if (tone === 'success') return <CheckCircle className={cls} weight="fill" />;
   if (tone === 'error') return <XCircle className={cls} weight="fill" />;
   if (tone === 'warn') return <UserCircle className={cls} weight="fill" />;
-  if (tone === 'active') return <CircleNotch className={`${cls} animate-spin`} />;
+  if (tone === 'active') return <Spinner className={cls} />;
   return <Clock className={cls} />;
 }
 
@@ -122,7 +122,7 @@ export function AppRunStatus({ initial }: { initial: AppRunView }) {
               {done}/{total} steps · started {run.startedAt ? new Date(run.startedAt).toLocaleString() : '—'}
               {polling ? (
                 <span className="ml-2 inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
-                  <CircleNotch className="size-3 animate-spin" /> live
+                  <Spinner className="size-3" /> live
                 </span>
               ) : null}
             </p>

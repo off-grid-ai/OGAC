@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -88,8 +89,14 @@ function AddOidcIdpForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         Keycloak admin console.
       </p>
       <div className="flex gap-2">
-        <Button size="sm" onClick={submit} disabled={saving}>
-          {saving ? 'Adding…' : 'Add provider'}
+        <Button size="sm" className="gap-1.5" onClick={submit} disabled={saving}>
+          {saving ? (
+            <>
+              <Spinner /> Adding…
+            </>
+          ) : (
+            'Add provider'
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
@@ -200,18 +207,24 @@ export function IdpList() {
               <Button
                 size="sm"
                 variant="outline"
-                className="mt-2"
+                className="mt-2 gap-1.5"
                 onClick={() => void grantAccess()}
                 disabled={granting}
               >
-                {granting ? 'Granting…' : 'Grant access'}
+                {granting ? (
+                  <>
+                    <Spinner /> Granting…
+                  </>
+                ) : (
+                  'Grant access'
+                )}
               </Button>
             )}
           </div>
         )}
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <div className="overflow-x-auto">
             <Table>
