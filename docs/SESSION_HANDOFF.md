@@ -1,8 +1,60 @@
-# Session handoff — console UX pass + BUILDER EPIC (live as of 2026-07-06)
+# Session handoff — PIPELINES × GATEWAYS architecture (live as of 2026-07-08, overnight autonomous)
 
 Read this first if you're a fresh session continuing the console work. The git log is the source of
 truth for code; this file captures the **state that isn't in code**: the live task queue, in-flight
-agents, the deploy workaround, and the operating cadence.
+agents, the deploy workaround, and the operating cadence. (The BUILDER-EPIC section below is older
+context — still true, but the ACTIVE work is the 3-tier Pipelines×Gateways architecture, next.)
+
+## ACTIVE WORK — the 3-tier architecture (canonical: `docs/PIPELINES_AND_GATEWAYS_PLAN.md`)
+
+**Model (founder-confirmed, hardened, stress-tested):** GATEWAYS (reusable model backends) → PIPELINES
+(reusable governed model-access = gateway binding + routing + HARD data-ceiling allowlist + policy/
+guardrail overlays + evals/golden/drift + telemetry lenses) → APPS/AGENTS/CHAT (consumers + real data +
+humans) + EXTERNAL 3rd-parties (per-pipeline API key). A RUN is the join key for all telemetry.
+Hardened decisions: chat binds a pipeline (admin sets available set, users pick per-project); pipeline
+allowlist is a HARD CEILING (widen = edit pipeline; 1:1 per app/dept is fine — composition, not forced
+sharing); FinOps = one run-keyed fact table many lenses; RBAC (mgmt plane) → ABAC (data plane, OPA)
+compose. **WE operate it, not the enterprise** (so no self-serve Rego bar; ship pre-built pipelines).
+Adversarial-review deferred gaps logged in `docs/GAPS_BACKLOG.md` as PA-3/4/6/8/9.
+
+**DONE + deployed + verified live:** P1 Gateways first-class (4 seeded GWs, honest health) · Pipeline
+foundation (pipelines + pipeline_versions tables, pure `pipelines-policy.ts` w/ effectiveGovernance
+mandatory-locked + hard-ceiling `canReachData`, versioning, CRUD, 6 BFSI seed pipelines × 2 orgs,
+`/pipelines` list→detail w/ tab IA scaffolded). Schema PRE-LANDED (applied live): `golden_cases.
+pipeline_id`, `eval_definitions.pipeline_id`, `pipeline_api_keys` table (so tab agents don't touch
+schema.ts).
+
+**IN FLIGHT — 4 disjoint worktree agents (launched 2026-07-08, gate=typecheck+tests+build, commit-not-
+merge). Process SEQUENTIALLY as they land (token budget). File ownership is STRICT/disjoint:**
+- **FANOUT-G** (task #162): Gateways full CRUD + detail view (the founder's "no way to edit gateway"). Owns `gateways*` lib/policy/routes/components/pages.
+- **FANOUT-A** (task #163): Pipeline mgmt UX — fix card overflow, make pipeline EDITABLE, comprehensive Overview dashboard. Owns pipelines Manager/Overview/RoutingEditor/DetailNav + Overview/routing/versions pages + `pipeline-detail.ts`.
+- **FANOUT-B** (task #164): Governance+Quality tabs (Policy/Guardrails/Quality/Drift) scoped+editable; re-point evals/golden/drift → pipeline_id. Owns those tab pages + `components/pipelines/governance/**` + eval-defs.ts/evals.ts.
+- **FANOUT-C** (task #165): Per-pipeline API keys (mint/revoke/verify) + Integrate tab + public run route + telemetry tabs (Observability/Audit/Cost lenses). Owns api/observability/audit/cost tab pages + `components/pipelines/telemetry/**` + `pipeline-api-keys.ts` + keys routes.
+
+**THE MERGE GATE IS A LIVE USABILITY AUDIT (founder: "don't give me half-assed stuff", "make sure it's
+actually usable", "audit it"):** do NOT merge on green build alone. For each agent: exercise the real
+write flow against the live DB (edit/mint/attach/run/toggle/revoke → read-back persists), screenshot
+EVERY surface + tab (Playwright harness — see `../desktop/scripts/screenshots-pro.mjs` pattern, wide+
+light), and run the full-CRUD checklist (create/read/update/delete/trigger). Placeholder-that-does-
+nothing / 404-on-submit / fabricated metric / overflow = REJECT, bounce to the agent with evidence.
+Anything not fully wireable this round → honest empty state (never fake) + logged gap. Report each
+surface as verified-usable (with evidence) or bounced — never inflate "done."
+
+**NEXT ROUND (after these 4 land+verify):** consumers binding — `apps.pipeline_id` + chat/project
+pipeline binding (admin-sets-available-set, user-picks); then the Overview "consumers" section goes
+live. Then a QA/platform-integration + user-docs sweep agent (operating-model cadence: every ~3
+completions). Deferred: PA-3 team tier, PA-6 FinOps rollups + on-prem cost model, PA-8 chat multi-
+pipeline, PA-4 ABAC attr-sourcing.
+
+**Ops quickref:** deploy `SERVER=offgrid-tunnel SSH_USER=admin SSH_KEY=~/.ssh/id_ed25519 ./deploy/
+push.sh`. Server docker = `/usr/local/bin/docker`; DB = `docker exec -i offgrid-console-postgres-1 psql
+-U offgrid -d offgrid_console` (drizzle-kit push hangs over SSH — apply SQL directly). Admin token:
+`grep OFFGRID_ADMIN_TOKEN /Users/admin/offgrid/console/.env.local` on the server. Build ON server before
+restart (node22 there vs node26 local — circular-import TDZ only shows on server). Migrations don't run
+on deploy — apply the `deploy/onprem/2026-*.sql` files manually.
+
+---
+
 
 ## Git trunk (IMPORTANT)
 Work is on **`main`**, pushed to `origin` (github.com/off-grid-ai/console). Commit small + meaningful
