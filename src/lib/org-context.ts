@@ -30,12 +30,13 @@ import {
 import { type GuardrailRule, listGuardrailRules } from '@/lib/guardrails-rules';
 import { type BrainDoc, listDocuments } from '@/lib/brain';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { listDomains } from '@/lib/data-domains-store';
 
-// ─── Data domains (Phase 1B dependency, imported DEFENSIVELY) ────────────────────────────────────
-// 1B owns `lib/data-domains-store.ts` (`listDomains`) + `lib/data-domains.ts` (the `DataDomain`
-// type). Those may not have merged yet, so we DO NOT statically import them (a missing module would
-// break the build of this file and every consumer). Instead we describe the minimum shape we render
-// and load the store at runtime; if the module or its table isn't there yet we return [].
+// ─── Data domains (Phase 1B — statically imported) ───────────────────────────────────────────────
+// `lib/data-domains-store.ts` (`listDomains`) is long since merged, so we import it statically (top
+// of file). It was previously loaded via a computed-specifier dynamic import as "merge-race"
+// defensiveness — but that specifier can't be bundled by the Next production build, so it threw at
+// runtime and silently degraded org data-domain inheritance to [] in prod. Static import is correct.
 //
 // Shape mirrors the plan (§3.2): DataDomain{ id, label, aliases[], connectorId, resource, ... }.
 // Kept intentionally loose so 1B's richer type is assignable without a hard compile-time coupling.
@@ -51,14 +52,10 @@ export interface OrgDataDomain {
 // module has no `listDomains` export yet, or if the query fails (e.g. table not yet migrated).
 async function loadDataDomains(orgId: string): Promise<OrgDataDomain[]> {
   try {
-    // Computed specifier so typecheck/bundler don't require the module to exist at build time
-    // (defensive against the 1B merge race described above).
-    const spec = '@/lib/data-domains-store';
-    const mod: Record<string, unknown> = await import(spec).catch(
-      () => ({}) as Record<string, unknown>,
-    );
-    const listDomains = mod.listDomains;
-    if (typeof listDomains !== 'function') return [];
+    // Phase 1B has long since landed, so we STATICALLY import listDomains (top of file). The old
+    // computed-specifier `import(spec)` could not be bundled by the Next production build → it threw
+    // at runtime → caught → [] → the builder ALWAYS showed "no data domains declared" in prod even
+    // though domains were declared. Static import fixes the inheritance for real. (2026-07-07)
     const rows = (await listDomains(orgId)) as unknown;
     if (!Array.isArray(rows)) return [];
     return rows.map((r) => {
