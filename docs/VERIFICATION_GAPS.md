@@ -58,6 +58,8 @@ actually showed, and the fix.)*
 |---|---|---|---|---|---|
 | S1 | **Brain — new-document ingest** | `POST /api/v1/admin/brain/ingest` and `/brain/documents` both **500** on the live console (2026-07-07 BFSI seed attempt). Retrieval/search of *existing* docs works, but adding NEW knowledge fails. | 500 with empty body; path is `addDocument` → `embed()` → embedded vector-store write. Consistent with the earlier "embedded store is the active one; external inspector unreachable" finding. | Reproduce on the server, capture the embed/vector-write error (find the console log), fix the ingest write path so operators can add knowledge. Blocks seeding Indian BFSI knowledge docs. | 🔴 |
 
+| S2 | **Per-tenant subdomain — TLS blocked** | Tenants now have a slug and a URL `<slug>.onprem-console.getoffgridai.co` shown in the UI. Wildcard DNS (`*.onprem-console` → tunnel, proxied) + tunnel ingress (`*.onprem-console.getoffgridai.co` → 127.0.0.1:3000) are in place. | `curl` → **TLS handshake failure**: Cloudflare Universal SSL covers `getoffgridai.co` + `*.getoffgridai.co` (one level only), NOT the 2nd-level `*.onprem-console.getoffgridai.co`. The CF API token used also **lacks SSL/ACM permissions** (`Authentication error` on `/acm/total_tls` + certificate-pack order). | Provision an edge cert for the 2nd-level wildcard: enable **Total TLS** or order an **Advanced Certificate Manager** pack for `*.onprem-console.getoffgridai.co` (paid add-on) with a CF token that has **SSL and Certificates: Edit**. DNS + tunnel are ready; only the cert is missing. Alternative: use first-level `<slug>.getoffgridai.co` (covered by the universal cert) with a reserved-slug guard. | 🟡 |
+
 _Other sweep findings (from the doc-deepening agents) still to be consolidated here._
 
 ---
