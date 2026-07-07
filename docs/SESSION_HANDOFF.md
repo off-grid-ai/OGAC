@@ -57,11 +57,23 @@ page live (`/docs/guides/{gateways,pipelines,pipeline-binding}`, `/docs/concepts
 all 200), live screenshots embedded, independent end-to-end integration pass (create pipeline→attach
 eval→mint key→bind app→Consumers shows it) matched the audit. No new gaps; docs match honest behavior.
 
-**IN FLIGHT NOW:** PA-16 (task #168) — enforce the bound pipeline's contract (routing/egress + policy +
-guardrails + data-allowlist) on each app/agent/chat RUN (binding + run-tagging already shipped; this is
-the runtime ENFORCEMENT). Single background agent. Remaining deferred: PA-11 (public-run full
-execution), PA-12 (telemetry pipeline-tagging at source), PA-15 (per-tenant gateway-URL tunnel+aggregator
-wiring — supervised), PA-10 (gateway partial-PATCH — low pri, UI path works).
+**PA-16 (#168) ✅ merged + deployed** — pure enforcement lib (`pipeline-enforcement.ts`: allowlist
+hard-ceiling deny + egress leash + policy-ceiling tighten, least-permissive-wins; no-pipeline → legacy
+fallback) + contract seam (`pipeline-contract.ts`). Enforced on the **app-run INLINE path** (connector
+reads gated by allowlist; model calls gated by egress leash; both audited). Verified: 12 pure + 5
+real-`runApp`-executor integration tests (1676 pass), clean build, live no-regression smoke (core
+surfaces + pipelines API healthy post-deploy). **Verification boundary (honest):** a live app-run
+against a restrictive pipeline was NOT exercised end-to-end from the console UI — enforcement is proven
+by the real-executor integration test, not a live UI run. Deferred + logged (PA-16a/b/c): durable
+(Temporal) run path (contract not serialized), agent-run + chat run paths (seam built, not yet called),
+overlay-driven PII-mask escalation.
+
+**NOTHING IN FLIGHT — clean stopping point.** The full Pipelines × Gateways epic is shipped +
+verified + documented: gateways (CRUD+detail), pipelines (all tabs), consumer binding, docs, tenant-404
+fix, and runtime enforcement (app-run inline). Remaining backlog (all logged in GAPS_BACKLOG, none
+blocking): PA-16a/b/c (durable/agent/chat enforcement + live restrictive-run audit), PA-11 (public-run
+full execution), PA-12 (telemetry pipeline-tagging at source), PA-15 (per-tenant gateway-URL tunnel +
+aggregator wiring — supervised), PA-10 (gateway partial-PATCH — UI path works). Pick any to resume.
 
 **THE MERGE GATE IS A LIVE USABILITY AUDIT (founder: "don't give me half-assed stuff", "make sure it's
 actually usable", "audit it"):** do NOT merge on green build alone. For each agent: exercise the real
