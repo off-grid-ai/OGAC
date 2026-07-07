@@ -10,6 +10,7 @@ export type ModuleId =
   | 'fleet'
   | 'gateway'
   | 'gateways'
+  | 'pipelines'
   | 'edge'
   | 'control'
   | 'data'
@@ -130,6 +131,15 @@ export const MODULES: readonly ModuleDef[] = [
     description:
       'The registry of model-serving gateways your pipelines run on — on-prem cluster, OpenAI, Anthropic, OpenRouter — each with its egress class (data stays on-prem vs. leaves) and live health.',
     route: '/gateways',
+    service: 'gateway',
+    internal: true,
+  },
+  {
+    id: 'pipelines',
+    label: 'Pipelines',
+    description:
+      'The heart of Off Grid AI — reusable, composable, governed model-access contracts. A pipeline binds a gateway, sets the routing + egress leash, fixes a hard data ceiling, and layers policy + guardrails; apps, agents, and chat consume it. Versioned and templated.',
+    route: '/pipelines',
     service: 'gateway',
     internal: true,
   },

@@ -940,3 +940,77 @@ export const gateways = pgTable('gateways', {
 
 export type Gateway = typeof gateways.$inferSelect;
 export type NewGateway = typeof gateways.$inferInsert;
+
+// ─── Pipelines (Gateways × Pipelines, the PIPELINE tier) ───────────────────────
+// A Pipeline is the reusable, composable, GOVERNED model-access contract — the heart of OGAC. It
+// RUNS ON a gateway (binding) and is CONSUMED BY apps/agents/chat. It owns:
+//   • gatewayId + defaultModel — the binding (nullable ⇒ org default gateway).
+//   • routing                  — fallback chain + egress leash (data_class → local|cloud|block).
+//   • dataAllowlist            — the data-domains/classes it may touch. A HARD CEILING: a consumer
+//                                can only ever touch data inside it (widen ⇒ edit the pipeline).
+//   • policyOverlay / guardrailOverlay — pipeline-scoped overrides that INHERIT org defaults and may
+//                                only TIGHTEN a `locked` org control, never loosen it (effectiveGovernance).
+//   • version + status         — immutable version snapshots live in `pipeline_versions`; every edit
+//                                bumps `version` and writes a snapshot. status: draft|published|archived.
+// Evals/golden/drift + telemetry lenses attach later (a fan-out phase fills those detail tabs).
+export const pipelines = pgTable('pipelines', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  ownerId: text('owner_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+  // The gateway binding — which gateway this pipeline runs on (null ⇒ org default gateway).
+  gatewayId: text('gateway_id'),
+  // Default model on that gateway (null ⇒ the gateway's own default).
+  defaultModel: text('default_model'),
+  // Routing: fallback chain + egress leash. Shape owned by pipelines-policy.ts; jsonb keeps it flexible.
+  routing: jsonb('routing')
+    .$type<{
+      egressAllowed?: boolean;
+      rules?: {
+        name: string;
+        priority: number;
+        attribute: string;
+        operator: string;
+        value: string;
+        action: string;
+        model: string;
+        fallback: string;
+        enabled: boolean;
+      }[];
+    }>()
+    .notNull()
+    .default({}),
+  // The HARD data ceiling — data-domain/class ids this pipeline may touch.
+  dataAllowlist: jsonb('data_allowlist').$type<string[]>().notNull().default([]),
+  // Pipeline-scoped policy overlay (inherits org defaults; may only tighten locked controls).
+  policyOverlay: jsonb('policy_overlay').$type<Record<string, unknown>>().notNull().default({}),
+  // Pipeline-scoped guardrail overlay (inherits org defaults; may only tighten locked controls).
+  guardrailOverlay: jsonb('guardrail_overlay').$type<Record<string, unknown>>().notNull().default({}),
+  status: text('status').notNull().default('draft'), // draft | published | archived
+  version: integer('version').notNull().default(1),
+  isTemplate: boolean('is_template').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('pipelines_org_idx').on(t.orgId), index('pipelines_gateway_idx').on(t.gatewayId)]);
+
+// ─── Pipeline versions — immutable config snapshots ────────────────────────────
+// One row per publish/edit: the FULL pipeline config at that version, frozen. Consumers will later
+// PIN a version; this table is the source of truth for what a pinned version was. Append-only.
+export const pipelineVersions = pgTable('pipeline_versions', {
+  id: text('id').primaryKey(),
+  pipelineId: text('pipeline_id').notNull(),
+  orgId: text('org_id').notNull().default('default'),
+  version: integer('version').notNull(),
+  // The full config snapshot at this version (name, binding, routing, allowlist, overlays, …).
+  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull().default({}),
+  note: text('note').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text('created_by').notNull().default(''),
+}, (t) => [index('pipeline_versions_pipeline_idx').on(t.pipelineId)]);
+
+export type Pipeline = typeof pipelines.$inferSelect;
+export type NewPipeline = typeof pipelines.$inferInsert;
+export type PipelineVersion = typeof pipelineVersions.$inferSelect;
+export type NewPipelineVersion = typeof pipelineVersions.$inferInsert;

@@ -39,6 +39,7 @@ import {
   Toolbox,
   Wrench,
   StackSimple as Stack,
+  FlowArrow,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -52,6 +53,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   fleet: MonitorSmartphone,
   gateway: Network,
   gateways: Stack,
+  pipelines: FlowArrow,
   edge: ShieldWarning,
   control: ShieldCheck,
   data: Database,
