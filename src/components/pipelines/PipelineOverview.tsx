@@ -1,13 +1,26 @@
 'use client';
 
-import { Cloud, HardDrives } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import {
+  ArrowRight,
+  Cloud,
+  Database,
+  FlowArrow,
+  HardDrives,
+  Plugs,
+  Scales,
+  ShieldCheck,
+  Target,
+} from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { pipelineTabHref } from '@/lib/pipeline-detail';
+import { PipelineActions } from './PipelineActions';
+import { PipelineEditSheet } from './PipelineEditSheet';
 
+// The rich, honest data the Overview renders. Everything read-only here is read from the real libs on
+// the server; where a per-pipeline number can't be honestly attributed yet, the field is a count or a
+// "not configured" flag — NEVER a fabricated metric.
 export interface PipelineOverviewData {
   id: string;
   name: string;
@@ -19,116 +32,353 @@ export interface PipelineOverviewData {
   defaultModel: string | null;
   dataAllowlist: string[];
   gateway?: { id: string; name: string; kind: string; egressClass: string } | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  /** Egress leash summary derived from routing (pure). */
+  routing: {
+    egressAllowed: boolean;
+    rules: { label: string; action: string }[];
+  };
+  /** Governance overlay state (this pipeline's own overrides) + inherited org rule counts. */
+  governance: {
+    policyOverlayKeys: number;
+    guardrailOverlayKeys: number;
+    orgPolicyRules: number;
+    orgGuardrailRules: number;
+  };
+  /** Quality attach counts (pipeline-scoped, honest). Run pass-rate is NOT attributed per pipeline. */
+  quality: {
+    evalsAttached: number;
+    goldenCases: number;
+  };
+  /** Recent version history (newest first, capped). */
+  recentVersions: { id: string; version: number; note: string; createdAt: string | null; createdBy: string }[];
 }
 
-function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+function egressBadge(egressClass: string | undefined) {
+  if (egressClass === 'on-prem') {
+    return (
+      <Badge variant="secondary" className="bg-primary/10 text-primary">
+        <HardDrives className="size-3" /> on-prem
+      </Badge>
+    );
+  }
+  if (egressClass === 'cloud') {
+    return (
+      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+        <Cloud className="size-3" /> cloud
+      </Badge>
+    );
+  }
+  return null;
+}
+
+function statusBadge(status: string) {
+  if (status === 'published') {
+    return <Badge variant="secondary" className="bg-primary/10 text-primary">published</Badge>;
+  }
+  if (status === 'archived') {
+    return <Badge variant="outline" className="text-muted-foreground">archived</Badge>;
+  }
+  return <Badge variant="outline" className="text-amber-600 dark:text-amber-400">draft</Badge>;
+}
+
+// A section card with a title, an optional icon, and a "manage on the X tab" link in the header.
+function SectionCard({
+  title,
+  icon,
+  href,
+  linkLabel,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  href?: string;
+  linkLabel?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
+    <Card className="flex flex-col shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          {icon}
+          {title}
         </CardTitle>
+        {href ? (
+          <Link
+            href={href}
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            {linkLabel ?? 'Open'} <ArrowRight className="size-3" />
+          </Link>
+        ) : null}
       </CardHeader>
-      <CardContent className="text-sm text-foreground">{children}</CardContent>
+      <CardContent className="flex-1 text-sm text-foreground">{children}</CardContent>
     </Card>
   );
 }
 
-// The Overview tab — the pipeline at a glance: its binding, data ceiling, status, and the publish
-// action. Publishing freezes an immutable version snapshot (see the Versions tab).
-export function PipelineOverview({ pipeline }: { pipeline: PipelineOverviewData }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1">
+      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-right text-sm text-foreground">{children}</span>
+    </div>
+  );
+}
 
-  async function publish() {
-    if (busy) return;
-    setBusy(true);
-    const res = await fetch(`/api/v1/admin/pipelines/${pipeline.id}/publish`, { method: 'POST' });
-    setBusy(false);
-    if (res.ok) {
-      toast.success(`Published "${pipeline.name}"`);
-      router.refresh();
-    } else {
-      toast.error('Failed to publish');
-    }
-  }
+// The comprehensive Overview — the heart-of-the-product surface. Full-width, real dashboard: identity
+// + lifecycle actions, binding, routing/egress leash, governance, quality, data ceiling, consumers,
+// and recent versions — each linking into the tab that owns it. Honest empty states throughout.
+export function PipelineOverview({ pipeline: p }: { pipeline: PipelineOverviewData }) {
+  const href = (tab: Parameters<typeof pipelineTabHref>[1]) => pipelineTabHref(p.id, tab);
 
   return (
     <div className="w-full space-y-6">
+      {/* ── header: identity + status + lifecycle actions ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-2xl">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium text-foreground">{pipeline.name}</h2>
-            <Badge variant="outline" className="text-xs">v{pipeline.version}</Badge>
-            {pipeline.isTemplate ? (
+        <div className="min-w-0 max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-medium text-foreground">{p.name}</h2>
+            {statusBadge(p.status)}
+            <Badge variant="outline" className="text-xs">v{p.version}</Badge>
+            {p.isTemplate ? (
               <Badge variant="secondary" className="bg-primary/10 text-primary">template</Badge>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {pipeline.description || 'No description.'}
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{p.description || 'No description.'}</p>
         </div>
-        {pipeline.status !== 'published' ? (
-          <Button size="sm" onClick={publish} disabled={busy}>
-            Publish
-          </Button>
-        ) : null}
+        <PipelineActions pipelineId={p.id} status={p.status} name={p.name} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Status">
-          <span className="capitalize">{pipeline.status}</span>
-        </StatCard>
-        <StatCard label="Runs on">
-          {pipeline.gateway ? (
-            <div className="flex items-center gap-2">
-              <span>{pipeline.gateway.name}</span>
-              {pipeline.gateway.egressClass === 'on-prem' ? (
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  <HardDrives className="size-3" /> on-prem
+      {/* ── the dashboard grid ── */}
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {/* Binding */}
+        <SectionCard
+          title="Binding"
+          icon={<FlowArrow className="size-4 text-primary" />}
+          href={href('routing')}
+          linkLabel="Gateway & Routing"
+        >
+          <div className="divide-y">
+            <Field label="Gateway">
+              {p.gateway ? (
+                <span className="inline-flex items-center gap-2">
+                  {p.gateway.name} {egressBadge(p.gateway.egressClass)}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Org default gateway</span>
+              )}
+            </Field>
+            <Field label="Egress">
+              {p.gateway
+                ? p.gateway.egressClass === 'on-prem'
+                  ? 'Data stays on-prem'
+                  : 'Data may leave to cloud'
+                : '—'}
+            </Field>
+            <Field label="Default model">
+              <span className="font-mono text-xs">{p.defaultModel || 'gateway default'}</span>
+            </Field>
+          </div>
+        </SectionCard>
+
+        {/* Routing / egress leash */}
+        <SectionCard
+          title="Routing (egress leash)"
+          icon={<Target className="size-4 text-primary" />}
+          href={href('routing')}
+          linkLabel="Edit routing"
+        >
+          <div className="space-y-2">
+            <Field label="Cloud egress">
+              {p.routing.egressAllowed ? (
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  allowed
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  <Cloud className="size-3" /> cloud
-                </Badge>
+                <Badge variant="secondary" className="bg-primary/10 text-primary">leashed to on-prem</Badge>
               )}
-            </div>
-          ) : (
-            <span className="text-muted-foreground">Org default gateway</span>
-          )}
-        </StatCard>
-        <StatCard label="Default model">
-          <span className="font-mono text-xs">{pipeline.defaultModel || 'gateway default'}</span>
-        </StatCard>
-        <StatCard label="Visibility">
-          <span className="capitalize">{pipeline.visibility}</span>
-        </StatCard>
-      </div>
+            </Field>
+            {p.routing.rules.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No data_class rules — everything defaults to local. Add rules on Gateway &amp; Routing to
+                steer PII/sensitive classes to block or on-prem.
+              </p>
+            ) : (
+              <ul className="space-y-1 text-xs">
+                {p.routing.rules.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-muted-foreground">{r.label}</span>
+                    <span className="font-medium text-foreground">{r.action}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </SectionCard>
 
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Data ceiling (hard allowlist)</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Consumers may only ever touch data inside this set. To use more, edit the pipeline on the
-            Gateway &amp; Routing tab.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {pipeline.dataAllowlist.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No data domains allowed — this pipeline touches no data (deny-by-default).
+        {/* Data ceiling — editable via the Edit sheet / Routing tab */}
+        <SectionCard
+          title="Data ceiling (hard allowlist)"
+          icon={<Database className="size-4 text-primary" />}
+          href={href('routing')}
+          linkLabel="Edit ceiling"
+        >
+          {p.dataAllowlist.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No data domains allowed — this pipeline touches no data (deny-by-default). Add domains via
+              Edit to let consumers reach them.
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
-              {pipeline.dataAllowlist.map((d) => (
+              {p.dataAllowlist.map((d) => (
                 <Badge key={d} variant="outline" className="font-mono text-xs">
                   {d}
                 </Badge>
               ))}
             </div>
           )}
+        </SectionCard>
+
+        {/* Governance — policy + guardrails */}
+        <SectionCard
+          title="Policy"
+          icon={<Scales className="size-4 text-primary" />}
+          href={href('policy')}
+          linkLabel="Policy tab"
+        >
+          <div className="divide-y">
+            <Field label="This pipeline">
+              {p.governance.policyOverlayKeys > 0
+                ? `${p.governance.policyOverlayKeys} override${p.governance.policyOverlayKeys === 1 ? '' : 's'}`
+                : 'inherits org defaults'}
+            </Field>
+            <Field label="Org policy rules">{p.governance.orgPolicyRules}</Field>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Effective policy = org defaults, tightened by this pipeline&apos;s overrides. Configure on the
+            Policy tab.
+          </p>
+        </SectionCard>
+
+        <SectionCard
+          title="Guardrails"
+          icon={<ShieldCheck className="size-4 text-primary" />}
+          href={href('guardrails')}
+          linkLabel="Guardrails tab"
+        >
+          <div className="divide-y">
+            <Field label="This pipeline">
+              {p.governance.guardrailOverlayKeys > 0
+                ? `${p.governance.guardrailOverlayKeys} override${p.governance.guardrailOverlayKeys === 1 ? '' : 's'}`
+                : 'inherits org defaults'}
+            </Field>
+            <Field label="Org guardrail rules">{p.governance.orgGuardrailRules}</Field>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            PII masking, injection, and grounding checks. Scoped to this pipeline; inherits org. Configure
+            on the Guardrails tab.
+          </p>
+        </SectionCard>
+
+        {/* Quality snapshot — honest attach counts, no fabricated pass-rate */}
+        <SectionCard
+          title="Quality"
+          icon={<Target className="size-4 text-primary" />}
+          href={href('quality')}
+          linkLabel="Quality tab"
+        >
+          <div className="divide-y">
+            <Field label="Evals attached">{p.quality.evalsAttached}</Field>
+            <Field label="Golden set size">{p.quality.goldenCases}</Field>
+          </div>
+          {p.quality.evalsAttached === 0 && p.quality.goldenCases === 0 ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              No quality bar configured yet — attach evals and a golden set on the Quality tab, then run
+              them in this pipeline&apos;s context to gate releases.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Run these in context and review the pass-rate + drift on the Quality tab.
+            </p>
+          )}
+        </SectionCard>
+
+        {/* Consumers — honest empty state (binding comes from an app/agent/chat) */}
+        <SectionCard
+          title="Consumers"
+          icon={<Plugs className="size-4 text-primary" />}
+          href={href('api')}
+          linkLabel="API tab"
+        >
+          <p className="text-xs text-muted-foreground">
+            Nothing consumes this pipeline yet. Apps, agents, and chat bind to a pipeline from their own
+            surface; external callers use a provisioned key from the API tab. Bound consumers will list
+            here.
+          </p>
+        </SectionCard>
+
+        {/* Identity / meta */}
+        <SectionCard title="Details" icon={<FlowArrow className="size-4 text-primary" />}>
+          <div className="divide-y">
+            <Field label="Status">
+              <span className="capitalize">{p.status}</span>
+            </Field>
+            <Field label="Visibility">
+              <span className="capitalize">{p.visibility}</span>
+            </Field>
+            <Field label="Version">v{p.version}</Field>
+            <Field label="Updated">
+              {p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'}
+            </Field>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* ── recent versions (full-width band) ── */}
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm">Recent versions</CardTitle>
+          <Link href={href('versions')} className="flex items-center gap-1 text-xs text-primary hover:underline">
+            All versions <ArrowRight className="size-3" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {p.recentVersions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No versions recorded yet.</p>
+          ) : (
+            <ul className="divide-y">
+              {p.recentVersions.map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Badge variant="outline">v{v.version}</Badge>
+                    <span className="capitalize text-muted-foreground">{v.note}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {v.createdAt ? new Date(v.createdAt).toLocaleString() : ''}
+                    {v.createdBy ? ` · ${v.createdBy}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
+
+      {/* The URL-driven edit sheet (?panel=edit); the header Edit button opens it. */}
+      <PipelineEditSheet
+        data={{
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          visibility: p.visibility,
+          gatewayId: p.gateway?.id ?? null,
+          defaultModel: p.defaultModel,
+          egressAllowed: p.routing.egressAllowed,
+          dataAllowlist: p.dataAllowlist,
+        }}
+      />
     </div>
   );
 }
