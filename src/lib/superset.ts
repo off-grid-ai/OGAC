@@ -17,14 +17,15 @@ import {
   buildDatasetPayload,
   buildRequestsOverTimeChart,
   buildTokensByModelChart,
-  dashboardExistsInList,
   decideEmbed,
+  embeddedUuidMatches,
   findByName,
   findOwnedDashboard,
   OFFGRID_DATASET_TABLE,
   OFFGRID_DB_NAME,
   type EmbedState,
   type SupersetDashboardRow,
+  type SupersetEmbeddedConfig,
 } from './superset-provision';
 
 const BASE = process.env.OFFGRID_SUPERSET_URL;
@@ -131,15 +132,30 @@ async function put(s: Session, path: string, body: unknown): Promise<void> {
 
 // ─── verify-or-fail ─────────────────────────────────────────────────────────
 
-// Probe whether the configured embed UUID actually exists in Superset, by listing dashboards and
-// matching the uuid. Returns undefined if we can't determine (network/auth failure) — treated as
-// not-verified by decideEmbed so we never mint against an unverified UUID.
+// GET the embedded config for a dashboard id → the embeddable uuid (or null if not embedded / 404).
+// The dashboard LIST endpoint doesn't expose the embed uuid, so this is the authoritative source.
+async function embeddedConfig(s: Session, dashboardId: number): Promise<SupersetEmbeddedConfig | null> {
+  const res = await fetch(`${BASE}/api/v1/dashboard/${dashboardId}/embedded`, {
+    headers: authHeaders(s, false),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (res.status === 404) return null; // dashboard exists but embedding not enabled
+  if (!res.ok) throw new Error(`GET /dashboard/${dashboardId}/embedded → ${res.status}`);
+  const json = (await res.json()) as { result?: SupersetEmbeddedConfig };
+  return json.result ?? null;
+}
+
+// Probe whether the configured embed UUID actually exists in Superset. Two-step because the list
+// endpoint has no uuid column: find our dashboard by its stable TITLE, then confirm that dashboard's
+// /embedded uuid equals the configured one. Returns false when the title isn't found, embedding is
+// off, or the uuid drifted — so a stale/missing embed UUID resolves to 'not-provisioned' (never a
+// token pointing at a ghost dashboard). Network/auth failures throw and are caught by the caller.
 async function dashboardExists(s: Session, uuid: string): Promise<boolean> {
-  const rows = await listAll<SupersetDashboardRow>(
-    s,
-    '/api/v1/dashboard/?q=(page_size:100)',
-  );
-  return dashboardExistsInList(rows, uuid);
+  const rows = await listAll<SupersetDashboardRow>(s, '/api/v1/dashboard/?q=(page_size:100)');
+  const owned = findOwnedDashboard(rows);
+  if (!owned) return false;
+  const config = await embeddedConfig(s, owned.id);
+  return embeddedUuidMatches(config, uuid);
 }
 
 export interface GuestTokenResult {
