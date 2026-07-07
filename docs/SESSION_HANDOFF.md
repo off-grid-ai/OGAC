@@ -52,9 +52,16 @@ downtime). `bharatunion-onprem-console` 15/15 → 200. See SERVER_STATE.md + clo
 (re-synced). PA-15 (per-tenant GATEWAY URLs `<slug5><rand5>-gateway.<apex>`) — pure host helper built +
 tested (`tenantGatewayHost`); tunnel-ingress + aggregator wiring deferred (supervised tunnel edit).
 
-**IN FLIGHT NOW:** QA/platform-integration + user-docs sweep for the Pipelines × Gateways surfaces
-(operating-model cadence). Nothing else running. NEXT candidates: PA-16 (consumer-run enforcement),
-PA-11 (public run execution), PA-12 (telemetry pipeline-tagging), PA-15 gateway-URL wiring.
+**SWEEP (#167) ✅ merged + deployed + verified** — user docs for Gateways/Pipelines/Binding + concept
+page live (`/docs/guides/{gateways,pipelines,pipeline-binding}`, `/docs/concepts/pipelines-and-gateways`
+all 200), live screenshots embedded, independent end-to-end integration pass (create pipeline→attach
+eval→mint key→bind app→Consumers shows it) matched the audit. No new gaps; docs match honest behavior.
+
+**IN FLIGHT NOW:** PA-16 (task #168) — enforce the bound pipeline's contract (routing/egress + policy +
+guardrails + data-allowlist) on each app/agent/chat RUN (binding + run-tagging already shipped; this is
+the runtime ENFORCEMENT). Single background agent. Remaining deferred: PA-11 (public-run full
+execution), PA-12 (telemetry pipeline-tagging at source), PA-15 (per-tenant gateway-URL tunnel+aggregator
+wiring — supervised), PA-10 (gateway partial-PATCH — low pri, UI path works).
 
 **THE MERGE GATE IS A LIVE USABILITY AUDIT (founder: "don't give me half-assed stuff", "make sure it's
 actually usable", "audit it"):** do NOT merge on green build alone. For each agent: exercise the real
