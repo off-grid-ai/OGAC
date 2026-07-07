@@ -1,22 +1,33 @@
 import { notFound } from 'next/navigation';
-import { TabPlaceholder } from '@/components/pipelines/TabPlaceholder';
+import { PipelineDriftPanel } from '@/components/pipelines/governance/PipelineDriftPanel';
+import { listEvalDefs } from '@/lib/eval-defs';
+import { listEvalRuns } from '@/lib/evals';
 import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-// The Drift tab — quality drift computed over THIS pipeline's run history. Wired in the telemetry
-// fan-out phase.
+// ─── Pipeline DRIFT tab — drift over THIS pipeline's eval-run history (Evidently presets) ──────────
+// Drift is a lens over the pipeline's run stream. Honest empty state: drift needs a HISTORY of eval
+// runs to split into baseline vs current windows, so we only enable the check once the pipeline has
+// evals AND there is recorded run history — never a fabricated verdict. The check runs through the
+// existing drift path (Evidently when configured, built-in PSI heuristic otherwise).
 export default async function PipelineDriftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const p = await getPipeline(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const p = await getPipeline(id, orgId);
   if (!p) notFound();
+
+  const [evals, runs] = await Promise.all([
+    listEvalDefs({ pipelineId: id }),
+    listEvalRuns(20, orgId),
+  ]);
+
+  // Honest gate: drift needs a run history to compare. Require this pipeline to have evals AND at
+  // least two recorded eval runs (a baseline + a current window to compare).
+  const hasHistory = evals.length > 0 && runs.length >= 2;
+
   return (
-    <TabPlaceholder title="Drift" pipelineName={p.name}>
-      <p>
-        Quality and data drift over this pipeline&apos;s own run history. This is a lens over the
-        pipeline&apos;s run stream, filled in the telemetry fan-out.
-      </p>
-    </TabPlaceholder>
+    <PipelineDriftPanel pipelineName={p.name} hasHistory={hasHistory} evalCount={evals.length} />
   );
 }

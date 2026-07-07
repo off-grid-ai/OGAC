@@ -1,28 +1,38 @@
 import { notFound } from 'next/navigation';
-import { TabPlaceholder } from '@/components/pipelines/TabPlaceholder';
+import { GovernancePanel } from '@/components/pipelines/governance/GovernancePanel';
+import {
+  ORG_POLICY_DEFAULTS,
+  describeEffective,
+  normalizeOverlay,
+} from '@/lib/pipeline-governance';
 import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-// The Policy tab — the pipeline's ABAC policy overlay. Inherits org defaults; may only TIGHTEN a
-// locked org control (effectiveGovernance in pipelines-policy.ts). The overlay editor + effective-
-// governance view land in the governance fan-out phase.
+// ─── Pipeline POLICY tab — EFFECTIVE governance (org defaults + this pipeline's policyOverlay) ─────
+// The pure describeEffective() merges the org policy baseline with this pipeline's overlay under the
+// locked→tighten-only rule and decorates every control with its source. The operator edits the
+// overlay here (tighten a control) → persists via updatePipeline (versions the pipeline). Scoped to
+// THIS pipeline — the org store is where the baseline lives, never here.
 export default async function PipelinePolicyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();
-  const keys = Object.keys(p.policyOverlay ?? {});
+
+  const overlay = normalizeOverlay(p.policyOverlay, ORG_POLICY_DEFAULTS);
+  const view = describeEffective(ORG_POLICY_DEFAULTS, overlay);
+
   return (
-    <TabPlaceholder title="Policy overlay" pipelineName={p.name}>
-      <p>
-        This pipeline&apos;s ABAC policy overlay inherits the org defaults and may only tighten a
-        locked control, never loosen it. The effective-governance view + overlay editor land in the
-        governance fan-out.
-      </p>
-      <p className="mt-3">
-        Overlay controls set: {keys.length === 0 ? 'none (inherits org defaults)' : keys.join(', ')}.
-      </p>
-    </TabPlaceholder>
+    <GovernancePanel
+      pipelineId={p.id}
+      pipelineName={p.name}
+      overlayField="policyOverlay"
+      title="Policy"
+      intro={`The effective ABAC policy for ${p.name}: your org defaults, with this pipeline's overrides on top. A control the org locked can only be tightened here, never loosened — every request through this pipeline is checked against the effective value below.`}
+      orgDefaults={ORG_POLICY_DEFAULTS}
+      overlay={overlay}
+      view={view}
+    />
   );
 }
