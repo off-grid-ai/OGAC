@@ -17,10 +17,11 @@ export async function POST(req: Request) {
   const name = body?.name as string | undefined;
   const plan = (body?.plan as string | undefined) ?? 'standard';
   const enabledModules = Array.isArray(body?.enabledModules) ? body.enabledModules : [];
+  const slug = typeof body?.slug === 'string' ? body.slug : undefined;
   if (!name) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
-  const tenant = await createTenant(name, plan, enabledModules);
+  const tenant = await createTenant(name, plan, enabledModules, slug);
   auditFromSession(gate, await currentOrgId(), {
     action: 'tenant.change',
     resource: `tenant:${tenant.id ?? name}`,
