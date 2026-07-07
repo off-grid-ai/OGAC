@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PipelineActions } from './PipelineActions';
+import { PipelineEditSheet } from './PipelineEditSheet';
 
 const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm';
 
@@ -19,6 +21,10 @@ interface GatewayOption {
 
 export interface RoutingEditorData {
   id: string;
+  name: string;
+  description: string;
+  status: string;
+  visibility: string;
   gatewayId: string | null;
   defaultModel: string | null;
   egressAllowed: boolean;
@@ -79,7 +85,19 @@ export function PipelineRoutingEditor({ data }: { data: RoutingEditorData }) {
   }
 
   return (
-    <div className="grid w-full gap-6 lg:grid-cols-3">
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-medium text-foreground">Gateway &amp; Routing</h2>
+          <p className="text-sm text-muted-foreground">
+            The gateway this pipeline runs on, its egress leash, and the hard data ceiling. Every save
+            records a new immutable version.
+          </p>
+        </div>
+        <PipelineActions pipelineId={data.id} status={data.status} name={data.name} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
@@ -183,6 +201,20 @@ export function PipelineRoutingEditor({ data }: { data: RoutingEditorData }) {
           </CardContent>
         </Card>
       </div>
+      </div>
+
+      <PipelineEditSheet
+        data={{
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          visibility: data.visibility,
+          gatewayId: data.gatewayId,
+          defaultModel: data.defaultModel,
+          egressAllowed: data.egressAllowed,
+          dataAllowlist: data.dataAllowlist,
+        }}
+      />
     </div>
   );
 }
