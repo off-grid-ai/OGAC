@@ -7,6 +7,7 @@ import {
   isGatewayKind,
   mergeGatewayHealth,
   validateGatewayCreate,
+  validateGatewayUpdate,
   type GatewayHealthSignal,
   type GatewayRow,
 } from '../src/lib/gateways-policy.ts';
@@ -117,6 +118,37 @@ test('validate: egressClass is derived, never taken from input', () => {
   assert.ok(r.ok);
   assert.equal(r.value.egressClass, 'on-prem');
   assert.equal(r.value.enabled, true, 'defaults enabled');
+});
+
+// ─── update validation — same rules as create + egress ALWAYS re-derived from the new kind ────────
+test('validateGatewayUpdate: name + valid kind required, compat needs a base URL', () => {
+  assert.equal(validateGatewayUpdate({ name: '  ', kind: 'openai' }).ok, false);
+  assert.equal(validateGatewayUpdate({ name: 'X', kind: 'bogus' }).ok, false);
+  assert.equal(validateGatewayUpdate({ name: 'X', kind: 'compat' }).ok, false, 'compat with no URL rejected');
+  const ok = validateGatewayUpdate({ name: 'X', kind: 'compat', baseUrl: 'https://openrouter.ai/api/v1/' });
+  assert.ok(ok.ok);
+  assert.equal(ok.value.baseUrl, 'https://openrouter.ai/api/v1', 'trailing slash trimmed');
+});
+
+test('validateGatewayUpdate: egress is RE-DERIVED from the new kind, never trusted from the client', () => {
+  // Flipping an on-prem gateway to a cloud kind must flip egress to cloud, regardless of any input.
+  const toCloud = validateGatewayUpdate({ name: 'Was on-prem', kind: 'openai' });
+  assert.ok(toCloud.ok);
+  assert.equal(toCloud.value.egressClass, 'cloud', 'kind→cloud ⇒ egress cloud');
+
+  // Flipping a cloud gateway to on-prem must flip egress back to on-prem.
+  const toOnPrem = validateGatewayUpdate({ name: 'Was cloud', kind: 'on-prem' });
+  assert.ok(toOnPrem.ok);
+  assert.equal(toOnPrem.value.egressClass, 'on-prem', 'kind→on-prem ⇒ egress on-prem');
+});
+
+test('validateGatewayUpdate: enabled false is honoured (disable via update); defaults true', () => {
+  const disabled = validateGatewayUpdate({ name: 'X', kind: 'openai', enabled: false });
+  assert.ok(disabled.ok);
+  assert.equal(disabled.value.enabled, false);
+  const dflt = validateGatewayUpdate({ name: 'X', kind: 'openai' });
+  assert.ok(dflt.ok);
+  assert.equal(dflt.value.enabled, true);
 });
 
 // ─── seed planning — stable ids, per-org isolation, correct egress ───────────────────────────────

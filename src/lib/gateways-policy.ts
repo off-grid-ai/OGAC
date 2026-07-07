@@ -174,3 +174,18 @@ export function validateGatewayCreate(input: GatewayCreateInput): GatewayValidat
     value: { name, kind, baseUrl, defaultModel, egressClass: egressClassFor(kind), enabled },
   };
 }
+
+/** The clean, egress-derived patch an update yields — the same shape as a validated create value. */
+export type GatewayUpdateValidation = GatewayValidation;
+
+/**
+ * Validate + normalise an UPDATE request into a clean, egress-derived value. PURE — no id/DB here.
+ * Semantically identical to create validation: a name and a valid kind are required, a `compat`
+ * gateway requires a base URL, and — critically — `egressClass` is ALWAYS RE-DERIVED from the (new)
+ * kind, NEVER trusted from the client. Changing a gateway from an on-prem cluster to a cloud kind
+ * therefore flips egress to 'cloud' automatically, keeping the routing leash honest. Delegates to
+ * `validateGatewayCreate` so the create and update rules can never drift apart.
+ */
+export function validateGatewayUpdate(input: GatewayCreateInput): GatewayUpdateValidation {
+  return validateGatewayCreate(input);
+}
