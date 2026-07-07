@@ -26,3 +26,26 @@ export function tenantHost(slug: string): string {
 export function tenantUrl(slug: string): string {
   return `https://${tenantHost(slug)}`;
 }
+
+// ─── Per-tenant GATEWAY hosts (PA-15) ─────────────────────────────────────────────────────────────
+// The shared aggregator is "gateway.getoffgridai.co". A per-tenant provisioned gateway gets its OWN
+// unguessable host: first 5 chars of the tenant slug + 5 random chars + "-gateway.<apex>", e.g.
+// "bharak7x2p-gateway.getoffgridai.co". The tenant prefix keeps it recognisable; the random suffix
+// makes it unguessable (so the endpoint isn't enumerable from the slug alone). PURE: the caller
+// supplies the random part (see randomGatewaySuffix), so this is deterministic + unit-testable.
+export const GATEWAY_HOST_SUFFIX = 'gateway'; // mirrors the shared gateway.<apex>
+
+export function tenantGatewayHost(slug: string, randomSuffix: string): string {
+  const prefix = slugifyTenant(slug).slice(0, 5);
+  const rand = randomSuffix.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 5);
+  return `${prefix}${rand}-${GATEWAY_HOST_SUFFIX}.${TENANT_APEX}`;
+}
+
+// Generate the 5-char random suffix for a tenant gateway host (lowercase alphanumerics). Impure
+// (randomness) — kept separate from tenantGatewayHost so the host builder stays testable.
+export function randomGatewaySuffix(): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < 5; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
