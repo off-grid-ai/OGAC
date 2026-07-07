@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
+import { tenantHost, tenantUrl } from '@/lib/tenant-domain';
 import {
   getOrgSystemPrompt,
   listAbacRules,
@@ -247,7 +248,21 @@ export default async function AdminPage() {
             <TableBody>
               {tenants.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="font-medium text-foreground">{t.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    {t.name}
+                    {t.slug ? (
+                      <a
+                        href={tenantUrl(t.slug)}
+                        className="mt-0.5 block font-mono text-[11px] font-normal text-primary hover:underline"
+                      >
+                        {tenantHost(t.slug)}
+                      </a>
+                    ) : (
+                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
+                        no subdomain
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{t.plan}</Badge>
                   </TableCell>
