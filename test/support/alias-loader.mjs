@@ -7,6 +7,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve as pathResolve } from 'node:path';
 
 const SRC = pathToFileURL(pathResolve(process.cwd(), 'src') + '/').href;
+// `next/navigation` has no ESM `exports` entry Node resolves under `node --test` (Next resolves it
+// via its own bundler). DB-backed libs (e.g. module-access) import its server helpers only for
+// navigation code paths the integration tests never take, so map it to a throwing stub so those
+// libs stay importable. Purely additive — only intercepts a specifier that would otherwise throw.
+const NEXT_NAV_STUB = pathToFileURL(
+  pathResolve(process.cwd(), 'test/support/next-navigation-stub.mjs'),
+).href;
 
 function isFile(p) {
   try {
@@ -26,6 +33,7 @@ function withExtension(url) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier === 'next/navigation') return nextResolve(NEXT_NAV_STUB, context);
   // "@/..." alias -> src/..., with .ts / index.ts probing.
   if (specifier === '@' || specifier.startsWith('@/')) {
     const rest = specifier === '@' ? '' : specifier.slice(2);

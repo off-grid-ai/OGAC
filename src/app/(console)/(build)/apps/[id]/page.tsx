@@ -19,7 +19,7 @@ export default async function AppBuildTab({ params }: { params: Promise<{ id: st
   const [app, ctx, agents] = await Promise.all([
     getApp(id, orgId),
     getOrgContext(orgId),
-    listManagedAgents().catch(() => []),
+    listManagedAgents(orgId).catch(() => []),
   ]);
   if (!app) notFound();
 

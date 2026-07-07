@@ -4,6 +4,7 @@ import { getEvals } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
 import { recordEvalRun } from '@/lib/evals';
 import { resolveRunEngine } from '@/lib/evals-golden';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,17 +29,21 @@ export async function POST(req: Request) {
     port = EVALS_PORTS.find((p) => p.meta.id === engine) ?? port;
   }
 
-  const result = await port.run();
-  // golden's runEval already inserted the row; non-golden adapters only return the result, so
-  // persist those so the per-engine rollup includes them.
+  const orgId = await currentOrgId();
+  const result = await port.run(orgId);
+  // golden's runEval already inserted the row (under orgId); non-golden adapters only return the
+  // result, so persist those under the caller's org so its per-engine rollup includes them.
   if (result.engine !== 'golden') {
-    await recordEvalRun({
-      id: result.id,
-      engine: result.engine,
-      score: result.score,
-      total: result.total,
-      passed: result.passed,
-    });
+    await recordEvalRun(
+      {
+        id: result.id,
+        engine: result.engine,
+        score: result.score,
+        total: result.total,
+        passed: result.passed,
+      },
+      orgId,
+    );
   }
   return NextResponse.json(result, { status: 201 });
 }

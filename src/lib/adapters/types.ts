@@ -185,7 +185,9 @@ export interface EvalRunResult {
 
 export interface EvalsPort {
   meta: AdapterMeta;
-  run(): Promise<EvalRunResult>;
+  // orgId scopes where a persisted run lands (golden persists in-process; other adapters return
+  // their result for the caller to persist under the same org). Defaults to the platform org.
+  run(orgId?: string): Promise<EvalRunResult>;
   health(): Promise<boolean>;
 }
 
@@ -218,6 +220,9 @@ export interface DriftRunOptions {
   method?: string | null;
   columnMethods?: Record<string, string>;
   driftShareThreshold?: number;
+  // Scope the eval-score history the verdict is computed over to one org, so a tenant's drift
+  // signal never mixes in another org's runs. Defaults to the platform org.
+  orgId?: string;
 }
 
 export interface DriftPort {
