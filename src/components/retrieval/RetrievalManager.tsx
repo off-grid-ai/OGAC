@@ -1,6 +1,6 @@
 'use client';
 
-import { Database, Stack, Warning, Plus, Trash, ArrowClockwise } from '@phosphor-icons/react/dist/ssr';
+import { Database, Stack, Warning, Plus, Trash, ArrowClockwise, HardDrives, CheckCircle } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -150,12 +150,18 @@ export function RetrievalManager({ initialView, initialError }: Props) {
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             {view.adapterId}
           </Badge>
-          <Badge
-            variant="secondary"
-            className={view.reachable ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}
-          >
-            {view.reachable ? 'reachable' : 'unreachable'}
-          </Badge>
+          {view.usingEmbeddedStore ? (
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              embedded store · active
+            </Badge>
+          ) : (
+            <Badge
+              variant="secondary"
+              className={view.reachable ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}
+            >
+              {view.reachable ? 'reachable' : 'unreachable'}
+            </Badge>
+          )}
           {manageable && (
             <Button size="sm" onClick={() => setParam('new', '1')} disabled={!view.reachable}>
               <Plus className="size-4" /> New collection
@@ -181,13 +187,25 @@ export function RetrievalManager({ initialView, initialError }: Props) {
         </CardContent>
       </Card>
 
-      {!view.isQdrant ? (
+      {view.usingEmbeddedStore ? (
         <Card className="shadow-sm">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            The active retrieval adapter is <span className="font-mono">{view.adapterId}</span>.
-            Collection management is only available for the Qdrant backend. Set{' '}
-            <span className="font-mono">OFFGRID_ADAPTER_RETRIEVAL=qdrant</span> and{' '}
-            <span className="font-mono">OFFGRID_QDRANT_URL</span> to manage it here.
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <HardDrives className="size-5" />
+            </div>
+            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <CheckCircle className="size-4 text-primary" weight="fill" />
+              Retrieval is served by the built-in embedded store
+              <span className="font-mono">({view.adapterId})</span>
+            </div>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              This is fully operational — documents indexed through the retrieval layer are stored
+              and searched here on your infrastructure. An external vector database (Qdrant) is{' '}
+              <span className="font-medium">optional</span>: set{' '}
+              <span className="font-mono">OFFGRID_ADAPTER_RETRIEVAL=qdrant</span> and{' '}
+              <span className="font-mono">OFFGRID_QDRANT_URL</span> only if you want to manage
+              collections from this screen. The embedded store needs no external service.
+            </p>
           </CardContent>
         </Card>
       ) : !view.reachable ? (

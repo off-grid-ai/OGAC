@@ -25,6 +25,13 @@ export interface RetrievalView {
   adapterId: string;
   /** Whether the active adapter is the dedicated Qdrant vector DB. */
   isQdrant: boolean;
+  /**
+   * Whether retrieval is served by the BUILT-IN embedded store (anything that isn't the external
+   * Qdrant vector DB — e.g. lancedb, pgvector). This is a normal, fully-working state; the external
+   * Qdrant collections API this inspector reads just isn't applicable, so a "0 vectors / unreachable"
+   * reading is NOT an error. The UI should say so affirmatively.
+   */
+  usingEmbeddedStore: boolean;
   /** Configured Qdrant base URL, if any. */
   url: string | null;
   /** Whether the vector store answered. */
@@ -32,6 +39,11 @@ export interface RetrievalView {
   collections: CollectionView[];
   /** Sum of vectorsCount across all collections. */
   totalVectors: number;
+  /**
+   * Human, operator-facing one-liner describing the current retrieval backing — affirmative for the
+   * embedded store, count-based for a live Qdrant, and a plain hint when Qdrant is set but unreachable.
+   */
+  note: string;
 }
 
 // Retrieval adapter ids, in registry order — the first is the default (mirrors
@@ -107,14 +119,39 @@ export function normalizeRetrieval(input: NormalizeInput): RetrievalView {
   collections.sort((a, b) => a.name.localeCompare(b.name));
   const totalVectors = collections.reduce((sum, c) => sum + c.vectorsCount, 0);
 
+  const isQdrant = adapterId === 'qdrant';
+  const usingEmbeddedStore = !isQdrant;
+  const reachable = Boolean(input.reachable);
+
   return {
     adapterId,
-    isQdrant: adapterId === 'qdrant',
+    isQdrant,
+    usingEmbeddedStore,
     url,
-    reachable: Boolean(input.reachable),
+    reachable,
     collections,
     totalVectors,
+    note: retrievalNote({ adapterId, isQdrant, usingEmbeddedStore, reachable }),
   };
+}
+
+// PURE: the operator-facing one-liner for the current retrieval backing.
+// - embedded store  → affirmative: it's serving retrieval; external vector DB is optional.
+// - Qdrant reachable → the live-store framing (counts come from the collections list beside it).
+// - Qdrant set but unreachable → a plain connectivity hint (this IS an error state).
+export function retrievalNote(v: {
+  adapterId: string;
+  isQdrant: boolean;
+  usingEmbeddedStore: boolean;
+  reachable: boolean;
+}): string {
+  if (v.usingEmbeddedStore) {
+    return `Retrieval is served by the built-in embedded store (${v.adapterId}). An external vector database (Qdrant) is optional — it is not configured, and that is not an error.`;
+  }
+  if (v.reachable) {
+    return 'Retrieval is served by the external Qdrant vector database.';
+  }
+  return 'The external Qdrant vector database is configured but unreachable. Check OFFGRID_QDRANT_URL and that Qdrant is running.';
 }
 
 // ── Pure: collection-management request/response logic (zero I/O) ──────────────
