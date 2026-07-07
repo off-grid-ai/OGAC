@@ -32,7 +32,10 @@ const NODE_API = /^\/api\/v1\/devices\/(enroll|[^/]+\/(policy|audit|commands))$/
 // GET of a single file is allowed through unauthenticated — the handler serves it only
 // if the file is public and returns 404 for private ones. Upload/list/patch/delete
 // (POST/GET-list/PATCH/DELETE) are NOT here and still require auth.
-const FILE_GET = /^\/api\/v1\/files\/[^/]+$/;
+// The key can be NESTED (e.g. media/2026/report.png) — object-store keys have slashes — so match
+// any non-empty tail, not just a single path segment. The catch-all [...id] handler still enforces
+// public-vs-private per file, so this only widens which GETs reach that gate, never what it serves.
+const FILE_GET = /^\/api\/v1\/files\/.+$/;
 
 // Marketing, docs, and auth surfaces that never require an SSO session.
 // /scalar.standalone.js — the self-hosted Scalar bundle the public /docs/api page loads. It must be
