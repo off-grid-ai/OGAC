@@ -8,8 +8,8 @@ import {
   buildDatasetPayload,
   buildRequestsOverTimeChart,
   buildTokensByModelChart,
-  dashboardExistsInList,
   decideEmbed,
+  embeddedUuidMatches,
   findByName,
   findOwnedDashboard,
   OFFGRID_DASHBOARD_TITLE,
@@ -46,20 +46,29 @@ test('decideEmbed: configured AND UUID verified to exist → ready', () => {
 
 // ── dashboard existence / idempotency matchers ────────────────────────────────
 
+// The list endpoint has NO uuid column — rows carry id + dashboard_title only. Existence is proven
+// by title match, then a separate /embedded lookup (embeddedUuidMatches).
 const rows: SupersetDashboardRow[] = [
-  { id: 1, uuid: 'uuid-a', dashboard_title: 'Something else' },
-  { id: 7, uuid: 'uuid-b', dashboard_title: OFFGRID_DASHBOARD_TITLE },
+  { id: 1, dashboard_title: 'Something else' },
+  { id: 7, dashboard_title: OFFGRID_DASHBOARD_TITLE },
 ];
-
-test('dashboardExistsInList matches on uuid', () => {
-  assert.equal(dashboardExistsInList(rows, 'uuid-b'), true);
-  assert.equal(dashboardExistsInList(rows, 'uuid-missing'), false);
-  assert.equal(dashboardExistsInList([], 'uuid-b'), false);
-});
 
 test('findOwnedDashboard matches the stable Off Grid title', () => {
   assert.equal(findOwnedDashboard(rows)?.id, 7);
   assert.equal(findOwnedDashboard([{ id: 3, dashboard_title: 'x' }]), undefined);
+});
+
+test('embeddedUuidMatches: only a matching /embedded uuid counts as existing', () => {
+  const EMBED = '8cf450b7-3b71-47e8-8c2b-f86bc2a62b45';
+  // Matching embedded uuid → true.
+  assert.equal(embeddedUuidMatches({ uuid: EMBED }, EMBED), true);
+  // Different uuid (drifted) → false — this is the ghost-dashboard guard.
+  assert.equal(embeddedUuidMatches({ uuid: 'some-other-uuid' }, EMBED), false);
+  // Embedding not enabled (null config, e.g. a 404 from /embedded) → false.
+  assert.equal(embeddedUuidMatches(null, EMBED), false);
+  assert.equal(embeddedUuidMatches(undefined, EMBED), false);
+  // No uuid field at all → false (defensive).
+  assert.equal(embeddedUuidMatches({}, EMBED), false);
 });
 
 test('findByName is generic over the name key', () => {

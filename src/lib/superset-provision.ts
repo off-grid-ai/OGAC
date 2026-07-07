@@ -51,24 +51,37 @@ export function decideEmbed(inp: EmbedInputs): EmbedDecision {
 }
 
 // ─── Superset dashboard-list matching (idempotency) ─────────────────────────
-// GET /api/v1/dashboard/{uuid} is not universally available across Superset versions, so we verify by
-// listing dashboards and matching on embed uuid OR the stable title. Pure matcher, given the parsed
-// list result.
+// The Superset dashboard LIST endpoint (/api/v1/dashboard/) does NOT expose a `uuid` column — its
+// list_columns are id/slug/dashboard_title/… only. The *embed* UUID (what the browser SDK loads) is a
+// separate resource: GET /api/v1/dashboard/{id}/embedded → result.uuid. So verification is a two step:
+//   1) find our dashboard in the list by its stable TITLE → get its id,
+//   2) fetch that id's /embedded config and match its uuid to the configured embed UUID.
+// These are the pure matchers; the two-step IO orchestration lives in superset.ts.
 
 export interface SupersetDashboardRow {
   id: number;
-  uuid?: string;
+  uuid?: string; // NOTE: not present in the list endpoint; only via a direct GET on some versions.
   dashboard_title?: string;
 }
 
-// True iff a dashboard with this embed uuid exists in the list.
-export function dashboardExistsInList(rows: SupersetDashboardRow[], embedUuid: string): boolean {
-  return rows.some((r) => r.uuid === embedUuid);
+// The /api/v1/dashboard/{id}/embedded payload shape (result.uuid is the embeddable UUID).
+export interface SupersetEmbeddedConfig {
+  uuid?: string;
 }
 
-// Find an already-provisioned Off Grid AI dashboard by its stable title (for idempotent provisioning).
+// Find an already-provisioned Off Grid AI dashboard by its stable title (for idempotent provisioning
+// AND for the embed-existence probe). Title is the only stable identifier the list endpoint returns.
 export function findOwnedDashboard(rows: SupersetDashboardRow[]): SupersetDashboardRow | undefined {
   return rows.find((r) => r.dashboard_title === OFFGRID_DASHBOARD_TITLE);
+}
+
+// True iff the fetched embedded config's uuid matches the configured embed UUID. Pure: the caller does
+// the GET /dashboard/{id}/embedded and passes the parsed result here.
+export function embeddedUuidMatches(
+  config: SupersetEmbeddedConfig | null | undefined,
+  embedUuid: string,
+): boolean {
+  return Boolean(config && typeof config.uuid === 'string' && config.uuid === embedUuid);
 }
 
 // Generic find-by-name over a Superset list result of {id, <nameKey>}.
