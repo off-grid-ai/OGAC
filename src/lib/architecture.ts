@@ -1,5 +1,5 @@
 // Deep per-phase content for /architecture/[phase] — components, OSS options, the diagram
-// gallery, and how Off Grid maps. Sourced from the agentic-AI stack navigator.
+// gallery, and how Off Grid AI maps. Sourced from the agentic-AI stack navigator.
 export interface ArchComponent {
   name: string;
   job: string;
@@ -281,7 +281,7 @@ export interface JourneyStage {
   n: string;
   name: string;
   reality: string; // where the org is at this stage, in the CIO's terms
-  console: string; // what Off Grid Console gives you to reach / hold this stage
+  console: string; // what Off Grid AI Console gives you to reach / hold this stage
 }
 
 export const STAGES: JourneyStage[] = [

@@ -4,7 +4,7 @@ import { provisionDashboard } from '@/lib/superset';
 
 export const dynamic = 'force-dynamic';
 
-// Idempotently provision the Off Grid starter dashboard in Superset (database → dataset → charts →
+// Idempotently provision the Off Grid AI starter dashboard in Superset (database → dataset → charts →
 // dashboard). Reuses an existing one rather than duplicating. Returns the embeddable UUID.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);

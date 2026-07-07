@@ -5,7 +5,7 @@ import { docHeadings, findDocBySlug } from '@/lib/docs';
 
 export const dynamic = 'force-static';
 
-// Docs home = the '' slug (What is Off Grid).
+// Docs home = the '' slug (What is Off Grid AI).
 export default function DocsHome() {
   const page = findDocBySlug('');
   if (!page) return null;

@@ -1,7 +1,7 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// Off Grid-branded markdown rendering for the hosted handbook. Maps each element to brand
+// Off Grid AI-branded markdown rendering for the hosted handbook. Maps each element to brand
 // classes (Menlo via global font, emerald links, flat surfaces) so docs match the app.
 const components: Components = {
   h1: ({ children }) => (

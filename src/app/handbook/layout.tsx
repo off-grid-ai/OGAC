@@ -8,7 +8,7 @@ export default function HandbookLayout({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-screen max-w-6xl gap-8 px-6 py-8">
       <aside className="w-60 shrink-0">
         <Link href="/" className="text-sm font-semibold tracking-tight text-foreground">
-          Off Grid <span className="text-primary">Console</span>
+          Off Grid AI <span className="text-primary">Console</span>
         </Link>
         <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
           Handbook

@@ -59,7 +59,7 @@ export default async function GatewayPage() {
     return (
       <ModulePlaceholder
         id="gateway"
-        note={`No gateway detected at ${toDisplayHost(GATEWAY_URL)}. Start Off Grid Desktop's local model gateway, or set OFFGRID_GATEWAY_URL.`}
+        note={`No gateway detected at ${toDisplayHost(GATEWAY_URL)}. Start Off Grid AI Desktop's local model gateway, or set OFFGRID_GATEWAY_URL.`}
       />
     );
   }

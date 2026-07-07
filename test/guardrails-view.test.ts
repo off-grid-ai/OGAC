@@ -82,7 +82,7 @@ test('buildGuardrailsView: presidio selected without embedUrl → not configured
 
 test('buildGuardrailsView: checks spine → regex engine, always reachable + configured', () => {
   const v = buildGuardrailsView(
-    { id: 'checks', vendor: 'Off Grid checks spine', license: 'first-party' },
+    { id: 'checks', vendor: 'Off Grid AI checks spine', license: 'first-party' },
     // health passed as false must NOT make the always-on floor unreachable
     false,
   );
@@ -106,7 +106,7 @@ test('buildGuardrailsView: null meta → safe regex defaults, never throws', () 
   const v = buildGuardrailsView(null, true);
   assert.equal(v.engine, 'regex');
   assert.equal(v.adapterId, 'checks');
-  assert.equal(v.vendor, 'Off Grid checks spine');
+  assert.equal(v.vendor, 'Off Grid AI checks spine');
   assert.equal(v.license, 'first-party');
   assert.equal(v.reachable, true);
   assert.equal(v.configured, true);
@@ -119,7 +119,7 @@ test('buildGuardrailsView: malformed meta fields fall back to defaults', () => {
   );
   assert.equal(v.engine, 'regex');
   assert.equal(v.adapterId, 'checks');
-  assert.equal(v.vendor, 'Off Grid checks spine');
+  assert.equal(v.vendor, 'Off Grid AI checks spine');
   assert.equal(v.license, 'first-party');
 });
 

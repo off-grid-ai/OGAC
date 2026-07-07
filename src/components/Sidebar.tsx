@@ -23,9 +23,9 @@ export function Sidebar() {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
       <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
-        <Image src="/logo.png" alt="Off Grid" width={28} height={28} priority />
+        <Image src="/logo.png" alt="Off Grid AI" width={28} height={28} priority />
         <div className="leading-tight">
-          <div className="text-sm font-medium text-foreground">Off Grid</div>
+          <div className="text-sm font-medium text-foreground">Off Grid AI</div>
           <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
             Console
           </div>

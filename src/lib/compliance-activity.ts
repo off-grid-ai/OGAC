@@ -259,7 +259,7 @@ function rangeLabel(a: ComplianceActivity): string {
 // regulator: summary, outcome breakdown, provenance coverage, who did what, and every refusal.
 export function activityToMarkdown(a: ComplianceActivity): string {
   const l: string[] = [];
-  l.push('# Off Grid — Data Processing Activity Report (DPIA)');
+  l.push('# Off Grid AI — Data Processing Activity Report (DPIA)');
   l.push('');
   l.push(`Generated: ${a.generatedAt}`);
   l.push(`Org: ${a.org}`);

@@ -17,7 +17,7 @@ export interface ServiceSpec {
 }
 
 export const SERVICE_SPECS: ServiceSpec[] = [
-  { id: 'console', label: 'Off Grid Console', kind: 'console' },
+  { id: 'console', label: 'Off Grid AI Console', kind: 'console' },
   { id: 'openbao', label: 'OpenBao (secrets)', kind: 'native', envVar: 'OFFGRID_OPENBAO_URL', specPath: '/v1/sys/internal/specs/openapi' },
   { id: 'qdrant', label: 'Qdrant (vectors)', kind: 'native', envVar: 'OFFGRID_QDRANT_URL', specPath: '/openapi/openapi-3.1.0.json' },
   { id: 'marquez', label: 'Marquez (lineage)', kind: 'native', envVar: 'OFFGRID_MARQUEZ_URL', specPath: '/api/v1/openapi.json' },

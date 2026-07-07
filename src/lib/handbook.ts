@@ -45,7 +45,7 @@ export const HANDBOOK: HandbookDoc[] = [
   {
     slug: 'fleet-control',
     title: 'Fleet Control — devices + intelligence',
-    blurb: 'Baseline device fleet (FleetDM/osquery) + the Off Grid field-force intelligence layer.',
+    blurb: 'Baseline device fleet (FleetDM/osquery) + the Off Grid AI field-force intelligence layer.',
     file: 'FLEET_CONTROL.md',
   },
   {

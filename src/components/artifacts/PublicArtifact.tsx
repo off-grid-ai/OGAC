@@ -72,7 +72,7 @@ export function PublicArtifact({
         )}
       </div>
       <footer className="shrink-0 border-t border-border px-4 py-1.5 text-center font-mono text-[10px] text-muted-foreground">
-        Published from Off Grid Console
+        Published from Off Grid AI Console
       </footer>
     </div>
   );

@@ -36,7 +36,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
   {
     service: 'gateway',
     clientId: 'offgrid-gateway',
-    name: 'Off Grid Gateway (service)',
+    name: 'Off Grid AI Gateway (service)',
     description: 'Service-account client for the AI gateway/aggregator.',
     realmRole: 'svc-gateway',
     audience: 'offgrid-gateway',
@@ -48,7 +48,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
   {
     service: 'opensearch',
     clientId: 'offgrid-opensearch',
-    name: 'Off Grid OpenSearch (service)',
+    name: 'Off Grid AI OpenSearch (service)',
     description: 'Service-account client for OpenSearch access.',
     realmRole: 'svc-opensearch',
     audience: 'offgrid-opensearch',
@@ -56,7 +56,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
   {
     service: 'fleet',
     clientId: 'offgrid-fleet',
-    name: 'Off Grid Fleet (service)',
+    name: 'Off Grid AI Fleet (service)',
     description: 'Service-account client for fleet management.',
     realmRole: 'svc-fleet',
     audience: 'offgrid-fleet',
@@ -64,7 +64,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
   {
     service: 'temporal',
     clientId: 'offgrid-temporal',
-    name: 'Off Grid Temporal (service)',
+    name: 'Off Grid AI Temporal (service)',
     description: 'Service-account client for the Temporal workflow engine.',
     realmRole: 'svc-temporal',
     audience: 'offgrid-temporal',
@@ -72,7 +72,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
   {
     service: 'seaweedfs',
     clientId: 'offgrid-seaweedfs',
-    name: 'Off Grid SeaweedFS (service)',
+    name: 'Off Grid AI SeaweedFS (service)',
     description: 'Service-account client for SeaweedFS object storage.',
     realmRole: 'svc-seaweedfs',
     audience: 'offgrid-seaweedfs',
@@ -85,7 +85,7 @@ export const SERVICE_CLIENTS: readonly ServiceClientDef[] = [
     // Ready-to-flip config: deploy/onprem/oidc-services.md § Superset.
     service: 'superset',
     clientId: 'offgrid-superset',
-    name: 'Off Grid Superset (SSO)',
+    name: 'Off Grid AI Superset (SSO)',
     description: 'OIDC login client for the Superset BI UI (Flask-AppBuilder AUTH_OAUTH).',
     realmRole: 'svc-superset',
     audience: 'offgrid-superset',

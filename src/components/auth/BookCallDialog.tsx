@@ -29,7 +29,7 @@ export function BookCallDialog() {
       </DialogTrigger>
       <DialogContent className="max-w-3xl p-0">
         <DialogHeader className="border-b border-border px-4 py-3">
-          <DialogTitle className="text-sm">Book a call with Off Grid</DialogTitle>
+          <DialogTitle className="text-sm">Book a call with Off Grid AI</DialogTitle>
         </DialogHeader>
         {open ? (
           <iframe

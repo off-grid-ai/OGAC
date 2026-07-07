@@ -7,8 +7,8 @@ export const integrationsSection: DocSection = {
     {
       slug: 'integrations/catalog',
       title: 'Integration catalog',
-      description: 'Every data source and service Off Grid connects to.',
-      body: `Off Grid connects to your systems on two sides: **data sources** you pull knowledge from,
+      description: 'Every data source and service Off Grid AI connects to.',
+      body: `Off Grid AI connects to your systems on two sides: **data sources** you pull knowledge from,
 and **platform services** that back the capabilities. Every one runs on your infrastructure or your
 own accounts.
 

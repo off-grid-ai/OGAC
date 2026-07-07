@@ -23,7 +23,7 @@ export default async function DeployedAppPage({ params }: { params: Promise<{ sl
         <h1 className="text-xl font-semibold text-foreground">{tpl.title}</h1>
         {tpl.summary ? <p className="mt-1 text-sm text-muted-foreground">{tpl.summary}</p> : null}
         <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          Off Grid · deployed app · runs governed on-prem
+          Off Grid AI · deployed app · runs governed on-prem
         </p>
       </header>
       <DeployedApp slug={tpl.slug} />

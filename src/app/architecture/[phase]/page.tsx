@@ -29,7 +29,7 @@ export default async function PhasePage({ params }: { params: Promise<{ phase: s
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid Console
+            Off Grid AI Console
           </Link>
           <Button asChild size="sm">
             <Link href="/fleet">Open console</Link>
@@ -46,7 +46,7 @@ export default async function PhasePage({ params }: { params: Promise<{ phase: s
           <p className="mt-3 max-w-2xl text-base text-muted-foreground">{p.blurb}</p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              In Off Grid
+              In Off Grid AI
             </span>
             {p.maps.map((m) => (
               <Badge key={m} variant="secondary">

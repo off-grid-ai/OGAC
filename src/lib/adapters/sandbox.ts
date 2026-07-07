@@ -29,7 +29,7 @@ export const noExecSandbox: SandboxPort = {
   meta: {
     id: 'none',
     capability: 'sandbox',
-    vendor: 'Off Grid (no-exec)',
+    vendor: 'Off Grid AI (no-exec)',
     license: 'first-party',
     render: 'native',
     description: 'No arbitrary code execution; tools run only via the scoped registry. Safe default.',
@@ -116,7 +116,7 @@ export const dockerSandbox: SandboxPort = {
   meta: {
     id: 'docker',
     capability: 'sandbox',
-    vendor: 'Off Grid Docker sandbox',
+    vendor: 'Off Grid AI Docker sandbox',
     license: 'first-party',
     render: 'native',
     description:

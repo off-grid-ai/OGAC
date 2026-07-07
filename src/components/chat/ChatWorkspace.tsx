@@ -1449,7 +1449,7 @@ export function ChatWorkspace({
                     ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
                     : activeProject
                       ? 'Chats here use this project’s instructions and knowledge.'
-                      : 'Answered on-prem by the Off Grid gateways. Ask anything.'}
+                      : 'Answered on-prem by the Off Grid AI gateways. Ask anything.'}
                 </p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">

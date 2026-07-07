@@ -1,4 +1,4 @@
-// The Off Grid service/product directory — every public surface in the suite, in one
+// The Off Grid AI service/product directory — every public surface in the suite, in one
 // place. Powers the /services page (a health-checked map of what we run) and is the
 // single source of truth for "which subdomains exist".
 //

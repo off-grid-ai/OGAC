@@ -3,7 +3,7 @@ import { computeStatus } from '@/lib/status';
 
 export const dynamic = 'force-dynamic';
 
-// PUBLIC status API — no auth, node-free. Tells consumers whether each Off Grid service is up
+// PUBLIC status API — no auth, node-free. Tells consumers whether each Off Grid AI service is up
 // and whether performance is good or degraded, plus an overall rollup. For uptime monitors,
 // status pages, and health dashboards.
 //

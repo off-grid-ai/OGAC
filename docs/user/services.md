@@ -4,7 +4,7 @@
 
 ## What it is
 
-The directory of every Off Grid surface — the console, the AI gateway, and each product subdomain and
+The directory of every Off Grid AI surface — the console, the AI gateway, and each product subdomain and
 backend service — each with its **live health**. One login covers them all. Health is reported
 **honestly**: a service is only "down" if it's a real outage. Backends that have no endpoint to probe,
 or optional dependencies you degrade past gracefully, get their own honest state rather than a scary

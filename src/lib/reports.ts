@@ -284,7 +284,7 @@ function h(lines: string[], title: string): void {
 async function auditSummary(): Promise<string> {
   const a = await computeAnalytics();
   const l: string[] = [];
-  h(l, 'Off Grid — Audit & Usage Summary');
+  h(l, 'Off Grid AI — Audit & Usage Summary');
   l.push(`- Events: ${a.totalEvents}`, `- Tokens: ${a.totalTokens}`);
   l.push(`- Latency p50/p95: ${a.p50}ms / ${a.p95}ms`, `- Egress rate: ${a.egressRate}%`);
   l.push(
@@ -308,7 +308,7 @@ async function evalReport(): Promise<string> {
   const [cases, runs] = await Promise.all([listGoldenCases(), listEvalRuns(1)]);
   const latest = runs[0];
   const l: string[] = [];
-  h(l, 'Off Grid — Retrieval Quality Report');
+  h(l, 'Off Grid AI — Retrieval Quality Report');
   l.push(`- Golden cases: ${cases.length}`);
   l.push(
     latest ? `- Latest run: ${latest.passed}/${latest.total} (${latest.score}%)` : '- No runs yet',
@@ -330,7 +330,7 @@ async function inventory(): Promise<string> {
     listDatasets(),
   ]);
   const l: string[] = [];
-  h(l, 'Off Grid — Model & Data Inventory');
+  h(l, 'Off Grid AI — Model & Data Inventory');
   l.push(`- Allowed models: ${policy.allowedModels.join(', ') || 'none'}`);
   l.push(`- Cloud egress: ${policy.egressAllowed ? 'allowed (leashed)' : 'blocked'}`);
   l.push('', `## Devices (${devices.length})`);

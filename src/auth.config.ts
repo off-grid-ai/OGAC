@@ -41,7 +41,7 @@ if (passwordEnabled) {
   providers.push(
     Credentials({
       id: 'password',
-      name: 'Off Grid',
+      name: 'Off Grid AI',
       credentials: { username: { label: 'Email' }, password: { label: 'Password', type: 'password' } },
       authorize: async (creds) => {
         const { authenticatePassword } = await import('@/lib/auth/identity');

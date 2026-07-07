@@ -78,12 +78,12 @@ export async function POST(req: Request) {
       // A client may also carry an OPTIONAL grant role (least-privilege: only the gateway does) that
       // elevates its service account to a console capability — ensured and assigned the same way.
       const roleExisted = (await kc.listRealmRoles()).some((r) => r.name === def.realmRole);
-      const role = await kc.ensureRealmRole(def.realmRole, `Off Grid service scope: ${def.realmRole}`);
+      const role = await kc.ensureRealmRole(def.realmRole, `Off Grid AI service scope: ${def.realmRole}`);
       const roleAction: ProvisionAction = roleExisted ? 'reused' : 'created';
       const rolesToAssign = [role];
       if (def.grantsRole) {
         rolesToAssign.push(
-          await kc.ensureRealmRole(def.grantsRole, `Off Grid console capability: ${def.grantsRole}`),
+          await kc.ensureRealmRole(def.grantsRole, `Off Grid AI console capability: ${def.grantsRole}`),
         );
       }
       const saUser = await kc.getServiceAccountUser(internalId);

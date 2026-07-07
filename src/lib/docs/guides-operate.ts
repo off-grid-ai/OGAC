@@ -38,7 +38,7 @@ fabricated number.`,
       slug: 'guides/services',
       title: 'Services',
       description: 'The map of everything you run, with live, server-probed health.',
-      body: `Services is the directory of every Off Grid surface — the console, the model gateway, the
+      body: `Services is the directory of every Off Grid AI surface — the console, the model gateway, the
 product subdomains, and the swappable backends — each with health probed live from the server.
 
 ## What you see
@@ -164,7 +164,7 @@ Manage virtual keys and their budgets from the FinOps surface.`,
       slug: 'guides/budgets',
       title: 'Budget enforcement',
       description: 'A spend limit that actually stops the spend — not just an alert after the fact.',
-      body: `A budget you can't enforce is a suggestion. Off Grid checks the limit **before** a call runs,
+      body: `A budget you can't enforce is a suggestion. Off Grid AI checks the limit **before** a call runs,
 so a team can't quietly blow past its cap and leave you to find out on the invoice.
 
 ## How it works
@@ -365,7 +365,7 @@ There is no other file-storage path — everything the console stores goes throu
       slug: 'guides/data',
       title: 'Data & connectors',
       description: 'Connect your systems of record and keep the data real.',
-      body: `Connectors bring your systems of record into the platform. Off Grid ships connectors for
+      body: `Connectors bring your systems of record into the platform. Off Grid AI ships connectors for
 databases (Postgres, MySQL, MSSQL), object storage (S3), event streams (Kafka), and REST APIs.
 
 ## Manage connectors

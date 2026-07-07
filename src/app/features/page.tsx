@@ -247,7 +247,7 @@ export default function FeaturesPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid Console
+            Off Grid AI Console
           </Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
@@ -273,7 +273,7 @@ export default function FeaturesPage() {
               AI agents across your enterprise.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Off Grid Console is the all-in-one control plane for agentic AI — every layer of the
+              Off Grid AI Console is the all-in-one control plane for agentic AI — every layer of the
               stack on one console, on your own infrastructure, entirely open source. No per-token
               fees, no API keys, no lock-in.
             </p>
@@ -350,7 +350,7 @@ export default function FeaturesPage() {
               Arm a distributed workforce with AI — without losing control of it
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Thousands of reps, agents, and edge devices, each running AI on customer data. Off Grid
+              Thousands of reps, agents, and edge devices, each running AI on customer data. Off Grid AI
               Console is how you give them that power and stay accountable for every call.
             </p>
           </BlurFade>

@@ -43,7 +43,7 @@ export const heuristicGrounding: GroundingPort = {
   meta: {
     id: 'lexical',
     capability: 'grounding',
-    vendor: 'Off Grid lexical',
+    vendor: 'Off Grid AI lexical',
     license: 'first-party',
     render: 'native',
     description: 'Token-overlap grounding. Offline, no model — the deterministic baseline.',

@@ -112,7 +112,7 @@ const VALUE = [
   {
     icon: Brain,
     title: 'Organizational brain',
-    body: 'Off Grid observes how work actually happens and connects your systems, distilling it into one governed knowledge brain that every agent and person draws from — your context, on your infrastructure.',
+    body: 'Off Grid AI observes how work actually happens and connects your systems, distilling it into one governed knowledge brain that every agent and person draws from — your context, on your infrastructure.',
   },
   {
     icon: Gauge,
@@ -138,9 +138,9 @@ function Nav() {
     <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <div className="flex shrink-0 items-center gap-2.5">
-          <Image src="/logo.png" alt="Off Grid" width={26} height={26} priority />
+          <Image src="/logo.png" alt="Off Grid AI" width={26} height={26} priority />
           <span className="whitespace-nowrap text-sm font-medium text-foreground">
-            Off Grid Console
+            Off Grid AI Console
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
@@ -302,7 +302,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-20">
           <h2 className="text-xl font-semibold tracking-tight">The five agentic layers</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            The reference architecture for a production AI estate — and exactly how Off Grid maps
+            The reference architecture for a production AI estate — and exactly how Off Grid AI maps
             onto it.
           </p>
           <Link
@@ -350,7 +350,7 @@ export default function LandingPage() {
                     <p className="mt-2 text-sm text-muted-foreground">{p.desc}</p>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                        In Off Grid
+                        In Off Grid AI
                       </span>
                       {p.maps.map((m) => (
                         <Badge key={m} variant="secondary">
@@ -490,7 +490,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-xs text-muted-foreground">
-          <span>Off Grid · on-prem, local-first AI control plane</span>
+          <span>Off Grid AI · on-prem, local-first AI control plane</span>
           <span>AGPL-3.0 · your infrastructure, your control</span>
         </div>
       </footer>

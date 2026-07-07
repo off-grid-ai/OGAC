@@ -38,7 +38,7 @@ export type ModelFamily =
   | 'DeepSeek'
   | 'Phi'
   | 'SDXL'
-  | 'Off Grid'
+  | 'Off Grid AI'
   | 'Other';
 
 export const MODEL_FAMILIES: ModelFamily[] = [
@@ -49,7 +49,7 @@ export const MODEL_FAMILIES: ModelFamily[] = [
   'DeepSeek',
   'Phi',
   'SDXL',
-  'Off Grid',
+  'Off Grid AI',
   'Other',
 ];
 

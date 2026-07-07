@@ -8,7 +8,7 @@ export const governSection: DocSection = {
       slug: 'guides/governance',
       title: 'Governance overview',
       description: 'Prove to a regulator that your AI is controlled.',
-      body: `Governance is why regulated organizations choose Off Grid. It isn't a feature bolted on;
+      body: `Governance is why regulated organizations choose Off Grid AI. It isn't a feature bolted on;
 it is the path every request takes. Each piece below is a surface you operate, not a dashboard you
 watch.
 

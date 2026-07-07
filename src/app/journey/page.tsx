@@ -112,7 +112,7 @@ function StageRow({ stage, last }: { stage: (typeof STAGES)[number]; last: boole
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{stage.reality}</p>
           <div className="mt-3 max-w-2xl rounded-md border border-border bg-card/60 p-3">
             <span className="text-[10px] uppercase tracking-wide text-primary">
-              With Off Grid Console
+              With Off Grid AI Console
             </span>
             <p className="mt-1 text-sm text-foreground">{stage.console}</p>
           </div>
@@ -161,7 +161,7 @@ export default function JourneyPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid Console
+            Off Grid AI Console
           </Link>
           <Button asChild size="sm">
             <Link href="/fleet">Open console</Link>
@@ -179,7 +179,7 @@ export default function JourneyPage() {
             From Shadow AI to a self-serve platform
           </h1>
           <p className="mt-3 max-w-2xl text-base text-muted-foreground">
-            Every enterprise is somewhere on this path. Off Grid Console is the platform that
+            Every enterprise is somewhere on this path. Off Grid AI Console is the platform that
             carries you from sanctioned access to an org-wide, auditable AI estate — one stage at a
             time.
           </p>

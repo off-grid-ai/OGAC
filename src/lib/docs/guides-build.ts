@@ -251,7 +251,7 @@ in plain language and Studio wires the model, policy, guardrails, and grounding 
 
 ## The flow
 
-1. **Describe** what the assistant should do. Off Grid can suggest a name, the relevant skills, and
+1. **Describe** what the assistant should do. Off Grid AI can suggest a name, the relevant skills, and
    whether it should use your uploaded knowledge — inferred from your description.
 2. **Pick skills** — the tools your org has set up.
 3. **Choose knowledge** — whether it answers from your documents.
@@ -276,13 +276,13 @@ built by hand.
       title: 'Knowledge & retrieval',
       description: 'Turn your documents and systems into grounded, cited answers.',
       body: `Knowledge is how your own content becomes answerable. You upload documents or connect a
-system; Off Grid indexes it on your hardware; Chat and agents answer from it with citations.
+system; Off Grid AI indexes it on your hardware; Chat and agents answer from it with citations.
 
 ![Knowledge — upload documents and index connected sources for grounded answers](/docs-shots/knowledge.png)
 
 ## Add knowledge
 
-Upload files on the **Knowledge** page (PDFs, text, docs) or index a connected data source. Off Grid
+Upload files on the **Knowledge** page (PDFs, text, docs) or index a connected data source. Off Grid AI
 chunks the content and embeds it using a model on your own gateway — no embedding service, no data
 sent out. The vector store is yours (an embedded store by default, or your own Qdrant at scale).
 

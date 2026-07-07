@@ -191,7 +191,7 @@ test('activityToJson: round-trips the report shape', () => {
 test('activityToMarkdown: has DPIA heading, summary, provenance line, enforcement table', () => {
   const a = buildComplianceActivity(rows, coverage, q);
   const md = activityToMarkdown(a);
-  assert.match(md, /# Off Grid — Data Processing Activity Report \(DPIA\)/);
+  assert.match(md, /# Off Grid AI — Data Processing Activity Report \(DPIA\)/);
   assert.match(md, /Governed events: \*\*5\*\*/);
   assert.match(md, /Provenance coverage: \*\*75%\*\* \(3\/4/);
   assert.match(md, /## Enforcement — blocked & denied actions/);

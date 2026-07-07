@@ -37,7 +37,7 @@ export const memoryCache: CachePort = {
   meta: {
     id: 'memory',
     capability: 'caching',
-    vendor: 'Off Grid in-process cache',
+    vendor: 'Off Grid AI in-process cache',
     license: 'first-party',
     render: 'native',
     description: 'Bounded, TTL’d in-process KV backing the exact response cache (default).',

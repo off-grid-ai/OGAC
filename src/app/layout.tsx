@@ -5,7 +5,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Off Grid Console',
+  title: 'Off Grid AI Console',
   description: 'The org-side common control plane for organizational AI.',
 };
 

@@ -149,7 +149,7 @@ function SectionBody(p: BodyProps) {
   if (p.section === 'appearance') {
     const dark = mounted && theme === 'dark';
     return (
-      <Field title="Appearance" hint="Off Grid brutalist theme — mono type, emerald accent.">
+      <Field title="Appearance" hint="Off Grid AI brutalist theme — mono type, emerald accent.">
         <Row label="Dark mode" desc="Toggle between the light and dark palette.">
           <Switch checked={dark} onCheckedChange={(v) => setTheme(v ? 'dark' : 'light')} />
         </Row>

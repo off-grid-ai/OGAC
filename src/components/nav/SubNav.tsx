@@ -17,7 +17,7 @@ export function SubNav({ children, className }: { children: ReactNode; className
   return (
     <div
       className={cn(
-        // A faint emerald wash (the Off Grid accent) makes the strip read clearly as its own nav
+        // A faint emerald wash (the Off Grid AI accent) makes the strip read clearly as its own nav
         // zone — plain `bg-muted` gray (#f1f2f4, ~6% off white) was too subtle to notice. The
         // primary-tinted bottom border brackets the band. Bleeds to the console <main> edges.
         '-mx-6 -mt-6 border-b border-primary/20 bg-primary/[0.07] px-6 py-3',

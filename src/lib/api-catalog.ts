@@ -66,7 +66,7 @@ export const API_CATALOG: readonly ApiArea[] = [
       {
         method: 'GET',
         path: '/api/v1/services/health',
-        summary: 'Live health probe of every Off Grid service in the directory.',
+        summary: 'Live health probe of every Off Grid AI service in the directory.',
         auth: 'public',
         safeGet: true,
       },
