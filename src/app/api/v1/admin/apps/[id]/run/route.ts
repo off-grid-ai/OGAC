@@ -6,6 +6,7 @@ import { getApp } from '@/lib/apps-store';
 import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
+import { resolveContract } from '@/lib/pipeline-contract';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,16 +32,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const input = body.input && typeof body.input === 'object' ? body.input : {};
 
   const runId = newAppRunId();
+
+  // PA-16 — resolve the bound-pipeline CONTRACT this run enforces (data allowlist + egress leash +
+  // policy/guardrail overlay), most-specific-wins (app binding → org default). Threaded into the run
+  // context so the inline executor enforces it per step. Null (no binding / unresolvable) ⇒ the run
+  // behaves exactly as before (additive-only). The durable worker path resolves its own contract
+  // (deferred gap — see docs/GAPS_BACKLOG.md PA-16); the inline path is enforced here.
+  const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
+  const contract = await resolveContract(pipelineId, orgId);
+
   const handle = await submitAppRun(app, input, {
     orgId,
     actor: gate.user.email ?? undefined,
     runId,
+    contract,
   });
 
-  // Resolve + tag the bound pipeline (CONSUMERS-BIND #166) so telemetry/governance lenses light up.
-  // The RUN is the join key: we stamp the audit event with the runId and a compound resource that
-  // carries the pipeline tag (`app:<id> pipeline:<pl>`), reusing the canonical audit path.
-  const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
+  // Tag the run audit with the resolved pipeline so the per-pipeline audit/FinOps lens lights up. The
+  // RUN is the join key: stamp runId + a compound resource carrying the pipeline tag.
   const tag = pipelineRunTag(pipelineId);
   auditFromSession(gate, orgId, {
     action: 'app.run',
