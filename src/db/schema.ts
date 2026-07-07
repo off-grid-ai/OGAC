@@ -318,6 +318,10 @@ export const users = pgTable('user', {
   emailVerified: timestamp('email_verified', { mode: 'date' }),
   image: text('image'),
   role: text('role').notNull().default('viewer'),
+  // The org this user belongs to (tenant membership). Drives currentOrgId: a user is scoped to
+  // THEIR org; only a platform admin may cross into another tenant (e.g. via its subdomain). Legacy
+  // rows default to the single 'default' org.
+  orgId: text('org_id').notNull().default('default'),
 });
 
 // ─── Chat workspace (end-user "your own ChatGPT" — ports desktop projects/threads/messages) ──
