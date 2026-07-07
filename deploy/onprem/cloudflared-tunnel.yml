@@ -3,12 +3,6 @@ credentials-file: /Users/admin/.cloudflared/00000000-0000-0000-0000-000000000000
 ingress:
   - hostname: onprem-console.getoffgridai.co
     service: http://127.0.0.1:3000
-  # Per-tenant subdomains (<slug>.onprem-console.getoffgridai.co) → same console. DNS wildcard
-  # (*.onprem-console CNAME → tunnel, proxied) + this rule are LIVE. BLOCKED on TLS: Universal SSL
-  # only covers *.getoffgridai.co (one level), so the 2nd-level wildcard needs a Total TLS / ACM cert
-  # (paid) — see docs/VERIFICATION_GAPS.md S2. Ready to serve the moment that cert exists.
-  - hostname: "*.onprem-console.getoffgridai.co"
-    service: http://127.0.0.1:3000
   # AI Gateway aggregator (OpenAI-compatible) — direct, not via Caddy.
   - hostname: gateway.getoffgridai.co
     service: http://127.0.0.1:8800
