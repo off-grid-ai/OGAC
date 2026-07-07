@@ -28,6 +28,9 @@ export interface EvalDef {
   threshold: number;
   suite: string;
   description: string;
+  // The pipeline (app) this eval belongs to. null = an org-wide/library eval (attachable to any
+  // pipeline). A pipeline's evals run in ITS context and can gate its releases.
+  appId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,9 +51,12 @@ export async function ensureEvalDefsSchema(): Promise<void> {
         suite text NOT NULL DEFAULT 'golden',
         description text NOT NULL DEFAULT '',
         created_by text NOT NULL DEFAULT '',
+        app_id text,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now());
     `);
+    // Self-migrate existing tables (pipeline-owns-governance): the eval belongs to an app.
+    await db.execute(sql`ALTER TABLE eval_definitions ADD COLUMN IF NOT EXISTS app_id text;`);
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -68,6 +74,7 @@ interface Row {
   threshold: number | string;
   suite: string | null;
   description: string | null;
+  app_id: string | null;
   created_at: Date | string;
   updated_at: Date | string;
   [k: string]: unknown;
@@ -88,17 +95,26 @@ function toDef(r: Row): EvalDef {
     threshold: Number(r.threshold),
     suite: r.suite ?? 'golden',
     description: r.description ?? '',
+    appId: r.app_id ?? null,
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
   };
 }
 
-export async function listEvalDefs(): Promise<EvalDef[]> {
+// List eval definitions. `appId` filters to a specific pipeline's evals; `appId: null` returns the
+// org-wide library evals (unattached); omitting it returns ALL (the global catalog view).
+export async function listEvalDefs(appId?: string | null): Promise<EvalDef[]> {
   await ensureEvalDefsSchema();
+  const where =
+    appId === undefined
+      ? sql``
+      : appId === null
+        ? sql`WHERE app_id IS NULL`
+        : sql`WHERE app_id = ${appId}`;
   const { rows } = await db.execute<Row>(
     sql`SELECT id, name, template_id, metric, engine, direction, threshold, suite, description,
-               created_at, updated_at
-        FROM eval_definitions ORDER BY created_at DESC;`,
+               app_id, created_at, updated_at
+        FROM eval_definitions ${where} ORDER BY created_at DESC;`,
   );
   return rows.map(toDef);
 }
@@ -107,22 +123,26 @@ export async function getEvalDef(id: string): Promise<EvalDef | null> {
   await ensureEvalDefsSchema();
   const { rows } = await db.execute<Row>(
     sql`SELECT id, name, template_id, metric, engine, direction, threshold, suite, description,
-               created_at, updated_at
+               app_id, created_at, updated_at
         FROM eval_definitions WHERE id = ${id} LIMIT 1;`,
   );
   return rows[0] ? toDef(rows[0]) : null;
 }
 
-export async function addEvalDef(draft: EvalDefDraft, createdBy = ''): Promise<EvalDef> {
+export async function addEvalDef(
+  draft: EvalDefDraft,
+  createdBy = '',
+  appId: string | null = null,
+): Promise<EvalDef> {
   await ensureEvalDefsSchema();
   const id = `ed_${randomUUID().slice(0, 8)}`;
   const { rows } = await db.execute<Row>(
     sql`INSERT INTO eval_definitions
-          (id, name, template_id, metric, engine, direction, threshold, suite, description, created_by)
+          (id, name, template_id, metric, engine, direction, threshold, suite, description, created_by, app_id)
         VALUES (${id}, ${draft.name}, ${draft.templateId}, ${draft.metric}, ${draft.engine},
-                ${draft.direction}, ${draft.threshold}, ${draft.suite}, ${draft.description}, ${createdBy})
+                ${draft.direction}, ${draft.threshold}, ${draft.suite}, ${draft.description}, ${createdBy}, ${appId})
         RETURNING id, name, template_id, metric, engine, direction, threshold, suite, description,
-                  created_at, updated_at;`,
+                  app_id, created_at, updated_at;`,
   );
   return toDef(rows[0]);
 }
@@ -136,7 +156,7 @@ export async function updateEvalDef(id: string, draft: EvalDefDraft): Promise<Ev
             suite = ${draft.suite}, description = ${draft.description}, updated_at = now()
         WHERE id = ${id}
         RETURNING id, name, template_id, metric, engine, direction, threshold, suite, description,
-                  created_at, updated_at;`,
+                  app_id, created_at, updated_at;`,
   );
   return rows[0] ? toDef(rows[0]) : null;
 }

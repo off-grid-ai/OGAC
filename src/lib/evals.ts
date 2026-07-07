@@ -20,6 +20,8 @@ export interface GoldenCase {
   query: string;
   expected: string;
   suite: string;
+  // The pipeline (app) this golden case belongs to. null = an org-wide/shared case (library).
+  appId: string | null;
 }
 
 export interface EvalResult {
@@ -71,6 +73,13 @@ export async function ensureEvalsSchema(): Promise<void> {
       sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
     );
     await db.execute(sql`CREATE INDEX IF NOT EXISTS eval_runs_org_idx ON eval_runs (org_id);`);
+    // Pipeline-owns-governance: a golden case belongs to a pipeline (app). Self-migrate app_id/org_id
+    // (same idempotent pattern) so the raw INSERT/SELECT never references a missing column.
+    await db.execute(sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS app_id text;`);
+    await db.execute(
+      sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS golden_cases_app_idx ON golden_cases (app_id);`);
   })();
   return ensurePromise;
 }
@@ -81,6 +90,7 @@ interface GoldenRow {
   query: string;
   expected: string;
   suite: string | null;
+  app_id: string | null;
   [k: string]: unknown;
 }
 
@@ -91,13 +101,22 @@ function toGoldenCase(r: GoldenRow): GoldenCase {
     query: r.query,
     expected: r.expected,
     suite: r.suite ?? 'golden',
+    appId: r.app_id ?? null,
   };
 }
 
-export async function listGoldenCases(): Promise<GoldenCase[]> {
+// List golden cases. `appId` filters to a pipeline's golden set; `appId: null` returns the org-wide
+// library cases; omitting it returns ALL (the global view).
+export async function listGoldenCases(appId?: string | null): Promise<GoldenCase[]> {
   await ensureEvalsSchema();
+  const where =
+    appId === undefined
+      ? sql``
+      : appId === null
+        ? sql`WHERE app_id IS NULL`
+        : sql`WHERE app_id = ${appId}`;
   const { rows } = await db.execute<GoldenRow>(
-    sql`SELECT id, name, query, expected, suite FROM golden_cases ORDER BY created_at DESC;`,
+    sql`SELECT id, name, query, expected, suite, app_id FROM golden_cases ${where} ORDER BY created_at DESC;`,
   );
   return rows.map(toGoldenCase);
 }
@@ -105,18 +124,21 @@ export async function listGoldenCases(): Promise<GoldenCase[]> {
 export async function getGoldenCase(id: string): Promise<GoldenCase | null> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<GoldenRow>(
-    sql`SELECT id, name, query, expected, suite FROM golden_cases WHERE id = ${id} LIMIT 1;`,
+    sql`SELECT id, name, query, expected, suite, app_id FROM golden_cases WHERE id = ${id} LIMIT 1;`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
 
-export async function addGoldenCase(draft: GoldenCaseDraft): Promise<GoldenCase> {
+export async function addGoldenCase(
+  draft: GoldenCaseDraft,
+  appId: string | null = null,
+): Promise<GoldenCase> {
   await ensureEvalsSchema();
   const id = `gc_${randomUUID().slice(0, 6)}`;
   const { rows } = await db.execute<GoldenRow>(
-    sql`INSERT INTO golden_cases (id, name, query, expected, suite)
-        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite})
-        RETURNING id, name, query, expected, suite;`,
+    sql`INSERT INTO golden_cases (id, name, query, expected, suite, app_id)
+        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite}, ${appId})
+        RETURNING id, name, query, expected, suite, app_id;`,
   );
   return toGoldenCase(rows[0]);
 }
@@ -131,7 +153,7 @@ export async function updateGoldenCase(
         SET name = ${draft.name}, query = ${draft.query}, expected = ${draft.expected},
             suite = ${draft.suite}, updated_at = now()
         WHERE id = ${id}
-        RETURNING id, name, query, expected, suite;`,
+        RETURNING id, name, query, expected, suite, app_id;`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
