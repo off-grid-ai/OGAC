@@ -54,11 +54,15 @@ rsync -az -e "ssh -i $SSH_KEY" --exclude node_modules --exclude src \
 rsync -az -e "ssh -i $SSH_KEY" \
   "$WORKSPACE/gateway/package.json" "${SSH_USER}@${SERVER}:$REMOTE/gateway/package.json"
 
-# ── 3. Sync the console source (NEVER clobber server env or build) ──
+# ── 3. Sync the console source (NEVER clobber server env, build, or live data) ──
+# CRITICAL: --delete would wipe server-only paths that aren't in the repo. `.lancedb` is the LIVE
+# embedded vector store (the Brain's knowledge) and `.env*` is runtime config — excluding them keeps
+# --delete from destroying live state on every deploy. NEVER remove these excludes.
 say "Syncing console source"
 rsync -az --delete -e "ssh -i $SSH_KEY" \
   --exclude node_modules --exclude .next --exclude .git \
   --exclude '.env' --exclude '.env.local' --exclude '.env.production' \
+  --exclude '.lancedb' \
   --exclude 'deploy/console.log' --exclude '.claude' \
   "$CONSOLE_DIR/" "${SSH_USER}@${SERVER}:$REMOTE/console/"
 
