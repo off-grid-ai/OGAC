@@ -23,7 +23,7 @@ const TARGETS = [
   ['fleet', 'fleet'],
   ['gateway', 'gateway'],
   ['control', 'control'],
-  ['connectors', 'connectors'],
+  ['data/connectors/con_corebank', 'connectors'],
   ['data', 'data'],
   ['brain', 'brain'],
   ['knowledge', 'knowledge'],
