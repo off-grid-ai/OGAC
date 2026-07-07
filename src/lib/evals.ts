@@ -21,7 +21,10 @@ export interface GoldenCase {
   expected: string;
   suite: string;
   // The pipeline (app) this golden case belongs to. null = an org-wide/shared case (library).
+  // BOTH columns during the app→pipeline re-point: `appId` = legacy (app Quality tab, back-compat);
+  // `pipelineId` = corrected association (pipeline Quality tab). Neither ⇒ an org-wide library case.
   appId: string | null;
+  pipelineId: string | null;
 }
 
 export interface EvalResult {
@@ -76,10 +79,14 @@ export async function ensureEvalsSchema(): Promise<void> {
     // Pipeline-owns-governance: a golden case belongs to a pipeline (app). Self-migrate app_id/org_id
     // (same idempotent pattern) so the raw INSERT/SELECT never references a missing column.
     await db.execute(sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS app_id text;`);
+    await db.execute(sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS pipeline_id text;`);
     await db.execute(
       sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
     );
     await db.execute(sql`CREATE INDEX IF NOT EXISTS golden_cases_app_idx ON golden_cases (app_id);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS golden_cases_pipeline_idx ON golden_cases (pipeline_id);`,
+    );
   })();
   return ensurePromise;
 }
@@ -91,6 +98,7 @@ interface GoldenRow {
   expected: string;
   suite: string | null;
   app_id: string | null;
+  pipeline_id: string | null;
   [k: string]: unknown;
 }
 
@@ -102,21 +110,40 @@ function toGoldenCase(r: GoldenRow): GoldenCase {
     expected: r.expected,
     suite: r.suite ?? 'golden',
     appId: r.app_id ?? null,
+    pipelineId: r.pipeline_id ?? null,
   };
 }
 
-// List golden cases. `appId` filters to a pipeline's golden set; `appId: null` returns the org-wide
-// library cases; omitting it returns ALL (the global view).
-export async function listGoldenCases(appId?: string | null): Promise<GoldenCase[]> {
+const GOLDEN_COLS = sql`id, name, query, expected, suite, app_id, pipeline_id`;
+
+// Filter — associate by the CORRECTED pipeline_id OR the legacy app_id (see EvalDefFilter). A bare
+// string arg is a legacy appId (back-compat with the shipped app Quality tab).
+export interface GoldenFilter {
+  appId?: string | null;
+  pipelineId?: string | null;
+}
+
+function goldenWhere(filter: GoldenFilter) {
+  if (filter.pipelineId !== undefined) {
+    return filter.pipelineId === null
+      ? sql`WHERE pipeline_id IS NULL AND app_id IS NULL`
+      : sql`WHERE pipeline_id = ${filter.pipelineId}`;
+  }
+  if (filter.appId !== undefined) {
+    return filter.appId === null ? sql`WHERE app_id IS NULL` : sql`WHERE app_id = ${filter.appId}`;
+  }
+  return sql``;
+}
+
+// List golden cases. Accepts EITHER the legacy `appId` string|null (back-compat) OR a GoldenFilter.
+// `{pipelineId}` filters to a pipeline's golden set; `{pipelineId:null}` returns the org-wide library;
+// omitting the arg returns ALL (the global view).
+export async function listGoldenCases(arg?: string | null | GoldenFilter): Promise<GoldenCase[]> {
   await ensureEvalsSchema();
-  const where =
-    appId === undefined
-      ? sql``
-      : appId === null
-        ? sql`WHERE app_id IS NULL`
-        : sql`WHERE app_id = ${appId}`;
+  const filter: GoldenFilter =
+    arg === undefined ? {} : arg === null || typeof arg === 'string' ? { appId: arg } : arg;
   const { rows } = await db.execute<GoldenRow>(
-    sql`SELECT id, name, query, expected, suite, app_id FROM golden_cases ${where} ORDER BY created_at DESC;`,
+    sql`SELECT ${GOLDEN_COLS} FROM golden_cases ${goldenWhere(filter)} ORDER BY created_at DESC;`,
   );
   return rows.map(toGoldenCase);
 }
@@ -124,21 +151,32 @@ export async function listGoldenCases(appId?: string | null): Promise<GoldenCase
 export async function getGoldenCase(id: string): Promise<GoldenCase | null> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<GoldenRow>(
-    sql`SELECT id, name, query, expected, suite, app_id FROM golden_cases WHERE id = ${id} LIMIT 1;`,
+    sql`SELECT ${GOLDEN_COLS} FROM golden_cases WHERE id = ${id} LIMIT 1;`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
 
+// Attach a golden case to a pipeline (`pipelineId`) and/or app (`appId`, legacy). Either/both null ⇒
+// an org-wide library case. A bare string arg is a legacy appId (back-compat).
+export interface AddGoldenTarget {
+  appId?: string | null;
+  pipelineId?: string | null;
+}
+
 export async function addGoldenCase(
   draft: GoldenCaseDraft,
-  appId: string | null = null,
+  target: string | null | AddGoldenTarget = null,
 ): Promise<GoldenCase> {
   await ensureEvalsSchema();
+  const t: AddGoldenTarget =
+    target === null || typeof target === 'string' ? { appId: target } : target;
+  const appId = t.appId ?? null;
+  const pipelineId = t.pipelineId ?? null;
   const id = `gc_${randomUUID().slice(0, 6)}`;
   const { rows } = await db.execute<GoldenRow>(
-    sql`INSERT INTO golden_cases (id, name, query, expected, suite, app_id)
-        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite}, ${appId})
-        RETURNING id, name, query, expected, suite, app_id;`,
+    sql`INSERT INTO golden_cases (id, name, query, expected, suite, app_id, pipeline_id)
+        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite}, ${appId}, ${pipelineId})
+        RETURNING ${GOLDEN_COLS};`,
   );
   return toGoldenCase(rows[0]);
 }
@@ -153,7 +191,7 @@ export async function updateGoldenCase(
         SET name = ${draft.name}, query = ${draft.query}, expected = ${draft.expected},
             suite = ${draft.suite}, updated_at = now()
         WHERE id = ${id}
-        RETURNING id, name, query, expected, suite, app_id;`,
+        RETURNING ${GOLDEN_COLS};`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
