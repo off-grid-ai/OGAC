@@ -1,16 +1,19 @@
 'use client';
 
 import {
+  ArrowRight,
   CheckCircle as CircleCheck,
   ProhibitInset as CircleSlash,
   Cloud,
   HardDrives,
+  Pencil,
   Plus,
   Trash,
   WarningCircle,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { GATEWAY_KINDS, type GatewayKind, type GatewayView } from '@/lib/gateways-policy';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
@@ -32,7 +36,7 @@ const KIND_LABEL: Record<string, string> = {
 
 // Honest status → colour + icon. `available` is the strict truth from the server (enabled+configured
 // +reachable); we never invent a green dot the probe didn't earn.
-function statusBadge(gw: GatewayView) {
+export function statusBadge(gw: GatewayView) {
   switch (gw.status) {
     case 'up':
       return (
@@ -67,7 +71,7 @@ function statusBadge(gw: GatewayView) {
   }
 }
 
-function egressBadge(egressClass: string) {
+export function egressBadge(egressClass: string) {
   return egressClass === 'on-prem' ? (
     <Badge variant="secondary" className="bg-primary/10 text-primary">
       <HardDrives className="size-3" /> data stays on-prem
@@ -79,12 +83,27 @@ function egressBadge(egressClass: string) {
   );
 }
 
-function GatewayCard({ gw, onDelete }: { gw: GatewayView; onDelete: (gw: GatewayView) => void }) {
+function GatewayCard({
+  gw,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  gw: GatewayView;
+  onEdit: (gw: GatewayView) => void;
+  onToggle: (gw: GatewayView, enabled: boolean) => void;
+  onDelete: (gw: GatewayView) => void;
+}) {
   return (
     <Card className="flex flex-col shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="min-w-0">
-          <CardTitle className="truncate text-sm">{gw.name}</CardTitle>
+          <Link
+            href={`/gateways/${gw.id}`}
+            className="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
+          >
+            {gw.name}
+          </Link>
           <p className="mt-1 text-xs text-muted-foreground">{KIND_LABEL[gw.kind] ?? gw.kind}</p>
         </div>
         {statusBadge(gw)}
@@ -109,61 +128,110 @@ function GatewayCard({ gw, onDelete }: { gw: GatewayView; onDelete: (gw: Gateway
             <dd className="text-foreground">{gw.detail}</dd>
           </div>
         </dl>
+
+        {/* Enable/disable — a management action, honestly reflected (a disabled gateway is never
+            available even if reachable). */}
+        <div className="flex items-center justify-between border-t pt-2">
+          <Label htmlFor={`gw-enabled-${gw.id}`} className="text-xs text-muted-foreground">
+            Enabled
+          </Label>
+          <Switch
+            id={`gw-enabled-${gw.id}`}
+            checked={gw.enabled}
+            onCheckedChange={(v) => onToggle(gw, v)}
+            aria-label={`${gw.enabled ? 'Disable' : 'Enable'} ${gw.name}`}
+          />
+        </div>
+
         <div className="mt-auto flex items-center justify-between pt-2">
           <span className={gw.available ? 'text-primary' : 'text-muted-foreground'}>
             {gw.available ? 'available' : 'unavailable'}
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => onDelete(gw)}
-          >
-            <Trash className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" asChild>
+              <Link href={`/gateways/${gw.id}`}>
+                Open <ArrowRight className="size-3.5" />
+              </Link>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onEdit(gw)} aria-label={`Edit ${gw.name}`}>
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={() => onDelete(gw)}
+              aria-label={`Delete ${gw.name}`}
+            >
+              <Trash className="size-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function AddGatewaySheet({
+// One create-or-edit sheet, NOT two. When `gateway` is null it's a create; when set it's an edit,
+// PREFILLED and PATCHing that gateway. DRY: a single form, one set of fields, one submit.
+export function GatewayFormSheet({
   open,
   onOpenChange,
   onSaved,
+  gateway,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  /** null ⇒ create; a view ⇒ edit that gateway. */
+  gateway: GatewayView | null;
 }) {
+  const isEdit = gateway !== null;
   const [name, setName] = useState('');
   const [kind, setKind] = useState<GatewayKind>('on-prem');
   const [baseUrl, setBaseUrl] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
+  const [enabled, setEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill from the target gateway whenever it changes / the sheet opens (edit), else reset (create).
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    if (gateway) {
+      setName(gateway.name);
+      setKind((GATEWAY_KINDS as readonly string[]).includes(gateway.kind) ? (gateway.kind as GatewayKind) : 'compat');
+      setBaseUrl(gateway.baseUrl);
+      setDefaultModel(gateway.defaultModel);
+      setEnabled(gateway.enabled);
+    } else {
+      setName('');
+      setKind('on-prem');
+      setBaseUrl('');
+      setDefaultModel('');
+      setEnabled(true);
+    }
+  }, [open, gateway]);
 
   async function save() {
     if (busy) return;
     setError(null);
     setBusy(true);
-    const res = await fetch('/api/v1/admin/gateways', {
-      method: 'POST',
+    const url = isEdit ? `/api/v1/admin/gateways/${gateway!.id}` : '/api/v1/admin/gateways';
+    const res = await fetch(url, {
+      method: isEdit ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, kind, baseUrl, defaultModel }),
+      body: JSON.stringify({ name, kind, baseUrl, defaultModel, enabled }),
     });
     setBusy(false);
     if (res.ok) {
-      toast.success(`Gateway "${name}" created`);
-      setName('');
-      setBaseUrl('');
-      setDefaultModel('');
-      setKind('on-prem');
+      toast.success(isEdit ? `Gateway "${name}" updated` : `Gateway "${name}" created`);
       onOpenChange(false);
       onSaved();
     } else {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? 'Failed to create gateway');
+      setError(body?.error ?? (isEdit ? 'Failed to update gateway' : 'Failed to create gateway'));
     }
   }
 
@@ -173,11 +241,11 @@ function AddGatewaySheet({
     <FormSheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Add gateway"
+      title={isEdit ? 'Edit gateway' : 'Add gateway'}
       description="Register a model-serving endpoint your pipelines can run on. Its egress class is derived from the kind — on-prem keeps data on your fleet; cloud means data leaves."
       footer={
         <Button onClick={save} disabled={busy || !name.trim()} className="w-full">
-          Create gateway
+          {isEdit ? 'Save changes' : 'Create gateway'}
         </Button>
       }
     >
@@ -233,27 +301,69 @@ function AddGatewaySheet({
             onChange={(e) => setDefaultModel(e.target.value)}
           />
         </div>
+        <div className="flex items-center justify-between rounded-md border px-3 py-2">
+          <div>
+            <Label htmlFor="gw-enabled" className="text-sm">
+              Enabled
+            </Label>
+            <p className="text-[11px] text-muted-foreground">
+              A disabled gateway is never available, even if reachable.
+            </p>
+          </div>
+          <Switch id="gw-enabled" checked={enabled} onCheckedChange={setEnabled} />
+        </div>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </div>
     </FormSheet>
   );
 }
 
-// The Gateways registry surface — full-width grid of gateway cards + a URL-driven Add sheet
-// (?panel=new-gateway so Back closes it and it's deep-linkable). Health is honest: the server
-// merged live probes, so an unconfigured OpenAI shows "not configured", never a fake green.
+// The Gateways registry surface — full-width grid of gateway cards + a URL-driven create-or-edit sheet
+// (?panel=new-gateway to add, ?panel=edit-gateway&id=… to edit — so Back closes it and it's
+// deep-linkable). Health is honest: the server merged live probes, so an unconfigured OpenAI shows
+// "not configured", never a fake green.
 export function GatewaysManager({ gateways }: { gateways: GatewayView[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const open = params.get('panel') === 'new-gateway';
+  const panel = params.get('panel');
+  const editId = params.get('id');
+  const creating = panel === 'new-gateway';
+  const editing = panel === 'edit-gateway';
+  const editTarget = editing ? (gateways.find((g) => g.id === editId) ?? null) : null;
 
   const setPanel = useCallback(
-    (value: string | null) => {
-      const qs = withPanelParams(params.toString(), { panel: value });
+    (value: string | null, id?: string | null) => {
+      const qs = withPanelParams(params.toString(), { panel: value, id: id ?? null });
       router.replace(panelHref(pathname, qs), { scroll: false });
     },
     [params, pathname, router],
+  );
+
+  const onEdit = useCallback((gw: GatewayView) => setPanel('edit-gateway', gw.id), [setPanel]);
+
+  const onToggle = useCallback(
+    async (gw: GatewayView, next: boolean) => {
+      // Reuse the edit path — PATCH the full validated shape with the flipped enabled flag.
+      const res = await fetch(`/api/v1/admin/gateways/${gw.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: gw.name,
+          kind: gw.kind,
+          baseUrl: gw.baseUrl,
+          defaultModel: gw.defaultModel,
+          enabled: next,
+        }),
+      });
+      if (res.ok) {
+        toast.success(`Gateway "${gw.name}" ${next ? 'enabled' : 'disabled'}`);
+        router.refresh();
+      } else {
+        toast.error(`Failed to ${next ? 'enable' : 'disable'} gateway`);
+      }
+    },
+    [router],
   );
 
   const onDelete = useCallback(
@@ -295,12 +405,17 @@ export function GatewaysManager({ gateways }: { gateways: GatewayView[] }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {gateways.map((gw) => (
-            <GatewayCard key={gw.id} gw={gw} onDelete={onDelete} />
+            <GatewayCard key={gw.id} gw={gw} onEdit={onEdit} onToggle={onToggle} onDelete={onDelete} />
           ))}
         </div>
       )}
 
-      <AddGatewaySheet open={open} onOpenChange={(o) => !o && setPanel(null)} onSaved={() => router.refresh()} />
+      <GatewayFormSheet
+        open={creating || editing}
+        onOpenChange={(o) => !o && setPanel(null)}
+        onSaved={() => router.refresh()}
+        gateway={editTarget}
+      />
     </div>
   );
 }
