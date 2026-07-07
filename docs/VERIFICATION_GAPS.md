@@ -54,7 +54,11 @@ actually showed, and the fix.)*
 | # | Surface | Looked like | Probe showed | Suggested fix | Status |
 -->
 
-_Sweep in progress — agents probing live; findings land here on completion._
+| # | Surface | Looked like | Probe showed | Suggested fix | Status |
+|---|---|---|---|---|---|
+| S1 | **Brain — new-document ingest** | `POST /api/v1/admin/brain/ingest` and `/brain/documents` both **500** on the live console (2026-07-07 BFSI seed attempt). Retrieval/search of *existing* docs works, but adding NEW knowledge fails. | 500 with empty body; path is `addDocument` → `embed()` → embedded vector-store write. Consistent with the earlier "embedded store is the active one; external inspector unreachable" finding. | Reproduce on the server, capture the embed/vector-write error (find the console log), fix the ingest write path so operators can add knowledge. Blocks seeding Indian BFSI knowledge docs. | 🔴 |
+
+_Other sweep findings (from the doc-deepening agents) still to be consolidated here._
 
 ---
 
