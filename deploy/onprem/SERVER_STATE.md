@@ -81,7 +81,14 @@ After editing `.env.local`, restart the console (see DEPLOY.md).
 Created with the `pg` client because `drizzle-kit push` hangs over SSH. **TODO: add proper
 drizzle migrations** (`drizzle/000X_*.sql`) so a migrate-based deploy reproduces them:
 `studio_templates`, `config_settings`, `config_audit`, `gateway_client_tokens`,
-**`fleet_nodes`** (2026-07-05 — the gateway SSOT; seeded with the 9 live nodes).
+**`fleet_nodes`** (2026-07-05 — the gateway SSOT; seeded with the 9 live nodes),
+**`gateways`** (2026-07-08 — Gateways × Pipelines P1: the registry of model-serving endpoints a
+pipeline runs on. Applied live via `deploy/onprem/2026-gateways.sql`; ALSO self-creates via
+`ensureGatewaysSchema()` in `src/lib/gateways.ts`. Seeded with the 4 sample gateways — On-Prem
+Cluster / OpenAI / Anthropic / OpenRouter — for org `default` AND `org_bharat` (stable ids
+`gw_seed_<org>_<key>`, `ON CONFLICT DO NOTHING`). `egress_class` derived from `kind`
+(on-prem⇒on-prem, cloud kinds⇒cloud). Availability is NOT stored — merged live from the aggregator
++ cloud-providers probe at read time).
 DDL for each is in `src/db/schema.ts`; the create statements used are in git history / DEPLOY.md.
 
 Self-creating tables (via `CREATE TABLE IF NOT EXISTS` on first use — no manual/migration step, deploy over SSH just works): `guardrails_rules`, and (2026-07-05, DEEP Presidio guardrails) **`presidio_recognizers`** (org-scoped custom recognizers: regex-pattern + context words, or deny-list terms — pushed to Presidio `/analyze` as `ad_hoc_recognizers`) and **`presidio_thresholds`** (per-org global + per-entity `score_threshold`). DDL in `src/lib/presidio-recognizers.ts` (`ensureRecognizersSchema`).
