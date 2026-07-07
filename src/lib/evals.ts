@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { goldenCases } from '@/db/schema';
 import { searchDocuments } from '@/lib/brain';
 import { type GoldenCaseDraft } from '@/lib/evals-golden';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Evals over the Brain — a golden set of {query → expected source} run against retrieval,
 // scored as recall (did the expected doc surface in top-k). Decoupled: reads the Brain only
@@ -64,6 +65,12 @@ export async function ensureEvalsSchema(): Promise<void> {
     await db.execute(
       sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS engine text NOT NULL DEFAULT 'golden';`,
     );
+    // T2 multi-tenant org-scoping: self-migrate org_id (same idempotent pattern) so the raw
+    // INSERT/SELECT here never references a missing column, even before the migration SQL is applied.
+    await db.execute(
+      sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS eval_runs_org_idx ON eval_runs (org_id);`);
   })();
   return ensurePromise;
 }
@@ -157,40 +164,46 @@ function toEvalRun(r: EvalRunRow): EvalRun {
   };
 }
 
-export async function listEvalRuns(limit = 10): Promise<EvalRun[]> {
+// Org-scoped: a tenant's eval history/rollup only ever includes its own runs. org_id lives on
+// eval_runs (see src/db/schema.ts) and is filtered here + stamped on insert below.
+export async function listEvalRuns(limit = 10, orgId: string = DEFAULT_ORG): Promise<EvalRun[]> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<EvalRunRow>(
     sql`SELECT id, engine, score, total, passed, started_at, results
-        FROM eval_runs ORDER BY started_at DESC LIMIT ${limit};`,
+        FROM eval_runs WHERE org_id = ${orgId} ORDER BY started_at DESC LIMIT ${limit};`,
   );
   return rows.map(toEvalRun);
 }
 
-// A single eval run by id — the per-case drilldown (Observability → eval detail).
-export async function getEvalRun(id: string): Promise<EvalRun | null> {
+// A single eval run by id — the per-case drilldown (Observability → eval detail). Scoped to the
+// caller's org so run ids from another tenant resolve to null.
+export async function getEvalRun(id: string, orgId: string = DEFAULT_ORG): Promise<EvalRun | null> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<EvalRunRow>(
     sql`SELECT id, engine, score, total, passed, started_at, results
-        FROM eval_runs WHERE id = ${id} LIMIT 1;`,
+        FROM eval_runs WHERE id = ${id} AND org_id = ${orgId} LIMIT 1;`,
   );
   return rows[0] ? toEvalRun(rows[0]) : null;
 }
 
 // Persist a scored run from any evals adapter (golden persists in-process via runEval below;
 // promptfoo/ragas hand their EvalRunResult here so they too land in the per-engine rollup).
-export async function recordEvalRun(run: {
-  id: string;
-  engine: string;
-  score: number;
-  total: number;
-  passed: number;
-  results?: EvalResult[];
-}): Promise<void> {
+export async function recordEvalRun(
+  run: {
+    id: string;
+    engine: string;
+    score: number;
+    total: number;
+    passed: number;
+    results?: EvalResult[];
+  },
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
   await ensureEvalsSchema();
   const results = run.results ? JSON.stringify(run.results) : null;
   await db.execute(
-    sql`INSERT INTO eval_runs (id, engine, score, total, passed, results)
-        VALUES (${run.id}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb);`,
+    sql`INSERT INTO eval_runs (id, org_id, engine, score, total, passed, results)
+        VALUES (${run.id}, ${orgId}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb);`,
   );
 }
 
@@ -209,7 +222,7 @@ async function evalCase(c: GoldenCase): Promise<EvalResult> {
   };
 }
 
-export async function runEval(): Promise<EvalRun> {
+export async function runEval(orgId: string = DEFAULT_ORG): Promise<EvalRun> {
   await ensureEvalsSchema();
   const cases = await listGoldenCases();
   const results: EvalResult[] = [];
@@ -220,7 +233,7 @@ export async function runEval(): Promise<EvalRun> {
   const total = results.length;
   const score = total ? Math.round((passed / total) * 100) : 0;
   const id = `eval_${randomUUID().slice(0, 6)}`;
-  await recordEvalRun({ id, engine: 'golden', score, total, passed, results });
-  const run = await getEvalRun(id);
+  await recordEvalRun({ id, engine: 'golden', score, total, passed, results }, orgId);
+  const run = await getEvalRun(id, orgId);
   return run ?? { id, engine: 'golden', score, total, passed, startedAt: iso(new Date()), results };
 }

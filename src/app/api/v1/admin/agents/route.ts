@@ -3,16 +3,18 @@ import { agentActivity, listAllAgents } from '@/lib/agents';
 import { parseCreateInput } from '@/lib/agent-form';
 import { requireAdmin } from '@/lib/authz';
 import { createCustomAgent } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // The catalog (built-ins + user-authored) + derived fleet activity. Agents are adoptable
 // standalone; the `planes` each declares lets a tenant see what it needs provisioned.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
+  const orgId = await currentOrgId();
   return NextResponse.json({
     object: 'list',
-    data: await listAllAgents(),
-    activity: await agentActivity(),
+    data: await listAllAgents(orgId),
+    activity: await agentActivity(orgId),
   });
 }
 
@@ -31,5 +33,5 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json(await createCustomAgent(input), { status: 201 });
+  return NextResponse.json(await createCustomAgent(input, await currentOrgId()), { status: 201 });
 }

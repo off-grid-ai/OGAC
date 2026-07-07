@@ -79,7 +79,7 @@ function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('agents');
   const { id } = await params;
-  const agent = await resolveAgent(id);
+  const agent = await resolveAgent(id, await currentOrgId());
   if (!agent) notFound();
   // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
   const runs = await listAgentRunsByAgent(id, 8).catch(() => []);

@@ -46,10 +46,10 @@ export default async function BrainPage({
   const [docs, cases, runs, datasets, tools, promptList] = await Promise.all([
     listDocuments(),
     listGoldenCases(),
-    listEvalRuns(1),
+    listEvalRuns(1, org),
     listDatasets(org),
     listTools(org),
-    listPrompts(),
+    listPrompts(org),
   ]);
   const latest = runs[0];
   const datasetOpts = datasets.map((d) => ({ id: d.id, name: d.name }));

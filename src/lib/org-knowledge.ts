@@ -1,7 +1,8 @@
-import { desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { orgKnowledgeChunks, orgKnowledgeCollections, orgKnowledgeDocs } from '@/db/schema';
-import { effectiveBaseRole } from '@/lib/module-access';
+import { effectiveBaseRole } from '@/lib/role-permissions';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Organization-wide knowledge base — the on-prem answer to "Ask Your Org" / "Company Knowledge".
 // An admin-curated shared corpus, indexed once via the gateway's /v1/embeddings (384-dim MiniLM),
@@ -43,6 +44,15 @@ async function ensureSchema(): Promise<void> {
   // deploy needs no separate migration step — matches the CREATE-IF-NOT-EXISTS pattern above.
   await db.execute(sql`ALTER TABLE org_knowledge_docs ADD COLUMN IF NOT EXISTS file_url text;`);
   await db.execute(sql`ALTER TABLE org_knowledge_docs ADD COLUMN IF NOT EXISTS mime text;`);
+  // T2 multi-tenant org-scoping: the collection carries the tenant boundary; docs/chunks inherit it
+  // through their collection. Self-migrated (same pattern) so the store's org filter never queries a
+  // missing column, whether the table pre-existed the T2 change or is created fresh here.
+  await db.execute(
+    sql`ALTER TABLE org_knowledge_collections ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS org_knowledge_collections_org_idx ON org_knowledge_collections (org_id);`,
+  );
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -105,27 +115,34 @@ async function roleIdentities(role: string): Promise<string[]> {
   return Array.from(new Set([role, base]));
 }
 
-// List collections visible to a role. Admins see all; others see only permitted collections.
-// Custom roles inherit their based_on role's allow-list grants.
-export async function listCollections(role: string): Promise<OrgCollection[]> {
+// List collections visible to a role, WITHIN the caller's org. Two layers of scoping: org isolation
+// (a tenant never sees another org's collections) then role permission (admins see all of their
+// org's; others see only permitted ones). Custom roles inherit their based_on role's grants.
+export async function listCollections(
+  role: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<OrgCollection[]> {
   await ensureSchema();
   const identities = await roleIdentities(role);
   const rows = await db
     .select()
     .from(orgKnowledgeCollections)
+    .where(eq(orgKnowledgeCollections.orgId, orgId))
     .orderBy(desc(orgKnowledgeCollections.createdAt));
   return rows.filter((c) => roleMayAccess(identities, c.allowedRoles));
 }
 
-// Admin-only: create a curated collection with an optional role allow-list.
+// Admin-only: create a curated collection for the caller's org with an optional role allow-list.
 export async function createCollection(
   createdBy: string,
   input: { name: string; description?: string; allowedRoles?: string[] },
+  orgId: string = DEFAULT_ORG,
 ): Promise<string> {
   await ensureSchema();
   const id = rid();
   await db.insert(orgKnowledgeCollections).values({
     id,
+    orgId,
     name: String(input.name).slice(0, 200),
     description: String(input.description ?? ''),
     allowedRoles: Array.isArray(input.allowedRoles) ? input.allowedRoles : [],
@@ -134,25 +151,39 @@ export async function createCollection(
   return id;
 }
 
-export async function getCollection(id: string): Promise<OrgCollection | null> {
+// Get a collection, constrained to the caller's org — a user in org A can never read org B's row.
+export async function getCollection(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<OrgCollection | null> {
   await ensureSchema();
   const [row] = await db
     .select()
     .from(orgKnowledgeCollections)
-    .where(eq(orgKnowledgeCollections.id, id))
+    .where(and(eq(orgKnowledgeCollections.id, id), eq(orgKnowledgeCollections.orgId, orgId)))
     .limit(1);
   return row ?? null;
 }
 
-export async function deleteCollection(id: string): Promise<void> {
+export async function deleteCollection(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureSchema();
+  // Only touch the collection (and cascade its docs/chunks) when it's the caller's own.
+  const [own] = await db
+    .select({ id: orgKnowledgeCollections.id })
+    .from(orgKnowledgeCollections)
+    .where(and(eq(orgKnowledgeCollections.id, id), eq(orgKnowledgeCollections.orgId, orgId)))
+    .limit(1);
+  if (!own) return;
   await db.delete(orgKnowledgeChunks).where(eq(orgKnowledgeChunks.collectionId, id));
   await db.delete(orgKnowledgeDocs).where(eq(orgKnowledgeDocs.collectionId, id));
   await db.delete(orgKnowledgeCollections).where(eq(orgKnowledgeCollections.id, id));
 }
 
-export async function listDocuments(collectionId: string) {
+// Documents inherit their collection's org — list them only when the collection is the caller's.
+export async function listDocuments(collectionId: string, orgId: string = DEFAULT_ORG) {
   await ensureSchema();
+  const col = await getCollection(collectionId, orgId);
+  if (!col) return [];
   return db
     .select({
       id: orgKnowledgeDocs.id,
@@ -176,8 +207,12 @@ export async function addDocument(
   // Reference to the original uploaded file in SeaweedFS (the single file-storage layer), so
   // the user can view/download what they uploaded. Omitted for docs added as raw pasted text.
   file?: { url: string; mime: string },
+  orgId: string = DEFAULT_ORG,
 ): Promise<{ id: string; chunks: number }> {
   await ensureSchema();
+  // Parent-scope guard: refuse to index into a collection that isn't the caller's org.
+  const col = await getCollection(collectionId, orgId);
+  if (!col) throw new Error('collection not found');
   const docId = rid();
   const pieces = chunkText(content);
   const vectors = await embed(pieces);
@@ -205,8 +240,18 @@ export async function addDocument(
   return { id: docId, chunks: pieces.length };
 }
 
-export async function deleteDocument(docId: string): Promise<void> {
+export async function deleteDocument(docId: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureSchema();
+  // The doc has no org column — resolve its collection and verify that collection is the caller's
+  // org before deleting, so a tenant can't delete another org's document by guessing its id.
+  const [doc] = await db
+    .select({ collectionId: orgKnowledgeDocs.collectionId })
+    .from(orgKnowledgeDocs)
+    .where(eq(orgKnowledgeDocs.id, docId))
+    .limit(1);
+  if (!doc) return;
+  const col = await getCollection(doc.collectionId, orgId);
+  if (!col) return;
   await db.delete(orgKnowledgeChunks).where(eq(orgKnowledgeChunks.docId, docId));
   await db.delete(orgKnowledgeDocs).where(eq(orgKnowledgeDocs.id, docId));
 }
@@ -226,9 +271,12 @@ export async function retrieve(
   query: string,
   role: string,
   topK = 6,
+  orgId: string = DEFAULT_ORG,
 ): Promise<{ context: string; citations: Citation[] }> {
   await ensureSchema();
-  const collections = await listCollections(role);
+  // listCollections already double-scopes by org + role, so the allowedIds below can only ever be
+  // this org's collections — the chunk search can never reach another tenant's knowledge.
+  const collections = await listCollections(role, orgId);
   if (!collections.length) return { context: '', citations: [] };
   const allowedIds = collections.map((c) => c.id);
   const colNames = new Map(collections.map((c) => [c.id, c.name]));

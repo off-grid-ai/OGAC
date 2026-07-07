@@ -3,6 +3,7 @@ import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
 import { listEvalRuns } from '@/lib/evals';
 import { scoringConfigured } from '@/lib/qa/scoring';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Agent-QA summary — one call that answers "are the agents still doing a good job?": the latest
 // offline eval score, the drift/degradation verdict, and whether online scoring is live. Drives
@@ -10,9 +11,10 @@ import { scoringConfigured } from '@/lib/qa/scoring';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
+  const orgId = await currentOrgId();
   const [runs, drift, onlineEnabled] = await Promise.all([
-    listEvalRuns(5),
-    getDrift().analyze(),
+    listEvalRuns(5, orgId),
+    getDrift().analyze({ orgId }),
     getFlags().isEnabled('online-evals', true),
   ]);
   const latest = runs[0];

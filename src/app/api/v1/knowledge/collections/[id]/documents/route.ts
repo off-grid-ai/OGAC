@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { publicUrlFor, saveFile } from '@/lib/files';
 import { addDocument, getCollection, listDocuments } from '@/lib/org-knowledge';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -15,11 +16,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
-  const col = await getCollection(id);
+  const orgId = await currentOrgId();
+  const col = await getCollection(id, orgId);
   if (!col) return NextResponse.json({ error: 'not found' }, { status: 404 });
   if (!mayAccess(session.user.role ?? 'viewer', col.allowedRoles))
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  return NextResponse.json({ documents: await listDocuments(id) });
+  return NextResponse.json({ documents: await listDocuments(id, orgId) });
 }
 
 // Index a document into the collection: chunk → embed (gateway) → store. Admin-only (curated).
@@ -30,7 +32,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (session.user.role !== 'admin')
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { id } = await params;
-  const col = await getCollection(id);
+  const orgId = await currentOrgId();
+  const col = await getCollection(id, orgId);
   if (!col) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   // Two intake shapes:
@@ -70,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!String(content).trim())
     return NextResponse.json({ error: 'empty document' }, { status: 400 });
   try {
-    return NextResponse.json(await addDocument(id, String(name), String(content), file));
+    return NextResponse.json(await addDocument(id, String(name), String(content), file, orgId));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }
