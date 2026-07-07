@@ -12,6 +12,8 @@ export const governSection: DocSection = {
 it is the path every request takes. Each piece below is a surface you operate, not a dashboard you
 watch.
 
+![Governance in one place — policy, guardrails, egress, and audit search you operate, not just watch](/docs-shots/control.png)
+
 - **[Control](/docs/guides/control)** — the control room: egress, routing, policy, users, audit search.
 - **[Policy](/docs/guides/policy)** — attribute-based access, deny by default.
 - **[Guardrails](/docs/guides/guardrails)** — PII detection and masking on every prompt.
@@ -118,6 +120,8 @@ leaves and recorded in the audit trail. Every verdict is logged against the requ
       description: 'Users, roles, and machine clients through your identity provider.',
       body: `Access is one identity model across every surface, backed by Keycloak.
 
+![Access — users, roles, machine clients, and sessions under one identity model](/docs-shots/access.png)
+
 ## Users & roles
 
 Manage users and their roles from the **Access** page. Roles map to module capabilities, so a role
@@ -162,6 +166,8 @@ These write straight through to your Keycloak realm via a service account grante
       body: `Secrets keeps sensitive values — connector credentials, virtual-key secrets, signing keys —
 out of code and configuration.
 
+![Secrets — connector credentials and signing keys held in a vault, write-only from the console](/docs-shots/secrets.png)
+
 ## How it works
 
 The default store is the process environment. For production, set the secrets adapter to **OpenBao**
@@ -201,6 +207,8 @@ On the **Provenance** page, verify a signed artifact and see its manifest.`,
       description: 'A governance registry and one-click compliance exports.',
       body: `Regulatory is the org-level wrapper around the technical controls — the record a DPO or
 compliance officer maintains.
+
+![Regulatory — a governance registry and signed, one-click compliance exports](/docs-shots/regulatory.png)
 
 ## The governance registry
 
