@@ -127,6 +127,7 @@ export const goldenCases = pgTable('golden_cases', {
 
 export const evalRuns = pgTable('eval_runs', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   score: integer('score').notNull().default(0),
   total: integer('total').notNull().default(0),
   passed: integer('passed').notNull().default(0),
@@ -171,6 +172,7 @@ export const featureFlags = pgTable('feature_flags', {
 // ─── Prompt registry (templates + versioning) ─────────────────────────────────
 export const prompts = pgTable('prompts', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   latestVersion: integer('latest_version').notNull().default(0),
@@ -261,6 +263,7 @@ export const routingRules = pgTable('routing_rules', {
 // steers composition; `model` ('' = gateway default + routing rules decide).
 export const customAgents = pgTable('custom_agents', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   role: text('role').notNull().default('Custom'),
   description: text('description').notNull().default(''),
@@ -481,6 +484,7 @@ export const chatChunks = pgTable('chat_chunks', {
 // permits). Parallel to the per-project chat RAG tables above. See lib/org-knowledge.ts.
 export const orgKnowledgeCollections = pgTable('org_knowledge_collections', {
   id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   // allowedRoles empty = every authenticated user may retrieve; otherwise role must be listed.
