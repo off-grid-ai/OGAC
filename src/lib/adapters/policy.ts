@@ -1,6 +1,21 @@
 import { evaluateAbac } from '@/lib/store';
+import { recordDecision } from '@/lib/policy-decision-log';
 import { POLICY } from './services';
-import type { PolicyInput, PolicyPort } from './types';
+import type { PolicyDecision, PolicyInput, PolicyPort } from './types';
+
+// Mirror every enforcement decision into the read-back log so the Policy/Control surface shows a
+// real decision history (see policy-decision-log.ts). Best-effort; never affects the decision.
+function record(input: PolicyInput, decision: PolicyDecision): PolicyDecision {
+  recordDecision({
+    allow: decision.allow,
+    engine: decision.engine,
+    reason: decision.reason,
+    role: input.role,
+    resource: input.resource,
+    attributes: input.attributes,
+  });
+  return decision;
+}
 
 // Access decisions behind one port. The first-party adapter evaluates the in-console ABAC rules
 // (deny-overrides); the OPA adapter delegates to a Rego decision API. Selected via
@@ -24,7 +39,9 @@ async function firstPartyDecision(input: PolicyInput) {
 
 export const firstPartyPolicy: PolicyPort = {
   meta: metaOf('abac'),
-  evaluate: firstPartyDecision,
+  async evaluate(input) {
+    return record(input, await firstPartyDecision(input));
+  },
 };
 
 interface OpaResponse {
@@ -35,7 +52,7 @@ export const opaPolicy: PolicyPort = {
   meta: metaOf('opa'),
   async evaluate(input) {
     const url = env.OFFGRID_OPA_URL;
-    if (!url) return firstPartyDecision(input);
+    if (!url) return record(input, await firstPartyDecision(input));
     try {
       const res = await fetch(`${url}/v1/data/offgrid/authz`, {
         method: 'POST',
@@ -46,10 +63,14 @@ export const opaPolicy: PolicyPort = {
       if (!res.ok) throw new Error(`opa ${res.status}`);
       const body = (await res.json()) as OpaResponse;
       const allow = Boolean(body.result?.allow);
-      return { allow, reason: `OPA decision (offgrid/authz): ${allow}`, engine: 'opa' };
+      return record(input, {
+        allow,
+        reason: `OPA decision (offgrid/authz): ${allow}`,
+        engine: 'opa',
+      });
     } catch {
       // OPA down → fall back to the in-console engine rather than fail closed unexpectedly.
-      return firstPartyDecision(input);
+      return record(input, await firstPartyDecision(input));
     }
   },
 };
