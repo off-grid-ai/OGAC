@@ -20,13 +20,26 @@ export function ErasureForm() {
         body: JSON.stringify({ subject }),
       });
       if (!res.ok) throw new Error('failed');
-      const data = await res.json();
-      toast.success(
-        `Erasure queued for ${subject} · propagates across ${data.propagatesTo} sensitive datasets`,
-      );
+      const data = (await res.json()) as {
+        status?: string;
+        erasedRows?: number;
+        results?: { store: string; deleted: number }[];
+        deferred?: string[];
+      };
+      const rows = data.erasedRows ?? 0;
+      const stores = (data.results ?? []).filter((r) => r.deleted > 0).length;
+      const deferred = data.deferred?.length ?? 0;
+      const detail =
+        `${rows} row${rows === 1 ? '' : 's'} erased across ${stores} store${stores === 1 ? '' : 's'}` +
+        (deferred ? ` · ${deferred} store${deferred === 1 ? '' : 's'} deferred (see docs)` : '');
+      if (data.status === 'partial') {
+        toast.warning(`Partial erasure for ${subject} · ${detail}`);
+      } else {
+        toast.success(`Erased ${subject} · ${detail}`);
+      }
       setSubject('');
     } catch {
-      toast.error('Failed to queue erasure');
+      toast.error('Failed to erase subject');
     } finally {
       setBusy(false);
     }
