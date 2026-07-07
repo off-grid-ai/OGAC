@@ -51,6 +51,13 @@ export interface PipelineOverviewData {
     evalsAttached: number;
     goldenCases: number;
   };
+  /** Consumers bound to this pipeline (apps/agents + chat projects) + chat-default/allowlist flags. */
+  consumers: {
+    apps: { id: string; title: string; published: boolean }[];
+    projects: { id: string; name: string }[];
+    isOrgDefaultChat: boolean;
+    inChatAllowlist: boolean;
+  };
   /** Recent version history (newest first, capped). */
   recentVersions: { id: string; version: number; note: string; createdAt: string | null; createdBy: string }[];
 }
@@ -305,18 +312,78 @@ export function PipelineOverview({ pipeline: p }: { pipeline: PipelineOverviewDa
           )}
         </SectionCard>
 
-        {/* Consumers — honest empty state (binding comes from an app/agent/chat) */}
+        {/* Consumers — LIVE (apps/agents bound + chat projects that pin it + chat-default flags) */}
         <SectionCard
           title="Consumers"
           icon={<Plugs className="size-4 text-primary" />}
           href={href('api')}
           linkLabel="API tab"
         >
-          <p className="text-xs text-muted-foreground">
-            Nothing consumes this pipeline yet. Apps, agents, and chat bind to a pipeline from their own
-            surface; external callers use a provisioned key from the API tab. Bound consumers will list
-            here.
-          </p>
+          {(() => {
+            const { apps, projects, isOrgDefaultChat, inChatAllowlist } = p.consumers;
+            const total =
+              apps.length + projects.length + (isOrgDefaultChat || inChatAllowlist ? 1 : 0);
+            if (total === 0) {
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Nothing consumes this pipeline yet. Bind it from an app/agent&apos;s &quot;Runs on&quot;
+                  selector, pin it on a chat project, or make it the org-default chat pipeline in Admin.
+                  External callers use a provisioned key from the API tab.
+                </p>
+              );
+            }
+            return (
+              <div className="space-y-3 text-xs">
+                {(isOrgDefaultChat || inChatAllowlist) && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {isOrgDefaultChat ? (
+                      <Badge variant="secondary" className="bg-primary/10 text-primary">
+                        org-default chat
+                      </Badge>
+                    ) : null}
+                    {inChatAllowlist ? (
+                      <Badge variant="outline">available for chat</Badge>
+                    ) : null}
+                  </div>
+                )}
+                {apps.length > 0 && (
+                  <div>
+                    <div className="mb-1 uppercase tracking-wide text-muted-foreground">
+                      Apps &amp; agents ({apps.length})
+                    </div>
+                    <ul className="space-y-1">
+                      {apps.map((a) => (
+                        <li key={a.id} className="flex items-center justify-between gap-2">
+                          <Link href={`/apps/${a.id}`} className="truncate text-primary hover:underline">
+                            {a.title || a.id}
+                          </Link>
+                          {a.published ? (
+                            <Badge variant="outline" className="shrink-0">live</Badge>
+                          ) : (
+                            <Badge variant="outline" className="shrink-0 text-muted-foreground">draft</Badge>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {projects.length > 0 && (
+                  <div>
+                    <div className="mb-1 uppercase tracking-wide text-muted-foreground">
+                      Chat projects ({projects.length})
+                    </div>
+                    <ul className="space-y-1">
+                      {projects.map((pr) => (
+                        <li key={pr.id} className="truncate text-foreground">
+                          {pr.name || pr.id}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </SectionCard>
 
         {/* Identity / meta */}

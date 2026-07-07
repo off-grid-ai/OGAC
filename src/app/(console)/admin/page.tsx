@@ -4,6 +4,7 @@ import { AddCustomRoleButton } from '@/components/admin/AddCustomRoleButton';
 import { AddTenantButton } from '@/components/admin/AddTenantButton';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { FlagToggle } from '@/components/admin/FlagToggle';
+import { OrgChatPipelineEditor } from '@/components/admin/OrgChatPipelineEditor';
 import { OrgInstructionsEditor } from '@/components/admin/OrgInstructionsEditor';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +18,11 @@ import {
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { tenantHost, tenantUrl } from '@/lib/tenant-domain';
+import { currentOrgId } from '@/lib/tenancy';
 import {
+  getChatBindingGovernance,
   getOrgSystemPrompt,
   listAbacRules,
   listCustomRoles,
@@ -46,15 +50,20 @@ function labelOf(id: string): string {
 
 export default async function AdminPage() {
   await requireModuleForUser('admin');
-  const [tenants, rules, bindings, flags, orgPrompt, customRoles] = await Promise.all([
-    listTenants(),
-    listAbacRules(),
-    listBindings(true),
-    listFlags(),
-    getOrgSystemPrompt(),
-    listCustomRoles(),
-  ]);
+  const orgId = await currentOrgId();
+  const [tenants, rules, bindings, flags, orgPrompt, customRoles, chatBinding, pipelines] =
+    await Promise.all([
+      listTenants(),
+      listAbacRules(),
+      listBindings(true),
+      listFlags(),
+      getOrgSystemPrompt(),
+      listCustomRoles(),
+      getChatBindingGovernance(),
+      listPipelines(orgId).catch(() => []),
+    ]);
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
+  const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name }));
 
   return (
     <div className="space-y-6">
@@ -68,6 +77,26 @@ export default async function AdminPage() {
         </CardHeader>
         <CardContent>
           <OrgInstructionsEditor initial={orgPrompt} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Chat pipeline governance</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Bind chat to a governed pipeline. Set the org-default pipeline every chat runs on, and the
+            set of pipelines a user may pin per-project — users can only pick from this set, so every
+            message is a governed run (policy, guardrails, observability, cost).
+          </p>
+        </CardHeader>
+        <CardContent>
+          <OrgChatPipelineEditor
+            initial={{
+              defaultChatPipelineId: chatBinding.defaultChatPipelineId,
+              allowlist: chatBinding.allowlist,
+            }}
+            pipelines={pipelineOptions}
+          />
         </CardContent>
       </Card>
 
