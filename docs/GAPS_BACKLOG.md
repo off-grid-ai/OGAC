@@ -542,3 +542,18 @@ typed `locked|default`; pipeline may only tighten a locked one).
 | PA-11 | **Public pipeline run route doesn't fully EXECUTE.** `POST /api/v1/pipeline/[id]/run` does REAL key-auth + the governed routing/egress decision (block honored + audited) but returns a governed plan/echo (202) — pipelines have no standalone executor (apps run via `submitAppRun`). | Dispatch the resolved gateway/model on the governed decision + apply output guardrail masking, so an external key call actually invokes the model. | console | M |
 | PA-12 | **Telemetry not pipeline-tagged at the source.** Langfuse traces + `eval_runs` aren't stamped with the pipeline id, so per-pipeline Observability/Drift is best-effort over a recent window (Cost/Audit filter correctly via the run tag). | Stamp run traces + eval_runs with `pipeline:<id>` so the Observability + Drift lenses are exact, not best-effort. | console | M |
 | PA-13 | Cosmetic: revoked "audit-test-key" rows linger on the Loan Underwriting seed pipeline (from live audit). Harmless (revoked). | Optionally purge on next seed refresh. | console | XS |
+
+## Live-audit round 2 (2026-07-08) — findings + resolutions
+
+- **S3 tenant-subdomain 404 — RESOLVED.** Not a Cloudflare/app bug: a stale duplicate cloudflared
+  replica served a config without the wildcard ingress. Killed it; single current replica remains.
+  `bharatunion-onprem-console` verified 15/15 → 200. (See SERVER_STATE.md 2026-07-08.)
+- **PA-14 org-settings admin gate — RESOLVED.** The chat-binding PUT double-gated (requireAdmin + a
+  redundant `auth()` session role check) and rejected the service bearer token every other admin route
+  accepts, so the write silently failed for non-session callers. Dropped the redundant check; verified
+  the chat-binding PUT now persists (default + allowlist round-trip live).
+
+| # | Gap | What to do | Owner | Effort |
+|---|-----|-----------|-------|--------|
+| PA-15 | **Per-tenant gateway URLs** — `<slug5><rand5>-gateway.getoffgridai.co` per provisioned tenant gateway (mirrors `gateway.getoffgridai.co`). | Pure host helper (done) + store the host on the gateway; add `*-gateway.getoffgridai.co → :8800` tunnel ingress above the wildcard (verify cloudflared pattern support); aggregator resolves tenant from Host. Supervised tunnel edit. | console + infra | M |
+| PA-16 | **Consumer-run governance ENFORCEMENT** — apps/agents/chat now BIND + run-tag a pipeline, but the executor doesn't yet gate each run against the bound pipeline's policy/guardrails/data-allowlist. | Wire the resolved pipeline contract into the app/agent/chat run path (deeper run-path integration). | console | M |
