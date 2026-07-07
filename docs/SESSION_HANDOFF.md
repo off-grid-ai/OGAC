@@ -39,8 +39,22 @@ deployed, and LIVE-AUDITED (real write flows + screenshots):
   render as pipeline-filtered lenses.
 Screenshot harness: `scripts/shoot-pipelines.mjs` (logs in via username/password form, wide+light).
 
-**IN FLIGHT NOW:** CONSUMERS-BIND (task #166) — apps/agents/chat bind a pipeline; makes the Overview
-Consumers section live. Single background agent (sequential, token-safe).
+**CONSUMERS-BIND (#166) ✅ merged + deployed + verified** — apps/agents/chat/projects bind a pipeline;
+Studio "Runs on" selector; admin-sets-available + user-picks-per-project chat binding; live Consumers
+section; run-tagging. Migration `2026-pipeline-consumers-2.sql` applied live. Verified: chat-binding
+PUT persists (default + allowlist round-trip). Fixed **PA-14** in the audit (org-settings PUT
+double-gated admin → rejected service token; now aligned to requireAdmin). PA-16 (run-path governance
+ENFORCEMENT of the bound pipeline) is deferred + logged.
+
+**TENANT SUBDOMAIN 404 — FIXED (2026-07-08).** Root cause = a stale duplicate cloudflared replica
+(Jul 3) serving a config without the wildcard ingress; killed it, single current replica remains (no
+downtime). `bharatunion-onprem-console` 15/15 → 200. See SERVER_STATE.md + cloudflared-tunnel.yml
+(re-synced). PA-15 (per-tenant GATEWAY URLs `<slug5><rand5>-gateway.<apex>`) — pure host helper built +
+tested (`tenantGatewayHost`); tunnel-ingress + aggregator wiring deferred (supervised tunnel edit).
+
+**IN FLIGHT NOW:** QA/platform-integration + user-docs sweep for the Pipelines × Gateways surfaces
+(operating-model cadence). Nothing else running. NEXT candidates: PA-16 (consumer-run enforcement),
+PA-11 (public run execution), PA-12 (telemetry pipeline-tagging), PA-15 gateway-URL wiring.
 
 **THE MERGE GATE IS A LIVE USABILITY AUDIT (founder: "don't give me half-assed stuff", "make sure it's
 actually usable", "audit it"):** do NOT merge on green build alone. For each agent: exercise the real
