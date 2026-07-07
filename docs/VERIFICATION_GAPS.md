@@ -63,6 +63,13 @@ actually showed, and the fix.)*
 
 _Other sweep findings (from the doc-deepening agents) still to be consolidated here._
 
+## Phase D — big integrations (2026-07-07)
+
+| # | Surface | State | Detail |
+|---|---|---|---|
+| D1 | **Temporal durable agent runs (#12)** | 🟢 code + 🟡 prod-flag | 3 inline agent-run trigger routes now go through the durable dispatch seam; injectable-deps SOLID seam + 7 tests; verified live via a manual worker (`mode:durable`, workflow COMPLETED). Code deployed. **Off in prod** until the infra flip: set `OFFGRID_QUEUE_ENABLED=1` + bootstrap the `co.getoffgridai.agent-worker` plist + restart console. Honest inline degradation until then. |
+| D2 | **Cloud-provider model routing (#26)** | 🟢 LIVE-verified | Console `cloud-*.ts` forwards `public`→cloud through a configured OpenAI-compatible provider; governance invariants (PII/block/egress-off never reach cloud) enforced in a pure chokepoint + tested; cost→FinOps + egress→audit. **Wired live** via OpenRouter as the `compat` provider: `/api/v1/gateway/providers` → compat `configured/up/200/available`. Full `public`→cloud chat completion to capture in Phase F (browser session). |
+
 ## Bharat Union Bank tenant epic (2026-07-07)
 
 | # | Surface | State | Detail | Status |
