@@ -20,7 +20,7 @@ export default async function StudioNewPage() {
 
   const [ctx, agents] = await Promise.all([
     getOrgContext(orgId),
-    listManagedAgents().catch(() => []),
+    listManagedAgents(orgId).catch(() => []),
   ]);
 
   const summary = summarizeOrgContext(ctx);

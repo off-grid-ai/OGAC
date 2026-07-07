@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getEvalDef } from '@/lib/eval-defs';
 import { runEvalDef } from '@/lib/eval-runner';
 import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const def = await getEvalDef(id);
   if (!def) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  const result = await runEvalDef(def);
+  const result = await runEvalDef(def, await currentOrgId());
   return NextResponse.json(result, { status: 201 });
 }

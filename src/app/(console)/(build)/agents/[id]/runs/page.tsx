@@ -14,6 +14,7 @@ import {
 import { listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default async function AgentRunsPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('agents');
   const { id } = await params;
-  const agent = await resolveAgent(id);
+  const agent = await resolveAgent(id, await currentOrgId());
   if (!agent) notFound();
   // Degrade gracefully: DB down → empty run history ("No runs yet.") not the whole-page error boundary.
   const runs = await listAgentRunsByAgent(id, 100).catch(() => []);

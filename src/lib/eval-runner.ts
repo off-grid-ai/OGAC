@@ -16,6 +16,7 @@ import {
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // EVAL-DEFINITION RUNNER (I/O layer). Given a saved eval definition, it:
 //   1. builds a RAG sample per golden case (Brain for contexts, gateway for a grounded answer,
@@ -181,7 +182,10 @@ export interface EvalDefRunResult {
 }
 
 // Run one eval definition end-to-end and persist the scored run.
-export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
+export async function runEvalDef(
+  def: EvalDef,
+  orgId: string = DEFAULT_ORG,
+): Promise<EvalDefRunResult> {
   const samples = await buildSamples();
   const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
   const perSample: MetricScore[] = [];
@@ -208,7 +212,7 @@ export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
       // could not score, with the reason — not a fake pass/fail.
       const id = `ed_run_${randomUUID().slice(0, 6)}`;
       const engineTag = `${def.metric}:unavailable`;
-      await recordEvalRun({ id, engine: engineTag, score: 0, total: 0, passed: 0 });
+      await recordEvalRun({ id, engine: engineTag, score: 0, total: 0, passed: 0 }, orgId);
       return {
         run: { id, engine: engineTag, score: 0, total: 0, passed: 0, startedAt: new Date().toISOString() },
         metrics: [],
@@ -216,7 +220,7 @@ export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
         unavailableReason: reason || 'G-Eval judge unavailable — no score recorded.',
       };
     }
-    return persistRun(def, perSample, 'deepeval');
+    return persistRun(def, perSample, 'deepeval', orgId);
   }
 
   // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
@@ -241,7 +245,7 @@ export async function runEvalDef(def: EvalDef): Promise<EvalDefRunResult> {
     }
   }
 
-  return persistRun(def, perSample, computedBy);
+  return persistRun(def, perSample, computedBy, orgId);
 }
 
 // Roll up + persist a scored run, tagged with the engine that actually computed it. Shared by the
@@ -250,17 +254,21 @@ async function persistRun(
   def: EvalDef,
   perSample: MetricScore[],
   computedBy: EvalEngine | 'heuristic',
+  orgId: string = DEFAULT_ORG,
 ): Promise<EvalDefRunResult> {
   const rollup = rollupMetrics(perSample);
   const id = `ed_run_${randomUUID().slice(0, 6)}`;
   const engineTag = `${def.metric}:${computedBy}`;
-  await recordEvalRun({
-    id,
-    engine: engineTag,
-    score: rollup.score,
-    total: rollup.total,
-    passed: rollup.passed,
-  });
+  await recordEvalRun(
+    {
+      id,
+      engine: engineTag,
+      score: rollup.score,
+      total: rollup.total,
+      passed: rollup.passed,
+    },
+    orgId,
+  );
   const run: EvalRun = {
     id,
     engine: engineTag,

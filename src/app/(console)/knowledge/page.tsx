@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listCollections, listDocuments } from '@/lib/org-knowledge';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,10 +27,11 @@ export default async function KnowledgePage() {
   const role = session?.user?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
+  const orgId = await currentOrgId();
   // Degrade gracefully: DB/store down → empty collection list rather than the whole-page error boundary.
-  const collections = await listCollections(role).catch(() => []);
+  const collections = await listCollections(role, orgId).catch(() => []);
   const docCounts = await Promise.all(
-    collections.map((c) => listDocuments(c.id).catch(() => [])),
+    collections.map((c) => listDocuments(c.id, orgId).catch(() => [])),
   );
 
   return (
