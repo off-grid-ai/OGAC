@@ -3,6 +3,7 @@
 // so importers keep working. Each section lives in its own file so pages can be expanded in
 // parallel without collisions.
 import { conceptsSection } from './concepts';
+import { pipelinesGatewaysSection } from './pipelines-gateways';
 import { integrationsSection } from './integrations';
 import { introductionSection } from './introduction';
 import { apiSection } from './api';
@@ -17,6 +18,7 @@ export type { DocPage, DocSection } from './types';
 export const DOC_SECTIONS: DocSection[] = [
   introductionSection,
   conceptsSection,
+  pipelinesGatewaysSection,
   buildSection,
   governSection,
   operateSection,
