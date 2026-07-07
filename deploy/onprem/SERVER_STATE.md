@@ -101,6 +101,28 @@ ALTER TABLE devices     ADD COLUMN IF NOT EXISTS token  text;
   do `rm -rf .next && next build` (clean) and verify BOTH `.next/server/middleware-manifest.json`
   and `pages-manifest.json` exist before restart.
 
+## Native launchd services (S1)
+
+Long-running native Node processes that are NOT in Docker and NOT pm2 — owned by launchd so they
+survive reboot/crash.
+
+- **`co.getoffgridai.landing`** — the **console landing page** (`console-landing-page` repo), native
+  `next start -p 3100`. Added 2026-07-07. Plist source of truth:
+  `console-landing-page/deploy/onprem/co.getoffgridai.landing.plist` (installed to
+  `/Library/LaunchDaemons/`). Server dir `/Users/admin/offgrid/console-landing-page`; log
+  `/tmp/offgrid-landing.log`. Fronted by the edge Caddy (`console-landing.getoffgridai.co`,
+  `import gated` → `127.0.0.1:3100`) → cloudflared. Deploy: `console-landing-page/deploy/push.sh`
+  (rsync source → `npm install` + `next build` on the box → `launchctl kickstart -k
+  system/co.getoffgridai.landing`). **Gotcha:** the landing has no `@offgrid` file: deps (unlike the
+  console), so no shared-monorepo sync is needed. **History:** found DOWN on 2026-07-07 — the fleet
+  was *configured* for it (tunnel + Caddy → :3100) but the source/process were absent and nothing
+  listened on :3100; redeployed + put under launchd so it stays up. Restart: `sudo launchctl
+  kickstart -k system/co.getoffgridai.landing`.
+- Note: the **console** itself (`:3000`) still runs as a plain backgrounded `next start` (no launchd),
+  restarted by `deploy/push.sh` (pkill + relaunch). The aggregator (`co.getoffgridai.aggregator`),
+  edge Caddy (`co.getoffgridai.edge`), app-worker (`co.getoffgridai.app-worker`), and Provit
+  (`co.getoffgridai.provit`) are the other launchd jobs.
+
 ## Docker containers (S1 OrbStack — daemon already initialised, no GUI first-run)
 
 Data sources — replay with `docker compose -f data-sources.yml up -d` (docker at
