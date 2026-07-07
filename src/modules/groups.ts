@@ -55,7 +55,12 @@ export const NAV_GROUPS: NavGroup[] = [
     // built-in primitives — reached from the Build nav. The old standalone `tool-catalog` route now
     // redirects into Tools→Catalog, so it stays a Build secondary (resolves, keeps highlight sane)
     // rather than lingering under Data.
-    primary: ['studio', 'brain'],
+    // Pipelines (the governed model-access contract — the heart of OGAC) is a primary here: it's the
+    // composition root apps/agents/chat consume, so it sits prominently in Build alongside Studio +
+    // Brain. It RUNS ON a gateway (Gateway & Fleet) and is CONSUMED BY the builder surfaces. Studio
+    // stays FIRST — it's the Build group's landing row that the /apps/* surfaces + Build secondaries
+    // alias to (see sidebarActiveIdFor); reordering that would relight the sidebar for those routes.
+    primary: ['studio', 'pipelines', 'brain'],
     secondary: ['agents', 'tools', 'tool-catalog', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {
