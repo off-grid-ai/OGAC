@@ -6,9 +6,9 @@ export const introductionSection: DocSection = {
   pages: [
     {
       slug: '',
-      title: 'What is Off Grid AI',
+      title: 'What is Off Grid AI Console',
       description: 'Your organization’s private AI platform — models, data, and governance on your own hardware.',
-      body: `Off Grid AI is your organization's private AI platform. You run capable models on your own
+      body: `Off Grid AI Console is your organization's private AI platform. You run capable models on your own
 hardware, connect your own data, and put every request under your own governance. Nothing leaves
 your infrastructure unless you allow it.
 
@@ -127,14 +127,14 @@ by capability from here.`,
     },
     {
       slug: 'why-off-grid',
-      title: 'Why Off Grid AI',
+      title: 'Why Off Grid AI Console',
       description: 'Why an integrated, on-prem platform beats a pile of SaaS point tools.',
       body: `The AI-infrastructure market is a pile of point tools: one product to route model calls,
 another to trace them, another to test them, another to police them, another to reach your internal
 data. Each is SaaS. Each holds a copy of your prompts and often your data. Each is one more contract
 and one more seam where governance leaks.
 
-Off Grid AI is one platform instead of that pile, running on your own hardware.
+Off Grid AI Console is one platform instead of that pile, running on your own hardware.
 
 ## The moat is the integration
 

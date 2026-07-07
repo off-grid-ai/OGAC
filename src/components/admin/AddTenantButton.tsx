@@ -16,15 +16,23 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { slugifyTenant, TENANT_BASE_DOMAIN, tenantHost } from '@/lib/tenant-domain';
 import { cn } from '@/lib/utils';
 
 export function AddTenantButton({ modules }: { modules: { id: string; label: string }[] }) {
   const router = useRouter();
   const params = useSearchParams();
-  const open = params.get('panel') === 'new-tenant';
+  // Open INSTANTLY from local state, then sync the URL in the background. Gating the panel purely on
+  // the URL param meant it only appeared after router.replace round-tripped the (dynamic) admin page
+  // — up to a second of "nothing happened" after the click. Local state opens it immediately; the URL
+  // entry still lands so the panel stays deep-linkable and Back-coherent (nav-in-URL rule).
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = localOpen || params.get('panel') === 'new-tenant';
 
   const setOpen = useCallback(
     (next: boolean) => {
+      setLocalOpen(next);
       const p = new URLSearchParams(params.toString());
       if (next) p.set('panel', 'new-tenant');
       else p.delete('panel');
@@ -35,27 +43,40 @@ export function AddTenantButton({ modules }: { modules: { id: string; label: str
   );
 
   const [name, setName] = useState('');
+  // Slug auto-derives from the name until the operator edits it (then we stop overriding).
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const effectiveSlug = slugTouched ? slugifyTenant(slug) : slugifyTenant(name);
 
   function toggle(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
   async function create() {
-    if (!name.trim()) return;
-    const res = await fetch('/api/v1/admin/tenants', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, enabledModules: selected }),
-    });
-    if (res.ok) {
-      toast.success(`Tenant "${name}" provisioned`);
-      setName('');
-      setSelected([]);
-      setOpen(false);
-      router.refresh();
-    } else {
-      toast.error('Failed to create tenant');
+    if (!name.trim() || creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch('/api/v1/admin/tenants', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, slug: effectiveSlug, enabledModules: selected }),
+      });
+      if (res.ok) {
+        toast.success(`Tenant "${name}" provisioned`);
+        setName('');
+        setSlug('');
+        setSlugTouched(false);
+        setSelected([]);
+        setOpen(false);
+        router.refresh();
+      } else {
+        const msg = (await res.json().catch(() => null))?.error;
+        toast.error(msg ? `Failed to create tenant: ${msg}` : 'Failed to create tenant');
+      }
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -75,6 +96,29 @@ export function AddTenantButton({ modules }: { modules: { id: string; label: str
             <div className="space-y-1.5">
               <Label htmlFor="tenant-name">Organization</Label>
               <Input id="tenant-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tenant-slug">Subdomain</Label>
+              <Input
+                id="tenant-slug"
+                value={slugTouched ? slug : effectiveSlug}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setSlug(e.target.value);
+                }}
+                placeholder="wednesdaysol"
+                className="font-mono"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {effectiveSlug ? (
+                  <>
+                    This tenant will live at{' '}
+                    <span className="text-foreground">{tenantHost(effectiveSlug)}</span>
+                  </>
+                ) : (
+                  <>Its own subdomain on {TENANT_BASE_DOMAIN}</>
+                )}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Provisioned planes</Label>
@@ -98,8 +142,14 @@ export function AddTenantButton({ modules }: { modules: { id: string; label: str
             </div>
           </SheetBody>
           <SheetFooter>
-            <Button onClick={create} className="w-full">
-              Provision tenant
+            <Button onClick={create} className="w-full" disabled={creating || !name.trim()}>
+              {creating ? (
+                <>
+                  <Spinner /> Provisioning…
+                </>
+              ) : (
+                'Provision tenant'
+              )}
             </Button>
           </SheetFooter>
         </SheetContent>

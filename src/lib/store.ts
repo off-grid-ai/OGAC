@@ -3,6 +3,7 @@
 import { randomUUID } from 'crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { slugifyTenant } from '@/lib/tenant-domain';
 import {
   abacRules,
   apiKeys,
@@ -801,6 +802,7 @@ export async function eraseSubjectScope(): Promise<number> {
 export interface Tenant {
   id: string;
   name: string;
+  slug: string | null;
   plan: string;
   enabledModules: string[];
   createdAt: string;
@@ -826,6 +828,7 @@ function toTenant(r: typeof tenants.$inferSelect): Tenant {
   return {
     id: r.id,
     name: r.name,
+    slug: r.slug ?? null,
     plan: r.plan,
     enabledModules: r.enabledModules,
     createdAt: iso(r.createdAt),
@@ -837,14 +840,31 @@ export async function listTenants(): Promise<Tenant[]> {
   return rows.map(toTenant);
 }
 
+// Resolve a tenant by its subdomain slug — the seam the middleware/tenancy layer uses to scope a
+// request coming in on <slug>.onprem-console.getoffgridai.co to that tenant's org.
+export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
+  const s = slug.trim().toLowerCase();
+  if (!s) return null;
+  const [row] = await db.select().from(tenants).where(eq(tenants.slug, s)).limit(1);
+  return row ? toTenant(row) : null;
+}
+
 export async function createTenant(
   name: string,
   plan: string,
   enabledModules: string[],
+  slug?: string | null,
 ): Promise<Tenant> {
+  const cleaned = slug ? slugifyTenant(slug) : slugifyTenant(name);
   const [row] = await db
     .insert(tenants)
-    .values({ id: `org_${randomUUID().slice(0, 6)}`, name, plan, enabledModules })
+    .values({
+      id: `org_${randomUUID().slice(0, 6)}`,
+      name,
+      slug: cleaned || null,
+      plan,
+      enabledModules,
+    })
     .returning();
   return toTenant(row);
 }

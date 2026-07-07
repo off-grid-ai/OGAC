@@ -141,6 +141,9 @@ export const evalRuns = pgTable('eval_runs', {
 export const tenants = pgTable('tenants', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  // URL-safe handle for the tenant's own subdomain (<slug>.onprem-console.getoffgridai.co).
+  // Nullable + unique: legacy rows have none; postgres allows multiple NULLs under a unique index.
+  slug: text('slug').unique(),
   plan: text('plan').notNull().default('standard'),
   enabledModules: jsonb('enabled_modules').$type<string[]>().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
