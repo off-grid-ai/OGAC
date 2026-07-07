@@ -57,6 +57,27 @@ you add a node, a subdomain, or a service.
   `src/middleware.ts` adds a 60 req/min per-IP layer. The aggregator legitimately exposes no
   rate-limit endpoint — don't file that as a gap.
 
+### Cloud model routing (egress-leashed) — gap #26, Phase D
+
+The aggregator round-robins **LOCAL** nodes only. When a routing rule (`routing-policy.ts`
+`decideRouting`) resolves to `cloud`, the **console** forwards the OpenAI-compatible request to a
+configured cloud provider — governance stays in the console, where routing rules, the egress
+switch, FinOps cost, and the audit ledger already live. The aggregator is unchanged.
+
+- **Providers (env-configured, keys NEVER in git):** `openai`, `anthropic` (via its OpenAI-compatible
+  `/v1`), and a generic `compat` OpenAI-compatible base URL. See SERVER_STATE.md § Console env for the
+  `OFFGRID_CLOUD_*` vars. A provider is only *wired* when it has both a base URL and an API key.
+- **Governance (enforced in the pure `cloud-routing.ts` chokepoint, unit-tested):** a `block`/`local`
+  decision or `data_class=pii` NEVER reaches cloud; **org egress OFF (`policies.egress_allowed`, default
+  false) hard-stops all cloud** (a cloud route is leashed to block); a cloud route with no configured
+  provider **falls back to local** (never fabricates a cloud response).
+- **Attribution + audit:** a cloud call is audited as `gateway.egress` with the provider-namespaced
+  model (`openai:gpt-4o-mini`) + real token usage, so FinOps prices the cloud spend; leashed /
+  unavailable cloud routes emit `gateway.egress.blocked` (leash + honest-degradation proof).
+- **Console surface:** Gateway → **Cloud providers** tab (`/api/v1/gateway/providers`) shows each
+  provider configured + reachable + whether egress is on — a cloud model reads *available* only when
+  all three hold (Services honest-health pattern). Keys are never returned.
+
 ### Gateway nodes → models (each node runs Off Grid Desktop/headless on `:7878`)
 
 | Node | IP | Model | Modality |
