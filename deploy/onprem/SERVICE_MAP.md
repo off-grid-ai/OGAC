@@ -12,7 +12,7 @@ you add a node, a subdomain, or a service.
 | `gateway.getoffgridai.co` | Network gateway (public API edge) | Caddy → console `/api/*` | Public + WAF/rate-limit |
 | `gateway.getoffgridai.co/files/*` | **Public file store** (SeaweedFS S3, media) | Caddy `handle_path /files/*` → `127.0.0.1:8333` | **GET/HEAD public; writes need Keycloak bearer** (forward_auth → `/api/auth/verify-write`) |
 | `console-status.getoffgridai.co` | Status page | `127.0.0.1:9100` | Keycloak session |
-| `console-landing.getoffgridai.co` | Landing page | `127.0.0.1:3100` | Keycloak session |
+| `console-landing.getoffgridai.co` | Landing page (`console-landing-page`, native `next start`, **launchd `co.getoffgridai.landing`**; deploy `console-landing-page/deploy/push.sh`) | `127.0.0.1:3100` | Keycloak session (Caddy `gated`) |
 | `gungnir.getoffgridai.co` | **Provit** (Prove It — visual QA) | `192.168.1.60:7799` | Keycloak session |
 
 > **Provit runs on S2 (`192.168.1.60`)** as a node process under launchd `co.getoffgridai.provit`
