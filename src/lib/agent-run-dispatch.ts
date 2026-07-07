@@ -2,6 +2,12 @@
 // agent run, and always return the persisted AgentRun the route serves. This is the thin I/O
 // adapter over the PURE decision logic in agent-run-durable.ts — the route stays a validator.
 //
+// SOLID: the impure collaborators (the durable-runtime submit, the in-process runAgent, the run
+// read-back, and the env-driven durable toggle) are injected as `DispatchDeps` with a real-wired
+// default (defaultDispatchDeps). The ORCHESTRATION — which path, how a submitted:false handle falls
+// back to sync, how a 'pending' durable submit is reported — is a function over those deps, so it is
+// testable end-to-end with fakes and NO Temporal/DB (see test/agent-run-dispatch.test.ts).
+//
 // Contract with the caller (route):
 //   - Returns { run, mode } where mode is 'durable' | 'sync' | 'pending'.
 //   - 'durable': the Temporal worker ran the pipeline and persisted; we read the run back.
@@ -13,10 +19,15 @@
 import { randomUUID } from 'crypto';
 import type { Actor } from '@/lib/audit-event';
 import type { RunContext } from '@/lib/agent-run-context';
-import { getAgentRun, type AgentRun, runAgent } from '@/lib/agentrun';
-import { getAgentRuntime } from '@/lib/adapters/agentruntime';
+import type { AgentRun } from '@/lib/agentrun';
+import type { DurableRunHandle } from '@/lib/adapters/agentruntime';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+
+// The heavy collaborators (runAgent → gateway/DB chain, the Temporal client adapter) are pulled in
+// via DYNAMIC import inside defaultDispatchDeps so merely loading this module (e.g. under node:test)
+// doesn't drag the whole Next/auth/db chain in — the orchestration + its pure decisions stay light
+// and unit-testable. Type-only imports above are erased at compile.
 
 export interface DispatchResult {
   run: AgentRun | null;
@@ -25,11 +36,7 @@ export interface DispatchResult {
   runId: string;
 }
 
-export function newRunId(): string {
-  return `run_${randomUUID().slice(0, 8)}`;
-}
-
-export async function dispatchAgentRun(args: {
+export interface DispatchArgs {
   agentId: string;
   query: string;
   caller?: string;
@@ -40,7 +47,59 @@ export async function dispatchAgentRun(args: {
   // whether it executes durably (in the worker, which has no request) or in the sync fallback.
   actor?: Actor;
   project?: string;
-}): Promise<DispatchResult> {
+}
+
+// The impure collaborators, injected so the orchestration is testable without Temporal/DB.
+export interface DispatchDeps {
+  /** True when durable dispatch is opted-in (env-driven). */
+  durableEnabled: () => boolean;
+  /** Submit to the durable runtime. MUST NOT throw; a submitted:false handle means "run sync". */
+  submit: (input: AgentRunWorkflowInput) => Promise<DurableRunHandle>;
+  /** Read a persisted run back by id (durable path reads what the worker persisted). */
+  getRun: (id: string) => Promise<AgentRun | null>;
+  /** Run the governed pipeline in-process (the synchronous fallback / default path). */
+  runAgent: (
+    agentId: string,
+    query: string,
+    caller: string | undefined,
+    requireReview: boolean,
+    orgId: string,
+    context: RunContext,
+  ) => Promise<AgentRun | null>;
+}
+
+// The pending-note the durable adapter returns when a submit succeeded but the result hasn't landed
+// within the await budget. Shared constant so dispatch + adapter agree exactly.
+export const PENDING_NOTE = 'workflow started; result pending';
+
+// Real-wired defaults. The runtime + pipeline are lazily imported per-call so an env change (durable
+// opt-in) between requests is honored and this module stays light to load.
+export function defaultDispatchDeps(): DispatchDeps {
+  return {
+    durableEnabled: () => durableEnabled(process.env),
+    submit: async (input) => {
+      const { getAgentRuntime } = await import('@/lib/adapters/agentruntime');
+      return getAgentRuntime().submit(input);
+    },
+    getRun: async (id) => {
+      const { getAgentRun } = await import('@/lib/agentrun');
+      return getAgentRun(id);
+    },
+    runAgent: async (agentId, query, caller, requireReview, orgId, context) => {
+      const { runAgent } = await import('@/lib/agentrun');
+      return runAgent(agentId, query, caller, requireReview, orgId, context);
+    },
+  };
+}
+
+export function newRunId(): string {
+  return `run_${randomUUID().slice(0, 8)}`;
+}
+
+export async function dispatchAgentRun(
+  args: DispatchArgs,
+  deps: DispatchDeps = defaultDispatchDeps(),
+): Promise<DispatchResult> {
   // One canonical runId minted here and carried through BOTH paths: it is the workflowId seed AND
   // (via the RunContext) the id the pipeline persists + keys all four planes by, so the dispatch,
   // the workflow, and the run's fan-out all share one correlation key.
@@ -59,18 +118,18 @@ export async function dispatchAgentRun(args: {
 
   // Durable path — only when opted in AND the runtime accepts the submission. The adapter never
   // throws: a submitted:false handle means "couldn't reach Temporal" → we fall through to sync.
-  if (durableEnabled(process.env)) {
-    const handle = await getAgentRuntime().submit(input);
+  if (deps.durableEnabled()) {
+    const handle = await deps.submit(input);
     if (handle.submitted) {
-      if (handle.note === 'workflow started; result pending') {
+      if (handle.note === PENDING_NOTE) {
         // The activity persists once it finishes; the run may not exist yet.
-        const existing = await getAgentRun(handle.runId).catch(() => null);
+        const existing = await deps.getRun(handle.runId).catch(() => null);
         return { run: existing, mode: 'pending', workflowId: handle.workflowId, runId };
       }
       if (handle.status === 'not_found') {
         return { run: null, mode: 'durable', workflowId: handle.workflowId, runId };
       }
-      const run = await getAgentRun(handle.runId);
+      const run = await deps.getRun(handle.runId);
       return { run, mode: 'durable', workflowId: handle.workflowId, runId };
     }
     // submitted:false → graceful fallback below.
@@ -84,7 +143,7 @@ export async function dispatchAgentRun(args: {
     org: orgId,
     project: args.project,
   };
-  const run = await runAgent(
+  const run = await deps.runAgent(
     args.agentId,
     args.query,
     args.caller,
