@@ -8,7 +8,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listGoldenCases() });
+  // ?appId=<id> → that pipeline's golden set · ?appId=none → org-wide library · omitted → all.
+  const raw = new URL(req.url).searchParams.get('appId');
+  const appId = raw === null ? undefined : raw === 'none' ? null : raw;
+  return NextResponse.json({ object: 'list', data: await listGoldenCases(appId) });
 }
 
 export async function POST(req: Request) {
@@ -17,5 +20,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const v = validateGoldenCase(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
-  return NextResponse.json(await addGoldenCase(v.value), { status: 201 });
+  // Optional appId attaches this golden case to a pipeline (else it's an org-wide library case).
+  const appId = typeof body?.appId === 'string' ? body.appId : null;
+  return NextResponse.json(await addGoldenCase(v.value, appId), { status: 201 });
 }

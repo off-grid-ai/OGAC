@@ -5,13 +5,17 @@ import { activeTabForPath, appTabHref, lifecycleTabs } from '../src/lib/app-life
 // Per-app lifecycle nav (Builder Epic #116). The five screens are the structure every app inherits;
 // this pure model drives the scoped SubNav and keeps every tab deep-linkable.
 
-test('lifecycleTabs: the canonical five in flow order', () => {
+test('lifecycleTabs: the lifecycle in flow order (+ Quality)', () => {
   const tabs = lifecycleTabs('app_42');
   assert.deepEqual(
     tabs.map((t) => t.tab),
-    ['build', 'input', 'runs', 'review', 'reports'],
+    ['build', 'input', 'runs', 'review', 'reports', 'quality'],
   );
   assert.ok(tabs.every((t) => t.hint.length > 0), 'every tab carries a helper hint');
+});
+
+test('activeTabForPath: the quality tab resolves from its sub-path', () => {
+  assert.equal(activeTabForPath('/apps/app_42/quality', 'app_42'), 'quality');
 });
 
 test('appTabHref: build is the bare app path; others hang off it', () => {
