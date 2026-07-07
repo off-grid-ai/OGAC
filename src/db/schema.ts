@@ -304,6 +304,12 @@ export const tools = pgTable('tools', {
 export const orgSettings = pgTable('org_settings', {
   id: text('id').primaryKey().default('org'), // singleton row
   systemPrompt: text('system_prompt').notNull().default(''),
+  // ─── Governed chat binding (CONSUMERS-BIND #166) ───────────────────────────
+  // Admin sets the org-default chat pipeline + the SET of pipelines a user may pick per-project.
+  // Users pick ONLY from the allowlist; no ungoverned binding. Most-specific-wins resolution:
+  // org default → per-project override (chat_projects.pipeline_id) → per-message model.
+  defaultChatPipelineId: text('default_chat_pipeline_id'),
+  chatPipelineAllowlist: jsonb('chat_pipeline_allowlist').$type<string[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text('updated_by').notNull().default(''),
 });
@@ -348,6 +354,9 @@ export const chatProjects = pgTable('chat_projects', {
   icon: text('icon'),
   // Sharing scope: private (only the owner) | org (shared with members below). Additive.
   visibility: text('visibility').notNull().default('private'), // private | org
+  // Per-project pipeline override (CONSUMERS-BIND #166). null ⇒ inherit the org-default chat
+  // pipeline. A user may only set this to a pipeline in org_settings.chat_pipeline_allowlist.
+  pipelineId: text('pipeline_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -792,6 +801,10 @@ export const apps = pgTable('apps', {
   title: text('title').notNull(),
   summary: text('summary').notNull().default(''),
   visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+  // The GOVERNED pipeline this app/agent runs on (CONSUMERS-BIND #166). null ⇒ resolve to the org
+  // default at run time. Every run resolves + is tagged with the bound pipeline (pipeline:<id>) so
+  // policy/guardrails/telemetry lenses light up. Set on the "Runs on" selector in the builder.
+  pipelineId: text('pipeline_id'),
   // Deployed-app slug: when published, the app is served at /app/<slug>.
   slug: text('slug'),
   published: boolean('published').notNull().default(false),

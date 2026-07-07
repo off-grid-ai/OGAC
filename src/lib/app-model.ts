@@ -101,6 +101,9 @@ export interface AppSpec {
   visibility: 'private' | 'org' | 'public';
   slug?: string;
   published: boolean;
+  // The GOVERNED pipeline this app/agent runs on (CONSUMERS-BIND #166). null/undefined ⇒ resolve to
+  // the org default at run time. Every run is tagged pipeline:<id> so governance + telemetry apply.
+  pipelineId?: string | null;
   trigger: TriggerSpec;
   inputForm?: FormField[];
   steps: AppStep[];
