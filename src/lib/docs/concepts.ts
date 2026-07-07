@@ -62,6 +62,41 @@ inherits every rule you've set. That is why an answer here is defensible: you ca
 was checked, what was retrieved, and where the answer came from.`,
     },
     {
+      slug: 'concepts/pipelines-and-gateways',
+      title: 'Gateways, pipelines, and consumers',
+      description: 'The three tiers that make model access reusable and governed by default.',
+      body: `Model access in Off Grid AI has three distinct tiers. Keeping them separate is what lets you
+reuse governance instead of re-writing it for every app.
+
+![Pipelines — reusable, governed model-access contracts, each bound to a gateway with a hard data ceiling](/docs-shots/pipelines-list.png)
+
+## Gateways — the model backends
+
+A **gateway** is a place requests go to be answered: your own on-prem cluster, or a cloud provider you
+allow. It carries an egress class — *data stays on-prem* or *data leaves (cloud)* — and its own health.
+Many pipelines can share one gateway. See [Gateways](/docs/guides/gateways).
+
+## Pipelines — the governed contract
+
+A **pipeline** is the reusable, governed way to call models. It binds a gateway, sets routing and a
+**hard data ceiling**, and layers policy, guardrails, and a quality bar on top. It is the chokepoint
+every model call passes through, so it is also where quality, drift, cost, and audit are seen. See
+[Pipelines](/docs/guides/pipelines).
+
+## Consumers — apps, agents, chat, and external callers
+
+**Apps, agents, and chat** don't call a model directly — they bind a pipeline as their "Runs on" and
+inherit every control it carries. **External systems** call a pipeline over its own provisioned API
+key. See [Binding & consuming a pipeline](/docs/guides/pipeline-binding).
+
+## The run is the join key
+
+Every request through a pipeline is a **run**, stamped with its pipeline, gateway, model, caller, and
+cost. That's why the per-pipeline lenses (observability, audit, cost, drift) are honest: they are the
+same run data, filtered to the pipeline. A gateway's totals are the sum of its pipelines; an app's are
+the runs it made. Nothing is pre-aggregated, so every view agrees.`,
+    },
+    {
       slug: 'concepts/modules',
       title: 'Modules',
       description: 'The console is modular — adopt the whole control plane or just one part.',
