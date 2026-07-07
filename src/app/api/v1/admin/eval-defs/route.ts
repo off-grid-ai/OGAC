@@ -9,10 +9,19 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  // ?appId=<id> → that pipeline's evals · ?appId=none → org-wide library evals · omitted → all.
-  const raw = new URL(req.url).searchParams.get('appId');
-  const appId = raw === null ? undefined : raw === 'none' ? null : raw;
-  return NextResponse.json({ object: 'list', data: await listEvalDefs(appId) });
+  // Association filter — the corrected pipeline_id takes precedence over the legacy app_id.
+  //   ?pipelineId=<id> → that pipeline's evals · ?pipelineId=none → org-wide library (unattached).
+  //   ?appId=<id>      → that app's evals (legacy) · ?appId=none → org-wide library · omitted → all.
+  const sp = new URL(req.url).searchParams;
+  const pipeRaw = sp.get('pipelineId');
+  const appRaw = sp.get('appId');
+  const filter =
+    pipeRaw !== null
+      ? { pipelineId: pipeRaw === 'none' ? null : pipeRaw }
+      : appRaw !== null
+        ? { appId: appRaw === 'none' ? null : appRaw }
+        : {};
+  return NextResponse.json({ object: 'list', data: await listEvalDefs(filter) });
 }
 
 export async function POST(req: Request) {
@@ -21,7 +30,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const v = validateEvalDef(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
-  // Optional appId in the body attaches the eval to a pipeline (else it's an org-wide library eval).
+  // Optional pipelineId/appId in the body attaches the eval (else it's an org-wide library eval).
   const appId = typeof body?.appId === 'string' ? body.appId : null;
-  return NextResponse.json(await addEvalDef(v.value, '', appId), { status: 201 });
+  const pipelineId = typeof body?.pipelineId === 'string' ? body.pipelineId : null;
+  return NextResponse.json(await addEvalDef(v.value, '', { appId, pipelineId }), { status: 201 });
 }
