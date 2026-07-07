@@ -29,6 +29,7 @@ import {
   users,
 } from '@/db/schema';
 import type { CheckResult } from '@/lib/checks';
+import type { ChatBindingGovernance } from '@/lib/chat-pipeline-policy';
 // The live connector query path lives in connector-exec.ts (Builder Epic Phase 0). `recordCount`
 // backs realRecordCount below; execConnectorQuery is re-exported so callers keep one import site.
 import { recordCount } from '@/lib/connector-exec';
@@ -72,6 +73,11 @@ export async function ensureOrgSchema(): Promise<void> {
         id text PRIMARY KEY DEFAULT 'org', system_prompt text NOT NULL DEFAULT '',
         updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '');
     `);
+    // Governed chat binding (CONSUMERS-BIND #166): org-default chat pipeline + available-for-chat set.
+    await db.execute(sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS default_chat_pipeline_id text;`);
+    await db.execute(
+      sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS chat_pipeline_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb;`,
+    );
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS custom_roles (
         id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
@@ -1378,6 +1384,37 @@ export async function setOrgSystemPrompt(text: string, updatedBy: string): Promi
     .onConflictDoUpdate({
       target: orgSettings.id,
       set: { systemPrompt: text, updatedBy, updatedAt: new Date() },
+    });
+}
+
+// ─── Governed chat binding (CONSUMERS-BIND #166) ───────────────────────────────
+// The org-default chat pipeline + the SET of pipelines a user may pick per-project. Admin-owned
+// (routes gate with requireAdmin). Pure resolution/gating lives in chat-pipeline-policy.ts.
+
+/** Read the org's chat-binding governance (default pipeline + available-for-chat allowlist). */
+export async function getChatBindingGovernance(): Promise<ChatBindingGovernance> {
+  await ensureOrgSchema();
+  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'org')).limit(1);
+  return {
+    defaultChatPipelineId: row?.defaultChatPipelineId ?? null,
+    allowlist: Array.isArray(row?.chatPipelineAllowlist) ? row.chatPipelineAllowlist : [],
+  };
+}
+
+/** Set the org's chat-binding governance (admin-only; validated at the route). Upserts the singleton. */
+export async function setChatBindingGovernance(
+  gov: ChatBindingGovernance,
+  updatedBy: string,
+): Promise<void> {
+  await ensureOrgSchema();
+  const defaultChatPipelineId = gov.defaultChatPipelineId || null;
+  const chatPipelineAllowlist = Array.from(new Set((gov.allowlist ?? []).filter(Boolean)));
+  await db
+    .insert(orgSettings)
+    .values({ id: 'org', defaultChatPipelineId, chatPipelineAllowlist, updatedBy })
+    .onConflictDoUpdate({
+      target: orgSettings.id,
+      set: { defaultChatPipelineId, chatPipelineAllowlist, updatedBy, updatedAt: new Date() },
     });
 }
 

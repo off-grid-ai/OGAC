@@ -80,6 +80,8 @@ export async function ensureChatSchema(): Promise<void> {
   await db.execute(
     sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'private';`,
   );
+  // Per-project pipeline binding (CONSUMERS-BIND #166) — null ⇒ inherit the org-default chat pipeline.
+  await db.execute(sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS pipeline_id text;`);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_project_members (
       project_id text NOT NULL, user_id text NOT NULL,
@@ -565,17 +567,24 @@ export async function listProjects(userId: string) {
   return rows.map((p) => ({ ...p, chatCount: byProject.get(p.id) ?? 0 }));
 }
 
-export async function createProject(userId: string, name: string, systemPrompt = '') {
+export async function createProject(
+  userId: string,
+  name: string,
+  systemPrompt = '',
+  pipelineId: string | null = null,
+) {
   await ensureChatSchema();
   const id = rid();
-  await db.insert(chatProjects).values({ id, userId, name: name.slice(0, 120), systemPrompt });
+  await db
+    .insert(chatProjects)
+    .values({ id, userId, name: name.slice(0, 120), systemPrompt, pipelineId });
   return id;
 }
 
 export async function updateProject(
   userId: string,
   id: string,
-  patch: { name?: string; description?: string; systemPrompt?: string },
+  patch: { name?: string; description?: string; systemPrompt?: string; pipelineId?: string | null },
 ) {
   await ensureChatSchema();
   await db
@@ -586,15 +595,40 @@ export async function updateProject(
 
 // Update a project's fields without the owner filter — the caller must have already been checked
 // for edit access (owner, member-editor, or admin). Used by the access-aware PATCH route.
+// NOTE: pipelineId must be GATED against the org allowlist by the caller (isChatPipelineAllowed).
 export async function updateProjectFields(
   id: string,
-  patch: { name?: string; description?: string; systemPrompt?: string },
+  patch: { name?: string; description?: string; systemPrompt?: string; pipelineId?: string | null },
 ) {
   await ensureChatSchema();
   await db
     .update(chatProjects)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(chatProjects.id, id));
+}
+
+// A project's pipeline binding (null = inherit the org default). Powers resolveChatPipeline + the
+// Overview "Consumers" section (listProjectsByPipeline).
+export async function getProjectBinding(
+  projectId: string | null,
+): Promise<{ pipelineId: string | null } | null> {
+  if (!projectId) return null;
+  await ensureChatSchema();
+  const [p] = await db.select().from(chatProjects).where(eq(chatProjects.id, projectId));
+  return p ? { pipelineId: p.pipelineId ?? null } : null;
+}
+
+// List the projects BOUND to a given pipeline (Overview "Consumers"). Read-only, stable order.
+export async function listProjectsByPipeline(
+  pipelineId: string,
+): Promise<{ id: string; name: string; userId: string }[]> {
+  await ensureChatSchema();
+  const rows = await db
+    .select({ id: chatProjects.id, name: chatProjects.name, userId: chatProjects.userId })
+    .from(chatProjects)
+    .where(eq(chatProjects.pipelineId, pipelineId))
+    .orderBy(desc(chatProjects.updatedAt));
+  return rows;
 }
 
 export async function deleteProject(userId: string, id: string) {

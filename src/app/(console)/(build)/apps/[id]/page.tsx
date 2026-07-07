@@ -5,6 +5,7 @@ import { listManagedAgents } from '@/lib/agents';
 import { getApp } from '@/lib/apps-store';
 import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +17,11 @@ export default async function AppBuildTab({ params }: { params: Promise<{ id: st
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();
-  const [app, ctx, agents] = await Promise.all([
+  const [app, ctx, agents, pipelines] = await Promise.all([
     getApp(id, orgId),
     getOrgContext(orgId),
     listManagedAgents(orgId).catch(() => []),
+    listPipelines(orgId).catch(() => []),
   ]);
   if (!app) notFound();
 
@@ -29,6 +31,7 @@ export default async function AppBuildTab({ params }: { params: Promise<{ id: st
     .map((d) => ({ id: d.id, label: d.label }));
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
   const connectorOptions = ctx.connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+  const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name }));
 
   return (
     <Suspense fallback={null}>
@@ -37,6 +40,7 @@ export default async function AppBuildTab({ params }: { params: Promise<{ id: st
         domains={domains}
         agents={agentOptions}
         connectors={connectorOptions}
+        pipelines={pipelineOptions}
         initialApp={app}
       />
     </Suspense>
