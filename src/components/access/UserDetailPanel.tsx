@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -174,8 +175,14 @@ function RolesCard({
             })}
           </div>
         )}
-        <Button size="sm" onClick={save} disabled={saving || allRoles.length === 0}>
-          {saving ? 'Saving…' : 'Save roles'}
+        <Button size="sm" className="gap-1.5" onClick={save} disabled={saving || allRoles.length === 0}>
+          {saving ? (
+            <>
+              <Spinner /> Saving…
+            </>
+          ) : (
+            'Save roles'
+          )}
         </Button>
       </CardContent>
     </Card>
@@ -246,8 +253,14 @@ function PasswordCard({ userId }: { userId: string }) {
             />
             Temporary
           </label>
-          <Button size="sm" onClick={reset} disabled={saving}>
-            {saving ? 'Resetting…' : 'Reset'}
+          <Button size="sm" className="gap-1.5" onClick={reset} disabled={saving}>
+            {saving ? (
+              <>
+                <Spinner /> Resetting…
+              </>
+            ) : (
+              'Reset'
+            )}
           </Button>
         </div>
       </CardContent>
@@ -356,7 +369,7 @@ function MfaCard({ userId }: { userId: string }) {
         {error ? (
           <DegradeBanner message={error} />
         ) : loading ? (
-          <p className="py-4 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <>
             <div className="flex items-center gap-2">
@@ -511,7 +524,7 @@ function SessionsCard({ userId, label }: { userId: string; label: string }) {
         {error ? (
           <DegradeBanner message={error} />
         ) : loading ? (
-          <p className="py-4 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -638,7 +651,7 @@ export function UserDetailPanel({ userId }: { userId: string }) {
   }, [loadUser, loadRoles]);
 
   if (loading) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">Loading user…</p>;
+    return <LoadingBlock label="Loading user…" />;
   }
 
   if (error) {

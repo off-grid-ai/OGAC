@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import { MODULES } from '@/modules/registry';
 
 interface KcClient {
@@ -163,8 +164,14 @@ function AddClientForm({
       )}
 
       <div className="flex gap-2">
-        <Button size="sm" onClick={submit} disabled={saving}>
-          {saving ? 'Creating…' : 'Create client'}
+        <Button size="sm" className="gap-1.5" onClick={submit} disabled={saving}>
+          {saving ? (
+            <>
+              <Spinner /> Creating…
+            </>
+          ) : (
+            'Create client'
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
@@ -325,8 +332,14 @@ function ExpandedClient({ client }: { client: KcClient }) {
               {copied ? 'Copied' : 'Copy'}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={rotate} disabled={rotating}>
-            {rotating ? 'Rotating…' : 'Rotate'}
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={rotate} disabled={rotating}>
+            {rotating ? (
+              <>
+                <Spinner /> Rotating…
+              </>
+            ) : (
+              'Rotate'
+            )}
           </Button>
         </div>
       </div>
@@ -433,7 +446,7 @@ export function MachineClientsList() {
         )}
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : clients.length === 0 ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
             No clients yet — create one to authenticate machines and services.

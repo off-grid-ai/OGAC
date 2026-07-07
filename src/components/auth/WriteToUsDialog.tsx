@@ -1,8 +1,9 @@
 'use client';
 
-import { CheckCircle, CircleNotch } from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
   DialogContent,
@@ -80,7 +81,7 @@ export function WriteToUsDialog() {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             {status === 'error' ? <p className="text-sm text-red-500">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={status === 'loading'}>
-              {status === 'loading' ? <CircleNotch className="size-4 animate-spin" /> : 'Request access'}
+              {status === 'loading' ? <Spinner className="size-4" /> : 'Request access'}
             </Button>
             <p className="text-center text-xs text-muted-foreground">No spam. Only about access.</p>
           </form>

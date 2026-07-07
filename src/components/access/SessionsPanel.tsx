@@ -8,6 +8,7 @@ import { UserPicker, type PickableUser } from '@/components/access/UserPicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingBlock } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -136,7 +137,7 @@ export function SessionsPanel() {
             )}
 
             {loading ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+              <LoadingBlock />
             ) : (
               <div className="overflow-x-auto">
                 <Table>

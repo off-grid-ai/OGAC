@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 
 // Trigger an Agent-QA sweep (offline eval + drift) on demand — POST /api/v1/admin/qa/sweep.
 // Returns 200 healthy / 503 degraded; we toast the verdict and refresh the dashboard.
@@ -32,7 +33,7 @@ export function RunSweepButton() {
 
   return (
     <Button size="sm" onClick={sweep} disabled={busy}>
-      <ArrowsClockwise className={busy ? 'size-4 animate-spin' : 'size-4'} />
+      {busy ? <Spinner className="size-4" /> : <ArrowsClockwise className="size-4" />}
       {busy ? 'Running sweep…' : 'Run QA sweep'}
     </Button>
   );
