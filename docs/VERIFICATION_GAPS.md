@@ -63,6 +63,14 @@ actually showed, and the fix.)*
 
 _Other sweep findings (from the doc-deepening agents) still to be consolidated here._
 
+## Bharat Union Bank tenant epic (2026-07-07)
+
+| # | Surface | State | Detail | Status |
+|---|---|---|---|---|
+| T1 | **Bharat tenant DATA** | Seeded live | org `org_bharat` / slug `bharatunion` + tenant-admin user. Source systems: 5k customers (PAN/masked-Aadhaar/IFSC/UPI), ~10k accounts, 50k txns, 6k policies, 3k claims, 40 branches, 4k invoices, 5k GL. Console (org-scoped): 5 connectors, 12 data-domains, 6 governed apps, 32 app_runs, 5 agents + 30 agent_runs, evals+golden, 8 masking rules, 6 virtual keys, 12 devices, 60 audit + 250 gateway OpenSearch docs. Idempotent (`bh_`/`source='bh_seed'`). | 🟢 |
+| T2 | **Global tables lack `org_id` — cross-tenant leak** | 🔴 real multi-tenancy gap | `custom_agents`, `prompts`/`prompt_versions`, `org_knowledge_collections`+docs, and `eval_runs` have **no `org_id` column** — they are GLOBAL, so every tenant sees the same agents/prompts/knowledge/eval history. Only `apps`, `app_runs`, `connectors`, `data_domains`, `masking_rules`, `api_keys`, `devices`, `audit` carry org scope. Fix: add `org_id` to those tables + scope their stores/queries, backfill 'default'. | 🔴 |
+| T3 | **Tenant subdomain routing (`<slug>-onprem-console`)** | 🟡 blocked on infra | Scoping LOGIC built + unit-tested (host→slug→org, membership-checked); tenant reachable under the base host as its org for a platform admin. But the vanity subdomain 404s at the **Cloudflare edge** — root cause is gap **S3** (two cloudflared processes, not launchd-managed; a stale one answers without the wildcard/route). Needs the S3 consolidation (one launchd-managed cloudflared) done carefully — it serves the whole fleet. Explicit per-tenant DNS record added for bharatunion (correct pattern once S3 is fixed). | 🟡 |
+
 ---
 
 ## How an item gets closed
