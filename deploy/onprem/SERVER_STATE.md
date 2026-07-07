@@ -30,7 +30,19 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_UNLEASH_URL` | `http://127.0.0.1:8932` | via localhost Caddy proxy → S2. |
 | `OFFGRID_SUPERSET_URL` | `http://127.0.0.1:8933` | via localhost Caddy proxy → S2. |
 | `OFFGRID_FLEET_URL` | `http://127.0.0.1:8934` | via localhost Caddy proxy → S2. |
-| `OFFGRID_SUPERSET_DB_URI` | _(unset — falls back to `DATABASE_URL`)_ | SQLAlchemy URI Superset uses to reach the console Postgres when **provisioning** the starter dashboard (`POST /api/v1/admin/superset/provision`). Set this if Superset runs on a different host than the console DB (localhost won't route). |
+| `OFFGRID_SUPERSET_DB_URI` | `postgresql://offgrid:offgrid@127.0.0.1:5432/offgrid_console` | SQLAlchemy URI Superset (on g6) uses to reach the console Postgres (on S1/`.59`) when **provisioning** the starter dashboard (`POST /api/v1/admin/superset/provision`). Points at the routable S1 LAN IP — `localhost`/`127.0.0.1` would resolve to the Superset container, not the DB. |
+| `OFFGRID_SUPERSET_USERNAME` / `_PASSWORD` | `admin` / `Offgrid-Superset-2026!` | Superset stock admin login used by the console to auth the REST API (guest-token mint + provisioning). **2026-07-08:** the container's admin password did NOT match this env (login 401'd) — re-synced on g6 with `docker exec offgrid-services-b-superset-1 superset fab reset-password --username admin --password '…'`. If Superset login 401s again, reset it to this value. |
+| `OFFGRID_SUPERSET_EMBED_UUID` | `8cf450b7-3b71-47e8-8c2b-f86bc2a62b45` | **Embed UUID of the provisioned "Off Grid AI — Gateway Overview" dashboard** (`dashboard_id=1` on g6 Superset). This is the *embedded-SDK* uuid (`GET /api/v1/dashboard/1/embedded`), **not** the dashboard's native uuid — the two differ, and the dashboard LIST endpoint exposes no uuid column at all. The console verifies existence by matching dashboard **title** in the list → then confirming that id's `/embedded` uuid equals this (`embeddedUuidMatches`), so a drifted/missing embed uuid degrades to an honest "not provisioned" CTA, never a blank iframe. |
+
+> **Superset starter dashboard — LIVE (task #9, 2026-07-08).** "Off Grid AI — Gateway Overview"
+> (`dashboard_id=1`, embed uuid `8cf450b7-…a62b45`, published, embedding enabled with open
+> `allowed_domains`) is provisioned on g6 Superset over the console Postgres `audit_events` table,
+> with two charts: **Requests over time** (daily event count) and **Tokens by model** (summed
+> tokens grouped by model), both laid out in the dashboard `position_json`. Provisioning is
+> idempotent — `POST /api/v1/admin/superset/provision` (or the "Provision dashboard" button on
+> `/analytics`) reuses it by title rather than duplicating. To re-provision from scratch: delete
+> dashboard 1 in Superset, then hit the route. Charts read the console DB directly via
+> `OFFGRID_SUPERSET_DB_URI` (Superset on g6 → Postgres on S1).
 | `OFFGRID_TOOL_EGRESS` | _(unset → OFF)_ | **Composable-tool air-gap master switch (task #117).** The built-in internet-reaching tool PRIMITIVES (`web_search`, `read_url`, `http_fetch`) are OFF by default — the on-prem "nothing leaves the network" default. Set truthy (`1`/`true`/`yes`/`on`) to opt the whole org IN to every internet primitive. Per-tool opt-in below overrides per primitive. Gated purely in `src/lib/tool-primitives.ts` (`isPrimitiveEnabled`). |
 | `OFFGRID_TOOL_WEB_SEARCH` | _(unset → OFF)_ | Per-tool opt-in for the `web_search` primitive only (no need for the master flag). Requires `OFFGRID_WEB_SEARCH_URL` to point at an org-run search endpoint (e.g. SearXNG) so egress stays through a controlled proxy. |
 | `OFFGRID_TOOL_READ_URL` | _(unset → OFF)_ | Per-tool opt-in for the `read_url` primitive only. |
