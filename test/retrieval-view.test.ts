@@ -7,6 +7,7 @@ import {
   normalizeDistance,
   normalizeRetrieval,
   normalizeWriteResponse,
+  retrievalNote,
   RETRIEVAL_ADAPTER_IDS,
 } from '../src/lib/retrieval-view.ts';
 
@@ -115,6 +116,59 @@ test('normalizeRetrieval: negative / non-finite / string counts coerced to 0', (
 test('normalizeRetrieval: non-qdrant adapter → isQdrant false, blank adapter → unknown', () => {
   assert.equal(normalizeRetrieval({ adapterId: 'lancedb', reachable: false }).isQdrant, false);
   assert.equal(normalizeRetrieval({ adapterId: '', reachable: false }).adapterId, 'unknown');
+});
+
+// ── Embedded-store affirmative state (the "0 vectors / unreachable" fix) ─────────────────────────
+test('embedded store: lancedb is a normal active state, NOT an error, even with 0 vectors', () => {
+  // This is exactly the live case: adapter=lancedb, no Qdrant URL, reader marks reachable=false.
+  const view = normalizeRetrieval({ adapterId: 'lancedb', reachable: false });
+  assert.equal(view.isQdrant, false);
+  assert.equal(view.usingEmbeddedStore, true);
+  assert.equal(view.totalVectors, 0);
+  // The note must AFFIRM the embedded store and say the external DB is optional — never "error".
+  assert.match(view.note, /built-in embedded store/i);
+  assert.match(view.note, /optional/i);
+  assert.match(view.note, /not an error/i);
+  assert.doesNotMatch(view.note, /unreachable/i);
+});
+
+test('embedded store: pgvector is also treated as the embedded store', () => {
+  const view = normalizeRetrieval({ adapterId: 'pgvector', reachable: false });
+  assert.equal(view.usingEmbeddedStore, true);
+  assert.match(view.note, /pgvector/);
+});
+
+test('qdrant reachable is NOT the embedded store, and its note reflects the live DB', () => {
+  const view = normalizeRetrieval({
+    adapterId: 'qdrant',
+    url: 'http://q:6333',
+    reachable: true,
+    collectionsBody: { result: { collections: [] } },
+  });
+  assert.equal(view.usingEmbeddedStore, false);
+  assert.match(view.note, /external Qdrant/i);
+  assert.doesNotMatch(view.note, /unreachable/i);
+});
+
+test('qdrant configured-but-unreachable IS an error state (distinct from embedded)', () => {
+  const view = normalizeRetrieval({ adapterId: 'qdrant', url: 'http://q:6333', reachable: false });
+  assert.equal(view.usingEmbeddedStore, false);
+  assert.match(view.note, /unreachable/i);
+});
+
+test('retrievalNote: pure branch coverage', () => {
+  assert.match(
+    retrievalNote({ adapterId: 'lancedb', isQdrant: false, usingEmbeddedStore: true, reachable: false }),
+    /embedded store/i,
+  );
+  assert.match(
+    retrievalNote({ adapterId: 'qdrant', isQdrant: true, usingEmbeddedStore: false, reachable: true }),
+    /external Qdrant/i,
+  );
+  assert.match(
+    retrievalNote({ adapterId: 'qdrant', isQdrant: true, usingEmbeddedStore: false, reachable: false }),
+    /unreachable/i,
+  );
 });
 
 // ── Collection-management pure logic ───────────────────────────────────────────
