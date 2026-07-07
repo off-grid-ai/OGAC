@@ -16,7 +16,7 @@ export const nativeFlags: FlagsPort = {
   meta: {
     id: 'native',
     capability: 'flags',
-    vendor: 'Off Grid flags',
+    vendor: 'Off Grid AI flags',
     license: 'first-party',
     render: 'native',
     description: 'Module/capability enablement via the in-console flag store + env (default).',

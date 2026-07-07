@@ -7,8 +7,8 @@ export const selfHostingSection: DocSection = {
     {
       slug: 'self-hosting/deployment',
       title: 'Deployment',
-      description: 'The shape of an Off Grid deployment on your own hardware.',
-      body: `Off Grid runs on hardware you control. A deployment has three kinds of machine:
+      description: 'The shape of an Off Grid AI deployment on your own hardware.',
+      body: `Off Grid AI runs on hardware you control. A deployment has three kinds of machine:
 
 - **Control plane** — the console, identity, database, object storage, and the model aggregator.
 - **Gateway nodes** — the machines that run the models (chat, vision, and image). Add or drain nodes

@@ -8,11 +8,11 @@ export const conceptsSection: DocSection = {
       slug: 'concepts/architecture',
       title: 'Architecture',
       description: 'The two intelligence flows and the governance spine between them.',
-      body: `Off Grid has a simple shape: two flows of intelligence, with a governance spine between them.
+      body: `Off Grid AI has a simple shape: two flows of intelligence, with a governance spine between them.
 
 ## Harness the intelligence inside your org
 
-Your data lives in systems that can't answer questions. Off Grid changes that:
+Your data lives in systems that can't answer questions. Off Grid AI changes that:
 
 - **Connectors** pull from your systems of record (databases, warehouses, CRM, event streams).
 - **Ingestion** chunks and embeds content on your own hardware into a vector store.
@@ -63,7 +63,7 @@ was checked, what was retrieved, and where the answer came from.`,
       slug: 'concepts/modules',
       title: 'Modules',
       description: 'The console is modular — adopt the whole control plane or just one part.',
-      body: `Off Grid is organized into modules, each an independently adoptable capability. A
+      body: `Off Grid AI is organized into modules, each an independently adoptable capability. A
 deployment enables the set you bought; the console shows only those.
 
 ## Grouped by job
@@ -87,7 +87,7 @@ rest when you're ready.`,
       slug: 'concepts/multi-tenancy',
       title: 'Multi-tenancy & isolation',
       description: 'How one deployment serves many orgs without one ever seeing another’s data.',
-      body: `One Off Grid deployment can serve several organizations at once, each fully walled off from
+      body: `One Off Grid AI deployment can serve several organizations at once, each fully walled off from
 the others. The point of isolation is simple: a valid login for one org must never return another
 org's chats, runs, connectors, or audit records — not by accident, not by a crafted request.
 
@@ -141,7 +141,7 @@ logged and attributable.
 
 ## Air-gapped
 
-Because everything runs on your infrastructure and cloud is opt-in, Off Grid can run fully
+Because everything runs on your infrastructure and cloud is opt-in, Off Grid AI can run fully
 air-gapped: no outbound path at all. In that mode, only local models serve requests, and the
 platform works the same — the governance, retrieval, and audit are all local.`,
     },

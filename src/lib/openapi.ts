@@ -20,7 +20,7 @@ const listOf = (ref: string) => ({
 export const openApiSpec = {
   openapi: '3.1.0',
   info: {
-    title: 'Off Grid Console API',
+    title: 'Off Grid AI Console API',
     version: '0.1.0',
     description:
       'The node↔console contract for the common control plane. Nodes enroll, pull policy, ' +
@@ -35,7 +35,7 @@ export const openApiSpec = {
   },
   servers: [{ url: '/', description: 'This deployment' }],
   tags: [
-    { name: 'node', description: 'Called by Off Grid nodes (Desktop/Mobile).' },
+    { name: 'node', description: 'Called by Off Grid AI nodes (Desktop/Mobile).' },
     { name: 'admin', description: 'Called by the console / admins.' },
     {
       name: 'agent-qa',

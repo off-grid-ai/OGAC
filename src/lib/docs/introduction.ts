@@ -6,13 +6,13 @@ export const introductionSection: DocSection = {
   pages: [
     {
       slug: '',
-      title: 'What is Off Grid',
+      title: 'What is Off Grid AI',
       description: 'Your organization’s private AI platform — models, data, and governance on your own hardware.',
-      body: `Off Grid is your organization's private AI platform. You run capable models on your own
+      body: `Off Grid AI is your organization's private AI platform. You run capable models on your own
 hardware, connect your own data, and put every request under your own governance. Nothing leaves
 your infrastructure unless you allow it.
 
-Most AI platforms make you choose: the frontier models, or your data staying private. Off Grid
+Most AI platforms make you choose: the frontier models, or your data staying private. Off Grid AI
 removes the trade-off. The intelligence *inside* your org (your documents, systems, and knowledge)
 and the intelligence *outside* it (open-weight and, when you permit it, cloud models) meet on one
 control plane that you own.
@@ -31,7 +31,7 @@ control plane that you own.
 
 ## Who it's for
 
-Off Grid runs the AI operations for a regulated organization. It serves four people: the platform
+Off Grid AI runs the AI operations for a regulated organization. It serves four people: the platform
 team keeping it fast and cheap, the compliance officer who has to defend it to a regulator, the
 builder shipping AI features, and the finance owner watching the spend. Each gets a surface built
 for their job.
@@ -49,7 +49,7 @@ Ready to try it? Start with the [Quickstart](/docs/quickstart).`,
       slug: 'quickstart',
       title: 'Quickstart',
       description: 'From sign-in to your first grounded answer in a few minutes.',
-      body: `This gets you from sign-in to a working, grounded answer. It assumes an Off Grid Console is
+      body: `This gets you from sign-in to a working, grounded answer. It assumes an Off Grid AI Console is
 already deployed for your org (if not, see [Self-hosting](/docs/self-hosting/deployment)).
 
 ## 1. Sign in
@@ -66,14 +66,14 @@ private AI, everywhere.
 
 ## 3. Give it your knowledge
 
-Go to **Knowledge** and upload a document (a policy PDF, an SOP, a spec). Off Grid chunks and indexes
+Go to **Knowledge** and upload a document (a policy PDF, an SOP, a spec). Off Grid AI chunks and indexes
 it on your own hardware. Back in Chat, ask a question the document answers; the reply now cites the
 source, and it won't invent facts beyond what it retrieved.
 
 ## 4. Build an assistant
 
 Open **Studio → New assistant**. Describe what you want in plain language ("answer HR policy
-questions and cite the policy"). Off Grid suggests the setup, you pick any skills, and you try it
+questions and cite the policy"). Off Grid AI suggests the setup, you pick any skills, and you try it
 right there. Publish it to your team.
 
 ## 5. Generate an image
@@ -127,18 +127,18 @@ by capability from here.`,
     },
     {
       slug: 'why-off-grid',
-      title: 'Why Off Grid',
+      title: 'Why Off Grid AI',
       description: 'Why an integrated, on-prem platform beats a pile of SaaS point tools.',
       body: `The AI-infrastructure market is a pile of point tools: one product to route model calls,
 another to trace them, another to test them, another to police them, another to reach your internal
 data. Each is SaaS. Each holds a copy of your prompts and often your data. Each is one more contract
 and one more seam where governance leaks.
 
-Off Grid is one platform instead of that pile, running on your own hardware.
+Off Grid AI is one platform instead of that pile, running on your own hardware.
 
 ## The moat is the integration
 
-Anyone can run the individual open-source pieces. The value is that in Off Grid they are one product:
+Anyone can run the individual open-source pieces. The value is that in Off Grid AI they are one product:
 the gateway knows about the policy engine, the policy engine knows about the PII scanner, the
 scanner's verdict lands in the same audit trail your regulator reads, retrieval respects the same
 access rules as chat, and every token's cost is attributed back to the team that spent it. One
@@ -148,7 +148,7 @@ control plane, one identity model, one audit ledger.
 
 For a bank, an insurer, or a hospital, the question isn't "is the AI good" — it's "can I defend this
 to my regulator." That reframes the product: governance isn't a feature added on, it's the reason
-Off Grid exists, and it's why the platform wins where a pure developer tool can't.
+Off Grid AI exists, and it's why the platform wins where a pure developer tool can't.
 
 ## On-prem by construction
 

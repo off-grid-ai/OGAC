@@ -79,7 +79,7 @@ export const goldenEvals: EvalsPort = {
   meta: {
     id: 'golden',
     capability: 'evals',
-    vendor: 'Off Grid golden set',
+    vendor: 'Off Grid AI golden set',
     license: 'first-party',
     render: 'native',
     description: 'Recall-scored golden query→expected-doc set over the Brain (always on).',
@@ -109,7 +109,7 @@ function promptfooConfig(
   auth: PromptfooProviderAuth,
 ): unknown {
   return {
-    description: 'Off Grid console golden set',
+    description: 'Off Grid AI console golden set',
     providers: [
       {
         id: `openai:chat:${EVAL_MODEL}`,

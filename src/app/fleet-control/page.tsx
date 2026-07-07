@@ -80,7 +80,7 @@ const BASELINE: Item[] = [
   },
 ];
 
-// Act 2 — the intelligence layer only Off Grid adds, on-device across desktop + mobile.
+// Act 2 — the intelligence layer only Off Grid AI adds, on-device across desktop + mobile.
 const INTELLIGENCE: Item[] = [
   {
     icon: UsersThree,
@@ -90,7 +90,7 @@ const INTELLIGENCE: Item[] = [
   {
     icon: Broadcast,
     name: 'Activity & workflow intelligence',
-    body: 'The Off Grid node on desktop AND mobile sees how work actually happens (screens, apps, calls — explicit opt-in) and turns it into signal.',
+    body: 'The Off Grid AI node on desktop AND mobile sees how work actually happens (screens, apps, calls — explicit opt-in) and turns it into signal.',
   },
   {
     icon: ChartLineUp,
@@ -146,7 +146,7 @@ export default function FleetControlPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid Console
+            Off Grid AI Console
           </Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
@@ -169,11 +169,11 @@ export default function FleetControlPage() {
             </Badge>
             <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
               Everything fleet control already means —{' '}
-              <span className="text-primary">plus the intelligence only Off Grid adds.</span>
+              <span className="text-primary">plus the intelligence only Off Grid AI adds.</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
               A complete, competitive frontline fleet-control system on open source (FleetDM +
-              osquery), with Off Grid’s field-force intelligence layered on top — across desktop and
+              osquery), with Off Grid AI’s field-force intelligence layered on top — across desktop and
               mobile, on your own infrastructure.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -214,13 +214,13 @@ export default function FleetControlPage() {
           <BlurFade inView>
             <Badge variant="secondary" className="bg-primary/10 text-primary">
               <Sparkle className="mr-1 size-3.5" />
-              Act 2 · The Off Grid moat
+              Act 2 · The Off Grid AI moat
             </Badge>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">
               Fleet <span className="text-primary">intelligence</span> — desktop & mobile
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              FleetDM manages the devices. Off Grid turns the fleet into a workforce you can coach —
+              FleetDM manages the devices. Off Grid AI turns the fleet into a workforce you can coach —
               on-device intelligence that no MDM gives you, captured (opt-in) on every desktop and
               phone and grounded in your own knowledge.
             </p>
@@ -251,7 +251,7 @@ export default function FleetControlPage() {
           <div className="mt-6 flex flex-col gap-3 text-sm sm:flex-row sm:items-stretch">
             {[
               { icon: Desktop, t: 'FleetDM + osquery', d: 'The device-fleet engine — inventory, policy, compliance.' },
-              { icon: DeviceMobile, t: 'Off Grid node (desktop + mobile)', d: 'The on-device signal — activity, capture, the copilot.' },
+              { icon: DeviceMobile, t: 'Off Grid AI node (desktop + mobile)', d: 'The on-device signal — activity, capture, the copilot.' },
               { icon: Brain, t: 'The Brain', d: 'Your knowledge — what the intelligence is grounded in.' },
               { icon: Broadcast, t: 'The console', d: 'One control plane — governance, audit, kill-switch, insight.' },
             ].map((s, i, arr) => (

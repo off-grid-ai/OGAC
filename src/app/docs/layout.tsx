@@ -12,8 +12,8 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link href="/docs" className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="Off Grid" width={26} height={26} priority />
-            <span className="text-sm font-medium">Off Grid Docs</span>
+            <Image src="/logo.png" alt="Off Grid AI" width={26} height={26} priority />
+            <span className="text-sm font-medium">Off Grid AI Docs</span>
           </Link>
           <div className="flex items-center gap-4 text-sm">
             <a href="/docs/api" className="text-muted-foreground transition-colors hover:text-foreground">
