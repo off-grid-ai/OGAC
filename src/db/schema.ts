@@ -122,6 +122,10 @@ export const goldenCases = pgTable('golden_cases', {
   id: text('id').primaryKey(),
   query: text('query').notNull(),
   expected: text('expected').notNull(),
+  // The pipeline (app) this golden case belongs to. NULL = an org-wide/shared case (the reusable
+  // library). A pipeline's golden set = its own cases; runs execute in that pipeline's context.
+  appId: text('app_id'),
+  orgId: text('org_id').notNull().default('default'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
