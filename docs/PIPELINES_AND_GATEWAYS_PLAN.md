@@ -1,8 +1,81 @@
 # OGAC architecture — Gateways × Pipelines × Consumers (reasoned plan)
 
+> **CORRECTED MODEL (2026-07-08) — THREE tiers, read this first.** An earlier draft conflated
+> "pipeline == app"; the founder corrected it. The three tiers are DISTINCT:
+> ```
+> GATEWAYS   reusable model backends (on-prem · OpenAI · Anthropic · OpenRouter)
+>    ▲ consumed by
+> PIPELINES  reusable GOVERNED MODEL-ACCESS = gateway binding + routing/rule-engine + policies
+>            + guardrails + evals + golden set + drift. "A safe, evaluated, policy-wrapped way to
+>            call models," reused across apps. (A NEW entity — NOT the current `apps` row.)
+>    ▲ consumed by
+> APPS & AGENTS  the business use-cases = pipeline binding(s) + connectors/REAL DATA SOURCES +
+>            knowledge + HITL + reports + triggers + interaction (the current `apps` entity).
+>            Also consumed by EXTERNAL 3rd-parties via a provisioned API.
+> ```
+> **What moved:** connectors/data, HITL, reports, interaction live on the APP/AGENT tier;
+> policy/guardrails/evals/drift/routing live on the PIPELINE tier.
+>
+> **Telemetry lives on the PIPELINE too** (the pipeline is the governed chokepoint every model call
+> passes through, so it already sees every request): **observability** (traces/latency/tokens),
+> **auditability** (every call + policy/guardrail decision + egress + invoker), **FinOps/cost** (spend
+> attributed to this pipeline → its gateway/model), **drift + eval history**, **provenance**. These are
+> LENSES over the pipeline's own request stream (filtered by pipeline id). Roll-up: a GATEWAY = sum of
+> all pipelines on it; an APP/AGENT = the pipeline telemetry for the calls IT made + its own HITL/
+> reports; GLOBAL pages = cross-pipeline roll-up + library. Pipeline-detail tabs: Overview · Gateway/
+> Routing · Policy · Guardrails · Evals+Golden · Drift · Observability · Audit · Cost · API. Gateways unchanged (reusable
+> backends). The evals→app association already shipped this session should re-point to the PIPELINE
+> entity once it exists (apps then reference pipelines). The sections BELOW predate this correction —
+> treat this box as authoritative where they differ.
+
+
 **Thesis (founder):** OGAC lets you create **reusable, composable pipelines that keep your data
 safe.** A pipeline is the governed unit; it runs on a gateway; it's consumed by apps, agents, and
 external third parties.
+
+**One-sentence model:** *Org owns the substrate (gateways, data, identity); a Pipeline is a reusable
+governance contract over that substrate (data-allowlist + policy + guardrails + evals + routing);
+Apps/Agents/Chat are consumers that bind a pipeline and add real data + humans; a RUN is the join key
+every lens (cost, traces, audit, drift) reads from.*
+
+## Hardened model — resolved decisions (2026-07-08, founder-confirmed)
+
+**(A) Chat/project/workspace bind a pipeline like any consumer.** Chat is NOT special — it holds a
+`pipeline_id`, so every message is a governed run (policy + guardrails + observability + audit + cost,
+free). Binding scopes, most-specific wins: **org default** ("Workspace Chat" pipeline, seeded per org)
+→ **per-project override** (a project pins a pipeline; its knowledge/policy/guardrails apply to chats
+in it — the main lever) → **per-message model pick** (only among the bound pipeline's gateway models —
+you never escape the pipeline). **Who may change it: admin sets the org-default + the set "available
+for chat"; users pick among those per-project.** No user can invent an ungoverned binding.
+
+**(B) The data layer is org-owned; permission is pipeline-owned; usage is app-owned.**
+- ORG owns the substrate: connector registry, data-domains, knowledge collections, live creds (vault).
+- PIPELINE owns the **allowlist** — which data-domains/classes it may touch. A governance contract.
+  **This allowlist is a HARD CEILING:** an app/agent can only ever touch data inside it. To use more
+  data you EDIT THE PIPELINE (or bind a different one) — there is no per-app widening. One contract.
+- APP/AGENT owns **usage** — the live connections + which allowed sources it actually queries (⊆ ceiling).
+- Integrates at TWO governed choke points at run time: **read-authorization** (request checked vs the
+  pipeline allowlist + ABAC BEFORE the connector is hit) and **masking** (retrieved rows pass through
+  guardrails/PII-masking BEFORE reaching the model). Lineage records source→run.
+
+**(C) FinOps/analytics = one fact table, many lenses; the RUN is the unit of accrual.** Every run is
+stamped: `pipeline_id → gateway_id/model`, `caller (app/agent/chat)`, `user/team/dept`, `org/tenant`,
+`tokens/cost/latency/egress-class`. Every view is a `group by`: per-pipeline (`pipeline_id`),
+per-gateway (roll-up of its pipelines), per-app/agent (`caller`), per-user/team (chargeback), org-wide
+(global FinOps = grouped by any dimension), cross-tenant (`org_id`, platform-admin only). Budgets/alerts
+attach at ANY level. **Commitment: instrument at the run, attribute by dimension, NEVER store
+pre-aggregated per-scope totals** — that's what keeps per-pipeline and org-wide consistent.
+
+**(D) RBAC and ABAC are two planes that compose in sequence.**
+- **RBAC = management plane (the console).** Who may DO what: create a pipeline, edit policy, mint an
+  API key, view audit, cross tenants. Roles (owner/admin/operator/analyst/viewer) per org/tenant, from
+  Keycloak roles → `requireModuleForUser`/`requireAdmin`. Mostly in place.
+- **ABAC = data plane (the runs).** Whether a SPECIFIC request may touch this data / reach this model.
+  OPA-evaluated inside the pipeline at run time on attributes: subject (role/dept/clearance/tenant) ×
+  resource (data-domain classification, PII level) × action (read/generate/export) × context (egress
+  class, purpose, time).
+- **Sequence per invocation:** RBAC (can you invoke this pipeline at all?) → ABAC (for this request +
+  this data, allowed? what's masked?). Chat closes the loop — even a chat message runs RBAC then ABAC.
 
 ## The layered model
 ```
