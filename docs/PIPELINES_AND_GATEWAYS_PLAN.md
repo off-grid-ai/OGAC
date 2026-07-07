@@ -38,6 +38,22 @@ governance contract over that substrate (data-allowlist + policy + guardrails + 
 Apps/Agents/Chat are consumers that bind a pipeline and add real data + humans; a RUN is the join key
 every lens (cost, traces, audit, drift) reads from.*
 
+## Adversarial review outcome (2026-07-08, founder-confirmed after critique)
+
+The model was stress-tested for enterprise fit. Founder rulings on the holes found:
+- **#1 reuse ↔ least-privilege:** ceiling stays HARD; reuse is opt-in via **composition** (pipeline-as-
+  building-block), NOT shared live objects. **1 pipeline per app / per department is fine** — the
+  pipeline is a *hygiene / composition* unit, not a forced-sharing unit. So no per-binding subsetting.
+- **WE operate it, the enterprise does not.** OGAC's operator persona for pipeline/gateway/policy config
+  is **us configuring on the customer's behalf** + shipped pre-built pipelines. So "nobody writes Rego"
+  (#4) is not a blocker — the bar is *usable by us* + sensible templates, not self-serve Rego authoring.
+- **Fold into schema now:** #2 pipeline **versioning** (immutable versions; consumers pin; edit = new
+  version) and #5 **mandatory-vs-overridable** controls (org controls typed locked|default; a pipeline
+  may only TIGHTEN a locked control, never loosen). These change tables, so build them in from the start.
+- **Logged to gaps ledger (fixable within the model, not v1-blocking):** #3 team/BU tier between org &
+  consumer, #6 FinOps rollup tables + on-prem cost-allocation model, #8 chat selecting multiple
+  pipelines-as-tools, #9 gateway(intra-backend) vs pipeline(inter-gateway) routing wording.
+
 ## Hardened model — resolved decisions (2026-07-08, founder-confirmed)
 
 **(A) Chat/project/workspace bind a pipeline like any consumer.** Chat is NOT special — it holds a

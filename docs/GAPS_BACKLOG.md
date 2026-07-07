@@ -510,3 +510,21 @@ Full report: `docs/HARDENING_AUDIT.md`. 20 findings (3 P0, 8 P1, 9 P2). Ranked; 
   observability/provit route try-catch — other concerns), #131 (fleet/tenant/org-settings/backup-prune
   audit — not in the named audit list + outside owned set), #132 (urlHint — vectordb concern), #122/#124
   (P0s, already fixed + deployed per task brief).
+
+## Pipelines-as-first-class — deferred design gaps (2026-07-08)
+
+From the adversarial review of the 3-tier model (canonical: `PIPELINES_AND_GATEWAYS_PLAN.md`
+§ Adversarial review). Founder-confirmed as fixable *within* the model, NOT v1-blocking. Each is
+real and should be closed before enterprise GA:
+
+| # | Gap | What to do | Owner | Effort |
+|---|-----|-----------|-------|--------|
+| PA-3 | **Flat org — no team/BU tier.** One admin per org doesn't scale to a bank's departments; per-team budgets/data-scope/delegated-admin have nowhere to live. | Add a `workspace`/team tier between org and consumer; RBAC + budgets + "available pipelines" delegated per team. | console | L |
+| PA-6 | **FinOps won't scale + on-prem cost is unmodeled.** One run-keyed fact table times out at volume; a self-hosted GPU has no per-token $ figure. | Add derived rollup tables/materialized views over the run fact-table; define an on-prem cost-allocation model ($/GPU-hour → $/token). | console | M |
+| PA-8 | **Chat bound to ONE pipeline is too rigid** — a conversation often needs several (loan, then fraud); rigidity drives shadow AI. | Let chat select among *multiple* allowed pipelines as tools, not a single hard binding. | console | M |
+| PA-9 | **Gateway vs pipeline routing overlap** confuses operators. | Doc + UI wording: gateway = intra-backend (nodes within one provider); pipeline = inter-gateway + model choice + egress leash. | console | XS |
+| PA-4 | **ABAC attribute sourcing + latency** — subject attrs must come fresh from the IdP per request; OPA on every interactive call has a latency cost. | Wire Keycloak/AD claims → OPA input; measure + budget per-request policy latency; cache attrs with TTL. | console + infra | M |
+
+Being built NOW (fold into schema from the start, per founder): pipeline **versioning** (immutable
+versions, consumers pin, edit = new version) and **mandatory-vs-overridable** controls (org control
+typed `locked|default`; pipeline may only tighten a locked one).
