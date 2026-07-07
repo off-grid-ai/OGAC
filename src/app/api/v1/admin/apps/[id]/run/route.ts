@@ -5,6 +5,7 @@ import { currentOrgId } from '@/lib/tenancy';
 import { getApp } from '@/lib/apps-store';
 import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
+import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,9 +37,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     runId,
   });
 
+  // Resolve + tag the bound pipeline (CONSUMERS-BIND #166) so telemetry/governance lenses light up.
+  // The RUN is the join key: we stamp the audit event with the runId and a compound resource that
+  // carries the pipeline tag (`app:<id> pipeline:<pl>`), reusing the canonical audit path.
+  const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
+  const tag = pipelineRunTag(pipelineId);
   auditFromSession(gate, orgId, {
     action: 'app.run',
-    resource: `app:${id}`,
+    resource: tag ? `app:${id} ${tag}` : `app:${id}`,
+    runId,
     outcome: handle.status === 'error' ? 'error' : 'ok',
   });
 

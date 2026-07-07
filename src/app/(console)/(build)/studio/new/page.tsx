@@ -5,6 +5,7 @@ import { AppBuilder } from '@/components/build/AppBuilder';
 import { listManagedAgents } from '@/lib/agents';
 import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -18,12 +19,14 @@ export default async function StudioNewPage() {
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
 
-  const [ctx, agents] = await Promise.all([
+  const [ctx, agents, pipelines] = await Promise.all([
     getOrgContext(orgId),
     listManagedAgents(orgId).catch(() => []),
+    listPipelines(orgId).catch(() => []),
   ]);
 
   const summary = summarizeOrgContext(ctx);
+  const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name }));
   // Only data domains with a real connector binding are usable to bind a connector-query step.
   const domains = ctx.dataDomains
     .filter((d) => d.connectorId && d.resource)
@@ -49,6 +52,7 @@ export default async function StudioNewPage() {
           domains={domains}
           agents={agentOptions}
           connectors={connectorOptions}
+          pipelines={pipelineOptions}
         />
       </Suspense>
     </div>

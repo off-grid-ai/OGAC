@@ -5,7 +5,7 @@
 // It never re-implements a rule that belongs in app-model.ts.
 
 import { randomUUID } from 'crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { apps, type App } from '@/db/schema';
 import {
@@ -19,12 +19,49 @@ import {
 
 const DEFAULT_ORG = 'default';
 
+// ─── self-migrate safety net (memoized; mirrors ensurePipelinesSchema/ensureChatSchema) ────────────
+// Deploy is rsync-only (no migration step over SSH), so the store self-provisions the `apps` table +
+// any post-hoc columns (CREATE/ALTER … IF NOT EXISTS). Column names MUST match schema.ts exactly.
+let appsEnsure: Promise<void> | null = null;
+export async function ensureAppsSchema(): Promise<void> {
+  if (appsEnsure) return appsEnsure;
+  appsEnsure = (async (): Promise<void> => {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS apps (
+        id text PRIMARY KEY,
+        org_id text NOT NULL DEFAULT 'default',
+        owner_id text NOT NULL,
+        title text NOT NULL,
+        summary text NOT NULL DEFAULT '',
+        visibility text NOT NULL DEFAULT 'private',
+        pipeline_id text,
+        slug text,
+        published boolean NOT NULL DEFAULT false,
+        trigger jsonb NOT NULL DEFAULT '{"kind":"on-demand"}'::jsonb,
+        input_form jsonb,
+        steps jsonb NOT NULL DEFAULT '[]'::jsonb,
+        edges jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now());
+    `);
+    // Post-hoc column for the pipeline binding (CONSUMERS-BIND #166) on a pre-existing apps table.
+    await db.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_org_idx ON apps (org_id);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_slug_idx ON apps (slug);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_pipeline_idx ON apps (pipeline_id);`);
+  })().catch((e) => {
+    appsEnsure = null;
+    throw e;
+  });
+  return appsEnsure;
+}
+
 // The mutable part of an AppSpec — everything a caller supplies on create (ids/timestamps are
 // minted by the store; slug/published are managed by publishApp).
 export type AppSpecInput = Pick<
   AppSpec,
   'title' | 'summary' | 'visibility' | 'trigger' | 'inputForm' | 'steps' | 'edges'
-> & { published?: boolean; slug?: string };
+> & { published?: boolean; slug?: string; pipelineId?: string | null };
 
 // A patch on an existing app — any subset of the mutable fields.
 export type AppPatch = Partial<AppSpecInput>;
@@ -38,6 +75,7 @@ function toAppSpec(row: App): AppSpec {
     title: row.title,
     summary: row.summary,
     visibility: normalizeVisibility(row.visibility),
+    pipelineId: row.pipelineId ?? null,
     slug: row.slug ?? undefined,
     published: row.published,
     trigger: (row.trigger as TriggerSpec) ?? { kind: 'on-demand' },
@@ -65,6 +103,7 @@ function specFor(
     title: input.title,
     summary: input.summary ?? '',
     visibility: normalizeVisibility(input.visibility ?? 'private'),
+    pipelineId: input.pipelineId ?? null,
     slug: input.slug,
     published: input.published ?? false,
     trigger: input.trigger ?? { kind: 'on-demand' },
@@ -90,6 +129,7 @@ export async function createApp(
   ownerId: string,
   input: AppSpecInput,
 ): Promise<AppSpec> {
+  await ensureAppsSchema();
   const id = `app_${randomUUID().slice(0, 8)}`;
   const spec = specFor(id, orgId || DEFAULT_ORG, ownerId, input);
   const check = validateAppSpec(spec);
@@ -104,6 +144,7 @@ export async function createApp(
       title: spec.title,
       summary: spec.summary,
       visibility: spec.visibility,
+      pipelineId: spec.pipelineId ?? null,
       slug: spec.slug ?? null,
       published: spec.published,
       trigger: spec.trigger,
@@ -119,6 +160,7 @@ export async function createApp(
 
 // ─── getApp — by id, org-scoped ─────────────────────────────────────────────────
 export async function getApp(id: string, orgId: string): Promise<AppSpec | null> {
+  await ensureAppsSchema();
   const [row] = await db
     .select()
     .from(apps)
@@ -130,16 +172,31 @@ export async function getApp(id: string, orgId: string): Promise<AppSpec | null>
 // ─── getAppBySlug — public lookup for /app/<slug> (slug is globally unique) ─────
 // Not org-scoped: a published app is served by its slug regardless of the viewer's org.
 export async function getAppBySlug(slug: string): Promise<AppSpec | null> {
+  await ensureAppsSchema();
   const [row] = await db.select().from(apps).where(eq(apps.slug, slug)).limit(1);
   return row ? toAppSpec(row) : null;
 }
 
 // ─── listApps — all apps in an org, newest first ────────────────────────────────
 export async function listApps(orgId: string): Promise<AppSpec[]> {
+  await ensureAppsSchema();
   const rows = await db
     .select()
     .from(apps)
     .where(eq(apps.orgId, orgId || DEFAULT_ORG))
+    .orderBy(desc(apps.createdAt));
+  return rows.map(toAppSpec);
+}
+
+// ─── listAppsByPipeline — apps/agents BOUND to a pipeline (Overview "Consumers") ─
+// Org-scoped, newest first. Read-only filter over the same rows as listApps — powers the pipeline
+// Overview's live Consumers section (count + links). Never diverges from the canonical mapping.
+export async function listAppsByPipeline(pipelineId: string, orgId: string): Promise<AppSpec[]> {
+  await ensureAppsSchema();
+  const rows = await db
+    .select()
+    .from(apps)
+    .where(and(eq(apps.orgId, orgId || DEFAULT_ORG), eq(apps.pipelineId, pipelineId)))
     .orderBy(desc(apps.createdAt));
   return rows.map(toAppSpec);
 }
@@ -161,6 +218,7 @@ export async function updateApp(
     ...(patch.visibility !== undefined
       ? { visibility: normalizeVisibility(patch.visibility) }
       : {}),
+    ...(patch.pipelineId !== undefined ? { pipelineId: patch.pipelineId ?? null } : {}),
     ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
     ...(patch.published !== undefined ? { published: patch.published } : {}),
     ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
@@ -177,6 +235,7 @@ export async function updateApp(
       title: merged.title,
       summary: merged.summary,
       visibility: merged.visibility,
+      pipelineId: merged.pipelineId ?? null,
       slug: merged.slug ?? null,
       published: merged.published,
       trigger: merged.trigger,
@@ -192,6 +251,7 @@ export async function updateApp(
 
 // ─── deleteApp — org-scoped ──────────────────────────────────────────────────────
 export async function deleteApp(id: string, orgId: string): Promise<void> {
+  await ensureAppsSchema();
   await db.delete(apps).where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)));
 }
 
