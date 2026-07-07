@@ -4,7 +4,7 @@
 
 ## What it is
 
-Your own ChatGPT, answered by the on-prem gateways — with your projects, memory, and knowledge in
+Your own private AI, answered by the on-prem gateways — with your projects, memory, and knowledge in
 reach, and every message run through the governed pipeline (Policy/Guardrails/budget). No per-seat
 cost; nothing leaves your infrastructure unless a routing rule sends it there.
 

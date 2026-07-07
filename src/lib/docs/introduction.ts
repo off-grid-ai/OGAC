@@ -19,7 +19,7 @@ control plane that you own.
 
 ## What you get
 
-- **A private ChatGPT for your org.** Chat, projects, and knowledge, answered by models running on
+- **A private AI, everywhere.** Chat, projects, and knowledge, answered by models running on
   your own gateways. No per-seat cost, no prompts sent to a vendor.
 - **Your data, made answerable.** Connect core systems, upload documents, and ask questions in plain
   language. Every answer cites the source it came from.
@@ -62,7 +62,7 @@ you already have. No account yet? Ask your admin, or book a call from the sign-i
 
 Open **Chat**, pick a model, and ask a question. The answer is generated on your own gateway; the
 footer confirms it: *runs on your on-prem gateways, nothing leaves your network*. This is your
-private ChatGPT.
+private AI, everywhere.
 
 ## 3. Give it your knowledge
 
