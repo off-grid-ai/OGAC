@@ -5,13 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPromptVersions, listPrompts } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PromptDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('brain');
   const { id } = await params;
-  const [prompts, versions] = await Promise.all([listPrompts(), listPromptVersions(id)]);
+  const org = await currentOrgId();
+  const [prompts, versions] = await Promise.all([listPrompts(org), listPromptVersions(id, org)]);
   const prompt = prompts.find((p) => p.id === id);
   if (!prompt) notFound();
 

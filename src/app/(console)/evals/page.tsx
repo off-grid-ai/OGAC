@@ -15,6 +15,7 @@ import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { readEvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export default async function EvalsPage({
 }) {
   await requireModuleForUser('evals');
   const { suite } = await searchParams;
-  const view = await readEvalsView();
+  const view = await readEvalsView(25, await currentOrgId());
 
   const activeSuite = suite && view.suites.some((s) => s.engine === suite) ? suite : null;
   const runs = activeSuite

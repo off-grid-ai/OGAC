@@ -1058,8 +1058,15 @@ export interface PromptVersion {
   createdAt: string;
 }
 
-export async function listPrompts(): Promise<Prompt[]> {
-  const rows = await db.select().from(prompts).orderBy(desc(prompts.createdAt));
+// Org-scoped registry. prompt_versions has no org column of its own — it inherits scope through
+// its parent prompt: every version read/write first verifies the parent belongs to the caller's
+// org, so a tenant can never reach another org's prompt or its version history.
+export async function listPrompts(orgId: string = DEFAULT_ORG): Promise<Prompt[]> {
+  const rows = await db
+    .select()
+    .from(prompts)
+    .where(eq(prompts.orgId, orgId))
+    .orderBy(desc(prompts.createdAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -1068,7 +1075,17 @@ export async function listPrompts(): Promise<Prompt[]> {
   }));
 }
 
-export async function listPromptVersions(promptId: string): Promise<PromptVersion[]> {
+export async function listPromptVersions(
+  promptId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PromptVersion[]> {
+  // Parent-scope guard: only return versions when the prompt itself belongs to the caller's org.
+  const [p] = await db
+    .select({ id: prompts.id })
+    .from(prompts)
+    .where(and(eq(prompts.id, promptId), eq(prompts.orgId, orgId)))
+    .limit(1);
+  if (!p) return [];
   const rows = await db
     .select()
     .from(promptVersions)
@@ -1083,34 +1100,54 @@ export async function listPromptVersions(promptId: string): Promise<PromptVersio
   }));
 }
 
-export async function createPrompt(name: string, description: string): Promise<Prompt> {
+export async function createPrompt(
+  name: string,
+  description: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<Prompt> {
   const [row] = await db
     .insert(prompts)
-    .values({ id: `pr_${randomUUID().slice(0, 8)}`, name, description })
+    .values({ id: `pr_${randomUUID().slice(0, 8)}`, orgId, name, description })
     .returning();
   return { id: row.id, name: row.name, description: row.description, latestVersion: 0 };
 }
 
 // Publish a new version of a prompt (immutable history; bumps the prompt's latestVersion).
+// Returns null when the prompt doesn't exist for the caller's org (can't version another org's).
 export async function addPromptVersion(
   promptId: string,
   body: string,
   label: string,
+  orgId: string = DEFAULT_ORG,
 ): Promise<PromptVersion | null> {
-  const [p] = await db.select().from(prompts).where(eq(prompts.id, promptId)).limit(1);
+  const [p] = await db
+    .select()
+    .from(prompts)
+    .where(and(eq(prompts.id, promptId), eq(prompts.orgId, orgId)))
+    .limit(1);
   if (!p) return null;
   const version = p.latestVersion + 1;
   const [row] = await db
     .insert(promptVersions)
     .values({ id: `pv_${randomUUID().slice(0, 8)}`, promptId, version, body, label })
     .returning();
-  await db.update(prompts).set({ latestVersion: version }).where(eq(prompts.id, promptId));
+  await db
+    .update(prompts)
+    .set({ latestVersion: version })
+    .where(and(eq(prompts.id, promptId), eq(prompts.orgId, orgId)));
   return { id: row.id, version, body, label, createdAt: iso(row.createdAt) };
 }
 
-export async function deletePrompt(id: string): Promise<void> {
+export async function deletePrompt(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  // Only cascade-delete the versions when the parent is the caller's — no cross-org reach.
+  const [p] = await db
+    .select({ id: prompts.id })
+    .from(prompts)
+    .where(and(eq(prompts.id, id), eq(prompts.orgId, orgId)))
+    .limit(1);
+  if (!p) return;
   await db.delete(promptVersions).where(eq(promptVersions.promptId, id));
-  await db.delete(prompts).where(eq(prompts.id, id));
+  await db.delete(prompts).where(and(eq(prompts.id, id), eq(prompts.orgId, orgId)));
 }
 
 // ─── Governance registry (Phase E org wrapper) ─────────────────────────────────
@@ -1442,30 +1479,47 @@ function toCustomAgent(r: typeof customAgents.$inferSelect): CustomAgent {
   };
 }
 
-export async function listCustomAgents(): Promise<CustomAgent[]> {
-  const rows = await db.select().from(customAgents).orderBy(desc(customAgents.createdAt));
+// Org-scoped: a tenant only ever sees/runs its own custom agents. Every read/write is constrained
+// to the caller's org so agents authored in org A never leak into org B.
+export async function listCustomAgents(orgId: string = DEFAULT_ORG): Promise<CustomAgent[]> {
+  const rows = await db
+    .select()
+    .from(customAgents)
+    .where(eq(customAgents.orgId, orgId))
+    .orderBy(desc(customAgents.createdAt));
   return rows.map(toCustomAgent);
 }
 
-export async function getCustomAgent(id: string): Promise<CustomAgent | undefined> {
-  const [row] = await db.select().from(customAgents).where(eq(customAgents.id, id)).limit(1);
+export async function getCustomAgent(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<CustomAgent | undefined> {
+  const [row] = await db
+    .select()
+    .from(customAgents)
+    .where(and(eq(customAgents.id, id), eq(customAgents.orgId, orgId)))
+    .limit(1);
   return row ? toCustomAgent(row) : undefined;
 }
 
-export async function createCustomAgent(input: {
-  name: string;
-  role?: string;
-  description?: string;
-  systemPrompt: string;
-  model?: string;
-  tools?: string[];
-  grounded?: boolean;
-  trigger?: string;
-}): Promise<CustomAgent> {
+export async function createCustomAgent(
+  input: {
+    name: string;
+    role?: string;
+    description?: string;
+    systemPrompt: string;
+    model?: string;
+    tools?: string[];
+    grounded?: boolean;
+    trigger?: string;
+  },
+  orgId: string = DEFAULT_ORG,
+): Promise<CustomAgent> {
   const [row] = await db
     .insert(customAgents)
     .values({
       id: `agent_${randomUUID().slice(0, 8)}`,
+      orgId,
       name: input.name,
       role: input.role || 'Custom',
       description: input.description || '',
@@ -1479,8 +1533,15 @@ export async function createCustomAgent(input: {
   return toCustomAgent(row);
 }
 
-export async function setCustomAgentEnabled(id: string, enabled: boolean): Promise<void> {
-  await db.update(customAgents).set({ enabled }).where(eq(customAgents.id, id));
+export async function setCustomAgentEnabled(
+  id: string,
+  enabled: boolean,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await db
+    .update(customAgents)
+    .set({ enabled })
+    .where(and(eq(customAgents.id, id), eq(customAgents.orgId, orgId)));
 }
 
 // Edit a user-authored agent in place. Only the provided fields are written, so a partial patch
@@ -1497,6 +1558,7 @@ export async function updateCustomAgent(
     grounded: boolean;
     trigger: string;
   }>,
+  orgId: string = DEFAULT_ORG,
 ): Promise<CustomAgent | undefined> {
   const set: Record<string, unknown> = {};
   if (patch.name !== undefined) set.name = patch.name;
@@ -1507,11 +1569,15 @@ export async function updateCustomAgent(
   if (patch.tools !== undefined) set.tools = patch.tools;
   if (patch.grounded !== undefined) set.grounded = patch.grounded;
   if (patch.trigger !== undefined) set.trigger = patch.trigger;
-  if (Object.keys(set).length === 0) return getCustomAgent(id);
-  const [row] = await db.update(customAgents).set(set).where(eq(customAgents.id, id)).returning();
+  if (Object.keys(set).length === 0) return getCustomAgent(id, orgId);
+  const [row] = await db
+    .update(customAgents)
+    .set(set)
+    .where(and(eq(customAgents.id, id), eq(customAgents.orgId, orgId)))
+    .returning();
   return row ? toCustomAgent(row) : undefined;
 }
 
-export async function deleteCustomAgent(id: string): Promise<void> {
-  await db.delete(customAgents).where(eq(customAgents.id, id));
+export async function deleteCustomAgent(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  await db.delete(customAgents).where(and(eq(customAgents.id, id), eq(customAgents.orgId, orgId)));
 }

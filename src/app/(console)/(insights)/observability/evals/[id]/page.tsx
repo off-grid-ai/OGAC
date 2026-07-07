@@ -14,13 +14,14 @@ import {
 } from '@/components/ui/table';
 import { getEvalRun } from '@/lib/evals';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EvalRunPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('observability');
   const { id } = await params;
-  const run = await getEvalRun(id);
+  const run = await getEvalRun(id, await currentOrgId());
   if (!run) notFound();
   const cases = run.results ?? [];
 

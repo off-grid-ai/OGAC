@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/authz';
 import { markdownToPdf } from '@/lib/pdf';
 import { buildManifest } from '@/lib/provenance';
 import { generateReport } from '@/lib/reports';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Generate one report live and stream it as a Markdown (default) or PDF (?format=pdf) download.
 // Every export carries a detached, signed provenance manifest: the signature + file hash ride in
@@ -27,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const report = await generateReport(id);
+  const report = await generateReport(id, await currentOrgId());
   if (!report) return NextResponse.json({ error: 'unknown report' }, { status: 404 });
 
   const url = new URL(req.url);

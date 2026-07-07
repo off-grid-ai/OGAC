@@ -304,8 +304,10 @@ async function auditSummary(): Promise<string> {
   return l.join('\n');
 }
 
-async function evalReport(): Promise<string> {
-  const [cases, runs] = await Promise.all([listGoldenCases(), listEvalRuns(1)]);
+async function evalReport(orgId?: string): Promise<string> {
+  // Latest run is org-scoped (undefined → DEFAULT_ORG in the store) so a tenant's quality report
+  // reflects only its own eval history.
+  const [cases, runs] = await Promise.all([listGoldenCases(), listEvalRuns(1, orgId)]);
   const latest = runs[0];
   const l: string[] = [];
   h(l, 'Off Grid AI — Retrieval Quality Report');
@@ -345,11 +347,13 @@ async function inventory(): Promise<string> {
 
 export async function generateReport(
   id: string,
+  orgId?: string,
 ): Promise<{ filename: string; body: string } | null> {
   if (id === 'compliance') return buildExport();
   if (id === 'audit-summary')
     return { filename: 'offgrid-audit-summary.md', body: await auditSummary() };
-  if (id === 'eval-report') return { filename: 'offgrid-eval-report.md', body: await evalReport() };
+  if (id === 'eval-report')
+    return { filename: 'offgrid-eval-report.md', body: await evalReport(orgId) };
   if (id === 'inventory') return { filename: 'offgrid-inventory.md', body: await inventory() };
   if (id in REGULATORS) return regulatorPack(id);
   // Fall through to operator-authored custom templates stored in the DB.

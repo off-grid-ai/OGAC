@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { deleteDocument } from '@/lib/org-knowledge';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ docI
   if (session.user.role !== 'admin')
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { docId } = await params;
-  await deleteDocument(docId);
+  await deleteDocument(docId, await currentOrgId());
   return NextResponse.json({ ok: true });
 }
