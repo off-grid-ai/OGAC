@@ -125,6 +125,10 @@ export const goldenCases = pgTable('golden_cases', {
   // The pipeline (app) this golden case belongs to. NULL = an org-wide/shared case (the reusable
   // library). A pipeline's golden set = its own cases; runs execute in that pipeline's context.
   appId: text('app_id'),
+  // The PIPELINE this golden case belongs to (corrected 3-tier model — governance lives on the
+  // pipeline). NULL = an org-wide/shared case (the reusable library). Supersedes app_id as the
+  // governance owner; app_id is kept for the already-shipped app Quality tab back-compat.
+  pipelineId: text('pipeline_id'),
   orgId: text('org_id').notNull().default('default'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1014,3 +1018,24 @@ export type Pipeline = typeof pipelines.$inferSelect;
 export type NewPipeline = typeof pipelines.$inferInsert;
 export type PipelineVersion = typeof pipelineVersions.$inferSelect;
 export type NewPipelineVersion = typeof pipelineVersions.$inferInsert;
+
+// Per-pipeline provisioned API keys — the pipeline is callable as its own governed endpoint by
+// apps/agents/external third-parties (analogous to tenant provisioning). Only the hash is stored;
+// the plaintext key is shown ONCE at mint time. `prefix` is the non-secret display stub (og_pl_…).
+export const pipelineApiKeys = pgTable('pipeline_api_keys', {
+  id: text('id').primaryKey(),
+  pipelineId: text('pipeline_id').notNull(),
+  orgId: text('org_id').notNull().default('default'),
+  name: text('name').notNull().default(''),
+  hashedKey: text('hashed_key').notNull(),
+  prefix: text('prefix').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text('created_by').notNull().default(''),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+}, (t) => [
+  index('pipeline_api_keys_pipeline_idx').on(t.pipelineId),
+  index('pipeline_api_keys_org_idx').on(t.orgId),
+]);
+
+export type PipelineApiKey = typeof pipelineApiKeys.$inferSelect;
+export type NewPipelineApiKey = typeof pipelineApiKeys.$inferInsert;
