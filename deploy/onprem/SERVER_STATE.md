@@ -760,3 +760,19 @@ Regulatory framework adoption + per-control status (ISO42001/NIST-AI-RMF/EU-AI-A
 
 ### app-worker now a launchd job (2026-07-06)
 The `offgrid-apps` worker is now a gui-domain LaunchAgent `co.getoffgridai.app-worker` (plist: `deploy/onprem/co.getoffgridai.app-worker.plist`) — RunAtLoad + KeepAlive, survives reboot. Bootstrapped on S1; log `/Users/admin/offgrid/console/app-worker.log`; restart `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.app-worker`. Supersedes the earlier "not yet a launchd job" note.
+
+## 2026-07-08 — tenant subdomains fixed (cloudflared stale replica) + per-tenant gateway URL plan
+
+- **Tenant console subdomains (`<slug>-onprem-console.getoffgridai.co`) were intermittently 404ing.**
+  Root cause: TWO `cloudflared tunnel run` replicas for tunnel `70f8a607…`; replica PID 10168 (started
+  Jul 3) ran a STALE config without the `*.getoffgridai.co` wildcard ingress, while PID 83567 (Jul 7)
+  had it. Cloudflare round-robins replicas → tenant (wildcard-only) hosts 404'd ~50% of the time.
+  **FIX:** killed the stale replica (`kill 10168`); one replica (83567, current config) remains and
+  keeps the tunnel up (no downtime). Verified `bharatunion-onprem-console` 15/15 → 200.
+- DNS already has wildcard `*.getoffgridai.co` (proxied CNAME → tunnel) + `*.onprem-console.*` +
+  explicit `bharatunion-onprem-console` — all → the tunnel. Live ingress already had `*.getoffgridai.co
+  → :3000`. Canonical `cloudflared-tunnel.yml` re-synced to live (was stale).
+- **Per-tenant GATEWAY URLs (planned, not yet live):** provisioned tenant gateway host =
+  `<slug[:5]><rand5>-gateway.getoffgridai.co` (mirrors `gateway.getoffgridai.co`). Needs: a
+  more-specific `*-gateway.getoffgridai.co → :8800` ingress rule ABOVE the wildcard (verify cloudflared
+  supports the pattern) + the aggregator resolving tenant from Host. Deferred (supervised tunnel edit).
