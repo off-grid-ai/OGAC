@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
@@ -23,13 +22,13 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  // requireAdmin already enforces the admin role AND accepts the service bearer token (the standard
+  // gate every other admin route uses). The previous extra `auth()` session re-check rejected the
+  // service-token path (auth() is null for a bearer request), making this route inconsistently
+  // stricter than the rest — dropped so it matches. (gap PA-14)
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const session = await auth();
-  if (session?.user?.role !== 'admin') {
-    return NextResponse.json({ error: 'admin only' }, { status: 403 });
-  }
-  const by = session.user.email ?? 'admin';
+  const by = gate.user.email ?? 'admin';
   const org = await currentOrgId();
   const b = (await req.json().catch(() => null)) as {
     systemPrompt?: unknown;
