@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/Pagination';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -153,8 +154,14 @@ function AddUserForm({
         </div>
       )}
       <div className="flex gap-2">
-        <Button size="sm" onClick={submit} disabled={saving}>
-          {saving ? 'Creating…' : 'Create user'}
+        <Button size="sm" className="gap-1.5" onClick={submit} disabled={saving}>
+          {saving ? (
+            <>
+              <Spinner /> Creating…
+            </>
+          ) : (
+            'Create user'
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
@@ -277,7 +284,7 @@ export function UsersList() {
         )}
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <div className="overflow-x-auto">
             <Table>

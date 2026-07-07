@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock } from '@/components/ui/spinner';
 
 export interface PickableUser {
   id: string;
@@ -60,7 +61,7 @@ export function UserPicker({
         className="max-w-xs"
       />
       {loading ? (
-        <p className="py-3 text-center text-xs text-muted-foreground">Loading…</p>
+        <LoadingBlock />
       ) : users.length === 0 ? (
         <p className="py-3 text-center text-xs text-muted-foreground">No users found.</p>
       ) : (
