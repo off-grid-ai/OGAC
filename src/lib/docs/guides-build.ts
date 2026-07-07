@@ -7,7 +7,7 @@ export const buildSection: DocSection = {
     {
       slug: 'guides/chat',
       title: 'Chat',
-      description: 'Your private ChatGPT — grounded, governed, and answered on your own hardware.',
+      description: 'Your private AI, everywhere — grounded, governed, and answered on your own hardware.',
       body: `Chat is your org's private assistant. It streams from your own gateways, so prompts and
 answers stay on your network.
 
