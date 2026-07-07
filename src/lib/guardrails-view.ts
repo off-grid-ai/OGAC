@@ -144,7 +144,7 @@ export function buildGuardrailsView(
   return {
     engine,
     adapterId,
-    vendor: str(m.vendor, engine === 'presidio' ? 'Microsoft Presidio' : 'Off Grid checks spine'),
+    vendor: str(m.vendor, engine === 'presidio' ? 'Microsoft Presidio' : 'Off Grid AI checks spine'),
     license: str(m.license, engine === 'presidio' ? 'MIT' : 'first-party'),
     description: str(m.description),
     // The always-on regex floor is reachable by definition; only Presidio can be unreachable.

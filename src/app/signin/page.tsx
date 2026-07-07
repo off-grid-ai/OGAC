@@ -83,8 +83,8 @@ export default async function SignInPage({
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-sm shadow-sm">
         <CardHeader className="items-center text-center">
-          <Image src="/logo.png" alt="Off Grid" width={40} height={40} className="mb-2" priority />
-          <CardTitle className="text-base">Off Grid Console</CardTitle>
+          <Image src="/logo.png" alt="Off Grid AI" width={40} height={40} className="mb-2" priority />
+          <CardTitle className="text-base">Off Grid AI Console</CardTitle>
           <CardDescription>
             Sign in to your control plane: fleet, models, data, agents, and governance.
           </CardDescription>

@@ -49,7 +49,7 @@ a badge names the device backend in use, and the **Devices** table lists each de
 2. Enter the **Role** the device will have (e.g. "Field Advisor").
 3. Click **Issue token**. The console shows a **one-time token** (`enr_…`) with a **Copy** button.
    *Copy it now — it's shown once and can be redeemed only once.*
-4. On the device, the Off Grid client redeems that token. In return it receives its own private
+4. On the device, the Off Grid AI client redeems that token. In return it receives its own private
    device credential and appears in the table as **online**, on the current policy version.
 
 That device credential is minted per-device and returned only at enrollment — the console never shows

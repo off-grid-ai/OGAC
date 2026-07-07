@@ -11,9 +11,9 @@
 // ─── Stable identifiers ─────────────────────────────────────────────────────
 // These names are the idempotency keys: provisioning finds-or-creates by matching them, so they must
 // never drift once shipped.
-export const OFFGRID_DB_NAME = 'Off Grid Console';
+export const OFFGRID_DB_NAME = 'Off Grid AI Console';
 export const OFFGRID_DATASET_TABLE = 'audit_events';
-export const OFFGRID_DASHBOARD_TITLE = 'Off Grid — Gateway Overview';
+export const OFFGRID_DASHBOARD_TITLE = 'Off Grid AI — Gateway Overview';
 export const CHART_REQUESTS_OVER_TIME = 'Requests over time';
 export const CHART_TOKENS_BY_MODEL = 'Tokens by model';
 
@@ -66,7 +66,7 @@ export function dashboardExistsInList(rows: SupersetDashboardRow[], embedUuid: s
   return rows.some((r) => r.uuid === embedUuid);
 }
 
-// Find an already-provisioned Off Grid dashboard by its stable title (for idempotent provisioning).
+// Find an already-provisioned Off Grid AI dashboard by its stable title (for idempotent provisioning).
 export function findOwnedDashboard(rows: SupersetDashboardRow[]): SupersetDashboardRow | undefined {
   return rows.find((r) => r.dashboard_title === OFFGRID_DASHBOARD_TITLE);
 }

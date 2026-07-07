@@ -158,7 +158,7 @@ export async function buildExport(
   const c = await computeCompliance();
   const frameworks = frameworkId ? c.frameworks.filter((f) => f.id === frameworkId) : c.frameworks;
   const lines: string[] = [];
-  lines.push(`# Off Grid — Compliance Evidence Pack`);
+  lines.push(`# Off Grid AI — Compliance Evidence Pack`);
   lines.push(`Generated: ${c.generatedAt}`);
   lines.push(`Overall posture: ${c.posture}%`);
   lines.push('');

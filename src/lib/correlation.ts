@@ -35,7 +35,7 @@ export function normalizeTraceId(runId: string): string {
   return runId.replace(/[^a-zA-Z0-9]/g, '');
 }
 
-// A fixed namespace UUID for Off Grid lineage run ids. Any constant UUID works as a UUIDv5 namespace;
+// A fixed namespace UUID for Off Grid AI lineage run ids. Any constant UUID works as a UUIDv5 namespace;
 // this one is arbitrary-but-fixed so the derivation is stable across deploys and reproducible by the
 // harness. (Generated once; never change it, or previously-emitted lineage runs stop correlating.)
 export const LINEAGE_UUID_NAMESPACE = '6f1a9d3e-2c4b-5a67-8f90-1b2c3d4e5f60';

@@ -62,7 +62,7 @@ export const nativeMdm: MdmPort = {
   meta: {
     id: 'native',
     capability: 'mdm',
-    vendor: 'Off Grid device registry',
+    vendor: 'Off Grid AI device registry',
     license: 'first-party',
     render: 'native',
     description: 'The nodes enrolled in this console — provision, policy, audit, kill-switch (default).',

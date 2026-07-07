@@ -8,7 +8,7 @@ export default function HandbookIndex() {
     <div>
       <h1 className="text-xl font-semibold tracking-tight text-foreground">Handbook</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        How the Off Grid Console is built, integrated, and operated. The API reference lives at{' '}
+        How the Off Grid AI Console is built, integrated, and operated. The API reference lives at{' '}
         <a href="/docs" className="text-primary underline underline-offset-2">
           /docs
         </a>

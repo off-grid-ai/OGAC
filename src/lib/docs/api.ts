@@ -149,7 +149,7 @@ store. The prompt and the image never leave your infrastructure.`,
       slug: 'api/service-specs',
       title: 'Service specs',
       description: 'Every underlying service’s OpenAPI, through one origin.',
-      body: `Each integrated service publishes its own OpenAPI document. Off Grid proxies them through
+      body: `Each integrated service publishes its own OpenAPI document. Off Grid AI proxies them through
 one authed origin so you can browse them together without CORS or LAN issues.
 
 - \`/specs/<service>\` returns the service's OpenAPI JSON (e.g. \`qdrant\`, \`langfuse\`, \`openbao\`,
@@ -170,7 +170,7 @@ and others) work today — point the base URL at your gateway and use a machine-
 For the console API (connectors, agents, policy, and the rest), call the REST routes directly with a
 bearer token; the [interactive reference](/docs/api) documents every one.
 
-A first-party Off Grid SDK that wraps both surfaces is on the roadmap.`,
+A first-party Off Grid AI SDK that wraps both surfaces is on the roadmap.`,
     },
   ],
 };

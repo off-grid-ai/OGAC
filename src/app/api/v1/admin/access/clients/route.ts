@@ -88,7 +88,7 @@ export async function POST(req: Request) {
       scopedRole = body.roleName;
     }
     if (scopedRole && body.serviceAccountsEnabled) {
-      const role = await kc.ensureRealmRole(scopedRole, `Off Grid scope: ${scopedRole}`);
+      const role = await kc.ensureRealmRole(scopedRole, `Off Grid AI scope: ${scopedRole}`);
       const saUser = await kc.getServiceAccountUser(id);
       if (saUser?.id) await kc.assignRoles(saUser.id, [role]);
     }

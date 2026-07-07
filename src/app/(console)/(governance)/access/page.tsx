@@ -35,7 +35,7 @@ export default async function AccessPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
-              Set the following environment variables to connect Off Grid to your Keycloak realm.
+              Set the following environment variables to connect Off Grid AI to your Keycloak realm.
             </p>
             <div className="rounded-md border border-border bg-muted/40 p-4 font-mono text-xs space-y-1">
               <div>

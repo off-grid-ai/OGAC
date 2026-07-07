@@ -232,7 +232,7 @@ export interface ProvisionResult {
 }
 
 // Idempotently provision the starter dashboard: database → dataset → charts → dashboard. Detects and
-// reuses an existing Off Grid dashboard (matched by stable title) rather than duplicating.
+// reuses an existing Off Grid AI dashboard (matched by stable title) rather than duplicating.
 export async function provisionDashboard(): Promise<ProvisionResult> {
   if (!supersetConfigured()) return { configured: false, ok: false, created: false };
   if (!DB_URI) {

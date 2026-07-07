@@ -124,7 +124,7 @@ export const nativeDrift: DriftPort = {
   meta: {
     id: 'native',
     capability: 'drift',
-    vendor: 'Off Grid drift (PSI)',
+    vendor: 'Off Grid AI drift (PSI)',
     license: 'first-party',
     render: 'native',
     description:

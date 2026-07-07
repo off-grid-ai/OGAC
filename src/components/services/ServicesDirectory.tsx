@@ -109,7 +109,7 @@ export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Services</h1>
           <p className="text-sm text-muted-foreground">
-            Every Off Grid surface and internal service with live health.
+            Every Off Grid AI surface and internal service with live health.
           </p>
         </div>
         {checkedAt && (

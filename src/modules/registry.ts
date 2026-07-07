@@ -79,7 +79,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'services',
     label: 'Services',
     description:
-      'The directory of every Off Grid surface — console, gateway, and product subdomains — with live health. One login covers them all.',
+      'The directory of every Off Grid AI surface — console, gateway, and product subdomains — with live health. One login covers them all.',
     route: '/services',
     service: 'console',
     internal: true,

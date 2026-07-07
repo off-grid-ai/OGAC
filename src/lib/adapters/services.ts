@@ -29,7 +29,7 @@ export const POLICY: RegEntry[] = [
     meta: {
       id: 'abac',
       capability: 'policy',
-      vendor: 'Off Grid RBAC + ABAC',
+      vendor: 'Off Grid AI RBAC + ABAC',
       license: 'first-party',
       render: 'native',
       description: 'Deny-overrides ABAC + RBAC evaluated in-console (always on).',
@@ -79,7 +79,7 @@ export const LINEAGE: RegEntry[] = [
     meta: {
       id: 'native',
       capability: 'lineage',
-      vendor: 'Off Grid (implicit)',
+      vendor: 'Off Grid AI (implicit)',
       license: 'first-party',
       render: 'native',
       description: 'Lineage implicit in the audit trace; no separate graph (default, zero-OSS).',
@@ -104,7 +104,7 @@ export const GUARDRAIL_ENTRIES: RegEntry[] = [
     meta: {
       id: 'checks',
       capability: 'guardrails',
-      vendor: 'Off Grid checks spine',
+      vendor: 'Off Grid AI checks spine',
       license: 'first-party',
       render: 'native',
       description: 'PII / injection hooks normalized onto the audit record (always on).',
@@ -168,7 +168,7 @@ export const SIEM: RegEntry[] = [
     meta: {
       id: 'audit',
       capability: 'siem',
-      vendor: 'Off Grid audit store',
+      vendor: 'Off Grid AI audit store',
       license: 'first-party',
       render: 'native',
       description: 'Append-only audit/traffic log in Postgres (always on).',
@@ -197,7 +197,7 @@ export const PROVENANCE: RegEntry[] = [
     meta: {
       id: 'native',
       capability: 'provenance',
-      vendor: 'Off Grid provenance chain',
+      vendor: 'Off Grid AI provenance chain',
       license: 'first-party',
       render: 'native',
       description:
@@ -208,7 +208,7 @@ export const PROVENANCE: RegEntry[] = [
     meta: {
       id: 'ed25519',
       capability: 'provenance',
-      vendor: 'Off Grid ed25519 signatures',
+      vendor: 'Off Grid AI ed25519 signatures',
       license: 'first-party',
       render: 'headless',
       description:

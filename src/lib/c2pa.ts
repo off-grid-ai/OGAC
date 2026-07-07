@@ -52,14 +52,14 @@ export async function c2paSign(
   const manifest = new ManifestBuilder({
     claim_generator: CLAIM_GENERATOR,
     format: mimeType,
-    title: opts.title ?? 'Off Grid asset',
+    title: opts.title ?? 'Off Grid AI asset',
     assertions: [
       {
         label: 'stds.schema-org.CreativeWork',
         data: {
           '@context': 'https://schema.org',
           '@type': 'CreativeWork',
-          author: [{ '@type': 'Organization', name: opts.author ?? 'Off Grid Console' }],
+          author: [{ '@type': 'Organization', name: opts.author ?? 'Off Grid AI Console' }],
         },
       },
     ],

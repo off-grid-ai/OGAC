@@ -1,4 +1,4 @@
-# Off Grid Console — operator guide
+# Off Grid AI Console — operator guide
 
 How to *use* the console to run your on-prem AI platform. One page per surface. Audience: the
 operator running the platform — not a developer. Each page answers the same questions:
