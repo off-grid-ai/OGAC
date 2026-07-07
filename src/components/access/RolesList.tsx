@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -133,8 +134,14 @@ export function RolesList() {
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={addRole} disabled={saving}>
-                {saving ? 'Creating…' : 'Create role'}
+              <Button size="sm" className="gap-1.5" onClick={addRole} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Spinner /> Creating…
+                  </>
+                ) : (
+                  'Create role'
+                )}
               </Button>
               <Button
                 size="sm"
@@ -152,7 +159,7 @@ export function RolesList() {
         )}
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          <LoadingBlock />
         ) : (
           <div className="overflow-x-auto">
             <Table>
