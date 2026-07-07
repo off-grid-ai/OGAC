@@ -145,19 +145,28 @@ export async function readPolicyStatus(): Promise<PolicyStatus> {
   };
 }
 
-// Fetch OPA decision logs when the console-facing decision-log endpoint is configured, else []. The
-// sink URL is separate from OFFGRID_OPA_URL (OPA ships decisions to an external sink, not its data
-// API). Absent config or any error → empty list, so the surface degrades to "no decisions yet".
+// Read recent policy DECISIONS for the read-back surface. Two sources, in priority order:
+//   1. OPA's external decision-log sink, when OFFGRID_OPA_DECISION_LOG_URL is configured (the OPA
+//      deployment ships decisions there — separate from OFFGRID_OPA_URL, which is the data API).
+//   2. Otherwise, the first-party in-process decision log: every enforcement decision (ABAC OR OPA)
+//      is mirrored there via the policy port, so the surface shows a real history with zero extra
+//      infra. Same PolicyDecisionRow shape either way (DRY) — nothing is fabricated.
+// Any error degrades to the local log then to [], so the surface never throws.
 export async function readDecisions(): Promise<PolicyDecisionRow[]> {
   const sink = process.env.OFFGRID_OPA_DECISION_LOG_URL;
-  if (!sink) return [];
-  try {
-    const res = await fetch(sink, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return [];
-    const body = await res.json();
-    const raw = Array.isArray(body) ? body : (body?.data ?? body?.decisions ?? body?.result);
-    return normalizeDecisions(raw);
-  } catch {
-    return [];
+  if (sink) {
+    try {
+      const res = await fetch(sink, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const body = await res.json();
+        const raw = Array.isArray(body) ? body : (body?.data ?? body?.decisions ?? body?.result);
+        const rows = normalizeDecisions(raw);
+        if (rows.length) return rows;
+      }
+    } catch {
+      /* fall through to the local decision log */
+    }
   }
+  const { recentDecisions } = await import('@/lib/policy-decision-log');
+  return recentDecisions();
 }
