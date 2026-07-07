@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeTabForPath, pipelineTabHref, pipelineTabs } from '../src/lib/pipeline-detail.ts';
+import {
+  activeTabForPath,
+  pipelineTabHref,
+  pipelineTabs,
+  pipelineTransitions,
+} from '../src/lib/pipeline-detail.ts';
 
 // The per-pipeline detail tab model (mirrors app-lifecycle). Pure — drives the scoped SubNav and keeps
 // every tab deep-linkable + Back-coherent.
@@ -46,4 +51,38 @@ test('activeTabForPath: an unknown sub-segment falls back to overview', () => {
 test('activeTabForPath: a path for a different pipeline is not claimed', () => {
   assert.equal(activeTabForPath('/pipelines/other', 'pl_42'), null);
   assert.equal(activeTabForPath('/gateways', 'pl_42'), null);
+});
+
+// ─── pipelineTransitions — the legal lifecycle actions from each status (drives Overview actions) ──
+
+test('pipelineTransitions: a draft can be published or archived', () => {
+  const t = pipelineTransitions('draft');
+  assert.deepEqual(
+    t.map((x) => x.action),
+    ['publish', 'archive'],
+  );
+  assert.equal(t.find((x) => x.action === 'publish')?.to, 'published');
+  assert.equal(t.find((x) => x.action === 'archive')?.to, 'archived');
+  assert.ok(t.every((x) => x.label && x.hint));
+});
+
+test('pipelineTransitions: a published pipeline can only be archived (not re-published)', () => {
+  const t = pipelineTransitions('published');
+  assert.deepEqual(
+    t.map((x) => x.action),
+    ['archive'],
+  );
+});
+
+test('pipelineTransitions: an archived pipeline restores to draft', () => {
+  const t = pipelineTransitions('archived');
+  assert.deepEqual(
+    t.map((x) => x.action),
+    ['unarchive'],
+  );
+  assert.equal(t[0].to, 'draft');
+});
+
+test('pipelineTransitions: an unknown status offers nothing', () => {
+  assert.deepEqual(pipelineTransitions('bogus'), []);
 });

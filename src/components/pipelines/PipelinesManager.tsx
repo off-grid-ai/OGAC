@@ -85,7 +85,11 @@ function PipelineCard({ p, onDelete }: { p: PipelineCardData; onDelete: (p: Pipe
         {statusBadge(p.status)}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 text-xs text-muted-foreground">
-        <p className="line-clamp-2 min-h-[2.5rem]">{p.description || 'No description.'}</p>
+        {/* Bulletproof: FIXED height + overflow-hidden + line-clamp-2 — a long description is clipped
+            to two lines and can NEVER grow to collide with the badges/footer below (min-h would). */}
+        <p className="h-8 overflow-hidden text-ellipsis leading-4 line-clamp-2">
+          {p.description || 'No description.'}
+        </p>
         <div className="flex flex-wrap gap-1.5">
           {p.gateway ? (
             <Badge variant="outline" className="font-normal">

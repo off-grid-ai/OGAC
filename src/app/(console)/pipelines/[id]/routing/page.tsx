@@ -15,6 +15,10 @@ export default async function PipelineRoutingPage({ params }: { params: Promise<
     <PipelineRoutingEditor
       data={{
         id: p.id,
+        name: p.name,
+        description: p.description,
+        status: p.status,
+        visibility: p.visibility,
         gatewayId: p.gatewayId,
         defaultModel: p.defaultModel,
         egressAllowed: p.routing.egressAllowed !== false,
