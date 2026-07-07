@@ -204,6 +204,12 @@ export function setSummary(spec: AppSpec, summary: string): AppSpec {
 export function setVisibility(spec: AppSpec, visibility: AppSpec['visibility']): AppSpec {
   return { ...spec, visibility };
 }
+// ─── setPipeline — bind the app/agent to a GOVERNED pipeline (CONSUMERS-BIND #166) ───────────────
+// null ⇒ "Org default (governed)" — resolved at run time. Any pipeline id ⇒ the app runs on that
+// pipeline and every run is tagged pipeline:<id> so policy/guardrails/telemetry apply.
+export function setPipeline(spec: AppSpec, pipelineId: string | null): AppSpec {
+  return { ...spec, pipelineId: pipelineId || null };
+}
 
 // ─── describeStepBinding — a human line of "what this step binds to" ─────────────────────────────
 // PURE presenter for the skeleton list: given a step (and the org's domain/agent names for lookup),

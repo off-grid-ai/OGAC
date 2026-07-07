@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { deleteProject, projectAccess, updateProjectFields } from '@/lib/chat';
+import { getChatBindingGovernance } from '@/lib/store';
+import { isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,11 +17,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (access !== 'owner' && access !== 'edit')
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const patch = await req.json().catch(() => ({}));
-  await updateProjectFields(id, {
+  // Only touch pipelineId when the caller sent it, and gate it against the org's available set.
+  const fields: { name?: string; description?: string; systemPrompt?: string; pipelineId?: string | null } = {
     name: patch.name,
     description: patch.description,
     systemPrompt: patch.systemPrompt,
-  });
+  };
+  if (patch.pipelineId !== undefined) {
+    const gov = await getChatBindingGovernance();
+    const next = patch.pipelineId ?? null;
+    if (!isChatPipelineAllowed(next, gov)) {
+      return NextResponse.json({ error: 'pipeline not available for chat' }, { status: 403 });
+    }
+    fields.pipelineId = next;
+  }
+  await updateProjectFields(id, fields);
   return NextResponse.json({ ok: true });
 }
 

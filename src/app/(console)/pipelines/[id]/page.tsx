@@ -1,10 +1,13 @@
 import { notFound } from 'next/navigation';
 import { PipelineOverview } from '@/components/pipelines/PipelineOverview';
+import { listAppsByPipeline } from '@/lib/apps-store';
+import { listProjectsByPipeline } from '@/lib/chat';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listGoldenCases } from '@/lib/evals';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { getPipeline, listPipelineVersions } from '@/lib/pipelines';
 import { listPolicyRules } from '@/lib/policy-rules';
+import { getChatBindingGovernance } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -24,13 +27,35 @@ export default async function PipelineOverviewPage({ params }: { params: Promise
   const p = await getPipeline(id, orgId);
   if (!p) notFound();
 
-  const [evalsAttached, goldenCases, orgPolicyRules, orgGuardrailRules, versions] = await Promise.all([
+  const [
+    evalsAttached,
+    goldenCases,
+    orgPolicyRules,
+    orgGuardrailRules,
+    versions,
+    boundApps,
+    boundProjects,
+    chatGov,
+  ] = await Promise.all([
     countOf(listEvalDefs(id)),
     countOf(listGoldenCases(id)),
     countOf(listPolicyRules(orgId)),
     countOf(listGuardrailRules(orgId)),
     listPipelineVersions(id, orgId).catch(() => []),
+    listAppsByPipeline(id, orgId).catch(() => []),
+    listProjectsByPipeline(id).catch(() => []),
+    getChatBindingGovernance().catch(() => ({ defaultChatPipelineId: null, allowlist: [] as string[] })),
   ]);
+
+  // Consumers of this pipeline (Overview "Consumers" section): apps/agents bound directly, chat
+  // projects that pin it, and whether it's the org-default chat pipeline / in the available-for-chat
+  // set. All honest — read from the real binding columns, never fabricated.
+  const consumers = {
+    apps: boundApps.map((a) => ({ id: a.id, title: a.title, published: a.published })),
+    projects: boundProjects.map((pr) => ({ id: pr.id, name: pr.name })),
+    isOrgDefaultChat: chatGov.defaultChatPipelineId === id,
+    inChatAllowlist: (chatGov.allowlist ?? []).includes(id),
+  };
 
   const rules = (p.routing.rules ?? []).map((r) => ({
     label: r.value || r.attribute || r.name,
@@ -63,6 +88,7 @@ export default async function PipelineOverviewPage({ params }: { params: Promise
           orgGuardrailRules,
         },
         quality: { evalsAttached, goldenCases },
+        consumers,
         recentVersions: versions.slice(0, 5).map((v) => ({
           id: v.id,
           version: v.version,

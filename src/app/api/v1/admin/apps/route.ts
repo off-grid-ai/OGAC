@@ -48,6 +48,7 @@ export async function POST(req: Request) {
     edges: body.edges ?? [],
     published: body.published,
     slug: body.slug,
+    pipelineId: body.pipelineId ?? null,
   };
 
   try {
