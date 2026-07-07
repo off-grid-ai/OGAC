@@ -1,0 +1,376 @@
+// ─── Pipeline store + version adapter (Gateways × Pipelines, the PIPELINE tier) ───────────────────
+//
+// The impure seam behind the pure rules in pipelines-policy.ts. This file does the I/O:
+//   • CRUD over the `pipelines` table (drizzle query-builder; org-scoped via `orgId`).
+//   • append-only version snapshots into `pipeline_versions` — EVERY update + publish bumps `version`
+//     and writes an immutable snapshot (via the pure snapshotOf/nextVersion).
+//   • an idempotent `ensurePipelinesSchema()` self-migrate so the module deploys over SSH before the
+//     SQL migration lands (mirrors ensureGatewaysSchema) — CREATE TABLE IF NOT EXISTS + ALTER ADD
+//     COLUMN IF NOT EXISTS safety net for both tables. Column names MUST match schema.ts exactly.
+//   • an optional cheap enrichment: the bound gateway's name/egress summary (from gateways.ts, DRY).
+//
+// The governance correctness (validation, effectiveGovernance, canReachData, snapshotOf) lives in the
+// PURE pipelines-policy.ts; this file only persists + reads facts.
+import { randomUUID } from 'crypto';
+import { and, asc, desc, eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { pipelines, pipelineVersions } from '@/db/schema';
+import type { Pipeline as PipelineRowDb } from '@/db/schema';
+import { getGatewayRow } from '@/lib/gateways';
+import { egressClassFor } from '@/lib/gateways-policy';
+import {
+  type PipelineRouting,
+  type PipelineShape,
+  normalizeAllowlist,
+  normalizeRouting,
+  nextVersion,
+  snapshotOf,
+} from '@/lib/pipelines-policy';
+
+const DEFAULT_ORG = 'default';
+
+// ─── self-migrate safety net (memoized; mirrors ensureGatewaysSchema) ─────────────────────────────
+// The canonical schema is the drizzle pgTables in src/db/schema.ts; these CREATE TABLE IF NOT EXISTS
+// (+ ALTER ADD COLUMN IF NOT EXISTS) let the store work on a DB that hasn't run the migration yet
+// (deploy is rsync-only, no migration step over SSH). Column names MUST match schema.ts exactly.
+let ensurePromise: Promise<void> | null = null;
+export async function ensurePipelinesSchema(): Promise<void> {
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = (async (): Promise<void> => {
+    const { sql } = await import('drizzle-orm');
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pipelines (
+        id text PRIMARY KEY,
+        org_id text NOT NULL DEFAULT 'default',
+        owner_id text NOT NULL DEFAULT '',
+        name text NOT NULL,
+        description text NOT NULL DEFAULT '',
+        visibility text NOT NULL DEFAULT 'private',
+        gateway_id text,
+        default_model text,
+        routing jsonb NOT NULL DEFAULT '{}'::jsonb,
+        data_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb,
+        policy_overlay jsonb NOT NULL DEFAULT '{}'::jsonb,
+        guardrail_overlay jsonb NOT NULL DEFAULT '{}'::jsonb,
+        status text NOT NULL DEFAULT 'draft',
+        version integer NOT NULL DEFAULT 1,
+        is_template boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now());
+    `);
+    // ALTER ADD COLUMN IF NOT EXISTS safety net — a pre-existing table gains any new column.
+    for (const col of [
+      "ADD COLUMN IF NOT EXISTS gateway_id text",
+      "ADD COLUMN IF NOT EXISTS default_model text",
+      "ADD COLUMN IF NOT EXISTS routing jsonb NOT NULL DEFAULT '{}'::jsonb",
+      "ADD COLUMN IF NOT EXISTS data_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb",
+      "ADD COLUMN IF NOT EXISTS policy_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
+      "ADD COLUMN IF NOT EXISTS guardrail_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
+      "ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft'",
+      "ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1",
+      "ADD COLUMN IF NOT EXISTS is_template boolean NOT NULL DEFAULT false",
+    ]) {
+      await db.execute(sql.raw(`ALTER TABLE pipelines ${col};`));
+    }
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pipeline_versions (
+        id text PRIMARY KEY,
+        pipeline_id text NOT NULL,
+        org_id text NOT NULL DEFAULT 'default',
+        version integer NOT NULL,
+        snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+        note text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        created_by text NOT NULL DEFAULT '');
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS pipeline_versions_pipeline_idx ON pipeline_versions (pipeline_id);`,
+    );
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
+  return ensurePromise;
+}
+
+// ─── row → pure-shape mapping ──────────────────────────────────────────────────────────────────────
+function iso(v: string | Date | null | undefined): string | null {
+  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+}
+
+export interface PipelineView extends PipelineShape {
+  createdAt: string | null;
+  updatedAt: string | null;
+  /** Cheap enrichment: the bound gateway's identity, if one is bound + resolvable. */
+  gateway?: { id: string; name: string; kind: string; egressClass: string } | null;
+}
+
+function toShape(r: PipelineRowDb): PipelineShape {
+  return {
+    id: r.id,
+    orgId: r.orgId,
+    ownerId: r.ownerId,
+    name: r.name,
+    description: r.description,
+    visibility: r.visibility,
+    gatewayId: r.gatewayId ?? null,
+    defaultModel: r.defaultModel ?? null,
+    routing: normalizeRouting(r.routing),
+    dataAllowlist: normalizeAllowlist(r.dataAllowlist),
+    policyOverlay: (r.policyOverlay as Record<string, unknown>) ?? {},
+    guardrailOverlay: (r.guardrailOverlay as Record<string, unknown>) ?? {},
+    status: r.status,
+    version: r.version,
+    isTemplate: r.isTemplate,
+    createdAt: iso(r.createdAt),
+    updatedAt: iso(r.updatedAt),
+  };
+}
+
+function toView(shape: PipelineShape, gateway?: PipelineView['gateway']): PipelineView {
+  return {
+    ...shape,
+    createdAt: iso(shape.createdAt),
+    updatedAt: iso(shape.updatedAt),
+    gateway: gateway ?? null,
+  };
+}
+
+/** Resolve the bound gateway's cheap summary, if bound + present. Never throws (best-effort enrich). */
+async function gatewaySummary(
+  gatewayId: string | null,
+  orgId: string,
+): Promise<PipelineView['gateway']> {
+  if (!gatewayId) return null;
+  try {
+    const gw = await getGatewayRow(gatewayId, orgId);
+    if (!gw) return null;
+    return { id: gw.id, name: gw.name, kind: gw.kind, egressClass: egressClassFor(gw.kind) };
+  } catch {
+    return null;
+  }
+}
+
+// ─── create input ───────────────────────────────────────────────────────────────────────────────────
+export interface CreatePipelineInput {
+  name: string;
+  description?: string;
+  visibility?: string;
+  gatewayId?: string | null;
+  defaultModel?: string | null;
+  routing?: PipelineRouting;
+  dataAllowlist?: string[];
+  policyOverlay?: Record<string, unknown>;
+  guardrailOverlay?: Record<string, unknown>;
+  status?: string;
+  isTemplate?: boolean;
+  /** Stable id for seeding; omitted ⇒ a random pl_… id. */
+  id?: string;
+}
+
+export type UpdatePipelinePatch = Partial<Omit<CreatePipelineInput, 'id'>>;
+
+// ─── reads ────────────────────────────────────────────────────────────────────────────────────────
+
+/** List an org's pipelines (with cheap gateway enrichment). Stable order (name asc). */
+export async function listPipelines(orgId: string = DEFAULT_ORG): Promise<PipelineView[]> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .select()
+    .from(pipelines)
+    .where(eq(pipelines.orgId, orgId))
+    .orderBy(asc(pipelines.name), asc(pipelines.id));
+  return Promise.all(
+    rows.map(async (r) => {
+      const shape = toShape(r);
+      return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+    }),
+  );
+}
+
+/** One pipeline by id, org-scoped (with gateway enrichment). Null if absent for this org. */
+export async function getPipeline(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .select()
+    .from(pipelines)
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .limit(1);
+  if (!rows[0]) return null;
+  const shape = toShape(rows[0]);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── create ───────────────────────────────────────────────────────────────────────────────────────
+
+/** Create a pipeline + write its v1 snapshot. Idempotent by stable id (onConflictDoNothing). */
+export async function createPipeline(
+  input: CreatePipelineInput,
+  ownerId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView> {
+  await ensurePipelinesSchema();
+  const id = input.id ?? `pl_${randomUUID().slice(0, 12)}`;
+  const values = {
+    id,
+    orgId,
+    ownerId,
+    name: input.name,
+    description: input.description ?? '',
+    visibility: input.visibility ?? 'private',
+    gatewayId: input.gatewayId ?? null,
+    defaultModel: input.defaultModel ?? null,
+    routing: normalizeRouting(input.routing),
+    dataAllowlist: normalizeAllowlist(input.dataAllowlist),
+    policyOverlay: input.policyOverlay ?? {},
+    guardrailOverlay: input.guardrailOverlay ?? {},
+    status: input.status ?? 'draft',
+    version: 1,
+    isTemplate: input.isTemplate ?? false,
+  };
+  const [row] = await db
+    .insert(pipelines)
+    .values(values)
+    .onConflictDoNothing({ target: pipelines.id })
+    .returning();
+
+  // onConflictDoNothing returns nothing when the id already existed (idempotent seed) — read it back.
+  if (!row) {
+    const existing = await getPipeline(id, orgId);
+    if (existing) return existing;
+    // Different org owns this id, or a race: fall back to a fresh id.
+    return createPipeline({ ...input, id: `pl_${randomUUID().slice(0, 12)}` }, ownerId, orgId);
+  }
+
+  const shape = toShape(row);
+  await writeVersion(shape, 'created', ownerId);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── version snapshot writer (append-only) ─────────────────────────────────────────────────────────
+async function writeVersion(shape: PipelineShape, note: string, by: string): Promise<void> {
+  await db
+    .insert(pipelineVersions)
+    .values({
+      id: `plv_${randomUUID().slice(0, 12)}`,
+      pipelineId: shape.id,
+      orgId: shape.orgId,
+      version: shape.version,
+      snapshot: snapshotOf(shape) as unknown as Record<string, unknown>,
+      note,
+      createdBy: by,
+    })
+    .onConflictDoNothing({ target: pipelineVersions.id });
+}
+
+// ─── update — bumps version + writes a snapshot on EVERY update ────────────────────────────────────
+export async function updatePipeline(
+  id: string,
+  patch: UpdatePipelinePatch,
+  orgId: string = DEFAULT_ORG,
+  editedBy: string = '',
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const current = await getPipeline(id, orgId);
+  if (!current) return null;
+
+  const version = nextVersion(current.version);
+  const set: Record<string, unknown> = { version, updatedAt: new Date() };
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.description !== undefined) set.description = patch.description;
+  if (patch.visibility !== undefined) set.visibility = patch.visibility;
+  if (patch.gatewayId !== undefined) set.gatewayId = patch.gatewayId ?? null;
+  if (patch.defaultModel !== undefined) set.defaultModel = patch.defaultModel ?? null;
+  if (patch.routing !== undefined) set.routing = normalizeRouting(patch.routing);
+  if (patch.dataAllowlist !== undefined) set.dataAllowlist = normalizeAllowlist(patch.dataAllowlist);
+  if (patch.policyOverlay !== undefined) set.policyOverlay = patch.policyOverlay ?? {};
+  if (patch.guardrailOverlay !== undefined) set.guardrailOverlay = patch.guardrailOverlay ?? {};
+  if (patch.status !== undefined) set.status = patch.status;
+  if (patch.isTemplate !== undefined) set.isTemplate = patch.isTemplate;
+
+  const [row] = await db
+    .update(pipelines)
+    .set(set)
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning();
+  if (!row) return null;
+
+  const shape = toShape(row);
+  await writeVersion(shape, 'edited', editedBy);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── publish — status → published + version bump + snapshot ────────────────────────────────────────
+export async function publishPipeline(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+  by: string = '',
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const current = await getPipeline(id, orgId);
+  if (!current) return null;
+  const version = nextVersion(current.version);
+  const [row] = await db
+    .update(pipelines)
+    .set({ status: 'published', version, updatedAt: new Date() })
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning();
+  if (!row) return null;
+  const shape = toShape(row);
+  await writeVersion(shape, 'published', by);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── delete ─────────────────────────────────────────────────────────────────────────────────────────
+export async function deletePipeline(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .delete(pipelines)
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning({ id: pipelines.id });
+  if (rows.length > 0) {
+    // Version history is append-only lineage — clean it up with the pipeline (org-scoped).
+    await db
+      .delete(pipelineVersions)
+      .where(and(eq(pipelineVersions.pipelineId, id), eq(pipelineVersions.orgId, orgId)));
+  }
+  return rows.length > 0;
+}
+
+// ─── version history read ─────────────────────────────────────────────────────────────────────────
+export interface PipelineVersionView {
+  id: string;
+  pipelineId: string;
+  version: number;
+  note: string;
+  snapshot: Record<string, unknown>;
+  createdAt: string | null;
+  createdBy: string;
+}
+
+/** List a pipeline's version history, newest first. Org-scoped. */
+export async function listPipelineVersions(
+  pipelineId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineVersionView[]> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .select()
+    .from(pipelineVersions)
+    .where(and(eq(pipelineVersions.pipelineId, pipelineId), eq(pipelineVersions.orgId, orgId)))
+    .orderBy(desc(pipelineVersions.version), desc(pipelineVersions.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    pipelineId: r.pipelineId,
+    version: r.version,
+    note: r.note,
+    snapshot: (r.snapshot as Record<string, unknown>) ?? {},
+    createdAt: iso(r.createdAt),
+    createdBy: r.createdBy,
+  }));
+}
