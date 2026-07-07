@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { LoadingBlock } from '@/components/ui/spinner';
 import { workflowActionsFor, type WorkflowExecutionStatus } from '@/lib/temporal-visibility';
 
 // The Jobs surface — the operator's live view of durable workflow executions (Temporal-side),
@@ -168,7 +169,7 @@ export function DurableExecutionsPanel() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading jobs…</p>
+        <LoadingBlock label="Loading jobs…" />
       ) : !view ? (
         <p className="text-sm text-muted-foreground">Could not load durable jobs.</p>
       ) : !view.configured ? (
@@ -319,7 +320,7 @@ function ExecutionDetail({ workflowId, onBack }: { workflowId: string; onBack: (
       </button>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading job…</p>
+        <LoadingBlock label="Loading job…" />
       ) : !detail || !detail.found ? (
         <p className="text-sm text-muted-foreground">{detail?.note ?? 'Job not found.'}</p>
       ) : (
