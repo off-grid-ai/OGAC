@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { addDocument, listDocuments } from '@/lib/brain';
+import { addDocument, BrainWriteError, listDocuments } from '@/lib/brain';
 import { normalizeAcl } from '@/lib/retrieval/acl';
 
 export async function GET(req: Request) {
@@ -21,5 +21,12 @@ export async function POST(req: Request) {
   }
   // Optional per-document ACL for permissions-aware retrieval. Absent/empty → un-ACL'd (visible).
   const acl = normalizeAcl(body?.acl) ?? undefined;
-  return NextResponse.json(await addDocument(title, source, text, acl), { status: 201 });
+  try {
+    return NextResponse.json(await addDocument(title, source, text, acl), { status: 201 });
+  } catch (e) {
+    if (e instanceof BrainWriteError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
+  }
 }
