@@ -36,6 +36,15 @@ Set/changed this session (values below; secrets marked — real values live on t
 | `OFFGRID_TOOL_READ_URL` | _(unset → OFF)_ | Per-tool opt-in for the `read_url` primitive only. |
 | `OFFGRID_TOOL_HTTP_FETCH` | _(unset → OFF)_ | Per-tool opt-in for the `http_fetch` primitive only. |
 | `OFFGRID_WEB_SEARCH_URL` | _(unset)_ | The search endpoint `web_search` calls (JSON `?q=…&format=json`, e.g. an org-run SearXNG). Required when `web_search` is enabled; without it `web_search` degrades honestly to a "not configured" error. |
+| `OFFGRID_CLOUD_OPENAI_API_KEY` | _(unset → provider not wired)_ | **Cloud model routing (gap #26, Phase D).** API key for OpenAI. When set, requests a routing rule sends to `cloud` AND the org egress switch is ON reach OpenAI via the OpenAI-compatible contract. No key ⇒ provider not configured ⇒ cloud routes fall back to local (honest degradation, never a fabricated cloud answer). **Never commit real keys.** |
+| `OFFGRID_CLOUD_OPENAI_BASE_URL` | `https://api.openai.com/v1` | Optional override of the OpenAI base URL (e.g. Azure OpenAI-compatible). |
+| `OFFGRID_CLOUD_OPENAI_MODEL` | `gpt-4o-mini` | Default upstream model when a rule routes to `openai` without naming a model. |
+| `OFFGRID_CLOUD_ANTHROPIC_API_KEY` | _(unset → provider not wired)_ | API key for Anthropic (via its OpenAI-compatible `/v1` endpoint). Same gating as OpenAI above. |
+| `OFFGRID_CLOUD_ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | Optional Anthropic base-URL override. |
+| `OFFGRID_CLOUD_ANTHROPIC_MODEL` | `claude-3-5-haiku-latest` | Default upstream model for the `anthropic` provider. |
+| `OFFGRID_CLOUD_COMPAT_BASE_URL` | _(unset → provider not wired)_ | Base URL of a generic OpenAI-compatible endpoint (vLLM, OpenRouter, a self-hosted cloud). REQUIRED for the `compat` provider (no well-known default). |
+| `OFFGRID_CLOUD_COMPAT_API_KEY` | _(unset)_ | API key for the generic compat provider. Both URL + key needed to wire it. |
+| `OFFGRID_CLOUD_COMPAT_MODEL` | _(unset)_ | Default upstream model for the `compat` provider. |
 
 > **⚠️ Console can't egress to the LAN (root cause of every S2 "unreachable"/Langfuse "fetch
 > failed"):** the `next-server` process gets `EHOSTUNREACH` connecting to any `192.168.1.x` host,

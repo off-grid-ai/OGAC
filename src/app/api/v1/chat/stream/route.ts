@@ -28,6 +28,9 @@ import { resolveTools } from '@/lib/chat-tools';
 import { emitChatTrace } from '@/lib/chat-trace';
 import { actorFrom } from '@/lib/audit-event';
 import { costForTokens } from '@/lib/finops';
+import { resolveCloudPlan } from '@/lib/cloud-route-plan';
+import { forwardToCloud } from '@/lib/cloud-client';
+import { egressAuditEvent, egressBlockedAuditEvent } from '@/lib/cloud-egress-audit';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
 import { type Citation, retrieve } from '@/lib/rag';
 import { citationInstruction, sourceNames } from '@/lib/chat-citations';
@@ -81,6 +84,10 @@ export async function POST(req: Request) {
     // @-mention references for THIS turn only: explicit memory ids to inject as context + KB scopes
     // (project / project+doc) to ground retrieval on. Parsed/validated by the pure helper.
     refs = null,
+    // Data classification for model routing. Chat defaults to `public` (eligible for cloud IF a rule
+    // + the org egress switch permit it); a caller tagging `pii`/`confidential` makes the request
+    // ineligible for cloud via the routing rules (data_class=pii → local). Egress is default-OFF.
+    dataClass = 'public',
   } = await req.json().catch(() => ({}));
   const mentionRefs = parseRefsPayload(refs);
   // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
@@ -364,20 +371,60 @@ export async function POST(req: Request) {
   };
   if (effectiveModel) payload.model = effectiveModel;
 
+  // ── Model routing: local | cloud | block ──────────────────────────────────────────────────────
+  // Resolve where this turn runs. The PURE decideRouting()/planCloudRoute() own the rules; egress is
+  // default-OFF, and a `data_class=pii` (or any rule that maps to local/block) can NEVER reach cloud.
+  // A cloud plan with no configured provider degrades honestly to local (never a fabricated cloud
+  // answer). All egress is audited.
+  const egressCtx = {
+    actor: actorFrom({ email: userId }),
+    org: DEFAULT_ORG,
+    project: convo.projectId ?? null,
+  };
+  const plan = await resolveCloudPlan({
+    data_class: String(dataClass || 'public'),
+    task: 'chat',
+    model: effectiveModel || '',
+  }).catch(() => null);
+
+  // A blocked route is a hard stop — nothing runs, and the block is audited (leash proof).
+  if (plan && plan.kind === 'block') {
+    recordAudit(egressBlockedAuditEvent(egressCtx, plan));
+    return deny(`request blocked by routing policy: ${plan.reason}`);
+  }
+  // Cloud unavailable → we fell back to local; record it so the honest degradation is provable.
+  if (plan && plan.kind === 'local' && plan.cloudUnavailable) {
+    recordAudit(egressBlockedAuditEvent(egressCtx, plan));
+  }
+
   // Observability: mark when the upstream request begins so the Langfuse generation observation
   // records real latency once the completion finalizes.
   const traceStart = Date.now();
-  const upstream = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
-    method: 'POST',
-    // x-offgrid-user attributes gateway spend to the real signed-in user (captured into the
-    // gateway's OpenSearch log as `caller`) rather than the console's user-agent.
-    headers: gatewayHeaders({ 'content-type': 'application/json', 'x-offgrid-user': userId }),
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(290000),
-  }).catch(() => null);
+  // When routing resolves to a wired cloud provider, forward the OpenAI-compatible request there and
+  // relay its stream; otherwise (local, or cloud-unavailable fallback) hit the on-prem gateway. Egress
+  // to cloud is audited after the stream finalizes (below), attributing the provider model + tokens.
+  const routedToCloud = plan?.kind === 'cloud' && plan.selection != null;
+  const upstream = routedToCloud
+    ? (await forwardToCloud(plan!.selection!, payload, { timeoutMs: 290000 })).response
+    : await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+        method: 'POST',
+        // x-offgrid-user attributes gateway spend to the real signed-in user (captured into the
+        // gateway's OpenSearch log as `caller`) rather than the console's user-agent.
+        headers: gatewayHeaders({ 'content-type': 'application/json', 'x-offgrid-user': userId }),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(290000),
+      }).catch(() => null);
 
   if (!upstream || !upstream.ok || !upstream.body) {
-    const detail = upstream ? `gateway ${upstream.status}` : 'gateway unreachable';
+    // A failed CLOUD call must NOT silently fabricate a local answer — surface the truth + audit it.
+    if (routedToCloud && plan) {
+      recordAudit(
+        egressAuditEvent(egressCtx, plan, { promptTokens: 0, completionTokens: 0 }, 'error'),
+      );
+    }
+    const detail = upstream
+      ? `${routedToCloud ? 'cloud provider' : 'gateway'} ${upstream.status}`
+      : `${routedToCloud ? 'cloud provider' : 'gateway'} unreachable`;
     return new Response(`data: ${JSON.stringify({ error: detail })}\n\n`, {
       status: 200,
       headers: { 'content-type': 'text/event-stream' },
@@ -440,6 +487,22 @@ export async function POST(req: Request) {
         } catch {
           /* best-effort persistence */
         }
+      }
+      // Egress audit: when this turn actually left the box to a cloud provider, record a
+      // `gateway.egress` event with the provider model + real token usage so FinOps prices the cloud
+      // spend and the Regulatory ledger proves what left. Local turns skip this (nothing egressed).
+      if (routedToCloud && plan) {
+        recordAudit(
+          egressAuditEvent(
+            egressCtx,
+            plan,
+            {
+              promptTokens: estimateTokens(String(content)),
+              completionTokens: estimateTokens(full),
+            },
+            full ? 'ok' : 'error',
+          ),
+        );
       }
       // Governance: audit this completion so Analytics/FinOps/Regulatory count chat usage, billed
       // to the project's virtual key when one exists.
