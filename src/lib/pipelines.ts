@@ -190,6 +190,29 @@ export async function listPipelines(orgId: string = DEFAULT_ORG): Promise<Pipeli
   );
 }
 
+/**
+ * List the org's pipelines BOUND to a specific gateway (gatewayId = id). Org-scoped, stable order
+ * (name asc). Powers the gateway detail's "Pipelines running on this gateway" section — a read-only
+ * filter over the same rows as listPipelines, so it can never diverge from the canonical mapping.
+ */
+export async function listPipelinesByGateway(
+  gatewayId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView[]> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .select()
+    .from(pipelines)
+    .where(and(eq(pipelines.orgId, orgId), eq(pipelines.gatewayId, gatewayId)))
+    .orderBy(asc(pipelines.name), asc(pipelines.id));
+  return Promise.all(
+    rows.map(async (r) => {
+      const shape = toShape(r);
+      return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+    }),
+  );
+}
+
 /** One pipeline by id, org-scoped (with gateway enrichment). Null if absent for this org. */
 export async function getPipeline(
   id: string,

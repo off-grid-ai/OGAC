@@ -151,6 +151,42 @@ export async function createGateway(
   return toRow(row2);
 }
 
+/** A validated update patch (from validateGatewayUpdate). egressClass is re-derived, never trusted. */
+export interface UpdateGatewayInput {
+  name: string;
+  kind: GatewayKind;
+  baseUrl: string;
+  defaultModel: string;
+  enabled: boolean;
+}
+
+/**
+ * Update a gateway, org-scoped. egressClass is ALWAYS re-derived from the (possibly new) kind —
+ * never taken from the caller — so a kind change flips egress consistently. Returns the fresh row,
+ * or null when no row for this org+id exists (graceful 404 at the route). Writes name/kind/baseUrl/
+ * defaultModel/enabled + the derived egressClass.
+ */
+export async function updateGateway(
+  id: string,
+  patch: UpdateGatewayInput,
+  orgId: string = DEFAULT_ORG,
+): Promise<GatewayRow | null> {
+  await ensureGatewaysSchema();
+  const [row] = await db
+    .update(gateways)
+    .set({
+      name: patch.name,
+      kind: patch.kind,
+      baseUrl: patch.baseUrl,
+      defaultModel: patch.defaultModel,
+      egressClass: egressClassFor(patch.kind),
+      enabled: patch.enabled,
+    })
+    .where(and(eq(gateways.id, id), eq(gateways.orgId, orgId)))
+    .returning();
+  return row ? toRow(row) : null;
+}
+
 /** Delete a gateway, org-scoped. True if a row was removed. */
 export async function deleteGateway(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
   await ensureGatewaysSchema();

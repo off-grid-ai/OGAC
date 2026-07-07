@@ -13,7 +13,7 @@ const OTHER = 'test-int-gateways-other';
 const dbUp = await dbReachable();
 
 test('gateways store CRUD + org scoping against a real Postgres', { skip: dbUp ? false : SKIP_MESSAGE }, async (t) => {
-  const { ensureGatewaysSchema, createGateway, listGatewayRows, getGatewayRow, deleteGateway } =
+  const { ensureGatewaysSchema, createGateway, listGatewayRows, getGatewayRow, updateGateway, deleteGateway } =
     await import('@/lib/gateways');
 
   await ensureGatewaysSchema();
@@ -60,6 +60,54 @@ test('gateways store CRUD + org scoping against a real Postgres', { skip: dbUp ?
   assert.equal((await listGatewayRows(OTHER)).length, 0, 'other org is empty');
   assert.equal(await getGatewayRow(openai.id, OTHER), null, 'cross-org get misses');
   assert.ok(await getGatewayRow(openai.id, ORG), 'same-org get hits');
+
+  // ── UPDATE — persists name/kind/baseUrl/defaultModel/enabled + RE-DERIVES egress from the new kind ─
+  const updated = await updateGateway(
+    cluster.id,
+    { name: 'Cluster → OpenRouter', kind: 'compat', baseUrl: 'https://openrouter.ai/api/v1', defaultModel: 'gpt-4o-mini', enabled: false },
+    ORG,
+  );
+  assert.ok(updated, 'update returned the fresh row');
+  assert.equal(updated.name, 'Cluster → OpenRouter');
+  assert.equal(updated.kind, 'compat');
+  assert.equal(updated.baseUrl, 'https://openrouter.ai/api/v1');
+  assert.equal(updated.defaultModel, 'gpt-4o-mini');
+  assert.equal(updated.enabled, false, 'enabled flag persisted');
+  assert.equal(updated.egressClass, 'cloud', 'on-prem→compat re-derives egress to cloud');
+
+  // Re-read confirms the write is durable, not just the returned row.
+  const reread = await getGatewayRow(cluster.id, ORG);
+  assert.ok(reread);
+  assert.equal(reread.kind, 'compat');
+  assert.equal(reread.egressClass, 'cloud');
+  assert.equal(reread.enabled, false);
+
+  // Flipping back to on-prem re-derives egress to on-prem (egress is never client-trusted).
+  const backToOnPrem = await updateGateway(
+    cluster.id,
+    { name: 'Cluster', kind: 'on-prem', baseUrl: '', defaultModel: '', enabled: true },
+    ORG,
+  );
+  assert.ok(backToOnPrem);
+  assert.equal(backToOnPrem.egressClass, 'on-prem', 'compat→on-prem re-derives egress to on-prem');
+
+  // ── UPDATE org isolation — another org can never update this row (returns null, row untouched) ────
+  assert.equal(
+    await updateGateway(cluster.id, { name: 'HIJACK', kind: 'openai', baseUrl: '', defaultModel: '', enabled: true }, OTHER),
+    null,
+    'cross-org update misses',
+  );
+  const afterCrossOrg = await getGatewayRow(cluster.id, ORG);
+  assert.ok(afterCrossOrg);
+  assert.equal(afterCrossOrg.name, 'Cluster', 'cross-org update left the row untouched');
+  assert.equal(afterCrossOrg.egressClass, 'on-prem', 'cross-org update did not drift egress');
+
+  // Update of a non-existent id returns null (graceful 404 at the route).
+  assert.equal(
+    await updateGateway('gw_does_not_exist', { name: 'X', kind: 'openai', baseUrl: '', defaultModel: '', enabled: true }, ORG),
+    null,
+    'unknown id ⇒ null',
+  );
 
   // ── DELETE — org-scoped; cross-org delete misses ─────────────────────────────────────────────────
   assert.equal(await deleteGateway(openai.id, OTHER), false, 'cross-org delete misses');
