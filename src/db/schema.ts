@@ -914,3 +914,29 @@ export const fleetNodes = pgTable('fleet_nodes', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Gateways — first-class MODEL-SERVING ENDPOINTS a pipeline runs on ─────────
+// (Gateways × Pipelines architecture, P1 — docs/PIPELINES_AND_GATEWAYS_PLAN.md.)
+// A gateway is the model substrate a pipeline RUNS ON. It is SHARED: many pipelines
+// point at one gateway. This is the REGISTRY of them — identity (name+kind), base URL,
+// default model, and the EGRESS CLASS (on-prem = data stays on the fleet; cloud = data
+// leaves — the routing leash keys off this). Health/reachability is NOT stored: it is
+// merged in live from the aggregator (on-prem) + the cloud-providers probe (see
+// src/lib/gateways.ts), so the registry never lies about "up".
+//   kind        — on-prem | openai | anthropic | compat (OpenAI-compatible proxy, e.g. OpenRouter)
+//   egressClass — 'on-prem' | 'cloud' — DERIVED from kind (on-prem⇒on-prem, else cloud); stored so a
+//                 query can filter without recomputing, but always kept consistent with kind on write.
+export const gateways = pgTable('gateways', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  name: text('name').notNull(),
+  kind: text('kind').notNull(),                                  // on-prem | openai | anthropic | compat
+  baseUrl: text('base_url').notNull().default(''),
+  defaultModel: text('default_model').notNull().default(''),
+  egressClass: text('egress_class').notNull().default('cloud'),  // on-prem | cloud (derived from kind)
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('gateways_org_idx').on(t.orgId)]);
+
+export type Gateway = typeof gateways.$inferSelect;
+export type NewGateway = typeof gateways.$inferInsert;

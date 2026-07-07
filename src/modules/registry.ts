@@ -9,6 +9,7 @@ export type ModuleId =
   | 'prompts'
   | 'fleet'
   | 'gateway'
+  | 'gateways'
   | 'edge'
   | 'control'
   | 'data'
@@ -122,6 +123,15 @@ export const MODULES: readonly ModuleDef[] = [
       'The LLM gateway — model routing (local + leashed cloud), providers, OpenAI-compatible endpoint, cache.',
     route: '/gateway',
     service: 'gateway',
+  },
+  {
+    id: 'gateways',
+    label: 'Gateways',
+    description:
+      'The registry of model-serving gateways your pipelines run on — on-prem cluster, OpenAI, Anthropic, OpenRouter — each with its egress class (data stays on-prem vs. leaves) and live health.',
+    route: '/gateways',
+    service: 'gateway',
+    internal: true,
   },
   {
     id: 'edge',

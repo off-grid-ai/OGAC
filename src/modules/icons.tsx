@@ -38,6 +38,7 @@ import {
   ClipboardText,
   Toolbox,
   Wrench,
+  StackSimple as Stack,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -50,6 +51,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   prompts: TextAlignLeft,
   fleet: MonitorSmartphone,
   gateway: Network,
+  gateways: Stack,
   edge: ShieldWarning,
   control: ShieldCheck,
   data: Database,
