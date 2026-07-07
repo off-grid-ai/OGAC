@@ -547,6 +547,19 @@ export async function listUsers(): Promise<ConsoleUser[]> {
     .from(users);
 }
 
+// The org a user belongs to (tenant membership), looked up by email at sign-in so the JWT can carry
+// it. Null when the user has no row yet (first federated login) — callers fall back to the default
+// org. This is the source of truth for currentOrgId's membership check.
+export async function getUserOrgByEmail(email: string): Promise<string | null> {
+  if (!email) return null;
+  const [row] = await db
+    .select({ orgId: users.orgId })
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1);
+  return row?.orgId ?? null;
+}
+
 // SCIM provisioning: create (or upsert by email) a console user. Idempotent on email so a repeated
 // SCIM POST is safe. Returns the row in ConsoleUser shape.
 export async function createConsoleUser(input: {
