@@ -1,5 +1,7 @@
 import { after, NextResponse } from 'next/server';
-import { getAgentRun, runAgent, scoreRun } from '@/lib/agentrun';
+import { getAgentRun, scoreRun } from '@/lib/agentrun';
+import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { actorFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
 import { runIdFromWorkflowId } from '@/lib/temporal-visibility';
@@ -8,11 +10,12 @@ export const dynamic = 'force-dynamic';
 
 // POST → re-run a durable workflow: re-dispatch the SAME agent+query as a fresh run. We correlate
 // the Temporal workflowId back to the recorded run (the workflowId embeds the console runId) and
-// re-submit through runAgent — which re-enters durable dispatch when it's enabled, or runs inline
-// otherwise. This makes "rerun a job" work from the Jobs surface regardless of runtime.
+// re-submit through dispatchAgentRun — which re-enters the DURABLE Temporal path when it's enabled
+// and reachable, or degrades to the synchronous in-process path otherwise. This makes "rerun a job"
+// work from the Jobs surface regardless of runtime.
 //
-// A rerun does not require Temporal to be reachable (the source run lives in the DB); that's why it
-// reuses runAgent rather than a Temporal-only replay. The QA score runs after the response flushes.
+// A rerun does not require Temporal to be reachable (the source run lives in the DB); dispatch's
+// graceful fallback covers the unreachable case. The QA score runs after the response flushes.
 export async function POST(req: Request, { params }: { params: Promise<{ wf: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -33,8 +36,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ wf: str
       { status: 404 },
     );
   }
-  const run = await runAgent(prior.agentId, prior.query, gate.user.email ?? undefined, false, await currentOrgId());
-  if (!run) return NextResponse.json({ error: 'unknown agent' }, { status: 404 });
-  after(() => scoreRun(run));
-  return NextResponse.json({ ok: true, run, sourceWorkflowId: workflowId }, { status: 201 });
+  const d = await dispatchAgentRun({
+    agentId: prior.agentId,
+    query: prior.query,
+    caller: gate.user.email ?? undefined,
+    orgId: await currentOrgId(),
+    actor: actorFromSession(gate),
+  });
+  // Durable submit accepted but still executing in the worker — 202 with the ids so the client polls.
+  if (d.mode === 'pending') {
+    return NextResponse.json(
+      { ok: true, status: 'running', runId: d.runId, workflowId: d.workflowId, run: d.run, mode: d.mode, sourceWorkflowId: workflowId },
+      { status: 202 },
+    );
+  }
+  if (!d.run) return NextResponse.json({ error: 'unknown agent' }, { status: 404 });
+  after(() => scoreRun(d.run!));
+  return NextResponse.json({ ok: true, run: d.run, sourceWorkflowId: workflowId }, { status: 201 });
 }
