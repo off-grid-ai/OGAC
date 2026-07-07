@@ -528,3 +528,9 @@ real and should be closed before enterprise GA:
 Being built NOW (fold into schema from the start, per founder): pipeline **versioning** (immutable
 versions, consumers pin, edit = new version) and **mandatory-vs-overridable** controls (org control
 typed `locked|default`; pipeline may only tighten a locked one).
+
+## Live-audit findings — pipelines/gateways fan-out (2026-07-08)
+
+| # | Gap | What to do | Owner | Effort |
+|---|-----|-----------|-------|--------|
+| PA-10 | **Gateway PATCH silently no-ops on a PARTIAL body** — sending only `{defaultModel}` returns 200 but does not persist (validateGatewayUpdate delegates to create-validation which needs name/kind/baseUrl). The edit UI always sends the FULL prefilled shape so the user-facing edit WORKS; but a partial API PATCH should either merge onto the existing row or return 400, not silent-200. | Make `updateGateway` merge the patch onto the current row (read-modify-write) OR the route 400 on missing required fields. Add a partial-PATCH test. | console (gap agent) | S |
