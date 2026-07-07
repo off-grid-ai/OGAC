@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Database,
   FloppyDisk,
+  FlowArrow,
   Info,
   ListChecks,
   PencilSimple,
@@ -39,6 +40,7 @@ import {
   removeStep,
   setAgentPrompt,
   setOutputSink,
+  setPipeline,
   setSummary,
   setTitle,
   setTrigger,
@@ -126,12 +128,15 @@ export function AppBuilder({
   domains: initialDomains,
   agents,
   connectors = [],
+  pipelines = [],
   initialApp,
 }: {
   summary: OrgContextSummary;
   domains: { id: string; label: string }[];
   agents: { id: string; name: string }[];
   connectors?: ConnectorOption[];
+  /** The org's pipelines, for the "Runs on" governed-binding selector. */
+  pipelines?: { id: string; name: string }[];
   /** When present, the builder EDITS a saved app: it opens in refine, and Save PATCHes it. */
   initialApp?: AppSpec;
 }) {
@@ -236,6 +241,7 @@ export function AppBuilder({
           title: spec.title,
           summary: spec.summary,
           visibility: spec.visibility,
+          pipelineId: spec.pipelineId ?? null,
           trigger: spec.trigger,
           inputForm: spec.inputForm,
           steps: spec.steps,
@@ -337,6 +343,7 @@ export function AppBuilder({
             <GuidedRefine
               spec={spec}
               names={names}
+              pipelines={pipelines}
               highlightStep={highlightStep}
               handlersFor={handlersFor}
               onSpec={setSpec}
@@ -424,12 +431,14 @@ export function AppBuilder({
 function GuidedRefine({
   spec,
   names,
+  pipelines,
   highlightStep,
   handlersFor,
   onSpec,
 }: {
   spec: AppSpec;
   names: BindingNames;
+  pipelines: { id: string; name: string }[];
   highlightStep: string | null;
   handlersFor: (id: string) => StepEditorHandlers;
   onSpec: (fn: (s: AppSpec | null) => AppSpec | null) => void;
@@ -547,6 +556,42 @@ function GuidedRefine({
                 onClick={() => onSpec((s) => (s ? setVisibility(s, v.id) : s))}
               />
             ))}
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <FlowArrow className="size-4 text-primary" />
+              Runs on
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">
+              The governed pipeline this app runs on — its model gateway, data ceiling, policy and
+              guardrails. Every run is tagged to it. Leave on the org default unless you need a
+              specific one.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <SelectRow
+              active={!spec.pipelineId}
+              label="Org default (governed)"
+              hint="Resolve to your org's default pipeline at run time"
+              onClick={() => onSpec((s) => (s ? setPipeline(s, null) : s))}
+            />
+            {pipelines.map((pl) => (
+              <SelectRow
+                key={pl.id}
+                active={spec.pipelineId === pl.id}
+                label={pl.name}
+                hint={`Runs on ${pl.name}`}
+                onClick={() => onSpec((s) => (s ? setPipeline(s, pl.id) : s))}
+              />
+            ))}
+            {pipelines.length === 0 ? (
+              <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+                No pipelines defined yet — the org default applies. Create pipelines under Governance
+                to offer specific ones here.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
