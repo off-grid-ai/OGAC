@@ -534,3 +534,11 @@ typed `locked|default`; pipeline may only tighten a locked one).
 | # | Gap | What to do | Owner | Effort |
 |---|-----|-----------|-------|--------|
 | PA-10 | **Gateway PATCH silently no-ops on a PARTIAL body** — sending only `{defaultModel}` returns 200 but does not persist (validateGatewayUpdate delegates to create-validation which needs name/kind/baseUrl). The edit UI always sends the FULL prefilled shape so the user-facing edit WORKS; but a partial API PATCH should either merge onto the existing row or return 400, not silent-200. | Make `updateGateway` merge the patch onto the current row (read-modify-write) OR the route 400 on missing required fields. Add a partial-PATCH test. | console (gap agent) | S |
+
+## Fan-out deferred gaps (honest — flagged by agents B/C, 2026-07-08)
+
+| # | Gap | What to do | Owner | Effort |
+|---|-----|-----------|-------|--------|
+| PA-11 | **Public pipeline run route doesn't fully EXECUTE.** `POST /api/v1/pipeline/[id]/run` does REAL key-auth + the governed routing/egress decision (block honored + audited) but returns a governed plan/echo (202) — pipelines have no standalone executor (apps run via `submitAppRun`). | Dispatch the resolved gateway/model on the governed decision + apply output guardrail masking, so an external key call actually invokes the model. | console | M |
+| PA-12 | **Telemetry not pipeline-tagged at the source.** Langfuse traces + `eval_runs` aren't stamped with the pipeline id, so per-pipeline Observability/Drift is best-effort over a recent window (Cost/Audit filter correctly via the run tag). | Stamp run traces + eval_runs with `pipeline:<id>` so the Observability + Drift lenses are exact, not best-effort. | console | M |
+| PA-13 | Cosmetic: revoked "audit-test-key" rows linger on the Loan Underwriting seed pipeline (from live audit). Harmless (revoked). | Optionally purge on next seed refresh. | console | XS |
