@@ -127,6 +127,8 @@ without editing config by hand.`,
       body: `Observability shows what your AI actually did. Every governed run and gateway call emits a
 trace you can read back.
 
+![Observability — traces of every governed run and gateway call, on your own tracing store](/docs-shots/observability.png)
+
 ## What you see
 
 - **Agent-run traces** — the pipeline steps for each run (policy, guard, retrieve, answer, ground),
@@ -150,6 +152,8 @@ traces to a real event — an unreachable source shows real zeros, never synthet
       title: 'FinOps',
       description: 'Cost per model, team, and key — with budgets and the on-prem dividend.',
       body: `FinOps meters usage and cost from the traffic log.
+
+![FinOps — cost by model, team, and key, with budgets and the on-prem dividend](/docs-shots/finops.png)
 
 ## What it shows
 
@@ -224,6 +228,8 @@ dividend), Accounting is the period close: the chargeback report you reconcile a
       body: `Reports turn the dashboards into a document you can hand someone. Built-in reports are
 seeded; you can also compose your own templates.
 
+![Reports — signed documents rendered live over your real platform data](/docs-shots/app-reports.png)
+
 ## Manage and run
 
 - **Templates** — built-in reports are ready to run; create, edit, and delete custom templates.
@@ -256,6 +262,8 @@ Manage thresholds and the baseline right on the Drift page.`,
       title: 'Evals',
       description: 'Gate quality with golden sets and LLM-as-judge scoring.',
       body: `Evals prove the AI still works, with evidence rather than vibes.
+
+![Evals — golden sets and LLM-as-judge scoring that gate quality with evidence](/docs-shots/evals.png)
 
 ## What you run
 
@@ -353,6 +361,8 @@ is disabled.`,
 store (SeaweedFS). Uploaded knowledge, generated images, chat attachments, and exported artifacts all
 live here.
 
+![Storage — one object store for knowledge, generated images, attachments, and exports](/docs-shots/storage.png)
+
 ## What you can do
 
 - Browse files by folder, with image and video previews.
@@ -368,11 +378,15 @@ There is no other file-storage path — everything the console stores goes throu
       body: `Connectors bring your systems of record into the platform. Off Grid AI ships connectors for
 databases (Postgres, MySQL, MSSQL), object storage (S3), event streams (Kafka), and REST APIs.
 
+![Data — your systems of record connected, synced, and kept to real row counts](/docs-shots/data.png)
+
 ## Manage connectors
 
 On the **Integrations** page, add a connector (point it at an endpoint, choose an auth scheme), edit
 it, trigger a sync, and see the ingest history — real row and document counts from the live source,
 never fabricated. Delete removes it and its history.
+
+![Connectors — add an endpoint, choose an auth scheme, sync, and read real ingest history](/docs-shots/connectors.png)
 
 ## Real data only
 

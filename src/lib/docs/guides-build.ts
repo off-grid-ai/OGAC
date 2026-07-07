@@ -59,6 +59,8 @@ Generation runs on your own image gateway node (stable-diffusion.cpp behind the 
 OpenAI-compatible gateway as chat). The prompt and the result never leave your infrastructure. Each
 image is stored in your object store, so it's also visible in [Storage](/docs/guides/storage).
 
+![Every generated image lands as a real file in your own object store](/docs-shots/storage.png)
+
 ## Tips
 
 - On CPU nodes, generation takes longer than chat — a low step count is faster for drafts.
@@ -86,6 +88,8 @@ Open an agent and run it with a query. You see the full pipeline execute — pol
 retrieval, answer, grounding, provenance — with the steps, guardrail verdicts, and citations shown
 inline. Re-run a past run, cancel one in flight, or send a run through human review.
 
+![Running an agent — the full governed pipeline executing live, with citations inline](/docs-shots/app-runs.png)
+
 ## Grounded vs. open
 
 - **Grounded (default)** — retrieves from your knowledge and answers only from sources, with
@@ -105,6 +109,8 @@ inherits every convention set on your console.`,
       body: `Agent runs is the history and the microscope for everything the agents did. Each run is a
 governed execution you can open and read stage by stage.
 
+![Agent runs — every governed execution with its full pipeline trace, timing, and verdicts](/docs-shots/app-runs.png)
+
 ## What a run shows
 
 Open any run to see the pipeline execute in order — policy, guardrails, retrieval, answer, grounding,
@@ -117,6 +123,8 @@ error to hide.
 - **Re-run** a past run with the same input to reproduce or compare.
 - **Cancel** a run in flight.
 - **Send to review** — route a run through human approval when policy calls for it.
+
+![Human review — route a run for approval before its output is trusted](/docs-shots/app-review.png)
 
 ## One id, four planes
 
@@ -132,6 +140,8 @@ them.`,
       body: `Brain is the workbench for the person tuning the retrieval-and-reasoning core directly. Where
 [Knowledge](/docs/guides/knowledge) and [Studio](/docs/guides/studio) hide the machinery, Brain
 exposes it, so you can inspect and tune each part.
+
+![Brain — documents, retrieval, tools, router, and evals in one power-user workbench](/docs-shots/brain.png)
 
 ## What it exposes
 
@@ -249,6 +259,8 @@ else. A fresh account simply shows an empty list, never someone else's work.`,
       body: `Studio is for the people who know the work but not the plumbing. You describe an assistant
 in plain language and Studio wires the model, policy, guardrails, and grounding for you.
 
+![Studio — describe an assistant in plain language and ship a governed agent, no setup](/docs-shots/studio.png)
+
 ## The flow
 
 1. **Describe** what the assistant should do. Off Grid AI can suggest a name, the relevant skills, and
@@ -263,6 +275,8 @@ None of the technical settings (model choice, sampling, token limits, embeddings
 are handled for you, under the same governance as everything else. A published assistant is a real
 governed agent plus a saved template that points at it — so it runs the same pipeline as anything
 built by hand.
+
+![A published app's lifecycle — build, input, runs, review, and reports in one shell](/docs-shots/app-lifecycle.png)
 
 ## Sharing
 
@@ -320,6 +334,8 @@ time.`,
       description: 'A reusable prompt library, plus what your org actually asks.',
       body: `The Prompts library keeps reusable prompt texts you can save, tag, and organize, so good
 prompts are shared instead of retyped.
+
+![Prompts — a reusable, tagged library plus what your org actually asks](/docs-shots/prompts.png)
 
 ## What it holds
 
