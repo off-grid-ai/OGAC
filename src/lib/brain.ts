@@ -46,8 +46,14 @@ interface DocRow extends BrainDoc {
   data_class: string;
 }
 
-// PURE-ish helpers: DocAcl ⇄ the flat LanceDB columns.
-function aclToColumns(acl?: DocAcl): Pick<DocRow, 'owner' | 'allowed_roles' | 'allowed_subjects' | 'data_class'> {
+// The flat ACL column names, in one place. A DocRow persists these four text columns in addition to
+// the base BrainDoc + vector. Kept as a typed constant so the schema-reconciliation migration and
+// the row-shaper can't drift apart. Empty string is the "no value" sentinel for every one of them.
+const ACL_COLUMNS = ['owner', 'allowed_roles', 'allowed_subjects', 'data_class'] as const;
+type AclColumn = (typeof ACL_COLUMNS)[number];
+
+// PURE helper: DocAcl → the flat LanceDB columns. Zero I/O, unit-testable.
+function aclToColumns(acl?: DocAcl): Record<AclColumn, string> {
   const arr = (v?: readonly string[] | null) => (v && v.length > 0 ? JSON.stringify(v) : '');
   return {
     owner: acl?.owner ?? '',
@@ -55,6 +61,16 @@ function aclToColumns(acl?: DocAcl): Pick<DocRow, 'owner' | 'allowed_roles' | 'a
     allowed_subjects: arr(acl?.allowed_subjects),
     data_class: acl?.data_class ?? '',
   };
+}
+
+// PURE helper: given the column names an existing table already has, return the migration needed to
+// bring it up to the current DocRow schema — i.e. the ACL columns it's missing, each as an
+// `addColumns` SQL transform that back-fills existing rows with the empty-string sentinel.
+// Returns [] when the table is already current (no migration). This is the fix for the live 500:
+// tables created before the ACL columns existed reject writes with "Found field not in schema".
+export function aclColumnMigration(existing: readonly string[]): Array<{ name: string; valueSql: string }> {
+  const have = new Set(existing);
+  return ACL_COLUMNS.filter((c) => !have.has(c)).map((name) => ({ name, valueSql: "''" }));
 }
 
 function parseJsonArr(s: unknown): string[] | null {
@@ -104,6 +120,18 @@ const SEED_DOCS: ReadonlyArray<Omit<BrainDoc, 'id'>> = [
   },
 ];
 
+// I/O adapter around the pure `aclColumnMigration` rule: bring an existing table's on-disk schema
+// up to the current DocRow shape. LanceDB fixes a table's schema at creation and rejects `add()`
+// rows carrying fields it doesn't know ("Found field not in schema: owner") — so a table created
+// before the ACL columns existed breaks every new ingest. This adds the missing columns in place
+// (back-filling existing rows with the empty-string sentinel), a metadata-cheap operation. Idempotent.
+async function reconcileAclColumns(tbl: lancedb.Table): Promise<void> {
+  const schema = await tbl.schema();
+  const migration = aclColumnMigration(schema.fields.map((f) => f.name));
+  if (migration.length === 0) return;
+  await tbl.addColumns(migration.map((m) => ({ name: m.name, valueSql: m.valueSql })));
+}
+
 let tablePromise: Promise<lancedb.Table> | null = null;
 
 async function getTable(): Promise<lancedb.Table> {
@@ -111,7 +139,11 @@ async function getTable(): Promise<lancedb.Table> {
   tablePromise = (async () => {
     const db = await lancedb.connect(LANCEDB_PATH);
     const names = await db.tableNames();
-    if (names.includes(TABLE)) return db.openTable(TABLE);
+    if (names.includes(TABLE)) {
+      const tbl = await db.openTable(TABLE);
+      await reconcileAclColumns(tbl);
+      return tbl;
+    }
     // Build rows from the sample SOPs (also used to define the table schema).
     const rows: DocRow[] = [];
     for (const d of SEED_DOCS) {
@@ -148,6 +180,22 @@ export async function getDocument(id: string): Promise<BrainDoc | null> {
   return docs.find((d) => d.id === id) ?? null;
 }
 
+// Thrown when the vector store genuinely can't accept a write. Carries a stable HTTP status so the
+// route can surface a clear error instead of a bare 500 with an empty body.
+export class BrainWriteError extends Error {
+  readonly status: number;
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'BrainWriteError';
+    this.status = 502; // upstream store failed, not the caller's fault
+  }
+}
+
+// PURE helper: shape a BrainDoc + embedding into the persisted DocRow. No I/O — unit-testable.
+function toDocRow(id: string, title: string, source: string, text: string, vector: number[], acl?: DocAcl): DocRow {
+  return { id, title, source, text, vector, ...aclToColumns(acl) };
+}
+
 export async function addDocument(
   title: string,
   source: string,
@@ -155,16 +203,25 @@ export async function addDocument(
   acl?: DocAcl,
 ): Promise<BrainDoc> {
   if (qdrantSelected()) return qdrantAdd(title, source, text, acl);
-  const tbl = await getTable();
-  const doc: DocRow = {
-    id: randomUUID(),
-    title,
-    source,
-    text,
-    vector: await embed(`${title}\n${text}`),
-    ...aclToColumns(acl),
-  };
-  await tbl.add([doc] as unknown as Record<string, unknown>[]);
+  let tbl: lancedb.Table;
+  let vector: number[];
+  try {
+    tbl = await getTable();
+    vector = await embed(`${title}\n${text}`);
+  } catch (e) {
+    throw new BrainWriteError('The knowledge store is unavailable — could not embed or open the index.', e);
+  }
+  const doc = toDocRow(randomUUID(), title, source, text, vector, acl);
+  try {
+    await tbl.add([doc] as unknown as Record<string, unknown>[]);
+  } catch (e) {
+    // e.g. a legacy-schema table that couldn't be reconciled. Surface a clear, actionable error
+    // rather than a bare 500 — never let the raw LanceDB message escape as an empty-body crash.
+    throw new BrainWriteError(
+      `The knowledge store rejected the document: ${e instanceof Error ? e.message : String(e)}`,
+      e,
+    );
+  }
   return { id: doc.id, title, source, text, acl };
 }
 

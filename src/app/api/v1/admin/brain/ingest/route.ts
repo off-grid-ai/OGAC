@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { BrainWriteError } from '@/lib/brain';
 import { ingestDatabase, ingestFile, ingestImage, ingestText } from '@/lib/ingest';
 
 // Ingest a source into the Brain. Body is discriminated by `kind`:
@@ -40,7 +41,14 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Body | null;
   if (!b || typeof b.kind !== 'string') return bad('kind required');
-  const result = await dispatch(b);
+  let result: { id: string } | null | undefined;
+  try {
+    result = await dispatch(b);
+  } catch (e) {
+    // The Brain's store rejected the write — return a clear error, never a bare empty-body 500.
+    if (e instanceof BrainWriteError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   if (result === undefined) return bad('missing fields for this kind');
   if (result === null) return NextResponse.json({ error: 'unknown dataset' }, { status: 404 });
   return NextResponse.json(result, { status: 201 });
