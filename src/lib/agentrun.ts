@@ -12,6 +12,7 @@ import {
   getSigning,
 } from '@/lib/adapters/registry';
 import { maybeRunComposableTool } from '@/lib/adapters/tool-primitives';
+import type { EgressDecision } from '@/lib/tool-primitives';
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { estimateTokens, projectBudget } from '@/lib/chat-governance';
@@ -271,6 +272,10 @@ function makeGovernedToolExecutor(
   agentId: string,
   caller: string | undefined,
   mark: Mark,
+  // The pipeline egress decision for this run (from enforceModelCall). Threaded into the composable
+  // seam so an autonomous agent's web_search tool call is leashed identically to a cloud model call:
+  // under a local-only/blocked pipeline it is refused (egress_blocked). Default 'cloud' (additive).
+  egress: EgressDecision = 'cloud',
 ) {
   return async (ref: string, args: Record<string, unknown>): Promise<ToolObservation> => {
     try {
@@ -279,7 +284,7 @@ function makeGovernedToolExecutor(
       await maybeRunSandboxTool(ref, mark);
       const result = await maybeRunComposableTool(
         ref,
-        { orgId, actor: caller, callerAppId: agentId },
+        { orgId, actor: caller, callerAppId: agentId, egress },
         mark,
         typeof args.query === 'string' ? args.query : JSON.stringify(args),
       );
@@ -587,19 +592,13 @@ export async function runAgent(
     routed.hits.map((h) => h.ref),
     t,
   );
-  const toolHit = routed.hits.find((h) => h.sourceKind === 'tool');
-  if (toolHit) {
-    mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
-    await maybeRunSandboxTool(toolHit.ref, mark);
-    // Composable tools: primitives (prim:web_search/read_url/http) + apps-as-tools (app:<id>).
-    // No-ops for tool:<id> (sandbox path above owns those) + unknown refs; governed + cycle-safe.
-    await maybeRunComposableTool(toolHit.ref, { orgId, actor: caller, callerAppId: agent.id }, mark, query);
-  }
-
-  // 3b. Model-call gate — the egress leash BEFORE the gateway call (compose → gatewayAnswer). A
-  // 'block' verdict stops the call (deny + audit, governed refusal); the pipeline can only be MORE
-  // restrictive than the routing leash, never less. No pipeline ⇒ the noPipeline verdict allows it
-  // (legacy routing — the gateway's own model-routing rules still decide where it actually runs).
+  // 3b. Model-call gate — the egress leash BEFORE any external reach (a routed web_search tool-hit
+  // OR the gateway compose → gatewayAnswer). A 'block' verdict stops the call (deny + audit, governed
+  // refusal); the pipeline can only be MORE restrictive than the routing leash, never less. No
+  // pipeline ⇒ the noPipeline verdict allows it (legacy routing — the gateway's own model-routing
+  // rules still decide where it actually runs). Resolved HERE (before the tool-hit dispatch) so the
+  // SAME egress decision governs web_search: the verdict's `egress` ('local'|'cloud'|'block') is
+  // threaded into the composable-tool seam, leashing web_search identically to a cloud model call.
   // (PA-16c: the overlay's requirePiiMasking is APPLIED below — after this allow check, before
   // compose, the raw query is substituted with its PII-redacted form. See the mask step.)
   const modelVerdict = enforceModelCall(contract, dataClass);
@@ -612,6 +611,24 @@ export async function runAgent(
       checks: [{ name: 'pipeline-egress', verdict: 'blocked' as const, detail: modelVerdict.reason }],
       provenance: null,
     }, attribution.org);
+  }
+  // The egress the pipeline permits for this run's data-class — threaded into every tool dispatch so
+  // an internet-reaching primitive (web_search) is refused under a local-only/blocked leash.
+  const runEgress = modelVerdict.egress;
+
+  const toolHit = routed.hits.find((h) => h.sourceKind === 'tool');
+  if (toolHit) {
+    mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
+    await maybeRunSandboxTool(toolHit.ref, mark);
+    // Composable tools: primitives (prim:web_search/read_url/http) + apps-as-tools (app:<id>).
+    // No-ops for tool:<id> (sandbox path above owns those) + unknown refs; governed + cycle-safe.
+    // egress leashes web_search exactly like the model call above.
+    await maybeRunComposableTool(
+      toolHit.ref,
+      { orgId, actor: caller, callerAppId: agent.id, egress: runEgress },
+      mark,
+      query,
+    );
   }
 
   // PA-16c — PII MASKING BEFORE THE MODEL. When the bound pipeline's guardrail overlay requires
@@ -669,7 +686,7 @@ export async function runAgent(
       goal: `${modelQuery}${context}`,
       tools: toolCatalog,
       planNext: makeGovernedPlanner(loopModel, loopSystem, caller),
-      callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark),
+      callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark, runEgress),
       maxIterations: budget,
     });
     recordTrajectory(loop.trajectory, mark);
