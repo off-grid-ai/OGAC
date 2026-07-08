@@ -118,3 +118,98 @@ export function summarizeErasure(
   const status = results.some((r) => r.error) ? 'partial' : 'completed';
   return { subject, status, erasedRows, results, deferred };
 }
+
+// ── External-plane PROPAGATION orchestrator (thin I/O) ────────────────────────────────────────────
+// Phase S6: the vector index, external lake, and device replicas are no longer merely "deferred" —
+// this orchestrates the REAL propagation. It builds the PURE plan (planPropagation), calls each
+// configured adapter, and folds an HONEST report (summarizePropagation) where an unconfigured/failed
+// target is `deferred` with a reason, never counted as erased. Adapters are injected (default = the
+// real ones) so the orchestrator is integration-testable with fakes over the real plan.
+
+import {
+  planPropagation,
+  summarizePropagation,
+  type PropagationConfig,
+  type PropagationReport,
+  type PropagationResult,
+} from '@/lib/erasure-plan';
+import { eraseSubjectVectors, isVectorConfigured } from '@/lib/adapters/erasure-vector';
+import { eraseSubjectLakeObjects, isLakeConfigured } from '@/lib/adapters/erasure-lake';
+import { eraseSubjectDeviceReplicas } from '@/lib/adapters/erasure-device';
+
+/** The adapter surface the orchestrator drives — injectable so tests can supply fakes. */
+export interface PropagationAdapters {
+  isVectorConfigured: () => Promise<boolean>;
+  eraseVectors: (subjectKey: string) => Promise<{ ok: boolean; removed: number | null; error: string | null }>;
+  isLakeConfigured: () => Promise<boolean>;
+  eraseLake: (subjectKey: string) => Promise<{ ok: boolean; removed: number; error: string | null }>;
+  eraseDevice: (
+    subjectKey: string,
+    requestedBy: string,
+    orgId: string,
+  ) => Promise<{ ok: boolean; removed: number; error: string | null }>;
+}
+
+const REAL_ADAPTERS: PropagationAdapters = {
+  isVectorConfigured,
+  eraseVectors: eraseSubjectVectors,
+  isLakeConfigured,
+  eraseLake: eraseSubjectLakeObjects,
+  eraseDevice: eraseSubjectDeviceReplicas,
+};
+
+/**
+ * Propagate a subject-erasure to the external planes. Thin orchestration: probe config → build the
+ * pure plan → run each configured adapter → aggregate honestly. Device propagation is ALWAYS
+ * actionable (it records a durable tombstone), so it's never a silent skip. Returns the honest
+ * {propagated, deferred} report.
+ */
+export async function propagateErasure(
+  subject: string,
+  requestedBy: string,
+  orgId: string,
+  adapters: PropagationAdapters = REAL_ADAPTERS,
+): Promise<PropagationReport> {
+  // Probe which external targets are reachable/configured (device is always available via the queue).
+  const [vector, lake] = await Promise.all([
+    adapters.isVectorConfigured().catch(() => false),
+    adapters.isLakeConfigured().catch(() => false),
+  ]);
+  const config: PropagationConfig = { vector, lake, device: true };
+
+  const plan = planPropagation(subject, config);
+  const executed: PropagationResult[] = [];
+
+  for (const step of plan.steps) {
+    if (step.target === 'vector') {
+      const r = await adapters.eraseVectors(step.subjectKey);
+      executed.push({
+        target: 'vector',
+        label: step.label,
+        outcome: r.ok ? 'erased' : 'error',
+        removed: r.removed ?? 0,
+        reason: r.ok ? null : r.error,
+      });
+    } else if (step.target === 'lake') {
+      const r = await adapters.eraseLake(step.subjectKey);
+      executed.push({
+        target: 'lake',
+        label: step.label,
+        outcome: r.ok ? 'erased' : 'error',
+        removed: r.removed,
+        reason: r.ok ? null : r.error,
+      });
+    } else {
+      const r = await adapters.eraseDevice(step.subjectKey, requestedBy, orgId);
+      executed.push({
+        target: 'device',
+        label: step.label,
+        outcome: r.ok ? 'erased' : 'error',
+        removed: r.removed,
+        reason: r.ok ? null : r.error,
+      });
+    }
+  }
+
+  return summarizePropagation(plan.subject, executed, plan.notConfigured);
+}
