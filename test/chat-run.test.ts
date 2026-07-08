@@ -73,9 +73,9 @@ test('runInboundGuardrails — a benign message passes, is not blocked, is not r
   assert.equal(r.blocked, false);
   assert.equal(r.redacted, false);
   assert.equal(r.text, 'what is our leave policy?');
-  // The pii + injection checks both ran (they are the wired 'pre' adapters).
+  // The wired 'pre' adapters all ran: guardrail-rules (operator rules), injection, and pii.
   const names = r.checks.map((c) => c.name).sort();
-  assert.deepEqual(names, ['injection', 'pii']);
+  assert.deepEqual(names, ['guardrail-rules', 'injection', 'pii']);
 });
 
 test('runInboundGuardrails — a prompt-injection message is BLOCKED (matches the agent path)', async () => {
