@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
-import { deleteGateway, getGatewayRow, getGatewayWithHealth, updateGateway } from '@/lib/gateways';
+import { deleteGateway, getGatewayWithHealth, updateGateway } from '@/lib/gateways';
 import { validateGatewayUpdate } from '@/lib/gateways-policy';
 
 export const dynamic = 'force-dynamic';
@@ -26,33 +26,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const orgId = await currentOrgId();
 
-  // PATCH is a PARTIAL update: merge the provided fields onto the current row, then validate the
-  // MERGED shape (so a partial body — e.g. only `defaultModel` — persists instead of failing
-  // create-validation or silently no-op'ing). `??` keeps an explicit empty string (clearing a
-  // field) while falling back to the stored value only when a key is absent. (gap PA-10)
-  const existing = await getGatewayRow(id, orgId);
-  if (!existing) return NextResponse.json({ error: 'unknown gateway' }, { status: 404 });
-
-  // Pure validation — egressClass is RE-DERIVED from kind in the store, never trusted from client.
+  // PATCH is a PARTIAL update (gap PA-10). The pure `validateGatewayUpdate` validates ONLY the
+  // supplied fields (a `{ defaultModel }`-only body is valid); the store then read-modify-writes the
+  // patch onto the stored row, re-derives egressClass from the merged kind, and re-checks the compat
+  // invariant on the MERGED shape — so a partial patch persists instead of silently no-op'ing, and
+  // a merge that breaks the compat rule is a clean 400, never a silent fail. No route-level merge.
   const result = validateGatewayUpdate({
-    name: (body?.name as string | undefined) ?? existing.name,
-    kind: (body?.kind as string | undefined) ?? existing.kind,
-    baseUrl: (body?.baseUrl as string | undefined) ?? existing.baseUrl,
-    defaultModel: (body?.defaultModel as string | undefined) ?? existing.defaultModel,
-    enabled: typeof body?.enabled === 'boolean' ? body.enabled : existing.enabled,
+    name: body?.name,
+    kind: body?.kind,
+    baseUrl: body?.baseUrl,
+    defaultModel: body?.defaultModel,
+    enabled: body?.enabled,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   const updated = await updateGateway(id, result.value, orgId);
-  if (!updated) return NextResponse.json({ error: 'unknown gateway' }, { status: 404 });
+  if (!updated.ok) {
+    const status = updated.reason === 'not-found' ? 404 : 400;
+    const error = updated.reason === 'not-found' ? 'unknown gateway' : updated.error;
+    return NextResponse.json({ error }, { status });
+  }
   auditFromSession(gate, orgId, {
     action: 'gateway.update',
     resource: `gateway:${id}`,
     outcome: 'ok',
   });
-  return NextResponse.json(updated);
+  return NextResponse.json(updated.row);
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {

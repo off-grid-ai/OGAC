@@ -8,6 +8,7 @@ import {
   mergeGatewayHealth,
   validateGatewayCreate,
   validateGatewayUpdate,
+  validateMergedGateway,
   type GatewayHealthSignal,
   type GatewayRow,
 } from '../src/lib/gateways-policy.ts';
@@ -120,35 +121,96 @@ test('validate: egressClass is derived, never taken from input', () => {
   assert.equal(r.value.enabled, true, 'defaults enabled');
 });
 
-// ─── update validation — same rules as create + egress ALWAYS re-derived from the new kind ────────
-test('validateGatewayUpdate: name + valid kind required, compat needs a base URL', () => {
-  assert.equal(validateGatewayUpdate({ name: '  ', kind: 'openai' }).ok, false);
-  assert.equal(validateGatewayUpdate({ name: 'X', kind: 'bogus' }).ok, false);
-  assert.equal(validateGatewayUpdate({ name: 'X', kind: 'compat' }).ok, false, 'compat with no URL rejected');
-  const ok = validateGatewayUpdate({ name: 'X', kind: 'compat', baseUrl: 'https://openrouter.ai/api/v1/' });
-  assert.ok(ok.ok);
-  assert.equal(ok.value.baseUrl, 'https://openrouter.ai/api/v1', 'trailing slash trimmed');
+// ─── update validation — PARTIAL: only supplied fields validated + returned (gap PA-10) ────────────
+test('validateGatewayUpdate: a defaultModel-only patch is valid and returns JUST that field', () => {
+  const r = validateGatewayUpdate({ defaultModel: '  gpt-5-mini  ' });
+  assert.ok(r.ok);
+  assert.deepEqual(r.value, { defaultModel: 'gpt-5-mini' }, 'only defaultModel present, trimmed');
 });
 
-test('validateGatewayUpdate: egress is RE-DERIVED from the new kind, never trusted from the client', () => {
-  // Flipping an on-prem gateway to a cloud kind must flip egress to cloud, regardless of any input.
-  const toCloud = validateGatewayUpdate({ name: 'Was on-prem', kind: 'openai' });
+test('validateGatewayUpdate: each field is validated only WHEN PRESENT', () => {
+  // name present but blank → error; kind present but bogus → error.
+  assert.equal(validateGatewayUpdate({ name: '   ' }).ok, false, 'blank name rejected when present');
+  assert.equal(validateGatewayUpdate({ kind: 'bogus' }).ok, false, 'bogus kind rejected when present');
+  // A non-string name is treated as blank → rejected.
+  assert.equal(validateGatewayUpdate({ name: 42 }).ok, false, 'non-string name rejected');
+  // Absent fields impose no requirement — a name-only patch with a valid name passes.
+  const okName = validateGatewayUpdate({ name: 'Renamed' });
+  assert.ok(okName.ok);
+  assert.deepEqual(okName.value, { name: 'Renamed' });
+});
+
+test('validateGatewayUpdate: baseUrl present is trimmed of trailing slashes; empty is allowed here', () => {
+  const trimmed = validateGatewayUpdate({ baseUrl: 'https://openrouter.ai/api/v1///' });
+  assert.ok(trimmed.ok);
+  assert.equal(trimmed.value.baseUrl, 'https://openrouter.ai/api/v1');
+  // An empty baseUrl is allowed at this layer — the compat-needs-a-URL rule is judged on the MERGED
+  // row (validateMergedGateway), since a partial patch may not carry both kind and baseUrl.
+  const empty = validateGatewayUpdate({ baseUrl: '' });
+  assert.ok(empty.ok);
+  assert.equal(empty.value.baseUrl, '');
+  // A non-string baseUrl normalises to empty string.
+  const nonStr = validateGatewayUpdate({ baseUrl: 5 });
+  assert.ok(nonStr.ok);
+  assert.equal(nonStr.value.baseUrl, '');
+});
+
+test('validateGatewayUpdate: when kind IS present, egress is RE-DERIVED from it (never client-trusted)', () => {
+  const toCloud = validateGatewayUpdate({ kind: 'openai' });
   assert.ok(toCloud.ok);
+  assert.equal(toCloud.value.kind, 'openai');
   assert.equal(toCloud.value.egressClass, 'cloud', 'kind→cloud ⇒ egress cloud');
 
-  // Flipping a cloud gateway to on-prem must flip egress back to on-prem.
-  const toOnPrem = validateGatewayUpdate({ name: 'Was cloud', kind: 'on-prem' });
+  const toOnPrem = validateGatewayUpdate({ kind: 'on-prem' });
   assert.ok(toOnPrem.ok);
   assert.equal(toOnPrem.value.egressClass, 'on-prem', 'kind→on-prem ⇒ egress on-prem');
 });
 
-test('validateGatewayUpdate: enabled false is honoured (disable via update); defaults true', () => {
-  const disabled = validateGatewayUpdate({ name: 'X', kind: 'openai', enabled: false });
-  assert.ok(disabled.ok);
-  assert.equal(disabled.value.enabled, false);
-  const dflt = validateGatewayUpdate({ name: 'X', kind: 'openai' });
-  assert.ok(dflt.ok);
-  assert.equal(dflt.value.enabled, true);
+test('validateGatewayUpdate: egressClass is absent from the patch when kind is NOT supplied', () => {
+  const r = validateGatewayUpdate({ defaultModel: 'm' });
+  assert.ok(r.ok);
+  assert.equal('egressClass' in r.value, false, 'no kind ⇒ no egress in the partial patch');
+  assert.equal('kind' in r.value, false);
+});
+
+test('validateGatewayUpdate: enabled present is coerced to a boolean; absent ⇒ not in the patch', () => {
+  const off = validateGatewayUpdate({ enabled: false });
+  assert.ok(off.ok);
+  assert.equal(off.value.enabled, false);
+  const truthy = validateGatewayUpdate({ enabled: 1 });
+  assert.ok(truthy.ok);
+  assert.equal(truthy.value.enabled, true, 'coerced to boolean');
+  const noEnabled = validateGatewayUpdate({ name: 'X' });
+  assert.ok(noEnabled.ok);
+  assert.equal('enabled' in noEnabled.value, false, 'absent enabled ⇒ untouched');
+});
+
+test('validateGatewayUpdate: an EMPTY patch (no recognised fields) is a clean error, not a no-op', () => {
+  assert.equal(validateGatewayUpdate({}).ok, false, 'empty patch rejected');
+  const r = validateGatewayUpdate({});
+  assert.ok(!r.ok);
+  assert.match(r.error, /no updatable fields/);
+});
+
+// ─── the compat invariant on the MERGED row (checked by the store after applying a patch) ──────────
+test('validateMergedGateway: compat with a base URL is valid; without one is rejected', () => {
+  assert.equal(validateMergedGateway({ kind: 'compat', baseUrl: 'https://openrouter.ai/api/v1' }), null);
+  assert.match(
+    validateMergedGateway({ kind: 'compat', baseUrl: '' })!,
+    /requires a base URL/,
+    'compat with empty baseUrl rejected',
+  );
+  assert.match(
+    validateMergedGateway({ kind: 'compat', baseUrl: '   ' })!,
+    /requires a base URL/,
+    'whitespace-only baseUrl is treated as empty',
+  );
+});
+
+test('validateMergedGateway: non-compat kinds never require a base URL', () => {
+  assert.equal(validateMergedGateway({ kind: 'on-prem', baseUrl: '' }), null);
+  assert.equal(validateMergedGateway({ kind: 'openai', baseUrl: '' }), null);
+  assert.equal(validateMergedGateway({ kind: 'anthropic', baseUrl: '' }), null);
 });
 
 // ─── seed planning — stable ids, per-org isolation, correct egress ───────────────────────────────
