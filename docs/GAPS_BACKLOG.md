@@ -660,3 +660,9 @@ governs an agent/chat run, most-specific-wins, then loads its contract).
 - **PA-16c:** overlay-driven PII-mask escalation still deferred (the org-locked guardrail floor masks
   today; the overlay-tighten delta is the remaining work). Not folded in this round — it touches the
   guardrail phase across both paths and warrants its own change.
+
+## T1-tail — residual OSS-name leaks (post-merge scan, 2026-07-08)
+T1 scrubbed its 9 named surfaces cleanly; a full scan found more OUTSIDE that scope — fold into the next agents:
+- **Observability Langfuse panels** (`LangfuseRegistryPanel.tsx`, `LangfuseInsightsPanel.tsx`): "Langfuse registry", "Read back from Langfuse's public API", "No Langfuse datasets/sessions" → "trace/prompt registry", "tracing store". → **fold into T2** (touching observability).
+- **/control SecretsPanel** (`SecretsPanel.tsx`): toast "Stored X in OpenBao" → "…in the secrets store". → **fold into T3** (owns /control).
+- **AI-Gateway tokens** (`GatewayApiKeys.tsx`): "backed by its own Keycloak service-account client", "Keycloak is not configured" → "identity-provider service account" / "SSO not configured". → **T4/misc**.
