@@ -129,3 +129,42 @@ Same peripheries govern data-movement as model-access (per PLATFORM.md): data-al
 OPA policy, PII redaction on the sync path, data-quality evals (Great Expectations), lineage
 (Marquez), audit. Those live in the console + S1 control plane; this runbook only stands up the
 engines they drive.
+
+## Seed data (BFSI demo)
+
+A large, realistic **Indian BFSI** demo dataset lives in the ClickHouse warehouse under the
+`bfsi` database. It exists so the platform has genuine enterprise data to be intelligent about
+(analytics, governance/redaction, evals). All PANs / account numbers are synthetic but
+format-valid — treat them as sensitive.
+
+**Load / reload it:**
+
+```bash
+node deploy/onprem/seed-warehouse.mjs
+```
+
+Targets ClickHouse HTTP via env (defaults shown): `WAREHOUSE_URL=http://192.168.1.60:8124`,
+`WAREHOUSE_USER=warehouse`, `WAREHOUSE_PASS=warehouse`. Point `WAREHOUSE_URL` at
+`http://127.0.0.1:8124` to run it from the S1 loopback. No external deps — Node stdlib + global
+`fetch` only.
+
+**Idempotent + deterministic:** it `CREATE TABLE IF NOT EXISTS`es the star schema (MergeTree),
+`TRUNCATE`s each table before loading, and generates rows from a **seeded PRNG** — so every run
+produces the exact same data. Bulk-loads via `INSERT ... FORMAT JSONEachRow` in 5k-row batches,
+then verifies `count()` per table and exits non-zero on any mismatch.
+
+**Schema + row counts (`bfsi.*`):**
+
+| table              | rows    | notes                                                                    |
+|--------------------|---------|--------------------------------------------------------------------------|
+| `dim_customer`     | 20,000  | PAN, name, gender, dob (`Date32`), city/state, segment, kyc_status       |
+| `dim_branch`       | 600     | IFSC, real bank names (HDFC/ICICI/SBI/Axis/Kotak/PNB/…)                   |
+| `dim_product`      | 33      | savings/current/credit_card/loans/term_deposit/life+health insurance     |
+| `fact_account`     | 50,000  | account_no, balance_inr, status, → customer/product/branch               |
+| `fact_transaction` | 600,000 | ts over last ~18 months, amount_inr, channel (UPI/NEFT/…), ~0.5% flagged |
+| `fact_loan`        | 15,000  | principal/roi/emi, dpd, status (active/closed/npa)                       |
+| `fact_claim`       | 8,000   | claim_amount_inr, status, reason                                         |
+| `fact_kyc_event`   | 30,000  | event_type (onboard/re_kyc/…), outcome (pass/fail/manual)                |
+
+Realism: currency INR; PAN `[A-Z]{5}[0-9]{4}[A-Z]`; IFSC `[A-Z]{4}0[A-Z0-9]{6}`; Indian
+names/cities/states; log-normal amount/balance distributions; realistic status/DPD/claim mixes.
