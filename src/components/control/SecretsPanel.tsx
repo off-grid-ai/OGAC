@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-// OpenBao secrets management. Stores connector/tool credentials + virtual-key secrets in OpenBao
-// KV v2 via /api/v1/admin/secrets. Values are write-only from the UI — GET returns key names only.
+// Secrets store panel. Stores connector/tool credentials + virtual-key secrets in the secrets store
+// (KV v2) via /api/v1/admin/secrets. Values are write-only from the UI — GET returns key names only.
 export function SecretsPanel({ configured, initialKeys }: { configured: boolean; initialKeys: string[] }) {
   const [keys, setKeys] = useState<string[]>(initialKeys);
   const [key, setKey] = useState('');
@@ -30,7 +30,7 @@ export function SecretsPanel({ configured, initialKeys }: { configured: boolean;
         body: JSON.stringify({ key: key.trim(), value }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'write failed');
-      toast.success(`Stored ${key.trim()} in OpenBao`);
+      toast.success(`Stored ${key.trim()} in the secrets store`);
       setKey('');
       setValue('');
       await refresh();
@@ -60,7 +60,7 @@ export function SecretsPanel({ configured, initialKeys }: { configured: boolean;
   if (!configured) {
     return (
       <p className="text-xs text-muted-foreground">
-        OpenBao not configured — set OFFGRID_OPENBAO_URL (token OFFGRID_OPENBAO_TOKEN, mount
+        Secrets store not configured — set OFFGRID_OPENBAO_URL (token OFFGRID_OPENBAO_TOKEN, mount
         OFFGRID_OPENBAO_MOUNT) to store connector/tool credentials in the KV vault.
       </p>
     );
