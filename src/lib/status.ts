@@ -52,8 +52,9 @@ const SLOW_MS = Number(process.env.OFFGRID_STATUS_SLOW_MS ?? 1500);
 export interface StatusEntry {
   id: string;
   label: string;
-  // 'embedded' (in-process backend) and 'optional' (on documented fallback) are healthy, not
-  // outages; only 'down' is a real failure.
+  // 'embedded' (in-process backend) and 'optional' (on documented fallback / alternative — incl.
+  // canonical planes not deployed on this fleet) are healthy, not outages; only 'down' is a real
+  // failure.
   status: 'up' | 'down' | 'embedded' | 'optional';
   performance: 'good' | 'degraded' | 'unknown'; // good/degraded when up (by latency); unknown otherwise
   ms: number | null;
