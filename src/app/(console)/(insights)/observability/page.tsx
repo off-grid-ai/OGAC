@@ -36,6 +36,8 @@ import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { currentOrgId } from '@/lib/tenancy';
 import { scoringConfigured } from '@/lib/qa/scoring';
+import type { DriftReport } from '@/lib/adapters/types';
+import { withTimeout } from '@/lib/with-timeout';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,11 +196,25 @@ export default async function ObservabilityPage({
   const lfRegRaw = Array.isArray(sp.lfReg) ? sp.lfReg[0] : sp.lfReg;
   const regTab = resolveRegistryTab(lfRegRaw);
   const { range, fromIso, toIso } = resolveRange(lfRangeRaw);
+  // Every probe runs in parallel AND under a wall-clock ceiling: the observability page fans out to
+  // eval history, the drift engine (Evidently), durable runs, feature flags, and three Langfuse
+  // calls. The Langfuse trio already degrade gracefully; here we also cap eval/drift/runs/flag reads
+  // so a slow or wedged backend degrades to an empty tile instead of stalling the whole page past
+  // the "instant" bar. The loading.tsx skeleton covers the render up to this ceiling.
+  const PROBE_MS = 1500;
+  const DRIFT_FALLBACK: DriftReport = {
+    engine: 'unavailable',
+    status: 'stable',
+    metrics: [],
+    baseline: 0,
+    current: 0,
+    note: 'Drift engine did not respond in time.',
+  };
   const [evals, drift, runs, onlineEnabled, traces, insights, registry] = await Promise.all([
-    listEvalRuns(20, org),
-    getDrift().analyze({ orgId: org }),
-    listAgentRuns(15, org),
-    getFlags().isEnabled('online-evals', true),
+    withTimeout(listEvalRuns(20, org), PROBE_MS, []),
+    withTimeout(getDrift().analyze({ orgId: org }), PROBE_MS, DRIFT_FALLBACK),
+    withTimeout(listAgentRuns(15, org), PROBE_MS, []),
+    withTimeout(getFlags().isEnabled('online-evals', true), PROBE_MS, true),
     safeListTraces(30),
     safeLangfuseInsights(fromIso, toIso),
     safeLangfuseRegistry(50),
