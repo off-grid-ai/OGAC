@@ -1060,6 +1060,9 @@ export const teams = pgTable('teams', {
   orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
+  // Optional DEPARTMENT this team belongs to (e.g. "Risk", "Operations", "Finance"). Nullable +
+  // additive: a team with no department reads as "Unassigned" in the org-chart view. M2-a (#189).
+  department: text('department'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('teams_org_idx').on(t.orgId)]);

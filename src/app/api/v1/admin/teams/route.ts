@@ -24,7 +24,11 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
-  const check = validateTeamCreate({ name: body?.name, description: body?.description });
+  const check = validateTeamCreate({
+    name: body?.name,
+    description: body?.description,
+    department: body?.department,
+  });
   if (!check.ok) {
     return NextResponse.json({ error: check.errors.join('; '), errors: check.errors }, { status: 400 });
   }
@@ -34,6 +38,7 @@ export async function POST(req: Request) {
     {
       name: String(body?.name ?? '').trim(),
       description: typeof body?.description === 'string' ? body.description : '',
+      department: typeof body?.department === 'string' ? body.department : null,
     },
     orgId,
   );

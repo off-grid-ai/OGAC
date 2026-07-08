@@ -16,6 +16,7 @@ export default async function TeamsPage() {
         id: t.id,
         name: t.name,
         description: t.description,
+        department: t.department,
         memberCount: t.memberCount,
       }))}
     />

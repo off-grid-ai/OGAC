@@ -7,10 +7,11 @@ import { MfaPanel } from '@/components/access/MfaPanel';
 import { RealmLifetimes } from '@/components/access/RealmLifetimes';
 import { RolesList } from '@/components/access/RolesList';
 import { SessionsPanel } from '@/components/access/SessionsPanel';
+import { TeamsDepartments } from '@/components/access/TeamsDepartments';
 import { UsersList } from '@/components/access/UsersList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TABS = ['users', 'clients', 'roles', 'sessions', 'mfa', 'idp', 'realm'] as const;
+const TABS = ['users', 'teams', 'clients', 'roles', 'sessions', 'mfa', 'idp', 'realm'] as const;
 type TabValue = (typeof TABS)[number];
 
 export function AccessTabs() {
@@ -30,6 +31,7 @@ export function AccessTabs() {
     <Tabs value={active} onValueChange={onChange}>
       <TabsList>
         <TabsTrigger value="users">Users</TabsTrigger>
+        <TabsTrigger value="teams">Teams &amp; Departments</TabsTrigger>
         <TabsTrigger value="clients">Machine Clients</TabsTrigger>
         <TabsTrigger value="roles">Roles</TabsTrigger>
         <TabsTrigger value="sessions">Sessions</TabsTrigger>
@@ -39,6 +41,9 @@ export function AccessTabs() {
       </TabsList>
       <TabsContent value="users" className="space-y-4">
         <UsersList />
+      </TabsContent>
+      <TabsContent value="teams" className="space-y-4">
+        <TeamsDepartments />
       </TabsContent>
       <TabsContent value="clients" className="space-y-4">
         <MachineClientsList />
