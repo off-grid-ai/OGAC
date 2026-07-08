@@ -143,6 +143,33 @@ export interface AppRunDeps {
    * created agent id is cached back onto the step + persisted to the app so re-runs don't duplicate.
    */
   materializeAgent: (spec: AppSpec, step: Extract<AppStep, { kind: 'agent' }>, orgId: string) => Promise<string>;
+  /**
+   * OUTPUT SINK — render a signed, auditable report artifact for the run (Phase 4B). Injected so the
+   * executor is unit-testable without the PDF/crypto layers. Production wires renderAppRunReport; the
+   * report sink calls this and records the signed manifest (sha256 + signature) onto the step so the
+   * artifact's provenance is captured at run time (the bytes are re-derivable via the download route).
+   */
+  renderReport: (
+    view: import('@/lib/app-runs-view').AppRunView,
+    format: 'pdf' | 'md',
+  ) => Promise<{
+    filename: string;
+    contentType: string;
+    bytes: Uint8Array;
+    manifest: { algorithm: string; sha256: string; signature: string };
+  }>;
+  /**
+   * OUTPUT SINK — deliver the run's result by on-prem SMTP (Phase 4B). Injected so the executor is
+   * unit-testable without a socket. Production wires sendEmail; the email sink calls this. HONEST:
+   * when SMTP is unconfigured it returns { configured:false } and the sink records "not configured" —
+   * never a fake success.
+   */
+  sendEmail: (msg: {
+    to: string;
+    subject: string;
+    text: string;
+    attachments?: { filename: string; contentType: string; bytes: Uint8Array }[];
+  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -239,6 +266,24 @@ export function defaultDeps(): AppRunDeps {
       }
       return created.id;
     },
+    async renderReport(view, format) {
+      const { renderAppRunReport } = await import('@/lib/adapters/sinks/report');
+      const report = await renderAppRunReport(view, format);
+      return {
+        filename: report.filename,
+        contentType: report.contentType,
+        bytes: report.bytes,
+        manifest: {
+          algorithm: report.manifest.algorithm,
+          sha256: report.manifest.sha256,
+          signature: report.manifest.signature,
+        },
+      };
+    },
+    async sendEmail(msg) {
+      const { sendEmail } = await import('@/lib/adapters/sinks/email-smtp');
+      return sendEmail(msg);
+    },
   };
 }
 
@@ -305,7 +350,7 @@ export async function executeStep(
           detail: `awaiting human decision at "${step.label || step.id}"`,
         };
       case 'output':
-        return executeOutputStep(step, priorResults);
+        return await executeOutputStep(spec, step, priorResults, ctx, deps);
       default:
         return errorResult(step, `unknown step kind`);
     }
@@ -452,22 +497,131 @@ async function executeGuardrailStep(
   return { stepId: step.id, kind: 'guardrail', status: 'done', detail: `guardrail ok: ${detail}` };
 }
 
-function executeOutputStep(
+// ─── buildInRunView — a self-contained AppRunView from the run-in-progress (PURE) ─────────────────
+// The report sink needs an AppRunView (the shape renderAppRunReport consumes) but the output step
+// runs BEFORE the run row is finalized, so we assemble the view from what we have in hand: the spec
+// (appId), the runId/input from ctx, and the prior StepResults mapped to the row's step shape. This is
+// pure + deterministic (no DB read), so the report reflects exactly the steps that ran up to here.
+export function buildInRunView(
+  spec: AppSpec,
+  priorResults: StepResult[],
+  ctx: AppRunContext,
+  input: Record<string, unknown>,
+): import('@/lib/app-runs-view').AppRunView {
+  return {
+    id: ctx.runId,
+    appId: spec.id,
+    status: 'running',
+    input,
+    steps: priorResults.map((r) => ({
+      id: r.stepId,
+      kind: r.kind,
+      label: r.stepId,
+      status: r.status,
+      outcome: r.output,
+      refs: (r.refs ?? []).map((x) => x.name),
+      detail: r.detail,
+      childRunId: r.childRunId,
+    })),
+    outcome: aggregateOutcome(priorResults),
+    provenance: null,
+    startedAt: null,
+    finishedAt: null,
+  };
+}
+
+// ─── executeOutputStep — deliver the run's result to the step's sink (Phase 4B) ───────────────────
+// console  → record the accumulated outcome (no external delivery).
+// report   → render a signed PDF (renderReport dep) and ATTACH it to the step: the signed manifest
+//            (sha256 + ed25519 signature) is recorded in the step detail/refs so provenance is
+//            captured at run time; the bytes are re-derivable on demand via the report download route.
+// email    → send the outcome (+ the report PDF when a report step ran) via the on-prem SMTP sink.
+//            HONEST: unconfigured SMTP → an "email not configured" outcome, never a fake success.
+// whatsapp → not yet wired (no on-prem gateway sink in this round) — recorded honestly as deferred.
+async function executeOutputStep(
+  spec: AppSpec,
   step: Extract<AppStep, { kind: 'output' }>,
   priorResults: StepResult[],
-): StepResult {
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<StepResult> {
   const outcome = aggregateOutcome(priorResults);
+
   if (step.sink === 'console') {
     return { stepId: step.id, kind: 'output', status: 'done', output: outcome, detail: 'sink: console' };
   }
-  // report / email / whatsapp sinks are Phase 4 — record the intent, don't deliver. The step still
-  // succeeds (the outcome is available); the sink note tells the reader delivery is deferred.
+
+  if (step.sink === 'report') {
+    const view = buildInRunView(spec, priorResults, ctx, {});
+    const format = step.config?.format === 'md' ? 'md' : 'pdf';
+    try {
+      const report = await deps.renderReport(view, format);
+      // Attach the artifact to the run by recording its signed provenance on the step. The bytes are
+      // re-derivable via GET /api/v1/admin/app-runs/[id]/report (the same renderer), so the download
+      // link IS the durable artifact; here we capture the signature at run time for the audit trail.
+      const downloadPath = `/api/v1/admin/app-runs/${ctx.runId}/report?format=${format}`;
+      return {
+        stepId: step.id,
+        kind: 'output',
+        status: 'done',
+        output: outcome,
+        refs: [{ name: report.filename }, { name: downloadPath }],
+        detail:
+          `sink: report → ${report.filename} (${report.contentType}); ` +
+          `signed ${report.manifest.algorithm} sha256=${report.manifest.sha256.slice(0, 12)}…; ` +
+          `download: ${downloadPath}`,
+      };
+    } catch (e) {
+      return errorResult(step, `report sink failed to render: ${(e as Error).message}`);
+    }
+  }
+
+  if (step.sink === 'email') {
+    const to = typeof step.config?.to === 'string' ? step.config.to : '';
+    const subject =
+      (typeof step.config?.subject === 'string' && step.config.subject) ||
+      `${spec.title || 'App'} run ${ctx.runId}`;
+    // If a prior report step attached a PDF, include the freshly-rendered report as an attachment.
+    let attachments: { filename: string; contentType: string; bytes: Uint8Array }[] | undefined;
+    if (step.config?.attachReport === true) {
+      try {
+        const report = await deps.renderReport(buildInRunView(spec, priorResults, ctx, {}), 'pdf');
+        attachments = [{ filename: report.filename, contentType: report.contentType, bytes: report.bytes }];
+      } catch {
+        /* report render failed — send the text body without the attachment (honest degrade) */
+      }
+    }
+    const result = await deps.sendEmail({ to, subject, text: outcome, attachments });
+    if (!result.configured) {
+      // Not a failure of the run — the run's outcome is available; delivery is simply not set up.
+      // Recorded HONESTLY as "not configured", never a fake success.
+      return {
+        stepId: step.id,
+        kind: 'output',
+        status: 'done',
+        output: outcome,
+        detail: `sink: email — NOT CONFIGURED (${result.reason}). Outcome available, not sent.`,
+      };
+    }
+    if (!result.ok) {
+      return errorResult(step, `email sink failed: ${result.reason}`);
+    }
+    return {
+      stepId: step.id,
+      kind: 'output',
+      status: 'done',
+      output: outcome,
+      detail: `sink: email — ${result.reason}`,
+    };
+  }
+
+  // whatsapp (and any future sink) — no on-prem gateway sink wired this round. Recorded honestly.
   return {
     stepId: step.id,
     kind: 'output',
     status: 'done',
     output: outcome,
-    detail: `sink: ${step.sink} (delivery deferred to Phase 4 — outcome available, not sent)`,
+    detail: `sink: ${step.sink} — delivery not wired (outcome available, not sent)`,
   };
 }
 

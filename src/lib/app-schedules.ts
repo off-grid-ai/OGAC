@@ -52,6 +52,46 @@ export function appScheduleId(appId: string): string {
   return sanitizeScheduleId(`appsched-${appId}`) || `appsched-app`;
 }
 
+// ─── cronFromTrigger — PURE: the cron spec a schedule trigger carries, or null ────────────────────
+// A schedule-triggered app stores its cron under trigger.config.cron (or `.schedule`/`.expression`).
+// This pure reader is the single place the publish/update route asks "does this app want a cron
+// schedule, and what is it?" — so the route stays a thin caller and the rule is unit-testable.
+export function cronFromTrigger(
+  trigger: { kind: string; config?: Record<string, unknown> } | null | undefined,
+): string | null {
+  if (!trigger || trigger.kind !== 'schedule') return null;
+  const c = trigger.config ?? {};
+  const raw = c.cron ?? c.schedule ?? c.expression;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  return raw.trim();
+}
+
+// ─── syncAppSchedule — reconcile an app's cron schedule with its current spec (I/O, graceful) ─────
+// The one entry point the publish/update route calls after a write, and delete calls to tear down.
+// Rules:
+//   • published schedule-trigger app with a cron  → scheduleApp (create/replace)
+//   • otherwise (unpublished, non-schedule, or no cron) → unscheduleApp (idempotent teardown)
+// NEVER throws — returns the AppScheduleResult so the route can note it in the audit trail without
+// letting a Temporal outage fail the publish. A missing/not_found teardown is a benign success.
+export async function syncAppSchedule(
+  app: {
+    id: string;
+    orgId?: string;
+    published?: boolean;
+    trigger?: { kind: string; config?: Record<string, unknown> };
+  },
+  opts: { caller?: string } = {},
+): Promise<AppScheduleResult> {
+  const cron = app.published ? cronFromTrigger(app.trigger) : null;
+  if (cron) {
+    return scheduleApp(app.id, cron, { orgId: app.orgId, caller: opts.caller });
+  }
+  const res = await unscheduleApp(app.id);
+  // A teardown that found nothing to remove is a benign success for the caller's purposes.
+  if (!res.ok && res.reason === 'not_found') return { ok: true, scheduleId: res.scheduleId };
+  return res;
+}
+
 /** Base runId for a scheduled fire; Temporal appends the nominal time to keep executions distinct. */
 export function appScheduleRunSeed(appId: string): string {
   return `appsched_${appId}`;
