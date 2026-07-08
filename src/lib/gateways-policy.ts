@@ -180,17 +180,88 @@ export function validateGatewayCreate(input: GatewayCreateInput): GatewayValidat
   };
 }
 
-/** The clean, egress-derived patch an update yields — the same shape as a validated create value. */
-export type GatewayUpdateValidation = GatewayValidation;
+/**
+ * A validated PARTIAL patch — ONLY the fields the client actually supplied, each already
+ * normalised. `egressClass` is present iff `kind` is present (it is derived from the new kind and
+ * NEVER trusted from the client). The store merges this onto the stored row (read-modify-write), so
+ * a `{ defaultModel }`-only PATCH updates just that field and leaves the rest untouched. This is the
+ * shape that makes a partial PATCH work instead of silently no-op'ing (gap PA-10).
+ */
+export interface GatewayPatch {
+  name?: string;
+  kind?: GatewayKind;
+  baseUrl?: string;
+  defaultModel?: string;
+  egressClass?: EgressClass;
+  enabled?: boolean;
+}
+
+export type GatewayUpdateValidation =
+  | { ok: true; value: GatewayPatch }
+  | { ok: false; error: string };
 
 /**
- * Validate + normalise an UPDATE request into a clean, egress-derived value. PURE — no id/DB here.
- * Semantically identical to create validation: a name and a valid kind are required, a `compat`
- * gateway requires a base URL, and — critically — `egressClass` is ALWAYS RE-DERIVED from the (new)
- * kind, NEVER trusted from the client. Changing a gateway from an on-prem cluster to a cloud kind
- * therefore flips egress to 'cloud' automatically, keeping the routing leash honest. Delegates to
- * `validateGatewayCreate` so the create and update rules can never drift apart.
+ * Validate + normalise a PARTIAL update request. PURE — no id/DB here. Unlike create, NOTHING is
+ * required: only the fields PRESENT in the patch are validated and returned, so a `{ defaultModel }`
+ * body updates just the default model. The rules that DO apply when a field is present:
+ *   • `name`, if present, must be a non-empty string once trimmed.
+ *   • `kind`, if present, must be one of the four known kinds; `egressClass` is then RE-DERIVED from
+ *     it (never trusted from the client) — flipping kind flips egress, keeping the leash honest.
+ *   • `baseUrl`, if present, is trimmed of trailing slashes.
+ *   • `defaultModel`, if present, is trimmed.
+ *   • `enabled`, if present, is coerced to a boolean.
+ * An EMPTY patch (no recognised fields) is an explicit 400 — a no-op PATCH is a caller mistake, not
+ * a silent success. The compat "needs a base URL" rule can't be judged from a partial alone (the
+ * patch may not carry both kind and baseUrl), so it is re-checked against the MERGED row in the
+ * store via `validateMergedGateway`, keeping the two layers from drifting.
  */
 export function validateGatewayUpdate(input: GatewayCreateInput): GatewayUpdateValidation {
-  return validateGatewayCreate(input);
+  const patch: GatewayPatch = {};
+
+  if (input.name !== undefined) {
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    if (!name) return { ok: false, error: 'name, when provided, must be a non-empty string' };
+    patch.name = name;
+  }
+
+  if (input.kind !== undefined) {
+    if (!isGatewayKind(input.kind)) {
+      return { ok: false, error: `kind must be one of ${GATEWAY_KINDS.join(', ')}` };
+    }
+    patch.kind = input.kind;
+    patch.egressClass = egressClassFor(input.kind);
+  }
+
+  if (input.baseUrl !== undefined) {
+    patch.baseUrl =
+      typeof input.baseUrl === 'string' ? input.baseUrl.trim().replace(/\/+$/, '') : '';
+  }
+
+  if (input.defaultModel !== undefined) {
+    patch.defaultModel = typeof input.defaultModel === 'string' ? input.defaultModel.trim() : '';
+  }
+
+  if (input.enabled !== undefined) {
+    patch.enabled = Boolean(input.enabled);
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: 'no updatable fields provided' };
+  }
+
+  return { ok: true, value: patch };
+}
+
+/**
+ * The compat invariant checked against a MERGED gateway row (used by the store after applying a
+ * patch): an OpenAI-compatible gateway must have a non-empty base URL — a generic proxy has no
+ * well-known default. PURE. Returns an error string, or null when the merged shape is valid. This is
+ * where a partial PATCH that (e.g.) sets kind→compat but never supplies a base URL, and the stored
+ * row had none, is caught — instead of silently persisting an unusable gateway.
+ */
+export function validateMergedGateway(merged: { kind: string; baseUrl: string }): string | null {
+  if (merged.kind === 'compat' && !merged.baseUrl.trim()) {
+    return 'an OpenAI-compatible (compat) gateway requires a base URL';
+  }
+  return null;
 }
