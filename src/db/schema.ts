@@ -82,6 +82,11 @@ export const connectors = pgTable('connectors', {
   auth: text('auth').notNull().default('none'), // none | api-key | oauth
   description: text('description').notNull().default(''),
   custom: boolean('custom').notNull().default(false), // admin-registered vs seeded/built-in
+  // OpenBao KV key path (NOT a value) naming this connector's credential (DB password / api key).
+  // Additive + nullable: legacy/seeded connectors have none and fall back to inline endpoint creds;
+  // connectors created via the UI store their password in the vault and reference it here — the
+  // endpoint stays credential-free. Resolved at query time by connector-exec.ts. See connector-secrets.ts.
+  secretRef: text('secret_ref'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
