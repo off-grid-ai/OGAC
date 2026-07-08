@@ -25,7 +25,7 @@ test('buildAggsQuery uses the native agg types the task requires', () => {
   // sum for tokens; percentiles for p50/p95; terms for byModel; date_histogram for series.
   assert.ok(q.aggs.total_tokens.sum, 'sum on tokens');
   assert.deepEqual(q.aggs.latency_pct.percentiles, { field: 'ms', percents: [50, 95] });
-  assert.equal(q.aggs.by_model.terms.field, 'model');
+  assert.equal(q.aggs.by_model.terms.field, 'model.keyword');
   assert.equal(q.aggs.by_model.terms.order.tokens, 'desc');
   assert.ok(q.aggs.by_model.aggs.tokens.sum, 'per-model token sum');
   assert.ok(q.aggs.by_model.aggs.latency.sum, 'per-model latency sum');
