@@ -26,6 +26,10 @@ export {
   type CreateValidation,
 } from './connector-policy';
 
+// Re-export the inverse (URL → {sanitized endpoint, secret}) pure helper so the update route has ONE
+// import site for the connector-credential seam (mirrors the connector-policy re-export above).
+export { splitEndpointSecret, endpointHasEmbeddedSecret, type SplitEndpoint } from './connector-endpoint';
+
 import { connectorSecretKey } from './connector-policy';
 
 // ─── Write / read / remove the connector's secret via OpenBao ──────────────────
