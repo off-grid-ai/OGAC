@@ -115,3 +115,55 @@ test('gateways store CRUD + org scoping against a real Postgres', { skip: dbUp ?
   assert.equal((await listGatewayRows(ORG)).length, 2, 'gone after delete');
   assert.equal(await deleteGateway(openai.id, ORG), false, 'second delete misses');
 });
+
+// PA-15 — per-tenant gateway HOST persistence + resolve-by-host + cross-org scoping, against a real
+// Postgres (self-migrated `hostname` column). A deterministic random suffix is injected so the
+// minted host is asserted exactly.
+test('gateway hostname: provision persists + resolve-by-host is org-scoped', { skip: dbUp ? false : SKIP_MESSAGE }, async (t) => {
+  const { ensureGatewaysSchema, createGateway, getGatewayRow, provisionGatewayHost, getGatewayByHostname, listGatewayRows, deleteGateway } =
+    await import('@/lib/gateways');
+  const { tenantGatewayHost } = await import('@/lib/tenant-domain');
+
+  await ensureGatewaysSchema();
+  t.after(async () => {
+    for (const org of [ORG, OTHER]) {
+      for (const g of await listGatewayRows(org)) await deleteGateway(g.id, org);
+    }
+  });
+
+  const gw = await createGateway(
+    { name: 'Bharat On-Prem', kind: 'on-prem', baseUrl: '', defaultModel: '', egressClass: 'cloud', enabled: true },
+    ORG,
+  );
+  assert.equal(gw.hostname ?? null, null, 'a fresh gateway has no provisioned host');
+
+  // ── PROVISION — mints "<slug5><rand5>-gateway.<apex>" from the tenant slug + injected suffix ──────
+  const expected = tenantGatewayHost('bharatunion', 'k7x2p'); // bharak7x2p-gateway.getoffgridai.co
+  const provisioned = await provisionGatewayHost(gw.id, 'bharatunion', ORG, 'k7x2p');
+  assert.ok(provisioned, 'provision returned the fresh row');
+  assert.equal(provisioned.hostname, expected, 'minted host persisted on the row');
+
+  // Re-read confirms durability (not just the returned row).
+  const reread = await getGatewayRow(gw.id, ORG);
+  assert.ok(reread);
+  assert.equal(reread.hostname, expected, 'hostname reads back from the DB');
+
+  // ── RESOLVE-BY-HOST — the attribution seam ───────────────────────────────────────────────────────
+  const byHost = await getGatewayByHostname(expected, ORG);
+  assert.ok(byHost, 'resolves the gateway from its provisioned host');
+  assert.equal(byHost.id, gw.id);
+
+  // ── CROSS-ORG SCOPING — another org never resolves or provisions this gateway ─────────────────────
+  assert.equal(await getGatewayByHostname(expected, OTHER), null, 'cross-org resolve-by-host misses');
+  assert.equal(
+    await provisionGatewayHost(gw.id, 'bharatunion', OTHER, 'zzzzz'),
+    null,
+    'cross-org provision misses (returns null, row untouched)',
+  );
+  const afterCrossOrg = await getGatewayRow(gw.id, ORG);
+  assert.ok(afterCrossOrg);
+  assert.equal(afterCrossOrg.hostname, expected, 'cross-org provision left the host untouched');
+
+  // Provisioning an unknown id returns null (graceful 404 at the route).
+  assert.equal(await provisionGatewayHost('gw_nope', 'bharatunion', ORG, 'k7x2p'), null, 'unknown id ⇒ null');
+});
