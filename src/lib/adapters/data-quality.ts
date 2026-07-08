@@ -47,7 +47,7 @@ function describeError(err: unknown): string {
 
 export interface DataQualityHealth {
   healthy: boolean;
-  engine?: string; // the sidecar's self-reported engine label (e.g. "fallback (stub)")
+  engine?: string; // the sidecar's self-reported engine label ("great-expectations" | "native")
   url: string;
 }
 
