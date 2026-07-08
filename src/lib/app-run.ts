@@ -40,6 +40,7 @@ import {
   enforceModelCall,
 } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 
@@ -134,6 +135,16 @@ export interface AppRunDeps {
     text: string,
     orgId?: string,
   ) => Promise<{ blocked: boolean; detail: string }>;
+  /**
+   * PII scan (the guardrails port) → a redacted form of the text, for the mask-before-model
+   * substitution on an agent step when the bound pipeline's overlay ESCALATES masking on (PA-16c).
+   * Injected so the escalation is unit-testable without a live detector; production wires getPii().
+   * `orgId` scopes the deep config on the worker path (gap #121).
+   */
+  scanPii: (
+    text: string,
+    orgId?: string,
+  ) => Promise<{ hits: boolean; redacted?: string; entities: string[]; engine: string }>;
   /** Persist the live app-run state (create on start, update per step). No-op sink is allowed. */
   persist: (state: AppRunState, input: Record<string, unknown>) => Promise<void>;
   /**
@@ -227,6 +238,12 @@ export function defaultDeps(): AppRunDeps {
         blocked: outcome === 'blocked',
         detail: checks.map((c) => `${c.name}:${c.verdict}`).join(' '),
       };
+    },
+    async scanPii(text, orgId) {
+      // Reuse the SAME guardrails PII port the agent/chat/pipeline paths use (regex floor by default,
+      // Presidio when configured). orgId scopes the deep config without `headers()` on the worker path.
+      const { getPii } = await import('@/lib/adapters/registry');
+      return getPii().scan(text, orgId);
     },
     async persist(state, input) {
       // Best-effort persistence to the appRuns row so screens 3/4 can read the live trace. Uses an
@@ -398,7 +415,35 @@ async function executeAgentStep(
     return errorResult(step, `model call blocked by pipeline egress leash: ${modelVerdict.reason}`);
   }
 
-  const query = buildAgentQuery(step, priorResults);
+  // PA-16c — PII MASK BEFORE THE MODEL. When the bound pipeline's guardrail overlay ESCALATES
+  // masking ON above the org floor (modelVerdict.requirePiiMasking, decided by the ONE pure
+  // authority effectivePiiMasking — max(floor, overlay)), the raw query MUST be replaced with its
+  // PII-redacted form BEFORE it reaches the agent step's model call. The query here folds in the
+  // upstream connector-query outputs (the retrieved rows), so this is exactly where a raw PAN/email
+  // read from a data source would otherwise leak into the prompt. The raw→redacted substitution is
+  // the same pure applyPiiEscalation() the agent/chat/pipeline paths use. Best-effort: a detector
+  // outage leaves the query as-is (the egress leash's local-only guarantee still holds). Additive:
+  // with no pipeline / masking not escalated, the query is untouched (legacy behaviour).
+  let query = buildAgentQuery(step, priorResults);
+  const requireMasking = effectivePiiMasking(false, modelVerdict);
+  if (requireMasking) {
+    try {
+      const scan = await deps.scanPii(query, ctx.orgId);
+      const esc = applyPiiEscalation(query, requireMasking, scan);
+      if (esc.masked) {
+        query = esc.text;
+        auditEnforcement(
+          { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+          'pipeline.pii.mask',
+          `model:agent:${agentId}`,
+          'redacted',
+          `masked ${scan.entities.join(', ')} (${scan.engine}) before model call`,
+        );
+      }
+    } catch {
+      /* detector unavailable — send the query unmasked (leash guarantees still hold) */
+    }
+  }
   const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId);
   if (!run) return errorResult(step, `unknown agent: ${agentId}`);
   if (run.status === 'denied' || run.status === 'blocked') {

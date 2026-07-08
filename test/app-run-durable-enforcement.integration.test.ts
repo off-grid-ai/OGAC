@@ -56,6 +56,9 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
     async runGuardrail() {
       return { blocked: false, detail: 'ok' };
     },
+    async scanPii() {
+      return { hits: false, entities: [], engine: 'regex' };
+    },
     async persist() {},
     async materializeAgent(_spec, step) {
       step.agentId = `ag_mat_${step.id}`;
