@@ -2,6 +2,7 @@
 
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { KeyToggle } from '@/components/finops/KeyToggle';
+import { KeyRateLimit } from '@/components/finops/KeyRateLimit';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/Pagination';
 import { Progress } from '@/components/ui/progress';
@@ -33,6 +34,7 @@ export function KeysTable({ rows }: { rows: KeySpend[] }) {
             <TableHead>Scope</TableHead>
             <TableHead className="text-right">Spend</TableHead>
             <TableHead className="w-40">Budget</TableHead>
+            <TableHead className="w-28">Rate limit</TableHead>
             <TableHead className="w-16">On</TableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -56,6 +58,9 @@ export function KeysTable({ rows }: { rows: KeySpend[] }) {
                 ) : (
                   <span className="text-xs text-muted-foreground">unlimited</span>
                 )}
+              </TableCell>
+              <TableCell>
+                <KeyRateLimit id={k.id} label={k.label} />
               </TableCell>
               <TableCell>
                 <KeyToggle id={k.id} enabled={k.enabled} label={k.label} />
