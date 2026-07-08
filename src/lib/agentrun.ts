@@ -36,6 +36,7 @@ import type { RetrievalHit } from '@/lib/retrieval/types';
 import { listTools } from '@/lib/store';
 import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 import {
   type AgentTool,
   type LoopStep,
@@ -631,23 +632,23 @@ export async function runAgent(
     );
   }
 
-  // PA-16c — PII MASKING BEFORE THE MODEL. When the bound pipeline's guardrail overlay requires
-  // masking (modelVerdict.requirePiiMasking), the raw query MUST be replaced with its PII-redacted
-  // form BEFORE it leaves for the model. Previously requirePiiMasking was only surfaced by the
-  // verdict and never applied — the raw PAN/email still reached the gateway. Here we actually
-  // substitute: run the guardrails PII port (org-scoped), and if it found PII, compose from the
-  // REDACTED query instead of the raw one. Best-effort — a detector outage leaves the query as-is
-  // rather than failing the run (the egress leash/local-only guarantees still hold). Additive: with
-  // no pipeline / masking not required, the query is untouched (legacy behaviour).
+  // PA-16c — PII MASKING BEFORE THE MODEL. When the bound pipeline's guardrail overlay ESCALATES
+  // masking ON above the org floor, the raw query MUST be replaced with its PII-redacted form BEFORE
+  // it leaves for the model. The "does masking apply?" decision = max(floor, overlay) is the PURE
+  // effectivePiiMasking() (ONE authority, shared by every run path); the raw→redacted substitution
+  // is the PURE applyPiiEscalation() over the guardrails PII port's scan. Best-effort — a detector
+  // outage leaves the query as-is rather than failing the run (the egress leash/local-only
+  // guarantees still hold). Additive: with no pipeline / masking not escalated, the query is
+  // untouched (legacy behaviour).
   let modelQuery = query;
-  if (modelVerdict.requirePiiMasking) {
+  const requireMasking = effectivePiiMasking(false, modelVerdict);
+  if (requireMasking) {
     t = Date.now();
     try {
       const scan = await getPii().scan(query, attribution.org);
-      const { maskTextForModel } = await import('@/lib/guardrail-rules-runtime');
-      const masked = maskTextForModel(query, scan);
-      if (masked !== query) {
-        modelQuery = masked;
+      const esc = applyPiiEscalation(query, requireMasking, scan);
+      if (esc.masked) {
+        modelQuery = esc.text;
         mark('mask', scan.engine, `masked ${scan.entities.join(', ')} before model`, [], t);
         auditEnforcement(
           enforceCtx,

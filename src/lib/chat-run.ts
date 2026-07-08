@@ -22,6 +22,7 @@ import { getLineage, getPii, getSigning } from '@/lib/adapters/registry';
 import { correlationIds } from '@/lib/correlation';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import { enforceModelCall } from '@/lib/pipeline-enforcement';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 
 // ─── durable identity (mirrors agent-run-durable.ts) ────────────────────────────────────────────
 
@@ -103,7 +104,10 @@ export interface InboundGuardrailResult {
  * masking on the chat path exactly as it does on the agent/app path.
  */
 export function chatRequiresMasking(contract: PipelineContract | null, dataClass: string): boolean {
-  return enforceModelCall(contract, dataClass).requirePiiMasking;
+  // The escalation decision = max(org floor, pipeline overlay), computed by the ONE pure authority
+  // shared with agentrun / pipeline-execute / app-run. A null contract contributes nothing, so with
+  // no pipeline the floor (false, here) stands — legacy chat never masked.
+  return effectivePiiMasking(false, enforceModelCall(contract, dataClass));
 }
 
 /**
@@ -129,11 +133,12 @@ export async function runInboundGuardrails(
   let text = message;
   let redacted = false;
   if (opts.requireMasking) {
+    // The raw→redacted substitution is the SAME pure applyPiiEscalation() the agent/pipeline paths
+    // use, so "the raw PAN/email never reaches the model when masking is escalated" is one rule.
     const scan = await getPii().scan(message, opts.orgId);
-    if (scan.hits && typeof scan.redacted === 'string') {
-      text = scan.redacted;
-      redacted = true;
-    }
+    const esc = applyPiiEscalation(message, true, scan);
+    text = esc.text;
+    redacted = esc.masked;
   }
   return { text, checks, blocked, redacted };
 }

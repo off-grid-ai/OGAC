@@ -53,6 +53,9 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
     async runGuardrail() {
       return { blocked: false, detail: 'ok' };
     },
+    async scanPii() {
+      return { hits: false, entities: [], engine: 'regex' };
+    },
     async persist() {},
     async materializeAgent(_spec, step) {
       // Fake materialization: mint a stable id from the step and cache it back (as prod does).
