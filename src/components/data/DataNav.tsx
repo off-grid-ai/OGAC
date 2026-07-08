@@ -28,6 +28,16 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     ],
   },
   {
+    // The live data-engine plane: the warehouse (catalog of tables), the query console, and
+    // data-movement pipelines. All gated on the `data` module (the data plane's home module).
+    heading: 'Warehouse',
+    tabs: [
+      { id: 'data', label: 'Warehouse', route: '/data/warehouse' },
+      { id: 'data', label: 'Query', route: '/data/query' },
+      { id: 'data', label: 'Pipelines', route: '/data/pipelines' },
+    ],
+  },
+  {
     heading: 'Govern',
     tabs: [
       { id: 'catalog', label: 'Catalog', route: '/data/catalog' },
