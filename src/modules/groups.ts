@@ -101,7 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'operations',
     label: 'Operations',
-    primary: ['admin', 'config', 'backups', 'api-docs'],
+    primary: ['runs', 'admin', 'config', 'backups', 'api-docs'],
   },
 ];
 
