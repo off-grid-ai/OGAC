@@ -212,9 +212,21 @@ export async function runEvalDef(
       // could not score, with the reason — not a fake pass/fail.
       const id = `ed_run_${randomUUID().slice(0, 6)}`;
       const engineTag = `${def.metric}:unavailable`;
-      await recordEvalRun({ id, engine: engineTag, score: 0, total: 0, passed: 0 }, orgId);
+      // PA-12: tag the run with the eval def's pipeline binding so Drift is per-pipeline exact.
+      await recordEvalRun(
+        { id, engine: engineTag, score: 0, total: 0, passed: 0, pipelineId: def.pipelineId },
+        orgId,
+      );
       return {
-        run: { id, engine: engineTag, score: 0, total: 0, passed: 0, startedAt: new Date().toISOString() },
+        run: {
+          id,
+          engine: engineTag,
+          score: 0,
+          total: 0,
+          passed: 0,
+          startedAt: new Date().toISOString(),
+          pipelineId: def.pipelineId,
+        },
         metrics: [],
         computedBy: 'unavailable',
         unavailableReason: reason || 'G-Eval judge unavailable — no score recorded.',
@@ -259,6 +271,8 @@ async function persistRun(
   const rollup = rollupMetrics(perSample);
   const id = `ed_run_${randomUUID().slice(0, 6)}`;
   const engineTag = `${def.metric}:${computedBy}`;
+  // PA-12: tag the persisted run with the eval def's pipeline binding (null for a library eval) so
+  // per-pipeline Drift reads exactly this pipeline's eval-score history.
   await recordEvalRun(
     {
       id,
@@ -266,6 +280,7 @@ async function persistRun(
       score: rollup.score,
       total: rollup.total,
       passed: rollup.passed,
+      pipelineId: def.pipelineId,
     },
     orgId,
   );
@@ -276,6 +291,7 @@ async function persistRun(
     total: rollup.total,
     passed: rollup.passed,
     startedAt: new Date().toISOString(),
+    pipelineId: def.pipelineId,
   };
   return { run, metrics: perSample, computedBy };
 }
