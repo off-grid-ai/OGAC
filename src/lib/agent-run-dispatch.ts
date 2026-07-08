@@ -19,6 +19,7 @@
 import { randomUUID } from 'crypto';
 import type { Actor } from '@/lib/audit-event';
 import type { RunContext } from '@/lib/agent-run-context';
+import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import type { AgentRun } from '@/lib/agentrun';
 import type { DurableRunHandle } from '@/lib/adapters/agentruntime';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
@@ -47,6 +48,11 @@ export interface DispatchArgs {
   // whether it executes durably (in the worker, which has no request) or in the sync fallback.
   actor?: Actor;
   project?: string;
+  // PA-16b: the resolved bound-pipeline contract the route resolved (resolveAgentBinding). Threaded
+  // onto the RunContext for the SYNC path so runAgent enforces the data allowlist + egress leash.
+  // Null/absent ⇒ legacy behaviour. (The DURABLE worker path resolves its own contract in a later
+  // round — see the note in dispatchAgentRun; today the durable input doesn't carry it.)
+  contract?: PipelineContract | null;
 }
 
 // The impure collaborators, injected so the orchestration is testable without Temporal/DB.
@@ -137,11 +143,16 @@ export async function dispatchAgentRun(
 
   // Synchronous in-process fallback (the default). Pass the SAME context (incl. the minted runId) so
   // the fallback attributes + correlates identically to the durable path and reuses the one runId.
+  // PA-16b: the resolved pipeline contract rides the context so runAgent enforces the allowlist +
+  // egress leash on this (the DEFAULT / most-common) path. The durable worker path does not yet
+  // carry the contract through AgentRunWorkflowInput — mirroring PA-16's deferred durable app-run
+  // gate — so a durably-dispatched run is not contract-gated this round (logged as PA-16b-durable).
   const context: RunContext = {
     runId,
     actor: args.actor,
     org: orgId,
     project: args.project,
+    contract: args.contract ?? null,
   };
   const run = await deps.runAgent(
     args.agentId,

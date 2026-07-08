@@ -32,6 +32,8 @@ import { scoreInteraction } from '@/lib/qa/scoring';
 import { route } from '@/lib/retrieval/router';
 import type { RetrievalHit } from '@/lib/retrieval/types';
 import { listTools } from '@/lib/store';
+import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
+import { auditEnforcement } from '@/lib/pipeline-contract';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the
 // platform's capabilities actually fire in-path, not just from admin endpoints:
@@ -410,6 +412,33 @@ export async function runAgent(
     }, attribution.org);
   }
 
+  // PA-16b — bound-pipeline enforcement (ADDITIVE, mirrors the app-run reference path). The
+  // route/dispatch resolves the contract once (resolveAgentBinding) and threads it via the context;
+  // absent/null ⇒ the noPipeline verdict allows everything (legacy behaviour, proven by test). The
+  // data-class the model sees is 'general' for a GROUNDED agent (it retrieves real org data into the
+  // prompt) and 'none' for an ungrounded one (a pure prompt, no data leaves).
+  const contract = context?.contract ?? null;
+  const enforceCtx = { orgId: attribution.org, actor: caller, runId, contract };
+  const dataClass = agent.grounded === false ? 'none' : 'general';
+
+  // 2c. Data-access gate — the HARD allowlist ceiling BEFORE retrieval touches the knowledge base.
+  // A grounded run reads org knowledge (the 'retrieval' data-domain); if the bound pipeline's
+  // allowlist doesn't cover it, deny + audit and short-circuit (no data is read). Ungrounded runs
+  // retrieve nothing, so there is nothing to gate.
+  if (agent.grounded !== false) {
+    const dataVerdict = enforceDataAccess(contract, 'retrieval');
+    if (!dataVerdict.allow) {
+      mark('data', 'deny', dataVerdict.reason, [], Date.now());
+      auditEnforcement(enforceCtx, 'pipeline.data.deny', 'data:retrieval', 'blocked', dataVerdict.reason);
+      auditRun('denied');
+      return persist(runId, {
+        agentId, query, answer: '', status: 'denied', steps, citations: [],
+        checks: [{ name: 'pipeline-data', verdict: 'blocked' as const, detail: dataVerdict.reason }],
+        provenance: null,
+      }, attribution.org);
+    }
+  }
+
   // 3. Retrieve — provenance refs come straight off the router's hits. Skipped for a non-grounded
   // agent (it answers from the model, so there are no sources to retrieve or cite).
   t = Date.now();
@@ -431,6 +460,24 @@ export async function runAgent(
     // Composable tools: primitives (prim:web_search/read_url/http) + apps-as-tools (app:<id>).
     // No-ops for tool:<id> (sandbox path above owns those) + unknown refs; governed + cycle-safe.
     await maybeRunComposableTool(toolHit.ref, { orgId, actor: caller, callerAppId: agent.id }, mark, query);
+  }
+
+  // 3b. Model-call gate — the egress leash BEFORE the gateway call (compose → gatewayAnswer). A
+  // 'block' verdict stops the call (deny + audit, governed refusal); the pipeline can only be MORE
+  // restrictive than the routing leash, never less. No pipeline ⇒ the noPipeline verdict allows it
+  // (legacy routing — the gateway's own model-routing rules still decide where it actually runs).
+  // (PA-16c: the overlay's requirePiiMasking is surfaced by the verdict; the run's guardrail floor
+  // already masks PII — see the note below. Escalation beyond the floor is deferred to PA-16c.)
+  const modelVerdict = enforceModelCall(contract, dataClass);
+  if (!modelVerdict.allow) {
+    mark('egress', 'block', modelVerdict.reason, [], Date.now());
+    auditEnforcement(enforceCtx, 'pipeline.egress.block', `model:agent:${agentId}`, 'blocked', modelVerdict.reason);
+    auditRun('blocked');
+    return persist(runId, {
+      agentId, query, answer: '', status: 'blocked', steps, citations: [],
+      checks: [{ name: 'pipeline-egress', verdict: 'blocked' as const, detail: modelVerdict.reason }],
+      provenance: null,
+    }, attribution.org);
   }
 
   // 4. Answer — composed from the retrieved sources (cached).
