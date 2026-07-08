@@ -38,6 +38,7 @@ export function IssueKeyButton() {
   const [subjectType, setSubjectType] = useState<(typeof TYPES)[number]>('user');
   const [subject, setSubject] = useState('');
   const [budget, setBudget] = useState('');
+  const [rateLimit, setRateLimit] = useState('');
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -53,6 +54,7 @@ export function IssueKeyButton() {
           subjectType,
           subject,
           budgetUsd: budget ? Number(budget) : null,
+          rateLimit: rateLimit ? Number(rateLimit) : null,
         }),
       });
       if (!res.ok) throw new Error('failed');
@@ -61,6 +63,7 @@ export function IssueKeyButton() {
       setName('');
       setSubject('');
       setBudget('');
+      setRateLimit('');
       router.refresh();
     } catch {
       toast.error('Failed to issue key');
@@ -85,8 +88,8 @@ export function IssueKeyButton() {
           <SheetHeader>
             <SheetTitle>Issue a virtual key</SheetTitle>
             <SheetDescription>
-              Scoped to a user or project, with an optional monthly budget. The secret is shown
-              once.
+              Scoped to a user or project, with an optional monthly budget and request rate limit.
+              The secret is shown once.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
@@ -153,6 +156,20 @@ export function IssueKeyButton() {
                   placeholder="optional"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="k-rate">Rate limit (requests / min)</Label>
+              <Input
+                id="k-rate"
+                type="number"
+                min={0}
+                value={rateLimit}
+                onChange={(e) => setRateLimit(e.target.value)}
+                placeholder="optional — defaults to the workspace limit"
+              />
+              <p className="text-xs text-muted-foreground">
+                Caps how fast this key can call the API. Leave blank to use the workspace default.
+              </p>
             </div>
             <Button onClick={issue} disabled={busy || !name || !subject} className="w-full">
               {busy ? 'Issuing…' : 'Issue key'}
