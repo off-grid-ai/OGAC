@@ -10,6 +10,7 @@ import {
   updateApp,
   type AppPatch,
 } from '@/lib/apps-store';
+import { syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,10 +47,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (body.publish) {
       const published = await publishApp(id, orgId);
       if (!published) return NextResponse.json({ error: 'not found' }, { status: 404 });
+      // Wire the schedule trigger: a published schedule-trigger app registers its cron on Temporal;
+      // anything else tears any prior schedule down. Graceful — a Temporal outage never fails publish.
+      const sched = await syncAppSchedule(published, { caller: 'app.publish' });
       auditFromSession(gate, orgId, {
         action: 'app.publish',
         resource: `app:${id}`,
-        outcome: 'ok',
+        outcome: sched.ok || sched.reason === 'not_configured' ? 'ok' : 'error',
       });
       return NextResponse.json(published);
     }
@@ -58,6 +62,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const { publish: _publish, ...patch } = body;
     const updated = await updateApp(id, orgId, patch);
     if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    // Reconcile the schedule after every update so editing the cron / trigger / published flag takes
+    // effect immediately (published+schedule+cron → register/replace; otherwise → tear down).
+    await syncAppSchedule(updated, { caller: 'app.update' });
     auditFromSession(gate, orgId, {
       action: 'app.update',
       resource: `app:${id}`,
@@ -79,6 +86,8 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const { id } = await params;
   const orgId = await currentOrgId();
   await deleteApp(id, orgId);
+  // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
+  await unscheduleApp(id);
   auditFromSession(gate, orgId, {
     action: 'app.delete',
     resource: `app:${id}`,
