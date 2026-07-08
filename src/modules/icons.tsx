@@ -41,6 +41,7 @@ import {
   Wrench,
   StackSimple as Stack,
   FlowArrow,
+  Broadcast,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -89,6 +90,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   retrieval: Database,
   provenance: SealCheck,
   secrets: Vault,
+  exporters: Broadcast,
   guardrails: ShieldCheck,
   sandbox: Cube,
   config: Sliders,
