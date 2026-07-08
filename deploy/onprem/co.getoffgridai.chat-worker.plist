@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Off Grid durable CHAT-RUN WORKER — the drain for the `offgrid-chat` Temporal task queue (W1/W2,
+     2026-07-08). Long-lived process polling Temporal (:7233 on S1), running ChatRunWorkflow: the
+     governed chat-run RECORD (guardrail verdicts + citations/lineage/provenance fan-out), correlated
+     by chatRunId. Sibling of app-worker (offgrid-apps) + agent-worker (offgrid-agents). The token
+     STREAM stays inline in the route (SSE); what rides Temporal is the durable, replayable run record.
+     Without this worker (or with OFFGRID_QUEUE_ENABLED off), chat runs record inline (safe fallback).
+
+     Install (on S1, gui domain — no sudo):
+       cp deploy/onprem/co.getoffgridai.chat-worker.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.getoffgridai.chat-worker.plist
+     Verify: launchctl list co.getoffgridai.chat-worker · Tail: tail -f ~/offgrid/console/chat-worker.log -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>co.getoffgridai.chat-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/admin/offgrid/console/node_modules/.bin/tsx</string>
+    <string>scripts/chat-worker.mts</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/admin/offgrid/console</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>OFFGRID_TEMPORAL_ADDRESS</key><string>127.0.0.1:7233</string>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/admin/offgrid/console/chat-worker.log</string>
+  <key>StandardErrorPath</key><string>/Users/admin/offgrid/console/chat-worker.log</string>
+</dict>
+</plist>
