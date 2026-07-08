@@ -28,6 +28,8 @@ export type ModuleId =
   | 'integrations'
   | 'tool-catalog'
   | 'data-domains'
+  | 'catalog'
+  | 'governance'
   | 'knowledge'
   | 'access'
   | 'teams'
@@ -273,6 +275,24 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Declare where data lives (customer→Salesforce, transactions→Postgres) — the rule engine agents route by.',
     route: '/data/domains',
     service: 'integrations',
+    internal: true,
+  },
+  {
+    id: 'catalog',
+    label: 'Data catalog',
+    description:
+      'The registry of every dataset the org holds — source, owner, classification, PII flags, row count, and freshness. What data do I have, in one place.',
+    route: '/data/catalog',
+    service: 'ingest',
+    internal: true,
+  },
+  {
+    id: 'governance',
+    label: 'Data governance',
+    description:
+      'Deep data governance — per-dataset classification, retention & right-to-be-forgotten across the warehouse, vector store, and lineage, plus freshness SLAs and broken-sync alerts.',
+    route: '/data/governance',
+    service: 'ingest',
     internal: true,
   },
   {
