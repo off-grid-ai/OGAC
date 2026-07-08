@@ -283,3 +283,40 @@ export function needsNetworkProbe(entry: ServiceEntry): boolean {
 export function isHealthy(status: HealthStatus): boolean {
   return status !== 'down';
 }
+
+// ─── Management honesty (Task C3) ──────────────────────────────────────────────────────────────
+// The console does NOT hold a service-control plane — the internal services run as launchd jobs /
+// Docker containers on the on-prem hosts, and there is deliberately no console→host restart path
+// (that would be a large blast-radius capability the console isn't trusted with). So the detail
+// view is honest about WHY a given service can't be restarted from here, per its kind, rather than
+// showing a dead "Restart" button. This is a PURE mapping — no I/O.
+export interface ServiceControl {
+  /** Whether the console can restart/reload this service. Always false today (honest). */
+  restartable: boolean;
+  /** Human explanation of who actually manages this service's lifecycle. */
+  managedBy: string;
+}
+
+export function serviceControl(entry: ServiceEntry): ServiceControl {
+  if ((entry.probe ?? 'network') === 'embedded') {
+    return {
+      restartable: false,
+      managedBy: 'Runs in-process inside the console — its lifecycle IS the console. Restart the console to restart it.',
+    };
+  }
+  if (entry.kind === 'console') {
+    return { restartable: false, managedBy: 'This control plane. Restart via the deploy runbook (next start on the host).' };
+  }
+  if (entry.kind === 'gateway' || entry.kind === 'api' || entry.kind === 'product') {
+    return {
+      restartable: false,
+      managedBy: 'Managed by launchd / Docker on the on-prem host — not console-controllable. Restart it on the host (see the deploy runbook).',
+    };
+  }
+  return { restartable: false, managedBy: 'Managed outside the console.' };
+}
+
+/** Find a service entry by id (for the detail view). */
+export function findService(services: ServiceEntry[], id: string): ServiceEntry | undefined {
+  return services.find((s) => s.id === id);
+}
