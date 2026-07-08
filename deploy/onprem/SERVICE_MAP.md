@@ -33,15 +33,14 @@ you add a node, a subdomain, or a service.
 | Node | IP | Runs |
 |------|----|----|
 | **S1** (control plane + backends) | `127.0.0.1` | Console (native `next start`), **gateway aggregator :8800**, Caddy edge, Cloudflare tunnel, queue worker, and the **`offgrid-services-a`/`-extra` Docker stacks**: Postgres, Keycloak, **OpenSearch :9200, Marquez :9000, OpenBao :8200**, OPA :8181, Qdrant :6333, Temporal :7233/:8081, SeaweedFS, VictoriaMetrics, Evidently + the seeded data-source containers. Console reaches all of these over **127.0.0.1** (localhost — not gated by Local-Network privacy). |
-| **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (provisioned 2026-07-05; **S2 replacement — S2 retired**). MAXED 15.5/16 GB. Console reaches these via S1 Caddy loopback proxies (LAN not directly reachable by the console daemon). |
-| ~~S2~~ (retired) | `192.168.1.60` | ❌ offline since router reboot — aux tier moved to g6, node not required. **Designated (staged, not live) host for the NEW data plane** — see below. |
+| **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (the canonical aux-tier copy the console points at). MAXED 15.5/16 GB. Console reaches these via S1 Caddy loopback proxies (LAN not directly reachable by the console daemon). |
+| **S2** (data plane) | `192.168.1.60` | **LIVE (2026-07-08):** the data engine under OrbStack — warehouse-clickhouse `:8124`, redpanda `:19092/:9644`, 6× airbyte-* `:8005/:8006`, great-expectations `:8003`. Console reaches these via S1 Caddy loopbacks `127.0.0.1:8941–8944`. (S2 had auto-restarted a redundant `offgrid-services-b` aux tier on reboot — **stopped**, since g6 is the canonical copy — to free the 16GB box for the data plane.) |
 
-### Data plane (NEW — staged, not live) — `warehouse` / `streaming` / `etl` / `dataquality` profiles
+### Data plane (LIVE on S2, 2026-07-08) — `warehouse` / `streaming` / `etl` / `dataquality` profiles
 
-The data engine (ClickHouse warehouse + Redpanda + Airbyte + Great Expectations; dbt as a job).
-**Compose + runbook exist; nothing is running yet.** Full bringup + Colima sizing + env wiring:
-[`DATA_PLANE.md`](DATA_PLANE.md). Intended host: **S2** (16GB, Colima) — reconcile against S2's
-retired status before provisioning. Services + host ports:
+The data engine (ClickHouse warehouse + Redpanda + Airbyte + Great Expectations; dbt as a job),
+running under **OrbStack** on S2. Full bringup + runtime + env wiring: [`DATA_PLANE.md`](DATA_PLANE.md).
+Services + host ports:
 
 | Service | Profile | Host port(s) | Purpose |
 |---------|---------|--------------|---------|
@@ -50,9 +49,11 @@ retired status before provisioning. Services + host ports:
 | `airbyte-*` (6 containers) | `etl` | 8005 (API), 8006 (UI) | Connectors + CDC (own Postgres + Temporal) |
 | `great-expectations` | `dataquality` | 8003 | Data-quality sidecar (mirrors evidently/ragas) |
 
-Console env (set only when live): `OFFGRID_WAREHOUSE_URL`, `OFFGRID_AIRBYTE_URL`,
+Console env (SET LIVE on S1 `.env.local` 2026-07-08): `OFFGRID_WAREHOUSE_URL`, `OFFGRID_AIRBYTE_URL`,
 `OFFGRID_REDPANDA_ADMIN_URL`/`_BROKERS`, `OFFGRID_DATAQUALITY_URL` — via edge-Caddy loopbacks
-`127.0.0.1:8941–8944` (LAN not reachable by the console daemon). Lake landing = existing SeaweedFS S3.
+`127.0.0.1:8941–8944` (LAN not reachable by the console daemon). The four engines are registered in
+the console health directory (`src/lib/services-directory.ts`: warehouse/airbyte/streaming/data-quality)
+so they appear + health-probe on the Services page. Lake landing = existing SeaweedFS S3.
 
 ## AI Gateway aggregator (the LLM control point)
 
