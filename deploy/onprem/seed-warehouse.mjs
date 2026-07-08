@@ -14,6 +14,13 @@
 const WAREHOUSE_URL = process.env.WAREHOUSE_URL || 'http://192.168.1.60:8124';
 const WAREHOUSE_USER = process.env.WAREHOUSE_USER || 'warehouse';
 const WAREHOUSE_PASS = process.env.WAREHOUSE_PASS || 'warehouse';
+// Target database. Default `bfsi` keeps the original generic-seed behaviour unchanged; set
+// WAREHOUSE_DB=<slug> to seed a per-tenant warehouse (e.g. WAREHOUSE_DB=bharatunion).
+const WAREHOUSE_DB = process.env.WAREHOUSE_DB || 'bfsi';
+if (!/^[a-z][a-z0-9_]*$/.test(WAREHOUSE_DB)) {
+  throw new Error(`Invalid WAREHOUSE_DB "${WAREHOUSE_DB}" — must be a safe identifier ([a-z][a-z0-9_]*).`);
+}
+const DB = WAREHOUSE_DB;
 
 // ------------------------------------------------------------------ HTTP
 async function ch(sql, { format } = {}) {
@@ -143,9 +150,9 @@ function daysAgo(n) { return new Date(NOW - n * DAY); }
 
 // ------------------------------------------------------------------ schema
 const DDL = `
-CREATE DATABASE IF NOT EXISTS bfsi;
+CREATE DATABASE IF NOT EXISTS ${DB};
 
-CREATE TABLE IF NOT EXISTS bfsi.dim_customer (
+CREATE TABLE IF NOT EXISTS ${DB}.dim_customer (
   customer_id UInt32,
   pan String,
   full_name String,
@@ -158,7 +165,7 @@ CREATE TABLE IF NOT EXISTS bfsi.dim_customer (
   onboarded_at DateTime
 ) ENGINE = MergeTree ORDER BY customer_id;
 
-CREATE TABLE IF NOT EXISTS bfsi.dim_branch (
+CREATE TABLE IF NOT EXISTS ${DB}.dim_branch (
   branch_id UInt32,
   ifsc String,
   bank_name LowCardinality(String),
@@ -167,14 +174,14 @@ CREATE TABLE IF NOT EXISTS bfsi.dim_branch (
   state LowCardinality(String)
 ) ENGINE = MergeTree ORDER BY branch_id;
 
-CREATE TABLE IF NOT EXISTS bfsi.dim_product (
+CREATE TABLE IF NOT EXISTS ${DB}.dim_product (
   product_id UInt32,
   category LowCardinality(String),
   name String,
   active UInt8
 ) ENGINE = MergeTree ORDER BY product_id;
 
-CREATE TABLE IF NOT EXISTS bfsi.fact_account (
+CREATE TABLE IF NOT EXISTS ${DB}.fact_account (
   account_id UInt32,
   account_no String,
   customer_id UInt32,
@@ -185,7 +192,7 @@ CREATE TABLE IF NOT EXISTS bfsi.fact_account (
   opened_at DateTime
 ) ENGINE = MergeTree ORDER BY (customer_id, account_id);
 
-CREATE TABLE IF NOT EXISTS bfsi.fact_transaction (
+CREATE TABLE IF NOT EXISTS ${DB}.fact_transaction (
   txn_id UInt64,
   account_id UInt32,
   ts DateTime,
@@ -197,7 +204,7 @@ CREATE TABLE IF NOT EXISTS bfsi.fact_transaction (
   is_flagged UInt8
 ) ENGINE = MergeTree PARTITION BY toYYYYMM(ts) ORDER BY (account_id, ts);
 
-CREATE TABLE IF NOT EXISTS bfsi.fact_loan (
+CREATE TABLE IF NOT EXISTS ${DB}.fact_loan (
   loan_id UInt32,
   customer_id UInt32,
   product_id UInt32,
@@ -210,7 +217,7 @@ CREATE TABLE IF NOT EXISTS bfsi.fact_loan (
   status LowCardinality(String)
 ) ENGINE = MergeTree ORDER BY (customer_id, loan_id);
 
-CREATE TABLE IF NOT EXISTS bfsi.fact_claim (
+CREATE TABLE IF NOT EXISTS ${DB}.fact_claim (
   claim_id UInt32,
   customer_id UInt32,
   product_id UInt32,
@@ -220,7 +227,7 @@ CREATE TABLE IF NOT EXISTS bfsi.fact_claim (
   reason String
 ) ENGINE = MergeTree ORDER BY (customer_id, claim_id);
 
-CREATE TABLE IF NOT EXISTS bfsi.fact_kyc_event (
+CREATE TABLE IF NOT EXISTS ${DB}.fact_kyc_event (
   event_id UInt32,
   customer_id UInt32,
   ts DateTime,
@@ -479,35 +486,35 @@ async function loadStreamed(table, total, genBatchFn) {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  console.log(`Warehouse: ${WAREHOUSE_URL} (user=${WAREHOUSE_USER})`);
-  console.log('Creating schema (bfsi.*) ...');
+  console.log(`Warehouse: ${WAREHOUSE_URL} (user=${WAREHOUSE_USER}) db=${DB}`);
+  console.log(`Creating schema (${DB}.*) ...`);
   // run DDL statements one at a time
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
     await ch(stmt);
   }
 
   console.log('Generating + loading dimensions ...');
-  await loadTable('bfsi.dim_customer', genCustomers());
-  await loadTable('bfsi.dim_branch', genBranches());
-  await loadTable('bfsi.dim_product', genProducts());
+  await loadTable(`${DB}.dim_customer`, genCustomers());
+  await loadTable(`${DB}.dim_branch`, genBranches());
+  await loadTable(`${DB}.dim_product`, genProducts());
 
   console.log('Generating + loading facts ...');
-  await loadTable('bfsi.fact_account', genAccounts());
-  await loadStreamed('bfsi.fact_transaction', N_TXN, genTransactionsBatch);
-  await loadTable('bfsi.fact_loan', genLoans());
-  await loadTable('bfsi.fact_claim', genClaims());
-  await loadTable('bfsi.fact_kyc_event', genKycEvents());
+  await loadTable(`${DB}.fact_account`, genAccounts());
+  await loadStreamed(`${DB}.fact_transaction`, N_TXN, genTransactionsBatch);
+  await loadTable(`${DB}.fact_loan`, genLoans());
+  await loadTable(`${DB}.fact_claim`, genClaims());
+  await loadTable(`${DB}.fact_kyc_event`, genKycEvents());
 
   // ---------------------------------------------------------------- verify
   const expected = {
-    'bfsi.dim_customer': N_CUSTOMER,
-    'bfsi.dim_branch': N_BRANCH,
-    'bfsi.dim_product': products.length,
-    'bfsi.fact_account': N_ACCOUNT,
-    'bfsi.fact_transaction': N_TXN,
-    'bfsi.fact_loan': N_LOAN,
-    'bfsi.fact_claim': N_CLAIM,
-    'bfsi.fact_kyc_event': N_KYC,
+    [`${DB}.dim_customer`]: N_CUSTOMER,
+    [`${DB}.dim_branch`]: N_BRANCH,
+    [`${DB}.dim_product`]: products.length,
+    [`${DB}.fact_account`]: N_ACCOUNT,
+    [`${DB}.fact_transaction`]: N_TXN,
+    [`${DB}.fact_loan`]: N_LOAN,
+    [`${DB}.fact_claim`]: N_CLAIM,
+    [`${DB}.fact_kyc_event`]: N_KYC,
   };
 
   console.log('\nVerification (expected vs actual):');
