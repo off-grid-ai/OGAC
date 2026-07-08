@@ -75,10 +75,20 @@ guardrails Enable scope), T5 (loading skeletons — client-nav paint 49ms vs 3s)
 hierarchy: `/data/*` `/governance/*` `/insights/*` `/build/*` `/gateway/*` `/workspace/*` `/operations/*`
 + 308 redirects from every old flat URL — VERIFIED old→new + sidebar highlight). Plus **durable execution
 turned ON** (agent-worker bootstrapped + `OFFGRID_QUEUE_ENABLED=1`, verified durable run) + Presidio
-confirmed on. IN FLIGHT: **T4** (completeness: bind BFSI seed apps→pipelines [show "Runs on" not
-"Ungoverned"], Knowledge/Prompts list→detail, make /services|/edge|/fleet[id]|/provenance actionable,
-de-dupe /agents from /studio, /analytics data wiring) + **PA-15** (per-tenant gateway URL wiring; tunnel
-edit supervised). Old **NOTHING IN FLIGHT** note below is stale.
+confirmed on. **UX-AUDIT PROGRAM COMPLETE (2026-07-08).** All six themes shipped+deployed+verified: T1 (OSS-name scrub),
+T2 (pipeline join-key visible), T3 (constrained governance inputs + guardrails scope), T4 (3/4: seed
+apps bound to pipelines — "Runs on" chips verified live; prompt detail; /build/agents dedup), T5 (nav
+49ms), T6 (RESTful URLs + redirects). PA-12/15/16/16b shipped. **Durable execution ON** (verified).
+Final gate: typecheck clean, 1761 tests pass. **Everything the founder asked "shipped and on" is on.**
+
+**REMAINING (small, logged in GAPS_BACKLOG, none blocking):**
+- **T4-tail:** Knowledge list→detail (rows still open a Sheet; `knowledge/[id]` exists — just wire it). Small.
+- **Deferred "actionable" polish:** /gateway/services drill-through, /gateway/edge WAF toggle,
+  /gateway/fleet[id] policy reassign, /governance/provenance verify+rotate, /insights/analytics data-wiring.
+- **PA-15-tail:** per-tenant gateway BACKEND routing (attribution done) + the tunnel ingress rule
+  `*-gateway.getoffgridai.co → :8800` (supervised tunnel edit — app-side + resolver shipped).
+- **PA-16c** overlay PII-mask escalation; **PA-16a/b-durable** contract on the durable worker path.
+- **NOTHING IN FLIGHT.** Clean stopping point.
 
 **(historical) NOTHING IN FLIGHT — clean stopping point.** The full Pipelines × Gateways epic is shipped +
 verified + documented: gateways (CRUD+detail), pipelines (all tabs), consumer binding, docs, tenant-404
