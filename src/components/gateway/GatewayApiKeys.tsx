@@ -97,8 +97,8 @@ function CreateKeyForm({
         <Input placeholder="Owner org (optional)" value={owner} onChange={(e) => setOwner(e.target.value)} />
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Each key is backed by its own Keycloak service-account client. Revoking a key disables that
-        client, so it stops working at the gateway immediately.
+        Each key is backed by its own identity-provider service account. Revoking a key disables that
+        account, so it stops working at the gateway immediately.
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={submit} disabled={saving}>
@@ -189,8 +189,8 @@ export function GatewayApiKeys() {
       <CardContent className="space-y-3">
         {!configured && (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-xs text-amber-700">
-            Keycloak is not configured on this deployment, so Keycloak-backed keys can't be minted.
-            Set <code className="rounded bg-muted px-1">OFFGRID_KEYCLOAK_URL</code>,{' '}
+            The identity provider is not configured on this deployment, so SSO-backed keys can't be
+            minted. Set <code className="rounded bg-muted px-1">OFFGRID_KEYCLOAK_URL</code>,{' '}
             <code className="rounded bg-muted px-1">_REALM</code>, and the admin client env, then reload.
           </div>
         )}
