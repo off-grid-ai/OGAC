@@ -10,7 +10,8 @@ export function MarquezGraph({ graph }: { graph: LineageGraph }) {
     return (
       <Card className="shadow-sm">
         <CardContent className="py-8 text-center text-xs text-muted-foreground">
-          Marquez not configured — set OFFGRID_MARQUEZ_URL to read the server lineage graph.
+          Lineage store not configured — configure the lineage service to read the server lineage
+          graph.
         </CardContent>
       </Card>
     );
@@ -19,7 +20,7 @@ export function MarquezGraph({ graph }: { graph: LineageGraph }) {
     return (
       <Card className="shadow-sm">
         <CardContent className="py-8 text-center text-xs text-destructive">
-          Marquez error: {graph.error}
+          Lineage store error: {graph.error}
         </CardContent>
       </Card>
     );
@@ -28,8 +29,8 @@ export function MarquezGraph({ graph }: { graph: LineageGraph }) {
     return (
       <Card className="shadow-sm">
         <CardContent className="py-8 text-center text-xs text-muted-foreground">
-          No lineage in Marquez namespace {graph.namespace ?? '—'} yet. Run a grounded agent to emit
-          OpenLineage events.
+          No lineage in namespace {graph.namespace ?? '—'} yet. Run a grounded agent to emit
+          lineage events.
         </CardContent>
       </Card>
     );
@@ -39,14 +40,14 @@ export function MarquezGraph({ graph }: { graph: LineageGraph }) {
     <Card className="shadow-sm">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Marquez lineage graph</CardTitle>
+          <CardTitle className="text-sm">Lineage graph</CardTitle>
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             {graph.namespace}
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground">
           {graph.jobs.length} job(s) · {graph.datasets.length} dataset(s) · {graph.edges.length}{' '}
-          edge(s) — read back from Marquez.
+          edge(s) — read back from the lineage store.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

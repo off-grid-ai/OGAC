@@ -35,19 +35,19 @@ variable. Defaults run first-party; these are the production swap-ins:
 
 ![Swap any backend through a capability port — one environment variable, first-party fallback always ready](/docs-shots/connectors.png)
 
-- **Keycloak** — identity / SSO.
-- **Qdrant** — vector store for retrieval (embedded store is the default).
-- **OpenBao** — secrets vault.
-- **Presidio** — PII detection + anonymization.
-- **OPA** — policy-as-code.
-- **Langfuse** — LLM tracing / observability.
-- **Marquez** — data lineage (OpenLineage).
-- **OpenSearch** — audit/security event index.
-- **Superset** — BI dashboards.
-- **Unleash** — feature flags.
-- **FleetDM** — device management.
-- **Temporal** — durable agent workflows.
-- **SeaweedFS** — object storage.
+- **Identity / SSO** — point the adapter at your identity provider (e.g. Keycloak).
+- **Vector store** — retrieval index at scale (embedded store is the default; e.g. Qdrant).
+- **Secrets store** — a KV vault for connector credentials and keys (e.g. OpenBao).
+- **PII detection** — entity-grade detection + anonymization (e.g. Presidio).
+- **Policy engine** — policy-as-code at scale (e.g. OPA).
+- **Tracing / observability** — trace store for runs and costs (e.g. Langfuse).
+- **Data lineage** — source-to-answer lineage store (e.g. Marquez / OpenLineage).
+- **Audit / security event index** — searchable event store (e.g. OpenSearch).
+- **Dashboards / BI** — analytics dashboards (e.g. Superset).
+- **Feature flags** — runtime capability gating (e.g. Unleash).
+- **Device management** — fleet inventory + posture (e.g. FleetDM).
+- **Workflow engine** — durable agent workflows (e.g. Temporal).
+- **Object storage** — file/artifact store (e.g. SeaweedFS).
 
 Browse the OpenAPI spec for any of these from **API docs & playground** in the console.`,
     },

@@ -93,7 +93,7 @@ export function PolicyRulesManager({ rules }: { rules: PolicyRule[] }) {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Console-owned allow/deny entries, evaluated deny-first by ascending priority. Push
-          compiles the enabled set into an OPA data document and reloads the engine.
+          compiles the enabled set into a policy data document and reloads the policy engine.
         </p>
         <div className="flex gap-2">
           <PushButton count={rules.filter((r) => r.enabled).length} />
@@ -182,7 +182,7 @@ function PushButton({ count }: { count: number }) {
   return (
     <Button size="sm" variant="outline" onClick={push} disabled={busy}>
       <UploadSimple className="size-4" />
-      {busy ? 'Pushing…' : `Push / Reload to OPA (${count})`}
+      {busy ? 'Pushing…' : `Push / Reload policy engine (${count})`}
     </Button>
   );
 }
@@ -239,7 +239,8 @@ function DeleteButton({ id, name }: { id: string; name: string }) {
         <DialogHeader>
           <DialogTitle>Delete policy rule</DialogTitle>
           <DialogDescription>
-            Delete &quot;{name}&quot;? This cannot be undone. Push to OPA afterwards to propagate.
+            Delete &quot;{name}&quot;? This cannot be undone. Push to the policy engine afterwards to
+            propagate.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

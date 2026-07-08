@@ -32,11 +32,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
               <Key className="size-4" />
             </div>
-            <CardTitle className="text-sm">Keycloak not configured</CardTitle>
+            <CardTitle className="text-sm">Identity provider not configured</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Set the Keycloak-admin environment variables (see the Users &amp; Access page) to manage
-            users.
+            Set the identity-provider environment variables (see the Users &amp; Access page) to
+            manage users.
           </CardContent>
         </Card>
       )}

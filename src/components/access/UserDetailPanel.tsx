@@ -71,7 +71,7 @@ function fmt(ms?: number): string {
 function DegradeBanner({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-      <span className="font-medium">Keycloak error:</span> {message}
+      <span className="font-medium">Identity provider error:</span> {message}
     </div>
   );
 }
@@ -289,7 +289,7 @@ function MfaCard({ userId }: { userId: string }) {
         configured?: boolean;
       };
       if (data.configured === false) {
-        setError('Keycloak is not configured.');
+        setError('Identity provider is not configured.');
         return;
       }
       if (!res.ok) {
@@ -461,7 +461,7 @@ function SessionsCard({ userId, label }: { userId: string; label: string }) {
         configured?: boolean;
       };
       if (data.configured === false) {
-        setError('Keycloak is not configured.');
+        setError('Identity provider is not configured.');
         return;
       }
       if (!res.ok) {
@@ -545,7 +545,7 @@ function SessionsCard({ userId, label }: { userId: string; label: string }) {
                       colSpan={6}
                       className="py-6 text-center text-xs text-muted-foreground"
                     >
-                      No active Keycloak sessions for this user. The console signs in with
+                      No active sessions for this user. The console signs in with
                       short-lived direct-grant tokens, so an idle online session may have already
                       expired even though the operator is still signed in.
                     </TableCell>
@@ -616,7 +616,7 @@ export function UserDetailPanel({ userId }: { userId: string }) {
         configured?: boolean;
       };
       if (data.configured === false) {
-        setError('Keycloak is not configured.');
+        setError('Identity provider is not configured.');
         return;
       }
       if (res.status === 404) {
@@ -659,7 +659,7 @@ export function UserDetailPanel({ userId }: { userId: string }) {
       <DegradeBanner
         message={
           error === 'forbidden'
-            ? 'forbidden — the service account needs the view-users / manage-users roles under realm-management in Keycloak.'
+            ? 'forbidden — the service account needs the view-users / manage-users roles under realm-management in your identity provider.'
             : error
         }
       />

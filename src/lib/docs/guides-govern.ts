@@ -81,11 +81,11 @@ rule, the safe default applies.
 On the **Policy** page, create, edit, enable/disable, and delete rules, each with a priority. Changes
 take effect on the next request.
 
-## First-party or OPA
+## First-party or policy-as-code
 
-The console ships a first-party attribute-based engine. For policy-as-code at scale, set the policy
-adapter to **OPA** and author rules in Rego; the console falls back to the first-party engine if OPA
-is unreachable, so turning it on is never a hard dependency.`,
+The console ships a first-party attribute-based engine. For policy-as-code at scale, point the policy
+adapter at an external policy engine and author rules there; the console falls back to the first-party
+engine if that engine is unreachable, so turning it on is never a hard dependency.`,
     },
     {
       slug: 'guides/guardrails',
@@ -99,8 +99,8 @@ is unreachable, so turning it on is never a hard dependency.`,
 
 - **Regex floor** — always on. Detects and redacts common PII (email, phone, card, SSN-like
   patterns). It's the safety net that can never be turned off.
-- **Presidio** — the production detector. When configured, it does entity-grade detection and calls
-  the anonymizer to mask spans. If Presidio is unreachable, guardrails degrade to the regex floor —
+- **Entity-grade detection** — the production detector. When configured, it does entity-grade
+  detection and masks the matched spans. If it's unreachable, guardrails degrade to the regex floor —
   they never fail open.
 
 ## Test it
@@ -118,7 +118,7 @@ leaves and recorded in the audit trail. Every verdict is logged against the requ
       slug: 'guides/access',
       title: 'Access & identity',
       description: 'Users, roles, and machine clients through your identity provider.',
-      body: `Access is one identity model across every surface, backed by Keycloak.
+      body: `Access is one identity model across every surface, backed by your identity provider.
 
 ![Access — users, roles, machine clients, and sessions under one identity model](/docs-shots/access.png)
 
@@ -136,13 +136,13 @@ it needs. Rotate its secret from the same surface.
 
 ## Single sign-on
 
-Providers activate from configuration: Google, Microsoft Entra, or Keycloak. Users sign in with the
-login they already have; the browser never leaves the console.
+Providers activate from configuration: Google, Microsoft Entra, or your own SSO. Users sign in with
+the login they already have; the browser never leaves the console.
 
 ## Realm administration
 
-The deep identity controls that usually live in the Keycloak admin console are surfaced here, so you
-run identity from one place instead of two:
+The deep identity controls that usually live in your identity provider's admin console are surfaced
+here, so you run identity from one place instead of two:
 
 - **Sessions** — see every active session for a user (client, IP, last access) and revoke one, or all
   of them, to sign someone out everywhere on the spot.
@@ -156,8 +156,8 @@ run identity from one place instead of two:
   lifetimes, offline-session idle, action-token lifespan), so how long a login stays valid is your
   policy, not a default.
 
-These write straight through to your Keycloak realm via a service account granted the
-\`realm-management\` role, so a change here is a change in the identity provider itself.`,
+These write straight through to your identity provider's realm via a service account granted realm
+administration rights, so a change here is a change in the identity provider itself.`,
     },
     {
       slug: 'guides/secrets',
@@ -170,8 +170,9 @@ out of code and configuration.
 
 ## How it works
 
-The default store is the process environment. For production, set the secrets adapter to **OpenBao**
-(a KV v2 vault); the console reads and writes through it, and falls back to env if it's down.
+The default store is the process environment. For production, point the secrets adapter at a
+**secrets store** (a KV v2 vault); the console reads and writes through it, and falls back to env if
+it's down.
 
 ## Manage it
 
