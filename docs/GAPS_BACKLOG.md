@@ -8,6 +8,42 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 **Owner:** `console` (my domain) · `infra` (aux tier / fleet — coordinate with the other session).
 **No mock data** — anything below is either real config, wiring to a live service, or a build task.
 
+---
+
+## OPEN NOW — current working set (index, 2026-07-08)
+
+> This file is append-only history; most numbered items below are already ✅ RESOLVED inline. This
+> index is the **actually-open** set. Everything not listed here is done (search the item for its ✅).
+
+**Pipelines × Gateways (the active epic — all code-side, mostly small):**
+- **PA-16a/b/c** — finish run-time enforcement: durable (Temporal) app-run path, agent-run + chat paths
+  (seam built, not called), overlay PII-mask escalation. *App-run inline path IS enforced + shipped.*
+- **PA-11** — public pipeline run route does key-auth + governed decision but doesn't fully EXECUTE the model.
+- **PA-12** — stamp run traces + `eval_runs` with `pipeline:<id>` so Observability/Drift lenses are exact (not best-effort).
+- **PA-10** — gateway partial-PATCH edge (UI path works; API partial body should merge or 400). Small.
+- **PA-13** — cosmetic: purge revoked test keys on the Loan Underwriting seed pipeline. XS.
+- **Residual verify** — exercise a live app-run against a restrictive pipeline through the UI (enforcement is test-proven, not UI-run).
+
+**Enterprise-readiness design gaps (larger, pre-GA):** PA-3 (team/BU tier), PA-6 (FinOps rollups +
+on-prem cost model), PA-8 (chat → multiple pipelines), PA-9 (routing wording), PA-4 (ABAC attr sourcing).
+
+**Supervised / on-site (need the box or a maintenance window — NOT code):**
+- **PA-15** — per-tenant gateway URLs: tunnel-ingress `*-gateway → :8800` + aggregator resolves-by-host (host helper done).
+- **#2** — Presidio via edge-Caddy reload (guardrails run the regex floor until then).
+- **#12 / HITL** — flip durable dispatch ON: bootstrap the Temporal `offgrid-agents` + `offgrid-apps` workers + `OFFGRID_QUEUE_ENABLED` (code complete; off in prod).
+- **#32** — A4 off-host unreachability curl from a non-S1 host.
+
+**Older still-open (verify-then-fix — some may be stale):** #6 (seed `offgrid-audit` index), #9 (Superset
+dashboard), #34 (Temporal cancel/terminate audit — P1), #35 (runIdFromWorkflowId hyphen-fragility — latent),
+#121 (durable-worker PII deep-config), report/email/whatsapp sinks defer delivery, #26 (cloud routing —
+recheck: OpenRouter was wired since this was written), #28 (backups restore e2e). Build gaps #13–20 are
+future features, not defects.
+
+**Housekeeping:** consider archiving the ✅-resolved rows to a `GAPS_ARCHIVE.md` so this file shows only
+open work — deferred (low value vs. the git history that already records them).
+
+---
+
 ## P0 — before the demo
 | # | Gap | What to do | Owner | Effort |
 |---|---|---|---|---|
