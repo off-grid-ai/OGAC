@@ -1,0 +1,161 @@
+<title>Off Grid AI — the platform</title>
+<style>
+  :root{
+    --bg:#0a0a0a;--panel:#111312;--panel2:#161917;--line:#242826;
+    --ink:#e7ece9;--dim:#8a938d;--em:#34D399;--em-dim:#1c5c46;--amber:#f0b24a;--amber-dim:#5c4a1c;
+    --mono:'Menlo','SFMono-Regular',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.5;padding:26px}
+  .wrap{max-width:1220px;margin:0 auto}
+  h1{font-size:20px;letter-spacing:.02em;margin:0 0 2px}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 6px}
+  .thesis{border-left:2px solid var(--em);padding:6px 0 6px 12px;margin:14px 0 22px;color:var(--ink);font-size:13.5px}
+  .em{color:var(--em)}.amber{color:var(--amber)}.dim{color:var(--dim)}
+  h2.sec{font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--em);margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .band{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:14px 16px;margin:0 0 12px}
+  .band h3{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin:0 0 12px;font-weight:500}
+  .row{display:grid;gap:10px}
+  .c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:repeat(3,1fr)}.c4{grid-template-columns:repeat(4,1fr)}.c5{grid-template-columns:repeat(5,1fr)}
+  .node{border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:10px 12px}
+  .node .t{font-weight:600;color:var(--ink);font-size:12.5px}
+  .node .d{color:var(--dim);font-size:11px;margin-top:3px}
+  .node.em{border-color:var(--em-dim);box-shadow:inset 0 0 0 1px rgba(52,211,153,.08)}.node.em .t{color:var(--em)}
+  .node.amber{border-color:var(--amber-dim)}.node.amber .t{color:var(--amber)}
+  .arrow{text-align:center;color:var(--em);font-size:14px;margin:2px 0;letter-spacing:.3em}
+  .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:10.5px;color:var(--dim);margin:2px 4px 2px 0}
+  .pill.on{border-color:var(--em-dim);color:var(--em)}.pill.new{border-color:var(--amber-dim);color:var(--amber)}
+  .spine{border:1px dashed var(--em-dim);border-radius:10px;background:linear-gradient(180deg,rgba(52,211,153,.05),transparent);padding:14px 16px;margin:0 0 12px}
+  .org{border:1px solid var(--em-dim);border-radius:10px;background:rgba(52,211,153,.04);padding:12px 16px;margin:0 0 12px;text-align:center}
+  .k{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 4px 0 12px}
+  .k.on{background:var(--em)}.k.new{background:var(--amber)}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:500;text-transform:uppercase;font-size:10px;letter-spacing:.1em}
+  td .s{color:var(--em)}td .n{color:var(--amber)}
+  .foot{color:var(--dim);font-size:11px;margin-top:8px}
+  @media(max-width:860px){.c2,.c3,.c4,.c5{grid-template-columns:1fr}}
+</style>
+<div class="wrap">
+  <h1>Off Grid AI — <span class="em">the platform</span></h1>
+  <p class="sub">Become an intelligent enterprise, without compromising. On-prem · local-first · open-source · data never leaves the box.</p>
+  <div class="thesis">
+    One <span class="em">governed pipeline</span> is the unit of everything — it governs <b>model access AND data movement</b> under one policy/guardrail/redaction/eval contract. It runs on a <span class="em">smart gateway</span> (routing + edge + its own telemetry). Every run and every sync emits into <b>one shared spine</b> (observability · audit · lineage · provenance · cost · compliance) — <span class="amber">replayable end-to-end</span> — and an <span class="em">org view</span> rolls the whole estate up. That's the platform.
+  </div>
+
+  <!-- ORG -->
+  <h2 class="sec">Org view — the whole estate</h2>
+  <div class="org">
+    <div class="em" style="font-weight:600">▲ roll-up across every pipeline, gateway &amp; consumer</div>
+    <div class="dim" style="font-size:11px;margin-top:3px">total spend &amp; chargeback · all traces/audit · every data flow + lineage graph · drift &amp; data-quality · compliance coverage · fleet health · tenants — the estate at a glance, drill into any pipeline's slice</div>
+  </div>
+
+  <!-- CONSUMERS -->
+  <h2 class="sec">Consumers — who uses a pipeline</h2>
+  <div class="band"><div class="row c5">
+    <div class="node em"><div class="t">Apps</div><div class="d">multi-step · HITL · reports · triggers (email/WhatsApp/webhook/schedule)</div></div>
+    <div class="node em"><div class="t">Agents</div><div class="d">tools · memory · durable runs (Temporal)</div></div>
+    <div class="node em"><div class="t">Chat / Projects</div><div class="d">governed conversation · @knowledge · citations</div></div>
+    <div class="node amber"><div class="t">BI — Superset / PowerBI <span class="pill new">new</span></div><div class="d">reads the warehouse a pipeline fills</div></div>
+    <div class="node em"><div class="t">External 3rd-party</div><div class="d">provisioned per-pipeline key + endpoint (coding apps, services)</div></div>
+  </div>
+  <div class="dim" style="margin-top:8px">Non-technical dept staff build these in plain language — the acceptance bar is a tax/ops analyst shipping a governed workflow without code.</div></div>
+
+  <div class="arrow">▲ bind ▲</div>
+
+  <!-- PIPELINE -->
+  <h2 class="sec">Pipeline — the one governed unit (owns everything)</h2>
+  <div class="band" style="border-color:var(--em-dim)">
+    <div class="row c2" style="margin-bottom:12px">
+      <div class="node"><div class="t">What it can DO</div><div class="d"><b>Model access</b> → grounded answers + citations. &nbsp;<b class="amber">Data movement</b> → connector→warehouse sync (batch · incremental · CDC). &nbsp;Compose pipelines-as-tools.</div></div>
+      <div class="node"><div class="t">How it's consumed</div><div class="d">provisioned API key + endpoint · versioned + <span class="amber">replayable</span> (every run/sync is a recorded, re-runnable event) · templated (sample BFSI pipelines)</div></div>
+    </div>
+    <div class="dim">Governed by the SAME peripheries whether it's moving tokens or rows:</div>
+    <div style="margin-top:6px">
+      <span class="pill on">data-allowlist — hard ceiling</span>
+      <span class="pill on">policy (ABAC / OPA)</span>
+      <span class="pill on">guardrails (injection · grounding · toxicity)</span>
+      <span class="pill on">PII redaction / masking (Presidio) — on the sync path too</span>
+      <span class="pill on">model evals + golden set</span>
+      <span class="pill on">drift detection</span>
+      <span class="pill new">data-quality evals (Great Expectations)</span>
+      <span class="pill on">routing + egress leash</span>
+      <span class="pill new">schedule / CDC trigger</span>
+      <span class="pill on">RBAC (who may run) → ABAC (what this request may touch)</span>
+    </div>
+    <div class="dim" style="margin-top:10px">Per-pipeline lenses = its slice of the spine: observability · audit · lineage · provenance · cost · quality.</div>
+  </div>
+
+  <div class="arrow">▲ runs on ▲</div>
+
+  <!-- GATEWAY -->
+  <h2 class="sec">Gateway — the smart network + model edge</h2>
+  <div class="band"><div class="row c3">
+    <div class="node em"><div class="t">Smart routing</div><div class="d">model pick · fallback chain · load-balance across fleet nodes · egress leash (data-class → local / cloud / block) · cost-aware</div></div>
+    <div class="node em"><div class="t">Edge functions (Caddy)</div><div class="d">WAF · rate-limit · caching (Redis) · TLS · per-tenant provisioned URL — the real internet-gateway layer</div></div>
+    <div class="node em"><div class="t">Gateway's OWN telemetry</div><div class="d">access logs · which node served · latency / throughput / errors — distinct from the pipeline's lenses</div></div>
+  </div>
+  <div style="margin-top:8px">
+    <span class="pill on">on-prem cluster (fleet)</span><span class="pill on">OpenAI</span><span class="pill on">Anthropic</span><span class="pill on">OpenRouter</span>
+    <span class="pill on">STT/TTS (speech)</span><span class="pill on">image (sd)</span><span class="pill on">embeddings</span>
+  </div></div>
+
+  <!-- ENGINES / SUBSTRATE -->
+  <h2 class="sec">Substrate — the two engines a pipeline runs on</h2>
+  <div class="band"><div class="row c2">
+    <div class="node em"><div class="t">Model engine — the AI gateway</div><div class="d">llama.cpp fleet + cloud providers, OpenAI-compatible. LIVE.</div></div>
+    <div class="node amber"><div class="t">Data engine — the ELT/CDC stack <span class="pill new">new · on S2</span></div><div class="d">Airbyte (connectors + CDC) · Redpanda (Kafka/MQ) · ClickHouse (warehouse) · dbt (transform) · Great Expectations (quality). Drag-drop / "write english → sync".</div></div>
+  </div></div>
+
+  <!-- SPINE -->
+  <h2 class="sec">The spine — run OR sync is the join key</h2>
+  <div class="spine"><div class="row c3">
+    <div class="node em"><div class="t">Observability</div><div class="d">traces · latency · tokens (Langfuse)</div></div>
+    <div class="node em"><div class="t">Audit / SIEM</div><div class="d">every call/sync + policy/guardrail decision + egress + invoker (OpenSearch)</div></div>
+    <div class="node em"><div class="t">Lineage</div><div class="d">source→chunk→answer AND <span class="amber">source→sync→warehouse→BI</span> (Marquez)</div></div>
+    <div class="node em"><div class="t">Provenance + Citations</div><div class="d">signed run manifests · grounded citations · verify + rotate · replayable</div></div>
+    <div class="node em"><div class="t">FinOps / Cost</div><div class="d">model spend + sync/warehouse cost per pipeline · virtual keys · budgets · chargeback</div></div>
+    <div class="node em"><div class="t">Regulatory</div><div class="d">ISO 42001 · NIST AI RMF · EU AI Act coverage over the same runs + syncs</div></div>
+  </div></div>
+
+  <!-- CROSS-CUTTING -->
+  <h2 class="sec">Platform services (cross-cutting)</h2>
+  <div class="band"><div class="row c4">
+    <div class="node em"><div class="t">Identity / SSO</div><div class="d">Keycloak — realms, service accounts, federation</div></div>
+    <div class="node em"><div class="t">Secrets</div><div class="d">OpenBao — keys, credentials, rotation</div></div>
+    <div class="node em"><div class="t">Multi-tenancy</div><div class="d">org-scoped everything · per-tenant subdomain + gateway URL · membership-checked</div></div>
+    <div class="node em"><div class="t">Feature flags</div><div class="d">Unleash — capability/module licensing per org</div></div>
+    <div class="node em"><div class="t">Fleet / MDM</div><div class="d">FleetDM — device mgmt · the on-prem compute fleet (10 nodes)</div></div>
+    <div class="node em"><div class="t">Storage</div><div class="d">SeaweedFS (S3) · buckets · artifacts</div></div>
+    <div class="node em"><div class="t">Knowledge / Brain</div><div class="d">RAG — Qdrant / LanceDB vector stores</div></div>
+    <div class="node em"><div class="t">Backups / DR</div><div class="d">scheduled · restore · prune</div></div>
+  </div></div>
+
+  <!-- OSS STACK -->
+  <h2 class="sec">The open-source stack (permissive licences — the moat is ownership, not secrecy)</h2>
+  <div class="band">
+    <table>
+      <tr><th>Capability</th><th>Engine (OSS)</th><th>Status</th></tr>
+      <tr><td>Model gateway</td><td>llama.cpp fleet + OpenAI-compat</td><td class="s">■ live</td></tr>
+      <tr><td>Warehouse (Snowflake/Databricks-equiv)</td><td>ClickHouse</td><td class="n">■ new</td></tr>
+      <tr><td>Connectors + ELT (Glue-equiv)</td><td>Airbyte — 300+ sources</td><td class="n">■ new</td></tr>
+      <tr><td>CDC (log-based change capture)</td><td>Debezium (via Airbyte)</td><td class="n">■ new</td></tr>
+      <tr><td>Streaming / MQ</td><td>Redpanda (Kafka API)</td><td class="n">■ new</td></tr>
+      <tr><td>Transforms</td><td>dbt</td><td class="n">■ new</td></tr>
+      <tr><td>Data-quality evals</td><td>Great Expectations</td><td class="n">■ new</td></tr>
+      <tr><td>PII redaction</td><td>Presidio</td><td class="s">■ live</td></tr>
+      <tr><td>Model evals / drift</td><td>ragas · deepeval · Evidently</td><td class="s">■ live</td></tr>
+      <tr><td>Observability / traces</td><td>Langfuse</td><td class="s">■ live</td></tr>
+      <tr><td>Audit / SIEM</td><td>OpenSearch</td><td class="s">■ live</td></tr>
+      <tr><td>Lineage</td><td>Marquez (OpenLineage)</td><td class="s">■ live</td></tr>
+      <tr><td>Policy</td><td>OPA (ABAC)</td><td class="s">■ live</td></tr>
+      <tr><td>Secrets</td><td>OpenBao</td><td class="s">■ live</td></tr>
+      <tr><td>Identity</td><td>Keycloak</td><td class="s">■ live</td></tr>
+      <tr><td>Durable runs</td><td>Temporal</td><td class="s">■ live</td></tr>
+      <tr><td>Flags · MDM · BI · store</td><td>Unleash · FleetDM · Superset · SeaweedFS</td><td class="s">■ live (BI+MDM: register)</td></tr>
+    </table>
+    <div class="foot"><span class="k on"></span>live &amp; wired &nbsp; <span class="k new"></span>new data plane — Airbyte · Redpanda · ClickHouse · dbt · Great Expectations · BI, on the freed <b>S2</b> server node. Fleet: 10 machines (S1 control-plane · S2 data-plane · g1–g8 model nodes).</div>
+  </div>
+
+  <p class="sub" style="margin-top:18px">Positioning: not "a private ChatGPT" — <span class="em">a private AI, everywhere</span>, and the governed data platform under it. Open-core: free under 20 people; 20+ license from us. The bet: every enterprise capability (model access, ETL, BI, governance, compliance) as <span class="em">reusable, composable, replayable pipelines</span> that never let data leave.</p>
+</div>
