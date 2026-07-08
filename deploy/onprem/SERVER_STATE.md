@@ -793,3 +793,21 @@ Founder directive "everything shipped and on." Flipped durable agent+app runs fr
 - Presidio already ON (`OFFGRID_ADAPTER_GUARDRAILS=presidio` + URLs) — /status shows presidio `up`; the
   old regex-floor gap (#2) is effectively resolved.
 - Restart worker: `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker`.
+
+## 2026-07-08 — S2 (second server) online + fleet topology corrected
+
+**Fleet is 10 machines total** (earlier notes wrongly implied g9/g10): **S1 + S2 + g1–g8.** There is NO
+g9/g10. Correcting the stale "g6 = aux server #2" note — the real second server is `offgrid-s2`.
+
+- **S1** `127.0.0.1` — main control-plane server (console :3000, aggregator :8800, Caddy edge,
+  cloudflared, OrbStack datastores).
+- **S2 = `offgrid-s2`** `192.168.1.60` — SECOND server, powered on 2026-07-08 (was briefly on the wrong
+  SSID `airtel_Wednesday`; moved to `airtel_wednesday_2` → reachable). Health: M1 MacBookPro17,1, 8-core,
+  16GB, 189GB free, node v22.23.1, SSH `admin/1234`. Has `co.getoffgridai.console.plist` installed (NOT
+  started). **No Docker/Colima installed** → can run the Node console but not the containerized stack
+  until Colima+containers are set up. ROLE NOT YET ASSIGNED (founder: "confirm healthy, decide later").
+- **Gateway model nodes (8):** g1 `.57` qwythos-9b · g2 `.58` gemma-4-e4b · g3 `.32` image(juggernaut,:1234)
+  · g4 `.63` qwen3-vl-8b · g5 `.65` gemma-4-e4b · g6 `.66` · g7 `.67` qwen3-vl-8b · g8 `.64` qwythos-9b.
+  Aggregator chat pool = g1,g2,g4,g5,g7,g8 (6); g3 in IMAGE_POOL; hostnames are the fleet-membership
+  signal (mDNS `offgrid-gN.local`), NOT open :7878 (stray OGA-Desktop laptops also serve :7878 — e.g. a
+  dev laptop appeared at .27; correctly NOT in the curated pool).
