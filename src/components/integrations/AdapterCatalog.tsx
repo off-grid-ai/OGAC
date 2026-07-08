@@ -3,7 +3,6 @@
 import { Plugs, PlugsConnected } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { SubNav } from '@/components/nav/SubNav';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CapabilityBinding } from '@/lib/adapters/registry';
@@ -73,7 +72,9 @@ export function AdapterCatalog({ bindings }: { bindings: CapabilityBinding[] }) 
         </p>
       </div>
 
-      <SubNav>
+      {/* Mid-page category filter — a plain in-flow tab strip, NOT <SubNav> (the top-of-page band that
+          bleeds to console edges; mid-page its -mt-6 pulls the emerald band over the content above). */}
+      <div className="border-b border-border pb-2">
         <nav className="flex flex-wrap items-center gap-1" aria-label="Adapter categories">
           {tabs.map((t) => {
             const isActive = active === t.id;
@@ -98,7 +99,7 @@ export function AdapterCatalog({ bindings }: { bindings: CapabilityBinding[] }) 
             );
           })}
         </nav>
-      </SubNav>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {shown.map((b) => {
