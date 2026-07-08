@@ -51,15 +51,31 @@
   </div>
 
   <!-- CONSUMERS -->
-  <h2 class="sec">Consumers — who uses a pipeline</h2>
-  <div class="band"><div class="row c5">
-    <div class="node em"><div class="t">Apps</div><div class="d">multi-step · HITL · reports · triggers (email/WhatsApp/webhook/schedule)</div></div>
-    <div class="node em"><div class="t">Agents</div><div class="d">tools · memory · durable runs (Temporal)</div></div>
-    <div class="node em"><div class="t">Chat / Projects</div><div class="d">governed conversation · @knowledge · citations</div></div>
-    <div class="node amber"><div class="t">BI — Superset / PowerBI <span class="pill new">new</span></div><div class="d">reads the warehouse a pipeline fills</div></div>
-    <div class="node em"><div class="t">External 3rd-party</div><div class="d">provisioned per-pipeline key + endpoint (coding apps, services)</div></div>
+  <h2 class="sec">Consumers — who uses a pipeline (Apps vs Agents is the key distinction)</h2>
+  <div class="band">
+    <div class="row c2" style="margin-bottom:10px">
+      <div class="node em"><div class="t">APP — has a UI</div><div class="d"><b>Human-facing.</b> A UI + input forms · <b>HITL</b> (human-in-the-loop approve/reject/edit) · a <b>Review</b> queue · <b>Reports</b>. A person drives it. e.g. reimbursement approval, KYC review.</div></div>
+      <div class="node em"><div class="t">AGENT — no UI</div><div class="d"><b>Autonomous.</b> No UI, runs on a trigger/schedule, does its work headless, and <b>emits a report</b>. No human in the loop. e.g. overnight fraud sweep, scheduled data sync, monitoring.</div></div>
+    </div>
+    <div class="row c3">
+      <div class="node em"><div class="t">Chat / Projects</div><div class="d">governed conversation · @knowledge · citations</div></div>
+      <div class="node amber"><div class="t">BI — Superset / PowerBI <span class="pill new">new</span></div><div class="d">reads the warehouse a pipeline fills</div></div>
+      <div class="node em"><div class="t">External 3rd-party</div><div class="d">provisioned per-pipeline key + endpoint</div></div>
+    </div>
+    <div class="dim" style="margin-top:8px"><span class="em">App = UI + HITL + review + reports.</span> &nbsp; <span class="em">Agent = autonomous, headless, report-only.</span> &nbsp; Both bind a governed pipeline; both built by non-technical dept staff in plain language.</div>
   </div>
-  <div class="dim" style="margin-top:8px">Non-technical dept staff build these in plain language — the acceptance bar is a tax/ops analyst shipping a governed workflow without code.</div></div>
+
+  <!-- LIBRARY -->
+  <h2 class="sec">The prebuilt library — the on-ramp &amp; the showcase</h2>
+  <div class="band" style="border-color:var(--em-dim)">
+    <div class="dim" style="margin-bottom:10px"><span class="em">A LOT of small, composable pipelines shipped as fully-governed examples.</span> Each is ONE thing done well, wired end-to-end (evals · golden set · drift · observability · policy · guardrails · lineage — everything), and composes into bigger ones (pipeline-as-tool). People <b>clone → tweak in plain language → deploy</b>. This is the fastest path to value and the proof the platform works.</div>
+    <div class="row c4">
+      <div class="node"><div class="t">Each example ships WITH</div><div class="d">evals + golden set · drift setup · observability · policy · guardrails · routing — governed from day one, not a bare skeleton</div></div>
+      <div class="node"><div class="t">Small + composable</div><div class="d">one job each; compose as tools into apps &amp; agents</div></div>
+      <div class="node"><div class="t">BFSI examples</div><div class="d">KYC · loan underwriting · fraud · FNOL · reimbursement · cross-sell</div></div>
+      <div class="node amber"><div class="t">Data examples <span class="pill new">new</span></div><div class="d">connector→warehouse syncs · CDC feeds · quality-gated ELT</div></div>
+    </div>
+  </div>
 
   <div class="arrow">▲ bind ▲</div>
 
@@ -104,7 +120,7 @@
   <h2 class="sec">Substrate — the two engines a pipeline runs on</h2>
   <div class="band"><div class="row c2">
     <div class="node em"><div class="t">Model engine — the AI gateway</div><div class="d">llama.cpp fleet + cloud providers, OpenAI-compatible. LIVE.</div></div>
-    <div class="node amber"><div class="t">Data engine — the ELT/CDC stack <span class="pill new">new · on S2</span></div><div class="d">Airbyte (connectors + CDC) · Redpanda (Kafka/MQ) · ClickHouse (warehouse) · dbt (transform) · Great Expectations (quality). Drag-drop / "write english → sync".</div></div>
+    <div class="node amber"><div class="t">Data engine — ETL + ELT / CDC stack <span class="pill new">new · on S2</span></div><div class="d">Airbyte (extract+load + CDC) · Redpanda (Kafka/MQ) · ClickHouse (warehouse) · dbt (in-warehouse transform) · Great Expectations (quality). <b>Both patterns:</b> PII redaction runs ETL-style <b>in-flight before load</b> (raw PII never lands) → then ELT-model in-warehouse. Drag-drop / "write english → sync".</div></div>
   </div></div>
 
   <!-- SPINE -->
@@ -157,5 +173,20 @@
     <div class="foot"><span class="k on"></span>live &amp; wired &nbsp; <span class="k new"></span>new data plane — Airbyte · Redpanda · ClickHouse · dbt · Great Expectations · BI, on the freed <b>S2</b> server node. Fleet: 10 machines (S1 control-plane · S2 data-plane · g1–g8 model nodes).</div>
   </div>
 
-  <p class="sub" style="margin-top:18px">Positioning: not "a private ChatGPT" — <span class="em">a private AI, everywhere</span>, and the governed data platform under it. Open-core: free under 20 people; 20+ license from us. The bet: every enterprise capability (model access, ETL, BI, governance, compliance) as <span class="em">reusable, composable, replayable pipelines</span> that never let data leave.</p>
+  <!-- MATURITY -->
+  <h2 class="sec">What's next — the maturity arc (governs → compounds)</h2>
+  <div class="band"><div class="row c5">
+    <div class="node em"><div class="t">M1 · Close the loop</div><div class="d">detect→ACT→learn: release gate + auto-rollback + HITL/thumbs → eval data. <span class="em">building</span></div></div>
+    <div class="node"><div class="t">M2 · Lifecycle &amp; ownership</div><div class="d">teams · owners · promote/approve gate (draft→eval-gated→published)</div></div>
+    <div class="node amber"><div class="t">M4 · Deep data governance</div><div class="d">catalog · classification · retention/RTBF · freshness + broken-sync alerts</div></div>
+    <div class="node"><div class="t">M5 · Self-driving</div><div class="d">ops copilot · auto-suggest guardrails/evals · anomaly detection (the AI moat)</div></div>
+    <div class="node"><div class="t">M6 · Good citizen</div><div class="d">export audit/lineage/metrics → Splunk · Purview · Grafana</div></div>
+  </div>
+  <div class="dim" style="margin-top:8px"><span class="dim">M3 (capacity/GPU quota + control-plane HA) — <s>dropped</s>: temporary 10-machine artifact; rack/cloud coming.</span></div></div>
+
+  <!-- EXPERIENCE -->
+  <h2 class="sec">The experience bet — beautiful &amp; effortless</h2>
+  <div class="band"><div class="dim">Creating and deploying a governed use-case is the core loop, and it must be a <span class="em">joy</span>, not a config chore. You start from a prebuilt pipeline (governance already wired), describe the change in plain <span class="em">English</span>, and deploy — as an <b>App</b> (UI + HITL + review + reports) or an <b>Agent</b> (autonomous, report-only). The library of small composable pipelines is the on-ramp; the plain-language authoring is the magic; the shared spine means every use-case is observable, auditable, and replayable the moment it ships.</div></div>
+
+  <p class="sub" style="margin-top:18px">Positioning: not "a private ChatGPT" — <span class="em">a private AI, everywhere</span>, and the governed data platform under it. Open-core: free under 20 people; 20+ license from us. The bet: every enterprise capability (model access, ETL, BI, governance, compliance) as <span class="em">small, reusable, composable, replayable pipelines</span> — shipped as fully-governed examples — that never let data leave.</p>
 </div>
