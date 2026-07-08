@@ -1153,3 +1153,111 @@ export const exportTargets = pgTable('export_targets', {
 
 export type ExportTarget = typeof exportTargets.$inferSelect;
 export type NewExportTarget = typeof exportTargets.$inferInsert;
+// ─── M4 — Deep data governance (task #190) ────────────────────────────────────
+// The data plane (Airbyte/ClickHouse on S2) will hold a warehouse full of enterprise data. These
+// tables are the CONSOLE-SIDE governance registry — engine-agnostic, filled either by an operator or
+// (later) by a data-pipeline sync that registers its output dataset. Pure rules live in
+// data-classification.ts / data-freshness.ts / data-retention.ts / data-rtbf.ts; the store + its
+// self-migrate live in data-catalog-store.ts. Org-scoped like everything else.
+//
+// `data_assets` — the CATALOG: "what data do I have". One row per dataset/table the org holds. Seeded
+// from connectors/data-domains, and designed so a sync can register its output here (source +
+// external ref + row count + last-refresh). Classification/retention hang off the asset by fk.
+export const dataAssets = pgTable('data_assets', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  name: text('name').notNull(),
+  // Where this asset physically lives — a free-text source label ("Warehouse", "Salesforce"), and
+  // optional structured refs to the console entities it derives from (connector/data-domain).
+  source: text('source').notNull().default(''),
+  connectorId: text('connector_id'), // fk-ish to connectors.id (soft — connectors is org-scoped too)
+  domainId: text('domain_id'), // fk-ish to data_domains.id
+  kind: text('kind').notNull().default('table'), // table | view | stream | file | collection
+  owner: text('owner').notNull().default(''), // steward email / team
+  description: text('description').notNull().default(''),
+  rowCount: integer('row_count').notNull().default(0),
+  // Freshness: the SLA (max staleness allowed, in hours; 0 = no SLA) and the last observed refresh.
+  freshnessSlaHours: integer('freshness_sla_hours').notNull().default(0),
+  lastRefreshAt: timestamp('last_refresh_at', { withTimezone: true }),
+  // Sync health as last reported by a pipeline/connector sync — drives broken-sync alerting.
+  syncStatus: text('sync_status').notNull().default('unknown'), // ok | failed | unknown
+  syncError: text('sync_error').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('data_assets_org_idx').on(t.orgId),
+  index('data_assets_connector_idx').on(t.connectorId),
+]);
+
+// `data_classifications` — per-asset (and optionally per-column) classification + PII tags. One row
+// per (asset, column); column NULL = the asset-level default classification. Drives policy: a
+// `restricted` asset with PII tags is what retention/RTBF/masking key off.
+export const dataClassifications = pgTable('data_classifications', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  assetId: text('asset_id').notNull(), // fk → data_assets.id
+  column: text('column'), // NULL = asset-level default; else a specific column
+  // public | internal | confidential | restricted (ascending sensitivity — see data-classification.ts).
+  level: text('level').notNull().default('internal'),
+  // PII entity tags on this asset/column — e.g. ['EMAIL','PAN','AADHAAR','PHONE']. Vocabulary is the
+  // guardrails/Presidio entity set; kept as free strings so a new recognizer needs no schema change.
+  piiTags: jsonb('pii_tags').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('data_classifications_org_idx').on(t.orgId),
+  index('data_classifications_asset_idx').on(t.assetId),
+]);
+
+// `retention_policies` — per-asset retention rule. `retainDays` = how long data is kept before it is
+// due for purge (0 = keep indefinitely). Evaluated against the asset's lastRefreshAt (data-retention.ts)
+// to surface assets that are OVER retention and due for disposal.
+export const retentionPolicies = pgTable('retention_policies', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  assetId: text('asset_id').notNull(), // fk → data_assets.id (one policy per asset)
+  retainDays: integer('retain_days').notNull().default(0), // 0 = indefinite
+  // What happens at expiry: delete (purge rows) | anonymize (strip PII) | archive (cold-store).
+  action: text('action').notNull().default('delete'),
+  legalHold: boolean('legal_hold').notNull().default(false), // if set, never auto-purge
+  note: text('note').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('retention_policies_org_idx').on(t.orgId),
+  index('retention_policies_asset_idx').on(t.assetId),
+]);
+
+// `erasure_requests` — RTBF / subject-erasure request records. The existing DSAR path
+// (src/lib/erasure.ts + /api/v1/admin/erasure) EXECUTES an erasure immediately against console tables;
+// this table RECORDS the request as a durable, auditable artifact and captures the resolved cross-plane
+// SCOPE (which data assets across warehouse + vector store + lineage reference the subject). Actual
+// warehouse purge wires when the S2 data engine is live — until then the request honestly records
+// status `recorded` with the planned scope.
+export const erasureRequests = pgTable('erasure_requests', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  subject: text('subject').notNull(), // the data-subject email/id to erase
+  // recorded | executing | completed | partial | failed — lifecycle of the request.
+  status: text('status').notNull().default('recorded'),
+  // The resolved erasure SCOPE at request time: the console-owned steps that ran (from planErasure)
+  // plus the cross-plane assets/stores that reference the subject and would be purged when the engine
+  // is live. Auditable snapshot — what this erasure DID + WOULD touch.
+  scope: jsonb('scope').$type<Record<string, unknown>>().notNull().default({}),
+  erasedRows: integer('erased_rows').notNull().default(0), // rows actually deleted in the console plane
+  requestedBy: text('requested_by').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+}, (t) => [
+  index('erasure_requests_org_idx').on(t.orgId),
+  index('erasure_requests_subject_idx').on(t.subject),
+]);
+
+export type DataAsset = typeof dataAssets.$inferSelect;
+export type NewDataAsset = typeof dataAssets.$inferInsert;
+export type DataClassificationRow = typeof dataClassifications.$inferSelect;
+export type NewDataClassificationRow = typeof dataClassifications.$inferInsert;
+export type RetentionPolicyRow = typeof retentionPolicies.$inferSelect;
+export type NewRetentionPolicyRow = typeof retentionPolicies.$inferInsert;
+export type ErasureRequestRow = typeof erasureRequests.$inferSelect;
+export type NewErasureRequestRow = typeof erasureRequests.$inferInsert;
