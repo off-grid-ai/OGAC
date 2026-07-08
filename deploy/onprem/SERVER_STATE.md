@@ -855,3 +855,11 @@ g9/g10. Correcting the stale "g6 = aux server #2" note — the real second serve
 - **Schedule trigger:** needs `OFFGRID_QUEUE_ENABLED=1` (already set) / `OFFGRID_ADAPTER_APPRUNTIME=temporal`; schedule registration is a no-op reporting not_configured until the durable runtime is on.
 - **Auto-rollback on drift (W3):** `OFFGRID_AUTO_ROLLBACK_ON_DRIFT=1` to enable auto-revert of published pipelines to last-good on a drift breach (opt-in — high-impact; off by default).
 - **Durable chat (W1):** the chat worker (`npm run worker:chat`, drains `offgrid-chat`) must run alongside app/agent workers for chat runs to go durable; inline fallback when off.
+
+## Schema migration applied directly (W5a, 2026-07-08)
+- `ALTER TABLE connectors ADD COLUMN IF NOT EXISTS secret_ref text;` — applied via pg client on S1
+  (`offgrid_console` DB). The code's lazy `ensureConnectorSecretRefColumn()` did NOT fire on the
+  connectors GET path → deployed code 500'd selecting a missing column. Fix: apply the ALTER directly
+  (drizzle-kit push hangs over SSH — DEPLOY.md § Database migrations). Verified: column PRESENT,
+  `/api/v1/admin/connectors` → 200. LESSON: additive columns must be applied directly at deploy, not
+  trusted to a lazy path that may not be on the first route hit.
