@@ -42,6 +42,7 @@ import {
   StackSimple as Stack,
   FlowArrow,
   Broadcast,
+  Pulse,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -83,6 +84,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   provit: Eye,
   'api-docs': Code,
   'agent-runs': ClockCounterClockwise,
+  runs: Pulse,
   policy: Gavel,
   evals: Flask,
   siem: ShieldWarning,
