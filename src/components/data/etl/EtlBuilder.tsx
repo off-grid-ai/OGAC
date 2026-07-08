@@ -12,7 +12,6 @@ import {
   MarkerType,
   Position,
   ReactFlow,
-  applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { FloppyDisk, Play, Plus, Trash, Warning } from '@phosphor-icons/react/dist/ssr';
@@ -214,17 +213,16 @@ export function EtlBuilder({
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Only persist position drags back into the spec; selection/dimension changes are UI-only.
-      const applied = applyNodeChanges(changes, rfNodes);
+      // Persist position changes (incl. interim drag frames, so dragging renders smoothly) back into
+      // the spec — the spec stays the single source of truth. Selection/dimension changes are UI-only.
       for (const c of changes) {
-        if (c.type === 'position' && c.position && !c.dragging) {
+        if (c.type === 'position' && c.position) {
           const nc = c;
           setSpec((s) => moveNode(s, nc.id, nc.position!));
         }
       }
-      void applied;
     },
-    [rfNodes],
+    [],
   );
 
   const onConnect = useCallback(
