@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { AppLifecycleNav } from '@/components/build/AppLifecycleNav';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
+import { resolveConsumerChip } from '@/lib/pipeline-chip';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -22,12 +23,14 @@ export default async function AppShellLayout({
 }) {
   await requireModuleForUser('studio');
   const { id } = await params;
-  const app = await getApp(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const app = await getApp(id, orgId);
   if (!app) notFound();
+  const pipeline = await resolveConsumerChip(app.pipelineId ?? null, orgId).catch(() => null);
 
   return (
     <div className="w-full space-y-6">
-      <AppLifecycleNav appId={app.id} title={app.title} />
+      <AppLifecycleNav appId={app.id} title={app.title} pipeline={pipeline} />
       {children}
     </div>
   );

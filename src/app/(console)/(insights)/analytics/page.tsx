@@ -18,12 +18,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
 import { supersetBase } from '@/lib/superset';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
+import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { listPipelines } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pipeline?: string }>;
+}) {
   await requireModuleForUser('analytics');
-  const a = await computeAnalytics();
+  const { pipeline: rawPipeline } = await searchParams;
+  const orgId = await currentOrgId();
+  const pipelines = await listPipelines(orgId).catch(() => []);
+  const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
+  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const a = await computeAnalytics(facet ? pipelineTag(facet) : null);
 
   const stats = [
     { label: 'Events (5k window)', value: a.totalEvents.toLocaleString(), icon: Activity },
@@ -34,6 +48,19 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            Traffic, latency, token and outcome rollups from real gateway traffic on-prem.
+            {facetName ? (
+              <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
+            ) : null}
+          </p>
+        </div>
+        <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
+      </div>
+
       {a.drift.flagged || a.perf.flagged ? (
         <div className="space-y-2">
           {a.drift.flagged ? (
