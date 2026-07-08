@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   // (nothing bound / unresolvable) ⇒ the run behaves exactly as before (additive-only). Threaded
   // into dispatch → the sync RunContext so runAgent enforces it per PA-16b.
   const gov = await getChatBindingGovernance().catch(() => ({ defaultChatPipelineId: null, allowlist: [] }));
-  const { contract } = await resolveAgentBinding(null, gov.defaultChatPipelineId, orgId);
+  const { contract, pipelineId } = await resolveAgentBinding(null, gov.defaultChatPipelineId, orgId);
 
   // C4: resolve the caller CONTEXT here — the request is the only place identity/org/project exist.
   // Pass the fully-resolved actor (machine vs user + label preserved, not just the email) so a
@@ -50,6 +50,8 @@ export async function POST(req: Request) {
     actor: actorFromSession(gate),
     project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
     contract,
+    // PA-12: thread the resolved pipeline id so the run's observability trace is tagged at the source.
+    pipelineId,
   });
 
   // Durable submit accepted but the pipeline is still executing in the worker — 202 with the

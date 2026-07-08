@@ -154,6 +154,17 @@ export function pipelineTag(pipelineId: string): string {
   return `pipeline:${pipelineId}`;
 }
 
+// PA-12 — the ONE canonical tag-derivation used at every telemetry SOURCE (traces, eval_runs, cost,
+// audit) so per-pipeline lenses filter EXACTLY on one form. Given a run's bound pipeline id (or
+// null/empty when no pipeline governs the run), returns the canonical `pipeline:<id>` tag or null.
+// A run with NO bound pipeline yields null ⇒ NO pipeline tag is stamped (unchanged legacy behaviour).
+// Pure + deterministic; trims and rejects blank ids so an empty binding never produces a bare
+// `pipeline:` tag.
+export function pipelineTagOrNull(pipelineId: string | null | undefined): string | null {
+  const id = (pipelineId ?? '').trim();
+  return id ? pipelineTag(id) : null;
+}
+
 // ─── telemetry lens: audit ────────────────────────────────────────────────────────────────────────
 // The audit lens for a pipeline is every governed decision that names it — the resource is
 // `pipeline:<id>` (management events: key mint/revoke, config change) OR the run carried the pipeline

@@ -43,6 +43,8 @@ export interface EvalRun {
   passed: number;
   startedAt: string;
   results?: EvalResult[];
+  // PA-12 — the pipeline this run executed in the context of (null = an org-wide/library run).
+  pipelineId: string | null;
 }
 
 function iso(v: Date | string): string {
@@ -76,6 +78,13 @@ export async function ensureEvalsSchema(): Promise<void> {
       sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
     );
     await db.execute(sql`CREATE INDEX IF NOT EXISTS eval_runs_org_idx ON eval_runs (org_id);`);
+    // PA-12: tag each run with the pipeline it ran in the CONTEXT of, so Drift can be per-pipeline
+    // exact. Self-migrate (same idempotent pattern) so the raw INSERT/SELECT never references a
+    // missing column even before the migration SQL is applied on the live DB.
+    await db.execute(sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS eval_runs_pipeline_idx ON eval_runs (pipeline_id);`,
+    );
     // Pipeline-owns-governance: a golden case belongs to a pipeline (app). Self-migrate app_id/org_id
     // (same idempotent pattern) so the raw INSERT/SELECT never references a missing column.
     await db.execute(sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS app_id text;`);
@@ -209,6 +218,7 @@ interface EvalRunRow {
   passed: number;
   started_at: Date | string;
   results: EvalResult[] | null;
+  pipeline_id: string | null;
   [k: string]: unknown;
 }
 
@@ -221,16 +231,32 @@ function toEvalRun(r: EvalRunRow): EvalRun {
     passed: Number(r.passed),
     startedAt: iso(r.started_at),
     results: r.results ?? undefined,
+    pipelineId: r.pipeline_id ?? null,
   };
 }
 
 // Org-scoped: a tenant's eval history/rollup only ever includes its own runs. org_id lives on
 // eval_runs (see src/db/schema.ts) and is filtered here + stamped on insert below.
-export async function listEvalRuns(limit = 10, orgId: string = DEFAULT_ORG): Promise<EvalRun[]> {
+//
+// PA-12: an optional `pipelineId` narrows history to ONE pipeline's runs so Drift can be
+// per-pipeline exact. Omitted (undefined) ⇒ ALL of the org's runs (the global roll-up, unchanged).
+// `null` ⇒ only the org-wide/library runs (not bound to any pipeline). A non-empty string ⇒ that
+// pipeline's runs. The org filter always applies (cross-tenant isolation is never relaxed).
+export async function listEvalRuns(
+  limit = 10,
+  orgId: string = DEFAULT_ORG,
+  pipelineId?: string | null,
+): Promise<EvalRun[]> {
   await ensureEvalsSchema();
+  const pipelineWhere =
+    pipelineId === undefined
+      ? sql``
+      : pipelineId === null
+        ? sql` AND pipeline_id IS NULL`
+        : sql` AND pipeline_id = ${pipelineId}`;
   const { rows } = await db.execute<EvalRunRow>(
-    sql`SELECT id, engine, score, total, passed, started_at, results
-        FROM eval_runs WHERE org_id = ${orgId} ORDER BY started_at DESC LIMIT ${limit};`,
+    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
+        FROM eval_runs WHERE org_id = ${orgId}${pipelineWhere} ORDER BY started_at DESC LIMIT ${limit};`,
   );
   return rows.map(toEvalRun);
 }
@@ -240,7 +266,7 @@ export async function listEvalRuns(limit = 10, orgId: string = DEFAULT_ORG): Pro
 export async function getEvalRun(id: string, orgId: string = DEFAULT_ORG): Promise<EvalRun | null> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<EvalRunRow>(
-    sql`SELECT id, engine, score, total, passed, started_at, results
+    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
         FROM eval_runs WHERE id = ${id} AND org_id = ${orgId} LIMIT 1;`,
   );
   return rows[0] ? toEvalRun(rows[0]) : null;
@@ -256,14 +282,19 @@ export async function recordEvalRun(
     total: number;
     passed: number;
     results?: EvalResult[];
+    // PA-12 — the pipeline this run executed in the context of (the eval def's pipeline binding).
+    // Omitted/null ⇒ an org-wide/library run (unchanged). Trimmed to null so an empty string never
+    // becomes a bogus pipeline id.
+    pipelineId?: string | null;
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureEvalsSchema();
   const results = run.results ? JSON.stringify(run.results) : null;
+  const pipelineId = (run.pipelineId ?? '').trim() || null;
   await db.execute(
-    sql`INSERT INTO eval_runs (id, org_id, engine, score, total, passed, results)
-        VALUES (${run.id}, ${orgId}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb);`,
+    sql`INSERT INTO eval_runs (id, org_id, pipeline_id, engine, score, total, passed, results)
+        VALUES (${run.id}, ${orgId}, ${pipelineId}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb);`,
   );
 }
 
@@ -295,5 +326,16 @@ export async function runEval(orgId: string = DEFAULT_ORG): Promise<EvalRun> {
   const id = `eval_${randomUUID().slice(0, 6)}`;
   await recordEvalRun({ id, engine: 'golden', score, total, passed, results }, orgId);
   const run = await getEvalRun(id, orgId);
-  return run ?? { id, engine: 'golden', score, total, passed, startedAt: iso(new Date()), results };
+  return (
+    run ?? {
+      id,
+      engine: 'golden',
+      score,
+      total,
+      passed,
+      startedAt: iso(new Date()),
+      results,
+      pipelineId: null,
+    }
+  );
 }

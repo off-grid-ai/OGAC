@@ -595,6 +595,9 @@ export async function POST(req: Request) {
           endTime: Date.now(),
           promptTokens: estimateTokens(traceInput),
           completionTokens: estimateTokens(full),
+          // PA-12 — stamp the bound pipeline (resolved above) at the trace SOURCE so the pipeline
+          // Observability tab + global Observability filter exactly. Null when nothing is bound.
+          pipelineId: pipelineBinding.pipelineId,
         });
       }
       if (citations.length) send({ citations });

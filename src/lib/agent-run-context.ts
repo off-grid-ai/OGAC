@@ -48,6 +48,13 @@ export interface RunContext {
    * workflow input in a later round.
    */
   contract?: PipelineContract | null;
+  /**
+   * PA-12 — the resolved bound-pipeline id for this run (the SAME binding the `contract` was loaded
+   * for). Threaded alongside the contract so the observability trace is stamped at the SOURCE with
+   * the canonical `pipeline:<id>` tag (see emitRunTrace / pipelineTagOrNull). OPTIONAL + ADDITIVE:
+   * absent/null ⇒ no pipeline tag (a run with no bound pipeline is unchanged).
+   */
+  pipelineId?: string | null;
 }
 
 /**
