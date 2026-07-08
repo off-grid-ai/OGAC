@@ -244,6 +244,71 @@ export interface AnalyzeRequest {
   score_threshold?: number;
 }
 
+// ─── Default recognizer set — Indian BFSI (G-F2) ─────────────────────────────
+// Presidio ships built-in IN_PAN / IN_AADHAAR recognizers, but they're only active if the analyzer
+// is configured to load them server-side — and there is NO built-in for IFSC or UPI. Rather than
+// depend on the server config, we always ship these as `ad_hoc_recognizers` on every /analyze call.
+// Ad-hoc recognizers are ADDITIVE (they don't disable Presidio's own), so if the built-ins ARE
+// enabled the duplicate entity types simply merge — no harm — and if they're NOT, this is the only
+// thing that detects them. Patterns mirror the regex floor in pii-regex.ts so both paths agree.
+//
+// The scores are deliberately high (0.85) because each pattern is format-anchored and low-FP; the
+// `context` words nudge confidence higher when the surrounding text confirms the entity, and they
+// let per-entity thresholds treat these like any other recognizer.
+export const DEFAULT_RECOGNIZERS: NormalizedRecognizer[] = [
+  {
+    kind: 'pattern',
+    entity: 'IN_PAN',
+    name: 'in_pan_default',
+    regex: '\\b[A-Z]{5}[0-9]{4}[A-Z]\\b',
+    context: ['pan', 'permanent account number', 'income tax'],
+    denyList: [],
+    score: 0.85,
+    enabled: true,
+  },
+  {
+    kind: 'pattern',
+    entity: 'IN_AADHAAR',
+    name: 'in_aadhaar_default',
+    // 4-4-4 (spaced/hyphenated) OR a bare 12-digit run; leading digit 2–9 as UIDAI issues.
+    regex: '\\b[2-9][0-9]{3}[ -][0-9]{4}[ -][0-9]{4}\\b|\\b[2-9][0-9]{11}\\b',
+    context: ['aadhaar', 'aadhar', 'uidai', 'uid'],
+    denyList: [],
+    score: 0.85,
+    enabled: true,
+  },
+  {
+    kind: 'pattern',
+    entity: 'IN_IFSC',
+    name: 'in_ifsc_default',
+    regex: '\\b[A-Z]{4}0[A-Z0-9]{6}\\b',
+    context: ['ifsc', 'branch', 'neft', 'rtgs', 'imps'],
+    denyList: [],
+    score: 0.85,
+    enabled: true,
+  },
+  {
+    kind: 'pattern',
+    entity: 'UPI_ID',
+    // PSP part is letters-only (no dot) so real emails aren't captured as UPI.
+    name: 'upi_id_default',
+    regex: '\\b[a-zA-Z0-9](?:[a-zA-Z0-9.\\-_]*[a-zA-Z0-9])?@[a-zA-Z]{2,}\\b',
+    context: ['upi', 'vpa', 'virtual payment address', 'collect'],
+    denyList: [],
+    score: 0.8,
+    enabled: true,
+  },
+];
+
+// Merge the always-on default set with the org's stored recognizers. A stored recognizer that
+// covers the same entity type WINS (the operator's tuning overrides our default), so an org can
+// relax/replace a default by defining its own recognizer for that entity.
+export function mergeWithDefaults(stored: NormalizedRecognizer[]): NormalizedRecognizer[] {
+  const storedEntities = new Set(stored.map((r) => r.entity.toUpperCase()));
+  const defaults = DEFAULT_RECOGNIZERS.filter((d) => !storedEntities.has(d.entity.toUpperCase()));
+  return [...defaults, ...stored];
+}
+
 // Build the full `/analyze` request body: the text, the enabled custom recognizers translated to
 // ad-hoc recognizers, and the global threshold as Presidio's request-level `score_threshold`.
 // Per-entity thresholds can't ride in the request body (Presidio has no per-entity request knob),
@@ -255,7 +320,10 @@ export function buildAnalyzeRequest(
   thresholds: ThresholdConfig = DEFAULT_THRESHOLDS,
   language = 'en',
 ): AnalyzeRequest {
-  const enabled = recognizers.filter((r) => r.enabled);
+  // Always fold in the Indian-BFSI default recognizers (PAN/Aadhaar/IFSC/UPI) so the Presidio path
+  // detects them even when the server has no built-ins and the org has stored none. A stored
+  // recognizer for the same entity overrides the default (see mergeWithDefaults).
+  const enabled = mergeWithDefaults(recognizers).filter((r) => r.enabled);
   const req: AnalyzeRequest = { text, language };
   if (enabled.length) {
     req.ad_hoc_recognizers = enabled.map((r) => recognizerToAdHoc(r, language));
