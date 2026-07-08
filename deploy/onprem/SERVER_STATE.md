@@ -142,6 +142,8 @@ UID_=$(id -u); for w in agent-worker app-worker chat-worker; do launchctl kickst
 
 Still pending on S2 (separate infra step): the **Great Expectations sidecar rebuild** (G-F4) — the console adapter is deployed and will report the real engine once the S2 GE container is rebuilt from `deploy/sidecars/great-expectations/` (native evaluator by default; GE lib opt-in).
 
+**insurer demo tenant — "Suraksha Life" (2026-07-09, #207 foundation).** A fictional Indian LIFE INSURER tenant for the insurer use cases (NOT the literal Suraksha brand, per founder). Applied to the console DB (`offgrid_console`) idempotently via the pg client: **tenant** `org_suraksha` (name "Suraksha Life", slug `suraksha`, plan enterprise) + **3 connectors** (`surcon_coreins` Postgres, `surcon_policyadmin` MySQL, `surcon_warehouse` S3) + **12 data-domains** (policies/premiums/claims/advisors/kyc + insurer tools). Emitter: `node deploy/onprem/seed-suraksha-console.mjs | <pg client>` (source of truth: `src/lib/suraksha-tenant-seed.ts`). Also applied defensive `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug text / plan text / enabled_modules jsonb` (idempotent). **Still pending:** the tenant's SOURCE-DATA rows (the tables the domains resolve against) — a data-plane seed on the source containers/warehouse for `org_suraksha` (reuse `seed-insurer-usecases.mjs` against the coreins/policyadmin endpoints); until then the domains resolve but return no rows. The 15 use cases themselves are authored later via NL in `/build/studio/new` (founder-steered).
+
 ### Gateway fleet SSOT (2026-07-05) — how it's wired
 `fleet_nodes` is the single source of truth for the on-prem fleet. Flow + gotchas:
 - **Console** `GET /api/v1/gateway/pool` derives the aggregator POOL/IMAGE_POOL from the table;
