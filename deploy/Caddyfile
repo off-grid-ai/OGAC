@@ -201,6 +201,10 @@ http://127.0.0.1:8943 {
 http://127.0.0.1:8944 {
 	reverse_proxy offgrid-s2.local:8003
 }
+# ETL / orchestration engine on S2 (host :8090) → console dials OFFGRID_KESTRA_URL=http://127.0.0.1:8945
+http://127.0.0.1:8945 {
+	reverse_proxy offgrid-s2.local:8090
+}
 
 # ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────
 # One public surface over the platform. /v1/* → the LLM aggregator; /specs/* → each
