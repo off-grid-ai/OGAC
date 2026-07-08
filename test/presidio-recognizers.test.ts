@@ -4,7 +4,9 @@ import {
   applyThresholds,
   buildAnalyzeRequest,
   clampScore,
+  DEFAULT_RECOGNIZERS,
   DEFAULT_THRESHOLDS,
+  mergeWithDefaults,
   normalizeThresholds,
   parseStringList,
   recognizerToAdHoc,
@@ -181,19 +183,43 @@ test('recognizerToAdHoc: deny_list → Presidio deny_list recognizer, no pattern
 
 // ── buildAnalyzeRequest ───────────────────────────────────────────────────────
 
-test('buildAnalyzeRequest: no recognizers, no threshold → bare text/language', () => {
+test('buildAnalyzeRequest: no stored recognizers still ships the Indian-BFSI default set', () => {
   const req = buildAnalyzeRequest('hello', [], DEFAULT_THRESHOLDS);
-  assert.deepEqual(req, { text: 'hello', language: 'en' });
+  assert.equal(req.text, 'hello');
+  assert.equal(req.language, 'en');
+  // The always-on default set (PAN/Aadhaar/IFSC/UPI) rides even with zero stored recognizers.
+  assert.deepEqual(
+    req.ad_hoc_recognizers?.map((r) => r.supported_entity).sort(),
+    ['IN_AADHAAR', 'IN_IFSC', 'IN_PAN', 'UPI_ID'],
+  );
 });
 
-test('buildAnalyzeRequest: only enabled recognizers ride as ad_hoc_recognizers', () => {
+test('buildAnalyzeRequest: only enabled recognizers ride, alongside the defaults', () => {
   const disabled = { ...patternRec, enabled: false };
   const req = buildAnalyzeRequest('scan me', [patternRec, disabled, denyRec], DEFAULT_THRESHOLDS);
-  assert.equal(req.ad_hoc_recognizers?.length, 2);
-  assert.deepEqual(
-    req.ad_hoc_recognizers?.map((r) => r.supported_entity),
-    ['EMPLOYEE_ID', 'CODENAME'],
-  );
+  const entities = req.ad_hoc_recognizers?.map((r) => r.supported_entity) ?? [];
+  // 4 defaults + 2 enabled stored (disabled one is dropped).
+  assert.equal(req.ad_hoc_recognizers?.length, 6);
+  assert.ok(entities.includes('EMPLOYEE_ID'));
+  assert.ok(entities.includes('CODENAME'));
+  assert.ok(entities.includes('IN_PAN'));
+});
+
+test('buildAnalyzeRequest: a stored recognizer overrides the default for the same entity', () => {
+  const customPan: NormalizedRecognizer = {
+    kind: 'pattern',
+    entity: 'IN_PAN',
+    name: 'my_pan',
+    regex: '\\bPAN-\\d+\\b',
+    context: [],
+    denyList: [],
+    score: 0.5,
+    enabled: true,
+  };
+  const req = buildAnalyzeRequest('x', [customPan], DEFAULT_THRESHOLDS);
+  const pans = req.ad_hoc_recognizers?.filter((r) => r.supported_entity === 'IN_PAN') ?? [];
+  assert.equal(pans.length, 1, 'only one IN_PAN recognizer — the stored one wins');
+  assert.equal(pans[0].name, 'my_pan');
 });
 
 test('buildAnalyzeRequest: positive global threshold rides as score_threshold', () => {
@@ -239,4 +265,88 @@ test('applyThresholds: filters below the effective floor, keeps score-less hits'
     kept.map((r) => `${r.entity_type}:${r.start}`),
     ['PERSON:5', 'EMAIL_ADDRESS:0', 'US_SSN:0'],
   );
+});
+
+// ── Indian-BFSI default recognizer set (G-F2) ─────────────────────────────────
+
+test('DEFAULT_RECOGNIZERS: covers PAN / Aadhaar / IFSC / UPI, all enabled patterns', () => {
+  const byEntity = new Map(DEFAULT_RECOGNIZERS.map((r) => [r.entity, r]));
+  for (const e of ['IN_PAN', 'IN_AADHAAR', 'IN_IFSC', 'UPI_ID']) {
+    const r = byEntity.get(e);
+    assert.ok(r, `${e} present in default set`);
+    assert.equal(r?.kind, 'pattern');
+    assert.equal(r?.enabled, true);
+    assert.equal(regexError(r?.regex ?? '('), null, `${e} pattern compiles`);
+  }
+});
+
+// Each default pattern must actually MATCH a valid sample and REJECT a near-miss — the recognizer
+// is only useful if its regex fires on real Indian BFSI PII. We compile and run each pattern the
+// same way Presidio would (whole-string search).
+function matches(entity: string, sample: string): boolean {
+  const rec = DEFAULT_RECOGNIZERS.find((r) => r.entity === entity)!;
+  return new RegExp(rec.regex).test(sample);
+}
+
+test('DEFAULT_RECOGNIZERS: PAN pattern matches a valid PAN, rejects malformed', () => {
+  assert.equal(matches('IN_PAN', 'ABCDE1234F'), true);
+  assert.equal(matches('IN_PAN', 'my pan is ABCDE1234F ok'), true);
+  assert.equal(matches('IN_PAN', 'ABCD1234F'), false); // only 4 leading letters
+  assert.equal(matches('IN_PAN', 'ABCDE12345'), false); // trailing digit not a letter
+});
+
+test('DEFAULT_RECOGNIZERS: IFSC pattern matches a valid IFSC, rejects malformed', () => {
+  assert.equal(matches('IN_IFSC', 'HDFC0001234'), true);
+  assert.equal(matches('IN_IFSC', 'SBIN0000456'), true);
+  assert.equal(matches('IN_IFSC', 'HDFC1001234'), false); // 5th char must be 0
+  assert.equal(matches('IN_IFSC', 'HDF0001234'), false); // only 3 bank letters
+});
+
+test('DEFAULT_RECOGNIZERS: Aadhaar matches 4-4-4 and bare 12-digit, rejects short/leading-1', () => {
+  assert.equal(matches('IN_AADHAAR', '2345 6789 0123'), true);
+  assert.equal(matches('IN_AADHAAR', '234567890123'), true);
+  assert.equal(matches('IN_AADHAAR', '1234 5678 9012'), false); // leading digit < 2
+  assert.equal(matches('IN_AADHAAR', '2345 6789'), false); // only 8 digits
+});
+
+test('DEFAULT_RECOGNIZERS: UPI matches a VPA but NOT a dotted email domain', () => {
+  assert.equal(matches('UPI_ID', 'ramesh@okhdfc'), true);
+  assert.equal(matches('UPI_ID', '9876543210@paytm'), true);
+  // A real email has a dotted TLD — the PSP part here contains a dot so the anchored pattern
+  // won't treat the whole `gmail.com` as the letters-only PSP.
+  assert.equal(new RegExp(`^${DEFAULT_RECOGNIZERS.find((r) => r.entity === 'UPI_ID')!.regex}$`).test('jane@gmail.com'), false);
+});
+
+test('mergeWithDefaults: prepends defaults, stored entity overrides same-entity default', () => {
+  const stored: NormalizedRecognizer[] = [
+    {
+      kind: 'pattern',
+      entity: 'IN_PAN',
+      name: 'org_pan',
+      regex: '\\bX\\b',
+      context: [],
+      denyList: [],
+      score: 0.4,
+      enabled: true,
+    },
+    {
+      kind: 'deny_list',
+      entity: 'CODENAME',
+      name: 'codes',
+      regex: '',
+      context: [],
+      denyList: ['Orion'],
+      score: 0.9,
+      enabled: true,
+    },
+  ];
+  const merged = mergeWithDefaults(stored);
+  const pans = merged.filter((r) => r.entity === 'IN_PAN');
+  assert.equal(pans.length, 1); // no duplicate — the org's PAN recognizer wins
+  assert.equal(pans[0].name, 'org_pan');
+  // The non-overridden defaults survive alongside the org's own recognizers.
+  assert.ok(merged.some((r) => r.entity === 'IN_AADHAAR'));
+  assert.ok(merged.some((r) => r.entity === 'IN_IFSC'));
+  assert.ok(merged.some((r) => r.entity === 'UPI_ID'));
+  assert.ok(merged.some((r) => r.entity === 'CODENAME'));
 });
