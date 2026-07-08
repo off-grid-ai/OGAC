@@ -54,8 +54,20 @@ export function PipelineActions({
         toast.success(`${verb} "${name}"`);
         router.refresh();
       } else {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        toast.error(body?.error ?? `Failed to ${action}`);
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          blocked?: boolean;
+          decision?: { summary?: string };
+        } | null;
+        // A 422 means the release gate blocked the publish — surface WHY and point to the Quality tab
+        // (where the operator can review the failing evals and, if warranted, override + publish).
+        if (res.status === 422 && body?.blocked) {
+          toast.error(
+            `${body.decision?.summary ?? 'Release gate failed.'} Review + override on the Quality tab.`,
+          );
+        } else {
+          toast.error(body?.error ?? `Failed to ${action}`);
+        }
       }
     },
     [busy, name, pipelineId, router],
