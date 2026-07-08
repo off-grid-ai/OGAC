@@ -2,7 +2,7 @@
 
 import { ArrowCounterClockwise, CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,9 +57,69 @@ export function PipelineQualityPanel({
   const [publishing, setPublishing] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
   const [gate, setGate] = useState<ReleaseGateDecision | null>(null);
+  // M1-a: the in-flight gating job (evals running in the background). While set, the tab shows a
+  // "gating in progress" state and polls the status route until the job resolves (published|blocked).
+  const [gatingJobId, setGatingJobId] = useState<string | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Publish THROUGH the release gate: runs this pipeline's evals, blocks on a failing gate unless the
-  // operator confirms an override (surfaced honestly with the failing evals named).
+  // Terminal-state handling for a gating job — surface the verdict + clear the gating state.
+  const finishGate = useCallback(
+    (job: {
+      status: string;
+      decision: { decision?: ReleaseGateDecision; overridden?: boolean } | null;
+    }) => {
+      setGatingJobId(null);
+      setPublishing(false);
+      const decision = job.decision?.decision ?? null;
+      if (decision) setGate(decision);
+      if (job.status === 'published') {
+        toast.success(
+          job.decision?.overridden
+            ? 'Published with override — the gate failure is audited.'
+            : 'Published — release gate cleared.',
+        );
+        router.refresh();
+      } else {
+        toast.error(decision?.summary ?? 'Release gate failed — publish blocked.');
+      }
+    },
+    [router],
+  );
+
+  // Poll the status route for the given job until it reaches a terminal state. Self-scheduling; the
+  // effect below clears the timer on unmount.
+  const pollGate = useCallback(
+    async (jobId: string) => {
+      try {
+        const r = await fetch(
+          `/api/v1/admin/pipelines/${pipelineId}/publish/status?jobId=${encodeURIComponent(jobId)}`,
+        );
+        const job = (await r.json().catch(() => ({}))) as {
+          status?: string;
+          decision?: { decision?: ReleaseGateDecision; overridden?: boolean } | null;
+        };
+        if (job.status === 'published' || job.status === 'blocked') {
+          finishGate({ status: job.status, decision: job.decision ?? null });
+          return;
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+      pollTimer.current = setTimeout(() => void pollGate(jobId), 2500);
+    },
+    [pipelineId, finishGate],
+  );
+
+  useEffect(() => {
+    if (gatingJobId) void pollGate(gatingJobId);
+    return () => {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+    };
+  }, [gatingJobId, pollGate]);
+
+  // Publish THROUGH the release gate. Ungated / no-evals → instant (200). A pipeline WITH evals goes
+  // ASYNC (202 {status:'gating', jobId}): the evals run in the background so a slow ragas run never
+  // times out the request — the tab polls the status route + surfaces the verdict when it lands.
   async function publish(override: boolean) {
     if (publishing) return;
     setPublishing(true);
@@ -70,10 +130,22 @@ export function PipelineQualityPanel({
         body: JSON.stringify({ override }),
       });
       const data = (await r.json().catch(() => ({}))) as {
+        status?: string;
+        jobId?: string;
         decision?: ReleaseGateDecision;
         blocked?: boolean;
         overridden?: boolean;
       };
+
+      if (r.status === 202 && data.status === 'gating' && data.jobId) {
+        // Async gate accepted — enter gating state; the effect starts polling. Keep `publishing` true
+        // so the buttons stay disabled while the evals run.
+        setGate(null);
+        setGatingJobId(data.jobId);
+        toast.info('Running evals — publishing once the release gate clears.');
+        return; // do NOT reset publishing here; finishGate clears it on resolve.
+      }
+
       if (data.decision) setGate(data.decision);
       if (r.status === 422 && data.blocked) {
         toast.error(data.decision?.summary ?? 'Release gate failed — publish blocked.');
@@ -87,7 +159,9 @@ export function PipelineQualityPanel({
       } else {
         toast.error('Publish failed');
       }
-    } finally {
+      setPublishing(false);
+    } catch {
+      toast.error('Publish failed');
       setPublishing(false);
     }
   }
@@ -244,9 +318,19 @@ export function PipelineQualityPanel({
                 ) : null}
               </div>
             ) : null}
+            {gatingJobId ? (
+              <div className="flex items-center gap-2 rounded-md border border-primary/40 px-3 py-2 text-sm text-foreground">
+                <Spinner />
+                <span>
+                  Running the release evals — this can take a minute. Publishing automatically once the
+                  gate clears; you can leave this page and come back.
+                </span>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => publish(false)} disabled={publishing}>
-                {publishing ? <Spinner /> : <CheckCircle className="size-4" />} Publish through gate
+                {publishing ? <Spinner /> : <CheckCircle className="size-4" />}{' '}
+                {gatingJobId ? 'Gating…' : 'Publish through gate'}
               </Button>
               {gate && !gate.pass ? (
                 <Button

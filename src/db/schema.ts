@@ -1051,6 +1051,29 @@ export type NewPipeline = typeof pipelines.$inferInsert;
 export type PipelineVersion = typeof pipelineVersions.$inferSelect;
 export type NewPipelineVersion = typeof pipelineVersions.$inferInsert;
 
+// ─── Publish-gate jobs (M1-a: ASYNC release-gate publish) ─────────────────────
+// A publish that must RUN evals first is tracked as a job: the request returns 202 {status:'gating'}
+// immediately, the evals run in the background, and the gate is applied on completion (publish or
+// leave draft). The poll route reads this row. `decision` (jsonb) is null while gating and carries
+// the ReleaseGateDecision + overridden/version once resolved. Org-scoped like everything else.
+export const publishJobs = pgTable('publish_jobs', {
+  id: text('id').primaryKey(),
+  pipelineId: text('pipeline_id').notNull(),
+  orgId: text('org_id').notNull().default('default'),
+  // gating → published | blocked (see publish-job.ts for the pure transition model).
+  status: text('status').notNull().default('gating'),
+  // Whether an override was requested on kickoff (applied to a failing gate on resolve).
+  override: boolean('override').notNull().default(false),
+  createdBy: text('created_by').notNull().default(''),
+  // The PublishJobDecision once resolved (decision + overridden + version); null while gating.
+  decision: jsonb('decision').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('publish_jobs_pipeline_idx').on(t.pipelineId)]);
+
+export type PublishJob = typeof publishJobs.$inferSelect;
+export type NewPublishJob = typeof publishJobs.$inferInsert;
+
 // ─── Teams / BU tier (M2 lifecycle & ownership) ───────────────────────────────
 // A TEAM/BU sits between the org and the pipeline. A pipeline may belong to a team (pipelines.team_id);
 // a team's members get DELEGATED access to their team's pipelines (RBAC scoped by membership). Pure
