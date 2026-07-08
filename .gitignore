@@ -20,6 +20,10 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 
+# c8 / coverage reports
+/coverage/
+.nyc_output/
+
 # LanceDB (Brain vector store)
 /.lancedb/
 .claude/worktrees/
