@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { assetPosture, listAssets, listErasureRequests, recordErasureRequest } from '@/lib/data-catalog-store';
-import { planErasure, summarizeErasure, type PlanStep, type StepResult } from '@/lib/erasure';
+import { planErasure, propagateErasure, summarizeErasure, type PlanStep, type StepResult } from '@/lib/erasure';
 import { deriveAssetPosture } from '@/lib/data-classification';
 import { resolveRtbfScope, type RtbfAsset } from '@/lib/data-rtbf';
 import { toClassification, listClassifications } from '@/lib/data-catalog-store';
@@ -67,8 +67,12 @@ export async function POST(req: Request) {
   for (const step of plan.steps) results.push(await executeStep(step));
   const report = summarizeErasure(plan.subject, results, plan.deferred);
 
-  // Record the durable, auditable request with the resolved scope + what ran.
+  // Propagate to the external planes (vector index, data lake, device replicas) for REAL — each
+  // configured target's delete runs now; unreachable ones are honestly deferred with a reason.
   const requestedBy = gate.user?.email ?? '';
+  const propagation = await propagateErasure(plan.subject, requestedBy, org);
+
+  // Record the durable, auditable request with the resolved scope + what ran (console + propagation).
   const record = await recordErasureRequest(
     {
       subject: plan.subject,
@@ -82,6 +86,8 @@ export async function POST(req: Request) {
         crossPlane: scope.targets,
         immediateCount: scope.immediateCount,
         deferredCount: scope.deferredCount,
+        propagated: propagation.propagated,
+        propagationDeferred: propagation.deferred,
       },
     },
     org,
@@ -93,5 +99,5 @@ export async function POST(req: Request) {
     outcome: report.status === 'completed' ? 'ok' : 'error',
   });
 
-  return NextResponse.json({ request: record, report, scope }, { status: 201 });
+  return NextResponse.json({ request: record, report, scope, propagation }, { status: 201 });
 }
