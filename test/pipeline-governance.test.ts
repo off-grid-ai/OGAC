@@ -6,8 +6,10 @@ import {
   clearOverlayControl,
   controlMeta,
   describeEffective,
+  enableGuardrailOnPipeline,
   guardrailEntityToControl,
   normalizeOverlay,
+  pipelinesEnforcingGuardrail,
   sourceOf,
   tightenOverlay,
 } from '../src/lib/pipeline-governance.ts';
@@ -223,4 +225,54 @@ test('guardrailEntityToControl maps catalog entities to the right pipeline contr
     key: 'requirePiiMasking',
     value: { bool: true },
   });
+});
+
+// ── enableGuardrailOnPipeline: the guardrails-catalog "scope → pipeline" write (task #173, T3) ────
+
+test('enableGuardrailOnPipeline tightens the mapped control ON in the next overlay', () => {
+  // TOXIC_LANGUAGE → filterToxicity (an org DEFAULT-off control the pipeline may enable).
+  const result = enableGuardrailOnPipeline({}, 'TOXIC_LANGUAGE');
+  assert.equal(result.ok, true);
+  assert.equal(result.key, 'filterToxicity');
+  if (result.ok) {
+    assert.deepEqual(result.overlay.filterToxicity, { mode: 'default', bool: true });
+  }
+});
+
+test('enableGuardrailOnPipeline is idempotent + preserves other overlay controls', () => {
+  const existing = { requireGrounding: { mode: 'default', bool: true } } as GovernanceControls;
+  const result = enableGuardrailOnPipeline(existing, 'GROUNDED');
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    // grounding stays on; nothing else is dropped.
+    assert.equal(result.overlay.requireGrounding?.bool, true);
+  }
+});
+
+test('enableGuardrailOnPipeline coerces a junk stored overlay without throwing', () => {
+  const result = enableGuardrailOnPipeline({ junk: 'nonsense', filterToxicity: 42 }, 'PROMPT_INJECTION');
+  assert.equal(result.ok, true);
+  assert.equal(result.key, 'blockPromptInjection');
+});
+
+// ── pipelinesEnforcingGuardrail: the current-scope badge count ────────────────────────────────────
+
+test('pipelinesEnforcingGuardrail lists pipelines whose EFFECTIVE guardrail is on', () => {
+  const pipelines = [
+    { id: 'p1', name: 'Payroll', guardrailOverlay: { filterToxicity: { mode: 'default', bool: true } } },
+    { id: 'p2', name: 'Support', guardrailOverlay: {} },
+    { id: 'p3', name: 'Legal', guardrailOverlay: { filterToxicity: { mode: 'default', bool: true } } },
+  ];
+  const on = pipelinesEnforcingGuardrail('TOXIC_LANGUAGE', pipelines);
+  assert.deepEqual(on.map((p) => p.id).sort(), ['p1', 'p3']);
+});
+
+test('pipelinesEnforcingGuardrail counts a LOCKED-on org control for every pipeline', () => {
+  // requirePiiMasking is locked ON at the org, so every pipeline inherits it → all match.
+  const pipelines = [
+    { id: 'p1', name: 'A', guardrailOverlay: {} },
+    { id: 'p2', name: 'B', guardrailOverlay: {} },
+  ];
+  const on = pipelinesEnforcingGuardrail('EMAIL_ADDRESS', pipelines);
+  assert.equal(on.length, 2);
 });
