@@ -15,6 +15,29 @@ the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTH
 > This file is append-only history; most numbered items below are already ✅ RESOLVED inline. This
 > index is the **actually-open** set. Everything not listed here is done (search the item for its ✅).
 
+**Phase F verification found (2026-07-09, LIVE) — new:**
+- **G-F1 (P0, `console`)** — **subdomain org-scoping does NOT engage for bearer / service-account
+  requests.** Confirmed live: `GET /apps` on `bharatunion-onprem-console.getoffgridai.co` returns the
+  `default`-org apps (`orgId:"default"`), never the 6 org_bharat apps in the DB — identical to
+  `wednesdaysol-…` and to no-host. Root cause: `currentOrgId()` (`src/lib/tenancy.ts`) reads the
+  tenant-binding role/org guard from NextAuth `auth()`, which is null for a bearer request (no session
+  cookie) → `session.user.role` undefined → the admin/member guard never passes → returns `sessionOrg`
+  (`default`). Fails **safe** (no cross-tenant leak) but machine principals can't be subdomain-scoped and
+  it blocks per-tenant verification via the admin token. Supersedes/root-causes S2 + T3 scoping.
+  Fix: feed `currentOrgId`'s guard the SAME principal `requireUser` resolves (verified bearer claims /
+  break-glass admin), not only the cookie session. Ship with the org-isolation integration tests.
+- **G-F2 (P1, `console`+`infra`)** — **Indian BFSI PII (PAN / Aadhaar / IFSC / UPI) not recognized by
+  either PII path.** `/pii/scan` runs real Presidio (catches EMAIL/CARD/etc.) and `/guardrails` demo
+  runs regex, but neither detects the tenant's actual PII types (PAN `ABCDE1234F`, masked Aadhaar). Add
+  custom Presidio recognizers (or regex patterns) for `IN_PAN`/`IN_AADHAAR`/`IN_IFSC`/`IN_UPI`. Also
+  reconcile the two scan paths so the `/guardrails` demo uses the real adapter, not `demoScan`/regex.
+- **G-F3 (P2, `console`)** — **grounding verification is on the heuristic/lexical fallback**, not
+  model-NLI. Exact-overlap source → supported; a paraphrase → unsupported (`score:0`). Set
+  `OFFGRID_ADAPTER_GROUNDING` to a model-NLI adapter (service reachable) for entailment-grade checks.
+- **G-F4 (P2, `infra`)** — **data-quality engine is a stub.** `GET /data-quality` → `engine:"fallback
+  (stub)"` (:8944); `/data-quality/run` reports `engineReachable:true` but evaluates 0 expectations.
+  Wire the real Great-Expectations service + seed expectations for the bharat catalog.
+
 **Pipelines × Gateways (the active epic — all code-side, mostly small):**
 - **PA-16a/b/c** — finish run-time enforcement: durable (Temporal) app-run path, agent-run + chat paths
   (seam built, not called), overlay PII-mask escalation. *App-run inline path IS enforced + shipped.*
