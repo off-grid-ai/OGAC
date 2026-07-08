@@ -16,6 +16,7 @@
     "smoke:api": "node scripts/smoke.mjs --api",
     "worker:agents": "tsx scripts/temporal-worker.mts",
     "worker:apps": "tsx scripts/app-worker.mts",
+    "worker:chat": "tsx scripts/chat-worker.mts",
     "trigger:email": "tsx scripts/email-trigger.mts",
     "db:seed": "tsx src/db/seed.ts",
     "seed:domains": "tsx scripts/seed-data-domains.mts",
