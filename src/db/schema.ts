@@ -987,6 +987,9 @@ export const pipelines = pgTable('pipelines', {
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+  // M2 lifecycle & ownership: the TEAM/BU this pipeline belongs to (null ⇒ no team; only the owner +
+  // org admins have access). Team members get delegated access to their team's pipelines.
+  teamId: text('team_id'),
   // The gateway binding — which gateway this pipeline runs on (null ⇒ org default gateway).
   gatewayId: text('gateway_id'),
   // Default model on that gateway (null ⇒ the gateway's own default).
@@ -1015,12 +1018,18 @@ export const pipelines = pgTable('pipelines', {
   policyOverlay: jsonb('policy_overlay').$type<Record<string, unknown>>().notNull().default({}),
   // Pipeline-scoped guardrail overlay (inherits org defaults; may only tighten locked controls).
   guardrailOverlay: jsonb('guardrail_overlay').$type<Record<string, unknown>>().notNull().default({}),
-  status: text('status').notNull().default('draft'), // draft | published | archived
+  // M2 lifecycle: draft → in_review → published → deprecated (+ legacy `archived`). Vocabulary owned
+  // by pipeline-lifecycle-model.ts; kept as text so the enum can widen without a DB type migration.
+  status: text('status').notNull().default('draft'),
   version: integer('version').notNull().default(1),
   isTemplate: boolean('is_template').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('pipelines_org_idx').on(t.orgId), index('pipelines_gateway_idx').on(t.gatewayId)]);
+}, (t) => [
+  index('pipelines_org_idx').on(t.orgId),
+  index('pipelines_gateway_idx').on(t.gatewayId),
+  index('pipelines_team_idx').on(t.teamId),
+]);
 
 // ─── Pipeline versions — immutable config snapshots ────────────────────────────
 // One row per publish/edit: the FULL pipeline config at that version, frozen. Consumers will later
@@ -1041,6 +1050,38 @@ export type Pipeline = typeof pipelines.$inferSelect;
 export type NewPipeline = typeof pipelines.$inferInsert;
 export type PipelineVersion = typeof pipelineVersions.$inferSelect;
 export type NewPipelineVersion = typeof pipelineVersions.$inferInsert;
+
+// ─── Teams / BU tier (M2 lifecycle & ownership) ───────────────────────────────
+// A TEAM/BU sits between the org and the pipeline. A pipeline may belong to a team (pipelines.team_id);
+// a team's members get DELEGATED access to their team's pipelines (RBAC scoped by membership). Pure
+// rules in teams-policy.ts; the store + self-migrate in teams.ts. Org-scoped like everything else.
+export const teams = pgTable('teams', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('teams_org_idx').on(t.orgId)]);
+
+// One row per (team, user). `userId` is the user's email/id. `role` is 'lead' (delegated edit +
+// promote) or 'member' (delegated read + deprecate) — vocabulary owned by teams-policy.ts.
+export const teamMembers = pgTable('team_members', {
+  id: text('id').primaryKey(),
+  teamId: text('team_id').notNull(),
+  orgId: text('org_id').notNull().default('default'),
+  userId: text('user_id').notNull(),
+  role: text('role').notNull().default('member'), // 'lead' | 'member'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('team_members_team_idx').on(t.teamId),
+  index('team_members_user_idx').on(t.userId),
+]);
+
+export type Team = typeof teams.$inferSelect;
+export type NewTeam = typeof teams.$inferInsert;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type NewTeamMember = typeof teamMembers.$inferInsert;
 
 // Per-pipeline provisioned API keys — the pipeline is callable as its own governed endpoint by
 // apps/agents/external third-parties (analogous to tenant provisioning). Only the hash is stored;

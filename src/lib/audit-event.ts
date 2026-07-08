@@ -37,6 +37,21 @@ export type AuditAction =
   | 'pipeline.publish'
   | 'pipeline.publish.override'
   | 'pipeline.autorollback'
+  // pipeline lifecycle + ownership (M2): promotion gate, sign-off, deprecation, owner/team moves
+  | 'pipeline.promote'
+  | 'pipeline.withdraw'
+  | 'pipeline.approve'
+  | 'pipeline.reject'
+  | 'pipeline.deprecate'
+  | 'pipeline.revive'
+  | 'pipeline.reassign'
+  | 'pipeline.team'
+  // team / BU tier (M2): team CRUD + membership
+  | 'team.create'
+  | 'team.update'
+  | 'team.delete'
+  | 'team.member.add'
+  | 'team.member.remove'
   // app-run HITL review (feedback → golden capture)
   | 'app.run.review'
   // budget enforcement — a call denied for exceeding a spend limit (hard stop, outcome=blocked)

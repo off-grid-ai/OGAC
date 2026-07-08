@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { pipelineTabHref } from '@/lib/pipeline-detail';
 import { PipelineActions } from './PipelineActions';
 import { PipelineEditSheet } from './PipelineEditSheet';
+import { PipelineLifecycle, type PipelineLifecycleData } from './PipelineLifecycle';
 
 // The rich, honest data the Overview renders. Everything read-only here is read from the real libs on
 // the server; where a per-pipeline number can't be honestly attributed yet, the field is a count or a
@@ -60,6 +61,8 @@ export interface PipelineOverviewData {
   };
   /** Recent version history (newest first, capped). */
   recentVersions: { id: string; version: number; note: string; createdAt: string | null; createdBy: string }[];
+  /** M2 lifecycle & ownership (server-resolved for THIS user's role). */
+  lifecycle: PipelineLifecycleData;
 }
 
 function egressBadge(egressClass: string | undefined) {
@@ -84,8 +87,15 @@ function statusBadge(status: string) {
   if (status === 'published') {
     return <Badge variant="secondary" className="bg-primary/10 text-primary">published</Badge>;
   }
-  if (status === 'archived') {
-    return <Badge variant="outline" className="text-muted-foreground">archived</Badge>;
+  if (status === 'in_review') {
+    return (
+      <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400">
+        in review
+      </Badge>
+    );
+  }
+  if (status === 'archived' || status === 'deprecated') {
+    return <Badge variant="outline" className="text-muted-foreground">{status}</Badge>;
   }
   return <Badge variant="outline" className="text-amber-600 dark:text-amber-400">draft</Badge>;
 }
@@ -155,8 +165,11 @@ export function PipelineOverview({ pipeline: p }: { pipeline: PipelineOverviewDa
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{p.description || 'No description.'}</p>
         </div>
-        <PipelineActions pipelineId={p.id} status={p.status} name={p.name} />
+        <PipelineActions pipelineId={p.id} status={p.status} name={p.name} showTransitions={false} />
       </div>
+
+      {/* ── M2 lifecycle & ownership band ── */}
+      <PipelineLifecycle data={p.lifecycle} />
 
       {/* ── the dashboard grid ── */}
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
