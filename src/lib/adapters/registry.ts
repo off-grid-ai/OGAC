@@ -52,7 +52,10 @@ import type {
 const INFERENCE: InferencePort[] = [gatewayInference, localInference];
 const OBSERVABILITY: ObservabilityPort[] = [otelObservability, signozObservability];
 const SECRETS: SecretsPort[] = [envSecrets, openBaoSecrets];
-const GROUNDING: GroundingPort[] = [modelGrounding, heuristicGrounding];
+// Default = lexical floor (heuristicGrounding): no per-run model cost, additive/safe. Opt into
+// paraphrase-aware model-NLI grounding with OFFGRID_ADAPTER_GROUNDING=model (falls back to lexical
+// if the gateway is unreachable). pick() returns adapters[0] when the env var is unset.
+const GROUNDING: GroundingPort[] = [heuristicGrounding, modelGrounding];
 
 function pick<T extends { meta: AdapterMeta }>(capability: Capability, adapters: T[]): T {
   const wanted = process.env[`OFFGRID_ADAPTER_${capability.toUpperCase()}`];
