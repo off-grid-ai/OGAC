@@ -132,7 +132,7 @@ export function SessionsPanel() {
 
             {error && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-                <span className="font-medium">Keycloak error:</span> {error}
+                <span className="font-medium">Identity provider error:</span> {error}
               </div>
             )}
 
@@ -155,7 +155,7 @@ export function SessionsPanel() {
                     {sessions.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
-                          No active Keycloak sessions for this user. The console signs in with
+                          No active sessions for this user. The console signs in with
                           short-lived direct-grant tokens, so an idle online session may have already
                           expired even though the operator is still signed into the console.
                         </TableCell>

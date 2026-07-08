@@ -46,7 +46,7 @@ export const openApiSpec = {
       description: 'Tamper-evidence — C2PA image credentials, Sigstore, ed25519 export manifests.',
     },
     { name: 'sandbox', description: 'Isolated execution of agent-authored code.' },
-    { name: 'mdm', description: 'Fleet Control — device management (first-party registry / FleetDM).' },
+    { name: 'mdm', description: 'Fleet Control — device management (first-party registry or an external device-management backend).' },
   ],
   paths: {
     '/api/v1/devices': {
@@ -762,9 +762,9 @@ export const openApiSpec = {
     '/api/v1/admin/evals/run': {
       post: {
         tags: ['admin'],
-        summary: 'Run an offline eval through the active adapter (golden / promptfoo / Ragas)',
+        summary: 'Run an offline eval through the active adapter',
         description:
-          'Runs the evals capability’s active adapter (OFFGRID_ADAPTER_EVALS). golden (default) scores recall over the Brain; promptfoo runs an assertion matrix via its CLI; Ragas calls a sidecar. OSS adapters fall back to golden if unavailable.',
+          'Runs the evals capability’s active adapter (OFFGRID_ADAPTER_EVALS). golden (default) scores recall over the Brain; assertion-matrix and RAG-scoring adapters can be selected instead. External adapters fall back to golden if unavailable.',
         responses: { '201': { description: 'Scored run (EvalRunResult).' } },
       },
     },
@@ -773,16 +773,16 @@ export const openApiSpec = {
         tags: ['agent-qa'],
         summary: 'Drift / degradation report',
         description:
-          'Compares a recent window of eval scores against a baseline window. Active drift adapter (OFFGRID_ADAPTER_DRIFT): native (Population Stability Index + mean-degradation, default) or evidently. Returns status stable | warning | drift.',
+          'Compares a recent window of eval scores against a baseline window. Active drift adapter (OFFGRID_ADAPTER_DRIFT): native (Population Stability Index + mean-degradation, default) or an external statistical-drift adapter. Returns status stable | warning | drift.',
         responses: { '200': { description: 'DriftReport.' } },
       },
     },
     '/api/v1/admin/qa/score': {
       post: {
         tags: ['agent-qa'],
-        summary: 'Online eval — judge one interaction and push scores to Langfuse',
+        summary: 'Online eval — judge one interaction and push scores to the tracing store',
         description:
-          'LLM-as-judge (via the gateway) scores an interaction’s quality + faithfulness, then writes the scores to Langfuse (where they trend over time = the degradation signal). Gated by the `online-evals` feature flag. Degrades gracefully: judged:false if the gateway is unreachable, posted:false if Langfuse is.',
+          'LLM-as-judge (via the gateway) scores an interaction’s quality + faithfulness, then writes the scores to the tracing store (where they trend over time = the degradation signal). Gated by the `online-evals` feature flag. Degrades gracefully: judged:false if the gateway is unreachable, posted:false if the tracing store is.',
         requestBody: {
           required: true,
           content: {
@@ -880,7 +880,7 @@ export const openApiSpec = {
         tags: ['mdm'],
         summary: 'Fleet Control device inventory',
         description:
-          'Devices through the active MDM adapter (OFFGRID_ADAPTER_MDM): the first-party device registry by default, or FleetDM (osquery, MIT Fleet Free) when selected. FleetDM falls back to the first-party registry if unreachable.',
+          'Devices through the active MDM adapter (OFFGRID_ADAPTER_MDM): the first-party device registry by default, or an external device-management backend when selected. The external backend falls back to the first-party registry if unreachable.',
         responses: { '200': { description: 'Device list { backend, data[] }.' } },
       },
     },

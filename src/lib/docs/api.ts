@@ -154,8 +154,10 @@ store. The prompt and the image never leave your infrastructure.`,
       body: `Each integrated service publishes its own OpenAPI document. Off Grid AI proxies them through
 one authed origin so you can browse them together without CORS or LAN issues.
 
-- \`/specs/<service>\` returns the service's OpenAPI JSON (e.g. \`qdrant\`, \`langfuse\`, \`openbao\`,
-  \`marquez\`, \`superset\`, \`unleash\`, \`presidio\`, \`fleetdm\`).
+- \`/specs/<service>\` returns that service's OpenAPI JSON. The service token names the underlying
+  capability — e.g. the vector store, tracing store, secrets store, data lineage, dashboards,
+  feature flags, PII detection, and device management. The full set of available tokens is listed on
+  the [API docs & playground](/api-docs) page.
 - The console (\`/openapi.json\`) is the platform's own spec, rendered interactively at
   [/docs/api](/docs/api).
 

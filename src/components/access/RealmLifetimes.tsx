@@ -130,7 +130,7 @@ export function RealmLifetimes() {
       <CardContent className="space-y-4">
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-            <span className="font-medium">Keycloak error:</span> {error}
+            <span className="font-medium">Identity provider error:</span> {error}
           </div>
         )}
 

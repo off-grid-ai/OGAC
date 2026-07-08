@@ -133,7 +133,7 @@ trace you can read back.
 
 - **Agent-run traces** — the pipeline steps for each run (policy, guard, retrieve, answer, ground),
   with timing.
-- **Recent traces** — a first-party read-back from your tracing store (Langfuse), with name, latency,
+- **Recent traces** — a first-party read-back from your tracing store, with name, latency,
   and cost when available.
 
 Traces are emitted best-effort — a failing trace never breaks a request — and read back from a store
@@ -278,8 +278,8 @@ rate before rolling out.`,
       slug: 'guides/security-events',
       title: 'Security events (SIEM)',
       description: 'The audit stream, searchable, kept to signal.',
-      body: `Security Events is the read-back of the audit/security stream shipped to your search index
-(OpenSearch): actor, action, outcome, and source IP for every event.
+      body: `Security Events is the read-back of the audit/security stream shipped to your search
+index: actor, action, outcome, and source IP for every event.
 
 ## Keep it signal
 
@@ -321,8 +321,8 @@ ledger; SIEM is the security-signal stream over the same events, tuned with supp
       title: 'Lineage',
       description: 'Trace an answer back to the sources it came from — source to answer, provable.',
       body: `Lineage traces where an answer came from: which sources fed a grounded run, all the way
-back to the document. It reads OpenLineage events from Marquez, with a fallback reconstruction from
-the source→answer references recorded on each run.
+back to the document. It reads lineage events from your data-lineage store, with a fallback
+reconstruction from the source→answer references recorded on each run.
 
 ![Lineage — the source-to-answer graph for a governed run](/docs-shots/lineage.png)
 
@@ -349,7 +349,7 @@ container — so an agent can compute, not just talk, without touching your syst
 ## Double-gated
 
 Execution is off by default and double-gated: the \`agent-code-exec\` feature flag must be on **and**
-the active backend must be exec-capable (a Docker/Firecracker sandbox). Anything else refuses. The
+the active backend must be exec-capable (an isolated code-execution sandbox). Anything else refuses. The
 Sandbox page shows the backend, its reachability, and recent runs, and states clearly when execution
 is disabled.`,
     },
@@ -358,7 +358,7 @@ is disabled.`,
       title: 'Storage',
       description: 'One object store for every file the platform touches.',
       body: `Storage is the single file layer for the platform, backed by your own S3-compatible object
-store (SeaweedFS). Uploaded knowledge, generated images, chat attachments, and exported artifacts all
+store. Uploaded knowledge, generated images, chat attachments, and exported artifacts all
 live here.
 
 ![Storage — one object store for knowledge, generated images, attachments, and exports](/docs-shots/storage.png)

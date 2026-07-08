@@ -47,8 +47,8 @@ happen on any agent run.
 1. **Policy** — an attribute-based check decides whether the request is allowed. A matching deny
    rule stops it here.
 2. **Guardrails (input)** — the prompt is scanned for PII and injection before it moves. A blocked
-   verdict refuses the request; the regex floor is always on, with Presidio for entity-grade
-   detection when configured.
+   verdict refuses the request; the regex floor is always on, with entity-grade PII detection
+   layered on when configured.
 3. **Retrieve** — for a grounded request, the relevant sources are pulled from your knowledge, with
    their provenance references.
 4. **Answer** — the model composes a reply from the retrieved sources.
