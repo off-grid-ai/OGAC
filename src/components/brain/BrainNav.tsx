@@ -19,10 +19,21 @@ export { BRAIN_VIEWS, type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView };
 // whose long section stack is organised into switchable views, so unlike DataNav (one tab = one
 // route) each tab here is a `?view=` on the same route. State lives in the URL (deep-linkable,
 // Back-coherent — Back steps between views, not off the page), never local state.
-// Ordered by how the pipeline actually flows: route a query → wire the tools it can reach → search
-// the RAG index → curate the knowledge feeding it → version prompts → measure quality with evals.
+// Ordered by how the pipeline actually flows: route a query → search the RAG index → curate the
+// knowledge feeding it → version prompts → measure quality with evals.
 // Mirrors DataNav / InsightsNav / GovernanceNav: same band + grouped-tab treatment so it reads as
 // the same nav plane as the rest of the console.
+//
+// IA-nav-dedup: two concepts used to be double-listed across the nav; each now has ONE home.
+//   • Tools — the canonical Tools hub is Build → Tools (#121). Brain's `?view=tools` is only a
+//     read-only mirror of that same registry (the view even says "reads the same registry managed
+//     under Build → Tools" and links there), so it is no longer advertised as a Brain nav TAB — the
+//     duplicate "Tools" label is gone. `tools` stays a valid BrainView so the existing deep-link
+//     `?view=tools` still resolves and renders the mirror; it just isn't a tab you land on here.
+//   • Knowledge — the sidebar's "Knowledge" row (/workspace/knowledge, the org-wide "Ask Your Org"
+//     KB used to ground chat) is a DIFFERENT store from Brain's agent-RAG index. To stop the
+//     "Knowledge" LABEL from appearing twice in the nav, this group is headed "Retrieval" (the RAG
+//     plane) rather than "Knowledge". The store dedup itself was done in #134; this fixes the NAV.
 
 interface Tab {
   view: BrainView;
@@ -32,13 +43,10 @@ interface Tab {
 const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Route',
-    tabs: [
-      { view: 'router', label: 'Router' },
-      { view: 'tools', label: 'Tools' },
-    ],
+    tabs: [{ view: 'router', label: 'Router' }],
   },
   {
-    heading: 'Knowledge',
+    heading: 'Retrieval',
     tabs: [
       { view: 'retrieval', label: 'Retrieval' },
       { view: 'knowledge', label: 'Agent knowledge base' },
