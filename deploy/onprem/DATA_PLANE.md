@@ -4,32 +4,35 @@ The **data engine** — the second substrate alongside the model engine (the lla
 fleet). It is the warehouse + streaming + connectors/CDC + data-quality stack: **ClickHouse +
 Redpanda + Airbyte + dbt + Great Expectations**. Platform vision: `../../docs/platform/PLATFORM.md`.
 
-> STATUS: **STAGED, NOT LIVE.** The compose services + profiles + this runbook exist so the S2
-> bringup is one command later. Nothing here is running yet; no console env var below is set live.
-> The console adapters that consume these are a later wiring task.
+> STATUS: **LIVE on S2 (2026-07-08).** warehouse-clickhouse, redpanda, the 6 airbyte-* containers
+> and great-expectations run under **OrbStack** on offgrid-s2, fronted on S1's edge Caddy at
+> `127.0.0.1:8941–8944` (verified reachable from S1). The console **adapters** that consume these
+> are the remaining wiring task; the env block below is the contract they read.
 
-## Where it runs — and a reconciliation note
+## Where it runs — resolved
 
-The data plane is intended for **offgrid-s2** (`192.168.1.60`, 16GB M1) under Colima, kept OFF S1
-so it never contends with the control plane. It is heavy — Airbyte alone is ~8 containers.
+The data plane runs on **offgrid-s2** (`192.168.1.60`, 16GB M1) under **OrbStack** — the fleet's
+Docker runtime everywhere, NOT Colima — kept OFF S1 so it never contends with the control plane.
+It is heavy — Airbyte alone is 6 containers.
 
-> ⚠️ **Reconcile before bringup:** `SERVICE_MAP.md` currently records S2 as *retired* (offline since
-> a router reboot; the aux tier moved to **g6** `192.168.1.66`). This runbook assumes S2 is brought
-> back for the data plane. **When you actually bring it up, first confirm which host is live** — if
-> S2 stays retired, land the data plane on whatever 16GB+ node is designated and substitute its IP
-> everywhere below. Update SERVICE_MAP.md § Nodes in the same commit that provisions it.
+> **Reconciliation (2026-07-08):** S2 was marked *retired* after a router reboot (aux tier moved to
+> **g6** `192.168.1.66`). S2 has since rejoined the LAN and — on reboot — auto-started its old
+> `offgrid-services-b` aux-tier stack, now **redundant with g6** (g6 is the canonical copy the
+> console points at). That stack was **stopped on S2** (`docker stop`, volumes kept) to free the
+> 16GB box for the data plane. SERVICE_MAP.md § Nodes updated to un-retire S2 as the data-plane host.
 
-## Colima sizing (S2 is 16GB — memory-bounded)
+## Runtime — OrbStack (already installed on S2)
 
-Docker Desktop is not used on the fleet Macs; Colima provides the Docker runtime. Give it a bounded
-slice of the 16GB so the host stays responsive (Airbyte + ClickHouse + Redpanda are hungry):
+The fleet uses **OrbStack** for Docker, not Colima/Docker-Desktop. S2 already has OrbStack.app + the
+privileged helper installed and the docker daemon running (provisioned via the headless recipe in
+`SERVER_STATE.md`). The docker CLI is at `/Applications/OrbStack.app/Contents/MacOS/xbin/docker`
+(also symlinked `~/.orbstack/bin/docker`); `docker compose` is the bundled plugin. Non-interactive
+SSH has a minimal PATH — prefix it:
 
 ```bash
-# On S2, once (persists across restarts):
-colima start --cpu 4 --memory 10 --disk 60 --vm-type vz
-# 10GB VM ceiling on a 16GB host: Airbyte working set (~4–6GB) + ClickHouse + Redpanda (capped 1G)
-# fit; ~6GB left for macOS. If Airbyte syncs OOM, raise --memory to 12 and re-`colima start`.
-docker context use colima   # ensure the docker CLI targets the Colima VM
+export PATH=/Applications/OrbStack.app/Contents/MacOS/xbin:$HOME/.orbstack/bin:$PATH
+# OrbStack allocates memory dynamically (no fixed VM sizing like Colima). If Airbyte syncs push the
+# 16GB host into heavy swap, stop the least-critical profile (usually etl) instead of resizing a VM.
 ```
 
 ## Bringup (the one command sequence)

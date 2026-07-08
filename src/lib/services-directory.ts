@@ -266,6 +266,48 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     kind: 'api',
   },
 
+  // ── Data plane (the data engine on S2 — warehouse/streaming/etl/dataquality) ─────
+  // These run under OrbStack on offgrid-s2 (192.168.1.60); the console daemon can't egress to the
+  // LAN, so each is fronted on S1's edge Caddy at a 127.0.0.1:894x loopback (8941 warehouse · 8942
+  // airbyte · 8943 redpanda-admin · 8944 great-expectations → see deploy/Caddyfile). Env overrides
+  // set these on S1. Runbook: deploy/onprem/DATA_PLANE.md.
+  {
+    id: 'warehouse',
+    label: 'Warehouse',
+    description: 'Analytics warehouse — columnar store the BI + dbt models read; the ELT sync target.',
+    url: process.env.OFFGRID_WAREHOUSE_URL ?? 'http://127.0.0.1:8941',
+    healthPath: '/ping', // ClickHouse HTTP /ping → "Ok." (unauthenticated)
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'airbyte',
+    label: 'ETL / Connectors',
+    description: 'Connector sync + change-data-capture engine — moves source data into the warehouse under the pipeline\'s governance.',
+    url: process.env.OFFGRID_AIRBYTE_URL ?? 'http://127.0.0.1:8942',
+    healthPath: '/api/v1/health',
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'streaming',
+    label: 'Streaming',
+    description: 'Kafka-API event broker — the CDC/streaming backbone between sources and the warehouse.',
+    url: process.env.OFFGRID_REDPANDA_ADMIN_URL ?? 'http://127.0.0.1:8943',
+    healthPath: '/v1/cluster/health_overview', // Redpanda admin API → {"is_healthy":true}
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'data-quality',
+    label: 'Data Quality',
+    description: 'Data-quality checkpoint engine — validates warehouse tables against expectations on the sync path.',
+    url: process.env.OFFGRID_DATAQUALITY_URL ?? 'http://127.0.0.1:8944',
+    healthPath: '/', // sidecar root → {"status":"ok"}
+    auth: 'api-key',
+    kind: 'api',
+  },
+
   // ── Canonical planes NOT deployed on THIS fleet (honest, non-alarming — never 'down') ────
   // The observability plane (VictoriaMetrics/VictoriaLogs/OTel/Jaeger) is canonical in
   // docker-compose.yml (observability profile) but is intentionally NOT run here: this fleet

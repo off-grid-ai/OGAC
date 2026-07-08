@@ -183,6 +183,25 @@ http://127.0.0.1:8939 {
 	reverse_proxy offgrid-g6.local:5001
 }
 
+# ── Data plane on S2 (192.168.1.60 / offgrid-s2.local) — 2026-07-08 ──────────────
+# The warehouse/streaming/etl/dataquality engines run on S2 under OrbStack (aux tier
+# stopped there — it's redundant with g6 — to free the 16GB box for the data plane).
+# Same loopback pattern as g6: the console daemon can't egress to the LAN, so Caddy
+# (launchd) fronts each S2 data-plane HTTP service on 127.0.0.1:894x and the console's
+# OFFGRID_*_URL env points at these. Loopback-bound → never exposed to the tunnel/LAN.
+http://127.0.0.1:8941 {
+	reverse_proxy offgrid-s2.local:8124
+}
+http://127.0.0.1:8942 {
+	reverse_proxy offgrid-s2.local:8006
+}
+http://127.0.0.1:8943 {
+	reverse_proxy offgrid-s2.local:9644
+}
+http://127.0.0.1:8944 {
+	reverse_proxy offgrid-s2.local:8003
+}
+
 # ── Unified API gateway (Phase 5): console-api.getoffgridai.co ──────────────────
 # One public surface over the platform. /v1/* → the LLM aggregator; /specs/* → each
 # service's OpenAPI (rewritten to the console's in-app proxy, which fetches server-side to
