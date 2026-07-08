@@ -10,6 +10,7 @@ import {
   TrendUp,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -316,7 +317,12 @@ function PromptCard({
         >
           <TextAlignLeft className="size-3.5" />
         </span>
-        <span className="truncate font-mono text-sm font-medium">{p.title}</span>
+        <Link
+          href={`/workspace/prompts/${encodeURIComponent(p.id)}`}
+          className="truncate font-mono text-sm font-medium hover:text-primary hover:underline"
+        >
+          {p.title}
+        </Link>
         {p.visibility === 'org' ? (
           <Badge variant="outline" className="ml-auto shrink-0 text-[10px]">
             org

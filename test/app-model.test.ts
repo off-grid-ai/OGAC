@@ -6,6 +6,7 @@ import {
   validateAppSpec,
   workflowToAppSpec,
   isSimpleAgent,
+  filterSingleStepApps,
 } from '../src/lib/app-model.ts';
 
 // PURE unit tests for the unified App model (Builder Epic #108, Phase 1A) — no DB, no network.
@@ -258,4 +259,31 @@ test('shim round-trips: a 1-step agent app fed back as a template is stable', ()
   assert.equal((round.steps[0] as { agentId?: string }).agentId, 'agent_x');
   assert.equal(round.steps[0].id, original.steps[0].id, 'node id preserved');
   assert.equal(isSimpleAgent(round), true);
+});
+
+// ─── filterSingleStepApps — the /build/agents distinct list (UX-audit T4 item 4) ───────────────────
+test('filterSingleStepApps keeps only single-agent apps (dedupes /build/agents from Studio)', () => {
+  const oneStep = simpleAgentApp({ id: 'app_agent' });
+  const twoStep = simpleAgentApp({
+    id: 'app_wf',
+    steps: [
+      { id: 's1', label: 'A', kind: 'agent', agentId: 'a1' },
+      { id: 's2', label: 'B', kind: 'output', sink: 'console' },
+    ],
+    edges: [{ from: 's1', to: 's2' }],
+  });
+  const out = filterSingleStepApps([oneStep, twoStep]);
+  assert.deepEqual(out.map((a) => a.id), ['app_agent']);
+});
+
+test('filterSingleStepApps is empty when there are no single-step apps', () => {
+  const twoStep = simpleAgentApp({
+    id: 'app_wf',
+    steps: [
+      { id: 's1', label: 'A', kind: 'agent', agentId: 'a1' },
+      { id: 's2', label: 'B', kind: 'output', sink: 'console' },
+    ],
+    edges: [{ from: 's1', to: 's2' }],
+  });
+  assert.deepEqual(filterSingleStepApps([twoStep]), []);
 });

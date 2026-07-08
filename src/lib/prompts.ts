@@ -1,6 +1,11 @@
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { promptLibrary } from '@/db/schema';
+// Pure {{variable}} template helpers live in a client-safe module (no DB import) so client components
+// can use them without bundling `pg`. Re-exported here for existing server callers.
+import { extractVariables, renderPromptTemplate } from '@/lib/prompt-template';
+
+export { extractVariables, renderPromptTemplate };
 
 // Prompt library server logic — a personal/org library of reusable prompt texts. Adjacent to but
 // distinct from skills (which are assistants). Tables are created idempotently on first use, copying
@@ -30,18 +35,6 @@ export async function ensurePromptSchema(): Promise<void> {
 }
 
 const rid = () => crypto.randomUUID();
-
-// Extract distinct {{variable}} placeholders from a prompt body, in order of first appearance.
-export function extractVariables(content: string): string[] {
-  const out: string[] = [];
-  const re = /\{\{\s*([\w.-]+)\s*\}\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const name = m[1].trim();
-    if (name && !out.includes(name)) out.push(name);
-  }
-  return out;
-}
 
 function cleanTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) return [];
