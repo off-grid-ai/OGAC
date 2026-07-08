@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { WafControls } from '@/components/edge/WafControls';
 
 interface EdgeEvent {
   ts: string;
@@ -220,6 +221,12 @@ export function EdgePanel() {
           </span>
         </div>
       </div>
+
+      {/* ── WAF control (toggle + rule CRUD) ── */}
+      <WafControls
+        liveWafEnabled={p?.wafEnabled ?? false}
+        liveRuleNames={p?.wafRules ?? []}
+      />
 
       {/* ── Blocks table ── */}
       <div className="rounded-lg border border-border bg-card shadow-sm">

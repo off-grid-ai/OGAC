@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -55,7 +56,9 @@ function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium text-foreground">{s.label}</span>
+        <Link href={`/services/${s.id}`} className="text-sm font-medium text-foreground hover:text-primary">
+          {s.label}
+        </Link>
         <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px] uppercase">{AUTH_LABEL[s.auth]}</Badge>
       </div>
       <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
