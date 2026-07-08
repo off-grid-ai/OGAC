@@ -119,6 +119,29 @@ ALTER TABLE devices     ADD COLUMN IF NOT EXISTS token  text;
 
 **Re-enroll note:** devices enrolled BEFORE this deploy have `token = NULL` and keep authenticating with the legacy `dt_<id>` bearer (backward-tolerant — see `src/lib/device-token.ts`). New enrollments get a random secret returned ONCE at `POST /api/v1/devices/enroll` (`deviceToken` field). To close the legacy form on an existing node, re-enroll it (issue a fresh enrollment token, enroll again) so its row gets a random `token`.
 
+**Burndown deploy (2026-07-09, main @ `85ca60b`)** — the (B)-tier OPEN_ITEMS burndown was deployed over the cloudflared tunnel (server-built on node22, console + all 3 workers restarted). Two DB changes were applied directly via the `pg` client (both ALSO self-migrate on first use — `ensureErasureTombstoneSchema()` / `ensureConnectorSecretRefColumn()` — so a normal deploy applies them with no manual step; applied eagerly here to be safe):
+
+```sql
+-- DSAR / right-to-erasure device-replica propagation queue (src/lib/erasure-tombstone-store.ts).
+CREATE TABLE IF NOT EXISTS erasure_tombstones (
+  id text PRIMARY KEY, org_id text NOT NULL DEFAULT 'default', subject text NOT NULL,
+  status text NOT NULL DEFAULT 'pending', requested_by text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(), acknowledged_at timestamptz);
+CREATE INDEX IF NOT EXISTS erasure_tombstones_org_idx ON erasure_tombstones (org_id);
+CREATE INDEX IF NOT EXISTS erasure_tombstones_status_idx ON erasure_tombstones (status);
+-- Vaulted connector-credential reference (insurer-connector-creds-vault): secret lives in OpenBao,
+-- the DB endpoint column no longer carries the password (src/lib/store.ts, connector-secrets.ts).
+ALTER TABLE connectors ADD COLUMN IF NOT EXISTS secret_ref text;
+```
+
+**Worker restart is required on any deploy that touches a run path** (`agent-run`/`app-run`/`chat` activities) — `next start` reload alone does NOT reload the Temporal workers. They are launchd-managed on S1; restart with:
+
+```sh
+UID_=$(id -u); for w in agent-worker app-worker chat-worker; do launchctl kickstart -k gui/$UID_/co.getoffgridai.$w; done
+```
+
+Still pending on S2 (separate infra step): the **Great Expectations sidecar rebuild** (G-F4) — the console adapter is deployed and will report the real engine once the S2 GE container is rebuilt from `deploy/sidecars/great-expectations/` (native evaluator by default; GE lib opt-in).
+
 ### Gateway fleet SSOT (2026-07-05) — how it's wired
 `fleet_nodes` is the single source of truth for the on-prem fleet. Flow + gotchas:
 - **Console** `GET /api/v1/gateway/pool` derives the aggregator POOL/IMAGE_POOL from the table;
