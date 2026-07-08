@@ -67,6 +67,8 @@ import {
 } from '@/lib/chat-mentions';
 import { thinkingLabel, thinkingState } from '@/lib/chat-thinking';
 import { toDisplayHost } from '@/lib/display-host';
+import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
+import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/workspace-grid';
@@ -426,6 +428,13 @@ export function ChatWorkspace({
   >([]);
   const [lastSendBody, setLastSendBody] = useState<Record<string, unknown> | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  // The org chat-binding governance (default chat pipeline + friendly names), read alongside projects
+  // from GET /api/v1/chat/projects. Drives the "Runs on: <pipeline>" chip near the model picker so the
+  // governing pipeline is legible in chat too (per-project override → org default, most-specific-wins).
+  const [chatBinding, setChatBinding] = useState<{
+    defaultChatPipelineId: string | null;
+    pipelines: { id: string; name: string }[];
+  }>({ defaultChatPipelineId: null, pipelines: [] });
   // NAVIGATIONAL position (which conversation, which project) lives in the URL — never useState —
   // so a conversation is shareable, refresh-safe, and Back steps between conversations/projects.
   // Route shape: /chat/<conversationId>?project=<projectId>; /chat = new-chat landing.
@@ -541,6 +550,21 @@ export function ChatWorkspace({
     ? matchMentions(mentionCands, mention.query, { exclude: refs, limit: 8 })
     : [];
   const activeProject = projects.find((p) => p.id === activeProjectId);
+  // The pipeline governing THIS chat: the active project's override (if pinned), else the org default —
+  // most-specific-wins, the SAME pure rule the run path uses. Named + linked via the chip by the model
+  // picker so the governing pipeline is legible in chat. Temporary chats have no project ⇒ org default.
+  const chatPipelineId = resolveConsumerPipeline(
+    activeProject?.pipelineId ?? null,
+    chatBinding.defaultChatPipelineId,
+  );
+  const chatPipelineChip = chatPipelineId
+    ? {
+        id: chatPipelineId,
+        name:
+          chatBinding.pipelines.find((p) => p.id === chatPipelineId)?.name ?? chatPipelineId,
+        inherited: !activeProject?.pipelineId,
+      }
+    : { id: null };
   const visibleConversations = conversations
     .filter((c) => (activeProjectId ? c.projectId === activeProjectId : !c.projectId))
     .filter((c) => c.title.toLowerCase().includes(search.toLowerCase()));
@@ -551,7 +575,16 @@ export function ChatWorkspace({
   }, []);
   const refreshProjects = useCallback(async () => {
     const r = await fetch('/api/v1/chat/projects');
-    if (r.ok) setProjects((await r.json()).projects ?? []);
+    if (r.ok) {
+      const body = await r.json();
+      setProjects(body.projects ?? []);
+      if (body.chatBinding) {
+        setChatBinding({
+          defaultChatPipelineId: body.chatBinding.defaultChatPipelineId ?? null,
+          pipelines: body.chatBinding.pipelines ?? [],
+        });
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -1411,6 +1444,9 @@ export function ChatWorkspace({
             >
               <SlidersHorizontal className="size-4" />
             </button>
+            {/* The pipeline governing this chat (project override → org default). Names + links it so
+                the join-key is legible in chat, right by the model picker. */}
+            <PipelineChip pipeline={chatPipelineChip} size="xs" />
             {gatewayError ? (
               <a
                 href="/gateway"

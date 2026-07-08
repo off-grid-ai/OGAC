@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SubNav } from '@/components/nav/SubNav';
+import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { activeTabForPath, lifecycleTabs } from '@/lib/app-lifecycle';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +14,16 @@ import { cn } from '@/lib/utils';
 // lifecycle tabs (Build · Input · Runs · Review · Reports), each a real deep-linkable route scoped to
 // the app id, with a one-line helper for the active tab. Tab selection is URL-driven (activeTabForPath
 // is the pure resolver in app-lifecycle.ts) so Back walks the tabs — never local useState.
-export function AppLifecycleNav({ appId, title }: { appId: string; title: string }) {
+export function AppLifecycleNav({
+  appId,
+  title,
+  pipeline,
+}: {
+  appId: string;
+  title: string;
+  /** The resolved "Runs on: <pipeline>" chip for this app (own binding, else org default). */
+  pipeline?: PipelineChipData | null;
+}) {
   const pathname = usePathname();
   const tabs = lifecycleTabs(appId);
   const active = activeTabForPath(pathname, appId) ?? 'build';
@@ -35,6 +45,7 @@ export function AppLifecycleNav({ appId, title }: { appId: string; title: string
           <span className="truncate text-sm font-medium text-foreground" title={title}>
             {title}
           </span>
+          {pipeline ? <PipelineChip pipeline={pipeline} size="xs" /> : null}
           <nav className="ml-auto flex flex-wrap items-center gap-1">
             {tabs.map((t) => {
               const isActive = t.tab === active;

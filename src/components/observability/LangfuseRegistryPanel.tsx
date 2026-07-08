@@ -87,9 +87,9 @@ export function LangfuseRegistryPanel({
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-sm">Langfuse registry — prompts · datasets · sessions</CardTitle>
+            <CardTitle className="text-sm">Prompt registry — prompts · datasets · sessions</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Read back from Langfuse&apos;s public API (v2/prompts, datasets, sessions). Read-only view.
+              Read back from the trace/prompt registry (prompts, datasets, sessions). Read-only view.
             </p>
           </div>
           <TabBar active={tab} counts={counts} />
@@ -98,12 +98,12 @@ export function LangfuseRegistryPanel({
       <CardContent>
         {!configured ? (
           <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-            Langfuse read-back not configured — set OFFGRID_LANGFUSE_URL + the project keys to pull the
-            prompt registry, datasets, and sessions.
+            Trace/prompt registry read-back not configured — set the tracing-store URL + project keys
+            to pull the prompt registry, datasets, and sessions.
           </p>
         ) : error ? (
           <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            Langfuse unreachable: {error}
+            Trace/prompt registry unreachable: {error}
           </p>
         ) : tab === 'prompts' ? (
           prompts.length ? (
@@ -147,7 +147,7 @@ export function LangfuseRegistryPanel({
             </Table>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No prompts in the Langfuse registry.
+              No prompts in the trace/prompt registry.
             </p>
           )
         ) : tab === 'datasets' ? (
@@ -175,7 +175,7 @@ export function LangfuseRegistryPanel({
               </TableBody>
             </Table>
           ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">No Langfuse datasets.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">No datasets in the registry.</p>
           )
         ) : sessions.length ? (
           <Table>
@@ -199,7 +199,7 @@ export function LangfuseRegistryPanel({
             </TableBody>
           </Table>
         ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">No Langfuse sessions.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">No sessions in the registry.</p>
         )}
       </CardContent>
     </Card>

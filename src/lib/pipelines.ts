@@ -19,8 +19,11 @@ import type { Pipeline as PipelineRowDb } from '@/db/schema';
 import { getGatewayRow } from '@/lib/gateways';
 import { egressClassFor } from '@/lib/gateways-policy';
 import {
+  type DomainRefTokens,
   type PipelineRouting,
   type PipelineShape,
+  allowlistReferencesTokens,
+  domainMatchTokens,
   normalizeAllowlist,
   normalizeRouting,
   nextVersion,
@@ -211,6 +214,59 @@ export async function listPipelinesByGateway(
       return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
     }),
   );
+}
+
+// ─── Reverse edges: pipelines that REFERENCE a data/library entity ──────────────────────────────────
+// The forward edge (a pipeline names its gateway/domains) already exists; these expose the REVERSE so
+// a data-domain / connector / tool / eval can show "referenced by N pipelines". We read the org's
+// pipelines once and filter in memory with the PURE matcher (allowlistReferencesTokens) — the
+// dataAllowlist is free-text (ids OR labels OR aliases), so a pure token match is the only correct
+// join. Org-scoped: NEVER returns a pipeline from another tenant.
+
+/**
+ * Pipelines whose data ceiling (dataAllowlist) references the given data-domain — matched against the
+ * domain's id ∪ label ∪ aliases (case-insensitive). Stable order (name asc). Powers the "referenced by
+ * pipelines" panel on the data-domain detail (mirrors the connector's "Bound data domains" card).
+ */
+export async function listPipelinesByDomain(
+  domain: DomainRefTokens,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView[]> {
+  const tokens = domainMatchTokens(domain);
+  if (!tokens.length) return [];
+  const all = await listPipelines(orgId);
+  return all.filter((p) => allowlistReferencesTokens(p.dataAllowlist, tokens));
+}
+
+/**
+ * Pipelines whose data ceiling references ANY of the given data-domains — used by the connector detail
+ * ("referenced by pipelines"): a connector is reached by a pipeline transitively through the domains
+ * bound to it. Pass the connector's bound domains; returns the de-duped union, stable order. Org-scoped.
+ */
+export async function listPipelinesByDomains(
+  domains: DomainRefTokens[],
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView[]> {
+  const tokenSets = domains.map(domainMatchTokens).filter((t) => t.length);
+  if (!tokenSets.length) return [];
+  const all = await listPipelines(orgId);
+  return all.filter((p) => tokenSets.some((tokens) => allowlistReferencesTokens(p.dataAllowlist, tokens)));
+}
+
+/**
+ * Pipelines whose data ceiling references ANY of the raw reference tokens (id/name/alias) supplied —
+ * the generic reverse resolver behind "used by N pipelines" on library entities (tools/evals) whose
+ * ceiling reference is a bare id or name. Case-insensitive; org-scoped; stable order.
+ */
+export async function listPipelinesReferencing(
+  refTokens: string[],
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView[]> {
+  // Reuse the same normalise/dedupe as a domain's token set (id-slot carries the first ref).
+  const tokens = domainMatchTokens({ id: refTokens[0] ?? '', aliases: refTokens.slice(1) });
+  if (!tokens.length) return [];
+  const all = await listPipelines(orgId);
+  return all.filter((p) => allowlistReferencesTokens(p.dataAllowlist, tokens));
 }
 
 /** One pipeline by id, org-scoped (with gateway enrichment). Null if absent for this org. */

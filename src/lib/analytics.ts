@@ -19,12 +19,17 @@ const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 // Re-export the result types so existing `@/lib/analytics` importers are unchanged.
 export type { Analytics, DayPoint, ModelStat, Signal } from '@/lib/analytics-types';
 
-export async function gatewayEvents(): Promise<AuditEvent[]> {
+export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditEvent[]> {
+  // Optional server-side narrowing to one pipeline's slice — the gateway docs carry the pipeline
+  // attribution in `project` (PA-12), so filter on `project.keyword` when a tag is supplied.
+  const query = pipelineTag
+    ? { bool: { filter: [{ term: { 'project.keyword': pipelineTag } }] } }
+    : { match_all: {} };
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ size: 5000, sort: [{ '@timestamp': 'desc' }], query: { match_all: {} } }),
+      body: JSON.stringify({ size: 5000, sort: [{ '@timestamp': 'desc' }], query }),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });
@@ -55,12 +60,12 @@ export async function gatewayEvents(): Promise<AuditEvent[]> {
 // Compute the analytics rollups via native OpenSearch aggregations — one `size:0` `_search`, no raw
 // docs. Graceful fallback to real zeros when OpenSearch is unreachable (identical to the old empty
 // path). The output shape is byte-identical to the previous JS-loop implementation.
-export async function computeAnalytics(): Promise<Analytics> {
+export async function computeAnalytics(pipelineTag?: string | null): Promise<Analytics> {
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildAggsQuery(Date.now())),
+      body: JSON.stringify(buildAggsQuery(Date.now(), pipelineTag)),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });

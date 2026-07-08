@@ -1,6 +1,7 @@
 import { ArrowSquareOut, Play, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
+import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { isSimpleAgent, type AppSpec } from '@/lib/app-model';
@@ -19,7 +20,14 @@ const VIS_LABEL: Record<string, string> = {
   public: 'Shared link',
 };
 
-export function AppsList({ apps }: { apps: AppSpec[] }) {
+export function AppsList({
+  apps,
+  chips,
+}: {
+  apps: AppSpec[];
+  /** The resolved "Runs on: <pipeline>" chip per app id (page resolves them in one batch). */
+  chips?: Record<string, PipelineChipData>;
+}) {
   if (apps.length === 0) {
     return (
       <Card className="shadow-sm">
@@ -58,6 +66,7 @@ export function AppsList({ apps }: { apps: AppSpec[] }) {
                   {VIS_LABEL[app.visibility] ?? app.visibility}
                 </span>
               </div>
+              <PipelineChip pipeline={chips?.[app.id] ?? { id: app.pipelineId ?? null }} size="xs" />
               <div className="flex items-center gap-2">
                 <Link
                   href={`/apps/${encodeURIComponent(app.id)}`}
