@@ -31,11 +31,15 @@ import {
   projectRow,
   redactionPolicyFromMappings,
   validateJobDraft,
+  flattenDagToJobFields,
   type ColumnMapping,
+  type EtlDagSpec,
   type EtlJobDraft,
   type EtlJobSpec,
   type EtlRunView,
 } from '@/lib/etl-job';
+import { compileToKestraFlow } from '@/lib/etl-kestra-compile';
+import { kestraOrchestration } from '@/lib/adapters/kestra';
 import type { EtlJobStatus } from '@/lib/etl-model';
 
 // ── self-migrate ────────────────────────────────────────────────────────────────
@@ -62,6 +66,9 @@ export async function ensureEtlJobsSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now());
     `);
+    // The visual DAG spec (source → transforms → destination) authored in the builder. Added after
+    // the flat-mapping model shipped, so ALTER idempotently for a DB that has the older table.
+    await db.execute(sql`ALTER TABLE etl_jobs ADD COLUMN IF NOT EXISTS dag jsonb;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS etl_runs (
         id text PRIMARY KEY,
@@ -73,9 +80,11 @@ export async function ensureEtlJobsSchema(): Promise<void> {
         rows_written integer NOT NULL DEFAULT 0,
         redacted integer NOT NULL DEFAULT 0,
         message text,
+        execution_id text,
         started_at timestamptz NOT NULL DEFAULT now(),
         finished_at timestamptz);
     `);
+    await db.execute(sql`ALTER TABLE etl_runs ADD COLUMN IF NOT EXISTS execution_id text;`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS etl_jobs_org_idx ON etl_jobs (org_id);`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS etl_runs_job_idx ON etl_runs (job_id);`);
   })().catch((e) => {
@@ -109,6 +118,7 @@ function rowToSpec(r: Record<string, unknown>): EtlJobSpec {
     lastRunAt: iso(r.last_run_at),
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
+    dag: r.dag && typeof r.dag === 'object' ? (r.dag as EtlDagSpec) : undefined,
   };
 }
 
@@ -117,13 +127,14 @@ function rowToRun(r: Record<string, unknown>): EtlRunView {
     runId: String(r.id),
     jobId: String(r.job_id),
     status: String(r.status ?? 'pending') as EtlJobStatus,
-    path: r.path === 'airbyte' ? 'airbyte' : 'direct-copy',
+    path: r.path === 'kestra' ? 'kestra' : r.path === 'airbyte' ? 'airbyte' : 'direct-copy',
     rowsRead: Number(r.rows_read ?? 0),
     rowsWritten: Number(r.rows_written ?? 0),
     redacted: Number(r.redacted ?? 0),
     message: r.message != null ? String(r.message) : undefined,
     startedAt: iso(r.started_at) ?? new Date().toISOString(),
     finishedAt: iso(r.finished_at),
+    executionId: r.execution_id != null ? String(r.execution_id) : undefined,
   };
 }
 
@@ -150,40 +161,63 @@ export async function getEtlJob(
   return row ? rowToSpec(row) : null;
 }
 
-export async function createEtlJob(
+// When a draft carries a visual DAG, the DAG is the source of truth: derive the flat persisted fields
+// from it (keeping the operator-supplied name) so the flat model + legacy engine stay in sync. The
+// DAG is persisted AS-AUTHORED without a hard validity gate here — an operator must be able to SAVE
+// partial/in-progress work in the builder. Full validity (`validateDagSpec`) is enforced at RUN time
+// (runJobViaKestra records an honest failed run) and gated client-side (the Run button). We only
+// require a name. Flat-only drafts (legacy form, no DAG) still pass through the strict flat validator.
+function prepareDraft(
   draft: EtlJobDraft,
-  orgId: string = DEFAULT_ORG,
-): Promise<{ ok: true; job: EtlJobSpec } | { ok: false; errors: string[] }> {
+): { ok: true; draft: EtlJobDraft } | { ok: false; errors: string[] } {
+  if (draft.dag) {
+    if (!draft.name || !String(draft.name).trim()) return { ok: false, errors: ['A job name is required.'] };
+    const flat = flattenDagToJobFields(draft.dag);
+    return { ok: true, draft: { ...flat, name: draft.name } };
+  }
   const v = validateJobDraft(draft);
   if (!v.ok) return { ok: false, errors: v.errors };
+  return { ok: true, draft };
+}
+
+export async function createEtlJob(
+  raw: EtlJobDraft,
+  orgId: string = DEFAULT_ORG,
+): Promise<{ ok: true; job: EtlJobSpec } | { ok: false; errors: string[] }> {
+  const prep = prepareDraft(raw);
+  if (!prep.ok) return { ok: false, errors: prep.errors };
+  const draft = prep.draft;
   await ensureEtlJobsSchema();
   const { sql } = await import('drizzle-orm');
   const id = `etl_${randomUUID().slice(0, 12)}`;
   const mappingsJson = JSON.stringify(draft.mappings ?? []);
+  const dagJson = draft.dag ? JSON.stringify(draft.dag) : null;
   const rowLimit = draft.rowLimit != null ? clampRowLimit(draft.rowLimit) : null;
   const res = await db.execute(sql`
     INSERT INTO etl_jobs
       (id, org_id, name, source_connector_id, source_resource, dest_database, dest_table,
-       mappings, trigger, cron, row_limit)
+       mappings, trigger, cron, row_limit, dag)
     VALUES
       (${id}, ${orgId}, ${draft.name}, ${draft.sourceConnectorId}, ${draft.sourceResource},
        ${draft.destDatabase}, ${draft.destTable}, ${mappingsJson}::jsonb, ${draft.trigger},
-       ${draft.cron ?? null}, ${rowLimit})
+       ${draft.cron ?? null}, ${rowLimit}, ${dagJson}::jsonb)
     RETURNING *`);
   return { ok: true, job: rowToSpec((res.rows as Record<string, unknown>[])[0]) };
 }
 
 export async function updateEtlJob(
   id: string,
-  draft: EtlJobDraft,
+  raw: EtlJobDraft,
   orgId: string = DEFAULT_ORG,
 ): Promise<{ ok: true; job: EtlJobSpec } | { ok: false; errors: string[] } | null> {
   const existing = await getEtlJob(id, orgId);
   if (!existing) return null;
-  const v = validateJobDraft(draft);
-  if (!v.ok) return { ok: false, errors: v.errors };
+  const prep = prepareDraft(raw);
+  if (!prep.ok) return { ok: false, errors: prep.errors };
+  const draft = prep.draft;
   const { sql } = await import('drizzle-orm');
   const mappingsJson = JSON.stringify(draft.mappings ?? []);
+  const dagJson = draft.dag ? JSON.stringify(draft.dag) : null;
   const rowLimit = draft.rowLimit != null ? clampRowLimit(draft.rowLimit) : null;
   const res = await db.execute(sql`
     UPDATE etl_jobs SET
@@ -196,6 +230,7 @@ export async function updateEtlJob(
       trigger = ${draft.trigger},
       cron = ${draft.cron ?? null},
       row_limit = ${rowLimit},
+      dag = ${dagJson}::jsonb,
       updated_at = now()
     WHERE id = ${id} AND org_id = ${orgId}
     RETURNING *`);
@@ -331,4 +366,106 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
 
   const res = await db.execute(sql`SELECT * FROM etl_runs WHERE id = ${runId} LIMIT 1`);
   return rowToRun((res.rows as Record<string, unknown>[])[0]);
+}
+
+// ── the orchestrated run path (Kestra) ───────────────────────────────────────────────────────────
+// Compile the job's DAG → an orchestration flow (YAML), deploy it to the engine (upsert), and trigger
+// an execution. Records an etl_runs row with path='kestra' + the engine's execution id. HONEST: when
+// the engine is unreachable/unconfigured the run is recorded FAILED with a clear message — we never
+// fake a success. Falls back to the governed direct-copy when the job has no DAG (older jobs) so
+// "Run now" always does something real. Never throws.
+export async function runJobViaKestra(
+  job: EtlJobSpec,
+  orgId: string = DEFAULT_ORG,
+): Promise<EtlRunView> {
+  // Older jobs authored before the visual builder have no DAG → run the governed direct-copy.
+  if (!job.dag) return runJob(job, orgId);
+
+  await ensureEtlJobsSchema();
+  const { sql } = await import('drizzle-orm');
+  const runId = `run_${randomUUID().slice(0, 12)}`;
+  await db.execute(
+    sql`INSERT INTO etl_runs (id, job_id, org_id, status, path) VALUES (${runId}, ${job.id}, ${orgId}, 'running', 'kestra')`,
+  );
+
+  let status: EtlJobStatus = 'failed';
+  let message = '';
+  let executionId: string | null = null;
+
+  try {
+    const compiled = compileToKestraFlow(job.dag, job.id, job.name);
+    const up = await kestraOrchestration.upsertFlow(compiled.yaml, compiled.namespace, compiled.flowId);
+    if (!up.ok) {
+      message = up.configured
+        ? `Could not deploy the flow to the orchestration engine: ${up.error}`
+        : `Orchestration engine not configured or unreachable: ${up.error}`;
+      throw new Error(message);
+    }
+    const exec = await kestraOrchestration.execute(compiled.namespace, compiled.flowId, {
+      steps: JSON.stringify(compiled.steps),
+      job_id: compiled.flowId,
+    });
+    if (!exec.ok) {
+      message = `Deployed the flow but could not start an execution: ${exec.error}`;
+      throw new Error(message);
+    }
+    executionId = exec.value.executionId;
+    status = 'running'; // the engine runs asynchronously; status is polled via refreshRunStatus
+    message = `Dispatched execution ${executionId} to the orchestration engine (${compiled.steps.length} step(s)).`;
+  } catch (err) {
+    status = 'failed';
+    if (!message) message = describeError(err);
+  }
+
+  await db.execute(sql`
+    UPDATE etl_runs SET status = ${status}, message = ${message}, execution_id = ${executionId},
+      finished_at = ${status === 'running' ? null : sql`now()`}
+    WHERE id = ${runId}`);
+  await db.execute(
+    sql`UPDATE etl_jobs SET last_run_status = ${status}, last_run_at = now() WHERE id = ${job.id}`,
+  );
+
+  const res = await db.execute(sql`SELECT * FROM etl_runs WHERE id = ${runId} LIMIT 1`);
+  return rowToRun((res.rows as Record<string, unknown>[])[0]);
+}
+
+// Poll the engine for a running execution's latest state and fold it back onto the run row. Called
+// by the [id]/runs route so the UI shows live status without the engine pushing to us. Returns the
+// refreshed view (or the unchanged one when there's no execution id / the engine is unreachable).
+export async function refreshRunStatus(run: EtlRunView, orgId: string = DEFAULT_ORG): Promise<EtlRunView> {
+  if (run.path !== 'kestra' || !run.executionId || run.status !== 'running') return run;
+  const exec = await kestraOrchestration.executionStatus(run.executionId);
+  if (!exec) return run;
+  const status: EtlJobStatus = exec.status;
+  if (status === run.status) return run;
+  const { sql } = await import('drizzle-orm');
+  const finished = exec.status === 'running' ? null : new Date();
+  await db.execute(sql`
+    UPDATE etl_runs SET status = ${status}, finished_at = ${finished}
+    WHERE id = ${run.runId} AND org_id = ${orgId}`);
+  await db.execute(
+    sql`UPDATE etl_jobs SET last_run_status = ${status} WHERE id = ${run.jobId}`,
+  );
+  return { ...run, status, finishedAt: finished ? finished.toISOString() : run.finishedAt };
+}
+
+// Fetch the engine logs for a run's execution (product-language wrapper). Empty when not applicable
+// or the engine is unreachable.
+export async function getRunLogs(run: EtlRunView) {
+  if (run.path !== 'kestra' || !run.executionId) return [];
+  return kestraOrchestration.executionLogs(run.executionId);
+}
+
+// Fetch a single run row for a job (used by the run/logs routes).
+export async function getEtlRun(
+  runId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<EtlRunView | null> {
+  await ensureEtlJobsSchema();
+  const { sql } = await import('drizzle-orm');
+  const res = await db.execute(
+    sql`SELECT * FROM etl_runs WHERE id = ${runId} AND org_id = ${orgId} LIMIT 1`,
+  );
+  const row = (res.rows as Record<string, unknown>[])[0];
+  return row ? rowToRun(row) : null;
 }
