@@ -26,6 +26,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     heading: 'Health',
     tabs: [
       { id: 'observability', label: 'Observability', route: '/insights' },
+      { id: 'observability', label: 'Ops Copilot', route: '/insights/copilot' },
       { id: 'analytics', label: 'Analytics', route: '/insights/analytics' },
       { id: 'drift', label: 'Drift', route: '/insights/drift' },
     ],
