@@ -10,6 +10,8 @@ import {
   sidebarSections,
 } from '../src/modules/groups.ts';
 import { MODULES, type ModuleId } from '../src/modules/registry.ts';
+// brain-view is the server-safe (zero-React) helper module, so it imports cleanly in a node test.
+import { BRAIN_VIEWS, normalizeBrainView } from '../src/lib/brain-view.ts';
 
 // Read a scoped nav component's source and pull out every module id it gates a tab on. The nav
 // components are 'use client' React files (they import next/link, etc.), so we can't import them in
@@ -211,6 +213,84 @@ test('Build Test tab: evals/sandbox/provit are reachable via BuildNav (the #132 
   const buildTabs = navTabIds('src/components/build/BuildNav.tsx');
   for (const id of ['evals', 'sandbox', 'provit'] as const) {
     assert.ok(buildTabs.has(id), `${id} must have a tab in BuildNav`);
+  }
+});
+
+// ── IA-nav-dedup: a concept lives in ONE nav home ────────────────────────────────────────────────
+//
+// The stores were deduped in #134; these lock the NAV so a concept can't be double-LISTED again.
+// Two overlaps were fixed:
+//   • "Tools" appeared as both Build → Tools (canonical, #121) AND a Brain `?view=tools` tab.
+//   • "Knowledge" appeared as both the Workspace sidebar row AND a Brain group heading.
+// We scrape the ACTUAL nav sources (same approach as navTabIds) so the test can't drift from code.
+
+function readNavSrc(relPath: string): string {
+  return readFileSync(fileURLToPath(new URL(`../${relPath}`, import.meta.url)), 'utf8');
+}
+
+// Every `label: '…'` string literal in a scoped nav component's tab/group tables.
+function navLabels(relPath: string): string[] {
+  const src = readNavSrc(relPath);
+  return [...src.matchAll(/\blabel:\s*'([^']+)'/g)].map((m) => m[1]);
+}
+
+// Every `heading: '…'` group heading in a scoped nav component.
+function navHeadings(relPath: string): string[] {
+  const src = readNavSrc(relPath);
+  return [...src.matchAll(/\bheading:\s*'([^']+)'/g)].map((m) => m[1]);
+}
+
+// Every `view: '…'` value in BrainNav (its tabs are ?view= params, not module ids).
+function brainViewsInNav(): string[] {
+  const src = readNavSrc('src/components/brain/BrainNav.tsx');
+  return [...src.matchAll(/\bview:\s*'([^']+)'/g)].map((m) => m[1]);
+}
+
+test('nav-dedup: "Tools" has ONE nav home — Build → Tools; Brain no longer lists a Tools tab', () => {
+  // Canonical Tools home present in Build (the module gate + a "Tools" label).
+  const buildLabels = navLabels('src/components/build/BuildNav.tsx');
+  assert.ok(buildLabels.includes('Tools'), 'Build → Tools tab must exist (the canonical Tools hub)');
+  assert.ok(navTabIds('src/components/build/BuildNav.tsx').has('tools'), 'BuildNav must gate a tab on the tools module');
+
+  // The duplicate is gone from Brain's nav.
+  const brainLabels = navLabels('src/components/brain/BrainNav.tsx');
+  assert.ok(!brainLabels.includes('Tools'), 'Brain must not list a duplicate "Tools" tab');
+  assert.ok(!brainViewsInNav().includes('tools'), 'BrainNav must not expose a tools view tab');
+});
+
+test('nav-dedup: the tools deep-link is NOT broken — ?view=tools still resolves', () => {
+  // De-duping the NAV must not 404 the existing deep-link. `tools` stays a valid BrainView so
+  // /build/brain?view=tools still renders the (read-only) mirror even though no tab advertises it.
+  assert.ok(BRAIN_VIEWS.includes('tools'), 'the tools BrainView must remain valid so ?view=tools deep-links resolve');
+  assert.equal(normalizeBrainView('tools'), 'tools', 'normalizeBrainView must still accept the tools view');
+});
+
+test('nav-dedup: "Knowledge" appears as a nav concept in ONE place, not two', () => {
+  // The org-KB sidebar row ("Knowledge" → /workspace/knowledge) is the single "Knowledge" label in
+  // the nav. Brain's RAG group is now headed "Retrieval", so the label no longer collides.
+  const knowledgeModule = MODULES.find((m) => m.id === 'knowledge');
+  assert.equal(knowledgeModule?.label, 'Knowledge', 'the Workspace org-KB row keeps the "Knowledge" label');
+
+  const brainHeadings = navHeadings('src/components/brain/BrainNav.tsx');
+  assert.ok(!brainHeadings.includes('Knowledge'), 'Brain must not head a group "Knowledge" (dupes the sidebar row)');
+  assert.ok(brainHeadings.includes('Retrieval'), 'Brain\'s RAG group is headed "Retrieval"');
+
+  // Brain still curates its own agent-RAG index — as "Agent knowledge base", a distinct label.
+  const brainLabels = navLabels('src/components/brain/BrainNav.tsx');
+  assert.ok(brainLabels.includes('Agent knowledge base'), 'Brain keeps its agent-RAG surface (distinct label)');
+});
+
+test('nav-dedup: no scoped nav double-lists the same tab label within itself', () => {
+  for (const nav of [
+    'src/components/build/BuildNav.tsx',
+    'src/components/brain/BrainNav.tsx',
+    'src/components/data/DataNav.tsx',
+    'src/components/workspace/WorkspaceNav.tsx',
+  ]) {
+    const labels = navLabels(nav);
+    // DataNav intentionally reuses one module id across warehouse tabs, but each tab LABEL is unique.
+    const dupes = labels.filter((l, i) => labels.indexOf(l) !== i);
+    assert.deepEqual([...new Set(dupes)], [], `${nav} lists a duplicate tab label: ${dupes.join(', ')}`);
   }
 });
 
