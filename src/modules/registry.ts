@@ -38,6 +38,7 @@ export type ModuleId =
   | 'provit'
   | 'api-docs'
   | 'agent-runs'
+  | 'runs'
   | 'policy'
   | 'evals'
   | 'siem'
@@ -358,6 +359,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Durable-execution history — every agent/workflow run, its pipeline timeline, and outcome. Recorded on-prem.',
     route: '/build/agent-runs',
     service: 'agents',
+    internal: true,
+  },
+  {
+    id: 'runs',
+    label: 'Runs',
+    description:
+      'Every job across the platform — apps, agents, and chat — with live status in one place. See what is running, queued, awaiting review, succeeded, or failed, and drill into any run.',
+    route: '/operations/runs',
+    service: 'console',
     internal: true,
   },
   {
