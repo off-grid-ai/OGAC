@@ -11,6 +11,15 @@ const DRIFT_FACTOR = 1.5;
 const PERF_FACTOR = 1.3;
 export const RECENT_MS = 2 * 86_400_000;
 
+// Field names in the gateway OpenSearch index (`offgrid-gateway`). `model` and `gateway` are text
+// fields with a `.keyword` sub-field — `terms` aggregation and exact `term` filtering MUST target
+// the `.keyword` sub-field (aggregating a bare `text` field 400s the whole `_search`, which is the
+// bug that made this page read all-zeros). Matches the convention the logs explorer uses.
+const MODEL_FIELD = 'model.keyword';
+// A "pipeline" here is the governed gateway/pipeline a call flowed through — the index calls it
+// `gateway`. The console surfaces it as the pipeline facet (mirrors the other insights roll-ups).
+const PIPELINE_FIELD = 'gateway.keyword';
+
 // A record is "blocked" when its HTTP status is >= 400, "ok" otherwise — the exact mapping the old
 // per-doc loop applied (status>=400 → 'blocked', else 'ok'; 'redacted' never occurs from the gateway
 // stream, so it stays 0, unchanged). We express that as a range filter on `status`.
@@ -34,20 +43,26 @@ const LATENCY_PCT = { percentiles: { field: 'ms', percents: [50, 95] } };
 /**
  * The single `size:0` aggregation query that replaces fetching raw docs.
  * `nowMs` is injected (not read from Date.now here) so the builder stays pure and testable.
+ * `pipeline` (optional) scopes every rollup to one gateway/pipeline via a `term` filter — the whole
+ * page then reflects that pipeline. Omitted → `match_all` (org-wide, unchanged behaviour). A
+ * `pipelines` terms agg always runs so the page can populate the facet from REAL data.
  */
-export function buildAggsQuery(nowMs: number): Record<string, unknown> {
+export function buildAggsQuery(nowMs: number, pipeline?: string): Record<string, unknown> {
   const recentGteIso = new Date(nowMs - RECENT_MS).toISOString();
+  const query = pipeline ? { term: { [PIPELINE_FIELD]: pipeline } } : { match_all: {} };
   return {
     size: 0,
-    query: { match_all: {} },
+    query,
     aggs: {
       total_tokens: { sum: { field: 'tokens' } },
       latency_pct: LATENCY_PCT,
       // Outcomes: total = hits.total; blocked = this filter; ok = total - blocked; redacted = 0.
       blocked: { filter: BLOCKED_FILTER },
+      // Distinct pipelines/gateways seen — powers the pipeline facet (honest: only real ones show).
+      pipelines: { terms: { field: PIPELINE_FIELD, size: 1000, order: { _key: 'asc' } } },
       // byModel — one bucket per model, tokens desc (parser re-sorts to guarantee identical order).
       by_model: {
-        terms: { field: 'model', size: 1000, order: { tokens: 'desc' } },
+        terms: { field: MODEL_FIELD, size: 1000, order: { tokens: 'desc' } },
         aggs: {
           tokens: { sum: { field: 'tokens' } },
           latency: { sum: { field: 'ms' } },
@@ -103,6 +118,7 @@ interface OsAggs {
   total_tokens?: { value?: number };
   latency_pct?: { values?: Record<string, number> };
   blocked?: { doc_count?: number };
+  pipelines?: { buckets?: { key?: unknown }[] };
   by_model?: { buckets?: OsBucket[] };
   series?: { buckets?: OsBucket[] };
   recent?: OsWindow;
@@ -163,6 +179,10 @@ export function parseAggsResponse(resp: OsResponse): Analytics {
     })
     .sort((a, b) => a.day.localeCompare(b.day));
 
+  const pipelines: string[] = (aggs.pipelines?.buckets ?? [])
+    .map((b) => String(b.key ?? ''))
+    .filter((k) => k.length > 0);
+
   const recentTotal = Number(aggs.recent?.doc_count ?? 0);
   const baseTotal = Number(aggs.baseline?.doc_count ?? 0);
   const recentBlocked = rate(Number(aggs.recent?.blocked?.doc_count ?? 0), recentTotal);
@@ -186,6 +206,7 @@ export function parseAggsResponse(resp: OsResponse): Analytics {
       flagged: recentBlocked > baseBlocked * DRIFT_FACTOR,
     },
     perf: { recent: recentP95, baseline: baseP95, flagged: recentP95 > baseP95 * PERF_FACTOR },
+    pipelines,
   };
 }
 
@@ -202,5 +223,6 @@ export function emptyAnalytics(): Analytics {
     series: [],
     drift: { recent: 0, baseline: 0, flagged: false },
     perf: { recent: 0, baseline: 0, flagged: false },
+    pipelines: [],
   };
 }

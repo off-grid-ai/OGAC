@@ -32,4 +32,6 @@ export interface Analytics {
   series: DayPoint[];
   drift: Signal;
   perf: Signal;
+  // Distinct gateways/pipelines present in the window — powers the pipeline facet. Sorted asc.
+  pipelines: string[];
 }

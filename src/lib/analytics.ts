@@ -55,12 +55,12 @@ export async function gatewayEvents(): Promise<AuditEvent[]> {
 // Compute the analytics rollups via native OpenSearch aggregations — one `size:0` `_search`, no raw
 // docs. Graceful fallback to real zeros when OpenSearch is unreachable (identical to the old empty
 // path). The output shape is byte-identical to the previous JS-loop implementation.
-export async function computeAnalytics(): Promise<Analytics> {
+export async function computeAnalytics(pipeline?: string): Promise<Analytics> {
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildAggsQuery(Date.now())),
+      body: JSON.stringify(buildAggsQuery(Date.now(), pipeline)),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });

@@ -25,7 +25,9 @@ test('buildAggsQuery uses the native agg types the task requires', () => {
   // sum for tokens; percentiles for p50/p95; terms for byModel; date_histogram for series.
   assert.ok(q.aggs.total_tokens.sum, 'sum on tokens');
   assert.deepEqual(q.aggs.latency_pct.percentiles, { field: 'ms', percents: [50, 95] });
-  assert.equal(q.aggs.by_model.terms.field, 'model');
+  // MUST aggregate the `.keyword` sub-field — a terms agg on the bare `text` field `model` 400s the
+  // whole `_search`, which is exactly what zeroed this page out. Regression guard.
+  assert.equal(q.aggs.by_model.terms.field, 'model.keyword');
   assert.equal(q.aggs.by_model.terms.order.tokens, 'desc');
   assert.ok(q.aggs.by_model.aggs.tokens.sum, 'per-model token sum');
   assert.ok(q.aggs.by_model.aggs.latency.sum, 'per-model latency sum');
@@ -33,6 +35,20 @@ test('buildAggsQuery uses the native agg types the task requires', () => {
   assert.equal(q.aggs.series.date_histogram.calendar_interval, 'day');
   // outcomes blocked = filter on status >= 400
   assert.deepEqual(q.aggs.blocked.filter, { range: { status: { gte: 400 } } });
+});
+
+test('buildAggsQuery: no pipeline arg → match_all + a pipelines terms agg (facet source)', () => {
+  const q = buildAggsQuery(Date.now()) as any;
+  assert.deepEqual(q.query, { match_all: {} });
+  // The facet options come from a real terms agg on the gateway/pipeline keyword field.
+  assert.equal(q.aggs.pipelines.terms.field, 'gateway.keyword');
+});
+
+test('buildAggsQuery: pipeline arg scopes the whole query via a term filter on gateway.keyword', () => {
+  const q = buildAggsQuery(Date.now(), 'corebank-gw') as any;
+  assert.deepEqual(q.query, { term: { 'gateway.keyword': 'corebank-gw' } });
+  // The facet agg still runs so the selector stays populated even when filtered.
+  assert.equal(q.aggs.pipelines.terms.field, 'gateway.keyword');
 });
 
 test('buildAggsQuery splits recent vs baseline on the 2-day boundary', () => {
@@ -59,6 +75,7 @@ function sampleResponse() {
       total_tokens: { value: 54321 },
       latency_pct: { values: { '50.0': 120.4, '95.0': 880.6 } },
       blocked: { doc_count: 12 },
+      pipelines: { buckets: [{ key: 'corebank-gw' }, { key: 'insurance-gw' }] },
       by_model: {
         buckets: [
           { key: 'gpt-4o', doc_count: 60, tokens: { value: 40000 }, latency: { value: 90000 } },
@@ -114,6 +131,17 @@ test('parseAggsResponse reconstructs the Analytics shape (field-by-field)', () =
 
   // perf: recent p95 1501 (round 1500.7) vs baseline 400, flagged (1501 > 400*1.3)
   assert.deepEqual(a.perf, { recent: 1501, baseline: 400, flagged: true });
+
+  // pipelines: the distinct gateways, empty keys dropped
+  assert.deepEqual(a.pipelines, ['corebank-gw', 'insurance-gw']);
+});
+
+test('parseAggsResponse: pipelines drops empty keys, missing agg → []', () => {
+  const resp = sampleResponse();
+  resp.aggregations.pipelines.buckets = [{ key: 'gw-a' }, { key: '' }, {}];
+  assert.deepEqual(parseAggsResponse(resp).pipelines, ['gw-a']);
+  const noAgg = parseAggsResponse({ hits: { total: { value: 5 } }, aggregations: {} });
+  assert.deepEqual(noAgg.pipelines, []);
 });
 
 test('parseAggsResponse: signals stay unflagged when within factor', () => {
@@ -162,5 +190,6 @@ test('emptyAnalytics matches the fallback shape exactly', () => {
     series: [],
     drift: { recent: 0, baseline: 0, flagged: false },
     perf: { recent: 0, baseline: 0, flagged: false },
+    pipelines: [],
   });
 });
