@@ -168,3 +168,90 @@ then verifies `count()` per table and exits non-zero on any mismatch.
 
 Realism: currency INR; PAN `[A-Z]{5}[0-9]{4}[A-Z]`; IFSC `[A-Z]{4}0[A-Z0-9]{6}`; Indian
 names/cities/states; log-normal amount/balance distributions; realistic status/DPD/claim mixes.
+
+---
+
+## Live pipeline (corebank → warehouse) — Airbyte, verified 2026-07-08
+
+**Real, working Airbyte 0.63.15 ELT pipeline** pulling BFSI OLTP data from the corebank Postgres
+source into the ClickHouse warehouse — Glue/DMS-style movement, end-to-end, with real rows landed.
+
+### What exists (Airbyte config API at `http://192.168.1.60:8005`, workspace `d98a7b4c-ef87-4c5a-872a-47c8e027f127`)
+
+| object       | id                                     | detail                                                     |
+|--------------|----------------------------------------|------------------------------------------------------------|
+| Source       | `a6491583-c787-4c08-bc21-d5a683dfdaba` | Postgres 3.6.13 → corebank (see host note below)           |
+| Destination  | `220b7042-834c-45cb-84cd-162b36d75296` | ClickHouse 1.0.0 → db `bfsi_raw`, warehouse/warehouse      |
+| Connection   | `39895f80-ce6f-4cc0-8c2e-be2a4ffd3034` | corebank → warehouse (BFSI raw), manual schedule           |
+
+Both `check_connection` calls **succeeded**. Streams synced: **customers, accounts, transactions**.
+
+### Sync mode: Incremental | cursor (append_dedup), cursor+PK = `id`
+
+**NOT CDC.** corebank Postgres has `wal_level = replica`, so logical replication / Debezium is
+impossible. Fallback = Standard replication + **Incremental cursor** on the `id` primary key
+(`destinationSyncMode: append_dedup`). To enable CDC later: set `wal_level=logical` on corebank
+and recreate the source with `replication_method.method = CDC`.
+
+### Sync result (job id 1) — VERIFIED
+
+Terminal status **succeeded**, attempt 0, **76,573 records committed** — matching source exactly.
+Rows physically in ClickHouse (query `http://192.168.1.60:8124/?user=warehouse&password=warehouse`):
+
+| ClickHouse table                                    | rows   |
+|-----------------------------------------------------|--------|
+| `airbyte_internal.bfsi_raw_raw__stream_customers`   | 7,400  |
+| `airbyte_internal.bfsi_raw_raw__stream_accounts`    | 9,973  |
+| `airbyte_internal.bfsi_raw_raw__stream_transactions`| 59,200 |
+
+Real Indian BFSI payloads land in `_airbyte_data` (PAN, masked Aadhaar, IFSC, UPI, RTGS/NEFT, INR).
+NOTE: the v1.0.0 ClickHouse connector landed the **raw** layer (`airbyte_internal.*`) but did NOT
+materialize typed/final tables under `bfsi_raw.*` (typing-and-deduping limitation of that connector
+version). The raw JSON is complete and queryable; parse with `JSONExtract(_airbyte_data, ...)` or
+upgrade the connector for typed tables.
+
+### Infra fixes required to make Airbyte functional on S2 (all applied, persistent)
+
+These were broken before this run — Airbyte could not launch a single connector. Fixed in
+`/Users/admin/offgrid/console/deploy/docker-compose.yml` on S2 (backup: `docker-compose.yml.bak.airbytefix`):
+
+1. **Connector images missing** — pulled `airbyte/source-postgres:3.6.13` and
+   `airbyte/destination-clickhouse:1.0.0` on S2 (`docker pull`).
+2. **Worker had no Docker socket permission** — worker ran as uid 1000 but the mounted
+   `/var/run/docker.sock` is `root:root 660` → every connector launch failed "Could not find
+   image". Fix: added `user: root` to the `airbyte-worker` service.
+3. **Wrong workspace volume name** — `WORKSPACE_DOCKER_MOUNT: airbyteworkspace` was unprefixed;
+   compose actually creates `offgrid-console_airbyteworkspace`, so connectors mounted an empty
+   volume → `NoSuchFileException: source_config.json`. Fix: set
+   `WORKSPACE_DOCKER_MOUNT: offgrid-console_airbyteworkspace`.
+   After 2+3: `docker compose --profile all up -d --no-deps airbyte-worker`.
+
+4. **OrbStack containers can't reach the physical LAN** — Airbyte connectors run with
+   `--network host`, and neither host- nor bridge-network OrbStack containers on S2 can reach
+   `127.0.0.1:5433` (corebank on S1). Fix: a **TCP relay on the S2 host** forwards
+   `0.0.0.0:15433 → 127.0.0.1:5433`; containers reach it via `host.docker.internal`.
+   - Relay script: `deploy/onprem/corebank-relay.py` (on S2 at same path).
+   - launchd service: `~/Library/LaunchAgents/local.offgrid.corebank-relay.plist`
+     (`RunAtLoad`+`KeepAlive`, log `/tmp/corebank-relay.log`), loaded via `launchctl load`.
+   - Hence the **Source host = `host.docker.internal`, port `15433`** (NOT 127.0.0.1:5433).
+   - The ClickHouse **Destination** host is likewise `host.docker.internal:8124` (the S2
+     host-mapped HTTP port), NOT the docker-network name `warehouse-clickhouse:8123`, for the same
+     host-network reachability reason.
+
+### Re-trigger a sync
+
+```bash
+# fire a sync
+curl -s -X POST http://192.168.1.60:8005/api/v1/connections/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"connectionId":"39895f80-ce6f-4cc0-8c2e-be2a4ffd3034"}'
+# poll (use the returned job id)
+curl -s -X POST http://192.168.1.60:8005/api/v1/jobs/get \
+  -H 'Content-Type: application/json' -d '{"id":<JOB_ID>}'
+# verify landed rows
+curl -s "http://192.168.1.60:8124/?user=warehouse&password=warehouse" \
+  --data-binary "SELECT count() FROM airbyte_internal.bfsi_raw_raw__stream_customers"
+```
+
+Prereq for any sync: the corebank relay launchd job must be running on S2
+(`launchctl list | grep corebank-relay`; log at `/tmp/corebank-relay.log`).
