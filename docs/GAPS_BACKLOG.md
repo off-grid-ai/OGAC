@@ -725,3 +725,12 @@ Fully diagnosed live. TWO bugs in the node's packaged `Off Grid AI.app --server-
    Owner: DESKTOP repo (team is already in tts.ts adding Parakeet). Console side (@offgrid/speech) is done
    + waits. g1 is left hand-modified (env + kokoro-js/phonemizer copied + Resources/node_modules symlink) —
    harmless; a clean desktop reinstall supersedes it.
+
+## M1 follow-up (found in live verify, 2026-07-08)
+- **M1-a: release-gate publish is SYNCHRONOUS → 524 on slow evals.** `publishWithGate` runs the pipeline's
+  evals inline in the POST /pipelines/[id]/publish request. A real ragas eval through the Cloudflare edge
+  exceeds ~100s → HTTP 524 (edge timeout) before a verdict returns. The gate IS wired + running the real
+  eval (verified — that's why it's slow); the gap is the sync request. FIX: make publish-gate async —
+  kick the eval (Temporal/queue), return `{status:'gating'}` 202, finalize publish (or block) on
+  completion + surface progress on the Quality tab. Block-path live verification still PENDING (the 524
+  pre-empted the verdict); pure release-gate unit tests DO cover pass/fail. Owner: console.
