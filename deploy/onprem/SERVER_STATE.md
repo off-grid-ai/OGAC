@@ -888,3 +888,7 @@ can be AUTHORED in plain English against real governed tools. Reproducible; idem
   `claim documents`. Deterministic ids + ON CONFLICT DO UPDATE → idempotent. Bound only to existing
   `bhcon_corebank` / `bhcon_policyadmin`. Use case #1 already covered by `bhdom_quota`.
   Definitions live in `src/lib/data-domains-insurer-seed.ts` (pure planner + tests).
+
+## Schema migration applied directly (prompt_partials, 2026-07-09)
+- `CREATE TABLE IF NOT EXISTS prompt_partials (id, name, title, content, owner, visibility, created_at, updated_at)` — applied via pg client on S1 (`offgrid_console`) over the cloudflared tunnel; lazy ensure not trusted on first route hit (same lesson as connectors.secret_ref/etl_jobs). Verified `/api/v1/prompts/partials` → 200.
+- Deploys now via the **cloudflared tunnel** (`SERVER=offgrid-tunnel ./deploy/push.sh`) when off the office LAN — tunnel drops mid-rsync intermittently, retry succeeds. `rm -rf coverage .nyc_output` before deploy (c8 output races rsync).
