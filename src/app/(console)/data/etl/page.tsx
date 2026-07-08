@@ -1,6 +1,6 @@
 import { ArrowsLeftRight, Database } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { EtlJobForm } from '@/components/data/EtlJobForm';
+import { NewEtlJobButton } from '@/components/data/etl/NewEtlJobButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listConnectors } from '@/lib/store';
@@ -49,7 +49,7 @@ export default async function EtlJobsPage() {
             governed and recorded.
           </p>
         </div>
-        <EtlJobForm connectors={connectorOptions} mode="create" />
+        <NewEtlJobButton hasConnectors={connectorOptions.length > 0} />
       </div>
 
       {jobs.length === 0 ? (
