@@ -892,3 +892,8 @@ can be AUTHORED in plain English against real governed tools. Reproducible; idem
 ## Schema migration applied directly (prompt_partials, 2026-07-09)
 - `CREATE TABLE IF NOT EXISTS prompt_partials (id, name, title, content, owner, visibility, created_at, updated_at)` — applied via pg client on S1 (`offgrid_console`) over the cloudflared tunnel; lazy ensure not trusted on first route hit (same lesson as connectors.secret_ref/etl_jobs). Verified `/api/v1/prompts/partials` → 200.
 - Deploys now via the **cloudflared tunnel** (`SERVER=offgrid-tunnel ./deploy/push.sh`) when off the office LAN — tunnel drops mid-rsync intermittently, retry succeeds. `rm -rf coverage .nyc_output` before deploy (c8 output races rsync).
+
+## Kestra ETL/orchestration engine — LIVE on S2 (2026-07-09)
+- Provisioned via the `kestra` compose profile on S2 (OrbStack): `offgrid-console-kestra-1` (Up, HTTP :8090 → 307 UI) + `offgrid-console-kestra-postgres-1` (healthy). JVM capped `-Xmx1200m` for the 16GB box; docker.sock mounted for custom-code Docker-task nodes; postgres repo/queue, local storage.
+- Provisioned off-office-wifi via the **Mac→S1(cloudflared tunnel)→S2(LAN, key-auth) hop** (S1→S2 SSH is key-based, no password; S1 lacks sshpass). Bringup script `~/kestra-up.sh` on S2. GOTCHA hit: first bringup used S1's STALE compose (no kestra profile → "no service selected") — must push the CURRENT compose Mac→S1→S2 before `--profile kestra up`.
+- REMAINING (lands with the console integration deploy): edge-Caddy loopback `127.0.0.1:8945 → offgrid-s2.local:8090` + `OFFGRID_KESTRA_URL=http://127.0.0.1:8945` in S1 `.env.local`, so the console (which can't egress to the LAN) reaches it. Then the Data-tab ETL surface drives Kestra flows.
