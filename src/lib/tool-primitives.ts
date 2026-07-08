@@ -141,6 +141,48 @@ export function isPrimitiveEnabled(
   return false; // air-gap default: OFF
 }
 
+// ─── egress-leash gating for internet primitives (reuses the pipeline egress DECISION) ────────────
+//
+// The air-gap gate above answers "is this internet primitive turned ON for the deployment at all?".
+// It is NOT the whole story: when a run is bound to a pipeline whose egress leash is LOCAL-ONLY (or
+// blocked) for the data-class in play, ANY reach to the public internet must be refused — exactly as
+// a cloud MODEL call is refused. A web search is external egress, so it is governed by the SAME
+// egress verdict `enforceModelCall` already produces (`'local' | 'cloud' | 'block'`). We do NOT
+// invent a second, weaker leash here — we CONSUME that decision.
+//
+// The mapping mirrors the model-call rule:
+//   • 'cloud'  → external egress permitted           → web search MAY reach out.
+//   • 'local'  → leashed to on-prem only             → web search REFUSED (it would leave the network).
+//   • 'block'  → nothing may leave for this class     → web search REFUSED.
+// With NO bound pipeline the caller passes 'cloud' (the additive "no new leash" default), so behaviour
+// is unchanged from before the leash existed — subject only to the air-gap opt-in above.
+export type EgressDecision = 'local' | 'cloud' | 'block';
+
+export interface WebSearchEgressVerdict {
+  /** true ⇒ an external web search may proceed for this run's egress posture. */
+  allow: boolean;
+  /** The egress decision that drove this (echoed for the audit trail). */
+  egress: EgressDecision;
+  /** Honest reason for the governed result + audit detail. */
+  reason: string;
+}
+
+/**
+ * Decide whether a web_search (external egress) may run given the pipeline's egress DECISION for the
+ * data-class in play. PURE — the caller passes the egress already computed by enforceModelCall so this
+ * NEVER re-derives (or bypasses) the leash. Any internet primitive can be gated the same way.
+ */
+export function webSearchEgressAllowed(egress: EgressDecision): WebSearchEgressVerdict {
+  if (egress === 'cloud') {
+    return { allow: true, egress, reason: 'egress leash permits external egress — web search allowed' };
+  }
+  const reason =
+    egress === 'local'
+      ? 'egress leash is LOCAL-ONLY (on-prem) — external web search refused'
+      : 'egress leash BLOCKS external egress — web search refused';
+  return { allow: false, egress, reason };
+}
+
 // ─── PrimitiveCatalogEntry — a primitive + its resolved enabled state, for the picker ─────────────
 export interface PrimitiveCatalogEntry {
   id: string;
