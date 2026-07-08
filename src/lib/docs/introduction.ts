@@ -57,7 +57,7 @@ already deployed for your org (if not, see [Self-hosting](/docs/self-hosting/dep
 ## 1. Sign in
 
 Open your console (e.g. \`https://console.yourorg.com\`) and sign in with your work account. Access
-is managed through your identity provider — Google, Microsoft, or Keycloak — so you use the login
+is managed through your identity provider — Google, Microsoft, or your own SSO — so you use the login
 you already have. No account yet? Ask your admin, or book a call from the sign-in screen.
 
 ## 2. Ask something
@@ -112,7 +112,7 @@ by capability from here.`,
 - **Stop customer data leaving the box.** In [Control](/docs/guides/control), add a routing rule
   \`data_class = PII → block\` and confirm cloud egress is off. Test it with the routing tester before
   you commit it.
-- **Catch and mask PII.** Set the guardrails adapter to Presidio, then test a string on the
+- **Catch and mask PII.** Turn on entity-grade PII detection, then test a string on the
   [Guardrails](/docs/guides/guardrails) page to see the live redaction.
 - **Restrict who can do what.** Add rules on the [Policy](/docs/guides/policy) page; deny wins.
 - **Hand a regulator a report.** Generate a signed compliance export in

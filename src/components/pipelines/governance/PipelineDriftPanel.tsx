@@ -112,7 +112,7 @@ export function PipelineDriftPanel({
           <CardHeader>
             <CardTitle className="text-sm">Configure a check</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Standard Evidently presets and stat tests (PSI · KL · KS · …). Without the Evidently
+              Standard drift presets and stat tests (PSI · KL · KS · …). Without the drift
               collector, the built-in PSI heuristic runs and still honours the threshold.
             </p>
           </CardHeader>

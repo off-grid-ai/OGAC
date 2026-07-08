@@ -35,6 +35,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
+import { evalEngineLabel } from '@/lib/eval-engine-label';
 
 interface EvalDef {
   id: string;
@@ -94,9 +95,8 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
     if (r.ok) {
       const result: RunResult = await r.json();
       setLastRun({ defId: def.id, result });
-      const verb = result.computedBy === 'ragas' ? 'ragas' : 'heuristic';
       toast.success(
-        `${def.name}: ${result.run.passed}/${result.run.total} passed (${result.run.score}%, ${verb})`,
+        `${def.name}: ${result.run.passed}/${result.run.total} passed (${result.run.score}%, ${evalEngineLabel(result.computedBy)})`,
       );
       router.refresh();
     } else {
@@ -165,7 +165,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Metric</TableHead>
-                <TableHead>Engine</TableHead>
+                <TableHead>Checker</TableHead>
                 <TableHead>Pass at</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -179,7 +179,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-[10px]">
-                      {d.engine}
+                      {evalEngineLabel(d.engine)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -226,7 +226,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">
-                Last run · {lastRun.result.run.score}% · computed by {lastRun.result.computedBy}
+                Last run · {lastRun.result.run.score}% · {evalEngineLabel(lastRun.result.computedBy)}
               </span>
               <span className="font-mono text-[10px] text-muted-foreground">
                 {lastRun.result.run.id}
@@ -239,7 +239,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
                   <TableHead className="text-xs">Metric</TableHead>
                   <TableHead className="text-xs">Score</TableHead>
                   <TableHead className="text-xs">Threshold</TableHead>
-                  <TableHead className="text-xs">Engine</TableHead>
+                  <TableHead className="text-xs">Checker</TableHead>
                   <TableHead className="text-xs">Verdict</TableHead>
                 </TableRow>
               </TableHeader>
@@ -253,7 +253,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px]">
-                        {m.engine}
+                        {evalEngineLabel(m.engine)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -282,7 +282,7 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
           <SheetHeader>
             <SheetTitle>Edit eval</SheetTitle>
             <SheetDescription>
-              Adjust the pass threshold and label. Metric + engine come from the template.
+              Adjust the pass threshold and label. Metric + checker come from the template.
             </SheetDescription>
           </SheetHeader>
           {editing && (
@@ -318,8 +318,8 @@ export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
                   <span className="font-mono">{editing.metric}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Engine</span>
-                  <span>{editing.engine}</span>
+                  <span className="text-muted-foreground">Checker</span>
+                  <span>{evalEngineLabel(editing.engine)}</span>
                 </div>
               </div>
             </SheetBody>

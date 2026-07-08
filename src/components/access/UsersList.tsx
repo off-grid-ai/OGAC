@@ -274,10 +274,10 @@ export function UsersList() {
 
         {apiError && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-            <span className="font-medium">Keycloak error:</span> {apiError}
+            <span className="font-medium">Identity provider error:</span> {apiError}
             {apiError === 'forbidden' && (
               <span className="ml-1 text-muted-foreground">
-                — the service account needs the <code className="rounded bg-muted px-1">view-users</code> role under realm-management in Keycloak.
+                — the service account needs the <code className="rounded bg-muted px-1">view-users</code> role under realm-management in your identity provider.
               </span>
             )}
           </div>

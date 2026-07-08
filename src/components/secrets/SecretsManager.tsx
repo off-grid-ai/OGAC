@@ -96,7 +96,7 @@ export function SecretsManager({
       });
       const d = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? 'Write failed.');
-      toast.success(`Stored "${v.key}" in OpenBao.`);
+      toast.success(`Stored "${v.key}" in the secrets store.`);
       setNewKey('');
       setNewValue(''); // clear write-only value immediately
       onToggleAdd(false);
@@ -109,7 +109,11 @@ export function SecretsManager({
   };
 
   const remove = async (key: string) => {
-    if (!window.confirm(`Delete secret "${key}"? This soft-deletes the latest version in OpenBao.`)) {
+    if (
+      !window.confirm(
+        `Delete secret "${key}"? This soft-deletes the latest version in the secrets store.`,
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -132,8 +136,9 @@ export function SecretsManager({
     return (
       <Card className="shadow-sm">
         <CardContent className="py-4 text-xs text-muted-foreground">
-          OpenBao is not configured — set <span className="font-mono">OFFGRID_OPENBAO_URL</span>{' '}
-          (token <span className="font-mono">OFFGRID_OPENBAO_TOKEN</span>, mount{' '}
+          The secrets store is not configured — set{' '}
+          <span className="font-mono">OFFGRID_OPENBAO_URL</span> (token{' '}
+          <span className="font-mono">OFFGRID_OPENBAO_TOKEN</span>, mount{' '}
           <span className="font-mono">OFFGRID_OPENBAO_MOUNT</span>) to store and manage
           connector/tool credentials in the KV vault.
         </CardContent>

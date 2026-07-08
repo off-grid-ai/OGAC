@@ -169,7 +169,7 @@ content; Retrieval is where you inspect how it's indexed and served.
 ## What you do here
 
 - **Inspect the store** — see collections and their document/chunk counts, and which vector backend
-  is active (an embedded store by default, or your own Qdrant at scale).
+  is active (an embedded store by default, or a dedicated vector store at scale).
 - **Query it** — run a retrieval query and see the ranked chunks, so you can verify what a grounded
   answer would find before an agent runs.
 - **Reindex** — rebuild the index after adding or changing content.
@@ -298,7 +298,7 @@ system; Off Grid AI indexes it on your hardware; Chat and agents answer from it 
 
 Upload files on the **Knowledge** page (PDFs, text, docs) or index a connected data source. Off Grid AI
 chunks the content and embeds it using a model on your own gateway — no embedding service, no data
-sent out. The vector store is yours (an embedded store by default, or your own Qdrant at scale).
+sent out. The vector store is yours (an embedded store by default, or a dedicated vector store at scale).
 
 ## How grounding works
 

@@ -45,6 +45,19 @@ function isExecStatus(v: string | undefined): v is ExecStatus {
 // Backend ids that actually execute code (mirrors the sandbox GET route). Anything else refuses.
 const EXEC_CAPABLE_BACKENDS = new Set(['docker', 'firecracker', 'e2b']);
 
+// Friendly capability labels for the active backend — operators see WHAT the sandbox does
+// (isolation strength), never the underlying execution-engine project name. Falls back to a
+// generic label. The raw backend id stays the internal key (routing, exec gating).
+const BACKEND_LABEL: Record<string, string> = {
+  none: 'No-exec (safe default)',
+  docker: 'Container isolation',
+  firecracker: 'Hardware-isolated microVM',
+  e2b: 'Managed secure sandbox',
+};
+function backendLabel(id: string): string {
+  return BACKEND_LABEL[id] ?? 'Secure sandbox';
+}
+
 export default async function SandboxPage({
   searchParams,
 }: {
@@ -84,9 +97,8 @@ export default async function SandboxPage({
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="secondary" className="font-medium text-foreground">
-              {view.backend}
+              {backendLabel(view.backend)}
             </Badge>
-            <span className="text-sm text-muted-foreground">{view.vendor}</span>
             <Badge variant="secondary" className="text-muted-foreground">
               {view.license}
             </Badge>

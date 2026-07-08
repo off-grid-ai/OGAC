@@ -40,8 +40,8 @@ export default async function SecretsPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
           <p className="text-sm text-muted-foreground">
-            Manage the on-prem secrets store (OpenBao) — seal state, active adapter, mount paths, and
-            full key CRUD. Secret values are write-only: never read back or shown here.
+            Manage the on-prem secrets store — seal state, active adapter, mount paths, and full key
+            CRUD. Secret values are write-only: never read back or shown here.
           </p>
         </div>
       </div>
@@ -51,8 +51,9 @@ export default async function SecretsPage() {
           <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
             <Warning className="size-5 shrink-0 text-muted-foreground" />
             <span>
-              OpenBao is not configured. Set <span className="font-mono">OFFGRID_OPENBAO_URL</span>{' '}
-              to enable the KMS-backed secrets store. The console falls back to the{' '}
+              The secrets store is not configured. Set{' '}
+              <span className="font-mono">OFFGRID_OPENBAO_URL</span> to enable the KMS-backed secrets
+              store. The console falls back to the{' '}
               <span className="font-mono">{view.activeAdapterVendor}</span> adapter.
             </span>
           </CardContent>
@@ -77,8 +78,8 @@ export default async function SecretsPage() {
               {view.unsealThreshold !== null && view.unsealShares !== null
                 ? ` (${view.unsealProgress ?? 0}/${view.unsealThreshold} of ${view.unsealShares} key shares provided)`
                 : ''}
-              . Unsealing requires operator key shares and is performed against OpenBao directly —
-              not from this browser.
+              . Unsealing requires operator key shares and is performed against the secrets store
+              directly — not from this browser.
             </span>
           </CardContent>
         </Card>
@@ -109,7 +110,7 @@ export default async function SecretsPage() {
           label="Active adapter"
           value={view.activeAdapterVendor}
           tone="muted"
-          sub={view.activeAdapterId}
+          sub={view.configured ? 'KMS-backed' : 'fallback'}
         />
         <SummaryTile
           icon={<Cube className="size-4" />}

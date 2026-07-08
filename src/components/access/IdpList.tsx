@@ -85,8 +85,8 @@ function AddOidcIdpForm({ onDone, onCancel }: { onDone: () => void; onCancel: ()
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        Covers the common OIDC authorization-code case. SAML and advanced mapper config stay in the
-        Keycloak admin console.
+        Covers the common OIDC authorization-code case. SAML and advanced mapper config stay in your
+        identity provider's admin console.
       </p>
       <div className="flex gap-2">
         <Button size="sm" className="gap-1.5" onClick={submit} disabled={saving}>
@@ -201,7 +201,7 @@ export function IdpList() {
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
             <div>
-              <span className="font-medium">Keycloak error:</span> {error}
+              <span className="font-medium">Identity provider error:</span> {error}
             </div>
             {grantable && (
               <Button

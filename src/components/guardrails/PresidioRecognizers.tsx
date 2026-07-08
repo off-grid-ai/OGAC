@@ -153,7 +153,7 @@ export function PresidioRecognizers({ recognizers }: { recognizers: Recognizer[]
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Custom PII patterns pushed to Presidio as ad-hoc recognizers on every scan — no
+          Custom PII patterns applied by the PII detector as ad-hoc recognizers on every scan — no
           server-side config needed. A pattern matches a regex (with optional context words); a
           deny list flags literal terms.
         </p>
@@ -287,7 +287,7 @@ export function PresidioRecognizers({ recognizers }: { recognizers: Recognizer[]
           {recognizers.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                No custom recognizers yet — Presidio&apos;s built-in catalog still applies.
+                No custom recognizers yet — the built-in recognizer catalog still applies.
               </TableCell>
             </TableRow>
           ) : (
