@@ -9,7 +9,7 @@
 //      Supports pause / resume / stop, and only ONE message speaks at a time.
 // Everything is on-prem / in-browser — no cloud API is ever contacted.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AudioConfigView,
   type RecordPhase,
@@ -25,6 +25,17 @@ import {
   speakButtonLabel,
   textForSpeech,
 } from '@/lib/chat-audio';
+import { type SpeechModel, defaultVoice } from '@offgrid/speech';
+
+/** The speech-model catalog + defaults the audio-config route ships alongside availability. */
+interface AudioModelCatalog {
+  stt: SpeechModel[];
+  tts: SpeechModel[];
+  defaultStt: string;
+  defaultTts: string;
+  defaultVoice: string | null;
+}
+type AudioConfig = AudioConfigView & { models?: AudioModelCatalog };
 
 function browserSpeechAvailable(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined';
@@ -50,6 +61,23 @@ export interface ChatAudioHook {
   stopSpeaking: () => void;
   /** Tooltip for a given message's play button. */
   speakLabel: (id: string) => string;
+
+  // ── Engine / voice picker (catalog-driven; degrades to gateway default) ──────
+  /** Selectable STT engines from the catalog ([] until the config probe resolves). */
+  sttModels: SpeechModel[];
+  /** Selectable TTS engines from the catalog. */
+  ttsModels: SpeechModel[];
+  /** Currently selected STT engine id ('' = gateway default). */
+  sttModel: string;
+  setSttModel: (id: string) => void;
+  /** Currently selected TTS engine id ('' = gateway default). */
+  ttsModel: string;
+  setTtsModel: (id: string) => void;
+  /** Voices for the selected TTS engine (empty for a voiceless model). */
+  ttsVoices: SpeechModel['voices'];
+  /** Currently selected TTS voice id. */
+  ttsVoice: string;
+  setTtsVoice: (id: string) => void;
 }
 
 export function useChatAudio(opts: {
@@ -60,12 +88,27 @@ export function useChatAudio(opts: {
   const notify = useCallback((m: string) => onError?.(m), [onError]);
 
   // ── config ──────────────────────────────────────────────────────────────
-  const [config, setConfig] = useState<AudioConfigView | null>(null);
+  const [config, setConfig] = useState<AudioConfig | null>(null);
+  // Picker selections. '' means "let the gateway pick its default" (fully backward-compatible with
+  // the pre-picker behavior — no model field is sent). Defaulted from the catalog once it loads.
+  const [sttModel, setSttModel] = useState('');
+  const [ttsModel, setTtsModel] = useState('');
+  const [ttsVoice, setTtsVoice] = useState('');
   useEffect(() => {
     let live = true;
     fetch('/api/v1/chat/audio-config')
       .then((r) => (r.ok ? r.json() : null))
-      .then((c) => { if (live && c) setConfig(c as AudioConfigView); })
+      .then((c) => {
+        if (!live || !c) return;
+        const cfg = c as AudioConfig;
+        setConfig(cfg);
+        // Seed the picker to the catalog defaults (Parakeet / Orpheus when available).
+        if (cfg.models) {
+          setSttModel((prev) => prev || cfg.models!.defaultStt);
+          setTtsModel((prev) => prev || cfg.models!.defaultTts);
+          setTtsVoice((prev) => prev || cfg.models!.defaultVoice || '');
+        }
+      })
       .catch(() => {});
     return () => { live = false; };
   }, []);
@@ -74,6 +117,21 @@ export function useChatAudio(opts: {
   const browserTts = browserSpeechAvailable();
   const backend = speakBackend(serverTts, browserTts);
   const ttsAvailable = backend !== 'none';
+
+  const sttModels = useMemo(() => config?.models?.stt ?? [], [config]);
+  const ttsModels = useMemo(() => config?.models?.tts ?? [], [config]);
+  const ttsVoices = useMemo(
+    () => ttsModels.find((m) => m.id === ttsModel)?.voices ?? [],
+    [ttsModels, ttsModel],
+  );
+  // Keep the voice coherent when the engine changes: reset to the new engine's default voice.
+  const setTtsModelAndVoice = useCallback(
+    (id: string) => {
+      setTtsModel(id);
+      setTtsVoice(defaultVoice(id) ?? '');
+    },
+    [],
+  );
 
   // ── STT ─────────────────────────────────────────────────────────────────
   const [recordPhase, setRecordPhase] = useState<RecordPhase>('idle');
@@ -112,6 +170,7 @@ export function useChatAudio(opts: {
           const fd = new FormData();
           fd.append('file', blob, filename);
           fd.append('filename', filename);
+          if (sttModel) fd.append('model', sttModel); // catalog pick; empty → gateway default
           const r = await fetch('/api/v1/chat/transcribe', { method: 'POST', body: fd });
           if (!r.ok) {
             advanceRecord({ type: 'fail' });
@@ -143,7 +202,7 @@ export function useChatAudio(opts: {
         notify('Microphone unavailable');
       }
     }
-  }, [recordPhase, sttAvailable, advanceRecord, notify, onTranscript]);
+  }, [recordPhase, sttAvailable, advanceRecord, notify, onTranscript, sttModel]);
 
   // ── TTS ─────────────────────────────────────────────────────────────────
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -203,7 +262,8 @@ export function useChatAudio(opts: {
           const r = await fetch('/api/v1/chat/speak', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ input: clean }),
+            // Catalog picks (empty → gateway default), fully backward-compatible.
+            body: JSON.stringify({ input: clean, model: ttsModel || undefined, voice: ttsVoice || undefined }),
           });
           if (r.ok) {
             const url = URL.createObjectURL(await r.blob());
@@ -249,7 +309,7 @@ export function useChatAudio(opts: {
         }
       }
     },
-    [speakingId, speakPhase, backend, browserTts, teardownPlayback, stopSpeaking, notify],
+    [speakingId, speakPhase, backend, browserTts, teardownPlayback, stopSpeaking, notify, ttsModel, ttsVoice],
   );
 
   const speakLabel = useCallback(
@@ -269,5 +329,14 @@ export function useChatAudio(opts: {
     speak,
     stopSpeaking,
     speakLabel,
+    sttModels,
+    ttsModels,
+    sttModel,
+    setSttModel,
+    ttsModel,
+    setTtsModel: setTtsModelAndVoice,
+    ttsVoices,
+    ttsVoice,
+    setTtsVoice,
   };
 }

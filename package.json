@@ -30,6 +30,7 @@
     "@offgrid/finops": "file:../shared/packages/finops",
     "@offgrid/gateway": "file:../gateway",
     "@offgrid/policy": "file:../shared/packages/policy",
+    "@offgrid/speech": "file:../shared/packages/speech",
     "@offgrid/vectordb": "file:../shared/packages/vectordb",
     "@phosphor-icons/react": "^2.1.10",
     "@scalar/nextjs-api-reference": "^0.11.5",

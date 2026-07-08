@@ -3,138 +3,57 @@
 // route handlers stay dumb and the behavior is unit-testable. All network work lives in the
 // route handlers (server) and the browser APIs (client); this module only DECIDES.
 //
-// AIR-GAP CONTRACT: the console never speaks to a cloud API. STT/TTS resolve to on-prem targets
-// only — a dedicated on-prem service (OFFGRID_STT_URL / OFFGRID_TTS_URL) if configured, else the
-// on-prem gateway aggregator's OpenAI-style /v1/audio/* endpoints (transcription + speech are live
-// modalities — see SERVICE_MAP.md). TTS additionally has a fully-local browser fallback
-// (speechSynthesis) that needs no server at all. Nothing in here can reach the internet.
+// DRY: the air-gap target resolution, the MIME→filename map, and the honest config view now live
+// ONCE in the shared, engine-agnostic `@offgrid/speech` package (used by the console + later the
+// desktop). This module re-exports them BOUND to the console's display policy (`toDisplayHost` —
+// mDNS host, never a raw IP / loopback, per the founder directive) and keeps the console-only bits:
+// the two UI state machines (record / speak) and the composer text/level shaping.
+//
+// AIR-GAP CONTRACT (enforced in the package): STT/TTS resolve to on-prem targets only — a dedicated
+// on-prem service (OFFGRID_STT_URL / OFFGRID_TTS_URL) if configured, else the on-prem gateway
+// aggregator's OpenAI-style /v1/audio/* endpoints. TTS additionally has a fully-local browser
+// fallback (speechSynthesis). Nothing here can reach the internet.
 
+import {
+  type AudioEnv,
+  type ModalityTarget,
+  type AudioConfigView,
+  resolveSttTarget as resolveSttTargetPkg,
+  resolveTtsTarget as resolveTtsTargetPkg,
+  audioConfigView as audioConfigViewPkg,
+} from '@offgrid/speech';
 import { toDisplayHost } from './display-host';
 
+// Re-export the shared MIME helpers + types verbatim so existing imports of `@/lib/chat-audio`
+// keep working unchanged (behavior-preserving consolidation).
+export {
+  RECORDER_MIME_PREFERENCE,
+  chooseRecorderMime,
+  audioFilename,
+} from '@offgrid/speech';
+export type { AudioEnv, AudioBackend, ModalityTarget, AudioConfigView } from '@offgrid/speech';
+
 // ─────────────────────────────────────────────────────────────────────────────
-// MIME / container handling for MediaRecorder.
+// Target resolution — console-bound to the mDNS display policy.
 //
-// Browsers disagree on what MediaRecorder can emit. We pick the first supported type from a
-// preference list (webm/opus is the widest), and map it to a filename the STT backend accepts.
+// The DECISION (dedicated → gateway → none + the /v1/audio/* path) is the shared package rule; we
+// inject `toDisplayHost` so the operator only ever sees an mDNS host (offgrid-s1.local, …), never a
+// raw IP / loopback. Same signatures + behavior as before the extraction.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Preference order for the recorder container. webm/opus first (Chrome/Firefox), then plain
- *  webm/ogg, then mp4/mpeg (Safari). The empty string result is the universal "let the UA decide". */
-export const RECORDER_MIME_PREFERENCE: readonly string[] = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/ogg;codecs=opus',
-  'audio/mp4',
-  'audio/mpeg',
-];
-
-/**
- * Choose a recorder MIME type given a support predicate (MediaRecorder.isTypeSupported). Pure:
- * the predicate is injected so this is testable without a browser. Returns '' when none of the
- * preferred types are supported — the caller then constructs MediaRecorder with no options and
- * lets the UA choose (still valid).
- */
-export function chooseRecorderMime(isSupported: (mime: string) => boolean): string {
-  for (const mime of RECORDER_MIME_PREFERENCE) {
-    if (isSupported(mime)) return mime;
-  }
-  return '';
-}
-
-/** Map a recorder MIME type to an upload filename with the right extension. The STT backend keys
- *  off the extension, so this must track the container we actually recorded. */
-export function audioFilename(mime: string): string {
-  const base = (mime || '').split(';')[0].trim().toLowerCase();
-  const ext =
-    base === 'audio/mp4' ? 'mp4'
-    : base === 'audio/mpeg' ? 'mp3'
-    : base === 'audio/ogg' ? 'ogg'
-    : 'webm';
-  return `audio.${ext}`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Config resolution — where do STT / TTS actually go, and is audio usable at all?
-//
-// Resolved on the SERVER from env, then a small honest view is handed to the UI so it can show
-// "audio not configured" states without ever guessing. The UI shows the mDNS display host
-// (never a raw IP / loopback — founder directive), so config uses toDisplayHost.
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface AudioEnv {
-  /** Dedicated on-prem STT service base URL (OFFGRID_STT_URL). Empty/undefined → use gateway. */
-  sttUrl?: string;
-  /** Dedicated on-prem TTS service base URL (OFFGRID_TTS_URL). Empty/undefined → use gateway. */
-  ttsUrl?: string;
-  /** The on-prem gateway aggregator base (OFFGRID_GATEWAY_URL). Its /v1/audio/* is the default. */
-  gatewayUrl?: string;
-}
-
-/** Which backend a modality resolves to. */
-export type AudioBackend = 'dedicated' | 'gateway' | 'none';
-
-export interface ModalityTarget {
-  backend: AudioBackend;
-  /** Absolute URL the route should POST to. '' when backend === 'none'. */
-  url: string;
-  /** Whether this modality is usable server-side (dedicated or gateway present). */
-  available: boolean;
-  /** mDNS host to SHOW the operator (never a raw IP / loopback). '' when unavailable. */
-  displayHost: string;
-}
-
-function trimUrl(u: string | undefined): string {
-  return (u ?? '').trim().replace(/\/+$/, '');
-}
-
-/**
- * Resolve the STT target: a dedicated service if configured, else the gateway's
- * /v1/audio/transcriptions, else none. Pure.
- */
+/** Resolve the STT target (dedicated → gateway → none), display host mapped to mDNS. */
 export function resolveSttTarget(env: AudioEnv): ModalityTarget {
-  const dedicated = trimUrl(env.sttUrl);
-  if (dedicated) {
-    return { backend: 'dedicated', url: `${dedicated}/v1/audio/transcriptions`, available: true, displayHost: toDisplayHost(dedicated) };
-  }
-  const gw = trimUrl(env.gatewayUrl);
-  if (gw) {
-    return { backend: 'gateway', url: `${gw}/v1/audio/transcriptions`, available: true, displayHost: toDisplayHost(gw) };
-  }
-  return { backend: 'none', url: '', available: false, displayHost: '' };
+  return resolveSttTargetPkg(env, toDisplayHost);
 }
 
-/**
- * Resolve the TTS target: a dedicated service if configured, else the gateway's /v1/audio/speech,
- * else none. Pure. Server TTS being 'none' is NOT fatal — the client falls back to the local
- * browser speechSynthesis (also air-gap-safe), decided by speakBackend below.
- */
+/** Resolve the TTS target (dedicated → gateway → none), display host mapped to mDNS. */
 export function resolveTtsTarget(env: AudioEnv): ModalityTarget {
-  const dedicated = trimUrl(env.ttsUrl);
-  if (dedicated) {
-    return { backend: 'dedicated', url: `${dedicated}/v1/audio/speech`, available: true, displayHost: toDisplayHost(dedicated) };
-  }
-  const gw = trimUrl(env.gatewayUrl);
-  if (gw) {
-    return { backend: 'gateway', url: `${gw}/v1/audio/speech`, available: true, displayHost: toDisplayHost(gw) };
-  }
-  return { backend: 'none', url: '', available: false, displayHost: '' };
+  return resolveTtsTargetPkg(env, toDisplayHost);
 }
 
-/** Honest config view handed to the client so it renders the right enabled/disabled + tooltip. */
-export interface AudioConfigView {
-  stt: { available: boolean; backend: AudioBackend; displayHost: string };
-  /** TTS: serverAvailable=false still allows the browser fallback (browserFallback always true). */
-  tts: { serverAvailable: boolean; backend: AudioBackend; displayHost: string; browserFallback: true };
-}
-
-/** Build the client-facing config view from env. Pure. */
+/** Build the client-facing config view from env, display hosts mapped to mDNS. */
 export function audioConfigView(env: AudioEnv): AudioConfigView {
-  const stt = resolveSttTarget(env);
-  const tts = resolveTtsTarget(env);
-  return {
-    stt: { available: stt.available, backend: stt.backend, displayHost: stt.displayHost },
-    tts: { serverAvailable: tts.available, backend: tts.backend, displayHost: tts.displayHost, browserFallback: true },
-  };
+  return audioConfigViewPkg(env, toDisplayHost);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
