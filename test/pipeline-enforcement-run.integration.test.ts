@@ -49,6 +49,17 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       step.agentId = `ag_mat_${step.id}`;
       return step.agentId;
     },
+    async renderReport(view, format) {
+      return {
+        filename: `offgrid-app-run-${view.id}.${format}`,
+        contentType: format === 'md' ? 'text/markdown' : 'application/pdf',
+        bytes: new TextEncoder().encode(`report:${view.id}`),
+        manifest: { algorithm: 'ed25519', sha256: 'a'.repeat(64), signature: 'sig' },
+      };
+    },
+    async sendEmail() {
+      return { ok: false, configured: false, reason: 'test: SMTP not configured' };
+    },
     ...over,
   };
 }
