@@ -43,6 +43,115 @@
     One <span class="em">governed pipeline</span> is the unit of everything — it governs <b>model access AND data movement</b> under one policy/guardrail/redaction/eval contract. It runs on a <span class="em">smart gateway</span> (routing + edge + its own telemetry). Every run and every sync emits into <b>one shared spine</b> (observability · audit · lineage · provenance · cost · compliance) — <span class="amber">replayable end-to-end</span> — and an <span class="em">org view</span> rolls the whole estate up. That's the platform.
   </div>
 
+  <!-- ============ THE DIAGRAM ============ -->
+  <h2 class="sec">The architecture — one governed flow</h2>
+  <div class="band" style="padding:18px">
+  <svg viewBox="0 0 1160 640" style="width:100%;height:auto;font-family:var(--mono)" role="img" aria-label="Off Grid AI architecture">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#34D399"/>
+      </marker>
+      <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#f0b24a"/>
+      </marker>
+    </defs>
+    <style>
+      .bx{fill:#161917;stroke:#242826;stroke-width:1;rx:8}
+      .bxE{fill:#12211b;stroke:#1c5c46;stroke-width:1.2}
+      .bxA{fill:#211d12;stroke:#5c4a1c;stroke-width:1.2}
+      .lbl{fill:#e7ece9;font-size:13px;font-weight:600}
+      .sub2{fill:#8a938d;font-size:10.5px}
+      .em2{fill:#34D399;font-size:11px;font-weight:600}
+      .am2{fill:#f0b24a;font-size:11px;font-weight:600}
+      .cap{fill:#8a938d;font-size:10px;text-transform:uppercase;letter-spacing:.14em}
+      .flow{stroke:#34D399;stroke-width:1.5;fill:none}
+      .flowA{stroke:#f0b24a;stroke-width:1.5;fill:none;stroke-dasharray:4 3}
+    </style>
+
+    <!-- ORG VIEW banner -->
+    <rect x="20" y="14" width="1120" height="40" rx="8" fill="#0f1c17" stroke="#1c5c46"/>
+    <text x="580" y="33" text-anchor="middle" class="em2">ORG VIEW — roll-up across every pipeline · gateway · consumer</text>
+    <text x="580" y="47" text-anchor="middle" class="sub2">spend · traces · audit · lineage graph · drift &amp; quality · compliance · fleet</text>
+
+    <!-- CONSUMERS row -->
+    <text x="20" y="82" class="cap">Consumers</text>
+    <g>
+      <rect class="bxE" x="20"  y="90" width="205" height="52" rx="8"/><text x="34" y="112" class="lbl">App</text><text x="34" y="130" class="sub2">UI · HITL · review · reports</text>
+      <rect class="bxE" x="242" y="90" width="205" height="52" rx="8"/><text x="256" y="112" class="lbl">Agent</text><text x="256" y="130" class="sub2">autonomous · headless · report</text>
+      <rect class="bxE" x="464" y="90" width="205" height="52" rx="8"/><text x="478" y="112" class="lbl">Chat / Projects</text><text x="478" y="130" class="sub2">governed conversation</text>
+      <rect class="bxA" x="686" y="90" width="205" height="52" rx="8"/><text x="700" y="112" class="am2">BI · PowerBI / Superset</text><text x="700" y="130" class="sub2">reads the warehouse</text>
+      <rect class="bxE" x="908" y="90" width="232" height="52" rx="8"/><text x="922" y="112" class="lbl">External 3rd-party</text><text x="922" y="130" class="sub2">provisioned pipeline key</text>
+    </g>
+
+    <!-- arrows consumers -> pipeline -->
+    <path class="flow" d="M580 142 L580 172" marker-end="url(#ar)"/>
+    <text x="592" y="162" class="sub2">bind</text>
+
+    <!-- PIPELINE (the big box) -->
+    <text x="20" y="192" class="cap">Pipeline — the one governed unit (owns everything)</text>
+    <rect x="20" y="200" width="1120" height="150" rx="10" fill="#0e1a15" stroke="#1c5c46" stroke-width="1.4"/>
+    <!-- does -->
+    <rect class="bx" x="36" y="214" width="250" height="50" rx="8"/><text x="48" y="234" class="lbl">Model access</text><text x="48" y="251" class="sub2">grounded answers + citations</text>
+    <rect class="bxA" x="298" y="214" width="300" height="50" rx="8"/><text x="310" y="234" class="am2">Data movement (ETL + ELT / CDC)</text><text x="310" y="251" class="sub2">connector → warehouse · redact pre-load</text>
+    <text x="620" y="234" class="sub2">+ compose</text><text x="620" y="249" class="sub2">pipelines-as-tools</text>
+    <!-- peripheries -->
+    <text x="36" y="286" class="cap">governed by the same peripheries</text>
+    <g class="sub2" font-size="10.5">
+      <rect x="36"  y="294" width="150" height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="46" y="308" class="em2" font-size="10">data-allowlist ⛔ceiling</text>
+      <rect x="196" y="294" width="95"  height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="206" y="308" class="em2" font-size="10">policy ABAC</text>
+      <rect x="301" y="294" width="90"  height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="311" y="308" class="em2" font-size="10">guardrails</text>
+      <rect x="401" y="294" width="105" height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="411" y="308" class="em2" font-size="10">PII redaction</text>
+      <rect x="516" y="294" width="120" height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="526" y="308" class="em2" font-size="10">evals + golden</text>
+      <rect x="646" y="294" width="70"  height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="656" y="308" class="em2" font-size="10">drift</text>
+      <rect x="726" y="294" width="150" height="20" rx="10" fill="#211d12" stroke="#5c4a1c"/><text x="736" y="308" class="am2" font-size="10">data-quality (GE)</text>
+      <rect x="886" y="294" width="90"  height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="896" y="308" class="em2" font-size="10">routing</text>
+      <rect x="986" y="294" width="138" height="20" rx="10" fill="#12211b" stroke="#1c5c46"/><text x="996" y="308" class="em2" font-size="10">API key · versioning</text>
+    </g>
+    <text x="36" y="336" class="cap">lifecycle</text>
+    <text x="120" y="337" class="em2" font-size="11">draft → in-review → published (approver + release-gate) → deprecated · auto-rollback on breach</text>
+
+    <!-- arrow pipeline -> gateway -->
+    <path class="flow" d="M300 350 L300 384" marker-end="url(#ar)"/><text x="312" y="373" class="sub2">runs on</text>
+    <!-- arrow pipeline -> data engine -->
+    <path class="flowA" d="M448 350 L448 384" marker-end="url(#arA)"/><text x="460" y="373" class="sub2">syncs via</text>
+
+    <!-- SUBSTRATE: gateway + data engine -->
+    <text x="20" y="404" class="cap">Substrate — two engines</text>
+    <rect x="20" y="412" width="558" height="96" rx="10" class="bxE"/>
+    <text x="34" y="432" class="em2" font-size="12">GATEWAY — smart model + network edge</text>
+    <text x="34" y="452" class="sub2">smart routing · fallback · egress leash (local/cloud/block)</text>
+    <text x="34" y="468" class="sub2">edge: WAF · rate-limit · cache · TLS · per-tenant URL</text>
+    <text x="34" y="484" class="sub2">its own logs + observability · llama.cpp fleet + cloud</text>
+    <text x="34" y="500" class="em2" font-size="10">on-prem · OpenAI · Anthropic · OpenRouter · STT/TTS · image</text>
+
+    <rect x="590" y="412" width="550" height="96" rx="10" class="bxA"/>
+    <text x="604" y="432" class="am2" font-size="12">DATA ENGINE — ETL/CDC + warehouse (on S2)</text>
+    <text x="604" y="452" class="sub2">Airbyte (connectors + CDC) · Redpanda (Kafka/MQ)</text>
+    <text x="604" y="468" class="sub2">ClickHouse (warehouse) · dbt (transform) · Great Expectations</text>
+    <text x="604" y="484" class="sub2">data lake (S3 / SeaweedFS) landing zone</text>
+    <text x="604" y="500" class="am2" font-size="10">staged in compose · provisions on S2</text>
+
+    <!-- arrow substrate -> spine -->
+    <path class="flow" d="M300 508 L300 540" marker-end="url(#ar)"/>
+    <path class="flowA" d="M865 508 L865 540" marker-end="url(#arA)"/>
+    <text x="470" y="530" text-anchor="middle" class="em2" font-size="11">every RUN or SYNC = the join key ↓</text>
+
+    <!-- SPINE -->
+    <rect x="20" y="548" width="1120" height="76" rx="10" fill="#0f1c17" stroke="#1c5c46" stroke-width="1.4"/>
+    <text x="34" y="568" class="em2">THE SPINE — what every run &amp; sync emits into</text>
+    <g class="sub2" font-size="11">
+      <text x="34"  y="592" class="em2">Observability</text><text x="34" y="607" class="sub2">traces·latency</text>
+      <text x="200" y="592" class="em2">Audit / SIEM</text><text x="200" y="607" class="sub2">every decision</text>
+      <text x="365" y="592" class="em2">Lineage</text><text x="365" y="607" class="sub2">src→answer / →BI</text>
+      <text x="540" y="592" class="em2">Provenance</text><text x="540" y="607" class="sub2">signed · citations</text>
+      <text x="710" y="592" class="em2">FinOps</text><text x="710" y="607" class="sub2">cost · chargeback</text>
+      <text x="850" y="592" class="em2">Regulatory</text><text x="850" y="607" class="sub2">ISO·NIST·EU-AI</text>
+      <text x="1010" y="592" class="am2">→ export</text><text x="1010" y="607" class="sub2">Splunk·Purview·Grafana</text>
+    </g>
+  </svg>
+  <p class="foot"><span style="color:var(--em)">green</span> = model plane (live) · <span style="color:var(--amber)">amber</span> = data plane (staged, provisions on S2). The pipeline owns both; the spine captures both; the org view rolls both up.</p>
+  </div>
+
   <!-- ORG -->
   <h2 class="sec">Org view — the whole estate</h2>
   <div class="org">
