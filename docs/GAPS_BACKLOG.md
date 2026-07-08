@@ -666,3 +666,7 @@ T1 scrubbed its 9 named surfaces cleanly; a full scan found more OUTSIDE that sc
 - **Observability Langfuse panels** (`LangfuseRegistryPanel.tsx`, `LangfuseInsightsPanel.tsx`): "Langfuse registry", "Read back from Langfuse's public API", "No Langfuse datasets/sessions" → "trace/prompt registry", "tracing store". → **fold into T2** (touching observability).
 - **/control SecretsPanel** (`SecretsPanel.tsx`): toast "Stored X in OpenBao" → "…in the secrets store". → **fold into T3** (owns /control).
 - **AI-Gateway tokens** (`GatewayApiKeys.tsx`): "backed by its own Keycloak service-account client", "Keycloak is not configured" → "identity-provider service account" / "SSO not configured". → **T4/misc**.
+
+## T4-tail (2026-07-08)
+- **Knowledge list→detail NOT done** — the `/workspace/knowledge` list still opens a side-Sheet; a `knowledge/[id]` detail route exists but rows don't route to it. (T4 agent hit session limit after 3/4 items.) Wire rows → `/workspace/knowledge/[id]`; keep the sheet for quick add-doc. Small.
+- **Still-deferred T4 'actionable' items:** /gateway/services drill-through, /gateway/edge WAF toggle, /gateway/fleet[id] policy reassign, /governance/provenance verify+rotate, /insights/analytics data-wiring. Read-only today; logged for a later pass.
