@@ -12,6 +12,7 @@ import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { distinctDepartments } from '@/lib/teams-policy';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 // The shape the server hands us (subset of TeamView; kept local so the client bundle stays lean).
@@ -19,6 +20,7 @@ export interface TeamCardData {
   id: string;
   name: string;
   description: string;
+  department: string | null;
   memberCount: number;
 }
 
@@ -32,6 +34,11 @@ function TeamCard({ t, onDelete }: { t: TeamCardData; onDelete: (t: TeamCardData
               <UsersThree className="size-4 text-primary" /> {t.name}
             </CardTitle>
           </Link>
+          {t.department ? (
+            <Badge variant="outline" className="mt-1 text-[10px] font-normal">
+              {t.department}
+            </Badge>
+          ) : null}
         </div>
         <Badge variant="outline" className="shrink-0">
           {t.memberCount} member{t.memberCount === 1 ? '' : 's'}
@@ -59,17 +66,24 @@ function TeamCard({ t, onDelete }: { t: TeamCardData; onDelete: (t: TeamCardData
   );
 }
 
-function AddTeamSheet({
+export function AddTeamSheet({
   open,
   onOpenChange,
   onSaved,
+  departments = [],
+  defaultDepartment = '',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  /** Existing department names, offered as datalist suggestions. */
+  departments?: string[];
+  /** Pre-fill the department (e.g. when creating from within a department group). */
+  defaultDepartment?: string;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [department, setDepartment] = useState(defaultDepartment);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,13 +94,14 @@ function AddTeamSheet({
     const res = await fetch('/api/v1/admin/teams', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, department: department.trim() || null }),
     });
     setBusy(false);
     if (res.ok) {
       toast.success(`Team "${name}" created`);
       setName('');
       setDescription('');
+      setDepartment(defaultDepartment);
       onOpenChange(false);
       onSaved();
     } else {
@@ -116,6 +131,24 @@ function AddTeamSheet({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="tm-dept">Department (optional)</Label>
+          <Input
+            id="tm-dept"
+            list="tm-dept-options"
+            placeholder="Finance"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          />
+          <datalist id="tm-dept-options">
+            {departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <p className="text-[11px] text-muted-foreground">
+            Groups this team under a department in the org chart. Leave blank for Unassigned.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="tm-desc">Description</Label>
@@ -199,7 +232,12 @@ export function TeamsManager({ teams }: { teams: TeamCardData[] }) {
         </div>
       )}
 
-      <AddTeamSheet open={open} onOpenChange={(o) => !o && setPanel(null)} onSaved={() => router.refresh()} />
+      <AddTeamSheet
+        open={open}
+        onOpenChange={(o) => !o && setPanel(null)}
+        onSaved={() => router.refresh()}
+        departments={distinctDepartments(teams)}
+      />
     </div>
   );
 }
