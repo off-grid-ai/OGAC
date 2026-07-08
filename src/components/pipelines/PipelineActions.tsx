@@ -53,6 +53,14 @@ export function PipelineActions({
         });
       }
       setBusy(false);
+      // M1-a: a gated publish returns 202 {status:'gating'} — the evals run in the background. Point
+      // the operator to the Quality tab, which polls the job and surfaces the verdict + override.
+      if (action === 'publish' && res.status === 202) {
+        toast.info(
+          `Running evals for "${name}" — it will publish once the release gate clears. Track it on the Quality tab.`,
+        );
+        return;
+      }
       if (res.ok) {
         const verb = action === 'publish' ? 'Published' : action === 'archive' ? 'Archived' : 'Restored';
         toast.success(`${verb} "${name}"`);

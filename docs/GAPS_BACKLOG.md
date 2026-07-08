@@ -727,10 +727,23 @@ Fully diagnosed live. TWO bugs in the node's packaged `Off Grid AI.app --server-
    harmless; a clean desktop reinstall supersedes it.
 
 ## M1 follow-up (found in live verify, 2026-07-08)
-- **M1-a: release-gate publish is SYNCHRONOUS → 524 on slow evals.** `publishWithGate` runs the pipeline's
-  evals inline in the POST /pipelines/[id]/publish request. A real ragas eval through the Cloudflare edge
-  exceeds ~100s → HTTP 524 (edge timeout) before a verdict returns. The gate IS wired + running the real
-  eval (verified — that's why it's slow); the gap is the sync request. FIX: make publish-gate async —
-  kick the eval (Temporal/queue), return `{status:'gating'}` 202, finalize publish (or block) on
-  completion + surface progress on the Quality tab. Block-path live verification still PENDING (the 524
-  pre-empted the verdict); pure release-gate unit tests DO cover pass/fail. Owner: console.
+- **[RESOLVED 2026-07-08] M1-a: release-gate publish is SYNCHRONOUS → 524 on slow evals.** `publishWithGate`
+  ran the pipeline's evals inline in the POST /pipelines/[id]/publish request; a real ragas eval through
+  the Cloudflare edge exceeded ~100s → HTTP 524 before a verdict returned. The gate logic was correct — the
+  sync request was the bug. **FIX (shipped):** the publish gate is now ASYNC via a tracked **job record**
+  (durable-agent path not reused — the eval chain itself isn't a Temporal workflow; a `publish_jobs` row is
+  the simplest correct seam and makes the resolution pollable + idempotent).
+  - Route branches on `countGatingEvals(id)`: **0 evals ⇒ instant sync publish** (unchanged); **≥1 eval ⇒
+    202 `{status:'gating', jobId}`** returned immediately, evals run in the BACKGROUND (fire-and-forget
+    `resolveGatingJob`), the gate is applied on completion (publish if pass/override, else leave draft +
+    record the blocked decision), audited either way.
+  - Poll route `GET /pipelines/[id]/publish/status?jobId=` → `{status: gating|published|blocked, decision}`
+    (or latest job when no jobId). Quality tab shows a "running the release evals" banner + polls every
+    2.5s and surfaces the verdict; PipelineActions lifecycle band toasts "running evals … track on Quality".
+  - **SOLID:** pure state model in `src/lib/publish-job.ts` (transitions + gate→terminal mapping,
+    zero-I/O); store `src/lib/publish-jobs-store.ts` (idempotent self-migrate, terminal-guard on resolve);
+    orchestration in `src/lib/pipeline-release.ts` reuses the unchanged `release-gate.ts` pure logic.
+  - **Evidence:** typecheck clean; `npm test` 1854 pass / 0 fail (pure `test/publish-job.test.ts` + real-DB
+    `test/publish-gate-async.integration.test.ts` — gating→terminal, idempotent double-resolve guard, ungated
+    instant publish); clean production build (both routes present). NEW `publish_jobs` table (schema.ts +
+    idempotent CREATE in the store) — NOT applied live yet; self-migrates on first use. Owner: console.

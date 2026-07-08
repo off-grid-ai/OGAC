@@ -37,6 +37,12 @@ import {
   type RollbackCandidate,
   type RollbackReason,
 } from '@/lib/rollback-policy';
+import {
+  resolveFromGate,
+  type PublishJobDecision,
+  type PublishJobView,
+} from '@/lib/publish-job';
+import { createPublishJob, resolvePublishJob } from '@/lib/publish-jobs-store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ─── 1. Release gate on publish ─────────────────────────────────────────────────────────────────────
@@ -65,42 +71,41 @@ async function runOneForGate(def: EvalDef, orgId: string): Promise<GateEvalResul
   }
 }
 
-/**
- * Publish a pipeline THROUGH its release gate. Runs the pipeline's attached evals, applies the pure
- * gate, and publishes iff the gate passes (or is ungated / no evals). On a failing gate: blocks
- * unless `override` — then publishes and records a `pipeline.publish.override` audit naming the
- * failing evals. Additive/safe: a pipeline with no evals publishes exactly as before.
- */
-export async function publishWithGate(
-  id: string,
-  opts: { orgId?: string; by?: string; override?: boolean } = {},
-): Promise<PublishGateResult | null> {
-  const orgId = opts.orgId ?? DEFAULT_ORG;
-  const by = opts.by ?? '';
-  const pipeline = await getPipeline(id, orgId);
-  if (!pipeline) return null;
-
+// How many gating evals a pipeline has attached — decides sync-instant vs async-gating. Zero ⇒ the
+// ungated/no-evals fast path (instant publish, exactly as before); ≥1 ⇒ the eval-running path, which
+// can be slow, so the route runs it ASYNC (M1-a) to never hit the Cloudflare 524 edge timeout.
+export async function countGatingEvals(id: string): Promise<number> {
   const defs = await listEvalDefs({ pipelineId: id });
-  const gateDefs: GateEvalDef[] = defs.map((d) => ({
-    id: d.id,
-    name: d.name,
-    threshold: d.threshold,
-  }));
+  return defs.length;
+}
 
-  // Run each attached eval (sequentially — each is a chain of gateway calls; parallel would saturate
-  // the fixed local fleet). No evals ⇒ empty results ⇒ ungated pass (no runs fired).
+// Run the pipeline's attached evals and compute the pure gate decision. Extracted so BOTH the sync
+// publishWithGate and the async background job run the SAME eval chain + the SAME pure verdict. Runs
+// sequentially — each eval is a chain of gateway calls; parallel would saturate the fixed local
+// fleet. No evals ⇒ empty results ⇒ ungated pass (no runs fired).
+async function runGateDecision(id: string, orgId: string): Promise<ReleaseGateDecision> {
+  const defs = await listEvalDefs({ pipelineId: id });
+  const gateDefs: GateEvalDef[] = defs.map((d) => ({ id: d.id, name: d.name, threshold: d.threshold }));
   const results: GateEvalResult[] = [];
   for (const def of defs) results.push(await runOneForGate(def, orgId));
+  return evaluateReleaseGate(gateDefs, results);
+}
 
-  const decision = evaluateReleaseGate(gateDefs, results);
+// Apply a computed gate decision: publish (pass), publish + audit override (fail + override), or
+// block + audit (fail, no override). Shared by the sync + async paths so the outcome + audit trail
+// are identical regardless of HOW the evals were run.
+async function applyGateVerdict(
+  id: string,
+  decision: ReleaseGateDecision,
+  opts: { orgId: string; by: string; override?: boolean },
+): Promise<PublishGateResult> {
+  const { orgId, by } = opts;
   const actor = actorFrom({ email: by });
 
   if (decision.pass) {
     const published = await publishPipeline(id, orgId, by);
     return { pipeline: published, decision, overridden: false, blocked: false };
   }
-
-  // Gate failed.
   if (opts.override) {
     const published = await publishPipeline(id, orgId, by);
     recordAudit({
@@ -112,8 +117,6 @@ export async function publishWithGate(
     });
     return { pipeline: published, decision, overridden: true, blocked: false };
   }
-
-  // Blocked — audit the blocked attempt so the trail shows the gate did its job.
   recordAudit({
     actor,
     org: orgId,
@@ -122,6 +125,95 @@ export async function publishWithGate(
     outcome: 'blocked',
   });
   return { pipeline: null, decision, overridden: false, blocked: true };
+}
+
+/**
+ * Publish a pipeline THROUGH its release gate (SYNCHRONOUS). Runs the pipeline's attached evals,
+ * applies the pure gate, and publishes iff the gate passes (or is ungated / no evals). On a failing
+ * gate: blocks unless `override` — then publishes and records a `pipeline.publish.override` audit.
+ * Additive/safe: a pipeline with no evals publishes exactly as before.
+ *
+ * NOTE (M1-a): the ROUTE only takes this path for the ungated/no-evals case (instant publish). A
+ * pipeline WITH evals goes through startPublishGate → resolveGatingJob (async) so a slow ragas eval
+ * never blocks the request past the ~100s edge timeout (524). This function stays the sync core +
+ * the reusable building block the async path finalizes with.
+ */
+export async function publishWithGate(
+  id: string,
+  opts: { orgId?: string; by?: string; override?: boolean } = {},
+): Promise<PublishGateResult | null> {
+  const orgId = opts.orgId ?? DEFAULT_ORG;
+  const by = opts.by ?? '';
+  const pipeline = await getPipeline(id, orgId);
+  if (!pipeline) return null;
+
+  const decision = await runGateDecision(id, orgId);
+  return applyGateVerdict(id, decision, { orgId, by, override: opts.override });
+}
+
+// ─── 1b. ASYNC publish gate (M1-a) — kick a gating job, resolve it in the background ─────────────────
+
+export interface StartPublishGateResult {
+  /** The gating job (status='gating') the operator polls. */
+  job: PublishJobView;
+}
+
+/**
+ * Start an ASYNC gated publish: create a `gating` job and return it immediately (the route returns
+ * 202 {status:'gating', jobId}). The caller kicks resolveGatingJob(job.jobId) as fire-and-forget so
+ * the slow eval chain runs in the BACKGROUND — the request never blocks past the edge timeout.
+ * Returns null when the pipeline is unknown (route → 404).
+ */
+export async function startPublishGate(
+  id: string,
+  opts: { orgId?: string; by?: string; override?: boolean } = {},
+): Promise<StartPublishGateResult | null> {
+  const orgId = opts.orgId ?? DEFAULT_ORG;
+  const pipeline = await getPipeline(id, orgId);
+  if (!pipeline) return null;
+  const job = await createPublishJob({
+    pipelineId: id,
+    orgId,
+    override: opts.override === true,
+    by: opts.by ?? '',
+  });
+  return { job };
+}
+
+/**
+ * Resolve a gating job: run the evals, apply the gate, publish-or-block, and transition the job to
+ * its terminal state with the decision payload. Idempotent at the store layer (a terminal job is
+ * never re-resolved). Never throws — a hard eval-runner failure is recorded as a BLOCKED job with an
+ * honest error (the pipeline stays draft), so a poll always sees a real terminal state. This is the
+ * background body the route fires after startPublishGate.
+ */
+export async function resolveGatingJob(
+  jobId: string,
+  id: string,
+  opts: { orgId?: string; by?: string; override?: boolean } = {},
+): Promise<PublishJobView | null> {
+  const orgId = opts.orgId ?? DEFAULT_ORG;
+  const by = opts.by ?? '';
+  try {
+    const decision = await runGateDecision(id, orgId);
+    const { status, overridden } = resolveFromGate(decision, opts.override === true);
+    const result = await applyGateVerdict(id, decision, { orgId, by, override: opts.override });
+    const payload: PublishJobDecision = {
+      decision,
+      overridden,
+      version: result.pipeline?.version,
+    };
+    return resolvePublishJob(jobId, status, payload, orgId);
+  } catch (e) {
+    // Hard failure (eval runner threw uncaught) — block honestly; the pipeline is untouched (draft).
+    const decision = evaluateReleaseGate([], []);
+    const payload: PublishJobDecision = {
+      decision,
+      overridden: false,
+      error: e instanceof Error ? e.message : 'gate run failed',
+    };
+    return resolvePublishJob(jobId, 'blocked', payload, orgId);
+  }
 }
 
 // ─── 2. Auto-rollback to last-good published version ─────────────────────────────────────────────────
