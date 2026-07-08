@@ -1,0 +1,19 @@
+{
+  "reporter": ["text-summary", "text"],
+  "all": true,
+  "src": ["src/lib"],
+  "include": ["src/lib/**/*.ts"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.d.ts",
+    "test/**",
+    "src/**/*.tsx"
+  ],
+  "excludeNodeModules": true,
+  "skip-full": false,
+  "lines": 85,
+  "functions": 85,
+  "branches": 85,
+  "statements": 85,
+  "check-coverage": false
+}
