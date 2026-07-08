@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { verifierFromEnv } from './lib/keycloak-verify.mjs';
 import { gatewayKeyVerifierFromEnv, isGatewayKey } from './lib/gateway-key-verify.mjs';
+import { gatewayFromHost } from './lib/gateway-host.mjs';
 
 // DEPRECATED (task #74): the single static gateway key. Retained ONLY as a backward-compat fallback
 // so an unmigrated deploy keeps working; new keys are the Keycloak-backed `ogak_…` API keys minted in
@@ -590,6 +591,12 @@ async function handle(req, res, chunks) {
     // Request-side context for the observability record (A + D above).
     const caller = String(req.headers['user-agent'] || '').slice(0, 80);
     const corrId = String(req.headers['x-offgrid-run'] || req.headers['x-request-id'] || '');
+    // PA-15 — per-tenant gateway ATTRIBUTION. When this request arrived on a provisioned per-tenant
+    // gateway host ("<slug5><rand5>-gateway.<apex>"), the tunnel/Caddy forwards the original host in
+    // the Host header. Resolve it (pure) so the request is attributed to that tenant's gateway on the
+    // observability record; the shared "gateway.<apex>" and any other host return null (unattributed).
+    const inboundHost = String(req.headers['host'] || req.headers['x-forwarded-host'] || '');
+    const tenantGateway = gatewayFromHost(inboundHost);
     const params = {
       temperature: body.temperature,
       maxTokens: body.max_tokens,
@@ -686,12 +693,14 @@ async function handle(req, res, chunks) {
           gateway: target.name, model: body.model || target.model, modelServed: target.model, kind,
           status: ur.statusCode || 0, ms: Date.now() - started, bytes, tokens, promptTokens, completionTokens,
           tps, finish, toolCalls, reasoning: reasoning.slice(0, 2000), caller, corrId, params, msgs,
+          tenantGateway: tenantGateway ? tenantGateway.label : null,
+          tenantGatewayHost: tenantGateway ? inboundHost.toLowerCase() : null,
           input: promptText(body), output: output.slice(0, 2000),
         });
       });
     });
     up.on('error', (e) => {
-      record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, input: promptText(body), output: `(error: ${e.message})` });
+      record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, tenantGateway: tenantGateway ? tenantGateway.label : null, tenantGatewayHost: tenantGateway ? inboundHost.toLowerCase() : null, input: promptText(body), output: `(error: ${e.message})` });
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
     up.setTimeout(Number(process.env.OFFGRID_GATEWAY_UPSTREAM_TIMEOUT_MS || 300000), () => up.destroy(new Error('upstream timeout')));

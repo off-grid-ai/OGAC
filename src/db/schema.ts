@@ -956,6 +956,11 @@ export const gateways = pgTable('gateways', {
   baseUrl: text('base_url').notNull().default(''),
   defaultModel: text('default_model').notNull().default(''),
   egressClass: text('egress_class').notNull().default('cloud'),  // on-prem | cloud (derived from kind)
+  // PA-15: the per-tenant PROVISIONED gateway HOST ("<slug5><rand5>-gateway.<apex>"), minted from
+  // the tenant slug + a random suffix (tenantGatewayHost). Nullable — most gateways use the shared
+  // "gateway.<apex>"; only a provisioned per-tenant gateway carries its own unguessable host. The
+  // aggregator/edge resolves the tenant from the inbound Host by matching gatewayFromHost() ↔ this.
+  hostname: text('hostname'),
   enabled: boolean('enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('gateways_org_idx').on(t.orgId)]);
