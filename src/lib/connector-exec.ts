@@ -15,9 +15,45 @@
 
 // The minimal connector shape this module needs — just the dialect + where to reach it. Matches
 // the fields on both the DB row and the `Connector` interface in store.ts, so either can be passed.
+//
+// `id` is optional: when present, the exec path resolves the connector's credential from the vault
+// (via connector-secrets) at QUERY time and injects it — the SQL password into the connection URL,
+// the REST api key as a Bearer header — so the stored endpoint stays credential-free. When absent
+// (or the connector has no vaulted secret) the raw endpoint is used as-is, preserving already-seeded
+// connectors that still carry inline creds. Nothing that works today breaks.
 export interface ConnectorTarget {
   type: string;
   endpoint: string;
+  id?: string;
+}
+
+// A connector target with its credential already resolved from the vault: the endpoint has any SQL
+// password spliced in, and `authHeader` carries a Bearer header for REST when the connector has an
+// api key. Produced by resolveTargetCreds; consumed by the dialect branches below.
+interface ResolvedExecTarget {
+  type: string;
+  endpoint: string;
+  authHeader: Record<string, string>;
+}
+
+// Resolve a target's credential from the vault (by `id`) into a ready-to-use exec target. Falls back
+// to the raw endpoint + no header when there's no id / no vaulted secret / the vault is unreachable,
+// so seeded connectors with inline creds keep working. Dynamic import breaks the exec↔secrets cycle.
+async function resolveTargetCreds(conn: ConnectorTarget): Promise<ResolvedExecTarget> {
+  const base: ResolvedExecTarget = { type: conn.type, endpoint: conn.endpoint, authHeader: {} };
+  if (!conn.id) return base;
+  try {
+    const { resolveConnectorSecret } = await import('./connector-secrets');
+    const { spliceCredential } = await import('./connector-policy');
+    const secret = await resolveConnectorSecret(conn.id);
+    if (!secret) return base;
+    const dialect = detectDialect(conn.type, conn.endpoint);
+    if (dialect === 'rest') return { ...base, authHeader: { authorization: `Bearer ${secret}` } };
+    // SQL dialects: splice the password into the connection URL (no-op if it already has one).
+    return { ...base, endpoint: spliceCredential(conn.type, conn.endpoint, secret) };
+  } catch {
+    return base;
+  }
 }
 
 // A READ request against a bound resource (table / path / object) on a connector.
@@ -141,12 +177,16 @@ export async function execConnectorQuery(
   if (!dialect) return null;
   const op = query.op ?? 'read';
   const limit = Math.max(1, Math.min(query.limit ?? 100, 1000));
+  // Inject the vaulted credential (SQL password / REST bearer) at query time. Endpoint stays
+  // credential-free on the row; the resolved copy is used only here and never persisted.
+  const resolved = await resolveTargetCreds(conn);
+  const endpoint = resolved.endpoint;
 
   if (dialect === 'postgres') {
     const table = safeIdentifier(query.resource);
     if (!table) return null;
     const { Pool } = await import('pg');
-    const pool = new Pool({ connectionString: conn.endpoint, connectionTimeoutMillis: 3000, max: 1 });
+    const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
     try {
       if (op === 'count') {
         const r = await pool.query(`SELECT COUNT(*)::bigint AS n FROM ${table}`);
@@ -162,7 +202,7 @@ export async function execConnectorQuery(
     if (!table) return null;
     try {
       const mysql = await import('mysql2/promise');
-      const c = await mysql.createConnection(conn.endpoint);
+      const c = await mysql.createConnection(endpoint);
       try {
         if (op === 'count') {
           const [rows] = await c.query(`SELECT COUNT(*) AS n FROM \`${table}\``);
@@ -182,7 +222,7 @@ export async function execConnectorQuery(
     try {
       const mssqlMod = await import('mssql');
       const mssql = mssqlMod.default ?? mssqlMod;
-      const u = new URL(conn.endpoint);
+      const u = new URL(endpoint);
       const pool = await mssql.connect({
         server: u.hostname,
         port: Number(u.port || 1433),
@@ -209,15 +249,16 @@ export async function execConnectorQuery(
   // (json-server style {accounts:[…]} → resource='accounts'). A top-level array is returned as-is.
   if (dialect === 'rest') {
     try {
-      const base = conn.endpoint.replace(/\/$/, '');
+      const base = endpoint.replace(/\/$/, '');
+      const headers = resolved.authHeader;
       // Prefer a resource-scoped path (…/accounts); fall back to the base if it 404s.
       const url = query.resource ? `${base}/${encodeURIComponent(query.resource)}` : base;
       let body: unknown;
-      const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      const r = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
       if (r.ok) {
         body = await r.json();
       } else {
-        const rb = await fetch(base, { signal: AbortSignal.timeout(3000) });
+        const rb = await fetch(base, { headers, signal: AbortSignal.timeout(3000) });
         if (!rb.ok) return null;
         const full = await rb.json();
         body = full && typeof full === 'object' && query.resource
@@ -241,4 +282,154 @@ export async function execConnectorQuery(
   }
 
   return null;
+}
+
+// ─── testConnection — a cheap live probe (SELECT 1 / REST root) ────────────────
+// Opens a connection with the vaulted credential injected and runs the lightest possible check:
+// `SELECT 1` for SQL, a HEAD/GET of the base URL for REST. Returns an honest pass/fail + a short
+// message the UI shows inline — the operator confirms the connector actually reaches its source
+// before relying on it. Never throws; a failure is `{ ok: false, message }`, never an exception.
+export interface ConnectionTestResult {
+  ok: boolean;
+  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | null;
+  message: string;
+}
+
+export async function testConnection(conn: ConnectorTarget): Promise<ConnectionTestResult> {
+  const dialect = detectDialect(conn.type, conn.endpoint);
+  if (!dialect) {
+    return { ok: false, dialect: null, message: 'This connector type cannot be queried live yet.' };
+  }
+  const resolved = await resolveTargetCreds(conn);
+  const endpoint = resolved.endpoint;
+
+  try {
+    if (dialect === 'postgres') {
+      const { Pool } = await import('pg');
+      const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 4000, max: 1 });
+      try {
+        await pool.query('SELECT 1');
+        return { ok: true, dialect, message: 'Connected — the database responded.' };
+      } finally { await pool.end().catch(() => undefined); }
+    }
+    if (dialect === 'mysql') {
+      const mysql = await import('mysql2/promise');
+      const c = await mysql.createConnection(endpoint);
+      try {
+        await c.query('SELECT 1');
+        return { ok: true, dialect, message: 'Connected — the database responded.' };
+      } finally { await c.end(); }
+    }
+    if (dialect === 'mssql') {
+      const mssqlMod = await import('mssql');
+      const mssql = mssqlMod.default ?? mssqlMod;
+      const u = new URL(endpoint);
+      const pool = await mssql.connect({
+        server: u.hostname,
+        port: Number(u.port || 1433),
+        user: decodeURIComponent(u.username) || 'sa',
+        password: decodeURIComponent(u.password) || process.env.OFFGRID_ERP_PASSWORD || '',
+        database: u.pathname.replace(/^\//, '') || 'master',
+        options: { encrypt: false, trustServerCertificate: true },
+        connectionTimeout: 4000,
+      });
+      try {
+        await pool.request().query('SELECT 1 AS n');
+        return { ok: true, dialect, message: 'Connected — the database responded.' };
+      } finally { await pool.close(); }
+    }
+    // rest
+    const r = await fetch(endpoint.replace(/\/$/, ''), {
+      headers: resolved.authHeader,
+      signal: AbortSignal.timeout(4000),
+    });
+    if (r.ok) return { ok: true, dialect, message: `Connected — the API returned ${r.status}.` };
+    return { ok: false, dialect, message: `The API responded ${r.status} ${r.statusText}.` };
+  } catch (e) {
+    const code = (e as { cause?: { code?: string } })?.cause?.code;
+    const msg = code ?? (e as Error)?.message ?? 'connection failed';
+    return { ok: false, dialect, message: `Could not connect: ${msg}.` };
+  }
+}
+
+// ─── listResources — enumerate the tables/objects the user can bind to ─────────
+// SQL: read information_schema for the base (non-system) tables so the user PICKS a table instead of
+// hand-typing a raw resource string. REST: read the base URL and surface the top-level array keys
+// (json-server style {accounts:[…], loans:[…]} → ['accounts','loans']). Returns null on failure so
+// the caller degrades to manual entry rather than showing a fake list.
+export async function listResources(conn: ConnectorTarget): Promise<string[] | null> {
+  const dialect = detectDialect(conn.type, conn.endpoint);
+  if (!dialect) return null;
+  const resolved = await resolveTargetCreds(conn);
+  const endpoint = resolved.endpoint;
+
+  try {
+    if (dialect === 'postgres') {
+      const { Pool } = await import('pg');
+      const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 4000, max: 1 });
+      try {
+        const r = await pool.query(
+          `SELECT table_schema, table_name FROM information_schema.tables
+           WHERE table_type = 'BASE TABLE'
+             AND table_schema NOT IN ('pg_catalog','information_schema')
+           ORDER BY table_schema, table_name LIMIT 500`,
+        );
+        return r.rows.map((row) =>
+          row.table_schema === 'public' ? String(row.table_name) : `${row.table_schema}.${row.table_name}`,
+        );
+      } finally { await pool.end().catch(() => undefined); }
+    }
+    if (dialect === 'mysql') {
+      const mysql = await import('mysql2/promise');
+      const c = await mysql.createConnection(endpoint);
+      try {
+        const [rows] = await c.query(
+          `SELECT table_name FROM information_schema.tables
+           WHERE table_schema = DATABASE() ORDER BY table_name LIMIT 500`,
+        );
+        return (rows as { table_name?: string; TABLE_NAME?: string }[]).map(
+          (row) => String(row.table_name ?? row.TABLE_NAME),
+        );
+      } finally { await c.end(); }
+    }
+    if (dialect === 'mssql') {
+      const mssqlMod = await import('mssql');
+      const mssql = mssqlMod.default ?? mssqlMod;
+      const u = new URL(endpoint);
+      const pool = await mssql.connect({
+        server: u.hostname,
+        port: Number(u.port || 1433),
+        user: decodeURIComponent(u.username) || 'sa',
+        password: decodeURIComponent(u.password) || process.env.OFFGRID_ERP_PASSWORD || '',
+        database: u.pathname.replace(/^\//, '') || 'master',
+        options: { encrypt: false, trustServerCertificate: true },
+        connectionTimeout: 4000,
+      });
+      try {
+        const res = await pool.request().query(
+          `SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+           WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME`,
+        );
+        return (res.recordset ?? []).map((row: { TABLE_SCHEMA: string; TABLE_NAME: string }) =>
+          row.TABLE_SCHEMA === 'dbo' ? String(row.TABLE_NAME) : `${row.TABLE_SCHEMA}.${row.TABLE_NAME}`,
+        );
+      } finally { await pool.close(); }
+    }
+    // rest — surface the top-level array keys (json-server collections) or [] for a bare array.
+    const r = await fetch(endpoint.replace(/\/$/, ''), {
+      headers: resolved.authHeader,
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!r.ok) return null;
+    const body = await r.json();
+    if (Array.isArray(body)) return [];
+    if (body && typeof body === 'object') {
+      return Object.entries(body as Record<string, unknown>)
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k]) => k);
+    }
+    return [];
+  } catch {
+    return null;
+  }
 }
