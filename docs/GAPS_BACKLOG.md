@@ -683,6 +683,18 @@ keep-both. STT = Parakeet (+Whisper); TTS = Orpheus (+Kokoro). Decision + detail
   on S1 — the audio handler tries to spawn a TTS binary but the path/binaries aren't present on the
   console's server, so live STT/TTS-through-gateway is BROKEN on S1. Working reference = desktop
   `src/main/model-server.ts` (Kokoro/Piper via `/v1/audio/speech`, catalog in desktop/packages/models).
+### SP-2 root cause + access boundary (2026-07-08, traced end-to-end)
+Traced: console → aggregator :8800 (no /v1/audio branch → default proxy `pick()`s a chat node) →
+node model-server (:7878, "Off Grid AI — local model gateway") → **spawns its TTS/STT binary →
+`spawn ENOTDIR`** (bad/missing binary path). Reproduced directly: `curl http://offgrid-g1.local:7878/v1/audio/voices` → same error.
+**BLOCKED remotely:** the node model-server + its bundled speech binaries run under the node's **`user`**
+account. S1/aggregator SSH key = `admin@gN` (works) but admin CANNOT access `user`'s procs/files/the
+Off Grid AI Desktop bundle where the TTS binary/model live; `user@gN` rejects the admin key. So the fix
+must happen in the node `user` context — it's a **desktop model-server / node-provisioning** task (bundle
++ correct the whisper/kokoro binary+model spawn path; desktop is adding Parakeet in that same code), NOT a
+console-side patch. Console side (@offgrid/speech client+catalog+picker+fallback) is DONE + live; it
+auto-works once the node serves /v1/audio/* correctly. Owner: desktop/fleet (on-node `user` access).
+
   MECHANISM (now clear): the desktop MODEL-SERVER (which runs on the gateway nodes as :7878) already
   serves /v1/audio/* natively (whisper.cpp STT + Kokoro TTS; handlers in desktop/src/main/model-server.ts
   handleTranscription/handleSpeech). ENOTDIR = the aggregator serves audio itself / routes to a node
