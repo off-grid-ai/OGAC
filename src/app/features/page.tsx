@@ -49,9 +49,9 @@ const GROUPS: FeatureGroup[] = [
     features: [
       { name: 'AI Gateway', value: 'A single, OpenAI-compatible endpoint for every model call — one place to route, govern, observe, and kill.' },
       { name: 'Guardrails (PII + injection)', value: 'Every prompt is scanned for sensitive data and prompt-injection before it ever reaches a model.' },
-      { name: 'Policy — RBAC + ABAC / OPA', value: 'Deny-overrides access decisions: who can use which model, data, and tool, provably enforced.' },
-      { name: 'Identity & SSO', value: 'Google / Microsoft / Keycloak (SAML/OIDC). Enterprise login with no bespoke user store.' },
-      { name: 'Secrets management', value: 'Env by default, OpenBao for production — no plaintext keys anywhere, rotated centrally.' },
+      { name: 'Policy — RBAC + ABAC', value: 'Deny-overrides access decisions: who can use which model, data, and tool, provably enforced.' },
+      { name: 'Identity & SSO', value: 'Google / Microsoft / enterprise SSO (SAML/OIDC). Enterprise login with no bespoke user store.' },
+      { name: 'Secrets management', value: 'Env by default, a hardened vault for production — no plaintext keys anywhere, rotated centrally.' },
       { name: 'Append-only audit + SIEM', value: 'Every model call, tool call, and byte of egress on one immutable record; ship to OpenSearch for search + dashboards.' },
       { name: 'Kill switch', value: 'One control halts all AI org-wide — the switch a board signs off on.' },
     ],
@@ -62,7 +62,7 @@ const GROUPS: FeatureGroup[] = [
     title: 'Your knowledge, grounded and cited',
     tagline: 'Agents answer from your content — not the model’s guesses.',
     features: [
-      { name: 'The Brain (RAG)', value: 'Versioned knowledge base over your own SOPs/playbooks; LanceDB on-disk, Qdrant/pgvector at scale.' },
+      { name: 'The Brain (RAG)', value: 'Versioned knowledge base over your own SOPs/playbooks; embedded on-disk, or a dedicated vector store at scale.' },
       { name: 'Retrieval router', value: 'Detects intent and queries the right source — knowledge base, database, or tool — with provenance on every hit.' },
       { name: 'Grounding & citation checks', value: 'Verifies each claim against its sources, so hallucination is caught before it ships.' },
       { name: 'Response cache', value: 'Exact + semantic caching (in-process or Redis) cuts cost and latency on repeated prompts.' },
@@ -75,9 +75,9 @@ const GROUPS: FeatureGroup[] = [
     title: 'Proof the agents are still doing a good job',
     tagline: 'Automated QA that answers: are they working, and if not, which one regressed and when?',
     features: [
-      { name: 'Offline evals', value: 'Golden-set recall plus promptfoo assertion matrices and Ragas RAG metrics — regression-test agents before release.' },
-      { name: 'Online scoring', value: 'An LLM-as-judge scores live traffic for quality + faithfulness and trends it in Langfuse — a falling score is your alarm.' },
-      { name: 'Drift & degradation', value: 'Population-stability + Evidently test suites detect distribution shift and quality decay over time.' },
+      { name: 'Offline evals', value: 'Golden-set recall plus assertion matrices and RAG metrics — regression-test agents before release.' },
+      { name: 'Online scoring', value: 'An LLM-as-judge scores live traffic for quality + faithfulness and trends it over time — a falling score is your alarm.' },
+      { name: 'Drift & degradation', value: 'Population-stability and test suites detect distribution shift and quality decay over time.' },
       { name: 'Live observability', value: 'OpenTelemetry traces, metrics, and per-call cost per user / team / project.' },
     ],
   },
@@ -90,7 +90,7 @@ const GROUPS: FeatureGroup[] = [
       { name: 'Signed exports', value: 'Every report carries a detached ed25519 manifest — offline-verifiable with only a public key, no shared secret.' },
       { name: 'C2PA Content Credentials', value: 'Industry-standard signed manifests embedded in generated images.' },
       { name: 'Sigstore attestation', value: 'Keyless signing of artifacts with a public transparency-log trail.' },
-      { name: 'Data lineage', value: 'A queryable source → chunk → answer graph (OpenLineage / Marquez) explains where any answer came from.' },
+      { name: 'Data lineage', value: 'A queryable source → chunk → answer graph explains where any answer came from.' },
     ],
   },
   {
@@ -100,7 +100,7 @@ const GROUPS: FeatureGroup[] = [
     tagline: 'The substrate for agents that act, not just answer.',
     features: [
       { name: 'Sandboxed code execution', value: 'Agent-authored code runs in an ephemeral, network-isolated, resource-capped container — off by default, gated by policy.' },
-      { name: 'Durable workflows', value: 'Temporal-backed multi-step agents survive a crash and resume — required before you trust autonomy.' },
+      { name: 'Durable workflows', value: 'Durable multi-step agents survive a crash and resume — required before you trust autonomy.' },
       { name: 'Tool registry', value: 'Agents call only registered, scoped tools — arbitrary action is refused by default.' },
       { name: 'Feature flags', value: 'Toggle modules and capabilities per tenant / environment; instant rollback.' },
     ],
@@ -122,7 +122,7 @@ const GROUPS: FeatureGroup[] = [
     title: 'One pane of glass over the whole estate',
     tagline: 'Where humans meet the agents — and where you keep control.',
     features: [
-      { name: 'Fleet control (FleetDM)', value: '“MDM for AI” on open source — FleetDM + osquery: provision, govern, and observe every AI-enabled device from one console.' },
+      { name: 'Fleet control', value: '“MDM for AI” open source — provision, govern, and observe every AI-enabled device from one console.' },
       { name: 'FinOps + virtual keys', value: 'Issue keys with budgets; per-user / project cost and chargeback — no surprise token bills.' },
       { name: 'BI / data exploration', value: 'Explore usage and data with Superset — without exporting it.' },
       { name: 'Agents & Reports', value: 'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) ready to run and govern.' },
@@ -173,7 +173,7 @@ const AGENTIFY: Angle[] = [
   {
     icon: Robot,
     title: 'From copilots to autonomous workflows',
-    body: 'Start with one human-in-the-loop agent on the gateway; graduate to durable, multi-step workflows (Temporal) that survive crashes and resume — majority-machine, humans only on the edges that matter.',
+    body: 'Start with one human-in-the-loop agent on the gateway; graduate to durable, multi-step workflows that survive crashes and resume — majority-machine, humans only on the edges that matter.',
   },
   {
     icon: Brain,
