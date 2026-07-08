@@ -39,6 +39,7 @@ import {
 import type * as activities from './app-run.activities';
 import type { AppRunWorkflowInput, AppRunWorkflowResult } from '../lib/app-run-durable';
 import type { StepResult } from '../lib/app-run';
+import type { PipelineContract } from '../lib/pipeline-enforcement';
 import {
   initState,
   applyStepResult,
@@ -103,6 +104,15 @@ export async function AppRunWorkflow(
     return { found: false, runId: input.runId, status: 'not_found' };
   }
 
+  // PA-16 — resolve the bound-pipeline CONTRACT ONCE (via the I/O activity, using the SAME resolver
+  // the inline route uses), then thread it into every step below so the WORKER path enforces the
+  // data-allowlist ceiling + egress leash + governance overlay identically to inline. No bound
+  // pipeline ⇒ null ⇒ legacy allow (additive-only). This closes the durable governance hole.
+  const contract: PipelineContract | null = await act.resolveContractActivity(
+    input.pipelineId,
+    input.orgId,
+  );
+
   let state = initState(spec, input.runId);
   const results: StepResult[] = [];
 
@@ -128,7 +138,7 @@ export async function AppRunWorkflow(
       state = applyStepResult(state, step.id, { status: 'running' });
       await act.persistState(state, input.input, input.orgId);
 
-      const result = await act.executeStepActivity(input, spec, step, results);
+      const result = await act.executeStepActivity(input, spec, step, results, contract);
       results.push(result);
       state = applyStepResult(state, step.id, foldResult(result));
       await act.persistState(state, input.input, input.orgId);
