@@ -9,23 +9,23 @@ test('matchFeatures finds a feature by an action keyword, not just its title', (
   // "suppress" isn't in any module name/description, but should surface the SIEM suppression feature.
   const hits = matchFeatures('suppress');
   assert.ok(
-    hits.some((f) => f.href === '/siem'),
+    hits.some((f) => f.href === '/insights/siem'),
     'searching "suppress" surfaces Security Events',
   );
 });
 
 test('matchFeatures matches egress/leash → control', () => {
-  assert.ok(matchFeatures('egress').some((f) => f.href === '/control'));
-  assert.ok(matchFeatures('leash').some((f) => f.href === '/control'));
+  assert.ok(matchFeatures('egress').some((f) => f.href === '/governance'));
+  assert.ok(matchFeatures('leash').some((f) => f.href === '/governance'));
 });
 
 test('matchFeatures matches baseline → drift and budget → finops', () => {
-  assert.ok(matchFeatures('baseline').some((f) => f.href === '/drift'));
-  assert.ok(matchFeatures('budget').some((f) => f.href === '/finops'));
+  assert.ok(matchFeatures('baseline').some((f) => f.href === '/insights/drift'));
+  assert.ok(matchFeatures('budget').some((f) => f.href === '/insights/finops'));
 });
 
 test('matchFeatures matches on title substring too', () => {
-  assert.ok(matchFeatures('golden').some((f) => f.href === '/evals'));
+  assert.ok(matchFeatures('golden').some((f) => f.href === '/build/evals'));
 });
 
 test('matchFeatures ignores queries shorter than 2 chars and caps results', () => {

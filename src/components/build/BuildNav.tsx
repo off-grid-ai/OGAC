@@ -32,20 +32,20 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     // (#121) is the ONE home for the tools apps can call — registered registry + MCP catalog +
     // built-in primitives.
     tabs: [
-      { gate: 'studio', label: 'Studio', route: '/studio' },
-      { gate: 'brain', label: 'Brain', route: '/brain' },
-      { gate: 'tools', label: 'Tools', route: '/tools' },
+      { gate: 'studio', label: 'Studio', route: '/build/studio' },
+      { gate: 'brain', label: 'Brain', route: '/build/brain' },
+      { gate: 'tools', label: 'Tools', route: '/build/tools' },
     ],
   },
   {
     heading: 'Operate',
     tabs: [
       // Global app runs — every app's runs in one list; open one to watch it (3) or review it (4).
-      { gate: 'studio', label: 'App runs', route: '/apps/runs' },
+      { gate: 'studio', label: 'App runs', route: '/build/apps/runs' },
       // Durable agent jobs (Temporal) — re-run / cancel / schedule.
-      { gate: 'agent-runs', label: 'Jobs', route: '/agent-runs' },
+      { gate: 'agent-runs', label: 'Jobs', route: '/build/agent-runs' },
       // Outcomes over time across all app runs (screen 5).
-      { gate: 'studio', label: 'Reports', route: '/apps/reports' },
+      { gate: 'studio', label: 'Reports', route: '/build/apps/reports' },
     ],
   },
   {
@@ -55,8 +55,8 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     // (task #132). Surfaced here so the Build group owns its own secondaries and nothing is orphaned.
     heading: 'Test',
     tabs: [
-      { gate: 'evals', label: 'Evals', route: '/evals' },
-      { gate: 'sandbox', label: 'Sandbox', route: '/sandbox' },
+      { gate: 'evals', label: 'Evals', route: '/build/evals' },
+      { gate: 'sandbox', label: 'Sandbox', route: '/build/sandbox' },
       { gate: 'provit', label: 'Visual QA', route: '/provit' },
     ],
   },
@@ -66,7 +66,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
 // the global-list segments `runs` / `reports`). On these paths AppLifecycleNav owns the band, so the
 // global Build band suppresses itself.
 function isAppShellPath(pathname: string): boolean {
-  const m = pathname.match(/^\/apps\/([^/]+)/);
+  const m = pathname.match(/^\/build\/apps\/([^/]+)/);
   if (!m) return false;
   const seg = m[1];
   return seg !== 'runs' && seg !== 'reports';

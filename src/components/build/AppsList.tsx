@@ -69,7 +69,7 @@ export function AppsList({
               <PipelineChip pipeline={chips?.[app.id] ?? { id: app.pipelineId ?? null }} size="xs" />
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/apps/${encodeURIComponent(app.id)}`}
+                  href={`/build/apps/${encodeURIComponent(app.id)}`}
                   className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 >
                   <Play className="size-3.5" />

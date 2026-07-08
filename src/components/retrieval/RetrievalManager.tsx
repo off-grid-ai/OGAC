@@ -61,7 +61,7 @@ export function RetrievalManager({ initialView, initialError }: Props) {
       if (value === null) next.delete(key);
       else next.set(key, value);
       const qs = next.toString();
-      router.push(qs ? `/retrieval?${qs}` : '/retrieval', { scroll: false });
+      router.push(qs ? `/data/retrieval?${qs}` : '/data/retrieval', { scroll: false });
     },
     [params, router],
   );

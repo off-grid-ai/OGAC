@@ -1,6 +1,6 @@
 // Pure chat-navigation mapping — zero imports, no I/O, unit-testable in isolation (see chat-nav.test.ts).
 // The NAVIGATIONAL position of the chat surface (which conversation, which project) lives in the URL,
-// not in React state: `/chat/<conversationId>?project=<projectId>`. `/chat` (no segment) is the
+// not in React state: `/workspace/chat/<conversationId>?project=<projectId>`. `/workspace/chat` (no segment) is the
 // "no conversation selected" landing (new-chat). This module is the single source of truth for
 // URL <-> selection so ChatWorkspace stays a thin consumer of it + the router.
 
@@ -36,8 +36,8 @@ export function selectionFromParams(args: {
 // output (stable key order) so equal selections produce identical strings — safe to compare/dedupe.
 export function selectionToPath(selection: ChatSelection): string {
   const base = selection.conversationId
-    ? `/chat/${encodeURIComponent(selection.conversationId)}`
-    : '/chat';
+    ? `/workspace/chat/${encodeURIComponent(selection.conversationId)}`
+    : '/workspace/chat';
   const query = selection.projectId
     ? `?project=${encodeURIComponent(selection.projectId)}`
     : '';
