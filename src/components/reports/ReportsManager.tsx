@@ -86,7 +86,7 @@ export function ReportsManager({ initial }: { initial: Template[] }) {
       const next = new URLSearchParams(params.toString());
       if (value === null) next.delete(key);
       else next.set(key, value);
-      router.push(`/reports?${next.toString()}`);
+      router.push(`/insights/reports?${next.toString()}`);
     },
     [params, router],
   );

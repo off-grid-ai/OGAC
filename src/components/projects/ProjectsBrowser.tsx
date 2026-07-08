@@ -69,7 +69,7 @@ export function ProjectsBrowser() {
     setCreating(false);
     if (r.ok) {
       const { id } = await r.json();
-      window.location.href = `/projects/${id}`;
+      window.location.href = `/workspace/projects/${id}`;
     } else {
       toast.error('Could not create project');
     }
@@ -166,7 +166,7 @@ function ProjectCard({
         className="h-1 w-full shrink-0"
         style={{ background: `hsl(${hue} 70% 45%)` }}
       />
-      <Link href={`/projects/${p.id}`} className="flex flex-1 flex-col gap-3 p-4">
+      <Link href={`/workspace/projects/${p.id}`} className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start gap-3">
           <span
             className="flex size-9 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold text-white"

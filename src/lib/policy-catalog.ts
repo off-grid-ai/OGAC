@@ -1,6 +1,6 @@
 // ─── PURE org-POLICY value catalog (Task #173, T3) — ZERO I/O ─────────────────────────────────────
 //
-// The org PolicyEditor (`/control`) used to accept ANY free-typed string for both "Guardrails" and
+// The org PolicyEditor (`/governance`) used to accept ANY free-typed string for both "Guardrails" and
 // "Allowed models", then POST it org-wide as policy v+1. That is silently-broken governance: a typo
 // (or garbage) becomes a rule every enrolled node tries to enforce, and NOTHING catches it. This
 // module is the pure allow-list the editor now constrains against — a value the org can't actually
