@@ -1,0 +1,14 @@
+# Copy to ~/.dbt/profiles.yml (or mount as /root/.dbt/profiles.yml for the container run).
+# DEV creds — NOT for production. In prod, source from OpenBao / env, never commit real secrets.
+offgrid_warehouse:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      host: "{{ env_var('DBT_CH_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('DBT_CH_PORT', '8124') | int }}"
+      user: "{{ env_var('DBT_CH_USER', 'warehouse') }}"
+      password: "{{ env_var('DBT_CH_PASSWORD', 'warehouse') }}"
+      schema: offgrid_warehouse
+      secure: false
+      driver: http

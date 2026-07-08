@@ -1,0 +1,6 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+# The real Great Expectations engine (heavy, ~pulls pandas + a lot). The stub's fallback validator
+# is dependency-free, so GE is commented until the data-quality adapter wires _ge_validate().
+# great-expectations==1.2.4
+# pandas==2.2.3
