@@ -1,5 +1,7 @@
 # Gaps backlog — the working list
 
+> **SOURCE OF TRUTH for what's OPEN is now [`docs/OPEN_ITEMS.md`](OPEN_ITEMS.md)** (reconciled + live-verified 2026-07-09: 28 genuinely open, 0 demo-blockers; ~440 candidate lines verified stale/resolved/out-of-scope). This file stays as append-only history — check OPEN_ITEMS.md before assuming anything below is still open.
+
 Consolidated, prioritized gaps from the demo walkthrough, service-capability audit, docs audit, and
 the cross-cutting mandates. This is the list we work from. Sources: `DEMO_WALKTHROUGH.md`,
 `SERVICE_CAPABILITY_AUDIT.md`, `DOCS_GAPS.md`, `ROADMAP.md` (mandates).
