@@ -683,8 +683,13 @@ keep-both. STT = Parakeet (+Whisper); TTS = Orpheus (+Kokoro). Decision + detail
   on S1 — the audio handler tries to spawn a TTS binary but the path/binaries aren't present on the
   console's server, so live STT/TTS-through-gateway is BROKEN on S1. Working reference = desktop
   `src/main/model-server.ts` (Kokoro/Piper via `/v1/audio/speech`, catalog in desktop/packages/models).
-  FIX: run the same proven audio engine behind the gateway (binaries + model paths correct on the
-  serving node). Needs fleet-side provisioning (on-site-ish). This is why the console's audio mode
-  falls back to the browser today.
+  MECHANISM (now clear): the desktop MODEL-SERVER (which runs on the gateway nodes as :7878) already
+  serves /v1/audio/* natively (whisper.cpp STT + Kokoro TTS; handlers in desktop/src/main/model-server.ts
+  handleTranscription/handleSpeech). ENOTDIR = the aggregator serves audio itself / routes to a node
+  WITHOUT the speech models loaded, instead of proxying to a node running the full model-server with
+  whisper(ggml)+kokoro(onnx) present. FIX: (a) ensure >=1 gateway node has the speech models downloaded
+  + model-server serving /v1/audio; (b) aggregator routes /v1/audio/* to that node (like it round-robins
+  chat, or a dedicated speech route). Fleet-side (SSH + ~230MB model download). This is why console
+  audio falls back to the browser today.
 - **SP-3 (models, after SP-2):** add Orpheus-TTS (Llama GGUF → same llama.cpp gateway engine) + Parakeet
   STT (parakeet-mlx) as selectable models alongside Kokoro/Whisper. Desktop is adding Parakeet now.
