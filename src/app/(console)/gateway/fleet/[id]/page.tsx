@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DeviceActions } from '@/components/fleet/DeviceActions';
 import { DeviceSoftware } from '@/components/fleet/DeviceSoftware';
+import { ReassignPolicyButton } from '@/components/fleet/ReassignPolicyButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { getMdm } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
-import { getDevice, listAudit, pullPolicyForDevice } from '@/lib/store';
+import { getDevice, listAudit, listDevices, pullPolicyForDevice } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,10 +131,12 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const device = await getDevice(id);
   if (!device) notFound();
-  const [policy, audit] = await Promise.all([
+  const [policy, audit, allDevices] = await Promise.all([
     pullPolicyForDevice(id),
     listAudit({ deviceId: id, limit: 25 }),
+    listDevices(),
   ]);
+  const knownRoles = [...new Set(allDevices.map((d) => d.role))].filter(Boolean);
   // FleetDM-backed features (software inventory + CVEs, and the real MDM device commands) come from
   // FleetDM by numeric host id — only enable when the active MDM supports it and this device carries
   // a FleetDM-style numeric id.
@@ -172,7 +175,15 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <p className="mt-1 font-mono text-xs text-muted-foreground">{device.id}</p>
           </div>
         </div>
-        <DeviceActions deviceId={device.id} name={device.name} fleet={fleetHost} />
+        <div className="flex items-center gap-2">
+          <ReassignPolicyButton
+            deviceId={device.id}
+            name={device.name}
+            currentRole={device.role}
+            knownRoles={knownRoles}
+          />
+          <DeviceActions deviceId={device.id} name={device.name} fleet={fleetHost} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">

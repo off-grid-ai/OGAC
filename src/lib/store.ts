@@ -53,6 +53,7 @@ import type {
   ActivityRow,
   ProvenanceCoverage,
 } from '@/lib/compliance-activity';
+import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
 
 // Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
 // the deploy needs no migration step (matches the chat module's ensure* pattern). Memoized.
@@ -220,6 +221,14 @@ export async function listDevices(): Promise<Device[]> {
 export async function getDevice(id: string): Promise<Device | undefined> {
   const [row] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
   return row ? toDevice(row) : undefined;
+}
+
+// Reassign a device's policy ROLE — the per-device dimension that selects which routing rules /
+// policy bundle apply (the policy bundle itself is org-wide; role is what varies per device). This
+// is the console's real "reassign policy" action. Returns the updated Device, or null if unknown.
+export async function updateDeviceRole(id: string, role: string): Promise<Device | null> {
+  const [row] = await db.update(devices).set({ role }).where(eq(devices.id, id)).returning();
+  return row ? toDevice(row) : null;
 }
 
 export async function createEnrollmentToken(role: string): Promise<EnrollmentToken> {
@@ -1047,6 +1056,61 @@ export async function isEnabled(key: string, fallback = false): Promise<boolean>
   if (flagsForcedOpen()) return true;
   const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
   return row ? row.enabled : fallback;
+}
+
+// ─── Edge-WAF intent (Task C3) ────────────────────────────────────────────────────────────────
+// The console reads the LIVE Caddy edge (edge-log.ts) but cannot safely reload Caddy from inside
+// the app, so operator WAF changes are persisted as *intent* — the desired state that applies on
+// the next edge reload. A single-row key/value table (`edge_intent`), created idempotently so the
+// deploy needs no migration (matches the audit_events_v2 ensure* pattern; `drizzle-kit push` hangs
+// over SSH). Pure validation/diff logic lives in edge-intent.ts — this is only the I/O seam.
+let edgeIntentEnsure: Promise<void> | null = null;
+async function ensureEdgeIntent(): Promise<void> {
+  if (edgeIntentEnsure) return edgeIntentEnsure;
+  edgeIntentEnsure = (async (): Promise<void> => {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS edge_intent (
+        id text PRIMARY KEY DEFAULT 'default',
+        intent jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+  })();
+  return edgeIntentEnsure;
+}
+
+// Read the persisted edge-WAF intent. Returns the default (WAF on, no custom rules) when nothing
+// has been configured. Best-effort — a missing table / read error yields the default, never a 500.
+export async function getEdgeIntent(): Promise<EdgeIntent> {
+  try {
+    await ensureEdgeIntent();
+    const res = await db.execute(sql`SELECT intent FROM edge_intent WHERE id = 'default' LIMIT 1`);
+    const rows =
+      (res as unknown as { rows?: { intent?: unknown }[] }).rows ??
+      (res as unknown as { intent?: unknown }[]);
+    const raw = rows[0]?.intent;
+    if (!raw) return defaultIntent();
+    const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Partial<EdgeIntent>;
+    return {
+      wafEnabled: parsed.wafEnabled !== false,
+      rules: Array.isArray(parsed.rules) ? parsed.rules : [],
+      updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return defaultIntent();
+  }
+}
+
+// Persist the edge-WAF intent (single row upsert). Throws on failure so the route can surface a 5xx
+// — unlike audit, a dropped WAF change must NOT be silently swallowed.
+export async function saveEdgeIntent(intent: EdgeIntent): Promise<EdgeIntent> {
+  await ensureEdgeIntent();
+  await db.execute(sql`
+    INSERT INTO edge_intent (id, intent, updated_at)
+    VALUES ('default', ${JSON.stringify(intent)}::jsonb, now())
+    ON CONFLICT (id) DO UPDATE SET intent = ${JSON.stringify(intent)}::jsonb, updated_at = now()
+  `);
+  return intent;
 }
 
 // ─── Prompt registry (templates + versioning) ──────────────────────────────────
