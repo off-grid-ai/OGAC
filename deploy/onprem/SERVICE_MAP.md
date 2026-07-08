@@ -34,7 +34,25 @@ you add a node, a subdomain, or a service.
 |------|----|----|
 | **S1** (control plane + backends) | `127.0.0.1` | Console (native `next start`), **gateway aggregator :8800**, Caddy edge, Cloudflare tunnel, queue worker, and the **`offgrid-services-a`/`-extra` Docker stacks**: Postgres, Keycloak, **OpenSearch :9200, Marquez :9000, OpenBao :8200**, OPA :8181, Qdrant :6333, Temporal :7233/:8081, SeaweedFS, VictoriaMetrics, Evidently + the seeded data-source containers. Console reaches all of these over **127.0.0.1** (localhost — not gated by Local-Network privacy). |
 | **g6** (server #2 — aux tier) | `192.168.1.66` | Langfuse `:3030`, Unleash `:4242`, Superset `:8088`, FleetDM `:8070`, Presidio `:5002/:5001`, Redis (provisioned 2026-07-05; **S2 replacement — S2 retired**). MAXED 15.5/16 GB. Console reaches these via S1 Caddy loopback proxies (LAN not directly reachable by the console daemon). |
-| ~~S2~~ (retired) | `192.168.1.60` | ❌ offline since router reboot — aux tier moved to g6, node not required |
+| ~~S2~~ (retired) | `192.168.1.60` | ❌ offline since router reboot — aux tier moved to g6, node not required. **Designated (staged, not live) host for the NEW data plane** — see below. |
+
+### Data plane (NEW — staged, not live) — `warehouse` / `streaming` / `etl` / `dataquality` profiles
+
+The data engine (ClickHouse warehouse + Redpanda + Airbyte + Great Expectations; dbt as a job).
+**Compose + runbook exist; nothing is running yet.** Full bringup + Colima sizing + env wiring:
+[`DATA_PLANE.md`](DATA_PLANE.md). Intended host: **S2** (16GB, Colima) — reconcile against S2's
+retired status before provisioning. Services + host ports:
+
+| Service | Profile | Host port(s) | Purpose |
+|---------|---------|--------------|---------|
+| `warehouse-clickhouse` | `warehouse` | 8124 (HTTP), 9001 (native) | Analytics warehouse (BI/dbt read it) — distinct from langfuse-clickhouse |
+| `redpanda` | `streaming` | 19092 (Kafka), 9644 (admin), 18083 (schema) | Kafka-API broker |
+| `airbyte-*` (6 containers) | `etl` | 8005 (API), 8006 (UI) | Connectors + CDC (own Postgres + Temporal) |
+| `great-expectations` | `dataquality` | 8003 | Data-quality sidecar (mirrors evidently/ragas) |
+
+Console env (set only when live): `OFFGRID_WAREHOUSE_URL`, `OFFGRID_AIRBYTE_URL`,
+`OFFGRID_REDPANDA_ADMIN_URL`/`_BROKERS`, `OFFGRID_DATAQUALITY_URL` — via edge-Caddy loopbacks
+`127.0.0.1:8941–8944` (LAN not reachable by the console daemon). Lake landing = existing SeaweedFS S3.
 
 ## AI Gateway aggregator (the LLM control point)
 
