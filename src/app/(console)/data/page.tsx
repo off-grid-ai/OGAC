@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DataPlaneHealthBand } from '@/components/data/DataPlaneHealthBand';
 import { AddConnectorButton } from '@/components/data/AddConnectorButton';
 import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
@@ -53,6 +54,9 @@ export default async function DataPage() {
 
   return (
     <div className="space-y-6">
+      {/* Data-plane engine health — the live warehouse/pipelines/streaming/quality engines. */}
+      <DataPlaneHealthBand />
+
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Connectors</CardTitle>
