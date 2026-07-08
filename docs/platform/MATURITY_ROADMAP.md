@@ -12,9 +12,8 @@ Today evals/drift/quality DETECT but nothing ACTS. Make the platform a flywheel:
 - **Owner** per pipeline; **teams/BU** tier between org and pipeline (RBAC delegated).
 - **Promotion gate:** draft → eval-gated → **published** (requires approver) → deprecated. No plain-language pipeline hits prod without sign-off. (Ties to M1's release gate.)
 
-## M3 — Capacity control + control-plane HA
-- **GPU/capacity scheduling:** per-pipeline/team quota, priority, admission control + backpressure when the fixed fleet is saturated (dollars aren't the scarce resource — GPU is).
-- **S1 SPOF → HA:** use S2 as warm standby for the control plane (console + DB replication + failover). DR beyond backups.
+## M3 — Capacity control + control-plane HA — DROPPED (founder, 2026-07-08)
+Not now. GPU scarcity + S1-SPOF are artifacts of the temporary 10-machine setup; a dedicated rack / cloud move is coming, so building quota/admission/HA against a constraint that's going away is wasted work. Revisit only if we commit to on-prem-at-scale before the rack.
 
 ## M4 — Deep data governance (for the warehouse ambition)
 - **Data catalog** (what data exists), classification, **retention / right-to-be-forgotten** propagated across warehouse + vector store + lineage.
@@ -27,4 +26,4 @@ Today evals/drift/quality DETECT but nothing ACTS. Make the platform a flywheel:
 ## M6 — Citizen of existing stacks (not an island)
 - Export **audit → Splunk, lineage → Purview/Collibra, metrics → Grafana** (OTLP/standards). IdP federation already done (Keycloak). "Bring your own observability/catalog."
 
-**Order:** M1 → M2 → M3 → M4 → M5 → M6, sequential. M1+M2 couple (release gate). Data plane (Airbyte/ClickHouse on S2) runs as its own track feeding M4.
+**Order:** M1 → M2 → M4 → M5 → M6, sequential (M3 dropped). M1+M2 couple (release gate). Data plane (Airbyte/ClickHouse on S2) runs as its own track feeding M4.
