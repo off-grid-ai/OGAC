@@ -9,6 +9,7 @@ import { getPii } from '@/lib/adapters/registry';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { readGuardrailsView } from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { getThresholds, listRecognizers } from '@/lib/presidio-recognizers';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -34,9 +35,10 @@ export default async function GuardrailsPage({
   // Degrade gracefully (consistent with the DEEP-layer .catch below): DB down → no rules, page renders.
   const rules = await listGuardrailRules(orgId).catch(() => []);
   // The DEEP layer — best-effort so a missing DB never breaks the page.
-  const [recognizers, thresholds] = await Promise.all([
+  const [recognizers, thresholds, pipelines] = await Promise.all([
     listRecognizers(orgId).catch(() => []),
     getThresholds(orgId).catch(() => ({ global: 0, perEntity: {} })),
+    listPipelines(orgId).catch(() => []),
   ]);
 
   // Honest engine status for the catalog's per-item availability badges: Presidio is "ready" only
@@ -126,6 +128,11 @@ export default async function GuardrailsPage({
           <GuardrailCatalog
             engineStatus={engineStatus}
             enabledRules={rules.map((r) => ({ matcher: r.matcher, pattern: r.pattern }))}
+            pipelines={pipelines.map((p) => ({
+              id: p.id,
+              name: p.name,
+              guardrailOverlay: p.guardrailOverlay,
+            }))}
           />
         </CardContent>
       </Card>
