@@ -863,3 +863,25 @@ g9/g10. Correcting the stale "g6 = aux server #2" note — the real second serve
   (drizzle-kit push hangs over SSH — DEPLOY.md § Database migrations). Verified: column PRESENT,
   `/api/v1/admin/connectors` → 200. LESSON: additive columns must be applied directly at deploy, not
   trusted to a lazy path that may not be on the first route hit.
+
+## insurer use-case demo substrate (2026-07-08) — source data + data-domains for org_bharat
+Seeded the source data + bindings so the 5 demo-priority insurer use cases (docs/USE_CASES_PLAN.md §13)
+can be AUTHORED in plain English against real governed tools. Reproducible; idempotent; deterministic.
+- **Warehouse (ClickHouse `bharatunion`, S2 :8124):** new analytics tables via
+  `node deploy/onprem/seed-insurer-usecases.mjs` — `employees` (500), `pricing_rfq` (120),
+  `pricing_rate_card` (20), `helpdesk_cases` (300), `job_requisitions` (12), `candidates` (177),
+  `competitor_products` (80), `claim_documents` (400). TRUNCATE+reload, seeded mulberry32.
+- **Container DBs (runtime tool source — connector-exec queries these):** same generated rows loaded
+  into the on-prem data-source containers so a compiled connector-query tool resolves LIVE:
+  - `offgrid-ds-corebank` (Postgres :5433) → `pricing_rfq`, `pricing_rate_card`, `helpdesk_cases`,
+    `competitor_products`, `claim_documents`.
+  - `offgrid-ds-policyadmin` (MySQL :3307) → `job_requisitions`, `candidates` (alongside the existing
+    `employees` / `employee_quota` that back use case #1). All `public`/default schema.
+  - Reason: connector-exec speaks postgres/mysql/mssql/rest — NOT ClickHouse — so the tool source must
+    live in a container DB. The `.mjs` seeds BOTH (SEED_SOURCES=0 to load warehouse only).
+- **Data-domains (console DB `data_domains`, org_bharat):** 7 new rows via
+  `node deploy/onprem/seed-insurer-domains.mjs | psql` — ids `bhdom_ey_*`: `pricing rfq`,
+  `pricing rate card`, `helpdesk cases`, `job requisitions`, `candidates`, `competitor intel`,
+  `claim documents`. Deterministic ids + ON CONFLICT DO UPDATE → idempotent. Bound only to existing
+  `bhcon_corebank` / `bhcon_policyadmin`. Use case #1 already covered by `bhdom_quota`.
+  Definitions live in `src/lib/data-domains-insurer-seed.ts` (pure planner + tests).
