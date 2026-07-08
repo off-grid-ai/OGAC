@@ -31,3 +31,7 @@ deploy/onprem/CREDENTIALS.md
 
 # ragas sidecar compose secret (real gateway key)
 deploy/onprem/ragas-sidecar/.env
+
+# Python bytecode
+__pycache__/
+*.pyc
