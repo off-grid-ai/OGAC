@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { correlationIds } from '@/lib/correlation';
+import { pipelineTagOrNull } from '@/lib/pipeline-api-key-format';
 
 // Chat -> Langfuse trace emission. Plain chat completions never pushed a trace (only the agent-run
 // pipeline did via OTLP), so the Observability page's trace list was empty. This posts a trace +
@@ -39,10 +40,17 @@ export interface ChatTraceInput {
   endTime?: number; // epoch ms when the completion finalized
   promptTokens?: number;
   completionTokens?: number;
+  // PA-12 — the run's bound pipeline id (most-specific-wins binding), if any. When set, the trace is
+  // stamped at the SOURCE with the canonical `pipeline:<id>` tag (Langfuse `tags[]`) + a `pipelineId`
+  // metadata field, so the pipeline Observability tab + global Observability filter EXACTLY on it.
+  // Absent/null ⇒ no pipeline tag is added (unchanged legacy behaviour).
+  pipelineId?: string | null;
 }
 
-// Build the two-event ingestion batch: a trace plus a nested generation observation.
-function buildBatch(t: ChatTraceInput): unknown[] {
+// Build the two-event ingestion batch: a trace plus a nested generation observation. PURE + zero-I/O
+// (the only nondeterminism is randomUUID for the event ids / default trace id) so the pipeline-tag
+// stamping is exhaustively unit-testable without the live Langfuse — see test/chat-trace-batch.test.ts.
+export function buildTraceBatch(t: ChatTraceInput): unknown[] {
   const traceId = t.traceId || randomUUID();
   const traceName = t.name || 'chat';
   const start = t.startTime ?? Date.now();
@@ -53,6 +61,11 @@ function buildBatch(t: ChatTraceInput): unknown[] {
   const usage = hasUsage
     ? { input: t.promptTokens, output: t.completionTokens, unit: 'TOKENS' }
     : undefined;
+  // Canonical pipeline tag at the SOURCE. A run with no bound pipeline yields null ⇒ no tag/metadata
+  // is added (the trace is byte-identical to today for un-piped runs).
+  const pipelineTag = pipelineTagOrNull(t.pipelineId);
+  const tags = pipelineTag ? [pipelineTag] : undefined;
+  const metadata = pipelineTag ? { pipelineId: (t.pipelineId ?? '').trim() } : undefined;
   return [
     {
       id: randomUUID(),
@@ -66,6 +79,8 @@ function buildBatch(t: ChatTraceInput): unknown[] {
         sessionId: t.conversationId || undefined,
         input: t.input,
         output: t.output,
+        ...(tags ? { tags } : {}),
+        ...(metadata ? { metadata } : {}),
       },
     },
     {
@@ -94,7 +109,7 @@ async function postTrace(t: ChatTraceInput): Promise<void> {
   await fetch(`${BASE}/api/public/ingestion`, {
     method: 'POST',
     headers: { authorization: auth, 'content-type': 'application/json' },
-    body: JSON.stringify({ batch: buildBatch(t) }),
+    body: JSON.stringify({ batch: buildTraceBatch(t) }),
     signal: AbortSignal.timeout(3000),
   });
 }
@@ -116,6 +131,9 @@ export function emitRunTrace(t: {
   input: string;
   output: string;
   caller?: string;
+  // PA-12 — the run's bound pipeline id (from the resolved binding on the run context), if any.
+  // Stamped as the canonical `pipeline:<id>` tag at the SOURCE. Absent/null ⇒ no pipeline tag.
+  pipelineId?: string | null;
 }): void {
   if (!configured() || !t.output) return;
   void postTrace({
@@ -126,5 +144,6 @@ export function emitRunTrace(t: {
     output: t.output,
     traceId: correlationIds(t.runId).traceId,
     name: 'agent-run',
+    pipelineId: t.pipelineId ?? null,
   }).catch(() => {});
 }
