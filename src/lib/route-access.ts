@@ -50,3 +50,32 @@ export function tenantSlugFromHost(host: string | null | undefined): string | nu
   const m = TENANT_HOST_RE.exec(host.toLowerCase());
   return m ? m[1] : null;
 }
+
+// A per-tenant PROVISIONED gateway host is "<slug5><rand5>-gateway.<apex>" (see tenantGatewayHost in
+// tenant-domain.ts): a 10-char label = 5 chars of the tenant slug + a 5-char unguessable random
+// suffix, then the fixed "-gateway" group. This is the mirror of tenantSlugFromHost for the GATEWAY
+// edge: given an inbound Host, extract the label parts so a call to a tenant gateway host can be
+// ATTRIBUTED/routed to that tenant's gateway. PURE (no I/O) — the aggregator/proxy that owns the
+// tenant→gateway lookup calls this first, then resolves the row by the returned `label`.
+//
+//   • `label`  — the full first-level label WITHOUT the "-gateway" group ("<slug5><rand5>"), the
+//                stable key stored on the gateway row's hostname. It is what a lookup keys off.
+//   • `slugPrefix` — the first 5 chars (the tenant-slug prefix); a hint for display/attribution.
+//   • `randSuffix` — the last 5 chars (the unguessable part).
+// The shared gateway ("gateway.<apex>") and any non-matching host return null — only a provisioned
+// per-tenant gateway host matches. The label MUST be exactly 10 alphanumerics before "-gateway".
+const GATEWAY_HOST_RE = /^([a-z0-9]{5})([a-z0-9]{5})-gateway\./;
+export interface GatewayHostParts {
+  /** The full "<slug5><rand5>" label (no "-gateway") — the key stored on gateways.hostname. */
+  label: string;
+  /** First 5 chars: the tenant-slug prefix (attribution hint). */
+  slugPrefix: string;
+  /** Last 5 chars: the unguessable random suffix. */
+  randSuffix: string;
+}
+export function gatewayFromHost(host: string | null | undefined): GatewayHostParts | null {
+  if (!host) return null;
+  const m = GATEWAY_HOST_RE.exec(host.toLowerCase());
+  if (!m) return null;
+  return { label: m[1] + m[2], slugPrefix: m[1], randSuffix: m[2] };
+}
