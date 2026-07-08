@@ -115,6 +115,11 @@ async function trySubmitDurable(
     input,
     orgId: ctx.orgId,
     caller: ctx.actor,
+    // PA-16 — thread the bound-pipeline id onto the durable path so the WORKER enforces the same
+    // contract the inline route does. The route already resolved the contract into ctx.contract
+    // (resolveConsumerPipeline → resolveContract); carry its pipelineId so the workflow re-resolves
+    // the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy allow.
+    pipelineId: ctx.contract?.pipelineId ?? null,
   };
   try {
     const client = await temporalClient(cfg);
