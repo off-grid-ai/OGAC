@@ -49,6 +49,7 @@ export async function ensurePipelinesSchema(): Promise<void> {
         name text NOT NULL,
         description text NOT NULL DEFAULT '',
         visibility text NOT NULL DEFAULT 'private',
+        team_id text,
         gateway_id text,
         default_model text,
         routing jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -63,6 +64,7 @@ export async function ensurePipelinesSchema(): Promise<void> {
     `);
     // ALTER ADD COLUMN IF NOT EXISTS safety net — a pre-existing table gains any new column.
     for (const col of [
+      "ADD COLUMN IF NOT EXISTS team_id text",
       "ADD COLUMN IF NOT EXISTS gateway_id text",
       "ADD COLUMN IF NOT EXISTS default_model text",
       "ADD COLUMN IF NOT EXISTS routing jsonb NOT NULL DEFAULT '{}'::jsonb",
@@ -77,6 +79,7 @@ export async function ensurePipelinesSchema(): Promise<void> {
     }
     await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_team_idx ON pipelines (team_id);`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS pipeline_versions (
         id text PRIMARY KEY,
@@ -115,6 +118,7 @@ function toShape(r: PipelineRowDb): PipelineShape {
     id: r.id,
     orgId: r.orgId,
     ownerId: r.ownerId,
+    teamId: r.teamId ?? null,
     name: r.name,
     description: r.description,
     visibility: r.visibility,
@@ -161,6 +165,8 @@ export interface CreatePipelineInput {
   name: string;
   description?: string;
   visibility?: string;
+  /** M2: the team/BU this pipeline belongs to (null ⇒ no team). */
+  teamId?: string | null;
   gatewayId?: string | null;
   defaultModel?: string | null;
   routing?: PipelineRouting;
@@ -302,6 +308,7 @@ export async function createPipeline(
     name: input.name,
     description: input.description ?? '',
     visibility: input.visibility ?? 'private',
+    teamId: input.teamId ?? null,
     gatewayId: input.gatewayId ?? null,
     defaultModel: input.defaultModel ?? null,
     routing: normalizeRouting(input.routing),
@@ -374,6 +381,7 @@ export async function updatePipeline(
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.description !== undefined) set.description = patch.description;
   if (patch.visibility !== undefined) set.visibility = patch.visibility;
+  if (patch.teamId !== undefined) set.teamId = patch.teamId ?? null;
   if (patch.gatewayId !== undefined) set.gatewayId = patch.gatewayId ?? null;
   if (patch.defaultModel !== undefined) set.defaultModel = patch.defaultModel ?? null;
   if (patch.routing !== undefined) set.routing = normalizeRouting(patch.routing);
@@ -393,6 +401,65 @@ export async function updatePipeline(
   const shape = toShape(row);
   await writeVersion(shape, 'edited', editedBy);
   return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── ownership / team metadata mutations (M2) — do NOT bump version or snapshot ─────────────────────
+// Owner + team are OWNERSHIP metadata, orthogonal to the versioned governance config: reassigning an
+// owner or moving a pipeline between teams must NOT create a new governance version (a version freezes
+// the config, not who owns it). These two thin writers set only the metadata column, org-scoped. The
+// audit trail (pipeline.reassign / pipeline.team) is written by the route, not here.
+
+/** Reassign a pipeline's owner. Org-scoped; touches only owner_id + updated_at. Null if absent. */
+export async function reassignPipelineOwner(
+  id: string,
+  newOwnerId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const [row] = await db
+    .update(pipelines)
+    .set({ ownerId: newOwnerId, updatedAt: new Date() })
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning();
+  if (!row) return null;
+  const shape = toShape(row);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+/** Assign/clear a pipeline's team (null clears it). Org-scoped; touches only team_id + updated_at. */
+export async function setPipelineTeam(
+  id: string,
+  teamId: string | null,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const [row] = await db
+    .update(pipelines)
+    .set({ teamId: teamId, updatedAt: new Date() })
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning();
+  if (!row) return null;
+  const shape = toShape(row);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+/** List an org's pipelines that belong to a given team (stable order). Powers the team detail. */
+export async function listPipelinesByTeam(
+  teamId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineView[]> {
+  await ensurePipelinesSchema();
+  const rows = await db
+    .select()
+    .from(pipelines)
+    .where(and(eq(pipelines.orgId, orgId), eq(pipelines.teamId, teamId)))
+    .orderBy(asc(pipelines.name), asc(pipelines.id));
+  return Promise.all(
+    rows.map(async (r) => {
+      const shape = toShape(r);
+      return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+    }),
+  );
 }
 
 // ─── publish — status → published + version bump + snapshot ────────────────────────────────────────
