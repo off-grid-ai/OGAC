@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 // eslint-disable-next-line complexity
 function safeCallback(raw: FormDataEntryValue | null): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
-  if (!v) return '/fleet';
+  if (!v) return '/gateway/fleet';
   if (v.startsWith('/') && !v.startsWith('//')) return v; // relative, same-origin
   try {
     const u = new URL(v);
@@ -32,7 +32,7 @@ function safeCallback(raw: FormDataEntryValue | null): string {
   } catch {
     /* not a URL — fall through */
   }
-  return '/fleet';
+  return '/gateway/fleet';
 }
 
 // Owned login: the console authenticates username/password through the identity seam

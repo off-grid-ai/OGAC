@@ -1399,21 +1399,21 @@ export function ChatWorkspace({
                 from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
             <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
               <Link
-                href="/projects"
+                href="/workspace/projects"
                 title="Projects"
                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <FolderOpen className="size-4" />
               </Link>
               <Link
-                href="/prompts"
+                href="/workspace/prompts"
                 title="Prompts library"
                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <TextAlignLeft className="size-4" />
               </Link>
               <Link
-                href="/artifacts"
+                href="/workspace/artifacts"
                 title="Artifacts"
                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
@@ -1449,7 +1449,7 @@ export function ChatWorkspace({
             <PipelineChip pipeline={chatPipelineChip} size="xs" />
             {gatewayError ? (
               <a
-                href="/gateway"
+                href="/gateway/ai"
                 title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — set OFFGRID_GATEWAY_URL`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >

@@ -34,7 +34,7 @@ test('isPublicPath: marketing/docs/auth surfaces are public', () => {
 });
 
 test('isPublicPath: authed console + admin API are NOT public', () => {
-  for (const p of ['/fleet', '/admin', '/api/v1/admin/tenants', '/chat']) {
+  for (const p of ['/gateway/fleet', '/operations/admin', '/api/v1/admin/tenants', '/workspace/chat']) {
     assert.equal(isPublicPath(p), false, `${p} should require auth`);
   }
 });

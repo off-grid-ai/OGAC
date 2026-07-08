@@ -242,7 +242,7 @@ export function GatewayDetail({
     const res = await fetch(`/api/v1/admin/gateways/${gateway.id}`, { method: 'DELETE' });
     if (res.ok) {
       toast.success(`Gateway "${gateway.name}" deleted`);
-      router.push('/gateways');
+      router.push('/gateway/registry');
       router.refresh();
     } else {
       toast.error('Failed to delete gateway');
@@ -260,7 +260,7 @@ export function GatewayDetail({
   return (
     <div className="w-full space-y-6">
       <Link
-        href="/gateways"
+        href="/gateway/registry"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
@@ -279,7 +279,7 @@ export function GatewayDetail({
         <div className="flex items-center gap-2">
           {/* Edit deep-links back to the list's URL-driven edit panel — one sheet, no fork. */}
           <Button size="sm" variant="outline" asChild>
-            <Link href={`/gateways?panel=edit-gateway&id=${gateway.id}`}>
+            <Link href={`/gateway/registry?panel=edit-gateway&id=${gateway.id}`}>
               <Pencil className="size-4" /> Edit
             </Link>
           </Button>
@@ -368,7 +368,7 @@ export function GatewayDetail({
                       <TableRow key={p.id}>
                         <TableCell>
                           <Link
-                            href={`/pipelines/${p.id}`}
+                            href={`/build/pipelines/${p.id}`}
                             className="text-foreground hover:text-primary hover:underline"
                           >
                             {p.name}

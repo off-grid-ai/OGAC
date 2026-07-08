@@ -66,11 +66,11 @@ async function probeHomeServices() {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Open chat', href: '/chat', icon: ChatCircle },
-  { label: 'Add data source', href: '/integrations', icon: Plus },
-  { label: 'Review policy', href: '/policy', icon: ShieldCheck },
-  { label: 'Add knowledge', href: '/knowledge', icon: Database },
-  { label: 'Generate report', href: '/reports', icon: FileText },
+  { label: 'Open chat', href: '/workspace/chat', icon: ChatCircle },
+  { label: 'Add data source', href: '/data/integrations', icon: Plus },
+  { label: 'Review policy', href: '/governance/policy', icon: ShieldCheck },
+  { label: 'Add knowledge', href: '/workspace/knowledge', icon: Database },
+  { label: 'Generate report', href: '/insights/reports', icon: FileText },
 ];
 
 export default async function ConsoleHome() {
@@ -166,7 +166,7 @@ export default async function ConsoleHome() {
 
       {/* Governance posture — the synthesized "is it controlled right now?" answer */}
       {home.posture.length > 0 ? (
-        <Section title="Governance posture" href="/control" linkLabel="Governance">
+        <Section title="Governance posture" href="/governance" linkLabel="Governance">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {home.posture.map((t) => (
               <TileCard key={t.label} t={t} />
@@ -180,7 +180,7 @@ export default async function ConsoleHome() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {home.cost.length > 0 ? (
-          <Section title="Cost" href="/finops" linkLabel="FinOps">
+          <Section title="Cost" href="/insights/finops" linkLabel="FinOps">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {home.cost.map((t) => (
                 <TileCard key={t.label} t={t} />
@@ -191,7 +191,7 @@ export default async function ConsoleHome() {
 
         <Section
           title={`Services (${home.health.up}/${home.health.total} up)`}
-          href="/services"
+          href="/gateway/services"
           linkLabel="All services"
         >
           <ServicesCard health={home.health} />
@@ -199,7 +199,7 @@ export default async function ConsoleHome() {
       </div>
 
       {/* Recent activity */}
-      <Section title="Recent activity" href="/agent-runs" linkLabel="All runs">
+      <Section title="Recent activity" href="/build/agent-runs" linkLabel="All runs">
         <ActivityCard activity={home.activity} />
       </Section>
     </div>

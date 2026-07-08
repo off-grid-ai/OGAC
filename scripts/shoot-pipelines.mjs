@@ -24,18 +24,18 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200);
 
 const shots = [
-  ['pipelines-list', '/pipelines'],
-  ['pipeline-overview', `/pipelines/${PID}`],
-  ['pipeline-policy', `/pipelines/${PID}/policy`],
-  ['pipeline-guardrails', `/pipelines/${PID}/guardrails`],
-  ['pipeline-quality', `/pipelines/${PID}/quality`],
-  ['pipeline-drift', `/pipelines/${PID}/drift`],
-  ['pipeline-api', `/pipelines/${PID}/api`],
-  ['pipeline-cost', `/pipelines/${PID}/cost`],
-  ['pipeline-audit', `/pipelines/${PID}/audit`],
-  ['pipeline-observability', `/pipelines/${PID}/observability`],
-  ['gateways-list', '/gateways'],
-  ['gateway-detail', '/gateways/gw_seed_default_onprem-cluster'],
+  ['pipelines-list', '/build/pipelines'],
+  ['pipeline-overview', `/build/pipelines/${PID}`],
+  ['pipeline-policy', `/build/pipelines/${PID}/policy`],
+  ['pipeline-guardrails', `/build/pipelines/${PID}/guardrails`],
+  ['pipeline-quality', `/build/pipelines/${PID}/quality`],
+  ['pipeline-drift', `/build/pipelines/${PID}/drift`],
+  ['pipeline-api', `/build/pipelines/${PID}/api`],
+  ['pipeline-cost', `/build/pipelines/${PID}/cost`],
+  ['pipeline-audit', `/build/pipelines/${PID}/audit`],
+  ['pipeline-observability', `/build/pipelines/${PID}/observability`],
+  ['gateways-list', '/gateway/registry'],
+  ['gateway-detail', '/gateway/registry/gw_seed_default_onprem-cluster'],
 ];
 
 for (const [name, route] of shots) {

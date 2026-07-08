@@ -23,10 +23,10 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'chat', label: 'Chat', route: '/chat', Icon: ChatCircleDots },
-  { id: 'projects', label: 'Projects', route: '/projects', Icon: FolderOpen },
-  { id: 'prompts', label: 'Prompts', route: '/prompts', Icon: TextAlignLeft },
-  { id: 'artifacts', label: 'Artifacts', route: '/artifacts', Icon: Cube },
+  { id: 'chat', label: 'Chat', route: '/workspace/chat', Icon: ChatCircleDots },
+  { id: 'projects', label: 'Projects', route: '/workspace/projects', Icon: FolderOpen },
+  { id: 'prompts', label: 'Prompts', route: '/workspace/prompts', Icon: TextAlignLeft },
+  { id: 'artifacts', label: 'Artifacts', route: '/workspace/artifacts', Icon: Cube },
 ];
 
 export function WorkspaceNav() {

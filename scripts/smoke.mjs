@@ -183,7 +183,7 @@ async function runUiChecks() {
   async function login() {
     await page.goto(`${BASE}/signin`, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /Dev sign-in/i }).click();
-    await page.waitForURL('**/fleet', { timeout: 45000 });
+    await page.waitForURL('**/gateway/fleet', { timeout: 45000 });
     await page.waitForLoadState('networkidle');
   }
   try {
@@ -211,57 +211,57 @@ async function runUiChecks() {
   });
 
   await check('UI: Observability renders QA data', async () => {
-    await nav('Observability', 'observability');
+    await nav('Observability', 'insights');
     await page.getByText('Eval score history').waitFor({ timeout: 10000 });
     await page.getByText('Drift & degradation').waitFor({ timeout: 8000 });
     await shot('observability');
   });
 
   await check('UI: Observability eval drilldown renders', async () => {
-    await nav('Observability', 'observability');
+    await nav('Observability', 'insights');
     const detail = page.getByRole('link', { name: /detail →/i }).first();
     if ((await detail.count()) === 0) return 'no eval runs to drill into (skipped)';
     await detail.click();
-    await page.waitForURL('**/observability/evals/*', { timeout: 45000 });
+    await page.waitForURL('**/insights/evals/*', { timeout: 45000 });
     await page.getByText('Per-case results').waitFor({ timeout: 15000 });
     await shot('eval-detail');
     return '';
   });
 
   await check('UI: Integrations renders cache + bindings', async () => {
-    await nav('Integrations', 'integrations');
+    await nav('Integrations', 'data/integrations');
     await page.getByText('Response cache').first().waitFor({ timeout: 10000 });
     await page.getByText(/OFFGRID_ADAPTER_INFERENCE/).first().waitFor({ timeout: 8000 });
     await shot('integrations');
   });
 
   await check('UI: Lineage renders', async () => {
-    await nav('Lineage', 'lineage');
+    await nav('Lineage', 'data/lineage');
     await page.getByText(/Data lineage for every agent run/).first().waitFor({ timeout: 10000 });
     await shot('lineage');
   });
 
   await check('UI: Fleet device detail drilldown', async () => {
-    await nav('Fleet', 'fleet');
-    await page.locator('a[href^="/fleet/"]').first().click();
-    await page.waitForURL('**/fleet/*', { timeout: 45000 });
+    await nav('Fleet', 'gateway/fleet');
+    await page.locator('a[href^="/gateway/fleet/"]').first().click();
+    await page.waitForURL('**/gateway/fleet/*', { timeout: 45000 });
     await page.getByText('Assigned policy').waitFor({ timeout: 15000 });
     await page.getByText('Recent activity').waitFor({ timeout: 8000 });
     await shot('device-detail');
   });
 
   await check('UI: Brain doc inspector renders', async () => {
-    await nav('Brain', 'brain');
-    await page.locator('a[href^="/brain/docs/"]').first().click();
-    await page.waitForURL('**/brain/docs/*', { timeout: 45000 });
+    await nav('Brain', 'build/brain');
+    await page.locator('a[href^="/build/brain/docs/"]').first().click();
+    await page.waitForURL('**/build/brain/docs/*', { timeout: 45000 });
     await page.getByText('Retrieval preview').waitFor({ timeout: 15000 });
     await shot('doc-inspector');
   });
 
   await check('UI: Brain prompt history renders', async () => {
-    await nav('Brain', 'brain');
-    await page.locator('a[href^="/brain/prompts/"]').first().click();
-    await page.waitForURL('**/brain/prompts/*', { timeout: 45000 });
+    await nav('Brain', 'build/brain');
+    await page.locator('a[href^="/build/brain/prompts/"]').first().click();
+    await page.waitForURL('**/build/brain/prompts/*', { timeout: 45000 });
     await page.getByText(/Version history/).waitFor({ timeout: 15000 });
     await shot('prompt-history');
   });
@@ -275,14 +275,14 @@ async function runUiChecks() {
   });
 
   await check('UI: ABAC tester click → decision renders', async () => {
-    await nav('Admin', 'admin');
+    await nav('Admin', 'operations/admin');
     await page.getByRole('button', { name: /Evaluate decision/i }).click();
     await page.getByText(/no rule matched|allow|deny/i).first().waitFor({ timeout: 10000 });
     await shot('abac');
   });
 
   await check('UI: Grounding verifier fill + click → faithfulness', async () => {
-    await nav('Brain', 'brain');
+    await nav('Brain', 'build/brain');
     await page.locator('#gv-answer').fill('Policies must be in force before FNOL intake.');
     await page.locator('#gv-sources').fill('Policies must be in force and past contestability before FNOL intake.');
     await page.getByRole('button', { name: /Verify grounding/i }).click();
@@ -291,14 +291,14 @@ async function runUiChecks() {
   });
 
   await check('UI: Provenance sign → signature renders', async () => {
-    await nav('Regulatory', 'regulatory');
+    await nav('Regulatory', 'governance/regulatory');
     await page.getByRole('button', { name: /^Sign$/ }).click();
     await page.getByText(/ed25519_|hmac/i).first().waitFor({ timeout: 10000 });
     await shot('provenance');
   });
 
   await check('UI: Sandbox run renders result', async () => {
-    await nav('Agents', 'agents');
+    await nav('Agents', 'build/agents');
     await page.getByRole('button', { name: /Run in sandbox/i }).click();
     // Either the safe-default refusal or real execution output, depending on deployment config.
     await page
@@ -308,7 +308,7 @@ async function runUiChecks() {
   });
 
   await check('UI: Agent run dialog → pipeline trace renders', async () => {
-    await nav('Agents', 'agents');
+    await nav('Agents', 'build/agents');
     await page.getByRole('button', { name: /^Run$/ }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/Ask this agent/i).fill('Is the policy in force?');
@@ -319,9 +319,9 @@ async function runUiChecks() {
   });
 
   await check('UI: Agent detail (drill-down) renders', async () => {
-    await nav('Agents', 'agents');
+    await nav('Agents', 'build/agents');
     await page.getByRole('link', { name: 'Smoke Test Agent' }).click();
-    await page.waitForURL('**/agents/*', { timeout: 45000 });
+    await page.waitForURL('**/build/agents/*', { timeout: 45000 });
     await page.getByText('Instructions').waitFor({ timeout: 10000 });
     await page.getByText('Recent runs').waitFor({ timeout: 8000 });
     await shot('agent-detail');

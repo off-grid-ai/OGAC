@@ -99,7 +99,7 @@ function GatewayCard({
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="min-w-0">
           <Link
-            href={`/gateways/${gw.id}`}
+            href={`/gateway/registry/${gw.id}`}
             className="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
           >
             {gw.name}
@@ -149,7 +149,7 @@ function GatewayCard({
           </span>
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" asChild>
-              <Link href={`/gateways/${gw.id}`}>
+              <Link href={`/gateway/registry/${gw.id}`}>
                 Open <ArrowRight className="size-3.5" />
               </Link>
             </Button>

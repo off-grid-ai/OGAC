@@ -72,7 +72,7 @@ export function DomainDetailPanel({
     setBusy(false);
     if (res.ok) {
       toast.success(`Data domain "${domain.label}" deleted`);
-      router.push('/data-domains');
+      router.push('/data/domains');
     } else {
       toast.error('Delete failed');
     }
@@ -213,7 +213,7 @@ export function DomainDetailPanel({
           ) : (
             <div className="flex flex-wrap gap-2">
               {referencedByPipelines.map((p) => (
-                <Link key={p.id} href={`/pipelines/${p.id}`}>
+                <Link key={p.id} href={`/build/pipelines/${p.id}`}>
                   <Badge
                     variant="outline"
                     className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"

@@ -37,9 +37,9 @@ test('withPanelParams: url-encodes values', () => {
 });
 
 test('panelHref: omits the "?" when the query is empty', () => {
-  assert.equal(panelHref('/integrations', ''), '/integrations');
+  assert.equal(panelHref('/data/integrations', ''), '/data/integrations');
 });
 
 test('panelHref: joins path and query with "?"', () => {
-  assert.equal(panelHref('/integrations', 'panel=new-connector'), '/integrations?panel=new-connector');
+  assert.equal(panelHref('/data/integrations', 'panel=new-connector'), '/data/integrations?panel=new-connector');
 });

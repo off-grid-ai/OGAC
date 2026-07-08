@@ -124,19 +124,20 @@ test('sidebarActiveIdForPath: the builder /apps/* surfaces keep the Build → St
   // their pages gate on `studio` and they route under /apps. The pure path resolver aliases them to
   // the `studio` module so the Build → Studio sidebar row stays highlighted instead of the whole
   // sidebar un-lighting. `studio` is a Build primary, so it maps to itself.
-  assert.equal(sidebarActiveIdForPath('/apps/runs', MODULES), 'studio');
-  assert.equal(sidebarActiveIdForPath('/apps/runs/run_123', MODULES), 'studio');
-  assert.equal(sidebarActiveIdForPath('/apps/reports', MODULES), 'studio');
-  assert.equal(sidebarActiveIdForPath('/apps/app_42', MODULES), 'studio');
-  assert.equal(sidebarActiveIdForPath('/apps/app_42/runs', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/build/apps/runs', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/build/apps/runs/run_123', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/build/apps/reports', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/build/apps/app_42', MODULES), 'studio');
+  assert.equal(sidebarActiveIdForPath('/build/apps/app_42/runs', MODULES), 'studio');
 });
 
 test('sidebarActiveIdForPath: a real module route resolves via its group landing', () => {
   // Falls through the alias table to longest-matching module route, then to the group primary.
-  assert.equal(sidebarActiveIdForPath('/studio', MODULES), 'studio'); // studio primary → itself
-  assert.equal(sidebarActiveIdForPath('/agent-runs', MODULES), 'studio'); // secondary → Studio
-  assert.equal(sidebarActiveIdForPath('/policy', MODULES), 'control'); // secondary → Governance
-  assert.equal(sidebarActiveIdForPath('/agents', MODULES), 'studio'); // secondary → Studio
+  // Routes are now nested under their section (T6): /build/studio, /governance/policy, etc.
+  assert.equal(sidebarActiveIdForPath('/build/studio', MODULES), 'studio'); // studio primary → itself
+  assert.equal(sidebarActiveIdForPath('/build/agent-runs', MODULES), 'studio'); // secondary → Studio
+  assert.equal(sidebarActiveIdForPath('/governance/policy', MODULES), 'control'); // secondary → Governance
+  assert.equal(sidebarActiveIdForPath('/build/agents', MODULES), 'studio'); // secondary → Studio
 });
 
 test('sidebarActiveIdForPath: an unmatched path lights nothing', () => {

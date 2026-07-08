@@ -254,7 +254,7 @@ export default function FeaturesPage() {
               <Link href="/journey">The journey</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/fleet">Open console</Link>
+              <Link href="/gateway/fleet">Open console</Link>
             </Button>
           </div>
         </div>
@@ -279,7 +279,7 @@ export default function FeaturesPage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/fleet">
+                <Link href="/gateway/fleet">
                   Open the console
                   <ArrowRight className="size-4" />
                 </Link>
@@ -418,7 +418,7 @@ export default function FeaturesPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild>
-              <Link href="/fleet">
+              <Link href="/gateway/fleet">
                 Open the console
                 <ArrowRight className="size-4" />
               </Link>

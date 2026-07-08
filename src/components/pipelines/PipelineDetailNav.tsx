@@ -23,7 +23,7 @@ export function PipelineDetailNav({ pipelineId, name }: { pipelineId: string; na
     <SubNav>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Link href="/pipelines" className="text-xs text-muted-foreground hover:text-foreground">
+          <Link href="/build/pipelines" className="text-xs text-muted-foreground hover:text-foreground">
             Pipelines
           </Link>
           <span className="text-muted-foreground/40" aria-hidden>

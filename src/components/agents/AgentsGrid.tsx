@@ -49,7 +49,7 @@ function AgentCard({ a }: { a: AgentCardModel }) {
         >
           {a.custom ? initials(a.name) : <Robot className="size-4" />}
         </span>
-        <Link href={`/agents/${a.id}`} className="min-w-0 flex-1 truncate hover:text-primary">
+        <Link href={`/build/agents/${a.id}`} className="min-w-0 flex-1 truncate hover:text-primary">
           <span className="truncate font-mono text-sm font-medium">{a.name}</span>
         </Link>
         {disabled ? (
