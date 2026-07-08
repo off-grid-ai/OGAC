@@ -848,3 +848,10 @@ g9/g10. Correcting the stale "g6 = aux server #2" note — the real second serve
   Aggregator chat pool = g1,g2,g4,g5,g7,g8 (6); g3 in IMAGE_POOL; hostnames are the fleet-membership
   signal (mDNS `offgrid-gN.local`), NOT open :7878 (stray OGA-Desktop laptops also serve :7878 — e.g. a
   dev laptop appeared at .27; correctly NOT in the curated pool).
+
+## Triggers + output sinks env (W5b, 2026-07-08) — set on S1 .env.local for actual delivery
+- **Email-in trigger:** `OFFGRID_EMAIL_IMAP_URL`, `OFFGRID_EMAIL_IMAP_USER`, `OFFGRID_EMAIL_IMAP_PASS` (opt `OFFGRID_EMAIL_IMAP_MAILBOX`) + a launchd/cron job POSTing `/api/v1/admin/triggers/email/poll` on an interval. Unset → poll route reports not-configured (no fake runs).
+- **Email output sink:** `OFFGRID_SMTP_URL`, `OFFGRID_SMTP_FROM` (opt `OFFGRID_SMTP_USER`/`OFFGRID_SMTP_PASS`). Unset → sink returns a "NOT CONFIGURED" verdict (run stays done, nothing sent — never a fake success).
+- **Schedule trigger:** needs `OFFGRID_QUEUE_ENABLED=1` (already set) / `OFFGRID_ADAPTER_APPRUNTIME=temporal`; schedule registration is a no-op reporting not_configured until the durable runtime is on.
+- **Auto-rollback on drift (W3):** `OFFGRID_AUTO_ROLLBACK_ON_DRIFT=1` to enable auto-revert of published pipelines to last-good on a drift breach (opt-in — high-impact; off by default).
+- **Durable chat (W1):** the chat worker (`npm run worker:chat`, drains `offgrid-chat`) must run alongside app/agent workers for chat runs to go durable; inline fallback when off.
