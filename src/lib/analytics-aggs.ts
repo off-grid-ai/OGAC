@@ -51,7 +51,10 @@ export function buildAggsQuery(nowMs: number, pipelineTag?: string | null): Reco
       blocked: { filter: BLOCKED_FILTER },
       // byModel — one bucket per model, tokens desc (parser re-sorts to guarantee identical order).
       by_model: {
-        terms: { field: 'model', size: 1000, order: { tokens: 'desc' } },
+        // `model.keyword` (the aggregatable sub-field), NOT the bare `text` field `model` — a terms
+        // agg on the text field 400s the whole size:0 search, which zeroed the entire analytics page
+        // (accounting worked because it uses `.keyword`). (C2 fix)
+        terms: { field: 'model.keyword', size: 1000, order: { tokens: 'desc' } },
         aggs: {
           tokens: { sum: { field: 'tokens' } },
           latency: { sum: { field: 'ms' } },
