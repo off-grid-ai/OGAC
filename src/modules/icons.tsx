@@ -73,6 +73,8 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   integrations: Vault,
   'tool-catalog': Toolbox,
   'data-domains': TreeStructure,
+  catalog: Database,
+  governance: ShieldCheck,
   knowledge: BookOpenText,
   access: UsersThree,
   teams: UsersFour,
