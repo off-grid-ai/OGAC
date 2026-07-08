@@ -32,7 +32,19 @@ interface PlaygroundResult {
 // prompt's {{variables}}, then POSTs to /api/v1/prompts/playground, which inlines any {{>partials}},
 // sends the rendered text through the GOVERNED gateway (same inbound/outbound guardrail floor as chat)
 // and returns the model output + the guardrail verdicts. Nothing runs client-side against a model.
-export function PromptPlayground({ content }: { content: string }) {
+export function PromptPlayground({
+  content,
+  promptId,
+  version,
+  onRun,
+}: {
+  content: string;
+  /** When set, runs are tagged (promptId + version) so they appear in the prompt's observability. */
+  promptId?: string;
+  version?: string;
+  /** Fired after a run completes (any outcome) so the detail page can refresh its metrics. */
+  onRun?: () => void;
+}) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -61,7 +73,7 @@ export function PromptPlayground({ content }: { content: string }) {
       const r = await fetch('/api/v1/prompts/playground', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content, model, values }),
+        body: JSON.stringify({ content, model, values, promptId, version }),
       });
       const data = (await r.json().catch(() => ({}))) as PlaygroundResult;
       setResult(data);
@@ -72,6 +84,8 @@ export function PromptPlayground({ content }: { content: string }) {
       toast.error('Could not reach the gateway');
     } finally {
       setRunning(false);
+      // Metrics only capture a governed run once it reaches the gateway; give the async index a beat.
+      if (promptId && version) setTimeout(() => onRun?.(), 1500);
     }
   }
 
