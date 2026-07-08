@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { PromptPlayground } from '@/components/prompts/PromptPlayground';
+import { PromptObservabilityPanel } from '@/components/prompts/PromptObservabilityPanel';
 import { renderPromptTemplate } from '@/lib/prompt-template';
 import { relativeTime } from '@/lib/workspace-grid';
 
@@ -39,6 +40,11 @@ interface PromptView {
 export function PromptDetail({ prompt, isOwner }: { prompt: PromptView; isOwner: boolean }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>({});
+  // The prompt's version is its updatedAt (single living version — each edit bumps it). Runs are
+  // tagged with this so the observability panel can attribute them to the version that produced them.
+  const version = prompt.updatedAt;
+  // Bumped after a Playground run so the observability panel re-pulls fresh metrics.
+  const [obsRefresh, setObsRefresh] = useState(0);
 
   const rendered = useMemo(
     () => renderPromptTemplate(prompt.content, values),
@@ -136,7 +142,18 @@ export function PromptDetail({ prompt, isOwner }: { prompt: PromptView; isOwner:
             </CardContent>
           </Card>
 
-          <PromptPlayground content={prompt.content} />
+          <PromptPlayground
+            content={prompt.content}
+            promptId={prompt.id}
+            version={version}
+            onRun={() => setObsRefresh((n) => n + 1)}
+          />
+
+          <PromptObservabilityPanel
+            promptId={prompt.id}
+            currentVersion={version}
+            refreshKey={obsRefresh}
+          />
 
           {prompt.variables.length > 0 ? (
             <Card className="shadow-sm">
