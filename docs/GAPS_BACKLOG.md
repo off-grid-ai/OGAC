@@ -705,3 +705,23 @@ auto-works once the node serves /v1/audio/* correctly. Owner: desktop/fleet (on-
   audio falls back to the browser today.
 - **SP-3 (models, after SP-2):** add Orpheus-TTS (Llama GGUF → same llama.cpp gateway engine) + Parakeet
   STT (parakeet-mlx) as selectable models alongside Kokoro/Whisper. Desktop is adding Parakeet now.
+
+### SP-2 — EXACT FIX (desktop-repo, hand off; 2026-07-08)
+Fully diagnosed live. TWO bugs in the node's packaged `Off Grid AI.app --server-only`:
+1. **ENOTDIR (FIXED live on g1):** `desktop/src/main/tts.ts` spawns the TTS worker with `cwd: appRoot()`,
+   and `appRoot()`=`app.getAppPath()`=`.../app.asar` (a FILE) → spawn ENOTDIR. Live hotfix applied to g1:
+   added `OFFGRID_APP_ROOT=/Users/admin` to the gateway launchd plist EnvironmentVariables (appRoot() is
+   used in exactly ONE place, so safe) + full bootout/bootstrap. **Permanent fix:** in tts.ts set
+   `cwd` to a guaranteed real dir (e.g. `os.tmpdir()`), drop the appRoot() dependency.
+2. **Dep tree not asarUnpacked (NOT fixed — the real blocker):** tts-worker.mjs is a loose file in
+   Resources/ that imports `kokoro-js` → `@huggingface/transformers` → (jinja, onnxruntime, sharp).
+   electron-builder auto-unpacked only the NATIVE modules (onnxruntime-node, sharp) + a PARTIAL
+   @huggingface/transformers (missing its dist/index.js); the pure-JS deps stayed inside app.asar so the
+   loose worker can't resolve them (ESM ignores NODE_PATH; it needs an ancestor node_modules).
+   **Permanent fix:** `desktop/electron-builder.yml` → add `asarUnpack` for `**/node_modules/kokoro-js/**`,
+   `**/node_modules/@huggingface/**`, `**/node_modules/phonemizer/**` (their native deps already unpack);
+   AND ensure the worker resolves them (a `Resources/node_modules` symlink → app.asar.unpacked/node_modules,
+   which I created on g1, or run the worker from inside app.asar). Then rebuild + redeploy the app to g1-g8.
+   Owner: DESKTOP repo (team is already in tts.ts adding Parakeet). Console side (@offgrid/speech) is done
+   + waits. g1 is left hand-modified (env + kokoro-js/phonemizer copied + Resources/node_modules symlink) —
+   harmless; a clean desktop reinstall supersedes it.
