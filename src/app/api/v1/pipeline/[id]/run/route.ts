@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { recordAudit } from '@/lib/store';
 import { actorFrom } from '@/lib/audit-event';
@@ -6,6 +7,10 @@ import { getPipeline } from '@/lib/pipelines';
 import { deriveEgress } from '@/lib/pipelines-policy';
 import { verifyPipelineKey } from '@/lib/pipeline-api-keys';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { resolveContract } from '@/lib/pipeline-contract';
+import { enforceModelCall } from '@/lib/pipeline-enforcement';
+import { executePipelineRun } from '@/lib/pipeline-execute';
+import { defaultExecuteDeps } from '@/lib/pipeline-execute-wiring';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,16 +21,20 @@ export const dynamic = 'force-dynamic';
 // The key is verified (SHA-256 hash lookup — shape alone never authenticates) back to a pipeline; the
 // key must match THIS pipeline id in the URL, so a key minted for pipeline A can never drive pipeline B.
 //
-// GOVERNANCE APPLIES ON EVERY CALL — no bypass. The pipeline is the governed chokepoint: we load it,
-// require it be published, and run the request's `data_class` through the pipeline's PURE routing leash
-// (deriveEgress) BEFORE anything else. A `block` decision is honored (403) so a locked pipeline can
-// never leak PII to cloud even through its provisioned key. Every call is audited against the pipeline.
+// GOVERNANCE APPLIES ON EVERY CALL — no bypass. The pipeline is the governed chokepoint:
+//   1. key-auth (valid, non-revoked, minted for THIS pipeline),
+//   2. the pipeline must exist AND be published,
+//   3. the request's `data_class` runs through the pipeline's CONTRACT (routing egress leash + the
+//      policy/guardrail overlay) via the PURE enforceModelCall — the SAME verdict the agent-run/chat
+//      paths use — so a `block` verdict is honored (403): a locked pipeline can never leak PII to
+//      cloud even through its provisioned key,
+//   4. the call is then EXECUTED end-to-end through the governed gateway path (input guardrails →
+//      PII-mask-before-model when the overlay requires it → the real model call → output guardrails),
+//      returning the real completion + governance metadata (model, egress, run id, usage, checks).
 //
-// DEFERRED (logged as a gap): full model EXECUTION (dispatching the resolved gateway/model, running
-// guardrail masking on the output, streaming a completion) is not wired here yet — apps run through
-// submitAppRun; pipelines have no standalone executor. This route implements the REAL, tested key-auth
-// + governed routing decision and returns a governed PLAN (the binding + egress verdict + what would
-// run). Wiring the execution onto this governed decision is the remaining step.
+// HONEST: a mis-provisioned pipeline returns a clean 409; a gateway outage / empty completion returns
+// a clean 502 — NEVER a fabricated 200. Every call is audited against the pipeline (correlated by the
+// minted run id).
 
 function bearer(req: Request): string {
   const h = req.headers.get('authorization') ?? '';
@@ -34,6 +43,7 @@ function bearer(req: Request): string {
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const runId = `plrun_${randomUUID().slice(0, 8)}`;
 
   // ── 1. Authenticate the provisioned key (real: SHA-256 hash lookup, not shape) ──────────────────
   const binding = await verifyPipelineKey(bearer(req));
@@ -55,65 +65,104 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'pipeline is not published' }, { status: 409 });
   }
 
-  // ── 3. Governance — run the request's data_class through the pipeline's routing leash (PURE) ────
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const dataClass = typeof body.data_class === 'string' ? body.data_class : 'general';
-  const egress = deriveEgress(pipeline.routing, dataClass);
 
   const actor = actorFrom({ clientId: `pipeline-key:${binding.keyId}`, name: 'Provisioned API key' });
   const ip = ipFromRequest(req);
 
-  if (egress.effective === 'block') {
+  // ── 3. Governance — the FULL contract decision (egress leash + policy/guardrail overlay), PURE ──
+  // resolveContract loads the enforceable contract (data allowlist + routing + overlays merged over
+  // the org baseline); enforceModelCall is the same pure verdict the agent-run/chat paths use, so the
+  // public API is leashed IDENTICALLY. A block ⇒ 403 (audited), no execution.
+  const contract = await resolveContract(id, binding.orgId);
+  const verdict = enforceModelCall(contract, dataClass);
+  // The leash may pin a specific model for this data-class — surface it so the plan can prefer it.
+  const leashModel = deriveEgress(pipeline.routing, dataClass).model;
+
+  if (!verdict.allow) {
     recordAudit({
       actor,
       org: binding.orgId,
       project: pipelineTag(id),
       action: 'pipeline.invoke',
-      resource: pipelineTag(id),
+      resource: `${pipelineTag(id)} — ${verdict.reason}`,
       outcome: 'blocked',
       ip,
+      runId,
     });
     return NextResponse.json(
       {
         object: 'pipeline_run',
         pipelineId: id,
+        runId,
         outcome: 'blocked',
-        reason: `routing leash blocked egress for data_class="${dataClass}"`,
-        egress,
+        reason: verdict.reason,
+        egress: verdict.egress,
       },
       { status: 403 },
     );
   }
 
-  // ── 4. Governed plan (execution wiring deferred — see the header gap note) ──────────────────────
-  recordAudit({
-    actor,
-    org: binding.orgId,
-    project: pipelineTag(id),
-    action: 'pipeline.invoke',
-    resource: pipelineTag(id),
-    model: pipeline.defaultModel ?? null,
-    outcome: 'ok',
-    ip,
-  });
+  // ── 4. EXECUTE end-to-end through the governed gateway path ─────────────────────────────────────
+  const deps = defaultExecuteDeps(id, binding.orgId, runId);
+  const result = await executePipelineRun(
+    runId,
+    {
+      id: pipeline.id,
+      version: pipeline.version,
+      defaultModel: pipeline.defaultModel ?? null,
+      gateway: pipeline.gateway ? { id: pipeline.gateway.id, name: pipeline.gateway.name } : null,
+    },
+    verdict,
+    leashModel,
+    body,
+    binding.orgId,
+    `pipeline-key:${binding.keyId}`,
+    deps,
+  );
 
+  // A guardrail block (or a missing prompt) → 403; the input never reached the model.
+  if (result.status === 'blocked') {
+    return NextResponse.json(
+      {
+        object: 'pipeline_run',
+        pipelineId: id,
+        runId,
+        outcome: 'blocked',
+        reason: result.reason,
+        checks: result.checks,
+      },
+      { status: 403 },
+    );
+  }
+
+  // A gateway outage / empty completion → a clean 502, NEVER a fabricated answer.
+  if (result.status === 'error') {
+    return NextResponse.json(
+      { object: 'pipeline_run', pipelineId: id, runId, outcome: 'error', reason: result.reason },
+      { status: 502 },
+    );
+  }
+
+  // ── The governed result: the REAL completion + governance metadata ──────────────────────────────
   return NextResponse.json(
     {
       object: 'pipeline_run',
       pipelineId: id,
       pipelineVersion: pipeline.version,
+      runId,
       outcome: 'ok',
       governed: true,
-      plan: {
-        gateway: pipeline.gateway ? { id: pipeline.gateway.id, name: pipeline.gateway.name } : null,
-        model: pipeline.defaultModel ?? null,
-        dataClass,
-        egress,
-      },
-      // Echo the caller's input under governance so integrators can wire + test the contract now.
-      input: body,
-      note: 'Governed key-auth + routing decision applied. Model execution wiring is pending (gap).',
+      output: result.output,
+      model: result.model,
+      egress: result.egress,
+      masked: result.masked,
+      usage: result.usage,
+      checks: result.checks,
+      gateway: pipeline.gateway ? { id: pipeline.gateway.id, name: pipeline.gateway.name } : null,
+      dataClass,
     },
-    { status: 202 },
+    { status: 200 },
   );
 }
