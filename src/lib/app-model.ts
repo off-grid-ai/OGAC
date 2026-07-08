@@ -234,6 +234,15 @@ export function isSimpleAgent(spec: AppSpec): boolean {
   return spec.steps.length === 1 && spec.steps[0].kind === 'agent';
 }
 
+// ─── single-step-app filter (PURE) — the /build/agents list ────────────────────
+// /build/agents is the AGENTS list (deduped from Studio's app-centric shell): it shows the built-in +
+// custom agent roster AND the single-step apps the user built (an agent IS a one-step app). This is
+// the pure predicate powering that list — the apps whose shape is a single agent step. Multi-step
+// workflows belong on Studio, not here.
+export function filterSingleStepApps(apps: AppSpec[]): AppSpec[] {
+  return apps.filter(isSimpleAgent);
+}
+
 // ─── workflowToAppSpec — the back-compat shim (pure) ───────────────────────────
 // Maps an existing studioTemplate → an AppSpec. A legacy template has:
 //   { id?, orgId?, ownerId?, title, summary, prompt, visibility?, slug?, published?,
