@@ -69,6 +69,7 @@ test('toWorkflowInput: validates required fields, normalizes optionals', () => {
     orgId: undefined,
     actor: undefined,
     project: undefined,
+    pipelineId: null, // PA-16a-durable — no binding by default ⇒ legacy allow
   });
   const full = toWorkflowInput({
     agentId: 'a',
@@ -85,6 +86,22 @@ test('toWorkflowInput: validates required fields, normalizes optionals', () => {
   assert.throws(() => toWorkflowInput({ query: 'q', runId: 'r' }), /agentId required/);
   assert.throws(() => toWorkflowInput({ agentId: 'a', query: '  ', runId: 'r' }), /query required/);
   assert.throws(() => toWorkflowInput({ agentId: 'a', query: 'q' }), /runId required/);
+});
+
+test('toWorkflowInput: carries the PA-16a-durable bound-pipeline id (blank/absent ⇒ null)', () => {
+  // A real binding is threaded so the WORKER re-resolves + enforces the same contract the sync path does.
+  const bound = toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1', pipelineId: '  pl_hr  ' });
+  assert.equal(bound.pipelineId, 'pl_hr'); // trimmed
+  // No / blank / non-string binding ⇒ null (no binding ⇒ legacy allow, the additive guarantee).
+  assert.equal(toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1' }).pipelineId, null);
+  assert.equal(
+    toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1', pipelineId: '   ' }).pipelineId,
+    null,
+  );
+  assert.equal(
+    toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1', pipelineId: 123 }).pipelineId,
+    null,
+  );
 });
 
 test('normalizeActor: accepts a valid {type,id} shape, defaults label, rejects garbage', () => {
