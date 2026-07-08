@@ -16,9 +16,11 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');
   const filename = String(form?.get('filename') ?? 'audio.webm');
+  // Optional STT engine selection from the catalog (picker). Empty → gateway default.
+  const model = form?.get('model') ? String(form.get('model')) : undefined;
   if (!(file instanceof Blob)) return NextResponse.json({ error: 'no audio' }, { status: 400 });
 
-  const result = await transcribeAudio(file, filename);
+  const result = await transcribeAudio(file, filename, model);
   if (!result.ok) {
     return result.reason === 'not-configured'
       ? NextResponse.json({ error: 'transcription not configured', reason: 'not-configured' }, { status: 503 })

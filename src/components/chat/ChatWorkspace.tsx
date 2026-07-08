@@ -52,6 +52,9 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -1845,6 +1848,61 @@ export function ChatWorkspace({
               >
                 <Microphone className="size-5" />
               </button>
+              {(audio.sttModels.length > 0 || audio.ttsModels.length > 0) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-1.5 text-muted-foreground hover:text-foreground"
+                      title="Voice settings — dictation & read-aloud engine"
+                      aria-label="Voice settings"
+                    >
+                      <SpeakerHigh className="size-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64">
+                    {audio.sttModels.length > 0 && (
+                      <>
+                        <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup value={audio.sttModel} onValueChange={audio.setSttModel}>
+                          {audio.sttModels.map((m) => (
+                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
+                              <span>{m.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </>
+                    )}
+                    {audio.ttsModels.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup value={audio.ttsModel} onValueChange={audio.setTtsModel}>
+                          {audio.ttsModels.map((m) => (
+                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
+                              <span>{m.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                        {audio.ttsVoices && audio.ttsVoices.length > 0 && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Voice</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup value={audio.ttsVoice} onValueChange={audio.setTtsVoice}>
+                              {audio.ttsVoices.map((v) => (
+                                <DropdownMenuRadioItem key={v.id} value={v.id}>
+                                  {v.label}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <textarea
                 ref={textareaRef}
                 value={input}
