@@ -205,7 +205,9 @@ export function defaultDeps(): AppRunDeps {
           resource: domain.resource,
           opHints: domain.opHints,
         },
-        { type: connector.type, endpoint: connector.endpoint },
+        // Pass `id` so connector-exec resolves the vaulted credential at query time (credential-free
+        // endpoint + secret from OpenBao). Without it, a vaulted connector would connect password-less.
+        { type: connector.type, endpoint: connector.endpoint, id: connector.id },
         opts,
       );
       return {

@@ -47,7 +47,9 @@ export function makeConnectorSource(deps: ConnectorSourceDeps = defaultDeps): Re
       // 3. Read live through the shared query path. Failure ⇒ null ⇒ nothing.
       const { result, decision } = await deps.queryDomain(
         domain,
-        { type: connector.type, endpoint: connector.endpoint },
+        // Pass `id` so connector-exec resolves the vaulted credential at query time — a vaulted
+        // connector stores a credential-free endpoint and the secret comes from OpenBao by id.
+        { type: connector.type, endpoint: connector.endpoint, id: connector.id },
         { op: 'read', limit: Math.max(1, Math.min(k, 50)) },
       );
       if (!result || result.rows.length === 0) return [];

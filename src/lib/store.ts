@@ -723,6 +723,11 @@ export async function updateConnector(
 }
 
 export async function deleteConnector(id: string): Promise<void> {
+  // Purge the connector's vaulted credential BEFORE deleting the row — removeConnectorSecret resolves
+  // the secretRef FROM the row, so the row must still exist. Best-effort (the row delete is what
+  // matters); dynamic import avoids pulling the secrets/vault graph into every store consumer.
+  const { removeConnectorSecret } = await import('@/lib/connector-secrets');
+  await removeConnectorSecret(id).catch(() => undefined);
   await db.delete(ingestJobs).where(eq(ingestJobs.connectorId, id));
   await db.delete(connectors).where(eq(connectors.id, id));
 }
