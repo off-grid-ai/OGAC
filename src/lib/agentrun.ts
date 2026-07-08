@@ -558,8 +558,18 @@ export async function runAgent(
   auditRun(run.status);
 
   // 8c. Langfuse trace — emit a run trace whose id == normalize(runId) for every run (not just the
-  //     sampled QA score), so the trace plane is reliably correlated.
-  emitRunTrace({ runId, agentId, model: agent.model || ANSWER_MODEL, input: query, output: answer, caller });
+  //     sampled QA score), so the trace plane is reliably correlated. PA-12: stamp the bound pipeline
+  //     (resolved once by the route → threaded on the context) at the SOURCE so per-pipeline + global
+  //     Observability filter exactly; null when no pipeline governs this run (unchanged behaviour).
+  emitRunTrace({
+    runId,
+    agentId,
+    model: agent.model || ANSWER_MODEL,
+    input: query,
+    output: answer,
+    caller,
+    pipelineId: context?.pipelineId ?? null,
+  });
 
   return run;
 }

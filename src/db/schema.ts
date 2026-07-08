@@ -136,6 +136,11 @@ export const goldenCases = pgTable('golden_cases', {
 export const evalRuns = pgTable('eval_runs', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull().default('default'),
+  // PA-12 — the pipeline this run executed in the CONTEXT of (the eval def's pipeline binding), so
+  // Drift (which reads eval-run history) can be per-pipeline EXACT. NULL = an org-wide/library run
+  // not bound to any pipeline (unchanged behaviour). eval_definitions/golden_cases already carry
+  // pipeline_id; this closes the loop by tagging the RUN at the source.
+  pipelineId: text('pipeline_id'),
   score: integer('score').notNull().default(0),
   total: integer('total').notNull().default(0),
   passed: integer('passed').notNull().default(0),

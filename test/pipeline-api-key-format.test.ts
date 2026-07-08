@@ -8,6 +8,7 @@ import {
   pipelineCostSlice,
   pipelineKeyHint,
   pipelineTag,
+  pipelineTagOrNull,
   prefixOf,
   validateKeyName,
 } from '@/lib/pipeline-api-key-format';
@@ -53,6 +54,20 @@ test('validateKeyName trims, requires non-empty, caps length', () => {
 
 test('pipelineTag is the canonical run attribution tag', () => {
   assert.equal(pipelineTag('pl_abc'), 'pipeline:pl_abc');
+});
+
+test('pipelineTagOrNull (PA-12) — canonical tag for a bound pipeline, null for none', () => {
+  // A bound pipeline → the SAME canonical form cost/audit use (unified across all sinks).
+  assert.equal(pipelineTagOrNull('pl_abc'), 'pipeline:pl_abc');
+  assert.equal(pipelineTagOrNull('pl_abc'), pipelineTag('pl_abc'));
+  // No bound pipeline → null ⇒ callers emit NO pipeline tag (unchanged legacy behaviour).
+  assert.equal(pipelineTagOrNull(null), null);
+  assert.equal(pipelineTagOrNull(undefined), null);
+  // Blank/whitespace ids never produce a bare `pipeline:` tag.
+  assert.equal(pipelineTagOrNull(''), null);
+  assert.equal(pipelineTagOrNull('   '), null);
+  // Ids are trimmed so a stray-padded binding still keys identically to the cost/audit sinks.
+  assert.equal(pipelineTagOrNull('  pl_abc  '), 'pipeline:pl_abc');
 });
 
 test('pipelineCostSlice picks the matching attributed row (byProject preferred, then byActor)', () => {

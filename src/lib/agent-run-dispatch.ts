@@ -53,6 +53,10 @@ export interface DispatchArgs {
   // Null/absent ⇒ legacy behaviour. (The DURABLE worker path resolves its own contract in a later
   // round — see the note in dispatchAgentRun; today the durable input doesn't carry it.)
   contract?: PipelineContract | null;
+  // PA-12: the resolved bound-pipeline id (same binding as `contract`). Threaded onto the sync
+  // RunContext so runAgent stamps the observability trace with the canonical pipeline tag at the
+  // SOURCE. Null/absent ⇒ no pipeline tag (unchanged).
+  pipelineId?: string | null;
 }
 
 // The impure collaborators, injected so the orchestration is testable without Temporal/DB.
@@ -153,6 +157,7 @@ export async function dispatchAgentRun(
     org: orgId,
     project: args.project,
     contract: args.contract ?? null,
+    pipelineId: args.pipelineId ?? null,
   };
   const run = await deps.runAgent(
     args.agentId,
