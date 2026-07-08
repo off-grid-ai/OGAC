@@ -716,6 +716,67 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── ETL / orchestration engine (Kestra) — the visual pipeline + custom-code + trigger engine.
+  # Governed behind the console's pipeline contract; surfaced in the Data tab in product language
+  # ("Data movement / ETL orchestration" — never "Kestra" in the UI). Runs on S2 with the data plane.
+  kestra-postgres:
+    image: postgres:16.6-alpine
+    profiles: [kestra, all]
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: kestra
+    volumes: [kestradb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kestra -d kestra']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  kestra:
+    image: kestra/kestra:latest
+    profiles: [kestra, all]
+    user: root
+    command: server standalone
+    depends_on:
+      kestra-postgres:
+        condition: service_healthy
+    volumes:
+      - kestradata:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock  # so Docker-task (custom code) nodes can run
+      - /tmp/kestra-wd:/tmp/kestra-wd
+    environment:
+      # JVM capped so it co-exists with Airbyte/ClickHouse on the 16GB S2 box.
+      JAVA_OPTS: '-Xmx1200m'
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra-postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: kestra
+        kestra:
+          server:
+            basicAuth:
+              enabled: false
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: /app/storage
+          queue:
+            type: postgres
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd
+          url: http://localhost:8090/
+    ports: ['8090:8080'] # Kestra UI/API :8080 → host 8090 (edge loopback 8945 → this)
+    healthcheck:
+      test: ['CMD-SHELL', 'true'] # Kestra image lacks curl/wget; liveness proven by the console adapter probe
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata:
   seaweed:
@@ -739,3 +800,5 @@ volumes:
   airbytedb:
   airbyteworkspace:
   airbytedata:
+  kestradb:
+  kestradata:
