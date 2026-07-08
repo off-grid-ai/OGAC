@@ -231,7 +231,7 @@ export function StudioBuilder({
               New assistant
             </Button>
             <Button asChild size="sm" variant="ghost">
-              <Link href="/studio">Done</Link>
+              <Link href="/build/studio">Done</Link>
             </Button>
           </CardContent>
         </Card>

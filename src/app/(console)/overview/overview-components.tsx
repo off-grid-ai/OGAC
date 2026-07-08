@@ -76,7 +76,7 @@ export function BlockingFeed({ blocking }: { blocking: OperatorHome['blocking'] 
   return (
     <Section
       title={`Blocking decisions (last ${blocking.windowHours}h)`}
-      href="/control"
+      href="/governance"
       linkLabel="Governance"
     >
       <Card className="shadow-sm">
@@ -159,7 +159,7 @@ export function ActivityCard({ activity }: { activity: OperatorHome['activity'] 
         {activity.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             Nothing has run yet. Kick off your first agent from{' '}
-            <Link href="/chat" className="text-primary hover:underline">
+            <Link href="/workspace/chat" className="text-primary hover:underline">
               chat
             </Link>
             .
@@ -168,7 +168,7 @@ export function ActivityCard({ activity }: { activity: OperatorHome['activity'] 
           activity.map((r) => (
             <Link
               key={r.id}
-              href={`/agent-runs?run=${r.id}`}
+              href={`/build/agent-runs?run=${r.id}`}
               className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
             >
               <span className="flex min-w-0 items-center gap-2">

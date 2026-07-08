@@ -23,29 +23,44 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Enforce',
     tabs: [
-      { id: 'control', label: 'Control', route: '/control' },
-      { id: 'policy', label: 'Policy', route: '/policy' },
-      { id: 'access', label: 'Access', route: '/access' },
+      { id: 'control', label: 'Control', route: '/governance' },
+      { id: 'policy', label: 'Policy', route: '/governance/policy' },
+      { id: 'access', label: 'Access', route: '/governance/access' },
     ],
   },
   {
     heading: 'Protect',
     tabs: [
-      { id: 'guardrails', label: 'Guardrails', route: '/guardrails' },
-      { id: 'secrets', label: 'Secrets', route: '/secrets' },
+      { id: 'guardrails', label: 'Guardrails', route: '/governance/guardrails' },
+      { id: 'secrets', label: 'Secrets', route: '/governance/secrets' },
     ],
   },
   {
     heading: 'Prove',
     tabs: [
-      { id: 'regulatory', label: 'Regulatory', route: '/regulatory' },
-      { id: 'provenance', label: 'Provenance', route: '/provenance' },
+      { id: 'regulatory', label: 'Regulatory', route: '/governance/regulatory' },
+      { id: 'provenance', label: 'Provenance', route: '/governance/provenance' },
     ],
   },
 ];
 
+// Longest-prefix match so nested paths light only their own tab, not the /governance Control landing
+// tab (which is a prefix of every Governance route).
+function activeRoute(pathname: string): string | null {
+  let best: string | null = null;
+  for (const g of GROUPS) {
+    for (const t of g.tabs) {
+      if (pathname === t.route || pathname.startsWith(`${t.route}/`)) {
+        if (!best || t.route.length > best.length) best = t.route;
+      }
+    }
+  }
+  return best;
+}
+
 export function GovernanceNav() {
   const pathname = usePathname();
+  const activeR = activeRoute(pathname);
 
   return (
     <SubNav>
@@ -60,7 +75,7 @@ export function GovernanceNav() {
               {group.heading}
             </span>
             {tabs.map((t) => {
-              const active = pathname === t.route || pathname.startsWith(`${t.route}/`);
+              const active = activeR === t.route;
               return (
                 <Link
                   key={t.id}

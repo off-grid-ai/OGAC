@@ -309,7 +309,7 @@ export function UsersList() {
                     <TableRow key={u.id} className="group">
                       <TableCell className="font-mono text-xs">
                         <Link
-                          href={`/access/${u.id}`}
+                          href={`/governance/access/${u.id}`}
                           className="inline-flex items-center gap-1 text-foreground hover:text-primary hover:underline"
                         >
                           <CaretRight className="size-3 text-muted-foreground group-hover:text-primary" />
