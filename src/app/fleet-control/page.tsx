@@ -35,8 +35,7 @@ interface Item {
   body: string;
 }
 
-// Act 1 — the table-stakes a buyer already expects from "fleet control" (delivered via FleetDM +
-// osquery, MIT core).
+// Act 1 — the table-stakes a buyer already expects from "fleet control" (delivered via open, self-hosted device management).
 const BASELINE: Item[] = [
   {
     icon: Desktop,
@@ -46,7 +45,7 @@ const BASELINE: Item[] = [
   {
     icon: MagnifyingGlass,
     name: 'Live & scheduled queries',
-    body: 'Ask any question across the whole fleet in real time (osquery): what’s installed, running, misconfigured — answered in seconds.',
+    body: 'Ask any question across the whole fleet in real time : what’s installed, running, misconfigured — answered in seconds.',
   },
   {
     icon: ShieldCheck,
@@ -172,8 +171,7 @@ export default function FleetControlPage() {
               <span className="text-primary">plus the intelligence only Off Grid AI adds.</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              A complete, competitive frontline fleet-control system on open source (FleetDM +
-              osquery), with Off Grid AI’s field-force intelligence layered on top — across desktop and
+              A complete, competitive frontline fleet-control system on open source, self-hosted, with Off Grid AI’s field-force intelligence layered on top — across desktop and
               mobile, on your own infrastructure.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -201,7 +199,7 @@ export default function FleetControlPage() {
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               The baseline a competitive fleet-control system must do — every bit of it delivered on
-              permissive open source (FleetDM + osquery), self-hosted, no per-device licence.
+              permissive open source, self-hosted, no per-device licence.
             </p>
           </BlurFade>
           <Cards items={BASELINE} cols="sm:grid-cols-2 lg:grid-cols-4" />
@@ -220,7 +218,7 @@ export default function FleetControlPage() {
               Fleet <span className="text-primary">intelligence</span> — desktop & mobile
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              FleetDM manages the devices. Off Grid AI turns the fleet into a workforce you can coach —
+              The platform manages the devices. Off Grid AI turns the fleet into a workforce you can coach —
               on-device intelligence that no MDM gives you, captured (opt-in) on every desktop and
               phone and grounded in your own knowledge.
             </p>
@@ -250,7 +248,7 @@ export default function FleetControlPage() {
           <h2 className="text-xl font-semibold tracking-tight">How it fits together</h2>
           <div className="mt-6 flex flex-col gap-3 text-sm sm:flex-row sm:items-stretch">
             {[
-              { icon: Desktop, t: 'FleetDM + osquery', d: 'The device-fleet engine — inventory, policy, compliance.' },
+              { icon: Desktop, t: 'Device-fleet engine', d: 'Inventory, policy, and compliance — inventory, policy, compliance.' },
               { icon: DeviceMobile, t: 'Off Grid AI node (desktop + mobile)', d: 'The on-device signal — activity, capture, the copilot.' },
               { icon: Brain, t: 'The Brain', d: 'Your knowledge — what the intelligence is grounded in.' },
               { icon: Broadcast, t: 'The console', d: 'One control plane — governance, audit, kill-switch, insight.' },
