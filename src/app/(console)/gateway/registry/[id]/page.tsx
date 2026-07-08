@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { GatewayDetail } from '@/components/gateways/GatewayDetail';
 import { getGatewayWithHealth } from '@/lib/gateways';
@@ -30,9 +31,15 @@ export default async function GatewayDetailPage({ params }: { params: Promise<{ 
   const fleetBaseline: ModelSpec[] = MODEL_CATALOG.filter((m) => m.servedOnFleet);
   const defaultSpec = gateway.defaultModel ? (getModelSpec(gateway.defaultModel) ?? null) : null;
 
+  // PA-15: prefill the "provision endpoint" form with the current tenant's slug when this request is
+  // on a tenant subdomain (x-offgrid-tenant-slug, set by middleware from the TRUSTED host). Off a
+  // tenant subdomain the operator types the tenant slug themselves.
+  const tenantSlug = (await headers()).get('x-offgrid-tenant-slug') ?? '';
+
   return (
     <GatewayDetail
       gateway={gateway}
+      tenantSlug={tenantSlug}
       pipelines={pipelines.map((p) => ({
         id: p.id,
         name: p.name,

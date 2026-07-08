@@ -45,6 +45,8 @@ export interface GatewayRow {
   defaultModel: string;
   egressClass: string;
   enabled: boolean;
+  /** PA-15: the per-tenant provisioned gateway host, or null when this gateway uses the shared one. */
+  hostname?: string | null;
   createdAt?: string | Date | null;
 }
 
@@ -76,6 +78,8 @@ export interface GatewayView {
   defaultModel: string;
   egressClass: EgressClass;
   enabled: boolean;
+  /** PA-15: the per-tenant provisioned gateway host ("<slug5><rand5>-gateway.<apex>"), or null. */
+  hostname: string | null;
   configured: boolean;
   reachable: boolean;
   /** enabled AND configured AND reachable — the only state in which a pipeline may truly use it. */
@@ -129,6 +133,7 @@ export function mergeGatewayHealth(row: GatewayRow, signal: GatewayHealthSignal)
     defaultModel: row.defaultModel,
     egressClass: egressClassFor(row.kind),
     enabled: row.enabled,
+    hostname: row.hostname ?? null,
     configured: signal.configured,
     reachable: signal.reachable,
     available,

@@ -1,10 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import {
+  gatewayFromHost,
   isPublicFileGet,
   isPublicPath,
   tenantSlugFromHost,
 } from '../src/lib/route-access.ts';
+import { tenantGatewayHost } from '../src/lib/tenant-domain.ts';
 
 // Real inputs, no mocks — these are pure functions, so we exercise the actual authorization rules
 // the middleware relies on.
@@ -70,4 +72,39 @@ test('tenantSlugFromHost: case-insensitive on the host', () => {
     tenantSlugFromHost('BharatUnion-OnPrem-Console.getoffgridai.co'),
     'bharatunion',
   );
+});
+
+// ─── PA-15: gatewayFromHost — the per-tenant gateway edge resolver ─────────────────────────────────
+
+test('gatewayFromHost: parses the <slug5><rand5>-gateway.<apex> label into parts', () => {
+  const parts = gatewayFromHost('bharak7x2p-gateway.getoffgridai.co');
+  assert.deepEqual(parts, { label: 'bharak7x2p', slugPrefix: 'bhara', randSuffix: 'k7x2p' });
+});
+
+test('gatewayFromHost: round-trips against tenantGatewayHost (the host SHAPE source of truth)', () => {
+  // Mint a host with the pure builder, then resolve it back — the label is the stored key.
+  const host = tenantGatewayHost('bharatunion', 'k7x2p');
+  assert.equal(host, 'bharak7x2p-gateway.getoffgridai.co');
+  const parts = gatewayFromHost(host);
+  assert.ok(parts);
+  assert.equal(parts.label, 'bharak7x2p');
+  assert.equal(parts.slugPrefix, 'bhara'); // first 5 of the slug
+  assert.equal(parts.randSuffix, 'k7x2p'); // the 5-char random suffix
+});
+
+test('gatewayFromHost: case-insensitive on the host', () => {
+  const parts = gatewayFromHost('Bharak7X2P-Gateway.getoffgridai.co');
+  assert.ok(parts);
+  assert.equal(parts.label, 'bharak7x2p');
+});
+
+test('gatewayFromHost: rejects the SHARED gateway + non-matching hosts (null)', () => {
+  assert.equal(gatewayFromHost('gateway.getoffgridai.co'), null, 'shared gateway is not per-tenant');
+  assert.equal(gatewayFromHost('bharatunion-onprem-console.getoffgridai.co'), null, 'a console host');
+  assert.equal(gatewayFromHost('getoffgridai.co'), null);
+  // Wrong label length (label must be exactly 10 alphanumerics before -gateway).
+  assert.equal(gatewayFromHost('short-gateway.getoffgridai.co'), null, 'label too short');
+  assert.equal(gatewayFromHost('waytoolonglabel-gateway.getoffgridai.co'), null, 'label too long');
+  assert.equal(gatewayFromHost(null), null);
+  assert.equal(gatewayFromHost(''), null);
 });

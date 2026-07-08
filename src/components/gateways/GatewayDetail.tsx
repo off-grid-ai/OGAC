@@ -2,7 +2,9 @@
 
 import {
   ArrowLeft,
+  Copy,
   Cpu,
+  Globe,
   Lock,
   Pencil,
   Trash,
@@ -202,14 +204,58 @@ export function GatewayDetail({
   isOnPrem,
   fleetModelBaseline,
   defaultModelSpec,
+  tenantSlug = '',
 }: {
   gateway: GatewayView;
   pipelines: PipelineSummary[];
   isOnPrem: boolean;
   fleetModelBaseline: ModelSpec[];
   defaultModelSpec: ModelSpec | null;
+  /** PA-15: the current tenant's slug (prefills the provision-endpoint form) — '' off a subdomain. */
+  tenantSlug?: string;
 }) {
   const router = useRouter();
+
+  // PA-15 — per-tenant provisioned gateway endpoint. Optimistically track the stored hostname so the
+  // "Endpoint" card flips from "provision" → the copyable URL without a full reload.
+  const [hostname, setHostname] = useState<string | null>(gateway.hostname);
+  const [slugInput, setSlugInput] = useState<string>(tenantSlug);
+  const [provisioning, setProvisioning] = useState(false);
+
+  const onProvisionHost = useCallback(async () => {
+    const slug = slugInput.trim();
+    if (!slug) {
+      toast.error('Enter the tenant slug to provision an endpoint');
+      return;
+    }
+    setProvisioning(true);
+    try {
+      const res = await fetch(`/api/v1/admin/gateways/${gateway.id}/provision-host`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tenantSlug: slug }),
+      });
+      if (res.ok) {
+        const d = (await res.json()) as { hostname?: string | null };
+        setHostname(d.hostname ?? null);
+        toast.success('Endpoint provisioned');
+        router.refresh();
+      } else {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(d.error ?? 'Failed to provision endpoint');
+      }
+    } catch {
+      toast.error('Failed to provision endpoint');
+    } finally {
+      setProvisioning(false);
+    }
+  }, [gateway.id, slugInput, router]);
+
+  const onCopyEndpoint = useCallback(() => {
+    if (!hostname) return;
+    void navigator.clipboard.writeText(`https://${hostname}`);
+    toast.success('Endpoint URL copied');
+  }, [hostname]);
 
   // On-prem: reconcile the fleet-served baseline against the LIVE node routing tags so the catalog
   // reflects what the fleet is actually serving — not a static assumption. Cloud: show the default
@@ -306,6 +352,53 @@ export function GatewayDetail({
           </Card>
         ))}
       </div>
+
+      {/* PA-15 — per-tenant PROVISIONED endpoint. Reads RESTfully like the tenant console subdomain:
+          "https://<slug5><rand5>-gateway.<apex>". Copyable when provisioned; a mint action otherwise. */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Globe className="size-4 text-primary" /> Endpoint
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            A per-tenant gateway URL, unguessable and tenant-scoped. Point the tenant’s clients at it;
+            the aggregator resolves the tenant from the host. Uses the shared gateway until provisioned.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {hostname ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
+                https://{hostname}
+              </code>
+              <Button size="sm" variant="outline" onClick={onCopyEndpoint}>
+                <Copy className="size-4" /> Copy
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-0">
+                <label
+                  htmlFor="gw-tenant-slug"
+                  className="text-[10px] uppercase tracking-wide text-muted-foreground/70"
+                >
+                  Tenant slug
+                </label>
+                <input
+                  id="gw-tenant-slug"
+                  value={slugInput}
+                  onChange={(e) => setSlugInput(e.target.value)}
+                  placeholder="e.g. bharatunion"
+                  className="mt-1 block w-56 rounded-md border border-input bg-background px-2 py-1.5 font-mono text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+              <Button size="sm" onClick={onProvisionHost} disabled={provisioning}>
+                {provisioning ? 'Provisioning…' : 'Provision endpoint'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Endpoint & auth — never render a secret; report presence only. */}
