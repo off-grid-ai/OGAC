@@ -166,3 +166,10 @@ _Other sweep findings (from the doc-deepening agents) still to be consolidated h
    `deploy/onprem/SERVER_STATE.md` in the same step.
 3. Re-run the probe; paste the passing output as evidence.
 4. Flip to 🟢/✅ here, and confirm the in-product signal in `user/VERIFY.md` now reads "real."
+
+---
+## Reconciliation 2026-07-09 (post-fix batch — verified live)
+- **G-F1 (S2/T3 scoping) → 🟢 RESOLVED + VERIFIED LIVE.** `bindTenantOrg` now feeds `currentOrgId` the verified bearer/break-glass principal. Proof: admin bearer + `Host: bharatunion-onprem-console.getoffgridai.co` → `GET /api/v1/admin/apps` returns **org_bharat** apps (bhapp_xsell…); `Host: wednesdaysol-…` → `[]` (no leak). Per-tenant machine scoping works.
+- **G-F2 (Indian BFSI PII) → 🟢 RESOLVED + VERIFIED LIVE.** `/pii/scan` "my PAN is ABCDE1234F" → `entities:["IN_PAN"], redacted:"my PAN is <IN_PAN>", engine:presidio`. Regex floor + Presidio defaults both carry IN_PAN/IN_AADHAAR/IN_IFSC/UPI.
+- **PA-16a (durable app-run enforcement) → 🟢** contract now resolved + enforced on the Temporal worker path (was skipped). **Chat governance (PA-16b chat) → 🟢** (durable + guarded). **Presidio (#2) → 🟢 live** (engine:presidio). **Durable workers (#12) → 🟢 live** (agent/app/chat workers running, OFFGRID_QUEUE_ENABLED=1).
+- **Still open (NOT #207 blockers):** G-F3 (grounding on lexical fallback — needs model-NLI adapter), G-F4 (data-quality GE stub — needs real GE engine), PA-11 (public pipeline run doesn't fully execute the model), PA-10/PA-13 (small), S3 (cloudflared consolidation — on-site), design gaps PA-3/4/6/8/9.
