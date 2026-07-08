@@ -30,6 +30,7 @@ export type ModuleId =
   | 'data-domains'
   | 'knowledge'
   | 'access'
+  | 'teams'
   | 'admin'
   | 'storage'
   | 'provit'
@@ -287,6 +288,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Manage users, roles, and machine clients via Keycloak.',
     route: '/governance/access',
     service: 'keycloak',
+    internal: true,
+  },
+  {
+    id: 'teams',
+    label: 'Teams',
+    description:
+      'Teams / business units between the org and the pipeline. A pipeline can belong to a team, and team members get delegated access to their team’s pipelines.',
+    route: '/governance/teams',
+    service: 'console',
     internal: true,
   },
   {
