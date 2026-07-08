@@ -1129,3 +1129,27 @@ export const pipelineApiKeys = pgTable('pipeline_api_keys', {
 
 export type PipelineApiKey = typeof pipelineApiKeys.$inferSelect;
 export type NewPipelineApiKey = typeof pipelineApiKeys.$inferInsert;
+
+// ─── Spine exporters (M6 "good citizen") ──────────────────────────────────────────────────────────
+// Config for exporting the spine (audit / lineage / metrics) OUT to the enterprise's own tooling
+// (Splunk, Purview/Collibra, Grafana/Prometheus). Org-scoped. `secretRef` NAMES an OpenBao key — the
+// raw auth token is NEVER stored here; it's resolved at export time via the existing secret path.
+// `lastStatus`/`lastAt` are the HONEST result of the most recent real test()/export() call.
+export const exportTargets = pgTable('export_targets', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  kind: text('kind').notNull(), // 'audit' | 'lineage' | 'metrics'
+  endpoint: text('endpoint').notNull().default(''),
+  enabled: boolean('enabled').notNull().default(true),
+  secretRef: text('secret_ref'), // OpenBao key path, never a value
+  lastStatus: text('last_status'), // 'ok' | 'fail' | null (never tested)
+  lastDetail: text('last_detail'), // human detail of the last test/export
+  lastAt: timestamp('last_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('export_targets_org_idx').on(t.orgId),
+]);
+
+export type ExportTarget = typeof exportTargets.$inferSelect;
+export type NewExportTarget = typeof exportTargets.$inferInsert;

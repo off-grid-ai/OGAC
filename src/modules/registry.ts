@@ -47,6 +47,7 @@ export type ModuleId =
   | 'secrets'
   | 'guardrails'
   | 'sandbox'
+  | 'exporters'
   | 'config';
 
 export interface ModuleDef {
@@ -410,6 +411,15 @@ export const MODULES: readonly ModuleDef[] = [
     description: 'Secrets management (OpenBao) — seal status, mounts, and secret lifecycle. Values never displayed.',
     route: '/governance/secrets',
     service: 'control',
+    internal: true,
+  },
+  {
+    id: 'exporters',
+    label: 'Export',
+    description:
+      'Send audit, lineage, and cost/usage metrics to your own SIEM, data catalog, and observability stack (Splunk, Purview/Collibra, Grafana/Prometheus) — the platform is a good citizen of your existing tooling, not an island.',
+    route: '/governance/exporters',
+    service: 'console',
     internal: true,
   },
   {
