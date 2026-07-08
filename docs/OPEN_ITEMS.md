@@ -35,6 +35,29 @@ _None._ Confirmed by the live Phase-F sweep + same-day reconciliation.
 
 ## (B) Real gaps — non-blocking (code-side, ship when convenient)
 
+> **✅ ALL (B) CODE-SIDE ITEMS RESOLVED — 2026-07-09 burndown (main @ `85ca60b`).** Every row below is
+> closed, merged, gated (typecheck + local production build + full-suite tests), and pushed; the
+> ≥85% coverage gate is now enforced by a pre-push hook (`#211`). Resolution map:
+> - **PA-11** → pipeline API fully executes the governed run (key-auth → contract → input guardrails →
+>   PII-mask-before-model → real gateway completion → output guardrails → audit; honest 403/502, no fake 200).
+>   Pure `pipeline-run-plan.ts` + injectable `pipeline-execute.ts` (`0f201a9`).
+> - **PA-16a-durable** → durable agent-run path resolves + enforces the pipeline contract on the worker,
+>   identical to sync (`3926e06`).
+> - **PA-16c** → new pure `pii-escalation.ts` authority; every run path (agentrun/pipeline-execute/chat-run
+>   + app-run's previously-unmasked agent step) honors overlay-escalated masking above the org floor (`a67e87d`).
+> - **PA-10 / PA-13** → real partial gateway PATCH (read-modify-write, discriminated result) + clean-seed lock (`685bcf6`).
+> - **insurer-connector-creds-vault** → connector secrets vaulted in OpenBao; DB endpoint column carries no
+>   password; create/edit split+vault, delete purges; legacy plaintext rows fall back gracefully (`4ade027`).
+> - **IA-nav-dedup** → Tools single-homed under Build; Brain RAG group renamed "Retrieval" (`76f40c6`).
+> - **DSAR-propagation** → real vector (Qdrant delete-by-filter) / lake (SeaweedFS object delete) / device
+>   (durable tombstone queue + operable route) seams behind a pure planner; unreachable target → honest
+>   `deferred`, never counted erased. New `erasure_tombstones` table self-migrates (`85ca60b`).
+> - **G-F3** → model-NLI grounding adapter with lexical floor default (model opt-in via `OFFGRID_ADAPTER_GROUNDING=model`); `G-F4` → real Great-Expectations data-quality engine (no stub label).
+>
+> Deploy-pending: batched tunnel deploy of both waves — apply `erasure_tombstones` CREATE + confirm
+> `connectors.secret_ref` self-migration on the server; restart console + workers (agent-run/app-run
+> contract + masking). Remaining OPEN work is only **(C) on-site/infra** (needs the box) and **(D) pre-GA design**.
+
 | id | Description | Prio | Demo-blocker | Effort | Evidence it's open |
 |----|-------------|------|--------------|--------|--------------------|
 | PA-11 | Public per-pipeline run route (`POST /api/v1/pipeline/[id]/run`) does REAL key-auth + governed routing/egress decision + audit, but returns a governed **plan (202)** — it does not dispatch the resolved gateway/model or run output masking. Pipelines have no standalone executor. | P1 | no | M | `src/app/api/v1/pipeline/[id]/run/route.ts:24-28,88,115` — explicit "Model execution wiring is pending (gap)" + returns `status:202 {plan}`. |
