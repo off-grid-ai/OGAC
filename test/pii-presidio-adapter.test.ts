@@ -61,9 +61,16 @@ test('scan: a recognizers/deep-config load failure does NOT force a regex fallba
   const body = seen[0].body as Record<string, unknown>;
   assert.equal(body.text, 'John lives here');
   assert.equal(body.language, 'en');
-  // With no custom recognizers loadable, the body must omit ad_hoc_recognizers entirely (an empty
-  // or degenerate array can 400 the whole /analyze call → the regex fallback we are fixing).
-  assert.equal('ad_hoc_recognizers' in body, false);
+  // Even with no org-custom recognizers loadable, the body carries the always-on Indian-BFSI
+  // default set (PAN/Aadhaar/IFSC/UPI) as valid PatternRecognizers — G-F2. These are a NON-empty,
+  // well-formed ad_hoc_recognizers array (the degenerate EMPTY array that could 400 /analyze is
+  // still never sent), so the request stays a valid presidio analyze, not a regex fallback.
+  const adhoc = body.ad_hoc_recognizers as Array<{ supported_entity: string }> | undefined;
+  assert.ok(Array.isArray(adhoc) && adhoc.length === 4, 'default recognizer set rides the body');
+  assert.deepEqual(
+    adhoc?.map((r) => r.supported_entity).sort(),
+    ['IN_AADHAAR', 'IN_IFSC', 'IN_PAN', 'UPI_ID'],
+  );
 });
 
 test('scan: Presidio 200 with no entities is reported as presidio (not regex) — "found nothing" is a real answer', async () => {
@@ -150,10 +157,16 @@ test('scan(text, orgId): passing an explicit orgId scans as presidio without nee
 });
 
 // Pure-builder guard (also lives in presidio-recognizers.test.ts, restated here as the load-bearing
-// invariant behind the adapter: no recognizers → the ad_hoc_recognizers field is OMITTED, never an
-// empty array, because Presidio can reject a degenerate ad_hoc_recognizers payload).
-test('buildAnalyzeRequest: omits ad_hoc_recognizers when there are no recognizers', () => {
+// invariant behind the adapter): with no org-custom recognizers the body still carries the always-on
+// Indian-BFSI default set as a NON-empty, well-formed ad_hoc_recognizers array — never the degenerate
+// EMPTY array that Presidio can 400 on, and never a missing entity/regex. G-F2.
+test('buildAnalyzeRequest: no custom recognizers → ships the 4 default recognizers, never an empty array', () => {
   const req = buildAnalyzeRequest('hello', [], DEFAULT_THRESHOLDS);
-  assert.equal('ad_hoc_recognizers' in req, false);
-  assert.deepEqual(req, { text: 'hello', language: 'en' });
+  assert.equal(req.text, 'hello');
+  assert.equal(req.language, 'en');
+  assert.equal(req.ad_hoc_recognizers?.length, 4);
+  for (const r of req.ad_hoc_recognizers ?? []) {
+    assert.ok(r.supported_entity, 'each default recognizer has an entity');
+    assert.ok(r.patterns && r.patterns.length > 0, 'each default is a pattern recognizer');
+  }
 });
