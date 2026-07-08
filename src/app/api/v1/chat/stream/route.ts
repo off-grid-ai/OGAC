@@ -37,6 +37,9 @@ import { citationInstruction, sourceNames } from '@/lib/chat-citations';
 import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
+import { auditEnforcement } from '@/lib/pipeline-contract';
+import { resolveChatBinding } from '@/lib/pipeline-run-glue';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -98,6 +101,24 @@ export async function POST(req: Request) {
       ? await getConversation(userId, conversationId)
       : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
+
+  // PA-16b — resolve the bound-pipeline CONTRACT this chat run enforces (data allowlist + egress
+  // leash + policy/guardrail overlay). Most-specific-wins via resolveChatPipeline: the project's own
+  // binding → the org default (allowlist-gated). Null (nothing bound / unresolvable) ⇒ legacy
+  // behaviour — the chat behaves EXACTLY as before (additive-only). Enforcement is layered on top of
+  // the existing chat governance (RBAC / budget / routing), never replacing it. Best-effort resolve:
+  // a DB hiccup degrades to a null contract (legacy), never breaks the chat.
+  const pipelineBinding = await resolveChatBinding(convo.projectId ?? null, orgId).catch(() => ({
+    pipelineId: null,
+    contract: null,
+  }));
+  const pipelineContract = pipelineBinding.contract;
+  const enforceCtx = {
+    orgId,
+    actor: userId,
+    runId: convo.id || `chat_${userId}`,
+    contract: pipelineContract,
+  };
 
   // Edit & branch: fork a new user turn from an edited prior message (persisted, becomes active).
   // The new user message is the parent of the assistant answer we're about to generate.
@@ -189,36 +210,51 @@ export async function POST(req: Request) {
   }
   // Project chats retrieve from the knowledgebase and cite (desktop RAG behavior).
   let citations: Citation[] = [];
+  // PA-16b — the HARD data-allowlist ceiling before a knowledge read (mirrors the app-run/agent
+  // path). enforceDataAccess with a null contract is permissive (legacy). When a bound pipeline's
+  // allowlist doesn't cover the requested knowledge domain the read is SKIPPED (not blocking the
+  // whole chat) + audited, so the model never sees ungoverned data. Data keys: the project id for a
+  // project KB, 'org-knowledge' for the org-wide KB.
   if (ragProjectId) {
-    try {
-      const r = await retrieve(ragProjectId, String(content));
-      if (r.context) {
-        messages.push({ role: 'system', content: r.context });
-        citations = r.citations;
+    const v = enforceDataAccess(pipelineContract, ragProjectId);
+    if (!v.allow) {
+      auditEnforcement(enforceCtx, 'pipeline.data.deny', `data:${ragProjectId}`, 'blocked', v.reason);
+    } else {
+      try {
+        const r = await retrieve(ragProjectId, String(content));
+        if (r.context) {
+          messages.push({ role: 'system', content: r.context });
+          citations = r.citations;
+        }
+      } catch {
+        /* knowledgebase optional — chat still answers without it */
       }
-    } catch {
-      /* knowledgebase optional — chat still answers without it */
     }
   }
   // Org-wide knowledge base ("Ask Your Org"): when the client opts in, retrieve permission-aware
   // chunks scoped to the session role and inject them as a system block + citations, mirroring the
   // project RAG branch above. Retrieval only ever returns collections the role may access.
   if (orgKnowledge) {
-    try {
-      const r = await retrieveOrgKnowledge(
-        String(content),
-        session?.user?.role ?? 'viewer',
-        6,
-        orgId,
-      );
-      if (r.context) {
-        messages.push({ role: 'system', content: r.context });
-        citations = citations.concat(
-          r.citations.map((c) => ({ name: c.name, position: c.position, score: c.score })),
+    const v = enforceDataAccess(pipelineContract, 'org-knowledge');
+    if (!v.allow) {
+      auditEnforcement(enforceCtx, 'pipeline.data.deny', 'data:org-knowledge', 'blocked', v.reason);
+    } else {
+      try {
+        const r = await retrieveOrgKnowledge(
+          String(content),
+          session?.user?.role ?? 'viewer',
+          6,
+          orgId,
         );
+        if (r.context) {
+          messages.push({ role: 'system', content: r.context });
+          citations = citations.concat(
+            r.citations.map((c) => ({ name: c.name, position: c.position, score: c.score })),
+          );
+        }
+      } catch {
+        /* org knowledge optional — chat still answers without it */
       }
-    } catch {
-      /* org knowledge optional — chat still answers without it */
     }
   }
   // @-mentioned knowledge: the user referenced one or more KBs (whole project) or specific KB docs
@@ -381,11 +417,32 @@ export async function POST(req: Request) {
     org: DEFAULT_ORG,
     project: convo.projectId ?? null,
   };
-  const plan = await resolveCloudPlan({
+  let plan = await resolveCloudPlan({
     data_class: String(dataClass || 'public'),
     task: 'chat',
     model: effectiveModel || '',
   }).catch(() => null);
+
+  // PA-16b — the bound-pipeline egress leash, ADDITIVE on top of the chat's own routing plan. The
+  // pipeline can only be MORE restrictive: a 'block' verdict is a hard stop (deny + audit); a
+  // 'local' verdict (forceLocal) demotes a cloud plan to on-prem so the pipeline's ceiling can never
+  // be widened by chat routing. Null contract ⇒ the noPipeline verdict is permissive (legacy).
+  const modelVerdict = enforceModelCall(pipelineContract, String(dataClass || 'public'));
+  if (!modelVerdict.allow) {
+    auditEnforcement(enforceCtx, 'pipeline.egress.block', `model:${effectiveModel || 'default'}`, 'blocked', modelVerdict.reason);
+    return deny(`request blocked by pipeline egress leash: ${modelVerdict.reason}`);
+  }
+  if (modelVerdict.forceLocal && plan?.kind === 'cloud') {
+    auditEnforcement(enforceCtx, 'pipeline.egress.local', `model:${effectiveModel || 'default'}`, 'redacted', modelVerdict.reason);
+    // Demote the cloud plan to on-prem (leash to local) — the pipeline can only tighten, never widen.
+    plan = {
+      kind: 'local',
+      selection: null,
+      cloudUnavailable: false,
+      model: null,
+      reason: `pipeline egress leash → local: ${modelVerdict.reason}`,
+    };
+  }
 
   // A blocked route is a hard stop — nothing runs, and the block is audited (leash proof).
   if (plan && plan.kind === 'block') {
