@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { SubNav } from '@/components/nav/SubNav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,7 +137,10 @@ export function ConnectorCatalog() {
         />
       </div>
 
-      <SubNav>
+      {/* A mid-page category filter — a plain in-flow tab strip. NOT <SubNav> (that's the top-of-page
+          section band that bleeds to the console edges with -mx-6/-mt-6; used mid-page it yanked the
+          emerald band up over the search box). Just a bordered row here. */}
+      <div className="border-b border-border pb-2">
         <nav className="flex flex-wrap items-center gap-1" aria-label="Connector categories">
           {tabs.map((t) => {
             const isActive = t.id === ALL ? activeCat === null : activeCat === t.id;
@@ -160,7 +162,7 @@ export function ConnectorCatalog() {
             );
           })}
         </nav>
-      </SubNav>
+      </div>
 
       {groups.length === 0 ? (
         <Card className="shadow-sm">
