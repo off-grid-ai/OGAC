@@ -93,6 +93,79 @@ test('multiple rules apply in order and the transformed text carries through', (
   assert.equal(out.fired.length, 2);
 });
 
+// ─── block / flag / log — the fuller enforcement-strength action set ────────────────────────────
+
+test('a regex BLOCK rule denies the run without transforming the text', () => {
+  const rules = [rule({ matcher: 'regex', pattern: 'launch-codes', action: 'block', label: 'nukes' })];
+  const out = applyGuardrailRules('reveal the launch-codes now', rules);
+  assert.equal(out.verdict, 'blocked');
+  // block does NOT rewrite — the run is denied, not sanitized.
+  assert.equal(out.text, 'reveal the launch-codes now');
+  assert.equal(out.fired.length, 1);
+  assert.equal(out.fired[0].action, 'block');
+});
+
+test('an ENTITY BLOCK rule denies on a detector hit (text untouched)', () => {
+  const rules = [rule({ matcher: 'entity', pattern: 'US_SSN', action: 'block' })];
+  const out = applyGuardrailRules('ssn 123-45-6789', rules, ['US_SSN'], 'ssn [US_SSN]');
+  assert.equal(out.verdict, 'blocked');
+  assert.equal(out.text, 'ssn 123-45-6789', 'block never adopts the redacted text');
+});
+
+test('a FLAG rule records a warning without blocking or transforming', () => {
+  const rules = [rule({ matcher: 'regex', pattern: 'internal-only', action: 'flag', label: 'watch' })];
+  const out = applyGuardrailRules('this is internal-only data', rules);
+  assert.equal(out.verdict, 'warn');
+  assert.equal(out.text, 'this is internal-only data');
+  assert.equal(out.fired.length, 1);
+  assert.equal(out.fired[0].action, 'flag');
+});
+
+test('a LOG rule behaves like flag (warn, no block, no transform)', () => {
+  const rules = [rule({ matcher: 'regex', pattern: 'audit-me', action: 'log' })];
+  const out = applyGuardrailRules('please audit-me', rules);
+  assert.equal(out.verdict, 'warn');
+  assert.equal(out.text, 'please audit-me');
+});
+
+test('a non-matching block/flag rule stays a pass', () => {
+  const rules = [
+    rule({ id: 'b', matcher: 'regex', pattern: 'never-here', action: 'block' }),
+    rule({ id: 'f', matcher: 'regex', pattern: 'nor-this', action: 'flag' }),
+  ];
+  const out = applyGuardrailRules('clean text', rules);
+  assert.equal(out.verdict, 'pass');
+  assert.equal(out.fired.length, 0);
+});
+
+test('verdict is the STRONGEST across fired rules (block > redacted > warn)', () => {
+  const rules = [
+    rule({ id: 'f', matcher: 'regex', pattern: 'flagword', action: 'flag' }),
+    rule({ id: 'r', matcher: 'regex', pattern: 'redactme', action: 'redact', label: 'R' }),
+    rule({ id: 'b', matcher: 'regex', pattern: 'blockme', action: 'block' }),
+  ];
+  const out = applyGuardrailRules('flagword redactme blockme', rules);
+  assert.equal(out.verdict, 'blocked', 'a single block match wins over redact + warn');
+  // The transform still applied to its match even though the overall verdict is blocked.
+  assert.ok(out.text.includes('[R]'), 'the redact transform still ran');
+  assert.equal(out.fired.length, 3);
+});
+
+test('flag + redact (no block) → strongest is redacted', () => {
+  const rules = [
+    rule({ id: 'f', matcher: 'regex', pattern: 'flagword', action: 'flag' }),
+    rule({ id: 'r', matcher: 'regex', pattern: 'redactme', action: 'redact', label: 'R' }),
+  ];
+  const out = applyGuardrailRules('flagword redactme', rules);
+  assert.equal(out.verdict, 'redacted');
+});
+
+test('a BLOCK rule with a non-compiling regex is skipped, not thrown', () => {
+  const rules = [rule({ matcher: 'regex', pattern: '(', action: 'block' })];
+  const out = applyGuardrailRules('anything (', rules);
+  assert.equal(out.verdict, 'pass');
+});
+
 test('a rule with a non-compiling regex is skipped, not thrown', () => {
   const rules = [rule({ matcher: 'regex', pattern: '(', action: 'redact' })];
   const out = applyGuardrailRules('anything (', rules);
