@@ -99,13 +99,13 @@ export function DatasetDetailPanel({ namespace }: Props) {
         </SheetHeader>
         <SheetBody className="space-y-5">
           {loading ? (
-            <p className="text-xs text-muted-foreground">Loading from Marquez…</p>
+            <p className="text-xs text-muted-foreground">Loading lineage…</p>
           ) : state?.error ? (
-            <p className="text-xs text-destructive">Marquez: {state.error}</p>
+            <p className="text-xs text-destructive">Lineage store: {state.error}</p>
           ) : !data ? (
             <p className="text-xs text-muted-foreground">
-              No detail for this dataset — it may not exist in Marquez yet, or Marquez is
-              unreachable.
+              No detail for this dataset — it may not exist in the lineage store yet, or the store
+              is unreachable.
             </p>
           ) : (
             <>
@@ -156,7 +156,7 @@ export function DatasetDetailPanel({ namespace }: Props) {
                 )}
               </Section>
 
-              <Section title="OpenLineage facets">
+              <Section title="Lineage facets">
                 {data.facetNames.length ? (
                   <div className="flex flex-wrap gap-1.5">
                     {data.facetNames.map((n) => (

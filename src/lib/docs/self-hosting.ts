@@ -45,8 +45,9 @@ implementations, not by changing code.
 Set an adapter with an environment variable and the console uses it, falling back to the first-party
 default if it's unreachable:
 
-- Policy → OPA, Guardrails → Presidio, Secrets → OpenBao, Retrieval → Qdrant, Observability →
-  Langfuse, Flags → Unleash, and so on.
+- Policy → a policy engine (e.g. OPA), Guardrails → PII detection (e.g. Presidio), Secrets → a
+  secrets store (e.g. OpenBao), Retrieval → a vector store (e.g. Qdrant), Observability → a tracing
+  store (e.g. Langfuse), Flags → feature flags (e.g. Unleash), and so on.
 
 Because the fallback is always there, turning an integration on is never a hard dependency: if the
 service is down, the platform keeps working on the built-in floor.
@@ -65,9 +66,10 @@ By default, cross-service calls are brokered through the console: it verifies yo
 host. So a single credential — your SSO login or a machine client — already governs the whole
 platform, with no per-service keys to hand out.
 
-Some backends (for example OpenSearch) can additionally validate a Keycloak token themselves. When you
-want a service to check identity directly rather than trust the console broker, enable its native OIDC
-path: register a Keycloak client for it, point it at your realm, and turn its security on. It is an
+Some backends (for example the audit/search index) can additionally validate an identity-provider
+token themselves. When you want a service to check identity directly rather than trust the console
+broker, enable its native OIDC path: register a client for it in your identity provider, point it at
+your realm, and turn its security on. It is an
 opt-in operational step — the brokered path keeps working until you flip it — so you can move to
 direct-service validation one service at a time, no flag day. Your platform team's runbook holds the
 exact per-service settings.`,

@@ -35,6 +35,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { evalEngineLabel } from '@/lib/eval-engine-label';
 
 interface GoldenCase {
   id: string;
@@ -162,7 +163,9 @@ export function GoldenCasesManager() {
     setRunning(false);
     if (r.ok) {
       const run = await r.json();
-      toast.success(`Ran ${run.engine}: ${run.passed}/${run.total} passed (${run.score}%)`);
+      toast.success(
+        `Ran ${evalEngineLabel(run.engine)}: ${run.passed}/${run.total} passed (${run.score}%)`,
+      );
       router.refresh(); // re-render the server rollup + recent-runs table with the new run
     } else {
       const e = await r.json().catch(() => null);
@@ -184,7 +187,7 @@ export function GoldenCasesManager() {
               onClick={() => runEvals(eng)}
             >
               <Play className="mr-1.5 size-3.5" />
-              Run {eng}
+              Run {evalEngineLabel(eng)}
             </Button>
           ))}
           <Button
@@ -295,7 +298,7 @@ export function GoldenCasesManager() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="gc-suite">Suite / engine</Label>
+                <Label htmlFor="gc-suite">Suite</Label>
                 <Input
                   id="gc-suite"
                   value={draft.suite}

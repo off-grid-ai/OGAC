@@ -29,6 +29,20 @@ function fmtScore(score: number | null): string {
   return score === null ? '—' : score.toString();
 }
 
+// Friendly engine label — operators see the drift METHOD in capability terms, never the underlying
+// OSS collector's project name. The raw `engine` value stays the internal key.
+function engineLabel(engine: string): string {
+  switch (engine) {
+    case 'evidently':
+      return 'Statistical drift tests';
+    case 'psi':
+    case 'heuristic':
+      return 'Built-in PSI';
+    default:
+      return engine === 'unknown' ? 'Drift checks' : engine;
+  }
+}
+
 export default async function DriftPage() {
   await requireModuleForUser('drift');
   const { data, error } = await readDriftView();
@@ -52,7 +66,7 @@ export default async function DriftPage() {
           <h1 className="text-lg font-semibold text-foreground">Model &amp; data drift</h1>
           <p className="text-sm text-muted-foreground">
             Distribution shift + quality degradation over the recent window vs a baseline —
-            first-party PSI, or full Evidently test suites when the collector is reachable.
+            first-party PSI, or full statistical drift test suites when the collector is reachable.
           </p>
         </div>
       </div>
@@ -66,7 +80,7 @@ export default async function DriftPage() {
             <p className="text-sm text-muted-foreground">
               Could not compute drift right now{error ? `: ${error}` : ''}. The drift engine is
               best-effort — this surface stays reachable and will populate once eval-run history or
-              the Evidently collector is available.
+              the drift collector is available.
             </p>
           </CardContent>
         </Card>
@@ -88,7 +102,8 @@ export default async function DriftPage() {
               <div>
                 <CardTitle className="text-sm">Overall verdict</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Engine: {data.engine} · baseline {data.baseline} vs current {data.current} samples
+                  Engine: {engineLabel(data.engine)} · baseline {data.baseline} vs current{' '}
+                  {data.current} samples
                   {data.lastChecked ? ` · checked ${data.lastChecked.slice(0, 19).replace('T', ' ')}` : ''}
                 </p>
               </div>
@@ -157,7 +172,7 @@ export default async function DriftPage() {
         <CardHeader>
           <CardTitle className="text-sm">Drift test catalog</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            The standard Evidently presets and per-column stat tests — the common drift methods,
+            The standard drift presets and per-column stat tests — the common drift methods,
             bundled so you don’t hand-configure them.
           </p>
         </CardHeader>

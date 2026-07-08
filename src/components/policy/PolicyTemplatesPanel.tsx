@@ -40,7 +40,7 @@ export function PolicyTemplatesPanel() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? 'failed');
-      toast.success(`Applied "${t.title}" — Push to OPA to propagate`);
+      toast.success(`Applied "${t.title}" — Push to the policy engine to propagate`);
       router.refresh();
     } catch (e) {
       toast.error(`Could not apply: ${(e as Error).message}`);
@@ -54,7 +54,7 @@ export function PolicyTemplatesPanel() {
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm text-muted-foreground">
           Ready-made governance rules. One click creates the concrete allow/deny rule below in the
-          ABAC set — then Push / Reload to OPA to enforce it.
+          ABAC set — then Push / Reload the policy engine to enforce it.
         </p>
         <div className="relative ml-auto w-full max-w-xs">
           <MagnifyingGlass className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

@@ -18,17 +18,17 @@ export interface ServiceSpec {
 
 export const SERVICE_SPECS: ServiceSpec[] = [
   { id: 'console', label: 'Off Grid AI Console', kind: 'console' },
-  { id: 'openbao', label: 'OpenBao (secrets)', kind: 'native', envVar: 'OFFGRID_OPENBAO_URL', specPath: '/v1/sys/internal/specs/openapi' },
-  { id: 'qdrant', label: 'Qdrant (vectors)', kind: 'native', envVar: 'OFFGRID_QDRANT_URL', specPath: '/openapi/openapi-3.1.0.json' },
-  { id: 'marquez', label: 'Marquez (lineage)', kind: 'native', envVar: 'OFFGRID_MARQUEZ_URL', specPath: '/api/v1/openapi.json' },
-  { id: 'langfuse', label: 'Langfuse (traces)', kind: 'native', envVar: 'OFFGRID_LANGFUSE_URL', specPath: '/api/public/openapi.json' },
-  { id: 'superset', label: 'Superset (BI)', kind: 'native', envVar: 'OFFGRID_SUPERSET_URL', specPath: '/api/v1/openapi.json' },
-  { id: 'fleetdm', label: 'FleetDM (devices)', kind: 'native', envVar: 'OFFGRID_FLEET_URL', specPath: '/api/openapi.json' },
-  { id: 'presidio', label: 'Presidio (PII)', kind: 'native', envVar: 'OFFGRID_PRESIDIO_URL', specPath: '/openapi.json' },
-  { id: 'unleash', label: 'Unleash (flags)', kind: 'native', envVar: 'OFFGRID_UNLEASH_URL', specPath: '/api/swagger.json' },
-  { id: 'keycloak', label: 'Keycloak (identity)', kind: 'stub', note: 'Keycloak has no machine-readable OpenAPI spec — see its admin REST docs.' },
-  { id: 'opa', label: 'OPA (policy)', kind: 'stub', note: 'OPA exposes the Data/Policy REST API; no OpenAPI document is published.' },
-  { id: 'temporal', label: 'Temporal (workflows)', kind: 'stub', note: 'Temporal is gRPC-first; no REST OpenAPI spec.' },
+  { id: 'openbao', label: 'Secrets store', kind: 'native', envVar: 'OFFGRID_OPENBAO_URL', specPath: '/v1/sys/internal/specs/openapi' },
+  { id: 'qdrant', label: 'Vector store', kind: 'native', envVar: 'OFFGRID_QDRANT_URL', specPath: '/openapi/openapi-3.1.0.json' },
+  { id: 'marquez', label: 'Data lineage', kind: 'native', envVar: 'OFFGRID_MARQUEZ_URL', specPath: '/api/v1/openapi.json' },
+  { id: 'langfuse', label: 'Tracing & observability', kind: 'native', envVar: 'OFFGRID_LANGFUSE_URL', specPath: '/api/public/openapi.json' },
+  { id: 'superset', label: 'Dashboards & BI', kind: 'native', envVar: 'OFFGRID_SUPERSET_URL', specPath: '/api/v1/openapi.json' },
+  { id: 'fleetdm', label: 'Device management', kind: 'native', envVar: 'OFFGRID_FLEET_URL', specPath: '/api/openapi.json' },
+  { id: 'presidio', label: 'PII detection', kind: 'native', envVar: 'OFFGRID_PRESIDIO_URL', specPath: '/openapi.json' },
+  { id: 'unleash', label: 'Feature flags', kind: 'native', envVar: 'OFFGRID_UNLEASH_URL', specPath: '/api/swagger.json' },
+  { id: 'keycloak', label: 'Identity provider', kind: 'stub', note: 'The identity provider has no machine-readable OpenAPI spec — see its admin REST docs.' },
+  { id: 'opa', label: 'Policy engine', kind: 'stub', note: 'The policy engine exposes a Data/Policy REST API; no OpenAPI document is published.' },
+  { id: 'temporal', label: 'Workflow engine', kind: 'stub', note: 'The workflow engine is gRPC-first; no REST OpenAPI spec.' },
 ];
 
 export function getServiceSpec(id: string): ServiceSpec | undefined {

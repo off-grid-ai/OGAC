@@ -22,6 +22,17 @@ import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
+// Operator-facing labels for the policy-engine ids. The raw ids (`abac` / `opa`) are real internal
+// adapter identifiers used for routing; they are never shown to a normal operator as our mechanism
+// (the "never expose the engine" brand rule). Unknown ids fall back to the id itself.
+const POLICY_ENGINE_LABEL: Record<string, string> = {
+  abac: 'Built-in rules (attribute-based)',
+  opa: 'Policy-as-code',
+};
+function policyEngineLabel(id: string): string {
+  return POLICY_ENGINE_LABEL[id?.toLowerCase()] ?? 'Policy rules';
+}
+
 // Policy management + decisions read-back. Server component: reads the active policy set + OPA
 // reachability, the console-owned policy rules, and the normalized recent decisions through the pure
 // views. The rules table (add/edit/delete + push-to-OPA) is a client child; its nav lives in the URL.
@@ -44,7 +55,7 @@ export default async function PolicyPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Policy</h1>
           <p className="text-sm text-muted-foreground">
-            Policy-as-code decisions — the active policy set, engine reachability, and recent
+            Policy-as-code decisions — the active policy set, policy-engine reachability, and recent
             allow/deny evaluations.
           </p>
         </div>
@@ -54,7 +65,7 @@ export default async function PolicyPage() {
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              Engine
+              Policy engine
               <Badge variant={status.reachable ? 'default' : 'destructive'}>
                 {status.reachable ? 'reachable' : 'unreachable'}
               </Badge>
@@ -62,7 +73,8 @@ export default async function PolicyPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
             <p>
-              Active engine: <span className="font-mono text-foreground">{status.engine}</span>
+              Active engine:{' '}
+              <span className="text-foreground">{policyEngineLabel(status.engine)}</span>
             </p>
             <p>
               Policy adapters:{' '}
@@ -79,25 +91,21 @@ export default async function PolicyPage() {
             <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Adapter</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>License</TableHead>
+                <TableHead>Policy engine</TableHead>
                 <TableHead>Description</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {status.policies.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-mono">
-                    {p.id}
+                  <TableCell>
+                    {policyEngineLabel(p.id)}
                     {p.id === status.engine ? (
                       <Badge variant="secondary" className="ml-2">
                         active
                       </Badge>
                     ) : null}
                   </TableCell>
-                  <TableCell>{p.vendor}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.license}</TableCell>
                   <TableCell className="text-muted-foreground">{p.description}</TableCell>
                 </TableRow>
               ))}
@@ -116,7 +124,7 @@ export default async function PolicyPage() {
             <TabsList>
               <TabsTrigger value="abac">ABAC rules (default)</TabsTrigger>
               <TabsTrigger value="templates">Starter templates</TabsTrigger>
-              <TabsTrigger value="rego">Rego modules (advanced)</TabsTrigger>
+              <TabsTrigger value="rego">Policy-as-code modules (advanced)</TabsTrigger>
             </TabsList>
             <TabsContent value="templates" className="pt-4">
               <PolicyTemplatesPanel />
@@ -151,7 +159,7 @@ export default async function PolicyPage() {
           {decisions.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
               No decision-log records. Configure{' '}
-              <span className="font-mono">OFFGRID_OPA_DECISION_LOG_URL</span> to stream OPA
+              <span className="font-mono">OFFGRID_OPA_DECISION_LOG_URL</span> to stream policy
               decisions here.
             </p>
           ) : (
@@ -175,7 +183,9 @@ export default async function PolicyPage() {
                     <TableCell className="max-w-md truncate text-muted-foreground">
                       {d.input}
                     </TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{d.engine}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {policyEngineLabel(d.engine)}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{d.timestamp || '—'}</TableCell>
                   </TableRow>
                 ))}

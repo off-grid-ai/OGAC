@@ -9,7 +9,6 @@ import { DatasetDetailPanel } from '@/components/lineage/DatasetDetailPanel';
 import { LineageCurate } from '@/components/lineage/LineageCurate';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getLineage } from '@/lib/adapters/registry';
 import { listAgentRuns } from '@/lib/agentrun';
 import { readLineageView } from '@/lib/marquez';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -26,7 +25,6 @@ export default async function LineagePage() {
     listAgentRuns(25, org).catch(() => []),
     readLineageView(),
   ]);
-  const engine = getLineage().meta;
   const withSources = runs.filter((r) => r.citations.length > 0);
   const { configured, data, error } = lineage;
 
@@ -35,33 +33,33 @@ export default async function LineagePage() {
       <div className="flex items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-muted-foreground">
           Data lineage for every agent run — which sources fed which answer, end to end. Each run
-          emits an OpenLineage event through the lineage adapter ({engine.vendor}); the graph below
-          is read back from Marquez, with a fallback reconstruction from recorded source→answer
-          edges.
+          records a lineage event; the graph below is read back from the lineage store, with a
+          fallback reconstruction from recorded source→answer edges.
         </p>
         <Badge variant="secondary" className="bg-primary/10 text-primary">
-          {engine.id}
+          Data lineage
         </Badge>
       </div>
 
-      {/* Marquez read-back — the server-sourced namespaces / jobs / datasets model. */}
+      {/* Lineage store read-back — the server-sourced namespaces / jobs / datasets model. */}
       {!configured ? (
         <Card className="shadow-sm">
           <CardContent className="py-8 text-center text-xs text-muted-foreground">
-            Marquez not configured — set OFFGRID_MARQUEZ_URL to read the server lineage graph.
+            Lineage store not configured — configure the lineage service to read the server lineage
+            graph.
           </CardContent>
         </Card>
       ) : error ? (
         <Card className="shadow-sm">
           <CardContent className="py-8 text-center text-xs text-destructive">
-            Marquez unreachable: {error}
+            Lineage store unreachable: {error}
           </CardContent>
         </Card>
       ) : (
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Marquez lineage</CardTitle>
+              <CardTitle className="text-sm">Data lineage</CardTitle>
               <Badge variant="secondary" className="bg-primary/10 text-primary">
                 {data.namespace ?? '—'}
               </Badge>
@@ -69,14 +67,14 @@ export default async function LineagePage() {
             <p className="text-xs text-muted-foreground">
               {data.counts.namespaces} namespace(s) · {data.counts.jobs} job(s) ·{' '}
               {data.counts.datasets} dataset(s) · {data.counts.edges} edge(s)
-              {data.lastRun ? ` · last run ${data.lastRun}` : ''} — read back from Marquez.
+              {data.lastRun ? ` · last run ${data.lastRun}` : ''} — read back from the lineage store.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {!data.jobs.length && !data.datasets.length ? (
               <p className="py-4 text-center text-xs text-muted-foreground">
                 No lineage in namespace {data.namespace ?? '—'} yet. Run a grounded agent to emit
-                OpenLineage events.
+                lineage events.
               </p>
             ) : (
               data.jobs.map((j) => (

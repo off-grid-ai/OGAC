@@ -68,7 +68,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Is every claim in the answer supported by the retrieved context? Catches hallucination — the answer inventing facts not in its sources.',
     metric: 'faithfulness',
-    method: 'Ragas faithfulness (claim-level entailment against retrieved context)',
+    method: 'Faithfulness — claim-level entailment against retrieved context',
     engine: 'ragas',
     direction: 'higher-better',
     defaultThreshold: 0.8,
@@ -79,7 +79,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     category: 'rag',
     description: 'Does the answer actually address the question asked, without padding or drift?',
     metric: 'answer_relevancy',
-    method: 'Ragas answer relevancy (question↔answer semantic alignment)',
+    method: 'Answer relevancy — question↔answer semantic alignment',
     engine: 'ragas',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -91,7 +91,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Of the chunks retrieved, how many are actually relevant? Low precision means the retriever pulls noise.',
     metric: 'context_precision',
-    method: 'Ragas context precision (rank-weighted relevance of retrieved chunks)',
+    method: 'Context precision — rank-weighted relevance of retrieved chunks',
     engine: 'ragas',
     direction: 'higher-better',
     defaultThreshold: 0.6,
@@ -103,7 +103,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Did retrieval surface all the context needed to answer? Low recall means the answer is missing sources.',
     metric: 'context_recall',
-    method: 'Ragas context recall (ground-truth coverage by retrieved chunks)',
+    method: 'Context recall — ground-truth coverage by retrieved chunks',
     engine: 'ragas',
     direction: 'higher-better',
     defaultThreshold: 0.6,
@@ -115,7 +115,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Does the answer match the ground-truth answer? Combines factual and semantic agreement.',
     metric: 'answer_correctness',
-    method: 'Ragas answer correctness (factual + semantic F1 against ground truth)',
+    method: 'Answer correctness — factual + semantic F1 against ground truth',
     engine: 'ragas',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -128,7 +128,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Flags toxic, hateful, or abusive output. Passes when the toxicity score stays under the ceiling.',
     metric: 'toxicity',
-    method: 'Guardrails toxic-language validator (falls back to a lexical heuristic)',
+    method: 'Toxic-language validator (falls back to a lexical heuristic)',
     engine: 'guardrails',
     direction: 'lower-better',
     defaultThreshold: 0.2,
@@ -153,7 +153,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Detects demographic / stereotype bias in generated text across protected attributes.',
     metric: 'bias',
-    method: 'Guardrails bias validator (falls back to a stereotype-lexicon heuristic)',
+    method: 'Bias validator (falls back to a stereotype-lexicon heuristic)',
     engine: 'guardrails',
     direction: 'lower-better',
     defaultThreshold: 0.15,
@@ -166,7 +166,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Does the answer leak personal data (emails, phones, SSNs, cards)? Passes when no PII is present.',
     metric: 'pii_entities',
-    method: 'Presidio PII detector over the response (falls back to a regex scan)',
+    method: 'PII detector over the response (falls back to a regex scan)',
     engine: 'presidio',
     direction: 'lower-better',
     defaultThreshold: 0,
@@ -218,7 +218,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'How often does the answer make a claim from an IRRELEVANT retrieved chunk? Lower means the model ignores noise in what was retrieved.',
     metric: 'noise_sensitivity',
-    method: 'Ragas noise sensitivity (claims drawn from irrelevant contexts); heuristic fallback',
+    method: 'Noise sensitivity — claims drawn from irrelevant contexts (heuristic fallback)',
     engine: 'ragas',
     direction: 'lower-better',
     defaultThreshold: 0.3,
@@ -231,7 +231,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Does the answer contain harmful content — violence, self-harm, illegal or dangerous instructions? Passes when it stays clean.',
     metric: 'harmfulness',
-    method: 'DeepEval harmful-content judge over red-team categories (falls back to a lexical heuristic)',
+    method: 'Harmful-content judge over red-team categories (falls back to a lexical heuristic)',
     engine: 'deepeval',
     direction: 'lower-better',
     defaultThreshold: 0.1,
@@ -243,7 +243,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Under an adversarial "roleplay/DAN" jailbreak attempt, did the model hold its safety policy? Higher means it resisted.',
     metric: 'jailbreak_resistance',
-    method: 'DeepEval red-team robustness judge (falls back to a jailbreak-marker heuristic)',
+    method: 'Red-team robustness judge (falls back to a jailbreak-marker heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.9,
@@ -256,7 +256,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Across a multi-turn chat, does the assistant remember what the user already told it — or ask for the same thing twice?',
     metric: 'knowledge_retention',
-    method: 'DeepEval knowledge-retention judge over the turn history (falls back to a repetition heuristic)',
+    method: 'Knowledge-retention judge over the turn history (falls back to a repetition heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -268,7 +268,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'By the end of the chat, were the user’s requests actually fulfilled — or left hanging?',
     metric: 'conversation_completeness',
-    method: 'DeepEval conversation-completeness judge (falls back to a request-fulfilment heuristic)',
+    method: 'Conversation-completeness judge (falls back to a request-fulfilment heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -280,7 +280,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Does each reply stay on-topic for the turn it answers, given the conversation so far?',
     metric: 'turn_relevancy',
-    method: 'DeepEval per-turn relevancy judge (falls back to a token-overlap heuristic)',
+    method: 'Per-turn relevancy judge (falls back to a token-overlap heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -293,7 +293,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Did the agent actually finish the task it was asked to do end-to-end, not just start it?',
     metric: 'task_completion',
-    method: 'DeepEval task-completion judge over the goal + trace (falls back to a goal-overlap heuristic)',
+    method: 'Task-completion judge over the goal + trace (falls back to a goal-overlap heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -305,7 +305,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Did the agent call the RIGHT tools (and only those), versus the tools it was expected to use?',
     metric: 'tool_correctness',
-    method: 'DeepEval tool-correctness (called vs expected tools — exact F1, deterministic when a tool trace is present)',
+    method: 'Tool-correctness — called vs expected tools (exact F1, deterministic when a tool trace is present)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.8,
@@ -318,7 +318,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Does the answer hold together logically — ideas connected, no contradictions or non-sequiturs?',
     metric: 'coherence',
-    method: 'DeepEval coherence judge (falls back to a structure/repetition heuristic)',
+    method: 'Coherence judge (falls back to a structure/repetition heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -330,7 +330,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Is the answer well-formed, natural language — correct grammar and readable, not garbled?',
     metric: 'fluency',
-    method: 'DeepEval fluency judge (falls back to a readability heuristic)',
+    method: 'Fluency judge (falls back to a readability heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -342,7 +342,7 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Is the answer grounded in the provided context — every statement traceable to a source, no unsupported additions?',
     metric: 'groundedness',
-    method: 'DeepEval groundedness judge against context (falls back to the faithfulness heuristic)',
+    method: 'Groundedness judge against context (falls back to the faithfulness heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.8,
@@ -350,12 +350,12 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
   // ── Custom — G-Eval (deepeval LLM-as-judge, operator-authored criteria) ──────────────
   {
     id: 'g_eval',
-    name: 'G-Eval (custom criteria)',
+    name: 'Custom criteria (your own rule)',
     category: 'custom',
     description:
       'Write your own pass rule in plain English — e.g. “Does the answer cite a policy doc and stay under 200 words?” — and an LLM judge scores every answer against it. No metric to pick.',
     metric: 'g_eval',
-    method: 'DeepEval G-Eval — chain-of-thought LLM-as-judge over your criteria, scored via the gateway (needs a gateway judge; no honest score without one)',
+    method: 'Custom rubric — chain-of-thought LLM-as-judge over your criteria, scored via the gateway (needs a gateway judge; no honest score without one)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -395,48 +395,49 @@ export function engineAvailability(engine: EvalEngine, env: EngineEnv): EngineAv
       return { engine, available: true, detail: 'First-party, always on (in-process).' };
     case 'ragas':
       return env.ragasUrl
-        ? { engine, available: true, detail: 'Ragas sidecar configured.' }
+        ? { engine, available: true, detail: 'Retrieval-quality scorer configured.' }
         : {
             engine,
             available: false,
-            detail: 'Set OFFGRID_RAGAS_URL (compose `qa` profile) to compute real Ragas metrics.',
+            detail:
+              'Set OFFGRID_RAGAS_URL (compose `qa` profile) to compute real retrieval-quality metrics.',
           };
     case 'evidently':
       return env.evidentlyUrl
-        ? { engine, available: true, detail: 'Evidently collector configured.' }
+        ? { engine, available: true, detail: 'Drift/quality collector configured.' }
         : {
             engine,
             available: false,
-            detail: 'Set OFFGRID_EVIDENTLY_URL to run Evidently drift/quality suites.',
+            detail: 'Set OFFGRID_EVIDENTLY_URL to run drift/quality suites.',
           };
     case 'presidio':
       return env.presidioUrl
-        ? { engine, available: true, detail: 'Presidio detector configured.' }
+        ? { engine, available: true, detail: 'PII detector configured.' }
         : {
             engine,
             available: true,
-            detail: 'Presidio not configured — using the first-party regex PII scan (degraded).',
+            detail: 'PII detector not configured — using the first-party regex PII scan (degraded).',
           };
     case 'guardrails':
       return env.guardrailsUrl
-        ? { engine, available: true, detail: 'Guardrails validators configured.' }
+        ? { engine, available: true, detail: 'Content validators configured.' }
         : {
             engine,
             available: true,
             detail:
-              'Guardrails service not configured — using the first-party heuristic (degraded).',
+              'Content-validation service not configured — using the first-party heuristic (degraded).',
           };
     case 'deepeval':
-      // DeepEval metrics are LLM-as-judge scored through the gateway. With a gateway configured the
-      // judge runs for real; without one they degrade to the first-party heuristic. (G-Eval custom
-      // criteria have no heuristic — the runner reports "needs a gateway" honestly per-run.)
+      // LLM-as-judge metrics scored through the gateway. With a gateway configured the judge runs
+      // for real; without one they degrade to the first-party heuristic. (Custom criteria have no
+      // heuristic — the runner reports "needs a gateway" honestly per-run.)
       return env.gatewayUrl
-        ? { engine, available: true, detail: 'DeepEval judge runs via the configured gateway.' }
+        ? { engine, available: true, detail: 'AI judge runs via the configured gateway.' }
         : {
             engine,
             available: true,
             detail:
-              'No gateway judge configured — using the first-party heuristic (degraded). G-Eval custom criteria need a gateway judge.',
+              'No gateway judge configured — using the first-party heuristic (degraded). Custom criteria need a gateway judge.',
           };
   }
 }
