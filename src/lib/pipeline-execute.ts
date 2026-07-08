@@ -19,6 +19,7 @@
 
 import type { CheckResult } from '@/lib/checks';
 import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 import { buildRunPlan, extractPrompt, type PipelineRunPlan } from '@/lib/pipeline-run-plan';
 
 // ─── the resolved pipeline facts the executor needs (a DB-free snapshot) ────────────────────────────
@@ -140,19 +141,22 @@ export async function executePipelineRun(
     return { status: 'blocked', runId, reason: 'input guardrail blocked the prompt', checks: pre.checks };
   }
 
-  // 2. PII mask BEFORE the model — when the pipeline's guardrail overlay requires it, the raw prompt
-  //    is replaced with its PII-redacted form so the raw PAN/email/phone never leaves the box. This is
-  //    an ADDITIVE tightening: with masking not required, the prompt is untouched. Best-effort — a
-  //    detector outage leaves the prompt as-is (the egress leash's local-only guarantee still holds).
+  // 2. PII mask BEFORE the model — when the pipeline's guardrail overlay ESCALATES masking ON above
+  //    the org floor, the raw prompt is replaced with its PII-redacted form so the raw PAN/email/phone
+  //    never leaves the box. The "does masking apply?" decision = max(floor, overlay) is the PURE
+  //    effectivePiiMasking() and the raw→redacted substitution is the PURE applyPiiEscalation() — the
+  //    SAME single authority every run path shares (agentrun / chat-run / app-run). Additive: with
+  //    masking not escalated, the prompt is untouched. Best-effort — a detector outage leaves the
+  //    prompt as-is (the egress leash's local-only guarantee still holds).
   let modelPrompt = prompt;
   let masked = false;
-  if (plan.requirePiiMasking) {
+  const requireMasking = effectivePiiMasking(false, plan);
+  if (requireMasking) {
     try {
       const scan = await deps.scanPii(prompt, orgId);
-      const { maskTextForModel } = await import('@/lib/guardrail-rules-runtime');
-      const redacted = maskTextForModel(prompt, scan);
-      if (redacted !== prompt) {
-        modelPrompt = redacted;
+      const esc = applyPiiEscalation(prompt, requireMasking, scan);
+      if (esc.masked) {
+        modelPrompt = esc.text;
         masked = true;
         deps.audit(
           'pipeline.pii.mask',

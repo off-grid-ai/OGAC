@@ -126,6 +126,9 @@ function fakeRunDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
     async runGuardrail() {
       return { blocked: false, detail: 'ok' };
     },
+    async scanPii() {
+      return { hits: false, entities: [], engine: 'regex' };
+    },
     async persist() {},
     async materializeAgent(_spec, step) {
       order.push(`materialize:${step.id}`);
