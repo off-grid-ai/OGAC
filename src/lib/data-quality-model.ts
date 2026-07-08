@@ -17,17 +17,18 @@
 //     { rows: [ {col: value, ...}, ... ],
 //       expectations: [ { type, column?, min?, max?, value_set? }, ... ] }
 //   Response
-//     { success: bool, evaluated: int,
+//     { success: bool, evaluated: int, engine: string,
 //       failed: [ { type, column, unexpected_count, note? }, ... ] }
 //
-// Supported expectation `type`s in the sidecar (its fallback evaluator + the GE vocabulary):
+// Supported expectation `type`s — REALLY evaluated by the sidecar (Great Expectations when the
+// library is present, else the sidecar's own faithful native evaluator; both compute real counts):
 //   expect_column_values_to_not_be_null  (column)
 //   expect_column_values_to_be_between   (column, min?, max?)
 //   expect_column_values_to_be_in_set    (column, value_set)
+//   expect_column_values_to_be_unique    (column)
 //   expect_column_to_exist               (column)
-// A distinct/unique check isn't in the sidecar's fallback vocabulary; expectUnique maps to the GE
-// name `expect_column_values_to_be_unique` so it rides the real engine path (and is honestly
-// reported as unsupported by the fallback when the stub is active, never silently "passed").
+// Any type outside this set is reported by the sidecar with unexpected_count === -1 (honestly
+// "unsupported"), which parseCheckpointResult counts as a FAIL — never silently "passed".
 
 // ─── Expectation shape (matches the sidecar's `Expectation` pydantic model) ────────────────────
 export interface Expectation {
@@ -50,6 +51,7 @@ export interface Checkpoint {
 export interface RawCheckpointResult {
   success?: boolean;
   evaluated?: number;
+  engine?: string; // which engine actually evaluated: "great-expectations" | "native"
   failed?: RawFailure[];
 }
 
@@ -77,6 +79,7 @@ export interface CheckpointVerdict {
   failed: number;
   results: ExpectationResult[];
   engineReachable: boolean; // false when we synthesized a failure verdict (sidecar down)
+  engine?: string; // the engine that actually ran, echoed from the sidecar
   note?: string;
 }
 
@@ -104,8 +107,8 @@ export function expectColumnExists(column: string): Expectation {
   return { type: 'expect_column_to_exist', column };
 }
 
-// Uniqueness rides the real GE engine (the sidecar's fallback stub reports it unsupported honestly
-// rather than passing it silently — see parseCheckpointResult, unexpected_count === -1).
+// Uniqueness is really evaluated by the sidecar (GE's expect_column_values_to_be_unique, or the
+// native evaluator's duplicate-group count).
 export function expectUnique(column: string): Expectation {
   return { type: 'expect_column_values_to_be_unique', column };
 }
@@ -145,7 +148,7 @@ function label(type: string, column?: string): string {
 // We can't recover the passing expectations' identities from the response (it only names failures),
 // so passes are represented as synthesized "passed" entries — the counts (total/passed/failed) are
 // exact, which is what the rollup and UI need. `unexpected_count === -1` marks an expectation the
-// running engine couldn't evaluate (the sidecar's honest "unsupported in fallback" signal); it is
+// running engine couldn't evaluate (the sidecar's honest "unsupported type" signal); it is
 // counted as a FAIL so nothing is silently green.
 export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdict {
   const failedRaw = Array.isArray(raw.failed) ? raw.failed : [];
@@ -192,6 +195,7 @@ export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdi
     failed,
     results: [...failedResults, ...passedResults],
     engineReachable: true,
+    engine: typeof raw.engine === 'string' ? raw.engine : undefined,
   };
 }
 

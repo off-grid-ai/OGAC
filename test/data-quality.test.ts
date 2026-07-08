@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 import {
   buildCheckpoint,
@@ -11,8 +13,93 @@ import {
   parseCheckpointResult,
   failureVerdict,
   summarize,
+  type Expectation,
+  type Row,
   type RawCheckpointResult,
 } from '../src/lib/data-quality-model.ts';
+
+// ─── A faithful in-process re-implementation of the sidecar's evaluator (deploy/sidecars/
+// great-expectations/app.py :: _native_validate). Used to stand up a REAL local HTTP sidecar the
+// adapter talks to — no network mock of fetch, the actual wire path is exercised. This mirrors the
+// Python semantics 1:1 so the adapter tests prove correct pass/fail counts per expectation type. ──
+function isMissing(v: unknown): boolean {
+  return v === null || v === undefined || v === '' || (typeof v === 'number' && Number.isNaN(v));
+}
+
+function nativeValidate(rows: Row[], expectations: Expectation[]): RawCheckpointResult {
+  const failed: RawCheckpointResult['failed'] = [];
+  for (const exp of expectations) {
+    const col = exp.column;
+    let unexpected = 0;
+    if (exp.type === 'expect_column_values_to_not_be_null') {
+      unexpected = rows.filter((r) => isMissing(r[col!])).length;
+    } else if (exp.type === 'expect_column_values_to_be_between') {
+      for (const r of rows) {
+        const v = r[col!];
+        if (isMissing(v)) continue;
+        if (typeof v !== 'number' || typeof v === 'boolean') {
+          unexpected++;
+          continue;
+        }
+        if (exp.min !== undefined && v < exp.min) unexpected++;
+        else if (exp.max !== undefined && v > exp.max) unexpected++;
+      }
+    } else if (exp.type === 'expect_column_values_to_be_in_set') {
+      const allowed = exp.value_set ?? [];
+      for (const r of rows) {
+        const v = r[col!];
+        if (isMissing(v)) continue;
+        if (!allowed.includes(v)) unexpected++;
+      }
+    } else if (exp.type === 'expect_column_values_to_be_unique') {
+      const counts = new Map<unknown, number>();
+      const present: unknown[] = [];
+      for (const r of rows) {
+        const v = r[col!];
+        if (isMissing(v)) continue;
+        present.push(v);
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      unexpected = present.filter((v) => (counts.get(v) ?? 0) > 1).length;
+    } else if (exp.type === 'expect_column_to_exist') {
+      unexpected = rows.length > 0 && rows.some((r) => col! in r) ? 0 : 1;
+    } else {
+      failed.push({ type: exp.type, column: col, unexpected_count: -1, note: `unsupported expectation type: ${exp.type}` });
+      continue;
+    }
+    if (unexpected > 0) failed.push({ type: exp.type, column: col, unexpected_count: unexpected });
+  }
+  return { success: failed.length === 0, evaluated: expectations.length, engine: 'native', failed };
+}
+
+// Stand up the faithful sidecar on an ephemeral port; returns its base URL + a close().
+async function startFakeSidecar(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', service: 'great-expectations', engine: 'native' }));
+      return;
+    }
+    if (req.method === 'POST' && req.url?.startsWith('/checkpoint/')) {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        const { rows, expectations } = JSON.parse(body || '{}');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(nativeValidate(rows ?? [], expectations ?? [])));
+      });
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => new Promise<void>((r) => server.close(() => r())),
+  };
+}
 
 // ─── UNIT: expectation constructors ─────────────────────────────────────────────────────────────
 test('expectation constructors emit the sidecar vocabulary', () => {
@@ -157,6 +244,114 @@ test('summarize renders a legible one-line rollup', () => {
     summarize(parseCheckpointResult({ success: true, evaluated: 0, failed: [] })),
     'no expectations evaluated',
   );
+});
+
+// ─── UNIT: parseCheckpointResult echoes the engine label from the sidecar ────────────────────────
+test('parseCheckpointResult surfaces the engine the sidecar actually used', () => {
+  assert.equal(parseCheckpointResult({ success: true, evaluated: 1, engine: 'great-expectations', failed: [] }).engine, 'great-expectations');
+  assert.equal(parseCheckpointResult({ success: true, evaluated: 1, engine: 'native', failed: [] }).engine, 'native');
+  // Absent → undefined (never invented).
+  assert.equal(parseCheckpointResult({ success: true, evaluated: 1, failed: [] }).engine, undefined);
+});
+
+// ─── INTEGRATION: adapter → REAL local sidecar (faithful native evaluator over HTTP) ─────────────
+// Exercises the true wire path (fetch, JSON, parse) — not a fetch mock — proving correct pass/fail
+// counts per expectation type on representative rows + edge cases. One test per expectation type.
+test('adapter drives a real sidecar: correct verdict per expectation type', async () => {
+  const sidecar = await startFakeSidecar();
+  process.env.OFFGRID_DATAQUALITY_URL = sidecar.url;
+  // Fresh import so the adapter reads the env we just set.
+  const { geDataQuality } = await import('../src/lib/adapters/data-quality.ts');
+
+  try {
+    // health reflects the real running engine label.
+    const health = await geDataQuality.health();
+    assert.equal(health.healthy, true);
+    assert.equal(health.engine, 'native');
+
+    // Indian-BFSI-shaped rows: PAN (nullable), amount (INR), status set, id (unique key).
+    const rows: Row[] = [
+      { pan: 'ABCDE1234F', amount: 50000, status: 'ACTIVE', id: 1 },
+      { pan: '', amount: -100, status: 'CLOSED', id: 2 },
+      { pan: 'ZZZZZ9999Z', amount: 2_000_000, status: 'PENDING', id: 2 },
+    ];
+
+    // not-null: one blank PAN → 1 unexpected.
+    let v = await geDataQuality.runCheckpoint('s', rows, [expectNotNull('pan')]);
+    assert.equal(v.engineReachable, true);
+    assert.equal(v.engine, 'native');
+    assert.equal(v.total, 1);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.unexpectedCount, 1);
+
+    // between 0..1_000_000: -100 (below) + 2_000_000 (above) → 2 unexpected; nulls ignored.
+    v = await geDataQuality.runCheckpoint('s', rows, [expectInRange('amount', 0, 1_000_000)]);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.unexpectedCount, 2);
+
+    // in-set {ACTIVE,CLOSED}: PENDING → 1 unexpected.
+    v = await geDataQuality.runCheckpoint('s', rows, [expectInSet('status', ['ACTIVE', 'CLOSED'])]);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.unexpectedCount, 1);
+
+    // unique on id: value 2 appears twice → 2 unexpected.
+    v = await geDataQuality.runCheckpoint('s', rows, [expectUnique('id')]);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.unexpectedCount, 2);
+
+    // column-exists: present column passes, absent column fails.
+    v = await geDataQuality.runCheckpoint('s', rows, [expectColumnExists('pan'), expectColumnExists('gstin')]);
+    assert.equal(v.total, 2);
+    assert.equal(v.passed, 1);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.column, 'gstin');
+
+    // all-pass suite over the rows → success.
+    v = await geDataQuality.runCheckpoint('s', rows, [
+      expectInSet('status', ['ACTIVE', 'CLOSED', 'PENDING']),
+      expectColumnExists('id'),
+    ]);
+    assert.equal(v.success, true);
+    assert.equal(v.passed, 2);
+    assert.equal(v.failed, 0);
+
+    // unsupported type → reported as fail with -1, never silently green.
+    v = await geDataQuality.runCheckpoint('s', rows, [{ type: 'expect_something_new', column: 'x' }]);
+    assert.equal(v.success, false);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results[0].unexpectedCount, -1);
+    assert.match(v.results[0].detail, /unsupported/);
+
+    // EDGE — empty rows: not-null over zero rows has zero unexpected → passes.
+    v = await geDataQuality.runCheckpoint('s', [], [expectNotNull('pan')]);
+    assert.equal(v.success, true);
+    assert.equal(v.passed, 1);
+
+    // EDGE — empty value_set: nothing allowed → every present value unexpected (3 statuses).
+    v = await geDataQuality.runCheckpoint('s', rows, [expectInSet('status', [])]);
+    assert.equal(v.failed, 1);
+    assert.equal(v.results.find((r) => !r.success)!.unexpectedCount, 3);
+  } finally {
+    await sidecar.close();
+  }
+});
+
+// ─── INTEGRATION: adapter fails closed when the sidecar is unreachable (real fetch, no mock) ──────
+test('adapter returns a fail-closed verdict when the sidecar is down', async () => {
+  const sidecar = await startFakeSidecar();
+  const deadUrl = sidecar.url;
+  await sidecar.close(); // now nothing is listening on that port
+  process.env.OFFGRID_DATAQUALITY_URL = deadUrl;
+  const { geDataQuality } = await import('../src/lib/adapters/data-quality.ts');
+
+  const health = await geDataQuality.health();
+  assert.equal(health.healthy, false);
+
+  const v = await geDataQuality.runCheckpoint('s', [{ a: 1 }], [expectNotNull('a')]);
+  assert.equal(v.engineReachable, false);
+  assert.equal(v.success, false);
+  assert.equal(v.failed, 1);
+  assert.match(v.note ?? '', /unreachable/);
 });
 
 // ─── INTEGRATION: real GE sidecar over the LAN ──────────────────────────────────────────────────
