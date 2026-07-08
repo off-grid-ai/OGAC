@@ -7,14 +7,20 @@
 //
 // This table is SEPARATE from the data-module's `masking_rules` (kind/action only): a guardrails
 // rule adds a matcher dimension (a named entity type OR a raw regex pattern) and a fuller action
-// set (redact | mask | hash | allow), so operators can express both "redact all US_SSN" and
-// "hash anything matching /\bACME-\d+\b/". Created idempotently on first use so it deploys over
+// set (redact | mask | hash | allow | block | flag | log), so operators can express both "redact
+// all US_SSN", "hash anything matching /\bACME-\d+\b/", AND "block the run on this pattern" or
+// "just flag it". Created idempotently on first use so it deploys over
 // SSH with no migration step (like ensureChatSchema / ensureFileSchema).
 
 // ─── Pure policy (zero-import, unit-testable) ───────────────────────────────
 
 export const RULE_MATCHERS = ['entity', 'regex'] as const;
-export const RULE_ACTIONS = ['redact', 'mask', 'hash', 'allow'] as const;
+// The enforcement-strength ladder an operator picks per rule:
+//   • redact / mask / hash — TRANSFORM the matched span (deep layer → verdict 'redacted').
+//   • allow                — EXEMPTION (explicitly permit; no transform).
+//   • block                — DENY the run when the pattern matches (hard stop, like injection).
+//   • flag / log           — allow the run but RECORD a warning verdict (observe, don't enforce).
+export const RULE_ACTIONS = ['redact', 'mask', 'hash', 'allow', 'block', 'flag', 'log'] as const;
 
 export type RuleMatcher = (typeof RULE_MATCHERS)[number];
 export type RuleAction = (typeof RULE_ACTIONS)[number];
