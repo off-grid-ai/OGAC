@@ -20,8 +20,10 @@ import {
   isPrimitiveEnabled,
   isPrimitiveRef,
   parsePrimitiveRef,
+  type EgressDecision,
   type ToolPrimitive,
 } from '@/lib/tool-primitives';
+import { governedWebSearch, WEBSEARCH_URL_ENV } from '@/lib/adapters/web-search';
 import {
   buildAppToolGraph,
   detectAppToolCycles,
@@ -29,6 +31,25 @@ import {
   parseAppToolRef,
   wouldCreateCycle,
 } from '@/lib/app-tools';
+
+// ─── env-var reconciliation (web_search endpoint) ─────────────────────────────────────────────────
+// Two names for the SAME on-prem search endpoint existed: this adapter's legacy OFFGRID_WEB_SEARCH_URL
+// and the governed seam's canonical OFFGRID_WEBSEARCH_URL (web-search.ts). We standardise on the
+// CANONICAL name (WEBSEARCH_URL_ENV = OFFGRID_WEBSEARCH_URL) and keep OFFGRID_WEB_SEARCH_URL as a
+// back-compat ALIAS: if only the legacy var is set, its value is copied onto the canonical key in the
+// env snapshot handed to governedWebSearch, so existing deployments keep working unchanged.
+export const WEBSEARCH_URL_ENV_LEGACY = 'OFFGRID_WEB_SEARCH_URL';
+
+function reconcileWebSearchEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  const canonical = (env[WEBSEARCH_URL_ENV] ?? '').trim();
+  const legacy = (env[WEBSEARCH_URL_ENV_LEGACY] ?? '').trim();
+  if (!canonical && legacy) {
+    return { ...env, [WEBSEARCH_URL_ENV]: legacy };
+  }
+  return env;
+}
 
 // ─── The structured result of running a primitive ────────────────────────────────────────────────
 export interface PrimitiveResult {
@@ -53,6 +74,13 @@ export interface RunPrimitiveOpts {
   env?: Record<string, string | undefined>;
   /** Injected fetch for testability (defaults to global fetch). */
   fetchImpl?: typeof fetch;
+  /**
+   * The pipeline EGRESS decision for this run's data-class (from enforceModelCall). Governs any
+   * internet-reaching primitive (web_search) exactly like a cloud model call: 'local'/'block' REFUSE
+   * external egress, 'cloud' permits it. Defaults to 'cloud' — the additive "no bound pipeline" rule
+   * used across the run path, so behaviour is unchanged when no contract is threaded.
+   */
+  egress?: EgressDecision;
 }
 
 // ─── runPrimitive — execute ONE primitive under governance ────────────────────────────────────────
@@ -95,7 +123,7 @@ export async function runPrimitive(
   try {
     switch (primitive.id) {
       case 'web_search':
-        return await execWebSearch(primitive, opts.params ?? {}, env, fetchImpl);
+        return await execWebSearch(primitive, opts.params ?? {}, env, fetchImpl, opts.egress ?? 'cloud');
       case 'read_url':
         return await execReadUrl(primitive, opts.params ?? {}, fetchImpl);
       case 'http_fetch':
@@ -108,36 +136,55 @@ export async function runPrimitive(
   }
 }
 
-// ─── web_search — via the on-prem gateway if configured, else a direct search endpoint ────────────
-// On-prem preference: if OFFGRID_WEB_SEARCH_URL is set (an org-run search proxy — e.g. SearXNG), use
-// it so egress stays through the org's own controlled endpoint. Returns a compact result list.
+// ─── web_search — delegate to the FULLY GOVERNED seam (governedWebSearch) ─────────────────────────
+// This no longer re-implements the reach inline. It delegates to governedWebSearch, which composes,
+// in order, the SAME three gates that govern any internet reach:
+//   1. the air-gap gate (opted in on this deploy?),
+//   2. the pipeline EGRESS leash (webSearchEgressAllowed(egress) — a local-only/blocked pipeline
+//      REFUSES the search exactly as it refuses a cloud model call),
+//   3. the reach itself against the org-configured search endpoint.
+// The `egress` decision is threaded down from enforceModelCall by the run path; 'cloud' is the
+// additive default (no bound pipeline). The endpoint env name is reconciled to the canonical
+// OFFGRID_WEBSEARCH_URL (OFFGRID_WEB_SEARCH_URL kept as a back-compat alias — see reconcileWebSearchEnv).
 async function execWebSearch(
   primitive: ToolPrimitive,
   params: Record<string, unknown>,
   env: Record<string, string | undefined>,
   fetchImpl: typeof fetch,
+  egress: EgressDecision,
 ): Promise<PrimitiveResult> {
   const query = String(params.query ?? '').trim();
   if (!query) return { ok: false, status: 'error', primitiveId: primitive.id, detail: 'web_search needs a query' };
   const count = Number(params.count ?? 5) || 5;
-  const base = env.OFFGRID_WEB_SEARCH_URL;
-  if (!base) {
-    return {
-      ok: false,
-      status: 'error',
-      primitiveId: primitive.id,
-      detail: 'web_search is enabled but no search endpoint (OFFGRID_WEB_SEARCH_URL) is configured',
-    };
+
+  const resp = await governedWebSearch(query, {
+    egress,
+    env: reconcileWebSearchEnv(env),
+    fetchImpl,
+    count,
+  });
+
+  // Map the governed response onto the primitive result contract. egress_blocked/disabled are
+  // honest refusals ('blocked'/'disabled'); a configured-but-failed reach is 'error'; ok ⇒ 'ran'.
+  if (resp.status === 'egress_blocked') {
+    return { ok: false, status: 'blocked', primitiveId: primitive.id, detail: resp.detail };
   }
-  const url = `${base}${base.includes('?') ? '&' : '?'}q=${encodeURIComponent(query)}&format=json`;
-  const res = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) return { ok: false, status: 'error', primitiveId: primitive.id, detail: `search endpoint ${res.status}` };
-  const data = (await res.json()) as { results?: { title?: string; url?: string; content?: string }[] };
-  const results = (data.results ?? []).slice(0, count);
-  const output = results
-    .map((r, i) => `${i + 1}. ${r.title ?? '(untitled)'} — ${r.url ?? ''}\n   ${(r.content ?? '').slice(0, 200)}`)
+  if (resp.status === 'disabled') {
+    return { ok: false, status: 'disabled', primitiveId: primitive.id, detail: resp.detail };
+  }
+  if (!resp.ok) {
+    return { ok: false, status: 'error', primitiveId: primitive.id, detail: resp.detail };
+  }
+  const output = resp.results
+    .map((r, i) => `${i + 1}. ${r.title} — ${r.url}\n   ${r.snippet.slice(0, 200)}`)
     .join('\n');
-  return { ok: true, status: 'ran', primitiveId: primitive.id, output: output || 'No results.', detail: `web_search: ${results.length} result(s)` };
+  return {
+    ok: true,
+    status: 'ran',
+    primitiveId: primitive.id,
+    output: output || 'No results.',
+    detail: `web_search: ${resp.results.length} result(s)`,
+  };
 }
 
 // ─── read_url — fetch a single page, return readable-ish text (tags stripped) ─────────────────────
@@ -279,6 +326,12 @@ export interface ComposableToolCtx {
   actor?: string;
   /** The id of the app whose agent step is calling — enables the app→app cycle guard. */
   callerAppId?: string;
+  /**
+   * The pipeline EGRESS decision for this run (from the caller's enforceModelCall verdict). Threaded
+   * into any internet-reaching primitive so web_search is leashed identically to a cloud model call.
+   * Default 'cloud' — the additive "no bound pipeline" rule (unchanged behaviour when unset).
+   */
+  egress?: EgressDecision;
 }
 
 export async function maybeRunComposableTool(
@@ -292,7 +345,7 @@ export async function maybeRunComposableTool(
   if (isPrimitiveRef(ref)) {
     const id = parsePrimitiveRef(ref)!;
     const policy = await resolvePrimitivePolicy(id, ctx.orgId);
-    const result = await runPrimitive(id, { policy });
+    const result = await runPrimitive(id, { policy, egress: ctx.egress ?? 'cloud' });
     mark?.('tool', `prim:${id}`, result.detail, [ref], t);
     return result;
   }
