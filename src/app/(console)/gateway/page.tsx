@@ -4,12 +4,15 @@ import {
   ProhibitInset as CircleSlash,
   Plug,
 } from '@phosphor-icons/react/dist/ssr';
+import { Suspense } from 'react';
 import { GatewayModels } from '@/components/gateway/GatewayModels';
 import { GatewayNodesCard } from '@/components/gateway/GatewayNodesCard';
 import { GatewayTabs } from '@/components/gateway/GatewayTabs';
 import { ModulePlaceholder } from '@/components/ModulePlaceholder';
+import { SkeletonDetailBody } from '@/components/PageSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 
@@ -51,8 +54,50 @@ async function fetchGateway(): Promise<GatewayInfo | null> {
   }
 }
 
+// The page shell: paints its title band immediately (no I/O), then streams the gateway body in a
+// Suspense boundary so the slow live probe (the aggregator's `/` fans out to every node and can
+// take several seconds) never blocks first paint. Keeping the generous 8s probe timeout inside the
+// streamed child avoids the false "no gateway" a hard wall-clock cap would cause on a slow-but-live
+// aggregator — we trade a longer skeleton for correctness, with instant navigation either way.
 export default async function GatewayPage() {
   await requireModuleForUser('gateway');
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold text-foreground">AI Gateway</h1>
+        <p className="text-sm text-muted-foreground">
+          The unified inference endpoint — models, modalities, and live node health.
+        </p>
+      </div>
+      <Suspense fallback={<GatewayBodySkeleton />}>
+        <GatewayBody />
+      </Suspense>
+    </div>
+  );
+}
+
+function GatewayBodySkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-live="polite">
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+          </div>
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </CardHeader>
+        <CardContent className="flex gap-4">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-24" />
+        </CardContent>
+      </Card>
+      <SkeletonDetailBody />
+    </div>
+  );
+}
+
+async function GatewayBody() {
   const info = await fetchGateway();
 
   if (!info) {
