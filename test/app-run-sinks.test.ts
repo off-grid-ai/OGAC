@@ -26,6 +26,7 @@ function stubDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
     async getConnector() { return null; },
     async queryDomain() { return { result: null, detail: '' }; },
     async runGuardrail() { return { blocked: false, detail: 'ok' }; },
+    async scanPii() { return { hits: false, entities: [], engine: 'regex' }; },
     async persist() {},
     async materializeAgent(_s, step) { return step.id; },
     async renderReport(view, format) {
