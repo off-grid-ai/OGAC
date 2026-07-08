@@ -415,6 +415,23 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
   (fleet), reload Caddy; Redis (`:6379`, non-HTTP) needs a TCP forward or stays in-memory fallback.
   S2 no longer required — g6 replaces it. Note: g6 was `enabled:false` in the aggregator POOL (server,
   not a GW) — keep it that way.
+- **Data plane provisioned on S2 — LIVE (2026-07-08).** S2 (`192.168.1.60`, 16GB M1) rejoined the
+  LAN; OrbStack + privileged helper were already installed (docker daemon up, Docker 29.4.0). On
+  reboot S2 had auto-restarted its old `offgrid-services-b` aux tier — **redundant with g6** (the
+  canonical copy the console points at), so it was **stopped** (`docker stop`, volumes kept; load
+  fell 12→5, ~12GB freed). Then brought up the four data-plane profiles from
+  `~/offgrid/console/deploy/docker-compose.yml` (orb PATH `/Applications/OrbStack.app/Contents/MacOS/xbin`):
+  - `warehouse-clickhouse` `:8124/:9001` (creds warehouse/warehouse) — verified `SELECT version()`=24.8.14.39.
+  - `redpanda` `:19092/:9644/:18083` — `rpk cluster health` Healthy:true.
+  - `great-expectations` `:8003` — `{"status":"ok"}` (fallback stub engine).
+  - 6× `airbyte-*` `:8005/:8006` — **crashlooping on 0.63.15 compose gaps** (temporal dynamicconfig,
+    worker secrets env, webapp nginx host vars, likely missing bootloader); fix in progress.
+  **S1 wiring:** added edge-Caddy loopbacks `127.0.0.1:8941→s2:8124`, `8942→:8006`, `8943→:9644`,
+  `8944→:8003` (`deploy/Caddyfile`); restarted edge (`sudo pkill -9 -f 'caddy run'` +
+  `launchctl kickstart -k system/co.getoffgridai.edge`) — loopbacks verified from S1. Set
+  `OFFGRID_WAREHOUSE_URL/_USER/_PASSWORD`, `OFFGRID_AIRBYTE_URL`, `OFFGRID_REDPANDA_ADMIN_URL/_BROKERS`,
+  `OFFGRID_DATAQUALITY_URL` in S1 `.env.local`. Console: the four engines registered in
+  `src/lib/services-directory.ts` (warehouse/airbyte/streaming/data-quality) → Services-page health.
 - **node-c (g5) plan — ABANDONED (2026-07-05), was never needed.** The premise ("OpenSearch/Marquez/
   OpenBao aren't running → provision a 3rd server") was **WRONG**: all three have been running the whole
   time in the **`offgrid-services-a` Docker stack ON S1** (up 4 days — see the S1 container list above).

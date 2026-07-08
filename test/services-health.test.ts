@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  getServices,
   isHealthy,
   needsNetworkProbe,
   resolveHealth,
@@ -99,4 +100,22 @@ test('isHealthy: only down is unhealthy', () => {
   assert.equal(isHealthy('embedded'), true);
   assert.equal(isHealthy('optional'), true);
   assert.equal(isHealthy('down'), false);
+});
+
+test('data-plane engines are registered on the S1 edge loopbacks (8941–8944)', () => {
+  const byId = new Map(getServices().map((s) => [s.id, s]));
+  const expected: Record<string, { url: string; healthPath: string }> = {
+    warehouse: { url: 'http://127.0.0.1:8941', healthPath: '/ping' },
+    airbyte: { url: 'http://127.0.0.1:8942', healthPath: '/api/v1/health' },
+    streaming: { url: 'http://127.0.0.1:8943', healthPath: '/v1/cluster/health_overview' },
+    'data-quality': { url: 'http://127.0.0.1:8944', healthPath: '/' },
+  };
+  for (const [id, want] of Object.entries(expected)) {
+    const e = byId.get(id);
+    assert.ok(e, `data-plane service '${id}' must be registered`);
+    assert.equal(e!.url, want.url, `${id} url`);
+    assert.equal(e!.healthPath, want.healthPath, `${id} healthPath`);
+    // Real engines — honestly network-probed (never masked as 'optional'): a genuine outage shows.
+    assert.equal(needsNetworkProbe(e!), true, `${id} must be network-probed`);
+  }
 });
