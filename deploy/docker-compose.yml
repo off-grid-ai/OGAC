@@ -453,6 +453,178 @@ services:
       FLEET_LOGGING_JSON: 'true'
     ports: ['8070:8070']
 
+  # ══ DATA PLANE (NEW — S2-only) ═════════════════════════════════════════════════════
+  # The second substrate engine (the first is the model engine — the llama.cpp gateway fleet).
+  # This is the DATA engine: warehouse + streaming + connectors/CDC + data-quality. It is heavy
+  # (Airbyte alone is ~8 containers) and is intended to run on offgrid-s2 (16GB M1) under Colima,
+  # NOT on S1 alongside the control plane. See onprem/DATA_PLANE.md for the S2 bringup runbook.
+  # All images below are permissive-licensed (Apache-2.0 / MIT / ELv2* / BSD) — dev creds are NOT
+  # for production. (*Redpanda core is BSL/permissive-for-single-node dev use; swap for a licensed
+  # broker or Apache Kafka in production if that matters to you.)
+
+  # ── WAREHOUSE (ClickHouse — columnar analytics store; what BI/PowerBI reads) ────────
+  # STANDALONE and DISTINCT from the langfuse-clickhouse above (that one is llmops-internal).
+  # Own service name, own volume, own ports (8124/9001) so the two never collide.
+  warehouse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    profiles: [warehouse, all]
+    environment:
+      CLICKHOUSE_USER: warehouse
+      CLICKHOUSE_PASSWORD: warehouse # DEV ONLY — not for production
+      CLICKHOUSE_DB: offgrid_warehouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    # HTTP 8124 (native SQL over HTTP; what dbt / BI point at) + native TCP 9001. Ports are shifted
+    # off ClickHouse defaults (8123/9000) so they don't clash with langfuse-clickhouse or Marquez.
+    ports: ['8124:8123', '9001:9000']
+    volumes:
+      - warehouseclickhouse:/var/lib/clickhouse
+      - warehouseclickhouselogs:/var/log/clickhouse-server
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ── STREAMING / MQ (Redpanda — Kafka-API broker, single container, lighter than Kafka) ──
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    profiles: [streaming, all]
+    command:
+      - redpanda
+      - start
+      - --smp=1 # 1 core — keep S2 footprint small
+      - --memory=1G # bounded so it co-exists with Airbyte + ClickHouse on 16GB
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      # Kafka API on 9092 (internal) + 19092 (host); admin 9644; schema-registry 8083.
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://127.0.0.1:19092
+    ports:
+      - '19092:19092' # Kafka API (external)
+      - '9644:9644' # admin API / metrics
+      - '18083:8083' # schema registry
+    volumes: [redpanda:/var/lib/redpanda/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'rpk cluster health | grep -q "Healthy:.*true" || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ── CONNECTORS + CDC (Airbyte OSS — the ELT engine, 300+ connectors + Debezium CDC) ──
+  # HONEST: Airbyte is inherently multi-container. This is the minimal viable OSS set — its own
+  # Postgres + Temporal + server + worker + webapp + connector-builder (~8 containers incl. deps).
+  # It is HEAVY (~4–6GB RAM working set) and S2-ONLY. In production the vendor-recommended install
+  # is `abctl` (a k3d/kind cluster); this compose set is the lean dev-parity path. Landing/lake zone
+  # for extracted data is the EXISTING SeaweedFS S3 (see note below) — no separate object store here.
+  airbyte-db:
+    image: postgres:16.6-alpine
+    profiles: [etl, all]
+    environment:
+      POSTGRES_USER: airbyte
+      POSTGRES_PASSWORD: airbyte # DEV ONLY — not for production
+      POSTGRES_DB: airbyte
+    volumes: [airbytedb:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U airbyte']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  # Airbyte runs its own Temporal (workflow engine for sync jobs) — SEPARATE from the agents-profile
+  # `temporal` above (different DB, different network role). Airbyte auto-creates its schema.
+  airbyte-temporal:
+    image: temporalio/auto-setup:1.23.1
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-db: { condition: service_healthy }
+    environment:
+      DB: postgresql
+      DB_PORT: '5432'
+      POSTGRES_USER: airbyte
+      POSTGRES_PWD: airbyte
+      POSTGRES_SEEDS: airbyte-db
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+  airbyte-server:
+    image: airbyte/server:0.63.15
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-db: { condition: service_healthy }
+      airbyte-temporal: { condition: service_started }
+    environment: &airbyte-env
+      DATABASE_USER: airbyte
+      DATABASE_PASSWORD: airbyte
+      DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
+      DATABASE_HOST: airbyte-db
+      DATABASE_PORT: '5432'
+      DATABASE_DB: airbyte
+      CONFIG_DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
+      TEMPORAL_HOST: airbyte-temporal:7233
+      AIRBYTE_VERSION: 0.63.15
+      WORKSPACE_ROOT: /tmp/workspace
+      WORKSPACE_DOCKER_MOUNT: airbyteworkspace
+      LOCAL_ROOT: /tmp/airbyte_local
+      CONFIG_ROOT: /data
+      TRACKING_STRATEGY: logging
+      WORKER_ENVIRONMENT: docker
+    ports: ['8005:8001'] # internal API (webapp proxies to it)
+    volumes:
+      - airbyteworkspace:/tmp/workspace
+      - airbytedata:/data
+  airbyte-worker:
+    image: airbyte/worker:0.63.15
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-server: { condition: service_started }
+      airbyte-temporal: { condition: service_started }
+    environment:
+      # The worker launches connector containers, so it needs the host Docker socket (S2 Colima).
+      <<: *airbyte-env
+    volumes:
+      - airbyteworkspace:/tmp/workspace
+      - airbytedata:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+  airbyte-webapp:
+    image: airbyte/webapp:0.63.15
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-server: { condition: service_started }
+    environment:
+      INTERNAL_API_HOST: airbyte-server:8001
+      CONNECTOR_BUILDER_API_HOST: airbyte-connector-builder-server:80
+    ports: ['8006:80'] # Airbyte UI → set OFFGRID_AIRBYTE_URL to http://<s2>:8006
+  airbyte-connector-builder-server:
+    image: airbyte/connector-builder-server:0.63.15
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-server: { condition: service_started }
+
+  # ── DATA-LAKE LANDING ZONE ──────────────────────────────────────────────────────────
+  # NOTE: no new object store here BY DESIGN. The lake landing/staging zone is the EXISTING
+  # `seaweedfs` service (S3-compatible, :8333) under the `data` profile. Airbyte's S3 destination
+  # points at it (bucket `offgrid-lake`, endpoint http://<s2-or-s1>:8333, path-style). Only add a
+  # dedicated MinIO if a connector strictly needs an isolated bucket namespace — prefer SeaweedFS.
+
+  # ── DATA QUALITY (Great Expectations sidecar — mirrors the evidently/ragas sidecar pattern) ──
+  # Thin Apache-2.0 service the console's data-quality adapter calls; runs GE checkpoints against a
+  # supplied dataset (or a warehouse-clickhouse query result) and returns pass/fail + failed rules.
+  great-expectations:
+    build: ./sidecars/great-expectations
+    profiles: [dataquality, all]
+    ports: ['8003:8003']
+    healthcheck:
+      test: ['CMD-SHELL', 'python -c "import urllib.request;urllib.request.urlopen(\"http://127.0.0.1:8003/\")"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata:
   seaweed:
@@ -469,3 +641,10 @@ volumes:
   unleashdb:
   superset:
   fleetmysql:
+  # ── data-plane (S2) volumes ──
+  warehouseclickhouse:
+  warehouseclickhouselogs:
+  redpanda:
+  airbytedb:
+  airbyteworkspace:
+  airbytedata:

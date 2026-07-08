@@ -1,0 +1,24 @@
+# Off Grid — dbt project scaffold (transforms on warehouse-clickhouse).
+# Starter only: one staging model placeholder. Extend with real models as pipelines land.
+name: offgrid_warehouse
+version: '0.1.0'
+config-version: 2
+
+# Points at the profile in profiles.yml (see profiles.example.yml).
+profile: offgrid_warehouse
+
+model-paths: ['models']
+seed-paths: ['seeds']
+macro-paths: ['macros']
+test-paths: ['tests']
+
+target-path: target
+clean-targets: [target, dbt_packages]
+
+models:
+  offgrid_warehouse:
+    # Staging models materialize as views; marts as tables (override per-model as needed).
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
