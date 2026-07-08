@@ -776,3 +776,20 @@ The `offgrid-apps` worker is now a gui-domain LaunchAgent `co.getoffgridai.app-w
   `<slug[:5]><rand5>-gateway.getoffgridai.co` (mirrors `gateway.getoffgridai.co`). Needs: a
   more-specific `*-gateway.getoffgridai.co → :8800` ingress rule ABOVE the wildcard (verify cloudflared
   supports the pattern) + the aggregator resolving tenant from Host. Deferred (supervised tunnel edit).
+
+## 2026-07-08 — durable execution turned ON (was shipped-but-off)
+
+Founder directive "everything shipped and on." Flipped durable agent+app runs from off→on:
+- **`OFFGRID_QUEUE_ENABLED=1`** appended to `/Users/admin/offgrid/console/.env.local` (fleet-wide durable
+  toggle — `shouldRunDurably`/`dispatchAgentRun` now dispatch to Temporal, not inline).
+- **`co.getoffgridai.agent-worker`** installed: `cp deploy/onprem/co.getoffgridai.agent-worker.plist
+  ~/Library/LaunchAgents/` + `launchctl bootstrap gui/$(id -u) …`. Runs `tsx scripts/temporal-worker.mts`
+  draining `offgrid-agents`; RunAtLoad+KeepAlive. Started clean ("ready — draining agent runs", state
+  RUNNING; no DATABASE_URL/SASL crash). Log: `agent-worker.log`.
+- `co.getoffgridai.app-worker` (offgrid-apps) + `co.getoffgridai.queue` (offgrid-inference) were already
+  running. Console (launchd `co.getoffgridai.console`) kickstarted to load the flag.
+- **Verified:** agent run `run_9ecfcfa4` dispatched durably (workflowId `agentrun-sop-synth-run_9ecfcfa4`),
+  completed `done`, 8 steps, provenance signed.
+- Presidio already ON (`OFFGRID_ADAPTER_GUARDRAILS=presidio` + URLs) — /status shows presidio `up`; the
+  old regex-floor gap (#2) is effectively resolved.
+- Restart worker: `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.agent-worker`.
