@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation';
 import { TeamDetail } from '@/components/teams/TeamDetail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelinesByTeam } from '@/lib/pipelines';
-import { getTeam, listTeamMembers } from '@/lib/teams';
+import { getTeam, listTeamMembers, listTeams } from '@/lib/teams';
 import { currentOrgId } from '@/lib/tenancy';
+import { distinctDepartments } from '@/lib/teams-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +17,10 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   const team = await getTeam(id, orgId);
   if (!team) notFound();
 
-  const [members, pipelines] = await Promise.all([
+  const [members, pipelines, allTeams] = await Promise.all([
     listTeamMembers(id, orgId).catch(() => []),
     listPipelinesByTeam(id, orgId).catch(() => []),
+    listTeams(orgId).catch(() => []),
   ]);
 
   return (
@@ -27,9 +29,11 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
         id: team.id,
         name: team.name,
         description: team.description,
+        department: team.department,
         members: members.map((m) => ({ id: m.id, userId: m.userId, role: m.role })),
         pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, status: p.status })),
       }}
+      departments={distinctDepartments(allTeams)}
     />
   );
 }

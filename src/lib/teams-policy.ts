@@ -35,6 +35,8 @@ export function normalizeTeamMemberRole(v: unknown): TeamMemberRole {
 export interface TeamCreateInput {
   name?: unknown;
   description?: unknown;
+  /** Optional department this team belongs to (nullable ⇒ Unassigned). */
+  department?: unknown;
 }
 
 export interface TeamValidation {
@@ -50,6 +52,7 @@ export function validateTeamCreate(draft: TeamCreateInput): TeamValidation {
   if (draft.description !== undefined && typeof draft.description !== 'string') {
     errors.push('description must be a string');
   }
+  errors.push(...validateDepartmentField(draft.department));
   return { ok: errors.length === 0, errors };
 }
 
@@ -64,7 +67,90 @@ export function validateTeamUpdate(patch: TeamCreateInput): TeamValidation {
   if (patch.description !== undefined && typeof patch.description !== 'string') {
     errors.push('description must be a string');
   }
+  errors.push(...validateDepartmentField(patch.department));
   return { ok: errors.length === 0, errors };
+}
+
+// ─── department field ─────────────────────────────────────────────────────────────────────────────
+// A team may belong to a DEPARTMENT (e.g. "Risk", "Operations", "Finance") — an optional grouping
+// above the team so the Access surface reads as an org chart. Nullable + additive: a team with no
+// department falls into the "Unassigned" bucket. PURE.
+
+/** The bucket label for teams that have no department. */
+export const UNASSIGNED_DEPARTMENT = 'Unassigned';
+
+/** Validate an (optional) department value: null/undefined ⇒ ok; a string ⇒ bounded. PURE. */
+function validateDepartmentField(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (typeof v !== 'string') return ['department must be a string'];
+  if (v.trim().length > 120) return ['department must be 120 characters or fewer'];
+  return [];
+}
+
+/**
+ * Normalise a department value for STORAGE: trimmed; an empty/whitespace-only string collapses to
+ * null (⇒ Unassigned). A non-string is null. PURE.
+ */
+export function normalizeDepartment(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t.length === 0 ? null : t;
+}
+
+/** A team as the grouping helper sees it — id/name + its (possibly null) department. */
+export interface TeamForGrouping {
+  department: string | null;
+}
+
+/** A department group: a display label + the teams under it, in input order. */
+export interface DepartmentGroup<T extends TeamForGrouping> {
+  /** Display label — the department name, or "Unassigned" for the null bucket. */
+  department: string;
+  /** True iff this is the null / no-department bucket. */
+  unassigned: boolean;
+  teams: T[];
+}
+
+/**
+ * Group teams by department into an ordered list of {department, teams} buckets. PURE — no IO.
+ *   • teams with a (trimmed, non-empty) department group under that department;
+ *   • teams with null / empty department fall into a single "Unassigned" bucket;
+ *   • named departments are sorted case-insensitively; the "Unassigned" bucket, if present, is LAST;
+ *   • team order WITHIN a bucket is preserved from the input (callers pre-sort, e.g. name asc).
+ * This is the org-chart backbone for the Access "Teams & Departments" tab.
+ */
+export function groupTeamsByDepartment<T extends TeamForGrouping>(
+  teamList: readonly T[],
+): DepartmentGroup<T>[] {
+  const named = new Map<string, T[]>();
+  const unassigned: T[] = [];
+  for (const t of teamList) {
+    const dept = normalizeDepartment(t.department);
+    if (dept === null) {
+      unassigned.push(t);
+    } else {
+      const bucket = named.get(dept);
+      if (bucket) bucket.push(t);
+      else named.set(dept, [t]);
+    }
+  }
+  const groups: DepartmentGroup<T>[] = [...named.entries()]
+    .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
+    .map(([department, teams]) => ({ department, unassigned: false, teams }));
+  if (unassigned.length > 0) {
+    groups.push({ department: UNASSIGNED_DEPARTMENT, unassigned: true, teams: unassigned });
+  }
+  return groups;
+}
+
+/** The distinct, sorted list of department names currently in use (excludes the null bucket). PURE. */
+export function distinctDepartments<T extends TeamForGrouping>(teamList: readonly T[]): string[] {
+  const set = new Set<string>();
+  for (const t of teamList) {
+    const dept = normalizeDepartment(t.department);
+    if (dept !== null) set.add(dept);
+  }
+  return [...set].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 
 // ─── member validation ──────────────────────────────────────────────────────────────────────────────

@@ -28,7 +28,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
-  const check = validateTeamUpdate({ name: body?.name, description: body?.description });
+  const check = validateTeamUpdate({
+    name: body?.name,
+    description: body?.description,
+    department: body?.department,
+  });
   if (!check.ok) {
     return NextResponse.json({ error: check.errors.join('; '), errors: check.errors }, { status: 400 });
   }
@@ -36,6 +40,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const patch: Parameters<typeof updateTeam>[1] = {};
   if (body?.name !== undefined) patch.name = String(body.name).trim();
   if (body?.description !== undefined) patch.description = String(body.description);
+  // department: a string sets it, explicit null clears it (⇒ Unassigned); undefined leaves it.
+  if (body && 'department' in body) {
+    patch.department = typeof body.department === 'string' ? body.department : null;
+  }
 
   const orgId = await currentOrgId();
   const updated = await updateTeam(id, patch, orgId);
