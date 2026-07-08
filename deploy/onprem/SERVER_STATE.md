@@ -424,8 +424,28 @@ The fleet has 8 GW nodes; dropping 2 for HA/aux (leaves 6 for inference). Decide
   - `warehouse-clickhouse` `:8124/:9001` (creds warehouse/warehouse) — verified `SELECT version()`=24.8.14.39.
   - `redpanda` `:19092/:9644/:18083` — `rpk cluster health` Healthy:true.
   - `great-expectations` `:8003` — `{"status":"ok"}` (fallback stub engine).
-  - 6× `airbyte-*` `:8005/:8006` — **crashlooping on 0.63.15 compose gaps** (temporal dynamicconfig,
-    worker secrets env, webapp nginx host vars, likely missing bootloader); fix in progress.
+  - 6× `airbyte-*` `:8005/:8006` — **crashloop FIXED (2026-07-08)** by aligning the hand-rolled
+    0.63.15 compose to airbyte's official env matrix. Fixes (all in `deploy/docker-compose.yml`, etl
+    profile): (1) added **`airbyte-bootloader`** (Flyway migrations; server/worker wait on it via
+    `service_completed_successfully`); (2) **temporal** now mounts `./airbyte/temporal/dynamicconfig`
+    at `/etc/temporal/config/dynamicconfig` with `DYNAMIC_CONFIG_FILE_PATH=…/development.yaml` (was the
+    non-existent `development-sql.yaml`) + `DB=postgresql`; (3) shared `x-airbyte-env` anchor (top-level,
+    not under `services:`) with the full DATABASE_*/CONFIG_DATABASE_*/INTERNAL_API_HOST/WORKLOAD_API_HOST/
+    STORAGE_TYPE=LOCAL + STORAGE_BUCKET_* / MICRONAUT_ENVIRONMENTS=control-plane matrix; (4) **server +
+    worker only** get `SECRET_PERSISTENCE=TESTING_CONFIG_DB_TABLE` **and** `JAVA_OPTS` defining the
+    hyphenated `datasources.local-secrets.*` Hikari datasource (env vars can't express the hyphen —
+    they bind to a broken `local` datasource); bootloader deliberately stays on the NO_OP default (it
+    crashes with TESTING_CONFIG_DB_TABLE); (5) **webapp** env is `AIRBYTE_SERVER_HOST=airbyte-server:8001`
+    + `CONNECTOR_BUILDER_API_HOST` + `KEYCLOAK_INTERNAL_HOST=localhost` (its nginx template interpolates
+    those, NOT `INTERNAL_API_HOST`) and its **port map is `8006:8080`** (the 0.63.15 nginx listens on
+    8080, not 80 — with `8006:80` the UI was unreachable / edge loopback 502'd); (6) `JDK_JAVA_OPTIONS`
+    (NOT `JAVA_OPTS`) carries the local-secrets `-D` props so the JVM APPENDS them — `JAVA_OPTS` would
+    REPLACE the image defaults and break the server's Flyway property resolution; (7) added
+    `CONFIGS/JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION` (0.40.23.002 / 0.40.26.001). New file:
+    `deploy/airbyte/temporal/dynamicconfig/development.yaml` (canonical airbyte content).
+    VERIFIED 2026-07-08: all 6 airbyte-* Up, RestartCount=0 (server/worker/webapp/temporal/builder/db),
+    bootloader Exited(0); `:8005/api/v1/health`→`{"available":true}`, `:8006/`→200, S1 loopback
+    `127.0.0.1:8942`→200.
   **S1 wiring:** added edge-Caddy loopbacks `127.0.0.1:8941→s2:8124`, `8942→:8006`, `8943→:9644`,
   `8944→:8003` (`deploy/Caddyfile`); restarted edge (`sudo pkill -9 -f 'caddy run'` +
   `launchctl kickstart -k system/co.getoffgridai.edge`) — loopbacks verified from S1. Set

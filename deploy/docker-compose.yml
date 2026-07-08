@@ -13,6 +13,71 @@
 # / BSD / PostgreSQL) — see ../LICENSES.md. Dev-mode creds below are NOT for production.
 name: offgrid-console
 
+# Shared Airbyte env matrix — matched to airbytehq/airbyte-platform v0.63.15 .env + docker-compose.
+# Top-level x- extension so it's a valid anchor source (Compose rejects bare keys under `services:`).
+# Anchored so server/worker/bootloader stay in lockstep. SECRET_PERSISTENCE + CONFIG_DATABASE_* +
+# INTERNAL_API_HOST are the version-specific requirements the old hand-rolled set was missing
+# (worker died: "requires a bean ConnectionFactory with qualifier @Named('local-secrets')").
+x-airbyte-env: &airbyte-env
+  DATABASE_USER: airbyte
+  DATABASE_PASSWORD: airbyte
+  DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
+  DATABASE_HOST: airbyte-db
+  DATABASE_PORT: '5432'
+  DATABASE_DB: airbyte
+  # ONE DB for jobs + configs here; CONFIG_DATABASE_* mirror DATABASE_* (server/bootloader define
+  # `config` + `jobs` jOOQ datasources from these).
+  # SECRET_PERSISTENCE is DELIBERATELY NOT in this shared anchor — it is set per-service (server +
+  # worker only) to TESTING_CONFIG_DB_TABLE, which registers the `local-secrets` jOOQ datasource
+  # (built from DATABASE_*) that those two binaries require. The BOOTLOADER must NOT get it: with
+  # TESTING_CONFIG_DB_TABLE the bootloader crashes (NoSuchBeanException DSLContext @Named('local-
+  # secrets')), so it stays on the NO_OP default. This split mirrors airbyte's official compose.
+  CONFIG_DATABASE_USER: airbyte
+  CONFIG_DATABASE_PASSWORD: airbyte
+  CONFIG_DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
+  # NOTE on the `local-secrets` datasource: LocalTestingSecretPersistence (SECRET_PERSISTENCE=
+  # TESTING_CONFIG_DB_TABLE) needs a Micronaut Hikari datasource named `local-secrets`. It CANNOT be
+  # supplied via env vars — Micronaut maps DATASOURCES_LOCAL_SECRETS_URL to `datasources.local.secrets.url`
+  # (underscore→dot), producing a broken datasource named `local` ("No URL specified"). The hyphen in
+  # `local-secrets` only survives as a JVM system property, so it's passed via JAVA_OPTS on the
+  # server + worker services below (NOT here — the bootloader stays on NO_OP and must not build it).
+  TEMPORAL_HOST: airbyte-temporal:7233
+  INTERNAL_API_HOST: http://airbyte-server:8001
+  WORKLOAD_API_HOST: http://airbyte-server:8001
+  CONNECTOR_BUILDER_SERVER_API_HOST: http://airbyte-connector-builder-server:80
+  WEBAPP_URL: http://localhost:8006/
+  AIRBYTE_VERSION: 0.63.15
+  DEPLOYMENT_MODE: OSS
+  WORKSPACE_ROOT: /tmp/workspace
+  WORKSPACE_DOCKER_MOUNT: airbyteworkspace
+  LOCAL_ROOT: /tmp/airbyte_local
+  LOCAL_DOCKER_MOUNT: /tmp/airbyte_local
+  CONFIG_ROOT: /data
+  TRACKING_STRATEGY: logging
+  JOB_MAIN_CONTAINER_CPU_REQUEST: ''
+  JOB_MAIN_CONTAINER_CPU_LIMIT: ''
+  JOB_MAIN_CONTAINER_MEMORY_REQUEST: ''
+  JOB_MAIN_CONTAINER_MEMORY_LIMIT: ''
+  WORKER_ENVIRONMENT: docker
+  LOG_LEVEL: INFO
+  # Micronaut bean profile. The worker registers its activity/spec workers only under the
+  # `control-plane` environment; without it registerGetSpec() throws NoSuchElementException at boot.
+  MICRONAUT_ENVIRONMENTS: control-plane
+  # 0.63.x unified storage layer — worker/server resolve ${STORAGE_TYPE} + ${STORAGE_BUCKET_*} at
+  # boot (worker crashed: "Could not resolve placeholder ${STORAGE_TYPE}"). LOCAL keeps logs/state on
+  # the mounted workspace volume (no S3 needed for this dev-parity set); bucket names are still
+  # required as keys even for LOCAL.
+  STORAGE_TYPE: LOCAL
+  STORAGE_BUCKET_LOG: airbyte-storage
+  STORAGE_BUCKET_STATE: airbyte-storage
+  STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-storage
+  STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-storage
+  # Flyway baseline versions the server's application.yml resolves at boot (server crashed:
+  # "property ${airbyte.flyway.configs.minimum-migration-version} doesn't exist"). Values per
+  # airbyte's official 0.63.x .env.
+  CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.40.23.002
+  JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.40.26.001
+
 services:
   # ── DATA PLANE ────────────────────────────────────────────────────────────────
   # Postgres + pgvector: console state, append-only audit, AND the server-scale Brain vector store.
@@ -533,8 +598,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  # Bootloader runs the Flyway DB migrations + connector-catalog seed, then exits. Server/worker
+  # MUST wait for it (service_completed_successfully) — without it the schema is absent and they die.
+  airbyte-bootloader:
+    image: airbyte/bootloader:0.63.15
+    profiles: [etl, all]
+    restart: on-failure
+    depends_on:
+      airbyte-db: { condition: service_healthy }
+    environment:
+      <<: *airbyte-env
+
   # Airbyte runs its own Temporal (workflow engine for sync jobs) — SEPARATE from the agents-profile
   # `temporal` above (different DB, different network role). Airbyte auto-creates its schema.
+  # v0.63.15 requires the dynamicconfig file mounted at config/dynamicconfig/development.yaml — the
+  # old `development-sql.yaml` path does not exist in this image (crash: "no such file or directory").
   airbyte-temporal:
     image: temporalio/auto-setup:1.23.1
     profiles: [etl, all]
@@ -547,30 +625,29 @@ services:
       POSTGRES_USER: airbyte
       POSTGRES_PWD: airbyte
       POSTGRES_SEEDS: airbyte-db
-      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development.yaml
+    volumes:
+      - ./airbyte/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
   airbyte-server:
     image: airbyte/server:0.63.15
     profiles: [etl, all]
     restart: on-failure
     depends_on:
       airbyte-db: { condition: service_healthy }
+      airbyte-bootloader: { condition: service_completed_successfully }
       airbyte-temporal: { condition: service_started }
-    environment: &airbyte-env
-      DATABASE_USER: airbyte
-      DATABASE_PASSWORD: airbyte
-      DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
-      DATABASE_HOST: airbyte-db
-      DATABASE_PORT: '5432'
-      DATABASE_DB: airbyte
-      CONFIG_DATABASE_URL: jdbc:postgresql://airbyte-db:5432/airbyte
-      TEMPORAL_HOST: airbyte-temporal:7233
-      AIRBYTE_VERSION: 0.63.15
-      WORKSPACE_ROOT: /tmp/workspace
-      WORKSPACE_DOCKER_MOUNT: airbyteworkspace
-      LOCAL_ROOT: /tmp/airbyte_local
-      CONFIG_ROOT: /data
-      TRACKING_STRATEGY: logging
-      WORKER_ENVIRONMENT: docker
+    environment:
+      <<: *airbyte-env
+      SECRET_PERSISTENCE: TESTING_CONFIG_DB_TABLE
+      # Defines the hyphenated `local-secrets` Hikari datasource that TESTING_CONFIG_DB_TABLE needs
+      # (env vars can't express the hyphen — see the anchor note). Points at the same airbyte DB.
+      # Use JDK_JAVA_OPTIONS (JVM APPENDS it) NOT JAVA_OPTS — JAVA_OPTS would REPLACE the image's
+      # baked JVM opts and break the server's Flyway property resolution at boot.
+      JDK_JAVA_OPTIONS: >-
+        -Ddatasources.local-secrets.url=jdbc:postgresql://airbyte-db:5432/airbyte
+        -Ddatasources.local-secrets.username=airbyte
+        -Ddatasources.local-secrets.password=airbyte
+        -Ddatasources.local-secrets.driver-class-name=org.postgresql.Driver
     ports: ['8005:8001'] # internal API (webapp proxies to it)
     volumes:
       - airbyteworkspace:/tmp/workspace
@@ -580,11 +657,20 @@ services:
     profiles: [etl, all]
     restart: on-failure
     depends_on:
+      airbyte-bootloader: { condition: service_completed_successfully }
       airbyte-server: { condition: service_started }
       airbyte-temporal: { condition: service_started }
     environment:
-      # The worker launches connector containers, so it needs the host Docker socket (S2 Colima).
+      # The worker launches connector containers, so it needs the host Docker socket (S2 OrbStack).
       <<: *airbyte-env
+      SECRET_PERSISTENCE: TESTING_CONFIG_DB_TABLE
+      # Defines the hyphenated `local-secrets` Hikari datasource (see server + anchor notes).
+      # JDK_JAVA_OPTIONS (appended by the JVM) — never JAVA_OPTS, which replaces the image defaults.
+      JDK_JAVA_OPTIONS: >-
+        -Ddatasources.local-secrets.url=jdbc:postgresql://airbyte-db:5432/airbyte
+        -Ddatasources.local-secrets.username=airbyte
+        -Ddatasources.local-secrets.password=airbyte
+        -Ddatasources.local-secrets.driver-class-name=org.postgresql.Driver
     volumes:
       - airbyteworkspace:/tmp/workspace
       - airbytedata:/data
@@ -596,9 +682,14 @@ services:
     depends_on:
       airbyte-server: { condition: service_started }
     environment:
-      INTERNAL_API_HOST: airbyte-server:8001
+      # v0.63.15 nginx template interpolates AIRBYTE_SERVER_HOST + CONNECTOR_BUILDER_API_HOST +
+      # KEYCLOAK_INTERNAL_HOST (NOT INTERNAL_API_HOST). Any missing ⇒ nginx "host not found in
+      # upstream". Keycloak isn't deployed in this OSS set, so point it at localhost (the default in
+      # airbyte's own compose) — the /auth upstream is simply never hit.
+      AIRBYTE_SERVER_HOST: airbyte-server:8001
       CONNECTOR_BUILDER_API_HOST: airbyte-connector-builder-server:80
-    ports: ['8006:80'] # Airbyte UI → set OFFGRID_AIRBYTE_URL to http://<s2>:8006
+      KEYCLOAK_INTERNAL_HOST: localhost
+    ports: ['8006:8080'] # 0.63.15 webapp nginx listens on 8080 (NOT 80). Airbyte UI → OFFGRID_AIRBYTE_URL=http://<s2>:8006
   airbyte-connector-builder-server:
     image: airbyte/connector-builder-server:0.63.15
     profiles: [etl, all]
