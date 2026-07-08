@@ -15,14 +15,16 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const { input = '', voice = 'alloy' } = (await req.json().catch(() => ({}))) as {
+  const { input = '', voice = 'alloy', model } = (await req.json().catch(() => ({}))) as {
     input?: string;
     voice?: string;
+    // Optional TTS engine selection from the catalog (picker). Empty → gateway default.
+    model?: string;
   };
   const clean = textForSpeech(String(input));
   if (!clean) return NextResponse.json({ error: 'no input' }, { status: 400 });
 
-  const result = await synthesizeSpeech(clean, String(voice));
+  const result = await synthesizeSpeech(clean, String(voice), model ? String(model) : undefined);
   if (!result.ok) {
     return result.reason === 'not-configured'
       ? NextResponse.json({ error: 'speech not configured', reason: 'not-configured' }, { status: 503 })
