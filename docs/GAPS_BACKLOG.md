@@ -670,3 +670,21 @@ T1 scrubbed its 9 named surfaces cleanly; a full scan found more OUTSIDE that sc
 ## T4-tail (2026-07-08)
 - **Knowledge list→detail NOT done** — the `/workspace/knowledge` list still opens a side-Sheet; a `knowledge/[id]` detail route exists but rows don't route to it. (T4 agent hit session limit after 3/4 items.) Wire rows → `/workspace/knowledge/[id]`; keep the sheet for quick add-doc. Small.
 - **Still-deferred T4 'actionable' items:** /gateway/services drill-through, /gateway/edge WAF toggle, /gateway/fleet[id] policy reassign, /governance/provenance verify+rotate, /insights/analytics data-wiring. Read-only today; logged for a later pass.
+
+## SPEECH consolidation (2026-07-08) — gateway is the single STT/TTS engine
+Founder: STT/TTS runs through the GATEWAY only (same engine desktop+console), multi-model selectable,
+keep-both. STT = Parakeet (+Whisper); TTS = Orpheus (+Kokoro). Decision + detail in memory
+`project-speech-stack`. Console speech client is engine-agnostic (OpenAI /v1/audio/*).
+
+- **SP-1 (building, #180):** `@offgrid/speech` shared pkg (../shared/packages/speech) — engine-agnostic
+  gateway speech client (transcribe/speak) + target-resolution + speech-model catalog; console consumes
+  it (behavior-preserving) + engine/voice picker. Desktop adopts later. IN PROGRESS.
+- **SP-2 (fleet fix, live bug):** gateway aggregator `:8800` `/v1/audio/voices` → **500 `spawn ENOTDIR`**
+  on S1 — the audio handler tries to spawn a TTS binary but the path/binaries aren't present on the
+  console's server, so live STT/TTS-through-gateway is BROKEN on S1. Working reference = desktop
+  `src/main/model-server.ts` (Kokoro/Piper via `/v1/audio/speech`, catalog in desktop/packages/models).
+  FIX: run the same proven audio engine behind the gateway (binaries + model paths correct on the
+  serving node). Needs fleet-side provisioning (on-site-ish). This is why the console's audio mode
+  falls back to the browser today.
+- **SP-3 (models, after SP-2):** add Orpheus-TTS (Llama GGUF → same llama.cpp gateway engine) + Parakeet
+  STT (parakeet-mlx) as selectable models alongside Kokoro/Whisper. Desktop is adding Parakeet now.
