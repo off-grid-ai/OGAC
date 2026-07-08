@@ -33,6 +33,12 @@ export type AuditAction =
   | 'masking.change'
   | 'routing.change'
   | 'secret.write'
+  // pipeline release/rollback (M1 close-the-loop): a blocked/overridden publish + an auto-rollback
+  | 'pipeline.publish'
+  | 'pipeline.publish.override'
+  | 'pipeline.autorollback'
+  // app-run HITL review (feedback → golden capture)
+  | 'app.run.review'
   // budget enforcement — a call denied for exceeding a spend limit (hard stop, outcome=blocked)
   | 'budget.deny'
   | 'access.role.change'

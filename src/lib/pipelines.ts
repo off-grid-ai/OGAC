@@ -332,6 +332,17 @@ export async function createPipeline(
 }
 
 // ─── version snapshot writer (append-only) ─────────────────────────────────────────────────────────
+// Exported so the M1 release/rollback orchestrator (pipeline-release.ts) can freeze a `published` or
+// `autorollback` snapshot through the SAME append-only path every other mutation uses — the Versions
+// tab reads these verbatim, so a rollback shows up in history exactly like a publish/edit.
+export async function writePipelineVersion(
+  shape: PipelineShape,
+  note: string,
+  by: string,
+): Promise<void> {
+  return writeVersion(shape, note, by);
+}
+
 async function writeVersion(shape: PipelineShape, note: string, by: string): Promise<void> {
   await db
     .insert(pipelineVersions)
@@ -402,6 +413,63 @@ export async function publishPipeline(
   if (!row) return null;
   const shape = toShape(row);
   await writeVersion(shape, 'published', by);
+  return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
+}
+
+// ─── rollback — restore a prior version's config as the live config (M1 auto-rollback I/O) ──────────
+// Given the FROZEN snapshot of a prior good version, write its governance config back onto the live
+// pipeline row (status → published, since we're restoring a published version), bump the version, and
+// freeze an `autorollback` snapshot carrying the restored config + a note explaining WHY. The pure
+// pickRollbackTarget (rollback-policy.ts) chose WHICH version; this only persists the restore. The
+// caller (pipeline-release.ts) supplies the note + audits. Never invents a target — a null snapshot
+// is a no-op returning null so the caller reports "nothing to roll back to" honestly.
+export async function rollbackPipeline(
+  id: string,
+  restore: {
+    name?: string;
+    description?: string;
+    visibility?: string;
+    gatewayId?: string | null;
+    defaultModel?: string | null;
+    routing?: unknown;
+    dataAllowlist?: string[];
+    policyOverlay?: Record<string, unknown>;
+    guardrailOverlay?: Record<string, unknown>;
+    isTemplate?: boolean;
+  },
+  note: string,
+  orgId: string = DEFAULT_ORG,
+  by: string = '',
+): Promise<PipelineView | null> {
+  await ensurePipelinesSchema();
+  const current = await getPipeline(id, orgId);
+  if (!current) return null;
+  const version = nextVersion(current.version);
+  const set: Record<string, unknown> = {
+    status: 'published',
+    version,
+    updatedAt: new Date(),
+  };
+  if (restore.name !== undefined) set.name = restore.name;
+  if (restore.description !== undefined) set.description = restore.description;
+  if (restore.visibility !== undefined) set.visibility = restore.visibility;
+  if (restore.gatewayId !== undefined) set.gatewayId = restore.gatewayId ?? null;
+  if (restore.defaultModel !== undefined) set.defaultModel = restore.defaultModel ?? null;
+  if (restore.routing !== undefined) set.routing = normalizeRouting(restore.routing);
+  if (restore.dataAllowlist !== undefined) set.dataAllowlist = normalizeAllowlist(restore.dataAllowlist);
+  if (restore.policyOverlay !== undefined) set.policyOverlay = restore.policyOverlay ?? {};
+  if (restore.guardrailOverlay !== undefined) set.guardrailOverlay = restore.guardrailOverlay ?? {};
+  if (restore.isTemplate !== undefined) set.isTemplate = restore.isTemplate;
+
+  const [row] = await db
+    .update(pipelines)
+    .set(set)
+    .where(and(eq(pipelines.id, id), eq(pipelines.orgId, orgId)))
+    .returning();
+  if (!row) return null;
+  const shape = toShape(row);
+  // Note is capped to the DB text column's practical width; the pure rollbackNote keeps it short.
+  await writeVersion(shape, note.slice(0, 200), by);
   return toView(shape, await gatewaySummary(shape.gatewayId, orgId));
 }
 
