@@ -1,10 +1,7 @@
 import {
   ArrowRight,
-  BookOpen,
   Stack as Boxes,
   Brain,
-  Broadcast,
-  ChartLineUp,
   Code,
   Cube,
   Gauge,
@@ -102,7 +99,7 @@ const VALUE = [
   {
     icon: Network,
     title: 'Fleet Control',
-    body: 'MDM for AI, on open source (FleetDM + osquery). Provision, govern, and observe every AI-enabled device from one console — push policy down, pull audit up, kill-switch on demand. Your workforce runs AI; you keep control.',
+    body: 'Open-source MDM for AI. Provision, govern, and observe every AI-enabled device from one console — push policy down, pull audit up, kill-switch on demand. Your workforce runs AI; you keep control.',
   },
   {
     icon: TrendingUp,
@@ -144,30 +141,6 @@ function Nav() {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/fleet-control">
-              <Broadcast className="size-4" />
-              <span className="hidden sm:inline">Fleet Control</span>
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/features">
-              <Boxes className="size-4" />
-              <span className="hidden sm:inline">Features</span>
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/journey">
-              <ChartLineUp className="size-4" />
-              <span className="hidden sm:inline">Journey</span>
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/handbook">
-              <BookOpen className="size-4" />
-              <span className="hidden sm:inline">Handbook</span>
-            </Link>
-          </Button>
           <Button asChild variant="ghost" size="sm">
             <a href="/docs" target="_blank" rel="noopener noreferrer">
               <Code className="size-4" />
