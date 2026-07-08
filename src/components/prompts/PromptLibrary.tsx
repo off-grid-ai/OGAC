@@ -5,6 +5,7 @@ import {
   MagnifyingGlass,
   PencilSimple,
   Plus,
+  PuzzlePiece,
   TextAlignLeft,
   Trash,
   TrendUp,
@@ -210,9 +211,16 @@ export function PromptLibrary() {
               copy one straight into chat.
             </p>
           </div>
-          <Button size="sm" className="gap-1.5" onClick={() => openPanel('new')}>
-            <Plus className="size-4" /> New prompt
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1.5" asChild>
+              <Link href="/workspace/prompts/partials">
+                <PuzzlePiece className="size-4" /> Partials
+              </Link>
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => openPanel('new')}>
+              <Plus className="size-4" /> New prompt
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

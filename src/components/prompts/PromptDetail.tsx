@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PromptPlayground } from '@/components/prompts/PromptPlayground';
 import { renderPromptTemplate } from '@/lib/prompt-template';
 import { relativeTime } from '@/lib/workspace-grid';
 
@@ -134,6 +135,8 @@ export function PromptDetail({ prompt, isOwner }: { prompt: PromptView; isOwner:
               </pre>
             </CardContent>
           </Card>
+
+          <PromptPlayground content={prompt.content} />
 
           {prompt.variables.length > 0 ? (
             <Card className="shadow-sm">

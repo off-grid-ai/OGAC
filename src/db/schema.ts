@@ -468,6 +468,23 @@ export const promptLibrary = pgTable('prompt_library', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Prompt partials — reusable prompt FRAGMENTS composed into full prompts. A prompt references a
+// partial by name with a Handlebars-style `{{>partial-name}}` token; the renderer inlines the
+// fragment's body in place (see src/lib/prompt-template.ts). `name` is the unique reference key
+// (slugged, per owner+visibility). Same private|org visibility model as the prompt library so a shared
+// partial composes into every org member's prompts. Table is created idempotently on first use
+// (ensurePromptPartialSchema) — no migration step on the SSH deploy path.
+export const promptPartials = pgTable('prompt_partials', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(), // reference key used in {{>name}}
+  title: text('title').notNull().default(''),
+  content: text('content').notNull().default(''),
+  owner: text('owner').notNull().default(''),
+  visibility: text('visibility').notNull().default('private'), // private | org
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Per-user custom instructions (like ChatGPT's) — injected as the first system message.
 export const chatSettings = pgTable('chat_settings', {
   userId: text('user_id').primaryKey(),
