@@ -11,10 +11,11 @@
 // agent-run.activities.ts).
 
 import { runApp as _unusedRunApp, executeStep, defaultDeps } from '../lib/app-run';
-import type { StepResult, AppRunContext } from '../lib/app-run';
+import type { StepResult, AppRunContext, AppRunDeps } from '../lib/app-run';
 import type { AppRunState } from '../lib/app-run-plan';
 import type { AppRunWorkflowInput } from '../lib/app-run-durable';
 import type { AppSpec, AppStep } from '../lib/app-model';
+import type { PipelineContract } from '../lib/pipeline-enforcement';
 
 // Silence the unused re-export import (kept so the module and app-run.ts stay coupled at the type
 // level; runApp itself is the inline path, not used by the durable worker).
@@ -30,9 +31,32 @@ export async function loadAppSpec(appId: string, orgId?: string): Promise<AppSpe
 }
 
 /**
+ * PA-16 — resolve the durable run's bound-pipeline CONTRACT (I/O), using the SAME resolver the inline
+ * route uses (resolveContract in pipeline-contract.ts: getPipeline + org governance defaults + overlay
+ * normalization). The workflow calls this ONCE up front and threads the resolved contract into every
+ * step's executeStepActivity, so the WORKER path enforces the identical data-allowlist ceiling + egress
+ * leash + policy/guardrail overlay the inline path does.
+ *
+ * Never throws / degrades to null: no bound pipeline (null id) or an unresolvable/deleted pipeline ⇒
+ * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as before).
+ */
+export async function resolveContractActivity(
+  pipelineId: string | null | undefined,
+  orgId?: string,
+): Promise<PipelineContract | null> {
+  if (!pipelineId) return null;
+  const { resolveContract } = await import('../lib/pipeline-contract');
+  return resolveContract(pipelineId, orgId ?? 'default');
+}
+
+/**
  * Execute ONE runnable step against the real platform (I/O), reusing executeStep verbatim. The
  * caller context is built from the workflow input so an agent step's child run attributes its
  * audit/trace/lineage identically to an inline run (mirrors runAgentPipeline's context threading).
+ *
+ * PA-16 — the resolved pipeline contract (from resolveContractActivity) is threaded onto ctx.contract
+ * so executeStep's pure enforcement (enforceDataAccess / enforceModelCall) gates this WORKER step with
+ * the SAME contract the inline route enforces. Null contract ⇒ legacy allow (unchanged).
  *
  * A human step returns { status:'awaiting_human' } WITHOUT blocking — the WORKFLOW owns the wait via
  * a condition()/signal. This activity never blocks on a human decision.
@@ -46,13 +70,18 @@ export async function executeStepActivity(
   spec: AppSpec,
   step: AppStep,
   priorResults: StepResult[],
+  contract: PipelineContract | null = null,
+  // Deps default to the real subsystems (as Temporal invokes it). Injectable so the enforcement is
+  // unit-testable without a live DB/gateway — mirrors executeStep/runApp's dep-injection seam.
+  deps: AppRunDeps = defaultDeps(),
 ): Promise<StepResult> {
   const ctx: AppRunContext = {
     orgId: input.orgId ?? 'default',
     actor: input.actor?.id ?? input.caller,
     runId: input.runId,
+    contract,
   };
-  return executeStep(spec, step, priorResults, ctx, defaultDeps());
+  return executeStep(spec, step, priorResults, ctx, deps);
 }
 
 /**
