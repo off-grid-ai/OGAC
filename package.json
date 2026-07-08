@@ -23,7 +23,9 @@
     "db:studio": "drizzle-kit studio",
     "test": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "test:integration": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.integration.test.ts",
-    "coverage": "c8 --config .c8rc.json node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts"
+    "coverage": "c8 --config .c8rc.json node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
+    "coverage:check": "c8 --config .c8rc.json --check-coverage node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
+    "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

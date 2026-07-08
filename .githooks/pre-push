@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Off Grid Console — pre-push gate.
+#
+# Blocks a push unless the code typechecks AND the unit-testable logic layer
+# (`src/lib` pure logic + adapters' pure paths, per .c8rc.json's include/exclude)
+# meets the coverage bar: branches / statements / lines / functions each ≥85%
+# (conditions are covered via branch coverage). See CLAUDE.md § Engineering
+# standards → "Coverage bar (≥85%, enforced)".
+#
+# INSTALL (one-time, per clone — hooks are not copied by `git clone`):
+#     npm run hooks:install        # == git config core.hooksPath .githooks
+# This points git at the repo-tracked .githooks/ dir so every dev gets the gate.
+# Undo with:  git config --unset core.hooksPath
+#
+# BYPASS (emergencies only — you own the consequences):
+#     git push --no-verify
+#
+# NOTE: run from the repo root; package.json scripts resolve relative to it.
+
+set -euo pipefail
+
+# Resolve to the repo root so the hook works from any subdir / worktree.
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+echo "pre-push: typecheck…"
+npm run --silent typecheck
+
+echo "pre-push: coverage:check (branches/statements/lines/functions ≥85%)…"
+npm run --silent coverage:check
+
+echo "pre-push: OK — typecheck clean and coverage above the bar."
