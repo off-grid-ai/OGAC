@@ -897,3 +897,9 @@ can be AUTHORED in plain English against real governed tools. Reproducible; idem
 - Provisioned via the `kestra` compose profile on S2 (OrbStack): `offgrid-console-kestra-1` (Up, HTTP :8090 → 307 UI) + `offgrid-console-kestra-postgres-1` (healthy). JVM capped `-Xmx1200m` for the 16GB box; docker.sock mounted for custom-code Docker-task nodes; postgres repo/queue, local storage.
 - Provisioned off-office-wifi via the **Mac→S1(cloudflared tunnel)→S2(LAN, key-auth) hop** (S1→S2 SSH is key-based, no password; S1 lacks sshpass). Bringup script `~/kestra-up.sh` on S2. GOTCHA hit: first bringup used S1's STALE compose (no kestra profile → "no service selected") — must push the CURRENT compose Mac→S1→S2 before `--profile kestra up`.
 - REMAINING (lands with the console integration deploy): edge-Caddy loopback `127.0.0.1:8945 → offgrid-s2.local:8090` + `OFFGRID_KESTRA_URL=http://127.0.0.1:8945` in S1 `.env.local`, so the console (which can't egress to the LAN) reaches it. Then the Data-tab ETL surface drives Kestra flows.
+
+## Batch deploy 2026-07-09 — Kestra ETL + rate limits + G-F1/G-F2 + user-activity (LIVE)
+- Deployed over the cloudflared tunnel. Verified live: signin 200, connectors 200 (rate-limit Edge middleware OK), /api/v1/admin/etl/jobs 200, **Kestra reachable via edge loopback 8945→S2:8090 (307)**, **PAN redaction live** (`ABCDE1234F` → `<IN_PAN>`, engine presidio — G-F2 fixed).
+- Env: `OFFGRID_KESTRA_URL=http://127.0.0.1:8945` added to S1 `.env.local`. Edge Caddy reloaded (Caddyfile 8945 block: `127.0.0.1:8945 → offgrid-s2.local:8090`). Workers (agent/app/chat) restarted for the web_search-egress agentrun change.
+- Rate-limit columns present (self-migrated + verified): `api_keys.rate_limit`, `api_keys.token_hash` (+ idx), `org_settings.default_rate_limit`.
+- G-F1 (bearer/service tenant scoping) + user-activity view + prompt observability also deployed.
