@@ -12,6 +12,7 @@
 // A raw provenance record as it arrives from the reader (or a test). Every field is treated as
 // untrusted — the normalizer copes with anything.
 export interface ProvenanceRecord {
+  runId?: unknown; // the agent-run id this record signs — lets the UI re-verify it on demand
   subject?: unknown; // what was signed (e.g. an agent-run id or filename)
   signer?: unknown; // identity / algorithm that produced the signature
   sha256?: unknown; // hex digest of the signed content, if known
@@ -21,6 +22,7 @@ export interface ProvenanceRecord {
 
 // A normalized row ready to render — every field is a safe, typed primitive.
 export interface ProvenanceRow {
+  runId: string; // '' when not backed by an agent-run (e.g. a detached export manifest)
   subject: string;
   signer: string;
   sha256Short: string; // first 12 hex chars, or '—'
@@ -58,6 +60,7 @@ function isoTime(v: unknown): string {
 
 function normalizeRow(r: ProvenanceRecord): ProvenanceRow {
   return {
+    runId: str(r?.runId, ''),
     subject: str(r?.subject, '(unknown)'),
     signer: str(r?.signer, '(unsigned)'),
     sha256Short: shortSha(r?.sha256),
@@ -94,9 +97,10 @@ export function buildProvenanceView(records: readonly ProvenanceRecord[] | null 
 // on any failure it returns the empty view so the page always renders.
 export async function readProvenanceView(limit = 50, orgId?: string): Promise<ProvenanceView> {
   try {
-    const [{ listAgentRuns }, { getSigning }] = await Promise.all([
+    const [{ listAgentRuns }, { getSigning }, { rebuildRunPayload }] = await Promise.all([
       import('@/lib/agentrun'),
       import('@/lib/adapters/registry'),
+      import('@/lib/provenance-verify'),
     ]);
     const signing = getSigning();
     const runs = await listAgentRuns(limit, orgId);
@@ -105,8 +109,9 @@ export async function readProvenanceView(limit = 50, orgId?: string): Promise<Pr
       .filter((r) => r.provenance != null)
       .map((r) => {
         const p = r.provenance!;
-        // Reconstruct the exact payload agentrun signs, then re-verify with the active key.
-        const payload = { agentId: r.agentId, query: r.query, answer: r.answer, refs: r.citations.map((c) => c.ref) };
+        // Reconstruct the EXACT payload agentrun signs (incl. runId as provenanceRef — the shared
+        // rebuild is the single source of truth), then re-verify with the active key.
+        const payload = rebuildRunPayload(r);
         let verified = false;
         try {
           verified = signing.verify(payload, p.signature);
@@ -114,6 +119,7 @@ export async function readProvenanceView(limit = 50, orgId?: string): Promise<Pr
           verified = false;
         }
         return {
+          runId: r.id,
           subject: `${r.agentId} · ${r.id}`,
           signer: p.publicKey ? `${p.algorithm} · ${p.publicKey.slice(0, 16)}…` : p.algorithm,
           sha256: p.signature.replace(/^sig_/, ''),
