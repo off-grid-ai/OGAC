@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
 import { createApiKey, listApiKeys } from '@/lib/store';
+import { finalizeKeyCreation } from '@/lib/rate-limit-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 const TYPES = ['user', 'project'];
@@ -9,6 +10,12 @@ const TYPES = ['user', 'project'];
 function valid(b: Record<string, unknown> | null): boolean {
   if (!b) return false;
   return Boolean(b.name) && Boolean(b.subject) && TYPES.includes(b.subjectType as string);
+}
+
+// A per-key rate limit (requests/minute). null = no per-key limit (falls back to org/global).
+function parseRateLimit(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return null;
+  return Math.floor(v);
 }
 
 export async function GET(req: Request) {
@@ -29,12 +36,16 @@ export async function POST(req: Request) {
     );
   }
   const budget = typeof b!.budgetUsd === 'number' ? (b!.budgetUsd as number) : null;
+  const rateLimit = parseRateLimit(b!.rateLimit);
   const created = await createApiKey({
     name: b!.name as string,
     subjectType: b!.subjectType as string,
     subject: b!.subject as string,
     budgetUsd: budget,
   });
+  // Store the secret's hash (so the edge can resolve this key from a presented Bearer) + the per-key
+  // rate limit. Kept out of store.createApiKey so schema.ts stays untouched (self-migrating columns).
+  await finalizeKeyCreation(created.key.id, created.token, rateLimit);
   auditFromSession(gate, await currentOrgId(), {
     action: 'access.machine.issue',
     resource: `key:${created.key.id}`,
