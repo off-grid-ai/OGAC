@@ -45,6 +45,15 @@ export default async function AppRunDetail({
         </div>
       </div>
 
+      {Object.keys(run.input ?? {}).length > 0 ? (
+        <div className="rounded-md border border-border bg-muted/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Run input</p>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-foreground">
+            {JSON.stringify(run.input, null, 2)}
+          </pre>
+        </div>
+      ) : null}
+
       <AppRunStatus initial={run} />
     </div>
   );

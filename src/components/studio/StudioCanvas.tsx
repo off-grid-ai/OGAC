@@ -3,17 +3,22 @@
 import {
   Background,
   Controls,
+  type Connection,
   type Edge,
+  type EdgeChange,
   Handle,
   MarkerType,
   type Node,
+  type NodeChange,
   type NodeProps,
   Position,
   ReactFlow,
+  applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ArrowSquareOut,
+  ArrowsOutCardinal,
   FloppyDisk,
   Play,
   Plus,
@@ -29,12 +34,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import type { BindingNames } from '@/lib/app-builder';
 import {
+  addEdge,
   addStep,
+  addStepNoRechain,
   moveStep,
   rebindAgent,
   rebindDomain,
   relabelStep,
+  removeEdge,
   removeStep,
+  removeStepAndEdges,
   setAgentPrompt,
   setOutputSink,
   toggleGrounding,
@@ -92,7 +101,11 @@ function StepNode({ data }: NodeProps) {
         boxShadow: d.selected ? `0 0 0 2px ${d.color}` : undefined,
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: d.color }} />
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ background: d.color, width: 9, height: 9 }}
+      />
       <div className="flex items-center justify-between gap-1">
         <span
           className="flex size-4 items-center justify-center rounded-full text-[9px] font-semibold text-white"
@@ -111,7 +124,11 @@ function StepNode({ data }: NodeProps) {
       <p className="truncate text-[10px] text-muted-foreground" title={d.binding}>
         {d.binding}
       </p>
-      <Handle type="source" position={Position.Bottom} style={{ background: d.color }} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ background: d.color, width: 9, height: 9 }}
+      />
     </div>
   );
 }
@@ -153,6 +170,15 @@ export function StudioCanvas({
   const [gaps, setGaps] = useState<string[]>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
+  // ── Canvas VIEW state (not part of the AppSpec — there is no position column on the apps table).
+  //    `positions` are the operator's manual node placements, keyed by step id; they persist for the
+  //    editing session and override the derived vertical-column layout. `editTopology` flips the
+  //    canvas from read-only (linear preview) to a full editor: draggable nodes + drawable/deletable
+  //    edges. Edges themselves ARE persisted (spec.edges → the DB), so a branching topology survives a
+  //    reload; only the manual x/y placement is session-local. ──
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [editTopology, setEditTopology] = useState(false);
+
   const [description, setDescription] = useState('');
   const [compiling, setCompiling] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -179,9 +205,11 @@ export function StudioCanvas({
     const rfNodes: Node[] = g.nodes.map((n) => ({
       id: n.id,
       type: 'step',
-      position: n.position,
+      // A manual placement (from a drag) overrides the derived vertical-column layout.
+      position: positions[n.id] ?? n.position,
       data: { ...n.data, selected: n.id === selectedStepId },
-      draggable: false,
+      // Draggable only in edit mode — read-only mode keeps the tidy linear preview stable.
+      draggable: editTopology,
     }));
     const rfEdges: Edge[] = g.edges.map((e) => ({
       id: e.id,
@@ -189,11 +217,20 @@ export function StudioCanvas({
       target: e.target,
       label: e.label,
       animated: true,
+      // In edit mode edges are deletable (select + Backspace / the delete affordance).
+      deletable: editTopology,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#059669' },
       style: { stroke: '#059669', strokeWidth: 2 },
     }));
     return { nodes: rfNodes, edges: rfEdges };
-  }, [spec, names, selectedStepId]);
+  }, [spec, names, selectedStepId, positions, editTopology]);
+
+  // Keep the latest nodes in a ref so the drag handler (a stable callback) applies changes against
+  // the current node set without stale closures.
+  const nodesRef = useRef<Node[]>(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   // A structural/binding edit invalidates the persisted-run affordances (the saved copy is stale).
   const markDirty = useCallback(() => {
@@ -211,6 +248,65 @@ export function StudioCanvas({
     },
     [markDirty],
   );
+
+  // ── React-Flow topology handlers — the visual editor's write path. Each drives a PURE reducer
+  //    (app-builder addEdge/removeEdge) so the AppSpec stays the single source of truth and cycles are
+  //    refused at the reducer, never drawn. A rejected connect returns the SAME spec (identity) → we
+  //    toast why. Positions are tracked separately (view-only). ──
+
+  // Draw an edge: React-Flow gives us {source,target}; addEdge validates (real steps, no dup, no
+  // self-loop, no cycle) and no-ops on rejection.
+  const onConnect = useCallback(
+    (c: Connection) => {
+      if (!c.source || !c.target) return;
+      setSpec((s) => {
+        if (!s) return s;
+        const next = addEdge(s, c.source!, c.target!);
+        if (next === s) {
+          // Rejected — the only interesting reason to surface is a cycle (dup/self are silent no-ops).
+          if (c.source !== c.target && !s.edges.some((e) => e.from === c.source && e.to === c.target)) {
+            toast.error('That connection would create a loop — steps must flow forward.');
+          }
+          return s;
+        }
+        return next;
+      });
+      markDirty();
+    },
+    [markDirty],
+  );
+
+  // Edge changes: React-Flow emits a 'remove' change when the operator deletes a selected edge. We
+  // translate each removal to removeEdge on the spec (by parsing the edge id back to from/to — the id
+  // is `e_<from>__<to>_<i>`, but we already carry source/target on the RF edge, so map by id).
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const removed = changes.filter((ch): ch is EdgeChange & { id: string } => ch.type === 'remove');
+      if (removed.length === 0) return;
+      setSpec((s) => {
+        if (!s) return s;
+        let next = s;
+        for (const ch of removed) {
+          const rfEdge = edges.find((e) => e.id === ch.id);
+          if (rfEdge) next = removeEdge(next, rfEdge.source, rfEdge.target);
+        }
+        return next;
+      });
+      markDirty();
+    },
+    [edges, markDirty],
+  );
+
+  // Node drags: track the manual placement per step id (view-only — not persisted to the spec).
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    // applyNodeChanges keeps RF's internal bookkeeping correct; we only harvest final positions.
+    setPositions((prev) => {
+      const applied = applyNodeChanges(changes, nodesRef.current);
+      const next = { ...prev };
+      for (const n of applied) next[n.id] = n.position;
+      return next;
+    });
+  }, []);
 
   // ── Controlled mode: mirror every spec change up to the parent (AppBuilder). Guard against loops
   //    by only propagating when the spec object identity actually changed here. ──
@@ -246,6 +342,7 @@ export function StudioCanvas({
       const data = (await res.json()) as { spec: AppSpec; gaps: string[] };
       setSpec(data.spec);
       setGaps(data.gaps ?? []);
+      setPositions({}); // fresh spec → derived layout
       setSelectedStepId(data.spec.steps[0]?.id ?? null);
       markDirty();
       toast.success('Carved a step graph — click a node to edit it, then Save.');
@@ -260,6 +357,7 @@ export function StudioCanvas({
     const s = emptySpec();
     setSpec(s);
     setGaps([]);
+    setPositions({});
     setSelectedStepId(s.steps[0].id);
     markDirty();
   }
@@ -267,6 +365,7 @@ export function StudioCanvas({
   function clear() {
     setSpec(null);
     setGaps([]);
+    setPositions({});
     setSelectedStepId(null);
     setDescription('');
     markDirty();
@@ -378,7 +477,13 @@ export function StudioCanvas({
       onMoveUp: () => edit((s) => moveStep(s, stepId, -1)),
       onMoveDown: () => edit((s) => moveStep(s, stepId, 1)),
       onRemove: () => {
-        edit((s) => removeStep(s, stepId));
+        // In edit-connections mode, delete the node + only its own edges (keep the branches);
+        // otherwise the text-mode behaviour rechains the survivors into a linear flow.
+        edit((s) => (editTopology ? removeStepAndEdges(s, stepId) : removeStep(s, stepId)));
+        setPositions((p) => {
+          const { [stepId]: _drop, ...rest } = p;
+          return rest;
+        });
         setSelectedStepId((cur) => (cur === stepId ? null : cur));
       },
       onRebindDomain: (d) => edit((s) => rebindDomain(s, stepId, d)),
@@ -473,6 +578,14 @@ export function StudioCanvas({
                       let newId = '';
                       setSpec((s) => {
                         if (!s) return s;
+                        // In edit-connections mode, add a DISCONNECTED node (preserve the branching
+                        // topology the operator drew) — they then wire its edges. Otherwise keep the
+                        // one-click linear behaviour (auto-appends to the chain).
+                        if (editTopology) {
+                          const r = addStepNoRechain(s, k.kind);
+                          newId = r.id;
+                          return r.spec;
+                        }
                         const next = addStep(s, k.kind);
                         newId = next.steps[next.steps.length - 1].id;
                         return next;
@@ -621,6 +734,12 @@ export function StudioCanvas({
             fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
             minZoom={0.3}
             proOptions={{ hideAttribution: true }}
+            nodesDraggable={editTopology}
+            nodesConnectable={editTopology}
+            elementsSelectable
+            onConnect={onConnect}
+            onEdgesChange={editTopology ? onEdgesChange : undefined}
+            onNodesChange={editTopology ? onNodesChange : undefined}
             onNodeClick={(_, n) => setSelectedStepId(n.id)}
             onPaneClick={() => setSelectedStepId(null)}
           >
@@ -628,6 +747,29 @@ export function StudioCanvas({
             <Controls showInteractive={false} />
           </ReactFlow>
         )}
+        {/* Edit-topology toggle — flips the canvas between the tidy linear preview and a full editor
+            where the operator drags nodes and draws/deletes connections to BRANCH the flow. */}
+        {spec ? (
+          <div className="absolute left-3 top-3 flex items-center gap-2">
+            <button
+              onClick={() => setEditTopology((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm ${
+                editTopology
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background/90 text-muted-foreground hover:text-foreground'
+              }`}
+              title="Drag nodes, and drag between the dots to connect / re-wire steps"
+            >
+              <ArrowsOutCardinal className="size-3.5" />
+              {editTopology ? 'Editing connections' : 'Edit connections'}
+            </button>
+            {editTopology ? (
+              <span className="rounded-md border border-border bg-background/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm">
+                Drag a dot to connect · select an arrow + Delete to remove
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {spec && !controlled ? (
           <button
             onClick={clear}
