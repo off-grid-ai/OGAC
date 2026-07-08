@@ -86,7 +86,13 @@ export type AuditAction =
   | 'org.settings.change'
   // fleet (MDM/osquery) control
   | 'fleet.livequery'
-  | 'fleet.policy.change';
+  | 'fleet.policy.change'
+  // spine export to enterprise tooling (M6 good citizen): SIEM/catalog/observability exporters
+  | 'exporter.create'
+  | 'exporter.update'
+  | 'exporter.delete'
+  | 'exporter.test'
+  | 'exporter.run';
 
 export interface TokenUsage {
   prompt: number;
