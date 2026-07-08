@@ -33,7 +33,7 @@ SSH="ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new ${SSH_USER}@${SERVER}"
 RSYNC="rsync -az -e \"ssh -i $SSH_KEY\""
 
 # @offgrid/* packages the console file:-links (keep in sync with package.json)
-SHARED_PKGS=(analytics finops policy vectordb)
+SHARED_PKGS=(analytics finops policy vectordb speech)
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
