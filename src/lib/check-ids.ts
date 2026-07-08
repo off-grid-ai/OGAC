@@ -9,6 +9,6 @@
 //
 // checks.ts asserts its REGISTRY matches this list exactly, so the two can never drift.
 
-export const CHECK_IDS = ['pii', 'injection', 'grounding'] as const;
+export const CHECK_IDS = ['pii', 'guardrail-rules', 'injection', 'grounding'] as const;
 
 export type CheckId = (typeof CHECK_IDS)[number];
