@@ -38,3 +38,31 @@ alongside (DB only, no code conflict). Honest gate: nothing "done" until verifie
 
 ## Ledgers
 Findings + status: `docs/VERIFICATION_GAPS.md` (S1–S3, V1–V4) and `docs/GAPS_BACKLOG.md`.
+
+## Data plane seeded + wired (2026-07) — VERIFIED LIVE
+
+The bharatunion tenant now has a real BFSI warehouse + governed catalog, verified against live infra.
+
+**Warehouse (ClickHouse `192.168.1.60:8124`), DB `bharatunion`** — seeded by the parameterized
+`deploy/onprem/seed-warehouse.mjs` (`WAREHOUSE_DB=bharatunion node deploy/onprem/seed-warehouse.mjs`;
+default `WAREHOUSE_DB=bfsi` leaves the generic seed intact). Deterministic + idempotent. Counts:
+dim_customer 20000, dim_branch 600, dim_product 33, fact_account 50000, fact_transaction 600000,
+fact_loan 15000, fact_claim 8000, fact_kyc_event 30000. Appears automatically in /data/warehouse +
+Query console (the ClickHouse adapter lists all non-system DBs).
+
+**Governed catalog (console Postgres `data_assets` + `data_classifications`, org_id=`org_bharat`)** —
+seeded by `deploy/onprem/seed-bharat-catalog.mjs` (emits idempotent SQL: deletes existing
+warehouse-source org_bharat assets, re-inserts with deterministic da_/dc_ ids). 8 assets (one per
+warehouse table, source='warehouse', connector_id='bhcon_warehouse') + 19 classifications. Sensitivity:
+dim_customer restricted (PAN/PERSON/DOB/LOCATION), fact_account restricted (account_no), fact_claim
+confidential (MEDICAL reason), fact_transaction/fact_loan internal, dim_product/dim_branch public.
+
+**Connector**: reused the existing `bhcon_warehouse` (type s3, "Warehouse Object Store") — org_bharat
+already had 5 connectors + 6 pipelines; nothing duplicated.
+
+**Live tenant analytics proof** (FROM bharatunion.*):
+- Flagged txns by channel: UPI 1326, POS 398, ATM 339, NEFT 324, IMPS 320, branch 203, cheque 89.
+- NPA loans by product: auto_loan 378 (₹51.44 Cr), home_loan 354 (₹265.03 Cr), personal_loan 348 (₹38.96 Cr).
+
+Re-run safe: re-running either seed produces identical rows; `bfsi` (600k txns) untouched.
+Code left uncommitted for review: `seed-warehouse.mjs` (parameterization), `seed-bharat-catalog.mjs` (new).
