@@ -6,6 +6,7 @@ import {
   getFlags,
   getGrounding,
   getLineage,
+  getPii,
   getPolicy,
   getSandbox,
   getSigning,
@@ -466,8 +467,8 @@ export async function runAgent(
   // 'block' verdict stops the call (deny + audit, governed refusal); the pipeline can only be MORE
   // restrictive than the routing leash, never less. No pipeline ⇒ the noPipeline verdict allows it
   // (legacy routing — the gateway's own model-routing rules still decide where it actually runs).
-  // (PA-16c: the overlay's requirePiiMasking is surfaced by the verdict; the run's guardrail floor
-  // already masks PII — see the note below. Escalation beyond the floor is deferred to PA-16c.)
+  // (PA-16c: the overlay's requirePiiMasking is APPLIED below — after this allow check, before
+  // compose, the raw query is substituted with its PII-redacted form. See the mask step.)
   const modelVerdict = enforceModelCall(contract, dataClass);
   if (!modelVerdict.allow) {
     mark('egress', 'block', modelVerdict.reason, [], Date.now());
@@ -480,9 +481,42 @@ export async function runAgent(
     }, attribution.org);
   }
 
-  // 4. Answer — composed from the retrieved sources (cached).
+  // PA-16c — PII MASKING BEFORE THE MODEL. When the bound pipeline's guardrail overlay requires
+  // masking (modelVerdict.requirePiiMasking), the raw query MUST be replaced with its PII-redacted
+  // form BEFORE it leaves for the model. Previously requirePiiMasking was only surfaced by the
+  // verdict and never applied — the raw PAN/email still reached the gateway. Here we actually
+  // substitute: run the guardrails PII port (org-scoped), and if it found PII, compose from the
+  // REDACTED query instead of the raw one. Best-effort — a detector outage leaves the query as-is
+  // rather than failing the run (the egress leash/local-only guarantees still hold). Additive: with
+  // no pipeline / masking not required, the query is untouched (legacy behaviour).
+  let modelQuery = query;
+  if (modelVerdict.requirePiiMasking) {
+    t = Date.now();
+    try {
+      const scan = await getPii().scan(query, attribution.org);
+      const { maskTextForModel } = await import('@/lib/guardrail-rules-runtime');
+      const masked = maskTextForModel(query, scan);
+      if (masked !== query) {
+        modelQuery = masked;
+        mark('mask', scan.engine, `masked ${scan.entities.join(', ')} before model`, [], t);
+        auditEnforcement(
+          enforceCtx,
+          'pipeline.pii.mask',
+          `model:agent:${agentId}`,
+          'redacted',
+          `masked ${scan.entities.join(', ')} (${scan.engine}) before model call`,
+        );
+      } else {
+        mark('mask', scan.engine, 'no PII to mask', [], t);
+      }
+    } catch {
+      mark('mask', 'skip', 'PII scan unavailable — query unmasked', [], t);
+    }
+  }
+
+  // 4. Answer — composed from the retrieved sources (cached). Uses the (possibly PII-masked) query.
   t = Date.now();
-  const answer = await compose(query, routed.hits, agent, caller);
+  const answer = await compose(modelQuery, routed.hits, agent, caller);
   mark('answer', 'compose', answer.slice(0, 120), [], t);
 
   // 5. Ground — verify the answer against the sources → citations.
