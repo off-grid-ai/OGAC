@@ -122,7 +122,9 @@ const PILLARS = [
   },
 ];
 
-const ALL_TOOLS = INTEGRATIONS.flatMap((l) => l.tools);
+// Show the capability LAYERS, not the underlying engine names — the ethos is "open foundations,
+// no lock-in", carried by the layers we govern, without parading which OSS engine powers each.
+const CAPABILITY_LAYERS = INTEGRATIONS.map((l) => l.layer);
 
 function Nav() {
   return (
@@ -433,7 +435,7 @@ export default function LandingPage() {
           </BlurFade>
           <div className="relative mt-8 flex flex-col gap-3 overflow-hidden">
             <Marquee pauseOnHover className="[--duration:45s] [--gap:0.6rem]">
-              {ALL_TOOLS.map((t, i) => (
+              {CAPABILITY_LAYERS.map((t, i) => (
                 <span
                   key={`${t}-${i}`}
                   className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm"
@@ -443,7 +445,7 @@ export default function LandingPage() {
               ))}
             </Marquee>
             <Marquee reverse pauseOnHover className="[--duration:45s] [--gap:0.6rem]">
-              {ALL_TOOLS.map((t, i) => (
+              {CAPABILITY_LAYERS.map((t, i) => (
                 <span
                   key={`${t}-${i}`}
                   className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm"

@@ -6,7 +6,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Off Grid AI Console',
-  description: 'The org-side common control plane for organizational AI.',
+  description:
+    'Become an intelligent enterprise, without compromising. A private AI platform on your own infrastructure — anyone builds governed apps and agents in plain language. Open source.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
