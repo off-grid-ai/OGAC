@@ -34,18 +34,33 @@ import {
 } from '@/components/ui/table';
 
 // Guardrails masking-rules management surface. Full CRUD over console-owned PII/masking rules:
-// add (entity name or regex → redact|mask|hash|allow), edit, delete-with-confirmation, and a
-// per-row enable toggle. Talks to /api/v1/admin/guardrails/rules[/:id]; refreshes the server
+// add (entity name or regex → redact|mask|hash|allow|block|flag|log), edit, delete-with-confirmation,
+// and a per-row enable toggle. Talks to /api/v1/admin/guardrails/rules[/:id]; refreshes the server
 // component after each mutation so the table stays the single source of truth.
 
 const MATCHERS = ['entity', 'regex'] as const;
-const ACTIONS = ['redact', 'mask', 'hash', 'allow'] as const;
+// The enforcement-strength ladder — transform (redact/mask/hash), exempt (allow), deny (block), or
+// observe (flag/log). Kept in step with RULE_ACTIONS in src/lib/guardrails-rules.ts.
+const ACTIONS = ['redact', 'mask', 'hash', 'allow', 'block', 'flag', 'log'] as const;
+type Action = (typeof ACTIONS)[number];
+
+// One-line "what this action does" — shown under the picker so an operator picks enforcement
+// strength deliberately (transform vs deny vs observe) rather than guessing from the verb.
+const ACTION_HELP: Record<Action, string> = {
+  redact: 'Replace matches with a typed placeholder.',
+  mask: 'Hide matches behind a fixed-width mask.',
+  hash: 'Swap matches for a stable pseudonym token.',
+  allow: 'Explicitly permit this pattern (exemption).',
+  block: 'Deny the run when this pattern matches (hard stop).',
+  flag: 'Allow the run but record a warning.',
+  log: 'Allow the run but record a warning.',
+};
 
 export interface Rule {
   id: string;
   matcher: 'entity' | 'regex';
   pattern: string;
-  action: 'redact' | 'mask' | 'hash' | 'allow';
+  action: Action;
   label: string;
   enabled: boolean;
   createdAt: string;
@@ -54,7 +69,7 @@ export interface Rule {
 interface Draft {
   matcher: 'entity' | 'regex';
   pattern: string;
-  action: 'redact' | 'mask' | 'hash' | 'allow';
+  action: Action;
   label: string;
 }
 
@@ -235,6 +250,7 @@ export function GuardrailRules({ rules }: { rules: Rule[] }) {
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <p className="text-xs text-muted-foreground">{ACTION_HELP[draft.action]}</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="rule-label">Label (optional)</Label>
