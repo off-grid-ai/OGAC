@@ -23,6 +23,8 @@ import {
   mcpCatalogByCategory,
 } from '@/lib/mcp-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
+import { allowlistReferencesTokens, normalizeRefToken } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
 import { listTools } from '@/lib/store';
 import { primitiveCatalog } from '@/lib/tool-primitives';
@@ -57,6 +59,17 @@ export default async function ToolsPage({
   // Degrade gracefully: DB down → empty tools list, page still renders (create/import still reachable).
   const tools = await listTools(org).catch(() => []);
 
+  // Reverse edge: how many pipelines reference each tool (by id or name) in their data ceiling. One
+  // pipelines read, then a pure per-tool token match — so each tool card can read "used by N pipelines".
+  const pipelines = await listPipelines(org).catch(() => []);
+  const usedByCount: Record<string, number> = {};
+  for (const t of tools) {
+    const tokens = [normalizeRefToken(t.id), normalizeRefToken(t.name)].filter(Boolean);
+    usedByCount[t.id] = pipelines.filter((p) =>
+      allowlistReferencesTokens(p.dataAllowlist, tokens),
+    ).length;
+  }
+
   return (
     <div className="w-full space-y-6">
       <header className="space-y-2">
@@ -72,7 +85,7 @@ export default async function ToolsPage({
         <ToolsNav />
       </Suspense>
 
-      {tab === 'registered' && <RegisteredTab tools={tools} />}
+      {tab === 'registered' && <RegisteredTab tools={tools} usedByCount={usedByCount} />}
       {tab === 'catalog' && <CatalogTab tools={tools} query={q} category={cat ?? null} />}
       {tab === 'primitives' && <PrimitivesTab />}
     </div>
@@ -80,7 +93,13 @@ export default async function ToolsPage({
 }
 
 // ─── Registered — the HTTP/MCP tool registry, full CRUD ───────────────────────────────────────────
-function RegisteredTab({ tools }: { tools: Awaited<ReturnType<typeof listTools>> }) {
+function RegisteredTab({
+  tools,
+  usedByCount,
+}: {
+  tools: Awaited<ReturnType<typeof listTools>>;
+  usedByCount: Record<string, number>;
+}) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -115,6 +134,7 @@ function RegisteredTab({ tools }: { tools: Awaited<ReturnType<typeof listTools>>
                 <TableHead>Tool</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>When to use</TableHead>
+                <TableHead className="w-28">Used by</TableHead>
                 <TableHead className="w-16">Enabled</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
@@ -130,6 +150,15 @@ function RegisteredTab({ tools }: { tools: Awaited<ReturnType<typeof listTools>>
                   </TableCell>
                   <TableCell className="max-w-sm truncate text-muted-foreground">
                     {t.description || t.endpoint}
+                  </TableCell>
+                  <TableCell>
+                    {usedByCount[t.id] ? (
+                      <Badge variant="outline" className="border-primary/40 text-primary">
+                        {usedByCount[t.id]} pipeline{usedByCount[t.id] === 1 ? '' : 's'}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <ToolToggle id={t.id} enabled={t.enabled} />

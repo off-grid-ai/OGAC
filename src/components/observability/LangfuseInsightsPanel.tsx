@@ -114,10 +114,10 @@ export function LangfuseInsightsPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">
-            Langfuse read-back — cost &amp; eval scores
+            Tracing store read-back — cost &amp; eval scores
           </h2>
           <p className="text-xs text-muted-foreground">
-            Sourced directly from Langfuse (metrics/daily + scores API) over the selected window.
+            Sourced directly from the tracing store (daily metrics + scores) over the selected window.
             Distinct from the audit-log-derived FinOps figures.
           </p>
         </div>
@@ -126,20 +126,20 @@ export function LangfuseInsightsPanel({
 
       {!configured ? (
         <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-          Langfuse read-back not configured — set OFFGRID_LANGFUSE_URL + the project keys to pull
+          Tracing store read-back not configured — set the tracing-store URL + project keys to pull
           cost and eval-score history back. Showing zeros.
         </p>
       ) : error ? (
         <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          Langfuse unreachable: {error} — showing zeros.
+          Tracing store unreachable: {error} — showing zeros.
         </p>
       ) : null}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'LF cost (window)', value: fmtUsd(cost.totalCost) },
-          { label: 'LF tokens', value: fmtNum(cost.totalTokens) },
-          { label: 'LF traces', value: fmtNum(cost.totalTraces) },
+          { label: 'Traced cost (window)', value: fmtUsd(cost.totalCost) },
+          { label: 'Traced tokens', value: fmtNum(cost.totalTokens) },
+          { label: 'Traces', value: fmtNum(cost.totalTraces) },
           { label: 'Scored metrics', value: String(trends.length) },
         ].map((s) => (
           <Card key={s.label} className="shadow-sm">
@@ -158,9 +158,9 @@ export function LangfuseInsightsPanel({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm">Eval score trend (Langfuse)</CardTitle>
+            <CardTitle className="text-sm">Eval score trend</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Numeric scores from Langfuse /api/public/scores, one line per metric.
+              Numeric eval scores from the tracing store, one line per metric.
             </p>
           </CardHeader>
           <CardContent>
@@ -187,7 +187,7 @@ export function LangfuseInsightsPanel({
               </ResponsiveContainer>
             ) : (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                No Langfuse scores in this window.
+                No eval scores in this window.
               </p>
             )}
           </CardContent>
@@ -195,9 +195,9 @@ export function LangfuseInsightsPanel({
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm">Cost by model (Langfuse)</CardTitle>
+            <CardTitle className="text-sm">Cost by model</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Per-model cost + token usage aggregated from Langfuse metrics/daily.
+              Per-model cost + token usage aggregated from the tracing store&apos;s daily metrics.
             </p>
           </CardHeader>
           <CardContent>
@@ -224,7 +224,7 @@ export function LangfuseInsightsPanel({
               </Table>
             ) : (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                No Langfuse cost data in this window.
+                No cost data in this window.
               </p>
             )}
           </CardContent>

@@ -14,9 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
+import { resolveConsumerChip } from '@/lib/pipeline-chip';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
@@ -79,13 +81,17 @@ function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('agents');
   const { id } = await params;
-  const agent = await resolveAgent(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const agent = await resolveAgent(id, orgId);
   if (!agent) notFound();
+  // Agents carry no own pipeline binding — every run flows through the org-default governed pipeline.
+  // Name + link it (was a generic "governed pipeline" mention) so the join-key is legible here too.
+  const pipeline = await resolveConsumerChip(null, orgId).catch(() => null);
   // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
   const runs = await listAgentRunsByAgent(id, 8).catch(() => []);
   const done = runs.filter((r) => r.status === 'done').length;
   const tools = agent.custom
-    ? (await listTools(await currentOrgId()).catch(() => []))
+    ? (await listTools(orgId).catch(() => []))
         .filter((t) => t.enabled)
         .map((t) => ({ id: t.id, name: t.name, policy: t.policy }))
     : [];
@@ -126,6 +132,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                 </Badge>
               ) : null}
               <Badge variant="secondary">{agent.role}</Badge>
+              <PipelineChip pipeline={pipeline} size="xs" />
             </div>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agent.description}</p>
           </div>
@@ -147,8 +154,9 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               </pre>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Built-in agent — answers from retrieved sources via the shared system prompt; the
-                governed pipeline applies policy, guardrails, grounding, and provenance.
+                Built-in agent — answers from retrieved sources via the shared system prompt. Its
+                governing pipeline (see the &quot;Runs on&quot; chip above) applies policy, guardrails,
+                grounding, and provenance.
               </p>
             )}
           </CardContent>

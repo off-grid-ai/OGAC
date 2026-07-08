@@ -10,6 +10,11 @@ import {
 } from '@/lib/audit-log-view';
 import { buildAuditStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
+import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { listPipelines } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,17 +35,35 @@ export default async function AuditLogPage({
     return typeof v === 'string' ? v : null;
   };
   const filters = parseAuditFilters(get);
-  const { rows, total, page, size, configured, error, facets } = await readAuditPage(filters);
+  const {
+    rows: allRows,
+    total,
+    page,
+    size,
+    configured,
+    error,
+    facets,
+  } = await readAuditPage(filters);
+
+  // Pipeline facet — narrow the page's rows to the events attributed to one pipeline (resource/project
+  // == pipeline:<id>). Applied client-side over the fetched page window (the audit reader isn't yet
+  // pipeline-aware server-side), so the note below is explicit about the scope.
+  const orgId = await currentOrgId();
+  const pipelines = await listPipelines(orgId).catch(() => []);
+  const facet = resolvePipelineFacet(get('pipeline'), pipelines.map((p) => p.id));
+  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const rows = facet ? filterAuditForPipeline(allRows, facet) : allRows;
 
   const pageCount = Math.max(1, Math.ceil(total / size));
   const query = auditFiltersToQuery(filters);
+  const pipeQ = facet ? `&pipeline=${encodeURIComponent(facet)}` : '';
   const exportBase = `/api/v1/admin/audit-log/export`;
   const exportCsv = `${exportBase}?format=csv${query ? `&${query}` : ''}`;
   const exportJson = `${exportBase}?format=json${query ? `&${query}` : ''}`;
 
   const pageHref = (p: number) => {
     const q = auditFiltersToQuery({ ...filters, page: p }, { includePaging: true });
-    return `/audit${q ? `?${q}` : ''}`;
+    return `/audit${q ? `?${q}${pipeQ}` : facet ? `?pipeline=${encodeURIComponent(facet)}` : ''}`;
   };
 
   return (
@@ -86,12 +109,25 @@ export default async function AuditLogPage({
         })}
       />
 
-      <AuditFilterBar
-        actors={facets.actors}
-        actions={facets.actions}
-        projects={facets.projects}
-        outcomes={facets.outcomes}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AuditFilterBar
+          actors={facets.actors}
+          actions={facets.actions}
+          projects={facets.projects}
+          outcomes={facets.outcomes}
+        />
+        <PipelineFacetSelect
+          pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+          resetParams={['page']}
+        />
+      </div>
+
+      {facetName ? (
+        <p className="text-xs text-muted-foreground">
+          Filtered to pipeline “{facetName}” — showing {rows.length} of the {allRows.length} events on
+          this page attributed to it (audit search narrows to this pipeline within the current window).
+        </p>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No audit events match these filters.</p>
