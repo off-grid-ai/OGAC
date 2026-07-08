@@ -35,6 +35,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
       { id: 'data', label: 'Warehouse', route: '/data/warehouse' },
       { id: 'data', label: 'Query', route: '/data/query' },
       { id: 'data', label: 'Pipelines', route: '/data/pipelines' },
+      { id: 'data', label: 'ETL jobs', route: '/data/etl' },
     ],
   },
   {
