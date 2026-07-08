@@ -5,8 +5,8 @@ import { createGuardrailRule, listGuardrailRules, validateRule } from '@/lib/gua
 import { currentOrgId } from '@/lib/tenancy';
 
 // Guardrails masking-rules collection. GET lists the org's rules; POST creates one after pure
-// validation (entity|regex matcher → redact|mask|hash|allow action). Thin: admin-gated, validate,
-// delegate to the lib.
+// validation (entity|regex matcher → redact|mask|hash|allow|block|flag|log action). Thin:
+// admin-gated, validate, delegate to the lib.
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);

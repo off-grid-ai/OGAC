@@ -122,6 +122,23 @@ export const GUARDRAIL_ENTRIES: RegEntry[] = [
     },
     health: ping(env.OFFGRID_PRESIDIO_URL, '/health'),
   },
+  {
+    // The bring-your-own external guardrail provider seam. Behavior lives in the PiiPort
+    // `httpGuardrailPii` (adapters/guardrail-provider.ts) — selected via
+    // OFFGRID_ADAPTER_GUARDRAILS=http-guardrail; this entry surfaces it in the Integrations UI +
+    // reports live health. A named vendor (Lakera / Aporia / …) slots in via config, not code.
+    meta: {
+      id: 'http-guardrail',
+      capability: 'guardrails',
+      vendor: 'External HTTP guardrail provider',
+      license: 'third-party (bring-your-own)',
+      render: 'headless',
+      embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
+      description:
+        'Plug in a third-party guardrail engine (Lakera / Aporia / Prompt-Security / self-hosted) by config: POSTs text, reads a verdict. Configure OFFGRID_HTTP_GUARDRAIL_URL + _API_KEY. Falls back to the regex floor when unset or unreachable.',
+    },
+    health: ping(env.OFFGRID_HTTP_GUARDRAIL_URL),
+  },
 ];
 
 export const RETRIEVAL_ENTRIES: RegEntry[] = [
