@@ -31,7 +31,9 @@ import { Textarea } from '@/components/ui/textarea';
 
 type Template = CatalogTemplate;
 
-const SORT_KEYS: CatalogSortKey[] = ['name', 'category', 'engine', 'threshold'];
+// 'engine' is a valid internal sort key but never exposed in the UI (sorting by it would surface
+// the underlying evaluator engine name). Operators sort by name / category / threshold.
+const SORT_KEYS: CatalogSortKey[] = ['name', 'category', 'threshold'];
 function isSortKey(v: string | null): v is CatalogSortKey {
   return v !== null && (SORT_KEYS as string[]).includes(v);
 }
@@ -80,8 +82,8 @@ const CATEGORY_ORDER = [
 ];
 
 // The HEADLINE surface: a browsable catalog of prebuilt evaluators. "Apply" turns a template into a
-// saved eval definition in one click (name pre-filled). Availability is shown honestly — which
-// engine backs the metric and whether it runs for real or via a degraded first-party fallback.
+// saved eval definition in one click (name pre-filled). Availability is shown honestly — whether
+// the check runs for real or via a degraded first-party fallback.
 export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +100,6 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
   const params = useSearchParams();
   const q = params.get('tq') ?? '';
   const category = params.get('tcat') ?? '';
-  const engine = params.get('teng') ?? '';
   const sortParam = params.get('tsort');
   const sortKey: CatalogSortKey = isSortKey(sortParam) ? sortParam : 'category';
 
@@ -117,7 +118,7 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
 
   const clearFilters = useCallback(() => {
     const next = new URLSearchParams(params.toString());
-    for (const k of ['tq', 'tcat', 'teng', 'tsort']) next.delete(k);
+    for (const k of ['tq', 'tcat', 'tsort']) next.delete(k);
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [params, pathname, router]);
@@ -166,13 +167,15 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
     }
   }
 
-  const filter = { q, category, engine };
+  // Engine filtering is intentionally never exposed in the UI (it would surface the underlying
+  // evaluator engine name), so `engine` is fixed empty — operators filter by search + category.
+  const filter = { q, category, engine: '' };
   const active = isFilterActive(filter);
   const facets = useMemo(() => catalogFacets(templates), [templates]);
   // Flat, sorted result when any filter is active; used for the count + flat grid.
   const filtered = useMemo(
     () => sortTemplates(filterTemplates(templates, filter), sortKey),
-    [templates, q, category, engine, sortKey],
+    [templates, q, category, sortKey],
   );
 
   const grouped = templates.reduce<Record<string, Template[]>>((acc, t) => {
@@ -209,9 +212,6 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
           <p className="text-xs leading-snug text-muted-foreground">{t.description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className="text-[10px]">
-            {t.engine}
-          </Badge>
           {t.availability.degraded ? (
             <Badge
               variant="secondary"
@@ -253,8 +253,8 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
           Evaluator templates
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Prebuilt evaluators — apply one to create an eval in a click. Each names the engine that
-          computes it and whether it runs for real or via a first-party fallback.
+          Prebuilt evaluators — apply one to create an eval in a click. Each shows whether it runs
+          for real or via a first-party fallback.
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -265,7 +265,6 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
             <EvalCatalogFilterBar
               q={q}
               category={category}
-              engine={engine}
               sortKey={sortKey}
               facets={facets}
               categoryLabel={CATEGORY_LABEL}
@@ -275,7 +274,6 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
               total={templates.length}
               onQ={(v) => setParam('tq', v)}
               onCategory={(v) => setParam('tcat', v)}
-              onEngine={(v) => setParam('teng', v)}
               onSort={(v) => setParam('tsort', v)}
               onClear={clearFilters}
             />
@@ -356,12 +354,8 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
               )}
               <div className="space-y-1 rounded-md border border-border bg-muted/20 p-3 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Engine</span>
-                  <span className="font-medium">{applying.engine}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Metric</span>
-                  <span className="font-mono">{applying.metric}</span>
+                  <span className="text-muted-foreground">Checks for</span>
+                  <span className="font-medium">{applying.metric}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Pass threshold</span>

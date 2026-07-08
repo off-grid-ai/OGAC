@@ -104,7 +104,7 @@ export const DRIFT_CATALOG: DriftCatalogItem[] = [
     defaultThreshold: 0.1,
     recommended: true,
     description:
-      'Population Stability Index — the industry-standard drift measure. This is exactly what the built-in fallback computes, so it works even without Evidently.',
+      'Population Stability Index — the industry-standard drift measure. This is exactly what the built-in fallback computes, so it works even without the drift collector.',
   },
   {
     id: 'ks',
@@ -116,7 +116,7 @@ export const DRIFT_CATALOG: DriftCatalogItem[] = [
     defaultThreshold: 0.05,
     recommended: true,
     description:
-      'KS test — Evidently’s default for numerical columns with a large sample. Compares the two distributions; drift when p-value < threshold.',
+      'KS test — the default for numerical columns with a large sample. Compares the two distributions; drift when p-value < threshold.',
   },
   {
     id: 'wasserstein',
@@ -166,7 +166,7 @@ export const DRIFT_CATALOG: DriftCatalogItem[] = [
     defaultThreshold: 0.05,
     recommended: true,
     description:
-      'Chi-square test — Evidently’s default for categorical columns with a large sample. Drift when p-value < threshold.',
+      'Chi-square test — the default for categorical columns with a large sample. Drift when p-value < threshold.',
   },
   {
     id: 'z',
@@ -178,7 +178,7 @@ export const DRIFT_CATALOG: DriftCatalogItem[] = [
     defaultThreshold: 0.05,
     recommended: false,
     description:
-      'Proportion Z-test — Evidently’s default for binary categorical columns with a large sample.',
+      'Proportion Z-test — the default for binary categorical columns with a large sample.',
   },
   {
     id: 'tvd',
@@ -287,20 +287,20 @@ export function driftItemAvailability(
   status: DriftEngineStatus,
 ): DriftItemAvailability {
   if (status.evidentlySelected && status.evidentlyConfigured) {
-    return { status: 'ready', detail: 'Runs in the on-prem Evidently collector.' };
+    return { status: 'ready', detail: 'Runs in the on-prem drift collector.' };
   }
   // PSI is the one method the fallback actually computes — call that out honestly.
   if (item.evidentlyName === 'psi') {
     return {
       status: 'fallback',
       detail:
-        'Evidently is not configured — the built-in PSI heuristic computes exactly this, over the eval-score history.',
+        'The drift collector is not configured — the built-in PSI heuristic computes exactly this, over the eval-score history.',
     };
   }
   return {
     status: 'fallback',
     detail:
-      'Evidently is not configured. The run falls back to the built-in PSI heuristic (this exact stat test needs the Evidently collector).',
+      'The drift collector is not configured. The run falls back to the built-in PSI heuristic (this exact stat test needs the drift collector).',
   };
 }
 

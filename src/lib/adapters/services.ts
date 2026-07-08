@@ -43,7 +43,7 @@ export const POLICY: RegEntry[] = [
       license: 'Apache-2.0',
       render: 'headless',
       embedUrl: env.OFFGRID_OPA_URL,
-      description: 'Policy-as-code (Rego) decision API for complex authorization.',
+      description: 'Policy-as-code decision API for complex authorization.',
     },
     health: ping(env.OFFGRID_OPA_URL, '/health'),
   },

@@ -236,7 +236,7 @@ function ExpandedClient({ client }: { client: KcClient }) {
   const [rotating, setRotating] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const keycloakUrl = typeof window !== 'undefined' ? window.location.origin : 'https://your-keycloak';
+  const keycloakUrl = typeof window !== 'undefined' ? window.location.origin : 'https://your-identity-provider';
 
   const reveal = async () => {
     if (secret) {
@@ -436,10 +436,10 @@ export function MachineClientsList() {
 
         {apiError && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-            <span className="font-medium">Keycloak error:</span> {apiError}
+            <span className="font-medium">Identity provider error:</span> {apiError}
             {apiError === 'forbidden' && (
               <span className="ml-1 text-muted-foreground">
-                — the service account needs <code className="rounded bg-muted px-1">view-clients</code> under realm-management in Keycloak.
+                — the service account needs <code className="rounded bg-muted px-1">view-clients</code> under realm-management in your identity provider.
               </span>
             )}
           </div>

@@ -45,7 +45,7 @@ const APPLIES_LABEL: Record<DriftAppliesTo, string> = {
 };
 
 const AVAIL_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' }> = {
-  ready: { label: 'Evidently ready', variant: 'default' },
+  ready: { label: 'Full test suite ready', variant: 'default' },
   fallback: { label: 'PSI fallback', variant: 'secondary' },
 };
 
@@ -139,9 +139,9 @@ export function DriftCatalog({ engineStatus }: { engineStatus: DriftEngineStatus
   return (
     <div className="space-y-4">
       <p className="max-w-3xl text-sm text-muted-foreground">
-        Pick a standard <span className="font-medium text-foreground">Evidently</span> preset or a
+        Pick a standard <span className="font-medium text-foreground">drift</span> preset or a
         per-column drift method, set how many columns must drift before the dataset counts as
-        drifted, and run. When the Evidently collector is configured it runs the real test suite;
+        drifted, and run. When the drift collector is configured it runs the real test suite;
         otherwise the built-in PSI heuristic runs and still honors your threshold — no drift score is
         ever faked.
       </p>

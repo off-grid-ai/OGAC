@@ -61,9 +61,9 @@ export function RegoModulesManager({
   if (!reachable) {
     return (
       <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-        OPA is not reachable{reason ? ` (${reason})` : ''}. Set{' '}
-        <span className="font-mono">OFFGRID_OPA_URL</span> to author, validate, and deploy Rego
-        modules. The first-party ABAC engine keeps serving decisions in the meantime.
+        The policy engine is not reachable{reason ? ` (${reason})` : ''}. Set{' '}
+        <span className="font-mono">OFFGRID_OPA_URL</span> to author, validate, and deploy
+        policy-as-code modules. The first-party ABAC engine keeps serving decisions in the meantime.
       </div>
     );
   }
@@ -73,7 +73,7 @@ export function RegoModulesManager({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Rego modules compiled and stored by OPA. OPA validates on deploy.
+            Policy-as-code modules compiled and stored by the policy engine, validated on deploy.
           </p>
           <Button size="sm" onClick={() => setSelected('new')}>
             <Plus className="size-4" /> New module
@@ -82,7 +82,7 @@ export function RegoModulesManager({
 
         {modules.length === 0 ? (
           <p className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-            No Rego modules yet. Create one to author a policy-as-code rule.
+            No policy-as-code modules yet. Create one to author a policy-as-code rule.
           </p>
         ) : (
           <Table>
@@ -217,11 +217,11 @@ function ModulePanel({
       const body = await res.json().catch(() => ({}));
       if (body.valid) {
         setValidState('valid');
-        toast.success('Rego compiles cleanly');
+        toast.success('Policy compiles cleanly');
       } else {
         setValidState('invalid');
         setErrors(body.errors ?? []);
-        toast.error(body.error ?? 'Invalid Rego');
+        toast.error(body.error ?? 'Invalid policy source');
       }
     } catch (e) {
       toast.error(`Validate failed: ${(e as Error).message}`);
@@ -268,7 +268,7 @@ function ModulePanel({
     <div className="rounded-md border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold">
-          {editingId ? `Edit ${module?.id}` : 'New Rego module'}
+          {editingId ? `Edit ${module?.id}` : 'New policy-as-code module'}
         </h3>
         <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close panel">
           <X className="size-4" />
@@ -300,7 +300,7 @@ function ModulePanel({
         )}
 
         <div className="space-y-1.5">
-          <Label htmlFor="rego-src">Rego source</Label>
+          <Label htmlFor="rego-src">Policy source</Label>
           <Textarea
             id="rego-src"
             value={rego}
@@ -317,7 +317,7 @@ function ModulePanel({
 
         {validState === 'valid' ? (
           <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2 text-sm text-emerald-600 dark:text-emerald-400">
-            <CheckCircle className="size-4" /> Rego compiles cleanly.
+            <CheckCircle className="size-4" /> Policy compiles cleanly.
           </div>
         ) : null}
 

@@ -57,7 +57,8 @@ export default async function GuardrailsPage({
           <h1 className="text-lg font-semibold text-foreground">Guardrails</h1>
           <p className="text-sm text-muted-foreground">
             Input/output PII policy — the active detection engine, its reachability, and the entity
-            types it surfaces. Detection degrades to the always-on regex floor if the engine is down.
+            types it surfaces. Detection degrades to the always-on regex floor if the detector is
+            down.
           </p>
         </div>
       </div>
@@ -66,7 +67,7 @@ export default async function GuardrailsPage({
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              Engine
+              PII detection
               <Badge variant={view.reachable ? 'default' : 'destructive'}>
                 {view.reachable ? 'reachable' : 'unreachable'}
               </Badge>
@@ -77,13 +78,18 @@ export default async function GuardrailsPage({
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
             <p>
-              Active engine: <span className="font-mono text-foreground">{view.engine}</span>{' '}
-              <span className="text-muted-foreground">({view.vendor})</span>
+              Detection:{' '}
+              <span className="text-foreground">
+                {view.engine === 'presidio'
+                  ? 'Entity-grade PII detection'
+                  : 'Built-in pattern detection'}
+              </span>
             </p>
-            <p>
-              License: <span className="font-mono text-foreground">{view.license}</span>
-            </p>
-            {view.description ? <p>{view.description}</p> : null}
+            {view.engine === 'presidio' ? (
+              <p className="text-xs">
+                Falls back to the always-on pattern detector when the detection service is down.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -172,9 +178,9 @@ export default async function GuardrailsPage({
             </button>
           </form>
           <p className="text-xs text-muted-foreground">
-            Runs the LIVE active engine — when Presidio is on, your custom recognizers, deny lists,
-            and thresholds all apply, so you see exactly what a real request would. Read-only,
-            nothing is stored.
+            Runs the LIVE active engine — when entity-grade detection is on, your custom recognizers,
+            deny lists, and thresholds all apply, so you see exactly what a real request would.
+            Read-only, nothing is stored.
           </p>
           {view.demo ? (
             <div className="space-y-1 rounded-md border border-border p-3">
@@ -183,7 +189,9 @@ export default async function GuardrailsPage({
                 <Badge variant={view.demo.hits ? 'destructive' : 'default'}>
                   {view.demo.hits ? 'PII detected' : 'no PII'}
                 </Badge>{' '}
-                <span className="text-muted-foreground">via {view.demo.engine}</span>
+                <span className="text-muted-foreground">
+                  via {view.demo.engine === 'presidio' ? 'entity-grade detection' : 'pattern detector'}
+                </span>
               </p>
               {view.demo.entities.length ? (
                 <p className="font-mono text-xs text-foreground">

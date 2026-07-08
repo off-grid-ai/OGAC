@@ -19,7 +19,7 @@ export default async function AccessPage() {
       <div>
         <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage users, roles and machine clients via Keycloak.
+          Manage users, roles and machine clients through your identity provider.
         </p>
       </div>
 
@@ -31,11 +31,12 @@ export default async function AccessPage() {
             <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
               <Key className="size-4" />
             </div>
-            <CardTitle className="text-sm">Keycloak not configured</CardTitle>
+            <CardTitle className="text-sm">Identity provider not configured</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
-              Set the following environment variables to connect Off Grid AI to your Keycloak realm.
+              Set the following environment variables to connect Off Grid AI to your identity
+              provider.
             </p>
             <div className="rounded-md border border-border bg-muted/40 p-4 font-mono text-xs space-y-1">
               <div>
@@ -58,8 +59,8 @@ export default async function AccessPage() {
             <p className="text-muted-foreground text-xs">
               The service account must be granted the{' '}
               <code className="rounded bg-muted px-1 py-0.5 font-mono">realm-management</code> client
-              role inside Keycloak so it can read and write users, roles, and clients on behalf of the
-              console.
+              role inside your identity provider so it can read and write users, roles, and clients on
+              behalf of the console.
             </p>
           </CardContent>
         </Card>

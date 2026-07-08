@@ -164,7 +164,7 @@ export function MfaPanel() {
             </p>
           ) : error ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-              <span className="font-medium">Keycloak error:</span> {error}
+              <span className="font-medium">Identity provider error:</span> {error}
             </div>
           ) : loading ? (
             <LoadingBlock />
@@ -248,7 +248,7 @@ export function MfaPanel() {
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-xs text-muted-foreground">
-            Read-only. Realm-wide default required actions are set in the Keycloak admin console
+            Read-only. Realm-wide default required actions are set in your identity provider's admin console
             (Authentication → Required actions). Per-user OTP enablement is done above.
           </p>
           <div className="flex flex-wrap gap-1.5">

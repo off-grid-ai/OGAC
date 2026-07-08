@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 // honestly to the operator rather than faked. (Client can't import server env-gated modules cleanly,
 // so the reason string is duplicated here as UI copy.)
 const DELETE_BLOCKED_REASON =
-  'Marquez has no delete endpoint — its lineage graph is an append-only audit trail. ' +
+  'The lineage store has no delete endpoint — its lineage graph is an append-only audit trail. ' +
   'Stale edges age out of the read window; they cannot be removed via the API.';
 
 interface Props {
@@ -49,8 +49,8 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: P
           Curate lineage
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Create namespaces and tag datasets/jobs in Marquez. Namespace + tag writes are real
-          (Marquez REST). Entity deletion is unavailable — the graph is append-only.
+          Create namespaces and tag datasets/jobs in the lineage store. Namespace + tag writes are
+          real. Entity deletion is unavailable — the graph is append-only.
         </p>
       </CardHeader>
       <CardContent className="space-y-5">

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
+import { evalEngineLabel } from '@/lib/eval-engine-label';
 import { readEvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -118,7 +119,7 @@ export default async function EvalsPage({
                     variant={activeSuite === s.engine ? 'secondary' : 'outline'}
                     className="gap-1.5"
                   >
-                    {s.engine} · {s.passRate}% ({s.passed}/{s.total})
+                    {evalEngineLabel(s.engine)} · {s.passRate}% ({s.passed}/{s.total})
                   </Badge>
                 </Link>
               ))}
@@ -134,7 +135,7 @@ export default async function EvalsPage({
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">
-            Recent runs{activeSuite ? ` · ${activeSuite}` : ''}
+            Recent runs{activeSuite ? ` · ${evalEngineLabel(activeSuite)}` : ''}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -158,7 +159,7 @@ export default async function EvalsPage({
                     <TableCell className="font-mono text-xs">{r.id}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px]">
-                        {r.engine}
+                        {evalEngineLabel(r.engine)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">{r.score}%</TableCell>
