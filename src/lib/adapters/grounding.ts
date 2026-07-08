@@ -1,19 +1,30 @@
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import {
+  type EntailmentModel,
+  MAX_CLAIMS,
+  extractCompletionText,
+  splitClaims,
+  verifyWithModel,
+} from './grounding-model';
 import type { ClaimVerdict, GroundingPort, GroundingResult, GroundingSource } from './types';
 
 // Grounding / attribution adapters. Standalone capability: verify a generated answer against
-// its cited sources, independent of any retrieval store or the Brain. The model-backed adapter
-// runs entirely through OUR gateway (the one gateway) — no separate model dependency. If the
-// gateway is unreachable it degrades to the lexical adapter so verification still returns.
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
-const GROUNDING_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
-const MAX_CLAIMS = 12;
+// its cited sources, independent of any retrieval store or the Brain.
+//
+// Two adapters behind one GroundingPort:
+//   - heuristicGrounding ('lexical')  — token-overlap, offline, deterministic. The ALWAYS-ON FLOOR.
+//   - modelGrounding ('model')        — model-NLI / entailment-grade, via OUR one gateway. Selected
+//                                        by OFFGRID_ADAPTER_GROUNDING=model. Falls back to the
+//                                        lexical floor if the gateway is unreachable.
+//
+// G-F3 (the paraphrase gap): the lexical floor scores by token overlap, so a PARAPHRASE of a
+// source scores 0/unsupported even though it is entailed. The model adapter judges semantic
+// entailment, so an entailed paraphrase scores supported. The lexical adapter stays the default
+// (additive — nothing changes when OFFGRID_ADAPTER_GROUNDING is unset).
 
-function splitClaims(answer: string): string[] {
-  return answer
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
+const GROUNDING_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
+
+// ─── Lexical (first-party, offline) floor ──────────────────────────────────────
 
 function tokens(text: string): Set<string> {
   return new Set(text.toLowerCase().match(/[a-z0-9]+/g) ?? []);
@@ -57,33 +68,15 @@ export const heuristicGrounding: GroundingPort = {
   health: () => Promise.resolve(true),
 };
 
-interface GwVerdict {
-  index: number;
-  supported: boolean;
-  score: number;
-  source?: string;
-}
+// ─── Model-NLI (entailment-grade) adapter ───────────────────────────────────────
 
-function buildPrompt(claims: string[], sources: GroundingSource[]): string {
-  const src = sources.map((s, i) => `[S${i + 1}${s.id ? ` ${s.id}` : ''}] ${s.text}`).join('\n');
-  const cl = claims.map((c, i) => `${i}. ${c}`).join('\n');
-  return (
-    `SOURCES:\n${src}\n\nCLAIMS:\n${cl}\n\n` +
-    'For each claim, decide if it is entailed by the SOURCES. Return JSON ' +
-    '{"verdicts":[{"index":int,"supported":bool,"score":0..1,"source":"S#"}]}. ' +
-    'Be strict: if the sources do not support a claim, supported=false.'
-  );
-}
-
-function extractVerdicts(data: unknown): GwVerdict[] {
-  const content = (data as { choices?: { message?: { content?: string } }[] })?.choices?.[0]
-    ?.message?.content;
-  const parsed = JSON.parse(content ?? '{}');
-  if (!Array.isArray(parsed?.verdicts)) throw new Error('unexpected grounding shape');
-  return parsed.verdicts as GwVerdict[];
-}
-
-async function gatewayVerify(claims: string[], sources: GroundingSource[]): Promise<GwVerdict[]> {
+/**
+ * The real gateway entailment model. This is the ONLY I/O in the model adapter — everything else
+ * (prompt build, parse, score) lives in the pure `grounding-model.ts` and is injected this fn.
+ * Sends the constrained NLI prompt to our one gateway at temperature 0 and returns the raw text.
+ * Throws on a non-OK gateway response so `verify` can fall back to the lexical floor.
+ */
+export const gatewayEntailmentModel: EntailmentModel = async (prompt) => {
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: gatewayHeaders({ 'content-type': 'application/json' }),
@@ -91,53 +84,55 @@ async function gatewayVerify(claims: string[], sources: GroundingSource[]): Prom
       model: GROUNDING_MODEL,
       temperature: 0,
       messages: [
-        { role: 'system', content: 'You are a strict entailment checker.' },
-        { role: 'user', content: buildPrompt(claims, sources) },
+        { role: 'system', content: 'You are a strict natural-language-inference (entailment) checker. Respond with JSON only.' },
+        { role: 'user', content: prompt },
       ],
       response_format: { type: 'json_object' },
       chat_template_kwargs: { enable_thinking: false },
     }),
     signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) throw new Error('gateway grounding unavailable');
-  return extractVerdicts(await res.json());
+  if (!res.ok) throw new Error(`gateway grounding unavailable (${res.status})`);
+  return extractCompletionText(await res.json());
+};
+
+/**
+ * Build the model-NLI grounding adapter. The entailment model fn is INJECTED, so the adapter is
+ * unit-testable with a fake model (no network). The exported `modelGrounding` binds the real
+ * gateway model; tests can build their own with a stub. On any model failure it degrades to the
+ * lexical floor — verification always returns an honest result, never throws at the call site.
+ */
+export function makeModelGrounding(model: EntailmentModel): GroundingPort {
+  return {
+    meta: {
+      id: 'model',
+      capability: 'grounding',
+      vendor: 'Off Grid AI Gateway (NLI)',
+      license: 'first-party',
+      render: 'native',
+      description:
+        'Entailment-grade grounding via the gateway model — supports paraphrased sources, not just token overlap. Falls back to the lexical floor if the gateway is unreachable.',
+    },
+    async verify(answer, sources) {
+      try {
+        return await verifyWithModel(answer, sources, model);
+      } catch {
+        // Honest floor: model unreachable / malformed → lexical verdict, never a fabricated pass.
+        return heuristicGrounding.verify(answer, sources);
+      }
+    },
+    async health() {
+      try {
+        const res = await fetch(`${GATEWAY_URL}/v1/models`, {
+          headers: gatewayHeaders(),
+          signal: AbortSignal.timeout(2000),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+  };
 }
 
-export const modelGrounding: GroundingPort = {
-  meta: {
-    id: 'gateway-nli',
-    capability: 'grounding',
-    vendor: 'Off Grid AI Gateway (NLI)',
-    license: 'first-party',
-    render: 'native',
-    description: 'Entailment-based grounding via the gateway model. Falls back to lexical offline.',
-  },
-  async verify(answer, sources) {
-    const claims = splitClaims(answer);
-    const truncated = Math.max(0, claims.length - MAX_CLAIMS);
-    const use = claims.slice(0, MAX_CLAIMS);
-    try {
-      const gw = await gatewayVerify(use, sources);
-      const verdicts: ClaimVerdict[] = use.map((claim, i) => {
-        const v = gw.find((x) => x.index === i);
-        return {
-          claim,
-          supported: Boolean(v?.supported),
-          score: Number((v?.score ?? 0).toFixed(2)),
-          source: v?.source,
-        };
-      });
-      return aggregate(verdicts, truncated);
-    } catch {
-      return heuristicGrounding.verify(answer, sources);
-    }
-  },
-  async health() {
-    try {
-      const res = await fetch(`${GATEWAY_URL}/v1/models`, { headers: gatewayHeaders(), signal: AbortSignal.timeout(2000) });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  },
-};
+export const modelGrounding: GroundingPort = makeModelGrounding(gatewayEntailmentModel);
