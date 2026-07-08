@@ -250,3 +250,19 @@ All "bundle the ecosystem catalog" tasks shipped (grounded in real libraries, ai
 - P0 fixes: ChunkLoadError (clean rebuild + push.sh now `rm -rf .next` before build); Evals/Sandbox/Visual-QA nav orphans surfaced (+ reachability regression test).
 Standing rules now in CLAUDE.md: full-width · full-CRUD · list→detail · nav-in-URL. Brand rule #9 (fill-the-width) in brand/DESIGN_PHILOSOPHY.md.
 Open: #88 device-enroll docs (parked for founder); #121 worker PII deep-config (P2); app-worker launchd plist (reboot durability); Users list→detail (top list→detail follow-up per LIST_DETAIL_AUDIT.md).
+
+## Overnight run 2026-07-09 (autonomous) — landing rework + insurer tenant foundation
+**Burndown (all OPEN_ITEMS (B)-tier) done + deployed + prod-verified earlier this session** (see OPEN_ITEMS.md; coverage gate now enforced by pre-push hook). Then:
+
+- **Console marketing landing reworked to the mission/vision ethos** and deployed (`main` @ latest, live at onprem-console root, verified). New arc: hero "Become an intelligent enterprise, without compromising" → spine (data→gateway→pipelines→apps|agents) → the unlock (anyone builds a governed automation in plain language / agent workforce) → governed by construction → on your terms → capabilities (Fleet Control demoted to one card) → open foundations → CTA. Nav trimmed to API-docs + Open-console (Fleet Control/Features/Journey/Handbook removed). **ZERO OSS-engine names in customer copy** — verified on the live HTML (page.tsx, layout meta, registry.ts, the marquee now shows capability LAYERS not engine names). CTAs: Open console `/overview` · Book a call `/signin` (the request-access + cal.com flow, which is committed in the console app).
+  - FLAGGED for a later pass (unlinked, so not user-visible, but off-ethos): `src/app/fleet-control/page.tsx` still reads device-fleet-heavy; `src/app/journey/page.tsx` still "six-stage journey" framing. OSS-clean + compiling, just old narrative. Consider retire/redirect or reframe.
+  - The separate `console-landing-page` repo is a STALE DUPLICATE — the real landing is the console app's own `src/app/page.tsx`. Ignore that repo.
+
+- **#207 insurer foundation — "Suraksha Life" fictional insurer tenant** built, tested (13/13), merged (`cf3198b`), and APPLIED to the prod console DB (verified tenant=1, connectors=3, domains=12). Fictional Indian life insurer, NOT literal Suraksha. Recorded in SERVER_STATE.md.
+
+### Next steps for #207 (resume here)
+1. **Source-data rows for `org_suraksha`** (data-plane, S2) — the domains resolve but return no rows until the source tables are populated. The `coreins`/`policyadmin`/`warehouse` containers live on S2 (reached via the S1 loopback proxies). Verify whether the #208 Suraksha tables are already populated there and how tenant-scoping works at the container level; then seed rows for the insurer book (reuse `seed-insurer-usecases.mjs` against the coreins/policyadmin endpoints). NOT yet done/verified.
+2. **Author the 15 insurer use cases** via NL in `/build/studio/new` (real-user path) — FOUNDER-STEERED per-case ("take the easiest, I test it, then the next"). Hold for founder. Plan/classification in `docs/USE_CASES_PLAN.md`.
+
+### Other still-pending (non-blocking)
+- **G-F4 GE sidecar rebuild on S2** — console adapter deployed; data-quality reports the old stub until the S2 GE container is rebuilt from `deploy/sidecars/great-expectations/`.
