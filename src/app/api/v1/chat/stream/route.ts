@@ -40,6 +40,16 @@ import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import { resolveChatBinding } from '@/lib/pipeline-run-glue';
+import {
+  chatRequiresMasking,
+  newChatRunId,
+  runInboundGuardrails,
+  runOutboundGuardrails,
+  signChatAnswer,
+  type ChatRunWorkflowInput,
+} from '@/lib/chat-run';
+import { dispatchChatRun } from '@/lib/chat-run-dispatch';
+import { correlationIds } from '@/lib/correlation';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -113,12 +123,72 @@ export async function POST(req: Request) {
     contract: null,
   }));
   const pipelineContract = pipelineBinding.contract;
+  // A governed refusal helper: emit an SSE error + done and close (200 so the browser reads the body).
+  // Defined here (not later) so the inbound guardrail gate below can refuse before the model call.
+  const deny = (msg: string) =>
+    new Response(`data: ${JSON.stringify({ error: msg })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' },
+    });
+  // One canonical chat-run id, minted here and carried through the guardrail floor, the durable
+  // dispatch (workflow id seed), the trace, provenance + lineage — so this turn's governed run is
+  // correlated across all planes by the ONE key (mirrors dispatchAgentRun's runId).
+  const chatRunId = newChatRunId();
   const enforceCtx = {
     orgId,
     actor: userId,
-    runId: convo.id || `chat_${userId}`,
+    runId: chatRunId,
     contract: pipelineContract,
   };
+
+  // ── W2: the GUARDRAIL FLOOR on the model path (PII + injection) — the audit gap vs the agent path.
+  // Chat already enforced the data-allowlist + egress leash below, but SKIPPED the runChecks('pre') +
+  // getPii().scan the agent path runs. Close it here, using the bound pipeline's contract:
+  //   • injection/blocked verdict → REFUSE the run (matches runAgent's pre-guardrail block);
+  //   • PII detected + the contract requires masking → REDACT before the model sees it.
+  // Chat's data-class is the caller-tagged `dataClass` (default 'public'); the contract's guardrail
+  // overlay (requirePiiMasking) decides masking. A null contract ⇒ no masking (legacy chat behaviour).
+  const chatDataClass = String(dataClass || 'public');
+  const requireMasking = chatRequiresMasking(pipelineContract, chatDataClass);
+  const inbound = await runInboundGuardrails(String(content), String(model || ''), {
+    requireMasking,
+    orgId,
+  }).catch(() => null);
+  const preChecks = inbound?.checks ?? [];
+  if (inbound?.blocked) {
+    // Injection/blocked on the inbound message — a hard refusal, audited (governed run = blocked).
+    auditEnforcement(
+      enforceCtx,
+      'pipeline.guardrail.block',
+      `conversation:${convo.id || 'temporary'}`,
+      'blocked',
+      'inbound guardrail blocked (injection)',
+    );
+    recordAudit({
+      actor: actorFrom({ email: userId }),
+      org: DEFAULT_ORG,
+      project: convo.projectId ?? undefined,
+      action: 'chat.run',
+      resource: convo.id ? `conversation:${convo.id}` : undefined,
+      model: (model as string) || undefined,
+      outcome: 'blocked',
+      runId: chatRunId,
+    });
+    return deny('request blocked by input guardrail: prompt injection detected');
+  }
+  // The model-facing copy of the user turn: redacted when the contract required masking + PII hit,
+  // else the original text. The user's OWN typed message is still persisted verbatim (below) — the
+  // redaction protects what the MODEL sees, mirroring the agent path's guardrail floor.
+  const modelContent = inbound?.text ?? String(content);
+  if (inbound?.redacted) {
+    auditEnforcement(
+      enforceCtx,
+      'pipeline.guardrail.redact',
+      `conversation:${convo.id || 'temporary'}`,
+      'redacted',
+      'inbound PII redacted before model (contract requiresPiiMasking)',
+    );
+  }
 
   // Edit & branch: fork a new user turn from an edited prior message (persisted, becomes active).
   // The new user message is the parent of the assistant answer we're about to generate.
@@ -300,13 +370,16 @@ export async function POST(req: Request) {
   // On regenerate/edit the driving user turn is already in `prior` (edit persisted it as the new
   // branch); only add + persist a brand-new turn otherwise.
   if (!regenerate && !editMessageId) {
-    const userContent: ContentPart[] = [{ type: 'text', text: String(content) }];
+    // The MODEL sees the guardrail-governed copy (redacted when the contract required masking); the
+    // user's OWN typed message is persisted verbatim below (the redaction protects what leaves to the
+    // model, matching the agent path's guardrail floor).
+    const userContent: ContentPart[] = [{ type: 'text', text: modelContent }];
     for (const url of Array.isArray(images) ? images : []) {
       if (typeof url === 'string' && url.startsWith('data:')) {
         userContent.push({ type: 'image_url', image_url: { url } });
       }
     }
-    messages.push({ role: 'user', content: userContent.length > 1 ? userContent : String(content) });
+    messages.push({ role: 'user', content: userContent.length > 1 ? userContent : modelContent });
     if (!temporary) {
       await addMessage({
         conversationId: convo.id,
@@ -321,11 +394,6 @@ export async function POST(req: Request) {
   const role = session?.user?.role ?? 'viewer';
 
   // Governance: RBAC gate the model + skill (abacRules deny), and enforce the project's budget.
-  const deny = (msg: string) =>
-    new Response(`data: ${JSON.stringify({ error: msg })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`, {
-      status: 200,
-      headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' },
-    });
   if (effectiveModel && (await isDenied(role, 'chat.model', effectiveModel))) {
     return deny(`model ${effectiveModel} is not permitted for your role`);
   }
@@ -595,11 +663,64 @@ export async function POST(req: Request) {
           endTime: Date.now(),
           promptTokens: estimateTokens(traceInput),
           completionTokens: estimateTokens(full),
+          // Correlate the trace with the run's other planes (audit / lineage / provenance) by the one
+          // chat-run id — the SAME pattern the agent run uses (traceId == normalize(runId)).
+          traceId: correlationIds(chatRunId).traceId,
           // PA-12 — stamp the bound pipeline (resolved above) at the trace SOURCE so the pipeline
           // Observability tab + global Observability filter exactly. Null when nothing is bound.
           pipelineId: pipelineBinding.pipelineId,
         });
       }
+
+      // ── W2: OUTBOUND guardrail scan on the answer (recorded, non-blocking — mirrors runAgent step 6).
+      const postChecks = full
+        ? await runOutboundGuardrails(full, effectiveModel, orgId).catch(() => [])
+        : [];
+
+      // ── W2: PROVENANCE — sign the answer, bound to the run id (tamper-evident, offline-verifiable).
+      const refs = citations.map((c) => c.name);
+      const provenance = full
+        ? signChatAnswer({
+            runId: chatRunId,
+            conversationId: convo.id,
+            query: String(content),
+            answer: full,
+            refs,
+          })
+        : null;
+
+      // ── W1: DURABLE RUN — record the governed chat run via the Temporal spine (gated by
+      // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable. The
+      // token stream above already reached the client; this records the run (guardrail verdicts +
+      // lineage + attributed audit) durably + replayably, and hands back the workflow/run id.
+      const runInput: ChatRunWorkflowInput = {
+        runId: chatRunId,
+        conversationId: convo.id,
+        userId,
+        model: effectiveModel,
+        query: String(content),
+        answer: full,
+        orgId,
+        project: convo.projectId ?? null,
+        pipelineId: pipelineBinding.pipelineId,
+        checks: [...preChecks, ...postChecks],
+        refs,
+        status: full ? 'done' : 'error',
+      };
+      const dispatch = await dispatchChatRun(runInput).catch(() => null);
+
+      // Surface the durable identity + trust artifacts to the client so the UI can show the run id,
+      // its provenance signature, and whether it was recorded durably.
+      send({
+        run: {
+          runId: chatRunId,
+          mode: dispatch?.mode ?? 'inline',
+          workflowId: dispatch?.workflowId ?? null,
+          status: dispatch?.status ?? runInput.status,
+          checks: runInput.checks,
+          provenance,
+        },
+      });
       if (citations.length) send({ citations });
       send({ done: true });
       controller.close();
