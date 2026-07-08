@@ -46,6 +46,10 @@ export interface EtlJobSpec {
   updatedAt?: string;
   lastRunStatus?: EtlJobStatus;
   lastRunAt?: string;
+  // The visual DAG the builder authored. When present it's the source of truth the orchestration
+  // compiler consumes; the flat source/dest/mappings fields above are kept in sync (derived from it)
+  // so the legacy direct-copy engine + list rendering keep working.
+  dag?: EtlDagSpec;
 }
 
 // What the authoring form submits (no server-stamped fields).
@@ -341,11 +345,321 @@ export interface EtlRunView {
   runId: string;
   jobId: string;
   status: EtlJobStatus;
-  path: 'airbyte' | 'direct-copy';
+  path: 'kestra' | 'airbyte' | 'direct-copy';
   rowsRead: number;
   rowsWritten: number;
   redacted: number;
   message?: string;
   startedAt: string;
   finishedAt?: string;
+  /** The orchestrator execution id when the run went through the orchestration engine. */
+  executionId?: string;
+}
+
+// ─── The visual ETL DAG — the richer AUTHORING model (source → transforms → destination) ────────
+// This is what the visual builder edits and what compiles to an orchestration flow. It is a superset
+// of the flat EtlJobSpec above (which stays the persisted DB record): the DAG's source maps to
+// sourceConnectorId/sourceResource, its destination to destDatabase/destTable, and its transform
+// chain is the richer expression of what the flat `mappings` captured. PURE + zero-IO: the compiler
+// and the UI both consume it; the store persists it as JSON on the job row. NO fetch/env/db here.
+
+// The transforms the operator can chain. Each is a pure, declarative step over the row stream:
+//  · filter   — keep rows where a column compares to a value (drop the rest)
+//  · select   — keep only the named columns (project)
+//  · rename   — rename a column
+//  · cast      — coerce a column to a type (string/int/float/bool/date)
+//  · derive    — add a column from an expression (the lambda-equivalent; runs in a script task)
+//  · redact    — apply a redaction action to a column ON THE MOVEMENT PATH (governance)
+//  · join      — join a second source resource on a key (enrichment)
+//  · aggregate — group by columns + aggregate a measure (count/sum/avg/min/max)
+//  · dedupe    — drop duplicate rows by key columns
+//  · limit     — cap the number of rows
+export type EtlTransformKind =
+  | 'filter'
+  | 'select'
+  | 'rename'
+  | 'cast'
+  | 'derive'
+  | 'redact'
+  | 'join'
+  | 'aggregate'
+  | 'dedupe'
+  | 'limit';
+
+export type EtlNodeKind = 'source' | EtlTransformKind | 'destination';
+
+export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'in';
+export type CastType = 'string' | 'int' | 'float' | 'bool' | 'date';
+export type AggFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+// The per-node configuration — a discriminated union keyed by node `kind`. Only the fields relevant
+// to a node's kind are set; the compiler and validator switch on `kind`.
+export interface EtlNodeConfig {
+  // source
+  connectorId?: string;
+  resource?: string;
+  // destination
+  database?: string;
+  table?: string;
+  // filter
+  column?: string;
+  op?: FilterOp;
+  value?: string;
+  // select / dedupe (columns), aggregate group-by
+  columns?: string[];
+  // rename
+  from?: string;
+  to?: string;
+  // cast
+  castType?: CastType;
+  // derive
+  target?: string;
+  expression?: string; // a safe row expression (e.g. "amount * 1.18"); runs in a script task
+  // redact
+  action?: RedactionAction;
+  keepLast?: number;
+  // join
+  joinConnectorId?: string;
+  joinResource?: string;
+  leftKey?: string;
+  rightKey?: string;
+  // aggregate
+  groupBy?: string[];
+  aggFn?: AggFn;
+  aggColumn?: string;
+  aggAlias?: string;
+  // limit
+  limit?: number;
+}
+
+// A node in the DAG. `id` is stable within the spec; `position` is UI-only (canvas coords).
+export interface EtlNode {
+  id: string;
+  kind: EtlNodeKind;
+  label?: string;
+  config: EtlNodeConfig;
+  position?: { x: number; y: number };
+}
+
+// A directed edge source→…→destination. The DAG is a linear-or-branching pipeline; the compiler
+// walks it topologically.
+export interface EtlEdge {
+  from: string;
+  to: string;
+}
+
+// The full visual DAG spec — source node(s) → transform nodes → destination node(s), plus trigger.
+export interface EtlDagSpec {
+  nodes: EtlNode[];
+  edges: EtlEdge[];
+  trigger: EtlTriggerMode;
+  cron?: string;
+  rowLimit?: number;
+}
+
+// ─── DAG helpers (pure) ─────────────────────────────────────────────────────────────────────────
+export function sourceNodes(spec: EtlDagSpec): EtlNode[] {
+  return spec.nodes.filter((n) => n.kind === 'source');
+}
+export function destinationNodes(spec: EtlDagSpec): EtlNode[] {
+  return spec.nodes.filter((n) => n.kind === 'destination');
+}
+export function transformNodes(spec: EtlDagSpec): EtlNode[] {
+  return spec.nodes.filter((n) => n.kind !== 'source' && n.kind !== 'destination');
+}
+
+// Topological order of the nodes following edges from the source(s). Returns null when the graph has
+// a cycle or a node is unreachable/dangling (an authoring error the validator reports).
+export function topoOrder(spec: EtlDagSpec): EtlNode[] | null {
+  const byId = new Map(spec.nodes.map((n) => [n.id, n]));
+  const indeg = new Map<string, number>(spec.nodes.map((n) => [n.id, 0]));
+  const out = new Map<string, string[]>();
+  for (const n of spec.nodes) out.set(n.id, []);
+  for (const e of spec.edges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) return null; // dangling edge
+    out.get(e.from)!.push(e.to);
+    indeg.set(e.to, (indeg.get(e.to) ?? 0) + 1);
+  }
+  const queue = spec.nodes.filter((n) => (indeg.get(n.id) ?? 0) === 0).map((n) => n.id);
+  const order: EtlNode[] = [];
+  const seen = new Set<string>();
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    order.push(byId.get(id)!);
+    for (const nxt of out.get(id) ?? []) {
+      indeg.set(nxt, (indeg.get(nxt) ?? 1) - 1);
+      if ((indeg.get(nxt) ?? 0) === 0) queue.push(nxt);
+    }
+  }
+  return order.length === spec.nodes.length ? order : null; // cycle → fewer than all
+}
+
+// A safe expression guard for `derive`: allow column names, numbers, strings, arithmetic and simple
+// comparisons only. Rejects anything that could be code (function calls, brackets, semicolons) so a
+// derived-column expression can be compiled into a script task without an injection surface.
+const SAFE_EXPR = /^[A-Za-z0-9_+\-*/%.,()'"\s<>=!&|]*$/;
+const UNSAFE_EXPR_TOKEN = /(;|=>|`|\$\{|\bimport\b|\brequire\b|\bprocess\b|\beval\b|\bFunction\b)/;
+export function isSafeExpression(expr: unknown): expr is string {
+  return (
+    typeof expr === 'string' &&
+    expr.trim().length > 0 &&
+    SAFE_EXPR.test(expr) &&
+    !UNSAFE_EXPR_TOKEN.test(expr)
+  );
+}
+
+// Validate a DAG spec (pure — collects ALL errors). Checks: exactly-reachable graph, a source + a
+// destination, safe identifiers on destination db/table, per-node required fields, safe derive
+// expressions, and a valid cron when scheduled.
+export function validateDagSpec(spec: Partial<EtlDagSpec> | null | undefined): ValidationResult {
+  const errors: string[] = [];
+  if (!spec || typeof spec !== 'object' || !Array.isArray(spec.nodes)) {
+    return { ok: false, errors: ['A DAG spec with nodes is required.'] };
+  }
+  const nodes = spec.nodes;
+  const edges = Array.isArray(spec.edges) ? spec.edges : [];
+  const full: EtlDagSpec = {
+    nodes,
+    edges,
+    trigger: spec.trigger === 'schedule' ? 'schedule' : 'manual',
+    cron: spec.cron,
+    rowLimit: spec.rowLimit,
+  };
+
+  const srcs = sourceNodes(full);
+  const dests = destinationNodes(full);
+  if (srcs.length === 0) errors.push('The job needs a source node.');
+  if (dests.length === 0) errors.push('The job needs a destination node.');
+
+  for (const s of srcs) {
+    if (!s.config.connectorId) errors.push(`Source "${s.label ?? s.id}": pick a source connector.`);
+    if (!s.config.resource || !String(s.config.resource).trim())
+      errors.push(`Source "${s.label ?? s.id}": a source table/resource is required.`);
+  }
+  for (const d of dests) {
+    if (!isSafeIdent(d.config.database))
+      errors.push(`Destination "${d.label ?? d.id}": database must be a valid identifier.`);
+    if (!isSafeIdent(d.config.table))
+      errors.push(`Destination "${d.label ?? d.id}": table must be a valid identifier.`);
+  }
+
+  for (const n of transformNodes(full)) {
+    const c = n.config;
+    const who = n.label ?? n.kind;
+    switch (n.kind) {
+      case 'filter':
+        if (!c.column) errors.push(`Filter "${who}": a column is required.`);
+        if (!c.op) errors.push(`Filter "${who}": an operator is required.`);
+        break;
+      case 'select':
+      case 'dedupe':
+        if (!Array.isArray(c.columns) || c.columns.length === 0)
+          errors.push(`${n.kind} "${who}": at least one column is required.`);
+        break;
+      case 'rename':
+        if (!c.from || !isSafeIdent(c.to))
+          errors.push(`Rename "${who}": a source column and a valid target name are required.`);
+        break;
+      case 'cast':
+        if (!c.column || !c.castType) errors.push(`Cast "${who}": a column and a type are required.`);
+        break;
+      case 'derive':
+        if (!isSafeIdent(c.target))
+          errors.push(`Derive "${who}": a valid target column name is required.`);
+        if (!isSafeExpression(c.expression))
+          errors.push(`Derive "${who}": the expression is empty or contains unsafe tokens.`);
+        break;
+      case 'redact':
+        if (!c.column) errors.push(`Redact "${who}": a column is required.`);
+        if (!c.action || c.action === 'keep')
+          errors.push(`Redact "${who}": choose a redaction action (mask/hash/tokenize/drop/detect).`);
+        break;
+      case 'join':
+        if (!c.joinConnectorId || !c.joinResource || !c.leftKey || !c.rightKey)
+          errors.push(`Join "${who}": a second source, its resource, and both keys are required.`);
+        break;
+      case 'aggregate':
+        if (!Array.isArray(c.groupBy) || c.groupBy.length === 0)
+          errors.push(`Aggregate "${who}": at least one group-by column is required.`);
+        if (!c.aggFn) errors.push(`Aggregate "${who}": an aggregate function is required.`);
+        if (c.aggFn !== 'count' && !c.aggColumn)
+          errors.push(`Aggregate "${who}": ${c.aggFn} needs a measure column.`);
+        break;
+      case 'limit':
+        if (!Number.isFinite(Number(c.limit)) || Number(c.limit) <= 0)
+          errors.push(`Limit "${who}": a positive row count is required.`);
+        break;
+    }
+  }
+
+  if (nodes.length > 0 && topoOrder(full) === null)
+    errors.push('The graph has a cycle or a disconnected/dangling node — fix the connections.');
+
+  if (full.trigger === 'schedule' && !isValidCron(full.cron))
+    errors.push('A valid 5-field cron expression is required for a scheduled job.');
+
+  return { ok: errors.length === 0, errors };
+}
+
+// Derive the flat job fields (the persisted DB columns + the legacy direct-copy engine's inputs)
+// from a DAG. Takes the first source + first destination; folds each `redact`/`rename`/`select`
+// transform into the flat `mappings` vocabulary so the flat model stays a faithful (if lossy)
+// projection of the DAG. Pure. The DAG remains the source of truth for the orchestration compiler.
+export function flattenDagToJobFields(dag: EtlDagSpec): EtlJobDraft & { dag: EtlDagSpec } {
+  const src = sourceNodes(dag)[0];
+  const dest = destinationNodes(dag)[0];
+  const mappings: ColumnMapping[] = [];
+  const renames = new Map<string, string>();
+  for (const n of transformNodes(dag)) {
+    if (n.kind === 'rename' && n.config.from && n.config.to) {
+      renames.set(n.config.from, n.config.to);
+    }
+  }
+  for (const n of transformNodes(dag)) {
+    if (n.kind === 'redact' && n.config.column && n.config.action) {
+      mappings.push({
+        source: n.config.column,
+        dest: renames.get(n.config.column),
+        action: n.config.action,
+        keepLast: n.config.keepLast,
+      });
+    }
+  }
+  // Any renames not already covered by a redact mapping → pass-through rename rows.
+  for (const [from, to] of renames) {
+    if (!mappings.some((m) => m.source === from)) mappings.push({ source: from, dest: to, action: 'keep' });
+  }
+  return {
+    name: '', // caller supplies the job name
+    sourceConnectorId: src?.config.connectorId ?? '',
+    sourceResource: src?.config.resource ?? '',
+    destDatabase: dest?.config.database ?? '',
+    destTable: dest?.config.table ?? '',
+    mappings,
+    trigger: dag.trigger,
+    cron: dag.cron,
+    rowLimit: dag.rowLimit,
+    dag,
+  };
+}
+
+// Build a minimal default DAG (source → destination) for a freshly-created job, so the builder opens
+// on a valid two-node canvas the operator extends. Pure.
+export function defaultDag(): EtlDagSpec {
+  return {
+    nodes: [
+      { id: 'source', kind: 'source', label: 'Source', config: {}, position: { x: 80, y: 120 } },
+      {
+        id: 'destination',
+        kind: 'destination',
+        label: 'Destination',
+        config: {},
+        position: { x: 520, y: 120 },
+      },
+    ],
+    edges: [{ from: 'source', to: 'destination' }],
+    trigger: 'manual',
+  };
 }
