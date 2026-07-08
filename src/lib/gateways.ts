@@ -19,6 +19,7 @@ import { gateways } from '@/db/schema';
 import type { Gateway as GatewayRowDb } from '@/db/schema';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { cloudProviderStatuses } from '@/lib/cloud-providers';
+import { randomGatewaySuffix, tenantGatewayHost } from '@/lib/tenant-domain';
 import {
   type EgressClass,
   type GatewayHealthSignal,
@@ -53,6 +54,12 @@ export async function ensureGatewaysSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now());
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS gateways_org_idx ON gateways (org_id);`);
+    // PA-15: the per-tenant provisioned gateway host. Additive + idempotent so this module keeps
+    // working on a DB that predates the column (deploy is rsync-only, no migration step over SSH).
+    await db.execute(sql`ALTER TABLE gateways ADD COLUMN IF NOT EXISTS hostname text;`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS gateways_hostname_idx ON gateways (hostname) WHERE hostname IS NOT NULL;`,
+    );
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -71,6 +78,7 @@ function toRow(r: GatewayRowDb): GatewayRow {
     defaultModel: r.defaultModel,
     egressClass: egressClassFor(r.kind),
     enabled: r.enabled,
+    hostname: r.hostname ?? null,
     createdAt: r.createdAt,
   };
 }
@@ -185,6 +193,50 @@ export async function updateGateway(
     .where(and(eq(gateways.id, id), eq(gateways.orgId, orgId)))
     .returning();
   return row ? toRow(row) : null;
+}
+
+/**
+ * PA-15 — PROVISION a per-tenant gateway HOST on an existing gateway row. Mints
+ * "<slug5><rand5>-gateway.<apex>" from the tenant slug (pure `tenantGatewayHost` +
+ * `randomGatewaySuffix`) and persists it on the row's `hostname`, org-scoped. Returns the fresh row,
+ * or null when no row for this org+id exists (graceful 404 at the route). The impure seam here is
+ * ONLY the randomness + the DB write; the host SHAPE is the pure, unit-tested helper. Idempotent by
+ * intent is NOT assumed — each call re-mints (a caller wanting to keep an existing host checks the
+ * row first). `randomSuffix` is injectable so the write path can be tested deterministically.
+ */
+export async function provisionGatewayHost(
+  id: string,
+  tenantSlug: string,
+  orgId: string = DEFAULT_ORG,
+  randomSuffix: string = randomGatewaySuffix(),
+): Promise<GatewayRow | null> {
+  await ensureGatewaysSchema();
+  const hostname = tenantGatewayHost(tenantSlug, randomSuffix);
+  const [row] = await db
+    .update(gateways)
+    .set({ hostname })
+    .where(and(eq(gateways.id, id), eq(gateways.orgId, orgId)))
+    .returning();
+  return row ? toRow(row) : null;
+}
+
+/**
+ * PA-15 — resolve a gateway row by its provisioned `hostname`, org-scoped. The console-side
+ * attribution seam: given a fully-qualified per-tenant gateway host, return the owning gateway row
+ * (or null). Used to attribute an inbound request to the right tenant/gateway. Org-scoped so a host
+ * only ever resolves within its own tenant.
+ */
+export async function getGatewayByHostname(
+  hostname: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<GatewayRow | null> {
+  await ensureGatewaysSchema();
+  const rows = await db
+    .select()
+    .from(gateways)
+    .where(and(eq(gateways.hostname, hostname), eq(gateways.orgId, orgId)))
+    .limit(1);
+  return rows[0] ? toRow(rows[0]) : null;
 }
 
 /** Delete a gateway, org-scoped. True if a row was removed. */
