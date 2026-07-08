@@ -5,6 +5,8 @@ import { currentOrgId } from '@/lib/tenancy';
 import { canReview, awaitingStep } from '@/lib/app-runs-view';
 import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { signalAppRun } from '@/lib/adapters/apprun';
+import { getApp } from '@/lib/apps-store';
+import { captureHitlCorrection } from '@/lib/feedback-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,11 +97,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     outcome: 'ok',
   });
 
+  // M1 LEARN: capture the reviewer's correction as a golden case for the run's bound pipeline, so the
+  // next eval run is measured against real HITL feedback. Only fires when the reviewer supplied a
+  // ground-truth (an edited output or a note); the pure mapper reasons out an approve-with-no-edit.
+  // Best-effort — never fails the review. The query is the run input; expected is the correction.
+  let feedbackCaptured = false;
+  try {
+    const app = await getApp(run.appId, orgId);
+    const pipelineId = app?.pipelineId ?? null;
+    const query =
+      typeof run.input === 'string' ? run.input : JSON.stringify(run.input ?? '');
+    const res = await captureHitlCorrection(
+      { input: query, correctedOutput: body.output, note: body.note, decision: body.decision },
+      pipelineId,
+    );
+    feedbackCaptured = res.captured;
+  } catch {
+    feedbackCaptured = false;
+  }
+
   return NextResponse.json({
     ok: true,
     decision: body.decision,
     stepId,
     workflowId: signal.workflowId,
     by: gate.user.email,
+    feedbackCaptured,
   });
 }
