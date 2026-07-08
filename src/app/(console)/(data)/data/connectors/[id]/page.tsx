@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { getConnectorDetail } from '@/lib/connector-detail';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelinesByDomains } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,15 @@ export default async function ConnectorDetailPage({ params }: { params: Promise<
   const detail = await getConnectorDetail(id, org);
   if (!detail) notFound();
   const { connector: c, dialect, syncHistory, boundDomains } = detail;
+
+  // Reverse edge: a connector is reached by a pipeline TRANSITIVELY through the domains bound to it.
+  // A pipeline references this connector when its data ceiling allowlists any of those domains.
+  const referencedByPipelines = (
+    await listPipelinesByDomains(
+      boundDomains.map((d) => ({ id: d.id, label: d.label, aliases: d.aliases })),
+      org,
+    ).catch(() => [])
+  ).map((p) => ({ id: p.id, name: p.name, status: p.status }));
 
   return (
     <div className="space-y-6">
@@ -195,6 +205,44 @@ export default async function ConnectorDetailPage({ params }: { params: Promise<
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reverse edge — pipelines that reach this connector through its bound domains. Mirrors the
+          "Bound data domains" card above, closing the loop: substrate legible from both ends. */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">
+            Referenced by pipelines ({referencedByPipelines.length})
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Pipelines whose data ceiling allowlists a domain that routes to this connector — the
+            governed consumers permitted to read from it.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {referencedByPipelines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No pipeline references this connector yet — no governed consumer can reach its data
+              until a pipeline allowlists one of its domains.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {referencedByPipelines.map((p) => (
+                <Link key={p.id} href={`/pipelines/${p.id}`}>
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    {p.name}
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {p.status}
+                    </span>
+                  </Badge>
+                </Link>
+              ))}
             </div>
           )}
         </CardContent>

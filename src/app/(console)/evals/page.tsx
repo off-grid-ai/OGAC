@@ -14,8 +14,10 @@ import {
 import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { evalEngineLabel } from '@/lib/eval-engine-label';
+import { listGoldenCases } from '@/lib/evals';
 import { readEvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +31,22 @@ export default async function EvalsPage({
 }) {
   await requireModuleForUser('evals');
   const { suite } = await searchParams;
-  const view = await readEvalsView(25, await currentOrgId());
+  const org = await currentOrgId();
+  const view = await readEvalsView(25, org);
+
+  // Reverse edge: which pipelines own a golden set (a case attached via pipeline_id → its Quality tab).
+  // Distinct pipeline ids across the golden cases, named + linked so evals read as "used by pipelines".
+  const [goldenCases, pipelines] = await Promise.all([
+    listGoldenCases().catch(() => []),
+    listPipelines(org).catch(() => []),
+  ]);
+  const nameById = new Map(pipelines.map((p) => [p.id, p.name]));
+  const boundPipelineIds = [
+    ...new Set(goldenCases.map((g) => g.pipelineId).filter((v): v is string => !!v)),
+  ];
+  const boundPipelines = boundPipelineIds
+    .map((id) => ({ id, name: nameById.get(id) ?? id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const activeSuite = suite && view.suites.some((s) => s.engine === suite) ? suite : null;
   const runs = activeSuite
@@ -120,6 +137,39 @@ export default async function EvalsPage({
                     className="gap-1.5"
                   >
                     {evalEngineLabel(s.engine)} · {s.passRate}% ({s.passed}/{s.total})
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reverse edge — pipelines that own a golden set (evals attached on their Quality tab). Reads
+          the eval library from the pipeline end: "used by N pipelines", each a deep link. */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Used by pipelines ({boundPipelines.length})</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Pipelines with their own golden set — evals attached on the pipeline&apos;s Quality tab run
+            in that pipeline&apos;s context. Org-wide library cases (no pipeline) aren&apos;t counted here.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {boundPipelines.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No pipeline has a golden set yet — attach cases to a pipeline on its Quality tab to gate
+              its quality per-pipeline.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {boundPipelines.map((p) => (
+                <Link key={p.id} href={`/pipelines/${p.id}`}>
+                  <Badge
+                    variant="outline"
+                    className="border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    {p.name}
                   </Badge>
                 </Link>
               ))}

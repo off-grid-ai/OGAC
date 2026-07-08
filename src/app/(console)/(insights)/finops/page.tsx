@@ -13,6 +13,11 @@ import {
 } from '@/components/ui/table';
 import { computeFinOps } from '@/lib/finops';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
+import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { listPipelines } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,12 +36,34 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default async function FinOpsPage() {
+export default async function FinOpsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pipeline?: string }>;
+}) {
   await requireModuleForUser('finops');
-  const f = await computeFinOps();
+  const { pipeline: rawPipeline } = await searchParams;
+  const orgId = await currentOrgId();
+  const pipelines = await listPipelines(orgId).catch(() => []);
+  const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
+  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const f = await computeFinOps(facet ? pipelineTag(facet) : null);
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">FinOps</h1>
+          <p className="text-sm text-muted-foreground">
+            Spend, usage, and budgets priced from real gateway traffic.
+            {facetName ? (
+              <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
+            ) : null}
+          </p>
+        </div>
+        <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
+      </div>
+
       <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
         <Stat label="Spend (all time)" value={usd(f.totals.costUsd)} />
         <Stat label="Requests" value={f.totals.requests.toLocaleString()} />

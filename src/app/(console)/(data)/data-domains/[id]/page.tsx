@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { DomainDetailPanel } from '@/components/data-domains/DomainDetailPanel';
 import { getDomain, listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelinesByDomain } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 import { listConnectors } from '@/lib/store';
 
@@ -26,6 +27,14 @@ export default async function DataDomainDetailPage({ params }: { params: Promise
 
   const connectorName = connectors.find((c) => c.id === domain.connectorId)?.name ?? domain.connectorId;
   const connectorOptions = connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+
+  // Reverse edge: pipelines whose data ceiling allowlists this domain (matched by id/label/aliases).
+  const referencedByPipelines = (
+    await listPipelinesByDomain(
+      { id: domain.id, label: domain.label, aliases: domain.aliases },
+      org,
+    ).catch(() => [])
+  ).map((p) => ({ id: p.id, name: p.name, status: p.status }));
 
   return (
     <div className="space-y-6">
@@ -53,6 +62,7 @@ export default async function DataDomainDetailPage({ params }: { params: Promise
         connectorName={connectorName}
         connectors={connectorOptions}
         allDomains={allDomains}
+        referencedByPipelines={referencedByPipelines}
       />
     </div>
   );

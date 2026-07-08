@@ -202,7 +202,26 @@ export interface SiemReadResult {
   error: string | null;
 }
 
-export async function readSiemView(limit = 500): Promise<SiemReadResult> {
+// Compose the SIEM query clause: match_all, or (when a pipeline tag is given) a bool that keeps only
+// the audit events attributed to that pipeline. The tag (`pipeline:<id>`) lands in `project` OR
+// `resource` on the audit docs, so we `should`-match either keyword field. Pure. Exported for tests.
+export function siemQueryClause(pipelineTag?: string | null): Record<string, unknown> {
+  if (!pipelineTag) return { match_all: {} };
+  return {
+    bool: {
+      minimum_should_match: 1,
+      should: [
+        { term: { 'project.keyword': pipelineTag } },
+        { term: { 'resource.keyword': pipelineTag } },
+      ],
+    },
+  };
+}
+
+export async function readSiemView(
+  limit = 500,
+  pipelineTag?: string | null,
+): Promise<SiemReadResult> {
   const empty = normalizeSiem(null);
   const configured = Boolean(process.env.OFFGRID_OPENSEARCH_URL);
   const url = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
@@ -214,7 +233,7 @@ export async function readSiemView(limit = 500): Promise<SiemReadResult> {
       body: JSON.stringify({
         size: limit,
         sort: [{ '@timestamp': { order: 'desc', unmapped_type: 'date' } }],
-        query: { match_all: {} },
+        query: siemQueryClause(pipelineTag),
       }),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),

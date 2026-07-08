@@ -31,11 +31,14 @@ export function DomainDetailPanel({
   connectorName,
   connectors,
   allDomains,
+  referencedByPipelines = [],
 }: {
   domain: DataDomain & { connectorName: string };
   connectorName: string;
   connectors: ConnectorOption[];
   allDomains: DataDomain[];
+  /** Pipelines whose data ceiling (dataAllowlist) allowlists THIS domain — the reverse edge. */
+  referencedByPipelines?: { id: string; name: string; status: string }[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -188,6 +191,44 @@ export function DomainDetailPanel({
           </CardContent>
         </Card>
       </div>
+
+      {/* Reverse edge — which pipelines allowlist THIS domain in their data ceiling. Mirrors the
+          connector's "Bound data domains" card: the substrate reads legibly from both ends. */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">
+            Referenced by pipelines ({referencedByPipelines.length})
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Pipelines whose data ceiling allowlists this domain — the only pipelines permitted to reach
+            it. Bind or remove it from a pipeline&apos;s ceiling on that pipeline&apos;s Routing tab.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {referencedByPipelines.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No pipeline references this domain yet — no governed consumer can reach it until a
+              pipeline adds it to its data ceiling.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {referencedByPipelines.map((p) => (
+                <Link key={p.id} href={`/pipelines/${p.id}`}>
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    {p.name}
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {p.status}
+                    </span>
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <DomainFormPanel
         open={editOpen}

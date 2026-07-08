@@ -155,9 +155,10 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
   });
 }
 
-export async function computeFinOps(): Promise<FinOps> {
-  // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit.
-  const [events, keys] = await Promise.all([gatewayEvents(), listApiKeys()]);
+export async function computeFinOps(pipelineTag?: string | null): Promise<FinOps> {
+  // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit. An optional
+  // pipeline tag narrows the traffic to that pipeline's slice server-side (project.keyword filter).
+  const [events, keys] = await Promise.all([gatewayEvents(pipelineTag), listApiKeys()]);
   const keyById = new Map(keys.map((k) => [k.id, k]));
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
   const localReq = events.filter((e) => priceFor(e.model) === 0).length;
