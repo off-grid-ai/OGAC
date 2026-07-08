@@ -21,6 +21,7 @@ export interface TeamDetailData {
   id: string;
   name: string;
   description: string;
+  department: string | null;
   members: { id: string; userId: string; role: string }[];
   pipelines: { id: string; name: string; status: string }[];
 }
@@ -39,15 +40,18 @@ function EditTeamSheet({
   open,
   onOpenChange,
   team,
+  departments,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   team: TeamDetailData;
+  departments: string[];
   onSaved: () => void;
 }) {
   const [name, setName] = useState(team.name);
   const [description, setDescription] = useState(team.description);
+  const [department, setDepartment] = useState(team.department ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +62,7 @@ function EditTeamSheet({
     const res = await fetch(`/api/v1/admin/teams/${team.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, department: department.trim() || null }),
     });
     setBusy(false);
     if (res.ok) {
@@ -87,6 +91,24 @@ function EditTeamSheet({
         <div className="space-y-1.5">
           <Label htmlFor="et-name">Name</Label>
           <Input id="et-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="et-dept">Department (optional)</Label>
+          <Input
+            id="et-dept"
+            list="et-dept-options"
+            placeholder="Finance"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          />
+          <datalist id="et-dept-options">
+            {departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <p className="text-[11px] text-muted-foreground">
+            Groups this team under a department in the org chart. Leave blank for Unassigned.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="et-desc">Description</Label>
@@ -179,7 +201,13 @@ function AddMemberSheet({
 // Team detail — full entity + its actions: edit/delete the team, add/remove members (with role),
 // and the pipelines assigned to it. URL-driven sheets (?panel=edit-team / add-member) so Back closes
 // them. Full-width, list→detail (each pipeline links to its own detail).
-export function TeamDetail({ team }: { team: TeamDetailData }) {
+export function TeamDetail({
+  team,
+  departments = [],
+}: {
+  team: TeamDetailData;
+  departments?: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -237,7 +265,12 @@ export function TeamDetail({ team }: { team: TeamDetailData }) {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="text-lg font-medium text-foreground">{team.name}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-medium text-foreground">{team.name}</h1>
+            <Badge variant="outline" className="text-[10px] font-normal">
+              {team.department ?? 'Unassigned'}
+            </Badge>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">{team.description || 'No description.'}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -330,6 +363,7 @@ export function TeamDetail({ team }: { team: TeamDetailData }) {
         open={panel === 'edit-team'}
         onOpenChange={(o) => !o && setPanel(null)}
         team={team}
+        departments={departments}
         onSaved={() => router.refresh()}
       />
       <AddMemberSheet
