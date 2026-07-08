@@ -11,9 +11,71 @@
 
 // Relative (not "@/…") imports on purpose: the worker is a standalone process launched by tsx, and
 // relative specifiers work without depending on an @/-alias resolver in that runtime.
-import { runAgent } from '../lib/agentrun';
+//
+// runAgent is pulled in via a lazy dynamic import inside defaultDeps (NOT a top-level import) so
+// merely LOADING this module — e.g. under node:test to unit-test the enforcement wiring — doesn't
+// drag the whole gateway/DB/next-auth chain in. The pure decisions + the dep-injected orchestration
+// stay light and testable; the real runAgent is resolved only when Temporal actually invokes it.
+import type { AgentRun } from '../lib/agentrun';
 import type { RunContext } from '../lib/agent-run-context';
 import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
+import type { PipelineContract } from '../lib/pipeline-enforcement';
+
+/**
+ * PA-16a-durable — resolve the durable run's bound-pipeline CONTRACT (I/O), using the SAME resolver
+ * the inline route/dispatch uses (resolveContract in pipeline-contract.ts: getPipeline + org
+ * governance defaults + overlay normalization). Mirrors app-run.activities.resolveContractActivity.
+ *
+ * The pipeline enforcement for an agent run lives INSIDE runAgent (enforceDataAccess before
+ * retrieval, enforceModelCall before the gateway call); it consumes ctx.contract. So the worker
+ * only needs to resolve the contract once and attach it to the RunContext — runAgent then gates the
+ * WORKER path identically to the sync path.
+ *
+ * Never throws / degrades to null: no bound pipeline (null id) or an unresolvable/deleted pipeline ⇒
+ * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as
+ * before this gate existed).
+ */
+export async function resolveContractActivity(
+  pipelineId: string | null | undefined,
+  orgId?: string,
+): Promise<PipelineContract | null> {
+  if (!pipelineId) return null;
+  const { resolveContract } = await import('../lib/pipeline-contract');
+  return resolveContract(pipelineId, orgId ?? 'default');
+}
+
+/**
+ * The two impure collaborators the pipeline activity leans on, injected so the enforcement is
+ * unit-testable WITHOUT a live gateway/DB (mirrors app-run's dep-injection seam). Defaults are the
+ * real subsystems, as Temporal invokes it.
+ */
+export interface AgentPipelineDeps {
+  /** Resolve the bound-pipeline contract (I/O). Default: resolveContractActivity (real resolver). */
+  resolveContract: (
+    pipelineId: string | null | undefined,
+    orgId?: string,
+  ) => Promise<PipelineContract | null>;
+  /** Run the governed pipeline (I/O). Default: the real runAgent, which enforces ctx.contract. */
+  runAgent: (
+    agentId: string,
+    query: string,
+    caller: string | undefined,
+    requireReview: boolean,
+    orgId: string | undefined,
+    context: RunContext,
+  ) => Promise<AgentRun | null>;
+}
+
+function defaultDeps(): AgentPipelineDeps {
+  return {
+    resolveContract: resolveContractActivity,
+    // Lazy import: keeps the gateway/DB/next-auth chain out of module load (see the note above).
+    runAgent: async (agentId, query, caller, requireReview, orgId, context) => {
+      const { runAgent } = await import('../lib/agentrun');
+      return runAgent(agentId, query, caller, requireReview, orgId, context);
+    },
+  };
+}
 
 /**
  * Run the full agent pipeline durably. Reuses runAgent verbatim (no duplicated pipeline); persists
@@ -25,17 +87,30 @@ import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent
  * run + all four planes are keyed by the id the workflow tracks) and the resolved actor/project
  * (which the worker cannot recover from a session — it has no request). runAgent falls back to
  * deriving from `caller` for any field the context omits, so a bare submission still works.
+ *
+ * PA-16a-durable: the bound-pipeline CONTRACT is resolved ONCE from input.pipelineId (via the I/O
+ * resolver) and attached to ctx.contract + ctx.pipelineId, so runAgent's pure enforcement
+ * (enforceDataAccess / enforceModelCall) gates the WORKER path with the SAME contract the sync path
+ * enforces — out-of-allowlist data is DENIED, and a cloud call under a local-only leash is BLOCKED.
+ * Null contract (no binding) ⇒ legacy allow (unchanged). This closes the durable governance hole.
  */
 export async function runAgentPipeline(
   input: AgentRunWorkflowInput,
+  deps: AgentPipelineDeps = defaultDeps(),
 ): Promise<AgentRunWorkflowResult> {
+  // Resolve the bound-pipeline contract for this durable run (I/O). Null ⇒ no binding ⇒ legacy allow.
+  const contract = await deps.resolveContract(input.pipelineId, input.orgId);
   const context: RunContext = {
     runId: input.runId,
     actor: input.actor,
     org: input.orgId,
     project: input.project,
+    // The resolved contract + its id ride the context: runAgent enforces the contract and stamps the
+    // observability trace with the pipeline tag at the SOURCE, identically to the sync/inline path.
+    contract,
+    pipelineId: input.pipelineId ?? null,
   };
-  const run = await runAgent(
+  const run = await deps.runAgent(
     input.agentId,
     input.query,
     input.caller,
