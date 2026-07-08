@@ -10,17 +10,17 @@ import type { CatalogFacets, CatalogSortKey } from '@/lib/eval-catalog-filter';
 // parent (URL-driven); this only renders controls and reports changes. Facets come from the pure
 // catalogFacets() so category/engine chips reflect the REAL catalog, never a stale list.
 
-const SORT_LABEL: Record<CatalogSortKey, string> = {
+// 'engine' is a valid internal sort key but is never offered in the UI — sorting by it would
+// expose the underlying evaluator engine name. Operators sort by name / category / threshold.
+const SORT_LABEL: Partial<Record<CatalogSortKey, string>> = {
   name: 'Name',
   category: 'Category',
-  engine: 'Engine',
   threshold: 'Threshold',
 };
 
 interface Props {
   q: string;
   category: string;
-  engine: string;
   sortKey: CatalogSortKey;
   facets: CatalogFacets;
   // Full label (tooltip). Short chip label falls back to the category id.
@@ -31,7 +31,6 @@ interface Props {
   total: number;
   onQ: (v: string) => void;
   onCategory: (v: string) => void;
-  onEngine: (v: string) => void;
   onSort: (v: string) => void;
   onClear: () => void;
 }
@@ -39,7 +38,6 @@ interface Props {
 export function EvalCatalogFilterBar({
   q,
   category,
-  engine,
   sortKey,
   facets,
   categoryLabel,
@@ -49,7 +47,6 @@ export function EvalCatalogFilterBar({
   total,
   onQ,
   onCategory,
-  onEngine,
   onSort,
   onClear,
 }: Props) {
@@ -79,22 +76,6 @@ export function EvalCatalogFilterBar({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            Engine
-            <select
-              value={engine}
-              onChange={(e) => onEngine(e.target.value)}
-              aria-label="Filter by engine"
-              className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-            >
-              <option value="">All</option>
-              {facets.engines.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.value} ({f.count})
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             Sort
             <select

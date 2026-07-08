@@ -57,7 +57,7 @@ export function SealControl({
   const seal = async () => {
     if (
       !window.confirm(
-        'SEAL the vault? All secrets become inaccessible until operators re-supply the unseal key shares. This will break every service reading from OpenBao.',
+        'SEAL the vault? All secrets become inaccessible until operators re-supply the unseal key shares. This will break every service reading from the secrets store.',
       )
     ) {
       return;

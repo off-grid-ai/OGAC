@@ -178,9 +178,10 @@ export async function readSecretsView(): Promise<{ data: SecretsView; error: str
   const { url, token, mount } = baoEnv();
   const configured = Boolean(url);
 
-  // Active adapter label: OpenBao when a URL is configured, else the env adapter.
+  // Active adapter: the KMS-backed secrets store (vault) when a URL is configured, else the env
+  // adapter. `activeAdapterId` stays the raw internal id; the vendor is the operator-facing label.
   const activeAdapterId = configured ? 'openbao' : 'env';
-  const activeAdapterVendor = configured ? 'OpenBao' : 'Process env';
+  const activeAdapterVendor = configured ? 'Secrets store (vault)' : 'Process env';
 
   if (!url) {
     return {
