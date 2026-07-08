@@ -307,6 +307,15 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     auth: 'api-key',
     kind: 'api',
   },
+  {
+    id: 'kestra',
+    label: 'ETL / Orchestration',
+    description: 'Workflow orchestration engine — runs the compiled data-movement jobs (extract → transform → load) under the console\'s governance.',
+    url: process.env.OFFGRID_KESTRA_URL ?? 'http://127.0.0.1:8945',
+    healthPath: '/health', // Kestra management endpoint → 200 when up
+    auth: 'api-key',
+    kind: 'api',
+  },
 
   // ── Canonical planes NOT deployed on THIS fleet (honest, non-alarming — never 'down') ────
   // The observability plane (VictoriaMetrics/VictoriaLogs/OTel/Jaeger) is canonical in

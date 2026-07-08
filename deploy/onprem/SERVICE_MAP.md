@@ -48,12 +48,23 @@ Services + host ports:
 | `redpanda` | `streaming` | 19092 (Kafka), 9644 (admin), 18083 (schema) | Kafka-API broker |
 | `airbyte-*` (6 containers) | `etl` | 8005 (API), 8006 (UI) | Connectors + CDC (own Postgres + Temporal) |
 | `great-expectations` | `dataquality` | 8003 | Data-quality sidecar (mirrors evidently/ragas) |
+| `kestra` | `orchestration` | 8090 (HTTP/API+UI) | Workflow orchestration — runs the console's compiled data-movement (ETL) flows. **Provisioning in progress on S2.** |
 
 Console env (SET LIVE on S1 `.env.local` 2026-07-08): `OFFGRID_WAREHOUSE_URL`, `OFFGRID_AIRBYTE_URL`,
 `OFFGRID_REDPANDA_ADMIN_URL`/`_BROKERS`, `OFFGRID_DATAQUALITY_URL` — via edge-Caddy loopbacks
-`127.0.0.1:8941–8944` (LAN not reachable by the console daemon). The four engines are registered in
-the console health directory (`src/lib/services-directory.ts`: warehouse/airbyte/streaming/data-quality)
+`127.0.0.1:8941–8944` (LAN not reachable by the console daemon). The engines are registered in
+the console health directory (`src/lib/services-directory.ts`: warehouse/airbyte/streaming/data-quality/kestra)
 so they appear + health-probe on the Services page. Lake landing = existing SeaweedFS S3.
+
+**Orchestration (Kestra) — STAGED, pending provisioning on S2:** the console's ETL/data-movement
+surface compiles its visual DAG jobs to **Kestra flows (YAML)** and deploys/executes/monitors them
+through Kestra's REST API. Console dials `OFFGRID_KESTRA_URL=http://127.0.0.1:8945` → edge-Caddy
+loopback `8945 → offgrid-s2.local:8090` (block staged in `deploy/Caddyfile`; reload the edge Caddy
+after S2 brings Kestra up on `:8090`). Optional basic auth via `OFFGRID_KESTRA_USER`/`_PASSWORD`;
+default tenant `main` (override `OFFGRID_KESTRA_TENANT`). Until the box answers, the surface renders
+an honest "not configured / unreachable" state and Run-now records a FAILED run — never a fake success.
+The visual ETL builder compiles jobs to Kestra flows via `src/lib/etl-kestra-compile.ts` and
+deploys/triggers/monitors them through `src/lib/adapters/kestra.ts`.
 
 **Console consumers (ports-and-adapters + admin APIs)** — AWS-parity map: [`../../docs/platform/DATA_PLANE_PARITY.md`](../../docs/platform/DATA_PLANE_PARITY.md):
 - `src/lib/adapters/warehouse.ts` (ClickHouse) → `GET /api/v1/admin/warehouse` (catalog), `GET /warehouse/[table]` (detail), `POST /warehouse/query` (read-only SQL = "Query"/Athena).
