@@ -994,5 +994,28 @@ current manual rsync-over-tunnel. Deferred, but planned.
 
 ---
 
-_Last updated: 2026-07-03. Owned by: console team._
-_Related: `README.md`, `docs/research/`, `../shared/ROADMAP.md`_
+## Data plane — the governed AWS-data-stack equivalent (LIVE 2026-07-08)
+
+The second substrate alongside the model engine: match the AWS data stack feature-for-feature with
+governed OSS, on the enterprise's own hardware. Full mapping: [`platform/DATA_PLANE_PARITY.md`](./platform/DATA_PLANE_PARITY.md).
+
+- **Provisioned live on S2** (OrbStack): ClickHouse warehouse (Redshift/Athena), Airbyte (Glue +
+  Debezium/DMS + 300+ connectors), Redpanda (Kinesis/MSK), Great Expectations (DataBrew), SeaweedFS
+  lake (S3). Fronted on S1 edge loopbacks 8941–8944; registered in the console health directory.
+- **Console consumers shipped** — ports-and-adapters (`src/lib/adapters/{warehouse,airbyte,data-quality}.ts`)
+  + admin APIs: Catalog, **Query** (read-only SQL = Athena), **Data movement** (trigger sync = Glue/DMS),
+  **Data quality** (checkpoint). The Data-plane management surface (`/data/*`) renders them in product language.
+- **Seeded** — 600k-row Indian-BFSI star schema (`deploy/onprem/seed-warehouse.mjs`) so the surfaces show real data.
+- **Governance on the movement path** — PII redaction (Presidio), classification-driven column masking (M4),
+  data-allowlist ceiling, data-quality gate, audit + lineage per sync. A data sync IS a governed pipeline.
+- **Next:** live corebank→warehouse pipeline (CDC), Parquet/lake (`s3()`), and the plain-language builder
+  (#199) so non-technical staff author governed pipelines. dbt transforms as jobs.
+
+**Definition of done:** an operator manages connectors, syncs, warehouse tables, ad-hoc queries, and
+data-quality checks from the console — every movement redacted, governed, audited, and replayable — with
+zero data leaving the perimeter, working with the source systems the enterprise already runs.
+
+---
+
+_Last updated: 2026-07-08. Owned by: console team._
+_Related: `README.md`, `docs/research/`, `platform/DATA_PLANE_PARITY.md`, `../shared/ROADMAP.md`_

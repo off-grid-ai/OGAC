@@ -10,7 +10,7 @@ One **governed pipeline** is the unit of everything — it governs **model acces
 - **Consumers** (bind a pipeline) — Apps · Agents · Chat/Projects · **BI (Superset/PowerBI)** · external 3rd-parties via a provisioned key. Built by non-technical dept staff in plain language.
 - **Pipeline** — THE governed unit, owns everything. Does **model-access** (grounded answers + citations) AND **data-movement** (connector→warehouse; batch/incremental/CDC). Same peripheries govern both: data-allowlist (hard ceiling), policy (ABAC/OPA), guardrails, **PII redaction on the sync path**, model evals+golden+drift, **data-quality evals (Great Expectations)**, routing/egress leash, schedule/CDC trigger, provisioned API key, versioning, **replay**. Per-pipeline lenses = its slice of the spine.
 - **Gateway** — the smart network+model edge: smart routing (model pick/fallback/load-balance/egress leash) + edge functions (Caddy: WAF, rate-limit, cache, TLS, per-tenant URL) + its OWN observability/logs.
-- **Substrate — two engines:** the **model engine** (llama.cpp fleet + cloud, OpenAI-compat — LIVE) and the **data engine** (Airbyte + Redpanda + ClickHouse + dbt + Great Expectations — NEW, on S2).
+- **Substrate — two engines:** the **model engine** (llama.cpp fleet + cloud, OpenAI-compat — LIVE) and the **data engine** (Airbyte + Redpanda + ClickHouse + dbt + Great Expectations — **LIVE on S2, 2026-07-08**; the AWS-data-stack parity map is [`DATA_PLANE_PARITY.md`](./DATA_PLANE_PARITY.md)).
 - **The spine** (run OR sync = the join key): Observability (Langfuse) · Audit/SIEM (OpenSearch) · Lineage (Marquez) · Provenance + Citations · FinOps/Cost · Regulatory (ISO 42001 / NIST / EU AI Act).
 - **Cross-cutting:** Identity (Keycloak) · Secrets (OpenBao) · Multi-tenancy · Flags (Unleash) · Fleet/MDM (FleetDM) · Storage (SeaweedFS) · Knowledge/Brain (Qdrant/LanceDB) · Backups/DR.
 
@@ -18,12 +18,12 @@ One **governed pipeline** is the unit of everything — it governs **model acces
 | Capability | Engine | Status |
 |---|---|---|
 | Model gateway | llama.cpp fleet + OpenAI-compat | live |
-| Warehouse (Snowflake/Databricks-equiv) | ClickHouse | new |
-| Connectors + ELT (Glue-equiv) | Airbyte (300+) | new |
-| CDC | Debezium (via Airbyte) | new |
-| Streaming / MQ | Redpanda (Kafka API) | new |
-| Transforms | dbt | new |
-| Data-quality evals | Great Expectations | new |
+| Warehouse (Snowflake/Databricks-equiv) | ClickHouse | **live on S2** |
+| Connectors + ELT (Glue-equiv) | Airbyte (300+) | **live on S2** |
+| CDC (DMS-equiv) | Debezium (via Airbyte) | **live on S2** |
+| Streaming / MQ | Redpanda (Kafka API) | **live on S2** |
+| Transforms | dbt | job/CLI |
+| Data-quality evals | Great Expectations | **live on S2** |
 | PII redaction | Presidio | live |
 | Model evals / drift | ragas · deepeval · Evidently | live |
 | Observability | Langfuse | live |
@@ -39,7 +39,7 @@ The platform must feel **beautiful and effortless** — creating and deploying a
 2. **Plain-language authoring** — describe the use-case in English; the platform wires the pipeline (gateway binding, data allowlist, guardrails, steps, schedule). Non-technical dept staff are the acceptance bar.
 
 ## Fleet
-10 machines: **S1** control-plane · **S2** data-plane (Airbyte/ClickHouse/Redpanda — needs Colima) · **g1–g8** model nodes.
+10 machines: **S1** control-plane · **S2** data-plane (Airbyte/ClickHouse/Redpanda/GE — **LIVE under OrbStack**, fronted on S1 edge loopbacks 8941–8944) · **g1–g8** model nodes.
 
 ## Positioning
 "A private AI, everywhere" + the governed data platform under it. Open-core: free under 20 people; 20+ license from us.

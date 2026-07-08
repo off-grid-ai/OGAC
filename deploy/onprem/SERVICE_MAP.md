@@ -55,6 +55,13 @@ Console env (SET LIVE on S1 `.env.local` 2026-07-08): `OFFGRID_WAREHOUSE_URL`, `
 the console health directory (`src/lib/services-directory.ts`: warehouse/airbyte/streaming/data-quality)
 so they appear + health-probe on the Services page. Lake landing = existing SeaweedFS S3.
 
+**Console consumers (ports-and-adapters + admin APIs)** — AWS-parity map: [`../../docs/platform/DATA_PLANE_PARITY.md`](../../docs/platform/DATA_PLANE_PARITY.md):
+- `src/lib/adapters/warehouse.ts` (ClickHouse) → `GET /api/v1/admin/warehouse` (catalog), `GET /warehouse/[table]` (detail), `POST /warehouse/query` (read-only SQL = "Query"/Athena).
+- `src/lib/adapters/airbyte.ts` (Airbyte) → `GET /api/v1/admin/etl`, `POST /etl/sync` ("Data movement" = Glue/DMS).
+- `src/lib/adapters/data-quality.ts` (Great Expectations) → `GET /api/v1/admin/data-quality`, `POST /data-quality/run` ("Data quality").
+- Data-plane management surface at `/data/*` (product language — OSS names never shown). Seed: `seed-warehouse.mjs` (600k-row `bfsi` schema).
+- **Governance on the movement path:** PII redaction (Presidio, the same engine as model-access guardrails) + M4 classification-driven column masking + data-allowlist ceiling + Great-Expectations quality gate, all applied as data moves → warehouse; every sync emits into the spine (Marquez lineage + OpenSearch audit).
+
 ## AI Gateway aggregator (the LLM control point)
 
 - **Process:** `console/scripts/gateway-aggregator.mjs` on S1, under launchd
