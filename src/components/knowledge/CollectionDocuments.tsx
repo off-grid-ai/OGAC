@@ -14,7 +14,7 @@ interface Doc {
 }
 
 // The documents sub-resource for a single collection's DETAIL page: upload/index a text document
-// and remove existing ones. Reuses the same endpoints the ManageCollection sheet used — the file is
+// and remove existing ones. Uses the collection documents endpoints — the file is
 // read client-side and sent as text; the server chunks + embeds it via the gateway. Read-only for
 // non-admins (no controls rendered).
 export function CollectionDocuments({
