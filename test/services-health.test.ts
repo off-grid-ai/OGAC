@@ -63,6 +63,22 @@ test('optional dep falls back to a generic label when none is given', () => {
   assert.equal(h.detail, 'fallback (optional)');
 });
 
+test('canonical-but-not-deployed plane reports its reason as an optional fallback, NOT down', () => {
+  // Modelled as an 'optional' service with a non-http URL → never network-probed, always reports
+  // the fallbackLabel reason. This keeps it non-alarming (never a red outage).
+  const e = base({
+    id: 'victoriametrics',
+    probe: 'optional',
+    fallbackLabel: 'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces',
+    url: 'not-deployed://victoriametrics',
+  });
+  const h = resolveHealth(e); // no raw — non-http optional isn't network-probed
+  assert.equal(h.status, 'optional');
+  assert.equal(h.detail, 'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces (optional)');
+  assert.equal(h.error, undefined); // no scary error surfaced
+  assert.equal(isHealthy(h.status), true); // NOT an outage
+});
+
 test('network service passes raw up/down through', () => {
   const e = base({ id: 'qdrant' }); // probe defaults to 'network'
   assert.equal(needsNetworkProbe(e), true);

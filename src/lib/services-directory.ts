@@ -2,6 +2,11 @@
 // place. Powers the /services page (a health-checked map of what we run) and is the
 // single source of truth for "which subdomains exist".
 //
+// KEEP IN SYNC WITH deploy/docker-compose.yml — that compose file is the source of truth for
+// the canonical stack (its profiles: data · secrets · observability · guardrails · policy ·
+// identity · lineage · llmops · agents · ai · caching · siem · flags · qa · bi · mdm). When a
+// service is added/removed/repointed in compose, reconcile it here (honest health, real port).
+//
 // Override for a given deployment with OFFGRID_SERVICES (a JSON array matching
 // ServiceEntry). Unset => the default suite below.
 
@@ -10,9 +15,13 @@
 //  · 'embedded' — an in-process/on-disk backend (e.g. LanceDB). There is no endpoint to hit;
 //                 a network probe is meaningless and would always read 'unreachable'. It runs
 //                 inside the console, so it's healthy whenever the console is.
-//  · 'optional' — a best-effort external dependency the app degrades past gracefully (e.g.
-//                 Redis: the cache falls back to an in-process store when it's absent). If it
-//                 answers it's 'up'; if not, that's the expected fallback state, NOT an outage.
+//  · 'optional' — a best-effort dependency the app degrades past gracefully, OR a plane that is
+//                 canonical in docker-compose.yml but intentionally NOT run on THIS fleet (an
+//                 alternative is used instead). Either way it's non-alarming: if it answers it's
+//                 'up', otherwise it reports its fallbackLabel state (the fallback in use, or the
+//                 reason it isn't deployed) — NEVER a scary 'down'. Examples: Redis (in-process
+//                 cache fallback); the VictoriaMetrics/VictoriaLogs/OTel/Jaeger observability
+//                 plane (this fleet uses OpenSearch + Langfuse for logs/traces instead).
 export type ProbeMode = 'network' | 'embedded' | 'optional';
 
 export interface ServiceEntry {
@@ -31,7 +40,8 @@ export interface ServiceEntry {
   probe?: ProbeMode;
   /**
    * For an 'optional' service, the state to SHOW when it doesn't answer — the honest name of
-   * the fallback (e.g. 'in-process cache'), rendered instead of a scary 'down'.
+   * the fallback (e.g. 'in-process cache') or the reason it isn't deployed here (e.g. the plane
+   * used instead), rendered instead of a scary 'down'.
    */
   fallbackLabel?: string;
 }
@@ -199,6 +209,110 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     probe: 'optional',
     fallbackLabel: 'in-process cache',
   },
+  {
+    id: 'seaweedfs',
+    label: 'SeaweedFS',
+    description: 'S3-compatible object store — documents, media, and artifacts. Fronted publicly at gateway.getoffgridai.co/files/* (reads public, writes Keycloak-gated).',
+    // data profile in compose (S3 API on :8333). Runs in the S1 offgrid-services-a stack → loopback.
+    url: process.env.OFFGRID_SEAWEEDFS_URL ?? 'http://127.0.0.1:8333',
+    // The S3 API answers on '/' (SeaweedFS filer/S3 gateway); a 403/401 from the bucket root still
+    // proves it's up (a gate answered), which the network probe counts as healthy.
+    healthPath: '/',
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'superset',
+    label: 'Superset',
+    description: 'BI & data exploration — SQL Lab, pivot/transpose, embeddable dashboards.',
+    // bi profile in compose (:8088). On g6 — via the S1 edge-Caddy loopback proxy
+    // (8933→offgrid-g6.local:8088), mirroring langfuse/unleash. Env override sets this on S1.
+    url: process.env.OFFGRID_SUPERSET_URL ?? 'http://127.0.0.1:8933',
+    healthPath: '/health',
+    auth: 'session',
+    kind: 'api',
+  },
+  {
+    id: 'fleetdm',
+    label: 'FleetDM',
+    description: 'MDM / device management — osquery-based cross-platform fleet control and posture.',
+    // mdm profile in compose (:8070). On g6 — via the S1 edge-Caddy loopback proxy
+    // (8934→offgrid-g6.local:8070). /healthz is unauthenticated and available pre-setup. Env on S1.
+    url: process.env.OFFGRID_FLEET_URL ?? 'http://127.0.0.1:8934',
+    healthPath: '/healthz',
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'evidently',
+    label: 'Evidently',
+    description: 'Drift & data-quality sidecar — the console\'s drift adapter runs PSI/quality suites through it.',
+    // qa profile in compose (:8001). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
+    // Health is the sidecar root '/' (see deploy/sidecars/drift/app.py @app.get("/")).
+    url: process.env.OFFGRID_EVIDENTLY_URL ?? 'http://127.0.0.1:8001',
+    healthPath: '/',
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'ragas',
+    label: 'Ragas',
+    description: 'RAG-eval sidecar — the console\'s evals adapter computes retrieval-quality metrics through it.',
+    // qa profile in compose (:8002). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
+    // Health is the sidecar's /health endpoint (see the compose healthcheck for ragas).
+    url: process.env.OFFGRID_RAGAS_URL ?? 'http://127.0.0.1:8002',
+    healthPath: '/health',
+    auth: 'api-key',
+    kind: 'api',
+  },
+
+  // ── Canonical planes NOT deployed on THIS fleet (honest, non-alarming — never 'down') ────
+  // The observability plane (VictoriaMetrics/VictoriaLogs/OTel/Jaeger) is canonical in
+  // docker-compose.yml (observability profile) but is intentionally NOT run here: this fleet
+  // uses OpenSearch (log/audit search) + Langfuse (LLM traces) instead. Probing them would
+  // always read 'down' — misleading — so they're modelled as 'optional' with a non-http URL
+  // (never network-probed, see status.ts#isHttpProbeable) and a fallbackLabel that states the
+  // reason. They render muted "Optional" + the reason, NOT a red outage.
+  {
+    id: 'victoriametrics',
+    label: 'VictoriaMetrics',
+    description: 'Metrics store (observability profile) — canonical in compose, not run on this fleet.',
+    url: process.env.OFFGRID_VICTORIAMETRICS_URL ?? 'not-deployed://victoriametrics',
+    auth: 'api-key',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces',
+  },
+  {
+    id: 'victorialogs',
+    label: 'VictoriaLogs',
+    description: 'Log store (observability profile) — canonical in compose, not run on this fleet.',
+    url: process.env.OFFGRID_VICTORIALOGS_URL ?? 'not-deployed://victorialogs',
+    auth: 'api-key',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'not deployed here — this fleet uses OpenSearch for log/audit search',
+  },
+  {
+    id: 'otel-collector',
+    label: 'OTel Collector',
+    description: 'OpenTelemetry collector (observability profile) — canonical in compose, not run on this fleet.',
+    url: process.env.OFFGRID_OTEL_URL ?? 'not-deployed://otel-collector',
+    auth: 'api-key',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'not deployed here — the console fans OTLP spans straight to Langfuse',
+  },
+  {
+    id: 'jaeger',
+    label: 'Jaeger',
+    description: 'Distributed-trace UI (observability profile) — canonical in compose, not run on this fleet.',
+    url: process.env.OFFGRID_JAEGER_URL ?? 'not-deployed://jaeger',
+    auth: 'session',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'not deployed here — Langfuse is the trace backend on this fleet',
+  },
 ];
 
 export function getServices(): ServiceEntry[] {
@@ -216,8 +330,9 @@ export function getServices(): ServiceEntry[] {
 //  · 'up'       — answered (or a gate answered 401/302).
 //  · 'down'     — a network-probed service failed (5xx / timeout / unreachable). A real outage.
 //  · 'embedded' — an in-process backend; healthy, no network probe was run.
-//  · 'optional' — an optional dependency that isn't answering; the app is on its documented
-//                 fallback. Non-alarming — NOT an outage.
+//  · 'optional' — an optional dependency that isn't answering (or a canonical plane not run on
+//                 this fleet); the app is on its documented fallback / alternative. Non-alarming
+//                 — NOT an outage.
 export type HealthStatus = 'up' | 'down' | 'embedded' | 'optional';
 
 export interface ServiceHealth {
@@ -244,7 +359,9 @@ export interface RawProbe {
  * honest status the UI shows. Zero-IO — the caller decides whether to run a network probe.
  *
  *  · embedded → always 'embedded' (no probe; healthy with the console).
- *  · optional → 'up' if it answered, else 'optional' (on the documented fallback, not down).
+ *  · optional → 'up' if it answered, else 'optional' (on the documented fallback / alternative,
+ *               not down). Also covers canonical planes not deployed on this fleet (non-http URL
+ *               → never probed → always reports the fallbackLabel reason).
  *  · network  → passes the raw up/down straight through.
  *
  * `raw` is omitted for embedded services (there's nothing to probe).
@@ -279,7 +396,11 @@ export function needsNetworkProbe(entry: ServiceEntry): boolean {
   return (entry.probe ?? 'network') !== 'embedded';
 }
 
-/** Healthy = not a real outage. Embedded backends and optional deps on fallback count as healthy. */
+/**
+ * Healthy = not a real outage. Embedded backends and optional deps on their fallback /
+ * alternative (incl. canonical planes not deployed on this fleet) count as healthy — only
+ * 'down' is an outage.
+ */
 export function isHealthy(status: HealthStatus): boolean {
   return status !== 'down';
 }
