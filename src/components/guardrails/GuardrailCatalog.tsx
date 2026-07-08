@@ -1,11 +1,18 @@
 'use client';
 
-import { CheckCircle, ShieldCheck, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import { Buildings, CheckCircle, ShieldCheck, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   type CatalogFilter,
@@ -21,12 +28,17 @@ import {
   isItemEnabled,
   itemAvailability,
 } from '@/lib/guardrails-catalog';
+import { enableGuardrailOnPipeline, pipelinesEnforcingGuardrail } from '@/lib/pipeline-governance';
 
-// Browse & one-click-enable the STANDARD guardrails (Builder Epic #124). A non-technical operator
-// searches/filters the bundled Presidio entities + Guardrails-AI validators and clicks "Enable" —
-// which writes a masking rule through the EXISTING guardrails rules path (POST
-// /api/v1/admin/guardrails/rules). No regex, no config. All the filter/enable/availability logic is
-// PURE in @/lib/guardrails-catalog; this component is thin. Search + kind + category live in the
+// Browse & enable the STANDARD guardrails (Builder Epic #124). A non-technical operator searches /
+// filters the bundled Presidio entities + Guardrails-AI validators and clicks "Enable → choose scope"
+// (T3, task #173): the enable is NEVER scope-invisible. They pick
+//   • Organization (default) → writes an org guardrail masking rule (POST /api/v1/admin/guardrails/
+//     rules), inherited by every pipeline, or
+//   • a specific pipeline    → tightens that pipeline's guardrailOverlay (PATCH /api/v1/admin/
+//     pipelines/[id]) — the exact mechanism the pipeline Guardrails tab uses.
+// The card shows the CURRENT scope as a badge (Org and/or "N pipelines"). All the filter/enable/
+// availability logic is PURE in @/lib; this component is thin. Search + kind + category live in the
 // URL (?cat_q / ?cat_kind / ?cat_cat) so the browser Back button and deep-links work.
 
 const KIND_LABEL: Record<GuardrailKind, string> = {
@@ -45,17 +57,29 @@ export interface EnabledRuleRef {
   pattern: string;
 }
 
+export interface PipelineScopeRef {
+  id: string;
+  name: string;
+  guardrailOverlay?: unknown;
+}
+
 export function GuardrailCatalog({
   engineStatus,
   enabledRules,
+  pipelines,
 }: {
   engineStatus: EngineStatus;
   enabledRules: EnabledRuleRef[];
+  /** Pipelines the operator can scope an enable to, with their current guardrail overlays. */
+  pipelines: PipelineScopeRef[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The item whose scope picker is open (null = closed). URL is unchanged — this is a transient
+  // create/edit form, which the nav rule explicitly permits as a modal.
+  const [scopeItem, setScopeItem] = useState<GuardrailCatalogItem | null>(null);
 
   // URL-driven filter state (navigational, not client-only).
   const filter: CatalogFilter = useMemo(
@@ -85,7 +109,8 @@ export function GuardrailCatalog({
     [active, filtered],
   );
 
-  async function enable(item: GuardrailCatalogItem) {
+  // Enable at ORG scope — the existing org guardrail masking rule (every pipeline inherits).
+  async function enableOrg(item: GuardrailCatalogItem) {
     setBusyId(item.id);
     const res = await fetch('/api/v1/admin/guardrails/rules', {
       method: 'POST',
@@ -93,8 +118,9 @@ export function GuardrailCatalog({
       body: JSON.stringify(buildEnablePayload(item)),
     });
     setBusyId(null);
+    setScopeItem(null);
     if (res.ok) {
-      toast.success(`Enabled: ${item.name}`);
+      toast.success(`Enabled org-wide: ${item.name}`);
       router.refresh();
     } else {
       const d = await res.json().catch(() => null);
@@ -102,12 +128,41 @@ export function GuardrailCatalog({
     }
   }
 
+  // Enable on ONE pipeline — tighten its guardrailOverlay (same path as the pipeline Guardrails tab).
+  // GET current overlay → compute next → PATCH. The pure enableGuardrailOnPipeline validates first.
+  async function enablePipeline(item: GuardrailCatalogItem, pipeline: PipelineScopeRef) {
+    setBusyId(item.id);
+    try {
+      const result = enableGuardrailOnPipeline(pipeline.guardrailOverlay, item.entity);
+      if (!result.ok) {
+        toast.error(result.reason);
+        return;
+      }
+      const res = await fetch(`/api/v1/admin/pipelines/${pipeline.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ guardrailOverlay: result.overlay }),
+      });
+      if (res.ok) {
+        toast.success(`Enabled on ${pipeline.name}: ${item.name}`);
+        setScopeItem(null);
+        router.refresh();
+      } else {
+        const d = await res.json().catch(() => null);
+        toast.error(d?.error ?? `Failed to enable on ${pipeline.name}`);
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Pick a protection and click <span className="font-medium text-foreground">Enable</span> —
-        no regex, no setup. Each one turns on detection for a common kind of sensitive data or a
-        safety check. Everything runs on your own network; nothing is sent out.
+        Pick a protection and click <span className="font-medium text-foreground">Enable</span>,
+        then choose its <span className="font-medium text-foreground">scope</span> — your whole
+        organization or a single pipeline. No regex, no setup. Everything runs on your own network;
+        nothing is sent out.
       </p>
 
       {/* Search + filters */}
@@ -168,7 +223,8 @@ export function GuardrailCatalog({
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {g.items.map((item) => {
                 const avail = itemAvailability(item, engineStatus);
-                const enabled = isItemEnabled(item, enabledRules);
+                const orgEnabled = isItemEnabled(item, enabledRules);
+                const scopedPipelines = pipelinesEnforcingGuardrail(item.entity, pipelines);
                 const badge = AVAIL_BADGE[avail.status];
                 return (
                   <div
@@ -199,19 +255,41 @@ export function GuardrailCatalog({
                         {badge.label}
                       </Badge>
                     </div>
+
+                    {/* CURRENT SCOPE — never scope-invisible. */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {orgEnabled ? (
+                        <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary">
+                          <Buildings className="size-3" /> Organization
+                        </Badge>
+                      ) : null}
+                      {scopedPipelines.length ? (
+                        <Badge
+                          variant="secondary"
+                          title={scopedPipelines.map((p) => p.name).join(', ')}
+                        >
+                          {scopedPipelines.length} pipeline
+                          {scopedPipelines.length === 1 ? '' : 's'}
+                        </Badge>
+                      ) : null}
+                      {!orgEnabled && !scopedPipelines.length ? (
+                        <span className="text-xs text-muted-foreground/70">Not enabled</span>
+                      ) : null}
+                    </div>
+
                     <div className="mt-auto pt-1">
-                      {enabled ? (
+                      {orgEnabled ? (
                         <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                          <CheckCircle className="size-4" /> Enabled
+                          <CheckCircle className="size-4" /> Enabled org-wide
                         </span>
                       ) : (
                         <Button
                           size="sm"
                           className="w-full"
                           disabled={busyId === item.id}
-                          onClick={() => void enable(item)}
+                          onClick={() => setScopeItem(item)}
                         >
-                          {busyId === item.id ? 'Enabling…' : 'Enable'}
+                          {busyId === item.id ? 'Enabling…' : 'Enable → choose scope'}
                         </Button>
                       )}
                     </div>
@@ -222,6 +300,65 @@ export function GuardrailCatalog({
           </div>
         ))
       )}
+
+      {/* Scope picker — org-default OR a specific pipeline. */}
+      <Dialog open={scopeItem !== null} onOpenChange={(o) => !o && setScopeItem(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enable {scopeItem?.name} — choose scope</DialogTitle>
+            <DialogDescription>
+              Turn this protection on for your whole organization, or scope it to a single pipeline.
+            </DialogDescription>
+          </DialogHeader>
+          {scopeItem ? (
+            <div className="space-y-4">
+              <button
+                type="button"
+                disabled={busyId === scopeItem.id}
+                onClick={() => void enableOrg(scopeItem)}
+                className="flex w-full items-start gap-3 rounded-md border border-border p-3 text-left hover:bg-accent disabled:opacity-60"
+              >
+                <Buildings className="mt-0.5 size-5 shrink-0 text-primary" />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">
+                    Organization (default)
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Every pipeline inherits it. Writes the org guardrail rule.
+                  </span>
+                </span>
+              </button>
+
+              <div>
+                <p className="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+                  Or a specific pipeline
+                </p>
+                {pipelines.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                    No pipelines yet — create one to scope a protection to it.
+                  </p>
+                ) : (
+                  <ul className="max-h-56 space-y-1 overflow-auto">
+                    {pipelines.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          disabled={busyId === scopeItem.id}
+                          onClick={() => void enablePipeline(scopeItem, p)}
+                          className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
+                        >
+                          <span className="font-medium text-foreground">{p.name}</span>
+                          <span className="text-xs text-muted-foreground">scope here</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

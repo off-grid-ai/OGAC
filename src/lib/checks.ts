@@ -1,4 +1,7 @@
 import { getPii } from './adapters/registry';
+import { CHECK_IDS } from './check-ids';
+
+export { CHECK_IDS } from './check-ids';
 
 // The findings spine. Guardrail/eval checks run as hooks (pre/post) and produce normalized
 // results stamped onto the audit record — the Portkey `hook_results` / Bifrost PostHook pattern.
@@ -71,6 +74,18 @@ export const groundingCheck: CheckAdapter = {
 };
 
 const REGISTRY: CheckAdapter[] = [piiCheck, injectionCheck, groundingCheck];
+
+// Drift guard: the wired REGISTRY must match the canonical CHECK_IDS list (check-ids.ts) exactly, so
+// the pure id list the policy editor constrains against can never fall out of sync with what runs.
+{
+  const wired = REGISTRY.map((a) => a.name);
+  const canonical = [...CHECK_IDS];
+  if (wired.length !== canonical.length || wired.some((n, i) => n !== canonical[i])) {
+    throw new Error(
+      `checks REGISTRY (${wired.join(',')}) drifted from CHECK_IDS (${canonical.join(',')})`,
+    );
+  }
+}
 
 export async function runChecks(phase: 'pre' | 'post', ctx: CheckContext): Promise<CheckResult[]> {
   const out: CheckResult[] = [];
