@@ -17,6 +17,7 @@ import type { Team as TeamRowDb, TeamMember as TeamMemberRowDb } from '@/db/sche
 import {
   type Membership,
   type TeamMemberRole,
+  normalizeDepartment,
   normalizeTeamMemberRole,
 } from '@/lib/teams-policy';
 
@@ -38,6 +39,9 @@ export async function ensureTeamsSchema(): Promise<void> {
         updated_at timestamptz NOT NULL DEFAULT now());
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS teams_org_idx ON teams (org_id);`);
+    // M2-a (#189): the optional DEPARTMENT grouping. Additive + idempotent — a team with no
+    // department reads as "Unassigned" in the org-chart view.
+    await db.execute(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS department text;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS team_members (
         id text PRIMARY KEY,
@@ -79,6 +83,8 @@ export interface TeamView {
   orgId: string;
   name: string;
   description: string;
+  /** The department this team belongs to (null ⇒ Unassigned). */
+  department: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** Member count — cheap roll-up for the list surface. */
@@ -101,6 +107,7 @@ function toTeamView(r: TeamRowDb, memberCount: number): TeamView {
     orgId: r.orgId,
     name: r.name,
     description: r.description,
+    department: r.department ?? null,
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
     memberCount,
@@ -111,6 +118,8 @@ function toTeamView(r: TeamRowDb, memberCount: number): TeamView {
 export interface CreateTeamInput {
   name: string;
   description?: string;
+  /** The department this team belongs to (null/omitted ⇒ Unassigned). */
+  department?: string | null;
   /** Stable id for seeding; omitted ⇒ a random tm_… id. */
   id?: string;
 }
@@ -152,7 +161,13 @@ export async function createTeam(
   const id = input.id ?? `tm_${randomUUID().slice(0, 12)}`;
   const [row] = await db
     .insert(teams)
-    .values({ id, orgId, name: input.name, description: input.description ?? '' })
+    .values({
+      id,
+      orgId,
+      name: input.name,
+      description: input.description ?? '',
+      department: normalizeDepartment(input.department),
+    })
     .onConflictDoNothing({ target: teams.id })
     .returning();
   if (!row) {
@@ -166,6 +181,8 @@ export async function createTeam(
 export interface UpdateTeamPatch {
   name?: string;
   description?: string;
+  /** Reassign the department (null clears it ⇒ Unassigned). Omit to leave unchanged. */
+  department?: string | null;
 }
 
 /** Update a team's name/description. Org-scoped. Null if absent. */
@@ -178,6 +195,7 @@ export async function updateTeam(
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.description !== undefined) set.description = patch.description;
+  if (patch.department !== undefined) set.department = normalizeDepartment(patch.department);
   const [row] = await db
     .update(teams)
     .set(set)
