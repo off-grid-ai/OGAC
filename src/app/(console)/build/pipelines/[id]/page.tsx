@@ -1,13 +1,22 @@
 import { notFound } from 'next/navigation';
+import { auth } from '@/auth';
 import { PipelineOverview } from '@/components/pipelines/PipelineOverview';
 import { listAppsByPipeline } from '@/lib/apps-store';
 import { listProjectsByPipeline } from '@/lib/chat';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listGoldenCases } from '@/lib/evals';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
+import { resolvePipelineRole } from '@/lib/pipeline-lifecycle';
+import {
+  PROMOTION_TRACK,
+  allowedTransitions,
+  roleAtLeast,
+  stageInfo,
+} from '@/lib/pipeline-lifecycle-model';
 import { getPipeline, listPipelineVersions } from '@/lib/pipelines';
 import { listPolicyRules } from '@/lib/policy-rules';
 import { getChatBindingGovernance } from '@/lib/store';
+import { getTeam, listTeams } from '@/lib/teams';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +66,30 @@ export default async function PipelineOverviewPage({ params }: { params: Promise
     inChatAllowlist: (chatGov.allowlist ?? []).includes(id),
   };
 
+  // ── M2 lifecycle & ownership — resolve THIS user's role on the pipeline + the legal transitions ──
+  const session = (await auth()) as { user?: { email?: string | null; role?: string } } | null;
+  const actor = { email: session?.user?.email ?? '', role: session?.user?.role };
+  const [role, teamOptions, boundTeam] = await Promise.all([
+    resolvePipelineRole(actor, { ownerId: p.ownerId, teamId: p.teamId }, orgId),
+    listTeams(orgId).catch(() => []),
+    p.teamId ? getTeam(p.teamId, orgId).catch(() => null) : Promise.resolve(null),
+  ]);
+  const stage = stageInfo(p.status);
+  const lifecycle = {
+    pipelineId: p.id,
+    name: p.name,
+    status: p.status,
+    role,
+    transitions: allowedTransitions(p.status, role),
+    ownerId: p.ownerId,
+    team: boundTeam ? { id: boundTeam.id, name: boundTeam.name } : null,
+    teamOptions: teamOptions.map((t) => ({ id: t.id, name: t.name })),
+    canManageOwnership: roleAtLeast(role, 'editor'),
+    track: PROMOTION_TRACK.map((s) => ({ status: s, label: stageInfo(s).label })),
+    trackIndex: stage.trackIndex,
+    stageDescription: stage.description,
+  };
+
   const rules = (p.routing.rules ?? []).map((r) => ({
     label: r.value || r.attribute || r.name,
     action: r.action,
@@ -96,6 +129,7 @@ export default async function PipelineOverviewPage({ params }: { params: Promise
           createdAt: v.createdAt,
           createdBy: v.createdBy,
         })),
+        lifecycle,
       }}
     />
   );

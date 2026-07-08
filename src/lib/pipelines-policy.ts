@@ -51,6 +51,8 @@ export interface PipelineShape {
   id: string;
   orgId: string;
   ownerId: string;
+  /** M2: the team/BU this pipeline belongs to (null ⇒ no team; owner + admin access only). */
+  teamId: string | null;
   name: string;
   description: string;
   visibility: string;

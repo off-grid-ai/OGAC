@@ -45,8 +45,15 @@ function statusBadge(status: string) {
   if (status === 'published') {
     return <Badge variant="secondary" className="bg-primary/10 text-primary">published</Badge>;
   }
-  if (status === 'archived') {
-    return <Badge variant="outline" className="text-muted-foreground">archived</Badge>;
+  if (status === 'in_review') {
+    return (
+      <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400">
+        in review
+      </Badge>
+    );
+  }
+  if (status === 'archived' || status === 'deprecated') {
+    return <Badge variant="outline" className="text-muted-foreground">{status}</Badge>;
   }
   return <Badge variant="outline" className="text-amber-600 dark:text-amber-400">draft</Badge>;
 }

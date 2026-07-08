@@ -26,6 +26,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
       { id: 'control', label: 'Control', route: '/governance' },
       { id: 'policy', label: 'Policy', route: '/governance/policy' },
       { id: 'access', label: 'Access', route: '/governance/access' },
+      { id: 'teams', label: 'Teams', route: '/governance/teams' },
     ],
   },
   {

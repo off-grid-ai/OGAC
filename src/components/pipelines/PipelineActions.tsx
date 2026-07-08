@@ -18,10 +18,14 @@ export function PipelineActions({
   pipelineId,
   status,
   name,
+  showTransitions = true,
 }: {
   pipelineId: string;
   status: string;
   name: string;
+  /** When false, render ONLY the Edit button — the M2 Lifecycle band owns the status transitions
+   *  (used on the Overview, where the PipelineLifecycle control is the source of truth). */
+  showTransitions?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -73,7 +77,7 @@ export function PipelineActions({
     [busy, name, pipelineId, router],
   );
 
-  const transitions = pipelineTransitions(status);
+  const transitions = showTransitions ? pipelineTransitions(status) : [];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
