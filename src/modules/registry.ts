@@ -205,7 +205,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'observability',
     label: 'Observability',
     description:
-      'Agent QA: eval scores, online LLM-as-judge scores, drift, and full run traces (Langfuse-backed).',
+      'Agent QA: eval scores, online LLM-as-judge scores, drift, and full run traces.',
     route: '/insights',
     service: 'qa',
   },
@@ -242,7 +242,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'lineage',
     label: 'Lineage',
-    description: 'Source→answer data lineage for every agent run (OpenLineage/Marquez-backed).',
+    description: 'Source→answer data lineage for every agent run.',
     route: '/data/lineage',
     service: 'lineage',
   },
@@ -307,7 +307,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'access',
     label: 'Access',
-    description: 'Manage users, roles, and machine clients via Keycloak.',
+    description: 'Manage users, roles, and machine clients with enterprise SSO.',
     route: '/governance/access',
     service: 'keycloak',
     internal: true,
@@ -373,7 +373,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'policy',
     label: 'Policy',
-    description: 'Policy-as-code (OPA) — the active policy set plus recent allow/deny decisions read back from the engine.',
+    description: 'Policy-as-code — the active policy set plus recent allow/deny decisions read back from the engine.',
     route: '/governance/policy',
     service: 'control',
     internal: true,
@@ -406,7 +406,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'drift',
     label: 'Drift',
-    description: 'Model/data drift monitoring (Evidently) — per-feature drift status and scores.',
+    description: 'Model/data drift monitoring — per-feature drift status and scores.',
     route: '/insights/drift',
     service: 'control',
     internal: true,
@@ -422,7 +422,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'retrieval',
     label: 'Retrieval',
-    description: 'Vector store (Qdrant) — collections, vector counts, and health for the retrieval backend.',
+    description: 'Vector store — collections, vector counts, and health for the retrieval backend.',
     route: '/data/retrieval',
     service: 'control',
     internal: true,
@@ -438,7 +438,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'secrets',
     label: 'Secrets',
-    description: 'Secrets management (OpenBao) — seal status, mounts, and secret lifecycle. Values never displayed.',
+    description: 'Secrets management — seal status, mounts, and secret lifecycle. Values never displayed.',
     route: '/governance/secrets',
     service: 'control',
     internal: true,
@@ -455,7 +455,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'guardrails',
     label: 'Guardrails',
-    description: 'Input/output policy — PII detection (Presidio + regex floor), injection, grounding. Engine + rules.',
+    description: 'Input/output policy — PII detection, injection, grounding. Engine + rules.',
     route: '/governance/guardrails',
     service: 'control',
     internal: true,
