@@ -34,12 +34,16 @@ const LATENCY_PCT = { percentiles: { field: 'ms', percents: [50, 95] } };
 /**
  * The single `size:0` aggregation query that replaces fetching raw docs.
  * `nowMs` is injected (not read from Date.now here) so the builder stays pure and testable.
+ * An optional `pipelineTag` (`pipeline:<id>`) narrows the whole rollup to one pipeline's slice — the
+ * gateway docs carry the pipeline attribution in `project` (PA-12), so we filter on `project.keyword`.
  */
-export function buildAggsQuery(nowMs: number): Record<string, unknown> {
+export function buildAggsQuery(nowMs: number, pipelineTag?: string | null): Record<string, unknown> {
   const recentGteIso = new Date(nowMs - RECENT_MS).toISOString();
   return {
     size: 0,
-    query: { match_all: {} },
+    query: pipelineTag
+      ? { bool: { filter: [{ term: { 'project.keyword': pipelineTag } }] } }
+      : { match_all: {} },
     aggs: {
       total_tokens: { sum: { field: 'tokens' } },
       latency_pct: LATENCY_PCT,

@@ -35,6 +35,9 @@ import {
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { currentOrgId } from '@/lib/tenancy';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { listPipelines } from '@/lib/pipelines';
 import { scoringConfigured } from '@/lib/qa/scoring';
 import type { DriftReport } from '@/lib/adapters/types';
 import { withTimeout } from '@/lib/with-timeout';
@@ -196,6 +199,11 @@ export default async function ObservabilityPage({
   const lfRegRaw = Array.isArray(sp.lfReg) ? sp.lfReg[0] : sp.lfReg;
   const regTab = resolveRegistryTab(lfRegRaw);
   const { range, fromIso, toIso } = resolveRange(lfRangeRaw);
+  // Pipeline facet — eval-run history filters server-side (eval_runs carry pipeline_id, PA-12); the
+  // other probes aren't pipeline-aware yet, so the note by the control is explicit about the scope.
+  const pipelines = await listPipelines(org).catch(() => []);
+  const facet = resolvePipelineFacet(sp.pipeline, pipelines.map((p) => p.id));
+  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
   // Every probe runs in parallel AND under a wall-clock ceiling: the observability page fans out to
   // eval history, the drift engine (Evidently), durable runs, feature flags, and three Langfuse
   // calls. The Langfuse trio already degrade gracefully; here we also cap eval/drift/runs/flag reads
@@ -211,7 +219,7 @@ export default async function ObservabilityPage({
     note: 'Drift engine did not respond in time.',
   };
   const [evals, drift, runs, onlineEnabled, traces, insights, registry] = await Promise.all([
-    withTimeout(listEvalRuns(20, org), PROBE_MS, []),
+    withTimeout(listEvalRuns(20, org, facet), PROBE_MS, []),
     withTimeout(getDrift().analyze({ orgId: org }), PROBE_MS, DRIFT_FALLBACK),
     withTimeout(listAgentRuns(15, org), PROBE_MS, []),
     withTimeout(getFlags().isEnabled('online-evals', true), PROBE_MS, true),
@@ -253,10 +261,19 @@ export default async function ObservabilityPage({
         <p className="max-w-2xl text-sm text-muted-foreground">
           Agent QA &amp; observability. Offline eval scores, drift (PSI), and the online
           LLM-as-judge — every agent run is traced through the governed pipeline with checks and
-          tamper-evident provenance. Online scores stream to {online ? 'Langfuse' : 'the local store'}{' '}
-          via the observability adapter.
+          tamper-evident provenance. Online scores stream to the tracing store via the observability
+          adapter.
+          {facetName ? (
+            <span className="text-foreground">
+              {' '}
+              Eval runs filtered to pipeline “{facetName}”; other panels show all pipelines.
+            </span>
+          ) : null}
         </p>
-        <RunSweepButton />
+        <div className="flex items-center gap-3">
+          <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
+          <RunSweepButton />
+        </div>
       </div>
 
       {drift.status === 'drift' ? (

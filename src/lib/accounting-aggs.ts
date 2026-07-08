@@ -49,17 +49,37 @@ function tokenSums(): Record<string, unknown> {
 }
 
 /**
- * The single `size:0` accounting query. Time range is injected as ISO strings (pure — no Date.now
- * here). `fromIso`/`toIso` are optional; when both omitted it's a `match_all` over all time.
+ * Compose the `query` clause from an optional time range + an optional pipeline filter. When a
+ * pipeline tag is given, the calls attributed to that pipeline are those whose `project` equals the
+ * canonical `pipeline:<id>` tag (PA-12 stamps it there), so we AND a `term` on `project.keyword`.
+ * Pure. Returns a bare range/match_all when no pipeline filter, else a `bool` combining both.
  */
-export function buildAccountingQuery(fromIso?: string, toIso?: string): Record<string, unknown> {
+export function accountingQueryClause(
+  fromIso?: string,
+  toIso?: string,
+  pipelineTag?: string | null,
+): Record<string, unknown> {
   const range =
     fromIso || toIso
       ? { range: { '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) } } }
       : { match_all: {} };
+  if (!pipelineTag) return range;
+  return { bool: { filter: [range, { term: { [PROJECT_FIELD]: pipelineTag } }] } };
+}
+
+/**
+ * The single `size:0` accounting query. Time range is injected as ISO strings (pure — no Date.now
+ * here). `fromIso`/`toIso` are optional; when both omitted it's a `match_all` over all time. An
+ * optional `pipelineTag` (`pipeline:<id>`) narrows the whole rollup to one pipeline's slice.
+ */
+export function buildAccountingQuery(
+  fromIso?: string,
+  toIso?: string,
+  pipelineTag?: string | null,
+): Record<string, unknown> {
   return {
     size: 0,
-    query: range,
+    query: accountingQueryClause(fromIso, toIso, pipelineTag),
     aggs: {
       // Org-wide token totals (prompt/completion/total) across the whole window.
       org_tokens: { sum: { field: 'tokens' } },
