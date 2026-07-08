@@ -124,6 +124,11 @@ export async function dispatchAgentRun(
     orgId,
     actor: args.actor,
     project: args.project,
+    // PA-16a-durable — thread the bound-pipeline id onto the DURABLE path so the WORKER enforces the
+    // same contract the sync path does (mirrors app-run's ctx.contract?.pipelineId ?? null). The
+    // route already resolved the binding into args.pipelineId (resolveAgentBinding); the workflow
+    // re-resolves the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy.
+    pipelineId: args.pipelineId ?? null,
   };
 
   // Durable path — only when opted in AND the runtime accepts the submission. The adapter never
@@ -148,9 +153,9 @@ export async function dispatchAgentRun(
   // Synchronous in-process fallback (the default). Pass the SAME context (incl. the minted runId) so
   // the fallback attributes + correlates identically to the durable path and reuses the one runId.
   // PA-16b: the resolved pipeline contract rides the context so runAgent enforces the allowlist +
-  // egress leash on this (the DEFAULT / most-common) path. The durable worker path does not yet
-  // carry the contract through AgentRunWorkflowInput — mirroring PA-16's deferred durable app-run
-  // gate — so a durably-dispatched run is not contract-gated this round (logged as PA-16b-durable).
+  // egress leash on this (the DEFAULT / most-common) path. PA-16a-durable now ALSO closes the
+  // durable worker path: the workflow input carries args.pipelineId (threaded above), and the
+  // runAgentPipeline activity re-resolves + enforces the same contract — so both paths are gated.
   const context: RunContext = {
     runId,
     actor: args.actor,
