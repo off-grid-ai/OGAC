@@ -78,7 +78,9 @@ export const NAV_GROUPS: NavGroup[] = [
     // lineage via DataNav (already rendered by src/app/(console)/(data)/layout.tsx).
     primary: ['data'],
     // `tool-catalog` moved to Build (Tools→Catalog is its home now; the old route redirects there).
-    secondary: ['integrations', 'data-domains', 'retrieval', 'lineage'],
+    // catalog + governance are the M4 deep-data-governance surfaces (catalog / classification /
+    // retention + RTBF / freshness), reached from the Data section nav.
+    secondary: ['integrations', 'data-domains', 'catalog', 'governance', 'retrieval', 'lineage'],
   },
   {
     id: 'governance',

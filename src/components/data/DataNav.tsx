@@ -28,6 +28,13 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     ],
   },
   {
+    heading: 'Govern',
+    tabs: [
+      { id: 'catalog', label: 'Catalog', route: '/data/catalog' },
+      { id: 'governance', label: 'Governance', route: '/data/governance' },
+    ],
+  },
+  {
     heading: 'Retrieve',
     tabs: [{ id: 'retrieval', label: 'Retrieval', route: '/data/retrieval' }],
   },
