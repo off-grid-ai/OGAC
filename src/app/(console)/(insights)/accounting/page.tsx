@@ -12,6 +12,11 @@ import {
 import { computeAccounting } from '@/lib/accounting';
 import { isRangePreset, type RangePreset } from '@/lib/accounting-aggs';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
+import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { listPipelines } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,12 +60,16 @@ function Stat({
 export default async function AccountingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; pipeline?: string }>;
 }) {
   await requireModuleForUser('accounting');
-  const { range: rawRange } = await searchParams;
+  const { range: rawRange, pipeline: rawPipeline } = await searchParams;
   const range: RangePreset = rawRange && isRangePreset(rawRange) ? rawRange : 'all';
-  const a = await computeAccounting(range);
+  const orgId = await currentOrgId();
+  const pipelines = await listPipelines(orgId).catch(() => []);
+  const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
+  const a = await computeAccounting(range, facet ? pipelineTag(facet) : null);
+  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
 
   return (
     <div className="space-y-6">
@@ -70,19 +79,25 @@ export default async function AccountingPage({
           <p className="text-sm text-muted-foreground">
             Token usage and spend attributed per user, per project, and per model — over the selected
             window. Read from real gateway traffic on-prem.
+            {facetName ? (
+              <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
+            ) : null}
           </p>
         </div>
-        {/* Time-range selector — URL driven (server round-trip, deep-linkable). */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {RANGES.map((r) => (
-            <Link
-              key={r.key}
-              href={`/accounting?range=${r.key}`}
-              className={`rounded-md border px-2 py-1 ${range === r.key ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
-            >
-              {r.label}
-            </Link>
-          ))}
+        {/* Pipeline facet + time-range selector — both URL-driven (server round-trip, deep-linkable). */}
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
+          <div className="flex flex-wrap items-center gap-2">
+            {RANGES.map((r) => (
+              <Link
+                key={r.key}
+                href={`/accounting?range=${r.key}${facet ? `&pipeline=${facet}` : ''}`}
+                className={`rounded-md border px-2 py-1 ${range === r.key ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
+              >
+                {r.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 

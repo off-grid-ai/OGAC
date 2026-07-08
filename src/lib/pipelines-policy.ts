@@ -351,3 +351,85 @@ export function snapshotOf(p: PipelineShape): PipelineSnapshot {
 export function nextVersion(current: number): number {
   return (Number.isFinite(current) && current > 0 ? current : 1) + 1;
 }
+
+// ─── Reverse edge: which pipelines reference a data entity (PURE) ───────────────────────────────────
+// A pipeline's `dataAllowlist` is a free-text list of domain references — an operator types domain
+// ids, labels, or aliases into the ceiling (see PipelineEditSheet). So to decide "does this pipeline
+// reference THIS domain" we match the allowlist against the FULL set of tokens the domain is known by
+// (its id + label + aliases), case-insensitively + trimmed. Pure, so it's exhaustively unit-testable
+// and identical whether we're rendering the domain-detail panel or a connector's roll-up.
+
+/** Normalise a reference token for comparison: trimmed + lower-cased. PURE. */
+export function normalizeRefToken(v: unknown): string {
+  return typeof v === 'string' ? v.trim().toLowerCase() : '';
+}
+
+export interface DomainRefTokens {
+  id: string;
+  label?: string | null;
+  aliases?: string[] | null;
+}
+
+/** The de-duped, normalised set of tokens a data-domain can be referenced by (id ∪ label ∪ aliases). */
+export function domainMatchTokens(domain: DomainRefTokens): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (v: unknown) => {
+    const t = normalizeRefToken(v);
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+    }
+  };
+  add(domain.id);
+  add(domain.label);
+  for (const a of domain.aliases ?? []) add(a);
+  return out;
+}
+
+/**
+ * Does a pipeline's dataAllowlist reference a domain identified by `tokens`? True when ANY normalised
+ * allowlist entry equals ANY of the domain's tokens. Pure — no I/O, given the already-read allowlist.
+ */
+export function allowlistReferencesTokens(dataAllowlist: string[], tokens: string[]): boolean {
+  if (!tokens.length) return false;
+  const want = new Set(tokens);
+  return normalizeAllowlist(dataAllowlist).some((entry) => want.has(normalizeRefToken(entry)));
+}
+
+// ─── Pipeline facet filter (PURE) ───────────────────────────────────────────────────────────────────
+// The Insights roll-ups (observability/analytics/siem/audit/accounting/finops/reports) expose a
+// `?pipeline=<id>` facet. This coerces the raw URL param into a clean pipeline id, GATED to the set the
+// org actually owns so a stale/forged id degrades to "all pipelines" (null) rather than an empty view.
+
+/** Coerce a raw `?pipeline` searchParam value (string | string[] | undefined) into a single string. */
+export function readPipelineParam(raw: string | string[] | undefined | null): string {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+/**
+ * Resolve the effective pipeline facet: the requested id if it's one the org owns, else null ("all").
+ * `known` is the list of pipeline ids the org has. Pure + deterministic — never trusts a raw id.
+ */
+export function resolvePipelineFacet(
+  raw: string | string[] | undefined | null,
+  known: string[],
+): string | null {
+  const id = readPipelineParam(raw);
+  if (!id) return null;
+  return known.includes(id) ? id : null;
+}
+
+/** Client/server-side filter of already-`pipeline:<id>`-tagged rows down to one pipeline's slice. PURE.
+ *  `tagOf` extracts a row's pipeline tag/label (e.g. `project`/`caller`/`resource`); a row matches when
+ *  it equals `pipeline:<id>` OR the bare id. Returns all rows unchanged when facet is null ("all"). */
+export function filterRowsByPipeline<T>(
+  rows: T[],
+  facet: string | null,
+  tagOf: (row: T) => (string | null | undefined)[],
+): T[] {
+  if (!facet) return rows;
+  const want = new Set([`pipeline:${facet}`, facet]);
+  return rows.filter((r) => tagOf(r).some((t) => (t ? want.has(t) : false)));
+}

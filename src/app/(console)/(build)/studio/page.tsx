@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { agentActivity, listManagedAgents } from '@/lib/agents';
 import { listApps } from '@/lib/apps-store';
+import { resolveConsumerChips } from '@/lib/pipeline-chip';
+import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -33,6 +35,16 @@ export default async function StudioPage() {
     agentActivity(orgId),
     listTools(orgId).catch(() => []),
   ]);
+
+  // Resolve each app's "Runs on: <pipeline>" chip in ONE batch (org governance + name map read once).
+  const appChipList = await resolveConsumerChips(
+    apps.map((a) => a.pipelineId ?? null),
+    orgId,
+  );
+  const appChips: Record<string, PipelineChipData> = {};
+  apps.forEach((a, i) => {
+    appChips[a.id] = appChipList[i];
+  });
 
   const customCount = agents.filter((a) => a.custom).length;
   const toolOptions = tools
@@ -90,7 +102,7 @@ export default async function StudioPage() {
           workflow. One "New app" front door opens the guided builder for both. */}
       <div>
         <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
-        <AppsList apps={apps} />
+        <AppsList apps={apps} chips={appChips} />
       </div>
 
       {/* Agents = single-step apps: the built-in roster + your own definitions, still fully editable

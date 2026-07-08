@@ -23,13 +23,18 @@ export type { Accounting, AttributedSpend, ModelSpend, RangePreset } from '@/lib
  * Compute the attributed usage/spend breakdown for a time-range preset via native OpenSearch
  * aggregations. Graceful fallback to real zeros when OpenSearch is unreachable.
  */
-export async function computeAccounting(preset: RangePreset = 'all'): Promise<Accounting> {
+export async function computeAccounting(
+  preset: RangePreset = 'all',
+  pipelineTag?: string | null,
+): Promise<Accounting> {
   const range = resolveRange(preset, Date.now());
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildAccountingQuery(range.from ?? undefined, range.to ?? undefined)),
+      body: JSON.stringify(
+        buildAccountingQuery(range.from ?? undefined, range.to ?? undefined, pipelineTag),
+      ),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });
