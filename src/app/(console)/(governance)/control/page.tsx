@@ -16,8 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { db } from '@/db';
+import { fleetNodes } from '@/db/schema';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
+import { fleetModelTags } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
+import { modelOptions } from '@/lib/policy-catalog';
 import { currentOrgId } from '@/lib/tenancy';
 import { siemConfigured } from '@/lib/siem';
 import {
@@ -57,10 +61,23 @@ export default async function ControlPage() {
   const baoReady = openBaoConfigured();
   const secretKeys = baoReady && openBaoSecrets.list ? await openBaoSecrets.list() : [];
 
+  // The live fleet routing tags feed the PolicyEditor's constrained model picker (catalog ∪ served).
+  // Degrade gracefully: DB down → catalog-only options, page still renders.
+  const nodes = await db
+    .select({ model: fleetNodes.model, role: fleetNodes.role })
+    .from(fleetNodes)
+    .catch(() => [] as { model: string; role: string }[]);
+  const liveModelTags = fleetModelTags(nodes);
+  const pickableModels = modelOptions(liveModelTags);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <PolicyEditor initial={policy} />
+        <PolicyEditor
+          initial={policy}
+          modelOptions={pickableModels}
+          fleetModelTags={liveModelTags}
+        />
 
         <Card className="shadow-sm">
           <CardHeader>
@@ -203,10 +220,10 @@ export default async function ControlPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-sm">Secrets vault (OpenBao)</CardTitle>
+          <CardTitle className="text-sm">Secrets vault</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Connector/tool credentials and virtual-key secrets stored in OpenBao KV v2 via the
-            secrets adapter. Values are write-only from here — only key names are listed back.
+            Connector/tool credentials and virtual-key secrets stored in the secrets store (KV v2)
+            via the secrets adapter. Values are write-only from here — only key names are listed back.
           </p>
         </CardHeader>
         <CardContent>

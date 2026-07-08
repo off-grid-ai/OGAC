@@ -381,3 +381,39 @@ export function guardrailEntityToControl(entity: string): { key: string; value: 
       return { key: 'requirePiiMasking', value: { bool: true } };
   }
 }
+
+/**
+ * Enable a guardrail-catalog item on ONE pipeline: map its entity → the control it tightens, then
+ * produce the NEXT guardrailOverlay from the pipeline's current (raw) overlay — pre-validated against
+ * the org guardrail defaults (a loosen is refused up-front). PURE: composes normalizeOverlay +
+ * guardrailEntityToControl + tightenOverlay so the scope-picker client only has to PATCH the result.
+ * Returns the control key alongside so the caller can report / audit which control it turned on.
+ */
+export function enableGuardrailOnPipeline(
+  rawOverlay: unknown,
+  entity: string,
+): OverlayEditResult & { key: string } {
+  const overlay = normalizeOverlay(rawOverlay, ORG_GUARDRAIL_DEFAULTS);
+  const { key, value } = guardrailEntityToControl(entity);
+  const result = tightenOverlay(ORG_GUARDRAIL_DEFAULTS, overlay, key, value);
+  return { ...result, key };
+}
+
+/**
+ * Of the given pipelines, which have the guardrail-control that `entity` maps to turned ON in their
+ * EFFECTIVE guardrails (org baseline tightened by their overlay)? Used by the catalog scope badge to
+ * show "on for N pipelines" honestly. PURE — no I/O. Returns the matching pipelines' {id,name}.
+ */
+export function pipelinesEnforcingGuardrail(
+  entity: string,
+  pipelines: readonly { id: string; name: string; guardrailOverlay?: unknown }[],
+): { id: string; name: string }[] {
+  const { key } = guardrailEntityToControl(entity);
+  return pipelines
+    .filter((p) => {
+      const overlay = normalizeOverlay(p.guardrailOverlay, ORG_GUARDRAIL_DEFAULTS);
+      const view = describeEffective(ORG_GUARDRAIL_DEFAULTS, overlay);
+      return view.controls.some((c) => c.key === key && c.bool === true);
+    })
+    .map((p) => ({ id: p.id, name: p.name }));
+}
