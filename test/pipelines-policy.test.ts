@@ -226,6 +226,25 @@ test('planSeedPipelines: is deterministic (idempotent re-seed)', () => {
   assert.deepEqual(planSeedPipelines('default'), planSeedPipelines('default'));
 });
 
+// gap PA-13 — a fresh seed must be CLEAN: it declares pipeline TEMPLATES only and carries NO API-key
+// material, so re-seeding can never (re)introduce the revoked "audit-test-key" rows a live audit
+// left behind. (Those lingering rows are runtime pipeline_api_keys records, purged via the revoke/DB
+// path — never emitted by this planner.) Lock that the seed plan has no key-bearing fields.
+test('planSeedPipelines: a fresh seed carries NO api-key material (PA-13 — clean re-seed)', () => {
+  for (const org of ['default', 'org_bharat']) {
+    for (const p of planSeedPipelines(org)) {
+      const keys = Object.keys(p);
+      assert.ok(
+        !keys.some((k) => /key|token|secret|revoke/i.test(k)),
+        `seed plan for ${p.name} declares no api-key/token/secret/revoke field`,
+      );
+      const blob = JSON.stringify(p);
+      assert.ok(!/audit-test-key/i.test(blob), 'no revoked audit-test-key artifact in the seed');
+      assert.ok(!/"revoked"|revokedAt/i.test(blob), 'no revoked-key state in the seed');
+    }
+  }
+});
+
 // helper: recover the key from a template name (mirrors the seed's key→name mapping loosely)
 function SAMPLE_KEY_OF(name: string): string {
   const map: Record<string, string> = {
