@@ -79,7 +79,7 @@ export function ServiceDetail({
   return (
     <div className="space-y-6">
       <Link
-        href="/services"
+        href="/gateway/services"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" /> Services
