@@ -1,15 +1,19 @@
 'use client';
 
-import { CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import type { EvalDef } from '@/lib/eval-defs';
 import type { GoldenCase } from '@/lib/evals';
+import { FEEDBACK_SUITE } from '@/lib/feedback-map';
+import type { RollbackHistoryEntry } from '@/lib/pipeline-release';
+import type { ReleaseGateDecision } from '@/lib/release-gate';
 
 // ─── PipelineQualityPanel — the pipeline-scoped Quality surface (mirrors AppQualityPanel) ──────────
 // Everything is scoped to ONE pipeline (pipelineId). Its evals run in THIS pipeline's context and can
@@ -25,15 +29,23 @@ type RunResult = {
 export function PipelineQualityPanel({
   pipelineId,
   pipelineName,
+  status,
+  version,
   evals,
   golden,
   libraryEvals,
+  rollbacks,
+  feedbackCount,
 }: {
   pipelineId: string;
   pipelineName: string;
+  status: string;
+  version: number;
   evals: EvalDef[];
   golden: GoldenCase[];
   libraryEvals: EvalDef[];
+  rollbacks: RollbackHistoryEntry[];
+  feedbackCount: number;
 }) {
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
@@ -42,6 +54,68 @@ export function PipelineQualityPanel({
   const [ge, setGe] = useState('');
   const [adding, setAdding] = useState(false);
   const [attaching, setAttaching] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+  const [gate, setGate] = useState<ReleaseGateDecision | null>(null);
+
+  // Publish THROUGH the release gate: runs this pipeline's evals, blocks on a failing gate unless the
+  // operator confirms an override (surfaced honestly with the failing evals named).
+  async function publish(override: boolean) {
+    if (publishing) return;
+    setPublishing(true);
+    try {
+      const r = await fetch(`/api/v1/admin/pipelines/${pipelineId}/publish`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ override }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        decision?: ReleaseGateDecision;
+        blocked?: boolean;
+        overridden?: boolean;
+      };
+      if (data.decision) setGate(data.decision);
+      if (r.status === 422 && data.blocked) {
+        toast.error(data.decision?.summary ?? 'Release gate failed — publish blocked.');
+      } else if (r.ok) {
+        toast.success(
+          data.overridden
+            ? 'Published with override — the gate failure is audited.'
+            : 'Published — release gate cleared.',
+        );
+        router.refresh();
+      } else {
+        toast.error('Publish failed');
+      }
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function rollback() {
+    if (rollingBack) return;
+    setRollingBack(true);
+    try {
+      const r = await fetch(`/api/v1/admin/pipelines/${pipelineId}/rollback`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: 'manual' }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        rolledBack?: boolean;
+        toVersion?: number;
+        error?: string;
+      };
+      if (r.ok && data.rolledBack) {
+        toast.success(`Rolled back to v${data.toVersion} — the last-good published version.`);
+        router.refresh();
+      } else {
+        toast.error(data.error ?? 'Nothing to roll back to.');
+      }
+    } finally {
+      setRollingBack(false);
+    }
+  }
 
   async function runEval(def: EvalDef) {
     setRunning(def.id);
@@ -129,6 +203,105 @@ export function PipelineQualityPanel({
         </p>
       </div>
 
+      {/* ── Release gate + auto-rollback (M1 close-the-loop) ── */}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm">Release gate</CardTitle>
+            <Badge variant="outline" className="capitalize">
+              {status} · v{version}
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Publishing runs this pipeline&apos;s evals first — a version only goes live if it clears
+              them. A failing gate blocks the release (you can override, which is audited).
+            </p>
+            {gate ? (
+              <div
+                className={`rounded-md border px-3 py-2 text-sm ${
+                  gate.pass
+                    ? 'border-primary/40 text-foreground'
+                    : 'border-destructive/50 text-foreground'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {gate.pass ? (
+                    <CheckCircle className="size-4 text-primary" weight="fill" />
+                  ) : (
+                    <XCircle className="size-4 text-destructive" weight="fill" />
+                  )}
+                  <span>{gate.summary}</span>
+                </div>
+                {gate.failing.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {gate.failing.map((f) => (
+                      <li key={f.evalId}>
+                        {f.name}: {f.score}% &lt; {f.thresholdPct}% threshold
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => publish(false)} disabled={publishing}>
+                {publishing ? <Spinner /> : <CheckCircle className="size-4" />} Publish through gate
+              </Button>
+              {gate && !gate.pass ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => publish(true)}
+                  disabled={publishing}
+                >
+                  Override &amp; publish
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm">Auto-rollback</CardTitle>
+            <span className="text-xs text-muted-foreground">{rollbacks.length} event(s)</span>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              On an eval-gate fail or a drift breach the pipeline rolls back to its last-good published
+              version. You can also roll back now.
+            </p>
+            {rollbacks.length > 0 ? (
+              <div className="max-h-40 space-y-1.5 overflow-y-auto">
+                {rollbacks.map((r) => (
+                  <div
+                    key={`${r.version}-${r.at ?? ''}`}
+                    className="rounded-md border border-border bg-background px-3 py-2 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">v{r.version}</Badge>
+                      <ArrowCounterClockwise className="size-3.5 text-muted-foreground" />
+                      <span className="text-foreground">{r.note}</span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {r.at ? new Date(r.at).toLocaleString() : ''}
+                      {r.by ? ` · ${r.by}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No rollbacks yet.</p>
+            )}
+            <Button size="sm" variant="outline" onClick={rollback} disabled={rollingBack}>
+              {rollingBack ? <Spinner /> : <ArrowCounterClockwise className="size-4" />} Roll back to
+              last-good
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-2">
         {/* This pipeline's evals */}
         <Card className="shadow-sm">
@@ -197,15 +370,30 @@ export function PipelineQualityPanel({
 
         {/* Golden set for this pipeline */}
         <Card className="shadow-sm">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm">Golden set for this pipeline ({golden.length})</CardTitle>
+            {feedbackCount > 0 ? (
+              <Badge variant="outline">{feedbackCount} from feedback</Badge>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Cases marked <span className="text-foreground">feedback</span> were captured from real
+              user corrections (app review) and chat ratings — the next eval run is measured against
+              them.
+            </p>
             {golden.length > 0 ? (
               <div className="max-h-64 space-y-1.5 overflow-y-auto">
                 {golden.map((g) => (
                   <div key={g.id} className="rounded-md border border-border bg-background px-3 py-2">
-                    <div className="text-sm text-foreground">{g.query}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1 truncate text-sm text-foreground">{g.query}</div>
+                      {g.suite === FEEDBACK_SUITE ? (
+                        <Badge variant="outline" className="shrink-0 text-[10px]">
+                          feedback
+                        </Badge>
+                      ) : null}
+                    </div>
                     <div className="text-[11px] text-muted-foreground">expects: {g.expected}</div>
                   </div>
                 ))}

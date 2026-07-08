@@ -33,10 +33,12 @@ const STATUS_VARIANT: Record<DriftDisplayStatus, string> = {
 type RunEnvelope = { data: DriftView | null; error: string | null };
 
 export function PipelineDriftPanel({
+  pipelineId,
   pipelineName,
   hasHistory,
   evalCount,
 }: {
+  pipelineId: string;
   pipelineName: string;
   /** True when this pipeline has enough eval-run history to compute drift honestly. */
   hasHistory: boolean;
@@ -48,6 +50,37 @@ export function PipelineDriftPanel({
   const [threshold, setThreshold] = useState<number>(DEFAULT_DRIFT_SHARE_THRESHOLD);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunEnvelope | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
+
+  // On a DRIFT breach, the operator can roll this pipeline back to its last-good published version
+  // (the same auto-rollback the release gate uses). Honest: if there's no prior good version the API
+  // says so and nothing changes. Reason is tagged 'drift-breach' so the version note explains why.
+  async function rollbackOnDrift() {
+    if (rollingBack) return;
+    setRollingBack(true);
+    try {
+      const r = await fetch(`/api/v1/admin/pipelines/${pipelineId}/rollback`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          reason: 'drift-breach',
+          detail: result?.data ? `drift score ${result.data.driftScore ?? 'n/a'}` : undefined,
+        }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        rolledBack?: boolean;
+        toVersion?: number;
+        error?: string;
+      };
+      if (r.ok && data.rolledBack) {
+        toast.success(`Rolled back to v${data.toVersion} on drift breach.`);
+      } else {
+        toast.error(data.error ?? 'Nothing to roll back to.');
+      }
+    } finally {
+      setRollingBack(false);
+    }
+  }
 
   const selected: DriftCatalogItem | undefined = DRIFT_CATALOG.find((i) => i.id === itemId);
 
@@ -234,6 +267,23 @@ export function PipelineDriftPanel({
                     ))}
                   </div>
                 )}
+                {result.data.status === 'drift' ? (
+                  <div className="rounded-md border border-destructive/50 px-3 py-2.5">
+                    <p className="text-sm text-foreground">
+                      Drift breach detected. Roll this pipeline back to its last-good published
+                      version to restore known-good behaviour.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={rollbackOnDrift}
+                      disabled={rollingBack}
+                    >
+                      {rollingBack ? <Spinner /> : null} Roll back to last-good
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             )}
           </CardContent>
