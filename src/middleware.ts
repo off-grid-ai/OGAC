@@ -2,27 +2,115 @@ import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
 import { isPublicFileGet, isPublicPath, tenantSlugFromHost } from '@/lib/route-access';
+import {
+  checkRateLimit as decideRateLimit,
+  resolveRateLimit,
+  GLOBAL_RATE_LIMIT,
+  RATE_WINDOW_MS,
+  type Counter,
+  type RateLimitConfig,
+} from '@/lib/rate-limit';
 
-// Sliding-window rate limiter — 60 req/min per IP on /api/* routes.
-// Keyed on CF-Connecting-IP (set by Cloudflare Tunnel) then x-forwarded-for fallback.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 60;
-const RATE_WINDOW_MS = 60_000;
+// The internal resolver route the edge uses to look up a key's configured limit (Node runtime → DB).
+// The edge short-circuits it so it isn't itself gated or rate-limited.
+const RL_RESOLVE_PATH = '/api/internal/rate-limit';
 
-function checkRateLimit(req: { headers: Headers; nextUrl: { pathname: string } }): boolean {
-  if (!req.nextUrl.pathname.startsWith('/api/')) return true;
-  const ip =
+// Two sliding-window counter maps, both driven by the SAME pure decision (@/lib/rate-limit):
+//   - ipCounters:  the global floor, keyed per client IP — applies to EVERY /api/* request.
+//   - keyCounters: the operator-configured per-key limit, keyed per API key — applied ADDITIONALLY
+//                  when a request carries an API key/bearer.
+const ipCounters = new Map<string, Counter>();
+const keyCounters = new Map<string, Counter>();
+
+// Per-key limit resolutions are cached (short TTL) so we don't call the resolver route on every
+// request — one lookup per key per KEY_TTL_MS, then served from memory.
+const KEY_TTL_MS = 30_000;
+const keyLimitCache = new Map<string, { config: RateLimitConfig; expires: number }>();
+
+const FLOOR: RateLimitConfig = { limit: GLOBAL_RATE_LIMIT, windowMs: RATE_WINDOW_MS };
+
+function clientIp(req: { headers: Headers }): string {
+  return (
     req.headers.get('cf-connecting-ip') ??
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    'unknown';
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
+    'unknown'
+  );
+}
+
+// The per-IP global floor: EVERY /api/* request is subject to it. Returns the retry-after seconds on
+// breach, or null when allowed.
+function checkIpFloor(req: { headers: Headers; nextUrl: { pathname: string } }): number | null {
+  if (!req.nextUrl.pathname.startsWith('/api/')) return null;
+  const r = decideRateLimit(clientIp(req), FLOOR, Date.now(), ipCounters);
+  return r.allow ? null : r.retryAfterSec;
+}
+
+// Extract the presented API secret: `Authorization: Bearer <token>` or `X-Api-Key: <token>`.
+function presentedKey(req: { headers: Headers }): string | null {
+  const auth = req.headers.get('authorization') ?? '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim() || null;
+  const xk = req.headers.get('x-api-key');
+  return xk?.trim() || null;
+}
+
+// SHA-256 of a token, hex — matches hashToken() in rate-limit-store.ts. Web Crypto is available in
+// the Edge runtime (node:crypto is not), so the edge fingerprints the secret itself and only sends
+// the hash to the resolver — the cleartext secret never leaves the edge.
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Resolve (cached) the configured limit for a key hash by asking the Node resolver route. Any failure
+// (resolver down, unknown key) falls back to the global floor so a resolver hiccup never opens the
+// gate wider than the floor and never hard-fails a request.
+async function resolveKeyConfig(origin: string, hash: string): Promise<RateLimitConfig> {
+  const cached = keyLimitCache.get(hash);
+  if (cached && cached.expires > Date.now()) return cached.config;
+  let config = FLOOR;
+  try {
+    const res = await fetch(`${origin}${RL_RESOLVE_PATH}?h=${hash}`, {
+      // Shared-secret so only the edge (which knows AUTH_SECRET) can drive the resolver — it isn't a
+      // key-existence oracle for outside callers. AUTH_SECRET is always set (NextAuth requires it).
+      headers: { 'x-rl-internal': process.env.AUTH_SECRET ?? '' },
+    });
+    if (res.ok) {
+      const body = (await res.json()) as { rateLimit?: number | null; orgDefault?: number | null };
+      config = resolveRateLimit(body.rateLimit, body.orgDefault, GLOBAL_RATE_LIMIT, RATE_WINDOW_MS);
+    }
+  } catch {
+    config = FLOOR;
   }
-  entry.count += 1;
-  return entry.count <= RATE_LIMIT;
+  keyLimitCache.set(hash, { config, expires: Date.now() + KEY_TTL_MS });
+  return config;
+}
+
+// The per-KEY configured limit, enforced ON TOP of the per-IP floor. Returns retry-after seconds on
+// breach, or null when allowed / no key present.
+async function checkKeyLimit(req: {
+  headers: Headers;
+  nextUrl: { pathname: string; origin: string };
+}): Promise<number | null> {
+  if (!req.nextUrl.pathname.startsWith('/api/')) return null;
+  const secret = presentedKey(req);
+  if (!secret) return null;
+  const hash = await sha256Hex(secret);
+  const config = await resolveKeyConfig(req.nextUrl.origin, hash);
+  const r = decideRateLimit(`key:${hash}`, config, Date.now(), keyCounters);
+  return r.allow ? null : r.retryAfterSec;
+}
+
+function tooManyRequests(retryAfterSec: number, pathname: string): NextResponse {
+  return withCors(
+    NextResponse.json(
+      { error: 'too many requests' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+    ),
+    pathname,
+  );
 }
 
 const { auth } = NextAuth(authConfig);
@@ -73,8 +161,16 @@ function tenantScopedHeaders(req: { headers: Headers; nextUrl: { hostname: strin
   return h;
 }
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
+
+  // The edge's own limit-resolver route: let it through untouched (no auth gate, no rate limit) so
+  // the middleware isn't recursively rate-limiting the very lookup it depends on. It self-guards with
+  // the x-rl-internal header + a same-origin fetch.
+  if (pathname === RL_RESOLVE_PATH) {
+    return NextResponse.next();
+  }
+
   // Downstream requests carry the (spoof-proof) tenant slug parsed from the host.
   const reqHeaders = tenantScopedHeaders(req);
   const pass = () => NextResponse.next({ request: { headers: reqHeaders } });
@@ -83,12 +179,12 @@ export default auth((req) => {
   if (req.method === 'OPTIONS' && isPublicApi(pathname)) {
     return withCors(new NextResponse(null, { status: 204 }), pathname);
   }
-  if (!checkRateLimit(req)) {
-    return withCors(
-      NextResponse.json({ error: 'too many requests' }, { status: 429, headers: { 'Retry-After': '60' } }),
-      pathname,
-    );
-  }
+  // (1) Global per-IP floor — every /api/* request.
+  const ipBreach = checkIpFloor(req);
+  if (ipBreach !== null) return tooManyRequests(ipBreach, pathname);
+  // (2) Per-key configured limit — enforced ON TOP of the floor when a key/bearer is present.
+  const keyBreach = await checkKeyLimit(req);
+  if (keyBreach !== null) return tooManyRequests(keyBreach, pathname);
   if (isPublicPath(pathname)) return withCors(pass(), pathname);
   if (isPublicFileGet(req.method, pathname)) return pass();
   if (isApiBearer(req)) return withCors(pass(), pathname);
