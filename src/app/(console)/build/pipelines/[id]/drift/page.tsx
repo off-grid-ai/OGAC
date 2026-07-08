@@ -28,6 +28,11 @@ export default async function PipelineDriftPage({ params }: { params: Promise<{ 
   const hasHistory = evals.length > 0 && runs.length >= 2;
 
   return (
-    <PipelineDriftPanel pipelineName={p.name} hasHistory={hasHistory} evalCount={evals.length} />
+    <PipelineDriftPanel
+      pipelineId={p.id}
+      pipelineName={p.name}
+      hasHistory={hasHistory}
+      evalCount={evals.length}
+    />
   );
 }
