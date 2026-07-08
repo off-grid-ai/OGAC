@@ -24,10 +24,12 @@ import {
   type EgressClass,
   type GatewayHealthSignal,
   type GatewayKind,
+  type GatewayPatch,
   type GatewayRow,
   type GatewayView,
   egressClassFor,
   mergeGatewayHealth,
+  validateMergedGateway,
 } from '@/lib/gateways-policy';
 
 const DEFAULT_ORG = 'default';
@@ -159,40 +161,62 @@ export async function createGateway(
   return toRow(row2);
 }
 
-/** A validated update patch (from validateGatewayUpdate). egressClass is re-derived, never trusted. */
-export interface UpdateGatewayInput {
-  name: string;
-  kind: GatewayKind;
-  baseUrl: string;
-  defaultModel: string;
-  enabled: boolean;
-}
+/** A validated PARTIAL update patch (from validateGatewayUpdate) — only the fields to change. */
+export type UpdateGatewayInput = GatewayPatch;
+
+/** The result of an update: the fresh row, a not-found signal, or a rejected merged shape. */
+export type UpdateGatewayResult =
+  | { ok: true; row: GatewayRow }
+  | { ok: false; reason: 'not-found' }
+  | { ok: false; reason: 'invalid'; error: string };
 
 /**
- * Update a gateway, org-scoped. egressClass is ALWAYS re-derived from the (possibly new) kind —
- * never taken from the caller — so a kind change flips egress consistently. Returns the fresh row,
- * or null when no row for this org+id exists (graceful 404 at the route). Writes name/kind/baseUrl/
- * defaultModel/enabled + the derived egressClass.
+ * Update a gateway, org-scoped, as a true PARTIAL (read-modify-write). gap PA-10: a `{ defaultModel }`
+ * -only patch updates JUST that field instead of silently no-op'ing or failing create-validation.
+ * Reads the current row, merges the provided fields over it, RE-DERIVES egressClass from the merged
+ * kind (never trusted from the caller — a kind change flips egress consistently), and re-checks the
+ * compat "needs a base URL" invariant against the MERGED shape (so a partial patch can never persist
+ * an unusable gateway). Returns a discriminated result: `not-found` when no row for this org+id
+ * exists (→404 at the route), `invalid` when the merged shape breaks the compat rule (→400, never a
+ * silent fail), or the fresh row.
  */
 export async function updateGateway(
   id: string,
   patch: UpdateGatewayInput,
   orgId: string = DEFAULT_ORG,
-): Promise<GatewayRow | null> {
+): Promise<UpdateGatewayResult> {
   await ensureGatewaysSchema();
+
+  const existing = await getGatewayRow(id, orgId);
+  if (!existing) return { ok: false, reason: 'not-found' };
+
+  // Read-modify-write: only patched keys override the stored row; the rest are preserved untouched.
+  const merged = {
+    name: patch.name ?? existing.name,
+    kind: patch.kind ?? existing.kind,
+    baseUrl: patch.baseUrl ?? existing.baseUrl,
+    defaultModel: patch.defaultModel ?? existing.defaultModel,
+    enabled: patch.enabled ?? existing.enabled,
+  };
+
+  // Re-check the compat invariant on the MERGED shape (partial patch may not carry kind + baseUrl).
+  const invalid = validateMergedGateway({ kind: merged.kind, baseUrl: merged.baseUrl });
+  if (invalid) return { ok: false, reason: 'invalid', error: invalid };
+
   const [row] = await db
     .update(gateways)
     .set({
-      name: patch.name,
-      kind: patch.kind,
-      baseUrl: patch.baseUrl,
-      defaultModel: patch.defaultModel,
-      egressClass: egressClassFor(patch.kind),
-      enabled: patch.enabled,
+      name: merged.name,
+      kind: merged.kind,
+      baseUrl: merged.baseUrl,
+      defaultModel: merged.defaultModel,
+      egressClass: egressClassFor(merged.kind), // always derived from the merged kind, never trusted
+      enabled: merged.enabled,
     })
     .where(and(eq(gateways.id, id), eq(gateways.orgId, orgId)))
     .returning();
-  return row ? toRow(row) : null;
+  // A row existed a moment ago; a null here is a race (deleted between read+write) → treat as 404.
+  return row ? { ok: true, row: toRow(row) } : { ok: false, reason: 'not-found' };
 }
 
 /**
