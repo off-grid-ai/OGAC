@@ -4,6 +4,7 @@ import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { renderPromptWithPartials } from '@/lib/prompt-template';
 import { resolvePartialMap } from '@/lib/prompt-partials';
 import { runInboundGuardrails, runOutboundGuardrails } from '@/lib/chat-run';
+import { promptRunTag } from '@/lib/prompt-observability';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -27,6 +28,13 @@ export async function POST(req: NextRequest) {
       ? (body.values as Record<string, string>)
       : {};
   const system = typeof body.system === 'string' ? body.system : '';
+  // Prompt-observability tagging: when the caller identifies which library prompt + version it is
+  // running, we stamp the gateway call with an `x-offgrid-run` header. The gateway aggregator records
+  // that header verbatim into the OpenSearch `corrId` field, so the run is attributable back to this
+  // prompt/version for the observability rollup (src/lib/prompt-observability.ts). Optional — an
+  // ad-hoc playground run (no promptId) is untagged and simply not counted, which is honest.
+  const promptId = typeof body.promptId === 'string' ? body.promptId.trim() : '';
+  const version = typeof body.version === 'string' ? body.version.trim() : '';
   const temperature =
     typeof body.temperature === 'number' && Number.isFinite(body.temperature)
       ? Math.max(0, Math.min(2, body.temperature))
@@ -70,13 +78,20 @@ export async function POST(req: NextRequest) {
   const payload: Record<string, unknown> = { messages, max_tokens: 2048, temperature, stream: false };
   if (model) payload.model = model;
 
+  // Stamp the prompt-run tag onto the gateway call so it lands as `corrId` in the telemetry doc.
+  const runHeaders: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-offgrid-user': owner,
+  };
+  if (promptId && version) runHeaders['x-offgrid-run'] = promptRunTag(promptId, version);
+
   let output = '';
   let ok = true;
   let detail = '';
   try {
     const r = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      headers: gatewayHeaders({ 'content-type': 'application/json', 'x-offgrid-user': owner }),
+      headers: gatewayHeaders(runHeaders),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(115000),
     });
