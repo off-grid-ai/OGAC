@@ -44,6 +44,9 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
     async runGuardrail() {
       return { blocked: false, detail: 'ok' };
     },
+    async scanPii() {
+      return { hits: false, entities: [], engine: 'regex' };
+    },
     async persist() {},
     async materializeAgent(_spec, step) {
       step.agentId = `ag_mat_${step.id}`;
@@ -160,4 +163,92 @@ test('contract with default (local) routing ⇒ agent runs on-prem, run complete
   );
   assert.equal(out.status, 'done');
   assert.equal(out.steps.find((s) => s.stepId === 's2')?.status, 'done');
+});
+
+// ─── PA-16c: an OVERLAY that ESCALATES masking ON masks the agent step's query before the model ────
+
+// A guardrail baseline where masking is a freely-overridable default OFF, so turning it ON via the
+// pipeline overlay is a genuine ESCALATION above the floor (not just the locked floor firing).
+const MASK_OFF_FLOOR = {
+  ...ORG_GUARDRAIL_DEFAULTS,
+  requirePiiMasking: { mode: 'default' as const, bool: false },
+};
+
+test('overlay ESCALATES masking ON ⇒ the agent step query is PII-redacted before runAgent (raw value never leaves)', async () => {
+  let sawQuery = '';
+  // A scanPii that actually redacts a raw PAN — the real substitution the pure helper applies.
+  const deps = fakeDeps({
+    async runAgent(agentId, query) {
+      sawQuery = query; // capture exactly what the child model call receives
+      return { id: `run_${agentId}`, answer: 'ok', status: 'done', citations: [] };
+    },
+    async scanPii(text) {
+      return {
+        hits: true,
+        redacted: text.replace(/[A-Z]{5}[0-9]{4}[A-Z]/g, '[PAN]'),
+        entities: ['PAN'],
+        engine: 'regex',
+      };
+    },
+  });
+
+  // Prompt-only spec (no connector) so we isolate the agent step; the step label carries the PII so
+  // buildAgentQuery folds it into the outbound query.
+  const promptSpec = spec([
+    { id: 'a1', label: 'assess applicant PAN ABCPE1234F for the loan', kind: 'agent', agentId: 'ag1' },
+  ]);
+
+  const out = await runApp(
+    promptSpec,
+    {},
+    {
+      orgId: 'default',
+      runId: 'r_mask',
+      contract: contract({
+        dataAllowlist: ['dom_hr'],
+        orgGuardrailDefaults: MASK_OFF_FLOOR,
+        guardrailOverlay: { requirePiiMasking: { mode: 'default', bool: true } },
+      }),
+    },
+    deps,
+  );
+
+  assert.equal(out.status, 'done');
+  assert.ok(!sawQuery.includes('ABCPE1234F'), 'the RAW PAN never reached the model call');
+  assert.ok(sawQuery.includes('[PAN]'), 'the redacted placeholder is what the model saw');
+});
+
+test('overlay does NOT escalate masking (floor off, no overlay) ⇒ the agent query is UNCHANGED (additive)', async () => {
+  let sawQuery = '';
+  const deps = fakeDeps({
+    async runAgent(agentId, query) {
+      sawQuery = query;
+      return { id: `run_${agentId}`, answer: 'ok', status: 'done', citations: [] };
+    },
+    // Even if the detector WOULD redact, masking is not required, so scanPii must never be consulted.
+    async scanPii() {
+      throw new Error('scanPii must not be called when masking is not escalated');
+    },
+  });
+
+  const promptSpec = spec([
+    { id: 'a1', label: 'assess applicant PAN ABCPE1234F for the loan', kind: 'agent', agentId: 'ag1' },
+  ]);
+
+  const out = await runApp(
+    promptSpec,
+    {},
+    {
+      orgId: 'default',
+      runId: 'r_nomask',
+      contract: contract({
+        dataAllowlist: ['dom_hr'],
+        orgGuardrailDefaults: MASK_OFF_FLOOR, // floor OFF, and no overlay tightening it on
+      }),
+    },
+    deps,
+  );
+
+  assert.equal(out.status, 'done');
+  assert.ok(sawQuery.includes('ABCPE1234F'), 'the query is untouched when masking is not escalated');
 });
