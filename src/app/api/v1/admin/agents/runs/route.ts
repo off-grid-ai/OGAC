@@ -4,6 +4,8 @@ import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
 import { actorFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { requireAdmin } from '@/lib/authz';
+import { getChatBindingGovernance } from '@/lib/store';
+import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
 export async function GET(req: Request) {
@@ -27,6 +29,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'agentId and query required' }, { status: 400 });
   }
 
+  const orgId = await currentOrgId();
+
+  // PA-16b — resolve the bound-pipeline CONTRACT this agent run enforces (data allowlist + egress
+  // leash + policy/guardrail overlay), most-specific-wins: an agent has no per-agent binding column
+  // yet, so this is the org-default chat/consumer pipeline (null agent binding → org default). Null
+  // (nothing bound / unresolvable) ⇒ the run behaves exactly as before (additive-only). Threaded
+  // into dispatch → the sync RunContext so runAgent enforces it per PA-16b.
+  const gov = await getChatBindingGovernance().catch(() => ({ defaultChatPipelineId: null, allowlist: [] }));
+  const { contract } = await resolveAgentBinding(null, gov.defaultChatPipelineId, orgId);
+
   // C4: resolve the caller CONTEXT here — the request is the only place identity/org/project exist.
   // Pass the fully-resolved actor (machine vs user + label preserved, not just the email) so a
   // durable run in the worker attributes its four-plane fan-out exactly as an inline run would.
@@ -34,9 +46,10 @@ export async function POST(req: Request) {
     agentId: b.agentId,
     query: b.query,
     caller: gate.user.email ?? undefined,
-    orgId: await currentOrgId(),
+    orgId,
     actor: actorFromSession(gate),
     project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
+    contract,
   });
 
   // Durable submit accepted but the pipeline is still executing in the worker — 202 with the

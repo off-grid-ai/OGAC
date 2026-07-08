@@ -16,6 +16,7 @@
 
 import type { Actor } from '@/lib/audit-event';
 import { actorFrom } from '@/lib/audit-event';
+import type { PipelineContract } from '@/lib/pipeline-enforcement';
 
 /**
  * The caller context for a governed agent run. Resolved AT SUBMIT TIME from the request (same source
@@ -37,6 +38,16 @@ export interface RunContext {
   org?: string;
   /** Owning project, if any. Attributed onto the canonical audit event's `project`. */
   project?: string;
+  /**
+   * PA-16b — the resolved bound-pipeline contract this agent run enforces (data allowlist + egress
+   * leash + policy/guardrail overlay). OPTIONAL + ADDITIVE: absent/null ⇒ legacy behaviour (no extra
+   * gate) — a run with no bound pipeline behaves EXACTLY as before. The route/dispatch resolves it
+   * once (resolveAgentBinding) and threads it here; runAgent calls the PURE enforcement decisions
+   * (enforceDataAccess before retrieval, enforceModelCall before the gateway call) + audits denials.
+   * Plain JSON-serializable data (mirrors AppRunContext.contract), so it can also ride the durable
+   * workflow input in a later round.
+   */
+  contract?: PipelineContract | null;
 }
 
 /**

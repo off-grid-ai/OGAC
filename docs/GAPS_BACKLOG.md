@@ -612,12 +612,52 @@ model call the egress leash refuses (audited). **Additive: a run with NO bound p
 | # | Gap | What to do | Owner | Effort |
 |---|-----|-----------|-------|--------|
 | PA-16a | **Durable (Temporal) app-run path not enforced.** `submitAppRun`'s durable branch serializes only `{appId,runId,input,orgId,caller}` to the workflow — the resolved contract isn't carried, so a durable run isn't gated. (Inline path IS enforced; durable is off by default, so the common path is covered.) | Resolve the contract inside the durable activity/worker (it already has orgId+appId), or serialize a contract ref into `AppRunWorkflowInput`, then call the same pure `enforceDataAccess`/`enforceModelCall`. | console | M |
-| PA-16b | **Agent-run + chat run paths not gated by the contract.** `runAgent` (agentrun.ts) + the chat run path run their OWN governance (policy/guardrails/budget) but don't yet consult the bound-pipeline contract's data-allowlist / egress leash / overlay. `resolveChatPipeline` resolves the binding; the enforcement seam isn't called there yet. | Thread a `PipelineContract` into `runAgent`/chat and call the same pure decisions before retrieval + the gateway call (data-class from the request). Reuse `pipeline-enforcement.ts` + `pipeline-contract.ts` (already built). | console | M |
-| PA-16c | **PII-masking flag not yet forced from the overlay.** `enforceModelCall` returns `requirePiiMasking`/`blockPromptInjection`, but the app-run path relies on the existing `runChecks` guardrail floor rather than escalating masking when the pipeline overlay tightens it on. | Have the run path raise the guardrail phase to enforce masking when `verdict.requirePiiMasking` is set (currently the org-locked floor already masks; the overlay-tighten escalation is the delta). | console | S |
+| ~~PA-16b~~ | ~~**Agent-run + chat run paths not gated by the contract.**~~ **RESOLVED (2026-07-08)** — enforcement is now wired into BOTH paths, reusing the pure libs (not rebuilt). See the resolution note below. | — | console | ✅ |
+| PA-16c | **PII-masking flag not yet forced from the overlay.** `enforceModelCall` returns `requirePiiMasking`/`blockPromptInjection`, but the run paths rely on the existing `runChecks` guardrail floor rather than escalating masking when the pipeline overlay tightens it on. | Have the run path raise the guardrail phase to enforce masking when `verdict.requirePiiMasking` is set (currently the org-locked floor already masks; the overlay-tighten escalation is the delta). | console | S |
 
 - **PA-16 (app-run inline enforcement) — SHIPPED + deployed.** Residual verification: a live app-run
   against a restrictive pipeline (empty allowlist / block egress) was not exercised end-to-end from the
   console UI — enforcement is proven by the real-`runApp`-executor integration test + no-regression
-  smoke, not a live UI run. Exercise a live restrictive run when convenient. Sub-gaps PA-16a (durable/
-  Temporal path), PA-16b (agent-run + chat run paths — seam built, not called), PA-16c (overlay PII-mask
-  escalation) remain.
+  smoke, not a live UI run. Exercise a live restrictive run when convenient. Sub-gap PA-16a (durable/
+  Temporal path) remains.
+
+### PA-16b — RESOLVED (2026-07-08): AGENT-RUN + CHAT-RUN paths now contract-gated
+
+The bound-pipeline contract is now enforced on both consumer run paths, reusing the ALREADY-BUILT
+pure decisions (`enforceDataAccess` / `enforceModelCall`) + contract seam (`resolveContract`,
+`auditEnforcement`) — nothing in `pipeline-enforcement.ts` / `pipeline-contract.ts` was rebuilt or
+changed (only imported). New thin glue: `src/lib/pipeline-run-glue.ts` (resolves which pipeline
+governs an agent/chat run, most-specific-wins, then loads its contract).
+
+- **Agent runs (`runAgent`, agentrun.ts):** the contract rides `RunContext.contract` (resolved once at
+  the `agents/runs` route via `resolveAgentBinding(null, orgDefault, org)` → threaded through
+  `dispatchAgentRun` onto the sync `RunContext`). Before retrieval a grounded run calls
+  `enforceDataAccess(contract,'retrieval')` (deny ⇒ status `denied` + `pipeline.data.deny` audit, no
+  retrieval); before the gateway/compose call it calls `enforceModelCall(contract, dataClass)`
+  (`block` ⇒ status `blocked` + `pipeline.egress.block` audit, no gateway call). `dataClass` =
+  `'general'` for a grounded run (real org data in the prompt), `'none'` for an ungrounded one.
+- **Chat runs (`chat/stream`):** the contract is resolved via `resolveChatBinding(convo.projectId, org)`
+  (real `resolveChatPipeline`). Knowledge reads are gated by `enforceDataAccess` (project KB keyed by
+  its project id, org-wide KB keyed `'org-knowledge'` — outside the allowlist ⇒ the read is SKIPPED +
+  audited, so the model never sees ungoverned data; the chat still answers). The model call is gated
+  by `enforceModelCall(contract, dataClass)` layered ON TOP of the existing routing plan — `block` is
+  a hard stop (deny + audit), `forceLocal` demotes a cloud plan to on-prem (the pipeline can only
+  tighten, never widen). All existing chat governance (RBAC / budget / routing) is untouched;
+  enforcement is purely additive.
+- **Additive / no-regression:** a run whose resolved contract is `null` (no bound pipeline) is
+  fully permissive (the `noPipeline` verdict) — proven by `test/pipeline-run-callsite.test.ts` and the
+  full suite passing (1686 pass / 0 fail). Coverage: `test/pipeline-run-glue.test.ts` (real binding
+  resolution, injected DB reads), `test/pipeline-run-callsite.test.ts` (real pure verdicts at the exact
+  data-keys/classes both paths use). NOTE: an end-to-end `runAgent` import test is NOT possible under
+  `node:test` — importing `agentrun.ts` transitively pulls in `next-auth`/`next/server`, which the
+  type-stripping loader can't resolve; the wiring is instead validated by the clean production build
+  (which compiles the routes + `runAgent` through the real Next toolchain) + the pure/glue tests.
+
+**Residual sub-gaps (open):**
+- **PA-16b-durable:** the DURABLE agent-run path (Temporal worker) does not yet carry the contract —
+  `AgentRunWorkflowInput` has no `contract` field, so a durably-dispatched run is not contract-gated
+  (only the default SYNC path is). Mirrors PA-16a (durable app-run). Thread the JSON-serializable
+  contract through `AgentRunWorkflowInput` → the worker's `RunContext` to close it.
+- **PA-16c:** overlay-driven PII-mask escalation still deferred (the org-locked guardrail floor masks
+  today; the overlay-tighten delta is the remaining work). Not folded in this round — it touches the
+  guardrail phase across both paths and warrants its own change.
