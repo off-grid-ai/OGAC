@@ -1,0 +1,1 @@
+# Placeholder for staging models (e.g. stg_<source>.sql). Materialized as views per dbt_project.yml.
