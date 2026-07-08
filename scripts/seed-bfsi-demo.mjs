@@ -14,6 +14,47 @@ const post = async (path, body) => {
   console.log(`${r.status}  POST ${path}  ${j?.id || j?.error || ''}`);
   return { status: r.status, json: j };
 };
+const patch = async (path, body) => {
+  const r = await fetch(`${BASE}${path}`, { method: 'PATCH', headers: H, body: JSON.stringify(body) });
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+  console.log(`${r.status}  PATCH ${path}  ${j?.id || j?.error || ''}`);
+  return { status: r.status, json: j };
+};
+const getJson = async (path) => {
+  const r = await fetch(`${BASE}${path}`, { headers: H });
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+  return { status: r.status, json: j };
+};
+
+// ── App → governing pipeline (mirror of src/lib/bfsi-app-pipeline-map.ts; JS can't import the TS
+//    source, so the title→pipeline-NAME map is duplicated here and kept in lock-step with it + with
+//    SAMPLE_PIPELINES in src/lib/pipelines-seed.ts). Each seeded app "Runs on:" its matching pipeline
+//    instead of rendering "Ungoverned". ──────────────────────────────────────────────────────────
+const APP_TITLE_TO_PIPELINE_NAME = {
+  'motor claim fnol triage': 'Motor-Claim FNOL',
+  'personal loan underwriting assist': 'Loan Underwriting',
+  'kyc & re-kyc verification': 'KYC Verification',
+  'reimbursement approval': 'Reimbursement Governance',
+  'fraud screening': 'Fraud Screening',
+  'cross-sell advisor': 'Cross-Sell Advisor',
+};
+const norm = (s) => String(s ?? '').trim().toLowerCase();
+
+// Build a live pipeline NAME→id map, then resolve the pipeline id a given app title binds to.
+async function loadPipelineIdByName() {
+  const { status, json } = await getJson('/api/v1/admin/pipelines');
+  const map = new Map();
+  if (status === 200 && Array.isArray(json?.data)) {
+    for (const p of json.data) if (p?.name && p?.id) map.set(norm(p.name), p.id);
+  } else {
+    console.log(`!  could not list pipelines (${status}) — apps will seed without a pipeline binding`);
+  }
+  return map;
+}
+function pipelineIdForApp(title, pipelineIdByName) {
+  const name = APP_TITLE_TO_PIPELINE_NAME[norm(title)];
+  return name ? (pipelineIdByName.get(norm(name)) ?? null) : null;
+}
 
 // ── Knowledge: real Indian BFSI SOPs/policies (grounds Chat + Brain with citations) ───────────────
 const DOCS = [
@@ -52,12 +93,27 @@ const APPS = [
 console.log('== ingesting Indian BFSI knowledge ==');
 for (const d of DOCS) await post('/api/v1/admin/brain/documents', { title: d.title, text: d.text, source: d.source });
 
-console.log('== creating governed BFSI apps ==');
+console.log('== binding governed BFSI apps to their pipelines ==');
+const pipelineIdByName = await loadPipelineIdByName();
+// Existing apps (idempotency): match by title so a re-run UPDATES pipeline_id instead of duplicating.
+const { json: appList } = await getJson('/api/v1/admin/apps');
+const existingByTitle = new Map();
+if (Array.isArray(appList?.data)) for (const a of appList.data) existingByTitle.set(norm(a.title), a);
+
+console.log('== creating / updating governed BFSI apps ==');
 for (const a of APPS) {
   const steps = a.steps.map((s, i) => ({ id: `s${i + 1}`, ...s }));
   // Chain the steps into one linear flow: s1 → s2 → … → sN (exactly one start step).
   const edges = steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id }));
-  await post('/api/v1/admin/apps', { title: a.title, summary: a.summary, visibility: 'private', trigger: { kind: 'on-demand' }, steps, edges, published: true });
+  const pipelineId = pipelineIdForApp(a.title, pipelineIdByName);
+  if (!pipelineId) console.log(`!  no pipeline resolved for "${a.title}" — seed the pipelines first (POST /api/v1/admin/pipelines/seed)`);
+  const existing = existingByTitle.get(norm(a.title));
+  if (existing) {
+    // Idempotent re-run: refresh the pipeline binding (+ steps/edges) on the already-present app.
+    await patch(`/api/v1/admin/apps/${encodeURIComponent(existing.id)}`, { pipelineId, steps, edges, summary: a.summary });
+  } else {
+    await post('/api/v1/admin/apps', { title: a.title, summary: a.summary, visibility: 'private', trigger: { kind: 'on-demand' }, steps, edges, published: true, pipelineId });
+  }
 }
 
 console.log('done.');

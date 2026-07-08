@@ -21,12 +21,13 @@
 import './worker-env.mts';
 import { createConnector, listConnectors } from '../src/lib/store.ts';
 import { createDomain, listDomains } from '../src/lib/data-domains-store.ts';
-import { createApp, listApps } from '../src/lib/apps-store.ts';
+import { createApp, listApps, updateApp } from '../src/lib/apps-store.ts';
+import { listPipelines } from '../src/lib/pipelines.ts';
+import { resolvePipelineIdForApp } from '../src/lib/bfsi-app-pipeline-map.ts';
 import {
   buildReimbursementAppSpec,
   planConnectors,
   planDomains,
-  shouldSeedSampleApp,
 } from '../src/lib/data-domains-demo-seed.ts';
 
 const log = (...a: unknown[]) => console.log('[seed:domains]', ...a);
@@ -65,11 +66,18 @@ async function main(): Promise<void> {
     log(`! domains SKIPPED (backing connector absent — never fabricated): ${domPlan.unbacked.map((d) => `${d.label}(${d.connectorKey})`).join(', ')}`);
   }
 
-  // 4. Sample app (idempotent by title).
+  // 4. Sample app (idempotent by title) — bound to its governing pipeline so it reads
+  //    "Runs on: Reimbursement Governance" instead of "Ungoverned". The binding is resolved from the
+  //    live pipeline library by name (pure rule in bfsi-app-pipeline-map.ts). A re-run UPDATES the
+  //    binding on the already-present app so it self-heals if the pipelines were seeded afterwards.
   if (wantSampleApp) {
-    const existingApps = await listApps(orgId);
-    if (shouldSeedSampleApp(existingApps.map((a) => a.title))) {
-      const spec = buildReimbursementAppSpec(orgId, ownerId);
+    const [existingApps, pipelines] = await Promise.all([listApps(orgId), listPipelines(orgId).catch(() => [])]);
+    const pipelineIdByName = new Map(pipelines.map((p) => [p.name, p.id]));
+    const spec = buildReimbursementAppSpec(orgId, ownerId);
+    const pipelineId = resolvePipelineIdForApp(spec.title, pipelineIdByName);
+    if (!pipelineId) log(`! no pipeline resolved for "${spec.title}" — seed the pipelines first (POST /api/v1/admin/pipelines/seed)`);
+    const existing = existingApps.find((a) => a.title.trim().toLowerCase() === spec.title.trim().toLowerCase());
+    if (!existing) {
       const app = await createApp(orgId, ownerId, {
         title: spec.title,
         summary: spec.summary,
@@ -77,10 +85,12 @@ async function main(): Promise<void> {
         trigger: spec.trigger,
         steps: spec.steps,
         edges: spec.edges,
+        pipelineId,
       });
-      log(`+ sample app "Reimbursement Approval" → ${app.id}`);
+      log(`+ sample app "Reimbursement Approval" → ${app.id} (pipeline ${pipelineId ?? 'none'})`);
     } else {
-      log('= sample app "Reimbursement Approval" already present');
+      await updateApp(existing.id, orgId, { pipelineId });
+      log(`= sample app "Reimbursement Approval" present → pipeline ${pipelineId ?? 'none'}`);
     }
   }
 
