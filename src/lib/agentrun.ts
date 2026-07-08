@@ -35,6 +35,16 @@ import type { RetrievalHit } from '@/lib/retrieval/types';
 import { listTools } from '@/lib/store';
 import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
+import {
+  type AgentTool,
+  type LoopStep,
+  type PlanInput,
+  type ToolObservation,
+  buildPlannerPrompt,
+  parseAgentAction,
+  runAgentLoop,
+} from '@/lib/agent-loop';
+import { buildAgentToolCatalog, isAutonomousAgent } from '@/lib/agent-tools-catalog';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the
 // platform's capabilities actually fire in-path, not just from admin endpoints:
@@ -183,6 +193,129 @@ async function compose(
     return answer;
   }
   return hits[0] ? `Based on ${hits.length} source(s): ${hits[0].snippet}` : 'No sources found.';
+}
+
+// Bound the ReAct step budget from env (OFFGRID_AGENT_MAX_ITERATIONS); the pure loop clamps to
+// [1,20] regardless. Default 6.
+function clampAgentIterations(v: string | undefined): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 20) : 6;
+}
+
+// ─── resolveAgentToolCatalog — I/O seam: an agent's declared refs → the planner's AgentTool[] ─────
+// Reads the agent's tool refs (built-in tags are dropped by the pure catalog; only prim:/app:/tool:
+// refs survive), resolves registry-tool + app-as-tool descriptors from the store (org-scoped), and
+// applies the air-gap gate over primitives via the pure buildAgentToolCatalog. Best-effort: a store
+// miss degrades to whatever resolved, never throws (an autonomous agent with an unresolvable tool
+// simply doesn't expose it, and may fall back to the linear path).
+async function resolveAgentToolCatalog(agent: AgentDef, orgId: string): Promise<AgentTool[]> {
+  const refs = agent.tools ?? [];
+  // Only touch the store if there are registry/app refs to resolve — built-ins (capability tags) and
+  // primitive-only agents need no lookup.
+  const appRefs = refs.filter((r) => r.startsWith('app:'));
+  const registryRefs = refs.filter((r) => r.startsWith('tool:'));
+  let registryTools: { ref: string; name: string; description: string }[] = [];
+  let appTools: { ref: string; name: string; description: string }[] = [];
+  try {
+    if (registryRefs.length) {
+      const tools = await listTools(orgId);
+      registryTools = tools
+        .filter((x) => registryRefs.includes(`tool:${x.id}`))
+        .map((x) => ({ ref: `tool:${x.id}`, name: x.name, description: x.name }));
+    }
+    if (appRefs.length) {
+      const { listApps } = await import('@/lib/apps-store');
+      const apps = await listApps(orgId);
+      appTools = apps
+        .filter((a) => a.published && appRefs.includes(`app:${a.id}`))
+        .map((a) => ({ ref: `app:${a.id}`, name: a.title, description: a.summary || a.title }));
+    }
+  } catch {
+    /* best-effort — degrade to whatever resolved */
+  }
+  return buildAgentToolCatalog({
+    refs,
+    env: process.env as Record<string, string | undefined>,
+    registryTools,
+    appTools,
+  });
+}
+
+// ─── The GOVERNED planner — the model call the pure agent-loop injects as `planNext` ─────────────
+// The pure loop (agent-loop.ts) decides WHAT to do; this decides HOW the "what to do next" question
+// reaches the model — through the SAME governed gateway path (gatewayAnswer → gateway + guardrails +
+// FinOps attribution) as a normal answer. It builds the ReAct prompt (pure), calls the gateway, and
+// parses the reply into an action. On an empty/unparseable reply it FINISHES with a best-effort note
+// rather than looping blindly — the loop's budget still bounds it either way.
+function makeGovernedPlanner(model: string, system: string, caller?: string) {
+  return async (input: PlanInput) => {
+    const prompt = buildPlannerPrompt(input);
+    // The planner reply is NOT the final answer, so it must not be cached under the compose key;
+    // call the gateway directly with the ReAct system + prompt.
+    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller);
+    const action = reply ? parseAgentAction(reply) : null;
+    if (action) return action;
+    // No usable action — end the loop honestly with whatever the model said (or a fallback).
+    return { kind: 'finish' as const, answer: reply?.trim() || 'Unable to determine a next step.' };
+  };
+}
+
+// ─── The GOVERNED tool executor — the tool call the pure agent-loop injects as `callTool` ────────
+// Every tool the planner chooses is dispatched through the EXISTING governed tool seam
+// (maybeRunComposableTool: primitives re-check the air-gap gate + action-policy, apps run through the
+// governed submitAppRun, all audited) or the sandbox path — never a raw fetch. `mark` records each
+// dispatch as a run step so the trajectory shows up in the trace/provenance. NEVER throws: a failure
+// becomes an honest observation the model can react to next turn.
+function makeGovernedToolExecutor(
+  orgId: string,
+  agentId: string,
+  caller: string | undefined,
+  mark: Mark,
+) {
+  return async (ref: string, args: Record<string, unknown>): Promise<ToolObservation> => {
+    try {
+      // Sandbox registry tools (tool:<id>) run through the sandbox path; primitives/apps through the
+      // composable seam. Both are governed + audited. The composable path returns a structured result.
+      await maybeRunSandboxTool(ref, mark);
+      const result = await maybeRunComposableTool(
+        ref,
+        { orgId, actor: caller, callerAppId: agentId },
+        mark,
+        typeof args.query === 'string' ? args.query : JSON.stringify(args),
+      );
+      if (result === null) {
+        // A registry tool handled by the sandbox path (or an unknown ref) — report what we can.
+        return { ref, args, ok: true, observation: `tool ${ref} dispatched` };
+      }
+      const output =
+        'output' in result && typeof result.output === 'string' && result.output.trim()
+          ? result.output.trim()
+          : result.detail;
+      return { ref, args, ok: result.ok, observation: output };
+    } catch (err) {
+      return {
+        ref,
+        args,
+        ok: false,
+        observation: `tool ${ref} error: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  };
+}
+
+// Fold the loop's trajectory into the run's step list so the plan→act→observe iterations are visible
+// in the trace + signed into provenance. Each planner turn and tool dispatch is one step.
+function recordTrajectory(trajectory: LoopStep[], mark: Mark): void {
+  for (const step of trajectory) {
+    if (step.kind === 'tool' && step.tool) continue; // already marked by the tool executor's `mark`
+    if (step.kind === 'finish') {
+      mark('loop', 'finish', (step.answer ?? '').slice(0, 120), [], Date.now());
+    } else if (step.kind === 'halt') {
+      mark('loop', 'halt', step.haltReason ?? 'halted', [], Date.now());
+    } else if (step.kind === 'plan') {
+      mark('loop', 'plan', step.thought?.slice(0, 120) ?? 'planning', [], Date.now());
+    }
+  }
 }
 
 function toRun(row: { id: string; startedAt: Date | string }, v: Omit<AgentRun, 'id' | 'startedAt'>): AgentRun {
@@ -514,10 +647,44 @@ export async function runAgent(
     }
   }
 
-  // 4. Answer — composed from the retrieved sources (cached). Uses the (possibly PII-masked) query.
+  // 4. Answer — either the AUTONOMOUS ReAct loop (agent has callable tools) or the LINEAR compose.
+  //
+  // Framework-grade agency: when the agent declares tools that resolve to a genuinely callable,
+  // air-gap-permitted set (buildAgentToolCatalog applies the same gate the executor re-checks), run
+  // the pure plan→act→observe→iterate loop with a hard step budget instead of a single compose pass.
+  // The loop's model call is the governed planner (gateway + guardrails + FinOps) and its tool call
+  // is the governed, audited tool seam — so autonomy stays inside the pipeline contract by
+  // construction. Absent callable tools, the existing linear path (unchanged) composes the answer.
   t = Date.now();
-  const answer = await compose(modelQuery, routed.hits, agent, caller);
-  mark('answer', 'compose', answer.slice(0, 120), [], t);
+  const toolCatalog = await resolveAgentToolCatalog(agent, orgId);
+  let answer: string;
+  if (isAutonomousAgent(toolCatalog)) {
+    const loopModel = agent.model || ANSWER_MODEL;
+    const loopSystem = systemFor(agent);
+    const budget = clampAgentIterations(process.env.OFFGRID_AGENT_MAX_ITERATIONS);
+    const context = routed.hits.length
+      ? `\n\nKNOWN SOURCES:\n${routed.hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n')}`
+      : '';
+    const loop = await runAgentLoop({
+      goal: `${modelQuery}${context}`,
+      tools: toolCatalog,
+      planNext: makeGovernedPlanner(loopModel, loopSystem, caller),
+      callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark),
+      maxIterations: budget,
+    });
+    recordTrajectory(loop.trajectory, mark);
+    answer = loop.answer;
+    mark(
+      'answer',
+      loop.finished ? 'agent-loop' : `agent-loop:${loop.haltReason}`,
+      `${loop.iterations} iter, ${loop.toolCalls} tool call(s): ${answer.slice(0, 100)}`,
+      [],
+      t,
+    );
+  } else {
+    answer = await compose(modelQuery, routed.hits, agent, caller);
+    mark('answer', 'compose', answer.slice(0, 120), [], t);
+  }
 
   // 5. Ground — verify the answer against the sources → citations.
   t = Date.now();
