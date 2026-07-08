@@ -112,7 +112,7 @@ test('blocking feed unions audit + policy + guardrails within the 24h window', (
   const g = blocking.items.find((i) => i.source === 'guardrails')!;
   assert.equal(g.kind, 'redacted');
   assert.match(g.title, /34 PII redactions/);
-  assert.equal(g.href, '/guardrails');
+  assert.equal(g.href, '/governance/guardrails');
 });
 
 test('blocking items are newest-first, timestamped ones before the undated rollup', () => {
@@ -128,10 +128,10 @@ test('blocking items are newest-first, timestamped ones before the undated rollu
 test('every blocking item deep-links to its source module', () => {
   const { blocking } = synthesizeOperatorHome(fullInput());
   const byId = new Map(blocking.items.map((i) => [i.id, i.href]));
-  assert.equal(byId.get('audit:a1'), '/siem?outcome=blocked');
-  assert.equal(byId.get('audit:a2'), '/siem?outcome=denied');
-  assert.equal(byId.get('policy:d1'), '/policy');
-  assert.equal(byId.get('guardrails:redactions'), '/guardrails');
+  assert.equal(byId.get('audit:a1'), '/insights/siem?outcome=blocked');
+  assert.equal(byId.get('audit:a2'), '/insights/siem?outcome=denied');
+  assert.equal(byId.get('policy:d1'), '/governance/policy');
+  assert.equal(byId.get('guardrails:redactions'), '/governance/guardrails');
 });
 
 test('posture tiles synthesize the blocking count, policy, guardrails, and egress', () => {
@@ -141,7 +141,7 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   const block = byLabel.get('Blocking decisions (24h)')!;
   assert.equal(block.value, '4');
   assert.equal(block.tone, 'warn');
-  assert.equal(block.href, '/control');
+  assert.equal(block.href, '/governance');
   assert.match(block.hint!, /1 policy · 2 audit · 1 redaction/);
 
   assert.equal(byLabel.get('Policy engine')!.value, 'OPA');
@@ -165,7 +165,7 @@ test('cost tiles report spend, on-prem dividend, and over-budget keys', () => {
   const over = byLabel.get('Keys over budget')!;
   assert.equal(over.value, '1'); // analytics-team at 140%
   assert.equal(over.tone, 'bad');
-  cost.forEach((t) => assert.equal(t.href, '/finops'));
+  cost.forEach((t) => assert.equal(t.href, '/insights/finops'));
 });
 
 test('health summary counts up/down and tones amber on partial outage', () => {
@@ -174,7 +174,7 @@ test('health summary counts up/down and tones amber on partial outage', () => {
   assert.equal(health.total, 3);
   assert.equal(health.tone, 'warn'); // 1 of 3 down
   assert.equal(health.tile.value, '2/3 up');
-  assert.equal(health.tile.href, '/services');
+  assert.equal(health.tile.href, '/gateway/services');
   assert.equal(health.items.length, 3);
 });
 

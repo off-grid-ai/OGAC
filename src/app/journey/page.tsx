@@ -164,7 +164,7 @@ export default function JourneyPage() {
             Off Grid AI Console
           </Link>
           <Button asChild size="sm">
-            <Link href="/fleet">Open console</Link>
+            <Link href="/gateway/fleet">Open console</Link>
           </Button>
         </div>
       </header>
@@ -255,7 +255,7 @@ export default function JourneyPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild>
-              <Link href="/fleet">
+              <Link href="/gateway/fleet">
                 Open the console
                 <ArrowRight className="size-4" />
               </Link>

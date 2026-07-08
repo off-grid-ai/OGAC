@@ -25,30 +25,45 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Health',
     tabs: [
-      { id: 'observability', label: 'Observability', route: '/observability' },
-      { id: 'analytics', label: 'Analytics', route: '/analytics' },
-      { id: 'drift', label: 'Drift', route: '/drift' },
+      { id: 'observability', label: 'Observability', route: '/insights' },
+      { id: 'analytics', label: 'Analytics', route: '/insights/analytics' },
+      { id: 'drift', label: 'Drift', route: '/insights/drift' },
     ],
   },
   {
     heading: 'Cost',
     tabs: [
-      { id: 'finops', label: 'FinOps', route: '/finops' },
-      { id: 'accounting', label: 'Usage & Spend', route: '/accounting' },
-      { id: 'reports', label: 'Reports', route: '/reports' },
+      { id: 'finops', label: 'FinOps', route: '/insights/finops' },
+      { id: 'accounting', label: 'Usage & Spend', route: '/insights/accounting' },
+      { id: 'reports', label: 'Reports', route: '/insights/reports' },
     ],
   },
   {
     heading: 'Security',
     tabs: [
-      { id: 'siem', label: 'Security Events', route: '/siem' },
-      { id: 'audit', label: 'Audit Log', route: '/audit' },
+      { id: 'siem', label: 'Security Events', route: '/insights/siem' },
+      { id: 'audit', label: 'Audit Log', route: '/insights/audit' },
     ],
   },
 ];
 
+// Longest-prefix match so nested paths light only their own tab, not the /insights Observability
+// landing tab (which is a prefix of every Insights route).
+function activeRoute(pathname: string): string | null {
+  let best: string | null = null;
+  for (const g of GROUPS) {
+    for (const t of g.tabs) {
+      if (pathname === t.route || pathname.startsWith(`${t.route}/`)) {
+        if (!best || t.route.length > best.length) best = t.route;
+      }
+    }
+  }
+  return best;
+}
+
 export function InsightsNav() {
   const pathname = usePathname();
+  const activeR = activeRoute(pathname);
 
   return (
     <SubNav>
@@ -63,7 +78,7 @@ export function InsightsNav() {
               {group.heading}
             </span>
             {tabs.map((t) => {
-              const active = pathname === t.route || pathname.startsWith(`${t.route}/`);
+              const active = activeR === t.route;
               return (
                 <Link
                   key={t.id}

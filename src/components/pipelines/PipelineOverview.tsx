@@ -354,7 +354,7 @@ export function PipelineOverview({ pipeline: p }: { pipeline: PipelineOverviewDa
                     <ul className="space-y-1">
                       {apps.map((a) => (
                         <li key={a.id} className="flex items-center justify-between gap-2">
-                          <Link href={`/apps/${a.id}`} className="truncate text-primary hover:underline">
+                          <Link href={`/build/apps/${a.id}`} className="truncate text-primary hover:underline">
                             {a.title || a.id}
                           </Link>
                           {a.published ? (

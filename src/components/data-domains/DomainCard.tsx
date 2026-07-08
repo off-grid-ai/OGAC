@@ -84,7 +84,7 @@ export function DomainCard({
       <Card className="flex h-full flex-col shadow-sm">
         <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
           <CardTitle className="text-sm font-semibold text-foreground">
-            <Link href={`/data-domains/${domain.id}`} className="hover:text-primary hover:underline">
+            <Link href={`/data/domains/${domain.id}`} className="hover:text-primary hover:underline">
               {domain.label}
             </Link>
           </CardTitle>

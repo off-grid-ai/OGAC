@@ -199,7 +199,7 @@ function GatewayReference({ gatewayUrl }: { gatewayUrl: string }) {
       </p>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <code className="rounded bg-background px-2 py-1 text-xs text-muted-foreground">{gatewayUrl}</code>
-        <a href="/gateway" className="text-primary hover:underline">Manage the gateway →</a>
+        <a href="/gateway/ai" className="text-primary hover:underline">Manage the gateway →</a>
       </div>
     </section>
   );

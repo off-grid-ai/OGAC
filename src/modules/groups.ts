@@ -122,7 +122,7 @@ export function sidebarActiveIdFor(id: ModuleId): ModuleId | undefined {
 // under /apps. Map them to the module whose sidebar row should stay lit while you're on them.
 // Longest-prefix wins (checked before falling back to module-route matching).
 const PATH_ALIASES: { prefix: string; moduleId: ModuleId }[] = [
-  { prefix: '/apps', moduleId: 'studio' },
+  { prefix: '/build/apps', moduleId: 'studio' },
 ];
 
 // Resolve which sidebar row should be active for a URL, purely — no React, no router. First tries

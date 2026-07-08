@@ -43,26 +43,26 @@ test('selectionFromParams: blank/whitespace params normalize to null', () => {
 test('selectionToPath: conversation + project', () => {
   assert.equal(
     selectionToPath({ conversationId: 'c1', projectId: 'p1' }),
-    '/chat/c1?project=p1',
+    '/workspace/chat/c1?project=p1',
   );
 });
 
 test('selectionToPath: no conversation, no project = /chat', () => {
-  assert.equal(selectionToPath({ conversationId: null, projectId: null }), '/chat');
+  assert.equal(selectionToPath({ conversationId: null, projectId: null }), '/workspace/chat');
 });
 
 test('selectionToPath: conversation only', () => {
-  assert.equal(selectionToPath({ conversationId: 'c1', projectId: null }), '/chat/c1');
+  assert.equal(selectionToPath({ conversationId: 'c1', projectId: null }), '/workspace/chat/c1');
 });
 
 test('selectionToPath: project only (new chat under a project)', () => {
-  assert.equal(selectionToPath({ conversationId: null, projectId: 'p1' }), '/chat?project=p1');
+  assert.equal(selectionToPath({ conversationId: null, projectId: 'p1' }), '/workspace/chat?project=p1');
 });
 
 test('selectionToPath: encodes ids with URL-unsafe characters', () => {
   assert.equal(
     selectionToPath({ conversationId: 'a b/c', projectId: 'x&y' }),
-    '/chat/a%20b%2Fc?project=x%26y',
+    '/workspace/chat/a%20b%2Fc?project=x%26y',
   );
 });
 
@@ -70,7 +70,7 @@ test('round-trip: params -> selection -> path decodes back to the same selection
   const original: ChatSelection = { conversationId: 'a b/c', projectId: 'x&y' };
   const path = selectionToPath(original);
   // Simulate Next decoding the path segment + query back into params.
-  const [seg, query] = path.replace(/^\/chat\/?/, '').split('?');
+  const [seg, query] = path.replace(/^\/workspace\/chat\/?/, '').split('?');
   const project = query ? new URLSearchParams(query).get('project') : null;
   const back = selectionFromParams({
     conversationId: seg ? decodeURIComponent(seg) : null,

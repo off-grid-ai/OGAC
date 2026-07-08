@@ -189,7 +189,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
     value: blocking.total.toLocaleString(),
     hint: blocking.total > 0 ? blockingBreakdown(blocking.items) : 'nothing stopped — all clear',
     tone: blocking.total > 0 ? 'warn' : 'good',
-    href: '/control',
+    href: '/governance',
   });
   if (policy) {
     posture.push({
@@ -197,7 +197,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: policy.engine.toUpperCase(),
       hint: policy.reachable ? 'enforcing every request' : 'unreachable — requests uncovered',
       tone: policy.reachable ? 'good' : 'bad',
-      href: '/policy',
+      href: '/governance/policy',
     });
   }
   if (guardrails) {
@@ -211,7 +211,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
           ? 'baseline floor active'
           : 'engine unreachable',
       tone: live ? 'good' : guardrails.engine === 'regex' ? 'muted' : 'bad',
-      href: '/guardrails',
+      href: '/governance/guardrails',
     });
   }
   if (analytics) {
@@ -220,7 +220,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: pct(analytics.egressRate),
       hint: analytics.egressRate > 0 ? 'some data left the box' : 'fully on-prem — nothing left',
       tone: analytics.egressRate > 0 ? 'warn' : 'good',
-      href: '/control',
+      href: '/governance',
     });
   }
 
@@ -232,7 +232,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: `$${finops.totals.costUsd.toFixed(2)}`,
       hint: `${finops.totals.requests.toLocaleString()} requests billed`,
       tone: 'muted',
-      href: '/finops',
+      href: '/insights/finops',
     });
     // localShare arrives as a whole-number percent (0..100) from finops.
     const localShare = finops.totals.localShare;
@@ -241,7 +241,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: `${Math.round(localShare)}%`,
       hint: 'ran free on your own hardware',
       tone: localShare >= 90 ? 'good' : localShare > 0 ? 'muted' : 'warn',
-      href: '/finops',
+      href: '/insights/finops',
     });
     const overBudget = finops.byKey.filter((k) => k.pct !== null && k.pct >= 100).length;
     cost.push({
@@ -252,7 +252,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
           ? 'capped — raise the limit or investigate'
           : `${finops.byKey.length} keys within budget`,
       tone: overBudget > 0 ? 'bad' : 'good',
-      href: '/finops',
+      href: '/insights/finops',
     });
   }
 
@@ -270,7 +270,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: total ? `${up}/${total} up` : '—',
       hint: down === 0 ? 'every service responding' : `${down} not responding`,
       tone: healthTone,
-      href: '/services',
+      href: '/gateway/services',
     },
     items: services.map((s) => ({ id: s.id, label: s.label, status: s.status, ms: s.ms })),
   };
@@ -303,7 +303,7 @@ function synthesizeBlocking(
       title: e.action && e.action !== 'unknown' ? e.action : 'audited request',
       subject: e.detail || e.actor || 'unknown actor',
       ts: e.ts,
-      href: `/siem?outcome=${e.outcome}`,
+      href: `/insights/siem?outcome=${e.outcome}`,
     });
   }
 
@@ -318,7 +318,7 @@ function synthesizeBlocking(
       title: 'Policy denied',
       subject: d.path || d.input || 'policy decision',
       ts: d.timestamp,
-      href: '/policy',
+      href: '/governance/policy',
     });
   }
 
@@ -334,7 +334,7 @@ function synthesizeBlocking(
       title: `${redactedCount.toLocaleString()} PII redaction${redactedCount === 1 ? '' : 's'}`,
       subject: guardrails ? `${guardrails.engine} engine masked sensitive data` : 'sensitive data masked',
       ts: '', // rollup, not a single-event timestamp
-      href: '/guardrails',
+      href: '/governance/guardrails',
     });
   }
 

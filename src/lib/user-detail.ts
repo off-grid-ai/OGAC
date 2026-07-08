@@ -1,4 +1,4 @@
-// Pure view-model helpers for the Access → User detail surface (`/access/[id]`).
+// Pure view-model helpers for the Access → User detail surface (`/governance/access/[id]`).
 // Zero I/O — unit-testable. The detail PANEL owns fetching; these shape the data it renders.
 
 import type { KcRole } from './keycloak-admin';
