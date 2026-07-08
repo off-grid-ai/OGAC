@@ -2,10 +2,12 @@
 
 import {
   DotsThree as MoreHorizontal,
+  Plugs,
   ArrowsClockwise as RefreshCw,
   Trash as Trash2,
 } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +19,26 @@ import {
 
 export function ConnectorActions({ id, name }: { id: string; name: string }) {
   const router = useRouter();
+  const [testing, setTesting] = useState(false);
+
+  async function test() {
+    if (testing) return;
+    setTesting(true);
+    const toastId = toast.loading(`Testing ${name}…`);
+    try {
+      const res = await fetch(`/api/v1/admin/connectors/${id}/test`, { method: 'POST' });
+      const body = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+      if (res.ok && body?.ok) {
+        toast.success(body.message ?? 'Connected', { id: toastId });
+      } else {
+        toast.error(body?.message ?? 'Connection failed', { id: toastId });
+      }
+    } catch {
+      toast.error('Connection test failed', { id: toastId });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function sync() {
     const res = await fetch(`/api/v1/admin/connectors/${id}/sync`, { method: 'POST' });
@@ -47,6 +69,10 @@ export function ConnectorActions({ id, name }: { id: string; name: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={test} disabled={testing}>
+          <Plugs className="size-4" />
+          Test connection
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={sync}>
           <RefreshCw className="size-4" />
           Sync now
