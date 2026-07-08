@@ -4,8 +4,8 @@ import { AddCustomRoleButton } from '@/components/admin/AddCustomRoleButton';
 import { AddTenantButton } from '@/components/admin/AddTenantButton';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { FlagToggle } from '@/components/admin/FlagToggle';
-import { OrgChatPipelineEditor } from '@/components/admin/OrgChatPipelineEditor';
 import { OrgInstructionsEditor } from '@/components/admin/OrgInstructionsEditor';
+import { WorkspacePipelineBinding } from '@/components/admin/WorkspacePipelineBinding';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -63,7 +63,7 @@ export default async function AdminPage() {
       listPipelines(orgId).catch(() => []),
     ]);
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
-  const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name }));
+  const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name, status: p.status }));
 
   return (
     <div className="space-y-6">
@@ -82,15 +82,16 @@ export default async function AdminPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-sm">Chat pipeline governance</CardTitle>
+          <CardTitle className="text-sm">Workspace pipeline binding</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Bind chat to a governed pipeline. Set the org-default pipeline every chat runs on, and the
-            set of pipelines a user may pin per-project — users can only pick from this set, so every
-            message is a governed run (policy, guardrails, observability, cost).
+            Choose which governed pipeline Chat &amp; Projects run on. Set the default every
+            conversation uses, and the set of pipelines a project may be switched to — people can only
+            pick from that set, so every message stays governed (policy, guardrails, cost controls and
+            observability).
           </p>
         </CardHeader>
         <CardContent>
-          <OrgChatPipelineEditor
+          <WorkspacePipelineBinding
             initial={{
               defaultChatPipelineId: chatBinding.defaultChatPipelineId,
               allowlist: chatBinding.allowlist,
