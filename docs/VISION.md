@@ -218,6 +218,30 @@ This vision sets the priorities the roadmap executes against:
 
 ---
 
+## The data plane — reaching the intelligence *inside* the org (LIVE 2026-07-08)
+
+The thesis names two intelligences: outside (models) and **inside (the org's own data)**. The data
+plane is how we reach the inside one — and the bet is that the **entire AWS data stack can be matched
+by governed open source**, on the enterprise's own hardware, so their data never leaves the perimeter:
+Glue → Airbyte, Athena → ClickHouse SQL, DMS/CDC → Debezium, Redshift → ClickHouse, Kinesis → Redpanda,
+DataBrew → Great Expectations, S3 → SeaweedFS, plus Parquet. Full map: [`platform/DATA_PLANE_PARITY.md`](./platform/DATA_PLANE_PARITY.md).
+
+Why it wins where point tools and the cloud stack don't:
+- **One governed control plane over best-of-breed OSS** — a data sync is a *pipeline*, governed by the
+  same spine as a model call: **PII redaction on the movement path**, classification-driven masking,
+  data-allowlist ceiling, data-quality gate, lineage + audit, replay. Not a separate ungoverned ETL tool.
+- **Works with the systems they already run, as-is** — connector breadth + CDC pull from the databases,
+  warehouses, and SaaS an enterprise already has; they change nothing. This is what makes population-scale
+  adoption feasible: we meet each enterprise where it is.
+- **Sovereign + no lock-in** — every engine on their hardware; permissive OSS; the moat is ownership,
+  air-gap, and the governance spine, not proprietary formats or a SaaS dependency.
+
+Live on S2 under OrbStack; consumed by the console via ports-and-adapters; seeded with a 600k-row BFSI
+dataset. The remaining leap is the **plain-language builder** so non-technical staff author these governed
+pipelines themselves — the empowerment that turns "we have a data platform" into "everyone is intelligent."
+
+---
+
 *Sources for the competitive analysis: Palo Alto Networks press releases and The New Stack (Portkey
 acquisition); Braintrust/Latitude/Product Leaders Day comparisons (eval landscape); TrueFoundry,
 Lyzr, PredictionGuard (sovereign/air-gapped AI); Glean and Credal (enterprise knowledge). Captured
