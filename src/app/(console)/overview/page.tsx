@@ -18,6 +18,7 @@ import { readSiemView } from '@/lib/siem-view';
 import { probeService } from '@/lib/status';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { safeWithTimeout } from '@/lib/with-timeout';
 import {
   ActivityCard,
   BlockingFeed,
@@ -35,12 +36,16 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fallback;
-  }
+// Per-probe wall-clock ceiling for the home. Each snapshot below has its own internal fetch timeout
+// (some as loose as 6s), and this page runs eight of them; a single slow backend used to drag the
+// whole home render past the 1s "instant" bar. `safe()` now delegates to `safeWithTimeout`, so any
+// probe that exceeds PROBE_TIMEOUT_MS degrades to its fallback tile instead of stalling first paint
+// — the same graceful-degrade contract as before (catch → fallback), now also covering hangs, not
+// just throws. The `loading.tsx` skeleton covers the render up to this ceiling.
+const PROBE_TIMEOUT_MS = 1500;
+
+function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  return safeWithTimeout(fn, PROBE_TIMEOUT_MS, fallback);
 }
 
 // Probe only the core on-prem services on the home — fast and legible. The full directory lives on
