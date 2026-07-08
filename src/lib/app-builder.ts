@@ -36,6 +36,91 @@ export function rechainEdges(steps: AppStep[]): AppEdge[] {
   return steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id }));
 }
 
+// ─── TOPOLOGY EDIT REDUCERS (Builder Epic — visual canvas, branching) ────────────────────────────
+//
+// The canvas (StudioCanvas 3B) is a REAL editor: the operator can draw an edge between any two steps,
+// delete an edge, and drag nodes — so a workflow can BRANCH/rewire, not just be a linear chain. These
+// reducers are the pure, cycle-safe edge ops the canvas calls (the linear `rechainEdges` above still
+// backs text-mode + the compiled default). They only touch `spec.edges`; node positions are a canvas
+// VIEW concern (there is no position column on the apps table), so they live in the component.
+//
+// INVARIANTS every op preserves:
+//   • no duplicate edge (same from→to appears at most once)
+//   • no self-loop (from === to rejected)
+//   • no CYCLE — adding an edge that would close a loop is refused (validateAppSpec forbids unreachable
+//     orphans but NOT cycles, so we guard cycles here at edit time so the executor's bounded loop
+//     never sees one).
+// A rejected op is a NO-OP (returns the SAME spec object) — the caller detects "nothing changed" by
+// identity and can surface a toast.
+
+// wouldCreateStepCycle — would adding from→to close a directed cycle over the CURRENT edges? (PURE)
+// True iff `to` can already reach `from` following existing edges (so from→to would loop), or it is a
+// self-reference. Same reachability shape as app-tools.reaches, but over AppEdge[] (steps) — kept
+// local so this module stays import-free and independently testable.
+export function wouldCreateStepCycle(edges: AppEdge[], from: string, to: string): boolean {
+  if (from === to) return true;
+  const adj = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!adj.has(e.from)) adj.set(e.from, []);
+    adj.get(e.from)!.push(e.to);
+  }
+  // BFS from `to`: can we reach `from` again? If so, from→to would close a cycle.
+  const seen = new Set<string>([to]);
+  const queue = [to];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (cur === from) return true;
+    for (const next of adj.get(cur) ?? []) {
+      if (!seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return false;
+}
+
+// addEdge — draw a directed edge from→to. NO-OP (same spec) if an endpoint is not a real step, the
+// edge already exists, it is a self-loop, or it would create a cycle. Otherwise appends the edge.
+export function addEdge(spec: AppSpec, from: string, to: string): AppSpec {
+  const ids = new Set(spec.steps.map((s) => s.id));
+  if (!ids.has(from) || !ids.has(to)) return spec; // dangling endpoint
+  if (from === to) return spec; // self-loop
+  if (spec.edges.some((e) => e.from === from && e.to === to)) return spec; // duplicate
+  if (wouldCreateStepCycle(spec.edges, from, to)) return spec; // cycle
+  return { ...spec, edges: [...spec.edges, { from, to }] };
+}
+
+// removeEdge — delete the edge from→to. NO-OP if it is not present.
+export function removeEdge(spec: AppSpec, from: string, to: string): AppSpec {
+  const edges = spec.edges.filter((e) => !(e.from === from && e.to === to));
+  if (edges.length === spec.edges.length) return spec; // nothing removed
+  return { ...spec, edges };
+}
+
+// addStepNoRechain — append a new step of `kind` WITHOUT rechaining the edges. The visual canvas, once
+// the operator has drawn a branching topology, must not have its edges flattened back to a linear
+// chain every time a node is added (that's what `addStep` does for text-mode). This drops in a new
+// disconnected node; the operator then draws its edges. Returns { spec, id } so the caller can select
+// the new node. PURE (mirrors addStep's mint+blank, minus rechain).
+export function addStepNoRechain(spec: AppSpec, kind: AppStepKind): { spec: AppSpec; id: string } {
+  const id = mintStepId(spec.steps);
+  const step = blankStep(kind, id);
+  return { spec: { ...spec, steps: [...spec.steps, step] }, id };
+}
+
+// removeStepAndEdges — drop a step by id AND every edge touching it, WITHOUT rechaining the survivors.
+// The canvas's node-delete: unlike text-mode `removeStep` (which rechains into a linear flow), this
+// preserves the remaining branching topology and only prunes the deleted node's edges. NO-OP if the id
+// isn't present or it's the last remaining step (an app keeps ≥1 step). PURE.
+export function removeStepAndEdges(spec: AppSpec, stepId: string): AppSpec {
+  if (spec.steps.length <= 1) return spec;
+  const steps = spec.steps.filter((s) => s.id !== stepId);
+  if (steps.length === spec.steps.length) return spec; // id not found
+  const edges = spec.edges.filter((e) => e.from !== stepId && e.to !== stepId);
+  return { ...spec, steps, edges };
+}
+
 // ─── mintStepId — a unique step id not already used in the spec ──────────────────────────────────
 // Ids are opaque (`s1`,`s2`,… by convention). We never reuse an id; on collision we suffix.
 export function mintStepId(steps: AppStep[], prefix = 's'): string {
