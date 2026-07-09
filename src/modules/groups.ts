@@ -88,7 +88,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // One sidebar row → the Governance section landing (Control), which tabs across policy,
     // access, guardrails, secrets, regulatory, and provenance via GovernanceNav.
     primary: ['control'],
-    secondary: ['policy', 'access', 'guardrails', 'secrets', 'regulatory', 'provenance'],
+    secondary: ['policy', 'access', 'guardrails', 'secrets', 'regulatory', 'trust', 'provenance'],
   },
   {
     id: 'insights',
