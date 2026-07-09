@@ -1,7 +1,8 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { boolean, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 import { db } from '@/db';
 import { computeAnalytics } from '@/lib/analytics';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type Metric,
   type RuleInput,
@@ -39,6 +40,9 @@ export type {
 
 export const alertRules = pgTable('analytics_alert_rules', {
   id: text('id').primaryKey(),
+  // Security Wave 2 tenant scope: an alert rule belongs to ONE tenant. Without org_id every tenant
+  // saw + could edit/delete every other tenant's rules. Self-migrated via ensureAnalyticsRulesSchema.
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   metric: text('metric').notNull(),
   comparator: text('comparator').notNull(),
@@ -52,6 +56,8 @@ export type AlertRule = typeof alertRules.$inferSelect;
 
 export const savedViews = pgTable('analytics_saved_views', {
   id: text('id').primaryKey(),
+  // Security Wave 2 tenant scope (see alertRules.orgId).
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   range: text('range').notNull().default('7d'),
   model: text('model').notNull().default(''), // model filter; '' = all
@@ -78,6 +84,20 @@ export async function ensureAnalyticsRulesSchema(): Promise<void> {
         model text NOT NULL DEFAULT '', outcome text NOT NULL DEFAULT '',
         created_by text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
     `);
+    // Security Wave 2: self-migrate org_id (idempotent) so the typed builder's org filter/stamp never
+    // references a missing column, even before the migration SQL is applied on the live DB.
+    await db.execute(
+      sql`ALTER TABLE analytics_alert_rules ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE analytics_saved_views ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS analytics_alert_rules_org_idx ON analytics_alert_rules (org_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS analytics_saved_views_org_idx ON analytics_saved_views (org_id);`,
+    );
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -88,15 +108,27 @@ export async function ensureAnalyticsRulesSchema(): Promise<void> {
 const rid = () => crypto.randomUUID();
 
 // ─── Alert rule CRUD ──────────────────────────────────────────────────────────────────────────────
-export async function listRules(): Promise<AlertRule[]> {
+// Every function is TENANT-scoped by `orgId` (the caller's org): reads filter on it, writes stamp it,
+// and update/delete match on (id AND org_id) so a tenant can never read/edit/delete another tenant's
+// rule with a guessed id. Defaults to the shared 'default' org for internal (single-tenant) callers.
+export async function listRules(orgId: string = DEFAULT_ORG): Promise<AlertRule[]> {
   await ensureAnalyticsRulesSchema();
-  return db.select().from(alertRules).orderBy(desc(alertRules.createdAt));
+  return db
+    .select()
+    .from(alertRules)
+    .where(eq(alertRules.orgId, orgId))
+    .orderBy(desc(alertRules.createdAt));
 }
 
-export async function createRule(input: RuleInput, createdBy: string): Promise<AlertRule> {
+export async function createRule(
+  input: RuleInput,
+  createdBy: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AlertRule> {
   await ensureAnalyticsRulesSchema();
   const row = {
     id: rid(),
+    orgId,
     name: input.name,
     metric: input.metric,
     comparator: input.comparator,
@@ -110,7 +142,11 @@ export async function createRule(input: RuleInput, createdBy: string): Promise<A
   return created;
 }
 
-export async function updateRule(id: string, input: RuleInput): Promise<AlertRule | null> {
+export async function updateRule(
+  id: string,
+  input: RuleInput,
+  orgId: string = DEFAULT_ORG,
+): Promise<AlertRule | null> {
   await ensureAnalyticsRulesSchema();
   await db
     .update(alertRules)
@@ -122,43 +158,61 @@ export async function updateRule(id: string, input: RuleInput): Promise<AlertRul
       windowMinutes: input.windowMinutes,
       enabled: input.enabled,
     })
-    .where(eq(alertRules.id, id));
-  const [updated] = await db.select().from(alertRules).where(eq(alertRules.id, id));
+    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
+  const [updated] = await db
+    .select()
+    .from(alertRules)
+    .where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
   return updated ?? null;
 }
 
-export async function deleteRule(id: string): Promise<void> {
+export async function deleteRule(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureAnalyticsRulesSchema();
-  await db.delete(alertRules).where(eq(alertRules.id, id));
+  await db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.orgId, orgId)));
 }
 
 // ─── Saved view CRUD ──────────────────────────────────────────────────────────────────────────────
-export async function listViews(): Promise<SavedView[]> {
+export async function listViews(orgId: string = DEFAULT_ORG): Promise<SavedView[]> {
   await ensureAnalyticsRulesSchema();
-  return db.select().from(savedViews).orderBy(desc(savedViews.createdAt));
+  return db
+    .select()
+    .from(savedViews)
+    .where(eq(savedViews.orgId, orgId))
+    .orderBy(desc(savedViews.createdAt));
 }
 
-export async function createView(input: ViewInput, createdBy: string): Promise<SavedView> {
+export async function createView(
+  input: ViewInput,
+  createdBy: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<SavedView> {
   await ensureAnalyticsRulesSchema();
-  const row = { id: rid(), ...input, createdBy };
+  const row = { id: rid(), orgId, ...input, createdBy };
   await db.insert(savedViews).values(row);
   const [created] = await db.select().from(savedViews).where(eq(savedViews.id, row.id));
   return created;
 }
 
-export async function updateView(id: string, input: ViewInput): Promise<SavedView | null> {
+export async function updateView(
+  id: string,
+  input: ViewInput,
+  orgId: string = DEFAULT_ORG,
+): Promise<SavedView | null> {
   await ensureAnalyticsRulesSchema();
   await db
     .update(savedViews)
     .set({ ...input })
-    .where(eq(savedViews.id, id));
-  const [updated] = await db.select().from(savedViews).where(eq(savedViews.id, id));
+    .where(and(eq(savedViews.id, id), eq(savedViews.orgId, orgId)));
+  const [updated] = await db
+    .select()
+    .from(savedViews)
+    .where(and(eq(savedViews.id, id), eq(savedViews.orgId, orgId)));
   return updated ?? null;
 }
 
-export async function deleteView(id: string): Promise<void> {
+export async function deleteView(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureAnalyticsRulesSchema();
-  await db.delete(savedViews).where(eq(savedViews.id, id));
+  await db.delete(savedViews).where(and(eq(savedViews.id, id), eq(savedViews.orgId, orgId)));
 }
 
 // ─── "Evaluate now" action ──────────────────────────────────────────────────────────────────────
@@ -177,8 +231,8 @@ export interface RuleEvaluation {
 // Check every rule against the CURRENT analytics snapshot and report firing/ok. Uses the existing
 // computeAnalytics() OpenSearch queries (unchanged) for the live values, then the PURE evaluateRule /
 // metricValue functions for the decision — so the decision logic itself is unit-tested without I/O.
-export async function evaluateRules(): Promise<RuleEvaluation[]> {
-  const [rules, a] = await Promise.all([listRules(), computeAnalytics()]);
+export async function evaluateRules(orgId: string = DEFAULT_ORG): Promise<RuleEvaluation[]> {
+  const [rules, a] = await Promise.all([listRules(orgId), computeAnalytics()]);
   return rules.map((r) => {
     const value = metricValue(a, r.metric as Metric);
     return {
