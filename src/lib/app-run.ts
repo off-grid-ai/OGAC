@@ -783,9 +783,30 @@ export async function runApp(
   ctx: AppRunContext,
   deps: AppRunDeps = defaultDeps(),
 ): Promise<AppRunOutcome> {
-  let state = initState(spec, ctx.runId);
-  const results: StepResult[] = [];
+  const state = initState(spec, ctx.runId);
   await deps.persist(state, input);
+  return driveRunnableSteps(spec, state, [], input, ctx, deps);
+}
+
+// ─── driveRunnableSteps — the ONE step-driving loop (DRY: runApp + resumeAppRun both use it) ──────
+// Given a starting AppRunState (fresh from initState for a first run, or rebuilt-and-decision-applied
+// for a resume) plus the StepResults already produced, drive the pure scheduler to completion or to
+// the next human pause: repeatedly take the next runnable steps, mark running + execute + fold the
+// result in + persist, and stop on a terminal state, a step error, or an awaiting_human step. Returns
+// the AppRunOutcome. This is the shared engine — no scheduling rule is duplicated between the two
+// entry points. `priorResults` seeds the downstream-context threading + aggregate outcome with the
+// steps that already ran (so a resume's downstream agent still sees the upstream outputs, and the
+// aggregate outcome reflects the whole run, not just the steps run after the pause).
+export async function driveRunnableSteps(
+  spec: AppSpec,
+  startState: AppRunState,
+  priorResults: StepResult[],
+  input: Record<string, unknown>,
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<AppRunOutcome> {
+  let state = startState;
+  const results: StepResult[] = [...priorResults];
 
   // Bounded loop: at most one pass per step (a validated DAG). Guards against a pathological cycle.
   const maxIterations = (spec.steps?.length ?? 0) + 1;
@@ -816,7 +837,7 @@ export async function runApp(
         return finalize(state, results);
       }
       if (result.status === 'awaiting_human') {
-        // Stop here — the durable workflow (2B) resumes once the human decides.
+        // Stop here — the human decision resumes it (inline via resumeAppRun, or the durable workflow).
         paused = true;
         break;
       }
