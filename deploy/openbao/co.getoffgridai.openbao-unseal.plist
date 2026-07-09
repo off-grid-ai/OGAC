@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Boot-time OpenBao auto-unseal (see deploy/openbao/auto-unseal.sh + SERVER_STATE.md § OpenBao).
+     Install on S1: cp to ~/Library/LaunchAgents/, then `launchctl load` it. Runs once at load/boot,
+     unseals the persistent vault so secret-dependent features come up without manual key entry. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>co.getoffgridai.openbao-unseal</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/admin/offgrid/console/deploy/openbao/auto-unseal.sh</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/admin/offgrid/logs/openbao-unseal.log</string>
+  <key>StandardErrorPath</key><string>/Users/admin/offgrid/logs/openbao-unseal.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BAO_ADDR</key><string>http://127.0.0.1:8200</string>
+  </dict>
+</dict>
+</plist>
