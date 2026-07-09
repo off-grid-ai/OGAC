@@ -62,6 +62,12 @@ risk team has not already blessed.
 
 ![One governed source of truth into one gateway, through composable pipelines, out to an agent workforce and apps that every employee can build](docs/assets/diagrams/flow-agents.png)
 
+Compliance is not a stage you bolt on at the end. It travels with every run: signed, cited, scored,
+guardrails held, and stopped the moment a check fails. At any point you hand a regulator a complete,
+reversible account.
+
+![Every finished run becomes a signed, cited, scored record; a run that fails a check is stopped; audit-ready evidence exports for a regulator, on infrastructure you own](docs/assets/diagrams/flow-compliance.png)
+
 - **Data.** It connects to the databases, warehouses, and identity you already run. You change
   nothing about your stack.
 - **Gateway.** One governed door to every model. Local by default. Cloud routing is opt-in and masks
