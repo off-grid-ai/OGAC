@@ -1,85 +1,113 @@
-# Off Grid AI Console (OGAC)
+# Off Grid AI Console
 
-> Become an intelligent enterprise, without compromising.
+**An open-source platform you run on your own servers that lets non-technical staff build governed
+AI apps on the systems you already have.**
 
-## You are the bottleneck, and this fixes that
+Local models, your data, your infrastructure. A claims officer or a tax analyst describes a workflow
+in plain English and gets back a working app. Every run is evaluated, guardrailed, audited, and
+signed. No data leaves the building. No engineer in the loop.
 
-Every team wants AI in their workflow, and each request lands on you. Wire up the model. Prove it
-won't leak data. Get risk and compliance to sign off. Keep it running. You end up as the one person
-standing between an idea and a working system, shipping one-off integrations that never quite stop
-being your problem.
+## Why it exists
 
-Off Grid AI Console changes who does that work.
+Every enterprise hits the same wall with AI. You can have it private, governed, or fast to build.
+Pick two.
 
-The people who understand the process, the underwriter, the tax analyst, the claims officer,
-describe what they need in plain language and get back a working application. You set the guardrails
-once. They build on top of them. You stop hand-wiring integrations and start running a platform.
+Off Grid AI gives all three:
 
-All of it runs on infrastructure you own. Your data stays inside your walls. Cloud model routing is
-there when you want it, but it masks sensitive data before anything leaves the box, and it stays off
-until you turn it on.
+- **Private.** The models run on your servers. Your data never leaves. Cloud routing is opt-in and
+  masks sensitive fields before anything crosses the wire.
+- **Governed.** Evals, drift, guardrails, and policy run on every request. Every output is audited,
+  cited, and signed. Reversible, and provable to a regulator.
+- **Fast to build.** The person who knows the process builds the app in plain language. It does not
+  sit in the engineering queue.
 
-## What you can do with it
+## When to use it
 
-**Put AI in the hands of non-technical staff without losing control.**
-Someone on a business team writes: "when a reimbursement claim comes in, pull the employee's policy,
-check it against the limit, and if it's over ₹40,000 send it to a manager to approve, then email the
-outcome." They get a real multi-step application back. You never wrote it. It still runs inside every
-control you defined.
+Use it when a data-sensitive or regulated enterprise wants AI inside real operational workflows
+(claims, underwriting, reconciliation, reporting) and:
 
-**Ship AI that risk and compliance will sign off on.**
-Governance runs where the work happens, not in a policy document. A model call that isn't allowed to
-leave the box doesn't. A record with personal data is masked before it crosses any wire. Every run
-is checked against the evaluations you set, and stopped when it fails one.
+- the data cannot go to a hosted AI,
+- every step has to be auditable, and
+- business teams should build these themselves, on the systems already in place.
 
-**Answer a regulator with evidence instead of a shrug.**
-Every run is audited. Every answer traces back to the source it came from. Reports come out
-citation-backed and ready to hand over.
+BFSI is the sharp case. It is not for a public consumer chatbot or a throwaway prototype. The whole
+point is control, governance, and self-hosting.
 
-**Connect it to the systems you already run.**
-Point a use case at your existing databases and warehouses. A trigger arrives (a webhook, an email,
-a scheduled job, a form), the run is governed from end to end, a person approves whatever needs
-approving, and the result is delivered out. Nothing gets ripped and replaced.
+## What you get
 
-**Show the business what it's worth.**
-Each application reports hours saved, value returned, and model cost, in plain numbers you can put
-in front of a budget owner.
+- **It is a drop-in.** It connects to the databases, warehouses, and identity you already run. You
+  change nothing about your stack.
+- **Non-technical people build the apps.** They describe the workflow. They never touch code, infra,
+  or a node canvas.
+- **Nothing is tested on production.** Every app is built and run in a sandbox against your evals
+  before it touches a live system.
+- **You stay in control, and can prove it.** A call that is not allowed off the box does not leave.
+  PII is masked. Every run is logged, scored, and stopped on a broken guardrail.
+- **You read every line.** Open source, self-hosted. No hosted service holding your data, no black
+  box, no phone-home.
 
-## What's real today
+## An example, start to finish
 
-Three enterprise tenants run from one deployment right now: a life insurer, a general insurer, and a
-real-estate group, each with its own data, its own users, and its own modules. The whole loop works
-end to end. Connect data, build an app in plain language, trigger it, approve a run, read the report.
+A claims officer writes:
 
-We hold a hard honesty line. Work is reported in one of three states, written, wired, or verified
-live, and nothing counts as done until it's verified. Where something isn't finished, it's in the
-open: `docs/GAPS_BACKLOG.md` lists every known gap. Keeping many tenants fully isolated from each
-other, on every single surface, is still in progress. Demo and single-tenant use are solid today.
+> When a reimbursement claim comes in, pull the employee's policy, check it against the limit, and if
+> it is over 40,000 rupees send it to a manager to approve, then email the outcome.
 
-The core is open source under AGPL-3.0. Run the entire platform with no account and nothing held
-back. Free for organisations under 20 people; larger teams license from us.
+Off Grid AI turns that into a governed multi-step app: it reads the claim, pulls the policy from your
+system, runs the check, pauses for a manager's approval, and emails the result. The claims officer
+built it. Your data stayed put. Every step is on the audit trail. You were not paged.
 
-## For developers
+## Built on what you already trust
+
+No proprietary runtime to learn. It composes engines your team already knows, each wrapped in
+governance:
+
+| Layer | Engine |
+|---|---|
+| System of record, vectors | Postgres + pgvector |
+| Identity / SSO | Keycloak (OIDC) |
+| Durable orchestration | Temporal |
+| Ingestion / ETL / DAG | Airbyte, dbt, Kestra |
+| Warehouse + lineage | ClickHouse, Marquez |
+| PII detection | Presidio |
+| Secrets | OpenBao |
+| Audit / traces | OpenSearch, Langfuse |
+| Vector store | Qdrant or LanceDB |
+| Object store | SeaweedFS |
+
+Swap any of them with one environment variable. Nothing is welded in.
+
+## Run it
 
 ```bash
+git clone <this-repo> && cd console
 npm install
-npm run dev          # http://localhost:3000
-npm run build        # the real gate: typecheck and tests don't catch route/build errors
-npm run typecheck
-npm test
-npm run coverage     # ≥85%, enforced by the pre-push hook
-npm run smoke        # health-check each service
+npm run dev        # http://localhost:3000
+npm run build      # production build
+npm test           # real tests, against a real database
 ```
 
-Bring up local infrastructure from `deploy/` (`make up` for the full stack, `make data` for
-Postgres and object storage, `make secrets` for the vault). Runtime config lives in
-`.env.local` / `.env.production` on the server, never in git. Deploy to the on-prem fleet with
-`./deploy/push.sh` (read `deploy/DEPLOY.md` first).
+Bring up the backing services from `deploy/`. `make up` for the full stack, `make data` for just
+Postgres and object storage. To boot you need `DATABASE_URL`, `AUTH_SECRET`, and `AUTH_KEYCLOAK_*`
+(see `.env.example`). Ship to your own fleet with `./deploy/push.sh` after reading `deploy/DEPLOY.md`.
 
-How the code is meant to be written, and where the systems of record live, is in
-[`CLAUDE.md`](CLAUDE.md) and [`docs/ENGINEERING.md`](docs/ENGINEERING.md). The roadmap is in
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+## How it is put together
+
+```
+   your data  ->  the gateway  ->  governed pipelines  ->  apps and agents  ->  the people who do the work
+  (ingest +      (one governed     (evals, drift,           (built in plain     (a trigger arrives,
+   transform)     model door)       guardrails, PII)         language)           it runs governed, result out)
+```
+
+A pipeline binds a model, evals, a golden set, policy, guardrails, and drift to a use case once.
+Every app that consumes it inherits all of it. That is how a non-technical person builds something
+your compliance team will sign off on. Business logic is pure and unit-tested, handlers are thin,
+every backend sits behind a swappable adapter. The rules are in [`docs/ENGINEERING.md`](docs/ENGINEERING.md).
+
+## License
+
+Open source under AGPL-3.0. The entire platform. Nothing held back, nothing gated.
 
 ---
 
-*AGPL-3.0-only. © Off Grid AI / Wednesday Solutions, Inc.*
+*Built by [Wednesday](https://wednesday.is). Developer guide: [`CLAUDE.md`](CLAUDE.md). Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md).*

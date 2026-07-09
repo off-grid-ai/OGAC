@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type AgentRun, getAgentRun } from '@/lib/agentrun';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,7 +137,7 @@ export default async function RunTracePage({
 }) {
   await requireModuleForUser('agents');
   const { id, runId } = await params;
-  const run = await getAgentRun(runId);
+  const run = await getAgentRun(runId, await currentOrgId());
   if (!run) notFound();
 
   return (
