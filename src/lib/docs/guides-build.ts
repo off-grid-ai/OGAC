@@ -7,21 +7,27 @@ export const buildSection: DocSection = {
     {
       slug: 'guides/chat',
       title: 'Chat',
-      description: 'Your private AI, everywhere — grounded, governed, and answered on your own hardware.',
-      body: `Chat is your org's private assistant. It streams from your own gateways, so prompts and
-answers stay on your network.
+      description: 'Your org’s AI, everywhere — grounded, governed, and inside the rules by default.',
+      body: `**What you'll get:** a chat that already knows your org's rules. Every answer runs through
+the same governed pipeline your admin set up once, grounded in your knowledge — nothing to configure.
 
-![Chat — a grounded, governed conversation answered on your own gateway](/docs-shots/chat.png)
+![Chat — a grounded, governed conversation that runs through your pipeline](/docs-shots/chat.png)
 
 ## What it does
 
-- **Models on your hardware.** Pick a model from the picker; the answer is generated on your gateway
-  nodes. Vision models read images; image models generate them.
+- **Every model, one place.** Pick a model from the picker; the request runs through your gateway
+  under the governance your org set once. Vision models read images; image models generate them.
 - **Projects.** Group related chats under shared instructions and a knowledgebase — a workspace per
   topic. See [Projects](/docs/guides/projects).
 - **Knowledge grounding.** With grounding on, the assistant answers only from your uploaded
   documents and cites them, so it won't invent facts. See [Knowledge](/docs/guides/knowledge).
 - **Skills and tools.** Type \`/\` to invoke a skill, or give an agent tools so it can act.
+
+## What success looks like
+
+You send a prompt and get a cited answer with a model badge — and every turn is already logged in
+the [audit ledger](/docs/guides/audit) without you doing anything. Governance is inherited, not
+switched on.
 
 ## Message actions
 
@@ -42,45 +48,43 @@ in a lightbox; text files (txt, md, csv, pdf) are extracted and injected as cont
     {
       slug: 'guides/image-generation',
       title: 'Image generation',
-      description: 'Generate images on your own image gateway, right inside chat.',
-      body: `Image generation lives inside Chat — there's no separate tool to learn. Pick an image
-model and the composer switches to generating.
+      description: 'Generate images right inside chat — no separate tool.',
+      body: `**What you'll get:** images generated from a prompt, in the same chat you already use —
+governed and logged like any other request.
 
 ## Generate an image
 
-1. In Chat, open the model picker and choose a model tagged **(image)** (e.g. an on-prem
-   Stable-Diffusion checkpoint).
+1. In Chat, open the model picker and choose a model tagged **(image)**.
 2. The composer placeholder changes to "Describe an image to generate".
 3. Type a prompt and send. The image renders in the thread and is saved to your storage.
 
-## Where it runs
+## What success looks like
 
-Generation runs on your own image gateway node (stable-diffusion.cpp behind the same
-OpenAI-compatible gateway as chat). The prompt and the result never leave your infrastructure. Each
-image is stored in your object store, so it's also visible in [Storage](/docs/guides/storage).
+The generated image appears inline and lands as a real file in [Storage](/docs/guides/storage) —
+routed through the same gateway and governance as chat, so it inherits your org's rules.
 
-![Every generated image lands as a real file in your own object store](/docs-shots/storage.png)
+![Every generated image lands as a real file in your object store](/docs-shots/storage.png)
 
 ## Tips
 
-- On CPU nodes, generation takes longer than chat — a low step count is faster for drafts.
+- Generation takes longer than chat — a low step count is faster for drafts.
 - Every generated image is a real file in your store; nothing is fabricated or held back.`,
     },
     {
       slug: 'guides/agents',
       title: 'Agents',
       description: 'Assistants that act — grounded, tool-using, and run through the governed pipeline.',
-      body: `An agent is an assistant with a job and capabilities. You give it instructions, ground it in
-your knowledge, and grant it tools; every run flows through the governed pipeline.
+      body: `**What you'll get:** an assistant with a job, grounded in your knowledge and able to use
+tools — and every run it does flows through the governed pipeline your org set once.
 
 ![Agents — assistants with instructions, grounding, and governed tools](/docs-shots/agents.png)
 
 ## Create one
 
-On the **Agents** page, create an agent from plain-language instructions. Ground it in your
-knowledge (on by default, so it cites sources and won't hallucinate) and grant it tools — the
-connectors your org has set up. Each granted tool still obeys its action policy: allow, needs
-approval, or blocked. Capability never bypasses governance.
+On the **Agents** page, describe the agent in plain language. Ground it in your knowledge (on by
+default, so it cites sources and won't hallucinate) and grant it tools — the connectors your org has
+set up. Each granted tool still obeys its action policy: allow, needs approval, or blocked.
+Capability never bypasses governance.
 
 ## Run and watch it
 
@@ -100,7 +104,13 @@ inline. Re-run a past run, cancel one in flight, or send a run through human rev
 ## No special powers
 
 A custom agent carries no special access. It runs the same governed path as the built-ins, so it
-inherits every convention set on your console.`,
+inherits every convention set on your console.
+
+## What success looks like
+
+You run the agent and watch policy, guardrails, retrieval, answer, and grounding execute in order,
+with citations inline — and the run shows up in [Agent runs](/docs/guides/agent-runs) and the
+[audit ledger](/docs/guides/audit). You built the assistant; the governance came for free.`,
     },
     {
       slug: 'guides/agent-runs',
@@ -159,20 +169,24 @@ still flows through the same governed pipeline as the rest of the console.`,
     {
       slug: 'guides/retrieval',
       title: 'Retrieval',
-      description: 'Inspect and tune the vector store behind every grounded answer.',
-      body: `Retrieval is the data-plane view of grounding: the vector store your grounded answers draw
-from, and the controls to keep it healthy. [Knowledge](/docs/guides/knowledge) is where you add
-content; Retrieval is where you inspect how it's indexed and served.
+      description: 'Inspect and tune the index behind every grounded answer.',
+      body: `**What you'll get:** a window into how your grounded answers are found — the index your
+answers draw from, and the controls to keep it healthy. [Knowledge](/docs/guides/knowledge) is where
+you add content; Retrieval is where you inspect how it's indexed and served.
 
-![Retrieval — collections, backend, and a live query against the vector store](/docs-shots/retrieval.png)
+![Retrieval — collections and a live query against the index](/docs-shots/retrieval.png)
 
 ## What you do here
 
-- **Inspect the store** — see collections and their document/chunk counts, and which vector backend
-  is active (an embedded store by default, or a dedicated vector store at scale).
+- **Inspect the index** — see collections and their document/chunk counts.
 - **Query it** — run a retrieval query and see the ranked chunks, so you can verify what a grounded
   answer would find before an agent runs.
 - **Reindex** — rebuild the index after adding or changing content.
+
+## What success looks like
+
+You type a question, hit query, and see the exact chunks a grounded answer would draw on — ranked,
+with their source document. If a chunk you expected doesn't appear, reindex and check again.
 
 ## Permissions-aware
 
@@ -256,8 +270,8 @@ else. A fresh account simply shows an empty list, never someone else's work.`,
       slug: 'guides/studio',
       title: 'Studio',
       description: 'Build a working assistant in plain language — no technical setup.',
-      body: `Studio is for the people who know the work but not the plumbing. You describe an assistant
-in plain language and Studio wires the model, policy, guardrails, and grounding for you.
+      body: `**What you'll get:** a working, governed assistant you built by describing it — no model
+settings, no policy files, no code. Studio is for the people who know the work, not the plumbing.
 
 ![Studio — describe an assistant in plain language and ship a governed agent, no setup](/docs-shots/studio.png)
 
@@ -267,7 +281,14 @@ in plain language and Studio wires the model, policy, guardrails, and grounding 
    whether it should use your uploaded knowledge — inferred from your description.
 2. **Pick skills** — the tools your org has set up.
 3. **Choose knowledge** — whether it answers from your documents.
-4. **Try it** right there, then **publish** — to just you, your org, or a shareable link.
+4. **Try it** right there in a safe sandbox, then **publish** — to just you, your org, or a
+   shareable link.
+
+## What success looks like
+
+You describe an assistant, try it once, and publish it — and it opens as a full app with the five
+lifecycle screens (Build, Input, Runs, Review, Reports). The model, policy, guardrails, and
+grounding were wired for you, so it runs the same governed pipeline as anything built by hand.
 
 ## What's hidden
 
@@ -289,16 +310,16 @@ built by hand.
       slug: 'guides/knowledge',
       title: 'Knowledge & retrieval',
       description: 'Turn your documents and systems into grounded, cited answers.',
-      body: `Knowledge is how your own content becomes answerable. You upload documents or connect a
-system; Off Grid AI indexes it on your hardware; Chat and agents answer from it with citations.
+      body: `**What you'll get:** your own content becomes answerable. You upload documents or connect a
+system; Off Grid AI indexes it; Chat and agents then answer from it with citations.
 
 ![Knowledge — upload documents and index connected sources for grounded answers](/docs-shots/knowledge.png)
 
 ## Add knowledge
 
 Upload files on the **Knowledge** page (PDFs, text, docs) or index a connected data source. Off Grid AI
-chunks the content and embeds it using a model on your own gateway — no embedding service, no data
-sent out. The vector store is yours (an embedded store by default, or a dedicated vector store at scale).
+chunks the content and indexes it through your own gateway — the indexing runs inside your governed
+pipeline, so it inherits the same rules as everything else.
 
 ## How grounding works
 
@@ -307,10 +328,16 @@ them, and verifies the answer against the sources. Every reply carries \`[Source
 can click through. If the sources don't cover the question, the assistant says so rather than
 inventing an answer.
 
+## What success looks like
+
+You upload a document, ask a question about it in Chat, and get an answer with a clickable
+\`[Source: …]\` citation pointing back to that document. If you delete the document, the answer stops
+citing it.
+
 ## Manage it
 
-The Knowledge and Retrieval surfaces let you add, list, and remove documents, inspect the vector
-store, and reindex — the console is how you run it, not just view it.`,
+The Knowledge and Retrieval surfaces let you add, list, and remove documents, inspect what's indexed,
+and reindex — the console is how you run it, not just view it.`,
     },
     {
       slug: 'guides/projects',
