@@ -27,8 +27,21 @@ test('every item carries the full required metadata', () => {
     assert.ok(i.id, 'id');
     assert.ok(i.name, `name for ${i.id}`);
     assert.ok(GUARDRAIL_CATEGORIES.includes(i.category), `valid category for ${i.id}`);
-    assert.ok(i.kind === 'presidio-entity' || i.kind === 'guardrails-validator', `kind ${i.id}`);
-    assert.ok(i.engine === 'presidio' || i.engine === 'guardrails-ai', `engine ${i.id}`);
+    assert.ok(
+      i.kind === 'presidio-entity' ||
+        i.kind === 'guardrails-validator' ||
+        i.kind === 'llm-guard-scanner',
+      `kind ${i.id}`,
+    );
+    assert.ok(
+      i.engine === 'presidio' || i.engine === 'guardrails-ai' || i.engine === 'llm-guard',
+      `engine ${i.id}`,
+    );
+    // An llm-guard-scanner item names the exact LLM Guard scanner class it enforces.
+    if (i.kind === 'llm-guard-scanner') {
+      assert.ok(i.scanner && /^[A-Z][A-Za-z]+$/.test(i.scanner), `scanner class for ${i.id}`);
+      assert.equal(i.engine, 'llm-guard', `llm-guard engine for ${i.id}`);
+    }
     assert.ok(i.description.length > 10, `description for ${i.id}`);
     assert.equal(typeof i.defaultEnabled, 'boolean', `defaultEnabled for ${i.id}`);
     // entity is a stable UPPER_SNAKE token (what a guardrails rule stores as its pattern).
@@ -43,14 +56,19 @@ test('ids and entity tokens are unique', () => {
   assert.equal(new Set(entities).size, entities.length, 'duplicate entity token');
 });
 
-test('kind/engine are consistent: presidio-entity↔presidio, validator↔guardrails-ai', () => {
+test('kind/engine are consistent per kind (presidio / guardrails-ai / llm-guard)', () => {
   for (const i of GUARDRAIL_CATALOG) {
     if (i.kind === 'presidio-entity') {
       assert.equal(i.engine, 'presidio', `${i.id} presidio-entity must use presidio`);
       assert.equal(i.hubId, undefined, `${i.id} presidio-entity should not carry a hubId`);
-    } else {
+    } else if (i.kind === 'guardrails-validator') {
       assert.equal(i.engine, 'guardrails-ai', `${i.id} validator must use guardrails-ai`);
       assert.ok(i.hubId, `${i.id} validator must carry a hubId`);
+    } else {
+      assert.equal(i.kind, 'llm-guard-scanner');
+      assert.equal(i.engine, 'llm-guard', `${i.id} scanner must use llm-guard`);
+      assert.equal(i.hubId, undefined, `${i.id} scanner should not carry a hubId`);
+      assert.ok(i.scanner, `${i.id} scanner must name its LLM Guard scanner class`);
     }
   }
 });
@@ -136,6 +154,55 @@ test('validator: ready when guardrails-ai configured, fallback otherwise', () =>
   const item = getGuardrailItem('toxic-language')!;
   assert.equal(itemAvailability(item, { presidioReady: true, guardrailsAiReady: true }).status, 'ready');
   assert.equal(itemAvailability(item, { presidioReady: true, guardrailsAiReady: false }).status, 'fallback');
+});
+
+// ─── LLM Guard scanners ─────────────────────────────────────────────────────────────────────────
+test('the catalog carries the full LLM Guard scanner spread', () => {
+  const llm = GUARDRAIL_CATALOG.filter((i) => i.engine === 'llm-guard');
+  assert.ok(llm.length >= 10, `expected >=10 LLM Guard scanners, got ${llm.length}`);
+  const scanners = new Set(llm.map((i) => i.scanner));
+  for (const s of [
+    'Anonymize',
+    'Secrets',
+    'Sensitive',
+    'Toxicity',
+    'Bias',
+    'BanTopics',
+    'PromptInjection',
+    'Language',
+    'Regex',
+    'TokenLimit',
+  ]) {
+    assert.ok(scanners.has(s), `missing LLM Guard scanner ${s}`);
+  }
+});
+
+test('llm-guard scanner: ready when the LLM Guard engine is active, fallback otherwise', () => {
+  const item = getGuardrailItem('llm-guard-prompt-injection')!;
+  assert.equal(item.kind, 'llm-guard-scanner');
+  assert.equal(
+    itemAvailability(item, { presidioReady: false, guardrailsAiReady: false, llmGuardReady: true })
+      .status,
+    'ready',
+  );
+  assert.equal(
+    itemAvailability(item, { presidioReady: true, guardrailsAiReady: true, llmGuardReady: false })
+      .status,
+    'fallback',
+  );
+  // Absent llmGuardReady (undefined) also degrades to fallback (not ready).
+  assert.equal(
+    itemAvailability(item, { presidioReady: true, guardrailsAiReady: true }).status,
+    'fallback',
+  );
+});
+
+test('buildEnablePayload labels an LLM Guard scanner with the LLM Guard engine', () => {
+  const p = buildEnablePayload(getGuardrailItem('llm-guard-toxicity')!);
+  assert.equal(p.matcher, 'entity');
+  assert.equal(p.pattern, 'LLM_GUARD_TOXICITY');
+  assert.match(p.label, /LLM Guard/);
+  assert.equal(p.enabled, true);
 });
 
 // ─── Enable-payload builder (the load-bearing pure fn) ─────────────────────────────────────────────

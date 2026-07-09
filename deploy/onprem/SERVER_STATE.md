@@ -1028,3 +1028,22 @@ Closes the chat sub-resources still global after Wave 1: chat **memory**, chat *
 psql "$DATABASE_URL" -f deploy/onprem/migrations/wave2-chat-artifacts-isolation.sql
 ```
 Applied to LOCAL Postgres (`offgrid_console`) 2026-07-09 (the Wave 2 integration test ran the `ensureChatSchema` self-migration live). Not yet applied on the fleet servers — run the psql line above during the #218 deploy.
+
+## 2026-07-09 — LLM Guard added as a NAMED guardrails engine (compose option, NOT yet deployed)
+
+Added LLM Guard (Protect AI, MIT) as a selectable guardrails engine alongside Presidio + the generic
+http-guardrail seam:
+- **Code**: `src/lib/adapters/guardrail-provider.ts` (`llmGuardPii` PiiPort + pure `normalizeLlmGuardResponse`),
+  registered in `PII_PORTS` (`src/lib/adapters/pii.ts`) and the Integrations registry
+  (`src/lib/adapters/services.ts`, id `llm-guard`). Select with `OFFGRID_ADAPTER_GUARDRAILS=llm-guard`.
+- **Compose (dev stack only)**: `deploy/docker-compose.yml` gained an `llm-guard` service
+  (`laiyer/llm-guard-api:0.3.16`, profiles `[guardrails, all]`, loopback `127.0.0.1:8000`, `AUTH_TOKEN`
+  from `LLM_GUARD_AUTH_TOKEN`, healthcheck GET `/healthz`). **NOT started on any fleet server** — the
+  fleet still runs Presidio (`OFFGRID_ADAPTER_GUARDRAILS=presidio`). This is an available option, not an
+  applied change. To adopt: `docker compose --profile guardrails up -d llm-guard` on the target host,
+  set `OFFGRID_HTTP_GUARDRAIL_URL`/`_API_KEY` + flip the adapter env, then restart the console.
+- **Image caveat**: upstream `protectai/llm-guard` repo is ARCHIVED (EOL, mid-2026); the canonical
+  documented image is still `laiyer/llm-guard-api` (no protectai ghcr image is published). Verified tag
+  `0.3.16` exists on Docker Hub (pushed 2025-05-19).
+- **New env vars** (`deploy/.env.example`): `OFFGRID_HTTP_GUARDRAIL_URL`, `OFFGRID_HTTP_GUARDRAIL_API_KEY`,
+  `LLM_GUARD_AUTH_TOKEN`.

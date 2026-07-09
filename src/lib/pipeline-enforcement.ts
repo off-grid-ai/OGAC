@@ -42,6 +42,13 @@ export interface PipelineContract {
   policyOverlay: GovernanceControls;
   /** This pipeline's guardrail overlay (tightening-only merge over orgGuardrailDefaults). */
   guardrailOverlay: GovernanceControls;
+  /**
+   * OPTIONAL deterministic REQUEST-shape gates (request-policy.ts). Absent ⇒ the pre-checks no-op
+   * (additive). Kept as a DISJOINT slice from the egress/overlay decisions above so the pure
+   * request-policy layer owns them without this file re-implementing anything.
+   */
+  requestParamsPolicy?: import('@/lib/request-policy').RequestParamsPolicy;
+  modelRules?: import('@/lib/request-policy').ModelRules;
 }
 
 // ─── verdicts ────────────────────────────────────────────────────────────────────────────────────

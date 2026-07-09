@@ -40,11 +40,19 @@ export function defaultExecuteDeps(pipelineId: string, orgId: string, runId: str
   return {
     defaultModel: DEFAULT_MODEL,
 
-    async gatewayComplete({ model, prompt, forceLocal, caller }): Promise<GatewayCompletion> {
+    async gatewayComplete({ model, prompt, forceLocal, caller, params }): Promise<GatewayCompletion> {
       const { GATEWAY_URL, gatewayHeaders } = await import('@/lib/gateway');
+      // Forward ONLY the known sampling params the request-policy layer governs (already clamped by
+      // the pure pre-check). Anything else the caller sent is ignored — the gateway body stays clean.
+      const p = params ?? {};
+      const sampling: Record<string, unknown> = {};
+      for (const key of ['max_tokens', 'temperature', 'top_p'] as const) {
+        if (typeof p[key] === 'number' && Number.isFinite(p[key] as number)) sampling[key] = p[key];
+      }
       const body = {
         model,
         temperature: 0,
+        ...sampling,
         messages: [{ role: 'user', content: prompt }],
         chat_template_kwargs: { enable_thinking: false },
         // A leashed call carries a data-class hint the gateway routes on-prem; a cloud-permitted call
