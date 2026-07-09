@@ -224,3 +224,21 @@ http://console-api.getoffgridai.co {
 		reverse_proxy 127.0.0.1:3000
 	}
 }
+
+# ── Webhook ingress (STAGED): hooks.getoffgridai.co ─────────────────────────────
+# The public inbound-trigger surface. Only /api/v1/triggers/* is proxied to the console; the request
+# is authenticated by a per-trigger HMAC signature (not a session), single-use per signature (nonce),
+# and fires a GOVERNED run under the trigger's tenant. Fronted by the edge policy (WAF + per-IP rate
+# limit) so a public endpoint still can't be abused; anything else returns a plain banner. PENDING an
+# on-server Caddy reload + the `hooks` DNS CNAME + the tunnel ingress (cloudflared-tunnel.yml) — all a
+# supervised apply. The route also works today behind onprem-console.getoffgridai.co/api/v1/triggers/*.
+http://hooks.getoffgridai.co {
+	import edge hooks 120
+	@triggers path /api/v1/triggers/*
+	handle @triggers {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		respond "Off Grid AI — webhook ingress" 200
+	}
+}
