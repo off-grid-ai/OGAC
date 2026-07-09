@@ -1,7 +1,11 @@
 import { ChartBar, DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import { notFound } from 'next/navigation';
 import { StatBand } from '@/components/insights/StatBand';
+import { AppRoiCard } from '@/components/build/AppRoiCard';
 import { StatusBadge } from '@/components/build/AppRunStatus';
+import { resolveRoiSettings } from '@/lib/roi';
+import { computeAppRoiRow } from '@/lib/roi-reader';
+import { getAppRoiOverride, getOrgRoiDefault } from '@/lib/roi-settings-store';
 import {
   bucketByDay,
   buildReportStats,
@@ -24,9 +28,12 @@ export default async function AppReportsTab({ params }: { params: Promise<{ id: 
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();
-  const [app, runs] = await Promise.all([
+  const [app, runs, roi, roiOverride, orgDefault] = await Promise.all([
     getApp(id, orgId),
     listAppRunsView(id, orgId, 200),
+    computeAppRoiRow(id, orgId),
+    getAppRoiOverride(id, orgId),
+    getOrgRoiDefault(orgId),
   ]);
   if (!app) notFound();
 
@@ -52,6 +59,15 @@ export default async function AppReportsTab({ params }: { params: Promise<{ id: 
       </div>
 
       <StatBand stats={stats} />
+
+      {roi ? (
+        <AppRoiCard
+          appId={id}
+          initial={roi}
+          hasOverride={roiOverride !== null}
+          orgDefault={resolveRoiSettings(null, orgDefault)}
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-md border border-border p-4">

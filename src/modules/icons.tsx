@@ -43,6 +43,7 @@ import {
   FlowArrow,
   Broadcast,
   Pulse,
+  TrendUp,
 } from '@phosphor-icons/react/dist/ssr';
 import { type ModuleId } from './registry';
 
@@ -66,6 +67,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   tools: Wrench,
   observability: Microscope,
   analytics: BarChart3,
+  roi: TrendUp,
   finops: Coins,
   accounting: Receipt,
   reports: ScrollText,
