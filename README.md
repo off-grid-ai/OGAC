@@ -41,6 +41,18 @@ run is secure, reliable, compliant, and governed, without anyone wiring that up 
 Non-technical people build the apps. They describe what they need in plain language and get back a
 working, governed workflow, tested in a sandbox before it touches anything real.
 
+## See it
+
+One place to build. Real apps and agents a business team can stand up in plain language: KYC,
+underwriting, claims triage, reimbursements.
+
+![The Studio: business apps and agents built in plain language, each governed](public/docs-shots/studio.png)
+
+Anything that needs a person pauses for one. The approver opens it, decides, and the run resumes and
+finishes on its own.
+
+![The review inbox: runs paused for a human decision, approve or reject and the run resumes](public/docs-shots/app-review.png)
+
 ## Set once, use everywhere
 
 This is the part that changes how an enterprise runs AI.
