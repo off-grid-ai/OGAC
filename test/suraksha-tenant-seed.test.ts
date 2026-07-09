@@ -107,3 +107,27 @@ test('every domain binds to a declared connector (no dangling references)', () =
   const ids = new Set(SURAKSHA_CONNECTORS.map((c) => c.id));
   for (const d of SURAKSHA_DOMAINS) assert.ok(ids.has(d.connectorId), `${d.label} → ${d.connectorId}`);
 });
+
+test('connectors point at the ISOLATED per-tenant `suraksha` databases (not shared corebank/policyadmin, not coreins)', () => {
+  const pg = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_coreins');
+  const my = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_policyadmin');
+  assert.ok(pg && pg.endpoint.endsWith('/suraksha'), 'coreins → …/suraksha');
+  assert.ok(pg && pg.endpoint.includes('corebank:corebank@'), 'uses the real corebank server creds');
+  assert.ok(!pg.endpoint.includes('coreins'), 'no stale coreins DB');
+  assert.ok(my && my.endpoint.endsWith('/suraksha'), 'policyadmin → …/suraksha');
+});
+
+test('reimbursement quota domain (#1) binds to MySQL employee_quota, mirroring bharatunion', () => {
+  const d = SURAKSHA_DOMAINS.find((x) => x.label === 'reimbursement quota');
+  assert.ok(d, 'reimbursement quota domain present');
+  assert.equal(d.connectorId, 'surcon_policyadmin');
+  assert.equal(d.resource, 'employee_quota');
+});
+
+test('every domain binds to a declared connector (no dangling resource)', () => {
+  const ids = new Set(SURAKSHA_CONNECTORS.map((c) => c.id));
+  for (const d of SURAKSHA_DOMAINS) {
+    assert.ok(ids.has(d.connectorId), `${d.label} → ${d.connectorId} exists`);
+    assert.ok(d.resource && /^[a-z][a-z0-9_]*$/.test(d.resource), `${d.label} resource is a table id`);
+  }
+});
