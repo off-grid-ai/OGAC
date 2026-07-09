@@ -7,7 +7,7 @@ import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
-import { enforceAppAccess } from '@/lib/app-access';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // contract. The run input doubles as the ABAC request attributes (e.g. amount thresholds). Denied →
   // 403 + reason, audited access.denied. Composes WITH (does not replace) org-scope + contract below.
   const caller = await callerFromSession(gate, orgId);
-  const access = await enforceAppAccess({
+  const access = await enforceAppAccessWithSharing({
     appId: id,
     orgId,
     ownerId: app.ownerId,

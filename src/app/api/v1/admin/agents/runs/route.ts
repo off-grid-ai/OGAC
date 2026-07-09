@@ -6,7 +6,7 @@ import { currentOrgId } from '@/lib/tenancy';
 import { requireAdmin } from '@/lib/authz';
 import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
 import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
-import { enforceAppAccess } from '@/lib/app-access';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const agent = await getCustomAgent(b.agentId, orgId).catch(() => undefined);
   if (agent) {
     const caller = await callerFromSession(gate, orgId);
-    const access = await enforceAppAccess({
+    const access = await enforceAppAccessWithSharing({
       appId: b.agentId,
       orgId,
       ownerId: '',
