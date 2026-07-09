@@ -1,6 +1,11 @@
-# Off Grid AI Console
+<div align="center">
+  <img src="public/logo.png" width="88" alt="Off Grid AI" />
+  <h1>Off Grid AI Console</h1>
+  <h3>AWS for AI. Make your enterprise intelligent, on one interface that just works.</h3>
+  <p>Open source. Set your rules once. Everyone builds governed AI on top.</p>
+</div>
 
-# AWS for AI.
+![The flow: your data into one governed gateway, through composable pipelines, out to apps and agents your people build in plain language](docs/assets/diagrams/flow-people.png)
 
 Every piece you need to run AI in a company already exists. A gateway to the models. Evals. Guardrails.
 PII masking. Data pipelines. Audit. Lineage. Knowledge bases. The problem was never the parts. It was
@@ -11,12 +16,17 @@ It is one interface where all of it is already set up and connected. You define 
 rules, policies, guardrails, and knowledge once. Everyone builds on top of them. It just works.
 
 ```bash
-git clone <this-repo> && cd console
-make up          # the whole stack comes up, wired together
-npm run dev      # http://localhost:3000
+git clone https://github.com/off-grid-ai/console.git && cd console
+npm install
+cp .env.example .env.local        # fill in DATABASE_URL, AUTH_SECRET, AUTH_KEYCLOAK_*
+make -C deploy up                 # the whole stack comes up, wired together
+npm run db:push                   # create the schema
+npm run dev                       # http://localhost:3000
 ```
 
-That is the setup. It just works. Run it on your own servers or in your cloud, your call.
+That is the setup. It just works. Needs Docker and Node 20+ — the whole backing stack (47 services:
+Postgres, the gateway, identity, orchestration, vector store, secrets, audit, and more) is one
+`docker compose` bring-up, wired together. Run it on your own servers or in your cloud, your call.
 
 ---
 
@@ -49,6 +59,8 @@ risk team has not already blessed.
                model door)  guardrails,    people in          regulator-ready)
                             PII, policy)   plain language)
 ```
+
+![One governed source of truth into one gateway, through composable pipelines, out to an agent workforce and apps that every employee can build](docs/assets/diagrams/flow-agents.png)
 
 - **Data.** It connects to the databases, warehouses, and identity you already run. You change
   nothing about your stack.
@@ -90,15 +102,17 @@ governance. Swap any of them with one environment variable.
 ## Run it
 
 ```bash
-make up            # bring up the backing services (make data for just Postgres + storage)
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # production build
-npm test           # real tests, against a real database
+cp .env.example .env.local        # DATABASE_URL, AUTH_SECRET, AUTH_KEYCLOAK_* are the essentials
+make -C deploy up                 # full stack; or `make -C deploy data` for just Postgres + storage
+npm run db:push                   # create the schema
+npm run dev                       # http://localhost:3000
+npm run build                     # production build
+npm test                          # real tests, against a real database
 ```
 
-To boot you need `DATABASE_URL`, `AUTH_SECRET`, and `AUTH_KEYCLOAK_*` (see `.env.example`). Ship to
-your own fleet with `./deploy/push.sh` after reading `deploy/DEPLOY.md`.
+`make -C deploy` lists every stack target (data, secrets, identity, agents, and more) so you can
+bring up only what you need. Full self-hosting and configuration are documented in the app at `/docs`.
 
 ## When to use it
 
