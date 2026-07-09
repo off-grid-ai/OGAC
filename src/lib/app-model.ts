@@ -234,6 +234,23 @@ export function isSimpleAgent(spec: AppSpec): boolean {
   return spec.steps.length === 1 && spec.steps[0].kind === 'agent';
 }
 
+// ─── appNeedsDataSource — the "needs a data source" state, derived from the spec (PURE) ───────────
+// Save-with-gap (#128): a non-technical user can save an app before wiring every data source. When
+// that happens the spec carries a connector-query step whose `domain` binding is still empty — the
+// step would return an honest "no data-domain binds …" at run time (never a fake success). This pure
+// predicate detects that state from the spec ALONE (no schema column, no I/O) so the app's own
+// screens (Input / detail) can show a plain-language "this app still needs a data source" banner and
+// link the user to where they resolve it. Returns the unbound step ids so the UI can name them.
+export function unboundConnectorSteps(spec: AppSpec): ConnectorQueryStep[] {
+  return spec.steps.filter(
+    (s): s is ConnectorQueryStep => s.kind === 'connector-query' && !s.domain?.trim(),
+  );
+}
+
+export function appNeedsDataSource(spec: AppSpec): boolean {
+  return unboundConnectorSteps(spec).length > 0;
+}
+
 // ─── single-step-app filter (PURE) — the /build/agents list ────────────────────
 // /build/agents is the AGENTS list (deduped from Studio's app-centric shell): it shows the built-in +
 // custom agent roster AND the single-step apps the user built (an agent IS a one-step app). This is

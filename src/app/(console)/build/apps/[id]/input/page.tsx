@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { AppInputForm } from '@/components/build/AppInputForm';
+import { NeedsDataSourceBanner } from '@/components/build/NeedsDataSourceBanner';
 import { getApp } from '@/lib/apps-store';
-import { isSimpleAgent, type AppStep } from '@/lib/app-model';
+import { isSimpleAgent, unboundConnectorSteps, type AppStep } from '@/lib/app-model';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -41,6 +42,7 @@ export default async function AppInputTab({ params }: { params: Promise<{ id: st
   if (!app) notFound();
 
   const hasHumanStep = app.steps.some((s) => s.kind === 'human');
+  const unboundSteps = unboundConnectorSteps(app);
 
   return (
     <div className="w-full space-y-5">
@@ -54,6 +56,10 @@ export default async function AppInputTab({ params }: { params: Promise<{ id: st
         </Badge>
       </div>
       {app.summary ? <p className="text-sm text-muted-foreground">{app.summary}</p> : null}
+
+      {unboundSteps.length > 0 ? (
+        <NeedsDataSourceBanner appId={app.id} count={unboundSteps.length} />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
         {/* Left: the form, capped to a readable input measure inside the full-width grid cell. */}
