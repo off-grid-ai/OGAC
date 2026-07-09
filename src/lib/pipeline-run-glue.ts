@@ -48,7 +48,11 @@ export async function resolveAgentBinding(
  */
 export interface ChatBindingIO {
   getProjectBinding: (projectId: string | null) => Promise<{ pipelineId: string | null } | null>;
-  getChatBindingGovernance: () => Promise<{ defaultChatPipelineId: string | null; allowlist: string[] }>;
+  // Tenant-scoped (SECURITY WAVE 1): the org chat-binding governance is now read PER-ORG, so the
+  // resolver takes the caller's org and never reads another tenant's default/allowlist.
+  getChatBindingGovernance: (
+    orgId: string,
+  ) => Promise<{ defaultChatPipelineId: string | null; allowlist: string[] }>;
 }
 
 export function defaultChatBindingIO(): ChatBindingIO {
@@ -57,9 +61,9 @@ export function defaultChatBindingIO(): ChatBindingIO {
       const { getProjectBinding } = await import('@/lib/chat');
       return getProjectBinding(projectId);
     },
-    async getChatBindingGovernance() {
+    async getChatBindingGovernance(orgId) {
       const { getChatBindingGovernance } = await import('@/lib/store');
-      return getChatBindingGovernance();
+      return getChatBindingGovernance(orgId);
     },
   };
 }
@@ -71,7 +75,7 @@ export async function resolveChatBinding(
 ): Promise<ResolvedPipelineBinding> {
   const [binding, gov] = await Promise.all([
     io.getProjectBinding(projectId),
-    io.getChatBindingGovernance(),
+    io.getChatBindingGovernance(orgId),
   ]);
   const pipelineId = resolveChatPipeline(binding, gov);
   const contract = await resolveContract(pipelineId, orgId);

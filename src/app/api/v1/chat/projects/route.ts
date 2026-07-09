@@ -15,7 +15,8 @@ export async function GET() {
   // Surface the governed set a user may pick from (default first) so the UI can render a picker.
   // Enrich the ids with names via the server-side lib read (NOT the admin HTTP route) so a
   // non-admin chat user sees friendly pipeline names without needing the admin pipelines endpoint.
-  const [gov, orgId] = await Promise.all([getChatBindingGovernance(), currentOrgId()]);
+  const orgId = await currentOrgId();
+  const gov = await getChatBindingGovernance(orgId);
   const availableIds = availableChatPipelines(gov);
   const nameById = new Map((await listPipelines(orgId).catch(() => [])).map((p) => [p.id, p.name]));
   return NextResponse.json({
@@ -35,10 +36,11 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { name = 'New project', systemPrompt = '', pipelineId } = await req.json().catch(() => ({}));
   // Server-side governance gate: a user may only bind a pipeline in the org's available-for-chat set.
-  const gov = await getChatBindingGovernance();
+  const orgId = await currentOrgId();
+  const gov = await getChatBindingGovernance(orgId);
   if (!isChatPipelineAllowed(pipelineId ?? null, gov)) {
     return NextResponse.json({ error: 'pipeline not available for chat' }, { status: 403 });
   }
-  const id = await createProject(userId, await currentOrgId(), name, systemPrompt, pipelineId ?? null);
+  const id = await createProject(userId, orgId, name, systemPrompt, pipelineId ?? null);
   return NextResponse.json({ id });
 }
