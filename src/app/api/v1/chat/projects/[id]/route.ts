@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { deleteProject, projectAccess, updateProjectFields } from '@/lib/chat';
 import { getChatBindingGovernance } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     systemPrompt: patch.systemPrompt,
   };
   if (patch.pipelineId !== undefined) {
-    const gov = await getChatBindingGovernance();
+    const gov = await getChatBindingGovernance(await currentOrgId());
     const next = patch.pipelineId ?? null;
     if (!isChatPipelineAllowed(next, gov)) {
       return NextResponse.json({ error: 'pipeline not available for chat' }, { status: 403 });

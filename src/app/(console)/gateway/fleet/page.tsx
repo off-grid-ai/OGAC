@@ -21,6 +21,7 @@ import {
 import { getMdm } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getOrgPolicy, listAudit, listDevices } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +33,11 @@ interface Stat {
 
 export default async function FleetPage() {
   await requireModuleForUser('fleet');
+  const org = await currentOrgId();
   const [devices, policy, audit] = await Promise.all([
-    listDevices(),
+    listDevices(org),
     getOrgPolicy(),
-    listAudit({ limit: 500 }),
+    listAudit({ limit: 500, orgId: org }),
   ]);
   const online = devices.filter((d) => d.status === 'online').length;
   const mdmPort = getMdm();
@@ -44,7 +46,7 @@ export default async function FleetPage() {
   // in, first-party ids otherwise). Only FleetDM's numeric ids can be targeted by osquery.
   const fleetSupported = mdmPort.supportsFleet === true;
   const hostOptions = fleetSupported
-    ? (await mdmPort.listDevices()).map((d) => ({ id: d.id, name: d.name }))
+    ? (await mdmPort.listDevices(org)).map((d) => ({ id: d.id, name: d.name }))
     : [];
 
   const stats: Stat[] = [

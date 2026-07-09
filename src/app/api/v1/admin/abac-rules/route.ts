@@ -18,7 +18,8 @@ function validRule(b: Record<string, unknown> | null): boolean {
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listAbacRules() });
+  // Tenant-scoped (SECURITY WAVE 1): only the caller's org rules.
+  return NextResponse.json({ object: 'list', data: await listAbacRules(await currentOrgId()) });
 }
 
 export async function POST(req: Request) {
@@ -31,15 +32,19 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const created = await createAbacRule({
-    role: (b!.role as string | undefined) ?? '*',
-    resource: (b!.resource as string | undefined) ?? '*',
-    attribute: b!.attribute as string,
-    operator: b!.operator as string,
-    value: b!.value as string,
-    effect: b!.effect as string,
-  });
-  auditFromSession(gate, await currentOrgId(), {
+  const org = await currentOrgId();
+  const created = await createAbacRule(
+    {
+      role: (b!.role as string | undefined) ?? '*',
+      resource: (b!.resource as string | undefined) ?? '*',
+      attribute: b!.attribute as string,
+      operator: b!.operator as string,
+      value: b!.value as string,
+      effect: b!.effect as string,
+    },
+    org,
+  );
+  auditFromSession(gate, org, {
     action: 'abac.change',
     resource: `abac:${created.id}`,
     outcome: 'ok',
