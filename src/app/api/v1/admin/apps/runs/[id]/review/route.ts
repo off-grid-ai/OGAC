@@ -7,7 +7,7 @@ import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { signalAppRun } from '@/lib/adapters/apprun';
 import { getApp } from '@/lib/apps-store';
 import { captureHitlCorrection } from '@/lib/feedback-store';
-import { enforceAppAccess } from '@/lib/app-access';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
@@ -65,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const app = await getApp(run.appId, orgId);
     const runInput = run.input ?? {};
     const caller = await callerFromSession(gate, orgId);
-    const access = await enforceAppAccess({
+    const access = await enforceAppAccessWithSharing({
       appId: run.appId,
       orgId,
       ownerId: app?.ownerId ?? '',

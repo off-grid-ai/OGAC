@@ -307,3 +307,16 @@ export async function listMembershipsForUser(
     role: normalizeTeamMemberRole(r.role),
   }));
 }
+
+// The FULL org membership list (all teams, all users), mapped to the pure Membership shape. The
+// upward-management-chain resolver (app-sharing-policy.resolveManagementChain) needs the whole
+// org-chart to climb a reporting line, so it reads every membership once, org-scoped.
+export async function listAllMemberships(orgId: string = DEFAULT_ORG): Promise<Membership[]> {
+  await ensureTeamsSchema();
+  const rows = await db.select().from(teamMembers).where(eq(teamMembers.orgId, orgId));
+  return rows.map((r) => ({
+    teamId: r.teamId,
+    userId: r.userId,
+    role: normalizeTeamMemberRole(r.role),
+  }));
+}
