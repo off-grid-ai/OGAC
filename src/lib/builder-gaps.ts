@@ -46,6 +46,14 @@ const NO_SOURCE_RE = /No data source declared for "([^"]+)"/i;
 // wire-data-source action carrying the phrase (so the inline create panel can prefill the label).
 // Anything else is surfaced as an advisory `review` item so nothing is hidden — the operator still
 // sees it, it just has no one-click remedy.
+//
+// SEVERITY (the save-with-gap fix, #128): a wire-data-source gap is ADVISORY, not a blocker. Here's
+// why that's honest — when the compiler can't bind a data phrase it DROPS that connector-query step,
+// so the saved spec is fully valid and runnable; it just doesn't read that source yet. A first-time,
+// non-technical user with zero declared sources MUST be able to save their app and wire the source
+// later (from this gap, or the app's own screens) — not hit a wall on step one. The genuinely
+// BLOCKING case is a connector-query step that IS in the spec but carries no domain (analyzeSpec →
+// bind-step): that step would error at run time, so it stays a blocker.
 export function analyzeGaps(gaps: string[]): FixIt[] {
   const out: FixIt[] = [];
   gaps.forEach((raw, i) => {
@@ -57,9 +65,9 @@ export function analyzeGaps(gaps: string[]): FixIt[] {
       out.push({
         id: `gap-source-${i}`,
         action: 'wire-data-source',
-        title: `No data source for "${phrase}"`,
+        title: `Not reading a source for "${phrase}" yet`,
         phrase,
-        severity: 'blocker',
+        severity: 'advisory',
       });
       return;
     }
