@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { editUserMessage } from '@/lib/chat';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ export async function PATCH(
   if (typeof content !== 'string' || !content.trim()) {
     return NextResponse.json({ error: 'content required' }, { status: 400 });
   }
-  const messages = await editUserMessage(userId, id, messageId, content);
+  const messages = await editUserMessage(userId, await currentOrgId(), id, messageId, content);
   if (!messages) return NextResponse.json({ error: 'not found' }, { status: 404 });
   return NextResponse.json({ ok: true, messages });
 }
