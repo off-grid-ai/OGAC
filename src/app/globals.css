@@ -95,6 +95,7 @@
 :root {
   /* Shared motion tokens — "smooth, not snappy, lots of finesse". */
   --og-ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out, gentle overshoot-free */
+  --og-dur-xfast: 120ms; /* page/tab entrance — calm, near-instant, opacity-only (no rise) */
   --og-dur-fast: 150ms;
   --og-dur: 300ms;
   --og-dur-slow: 400ms;
@@ -193,42 +194,41 @@
 
 /* ── Reusable app-chrome entrances ──────────────────────────────────────── */
 
-/* Page / route entrance — subtle fade + rise. Applied once at the console layout
-   (keyed on pathname), so every module page and every route-based section-nav tab
-   change cross-fades in with zero per-page code. */
+/* Page / route entrance — a calm, near-instant OPACITY cross-fade (no rise). Applied once at
+   the console layout (keyed on pathname). Deliberately opacity-only + 120ms: a vertical rise
+   here replayed on every route/section-nav change and, stacked with per-card/row entrances,
+   read as a "glitchy shimmer" on data-dense operator pages. Content must feel present instantly. */
 @keyframes og-page-enter {
   from {
     opacity: 0;
-    transform: translate3d(0, 0.5rem, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 @utility og-page-enter {
-  animation: og-page-enter var(--og-dur-slow) var(--og-ease) both;
+  animation: og-page-enter var(--og-dur-xfast) var(--og-ease) both;
 }
 
-/* Tab-content cross-fade — a quick fade+rise when the active tab's panel mounts. */
+/* Tab-content cross-fade — a quick OPACITY fade when the active tab's panel mounts. No rise:
+   switching tabs must not move content vertically. */
 @keyframes og-fade-rise {
   from {
     opacity: 0;
-    transform: translate3d(0, 0.375rem, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 @utility og-fade-in {
-  animation: og-fade-rise var(--og-dur) var(--og-ease) both;
+  animation: og-fade-rise var(--og-dur-xfast) var(--og-ease) both;
 }
 
-/* List/row/card entrance — same fade+rise, meant to be combined with an inline
-   `animation-delay` for a cheap stagger. */
+/* Opt-in list/row/card entrance (opacity-only). NOT applied to the base Card/TableRow
+   primitives — a collection of these must not each animate on mount. Use sparingly, e.g. a
+   single hero region, optionally with an inline `animation-delay` for a cheap stagger. */
 @utility og-rise {
-  animation: og-fade-rise var(--og-dur) var(--og-ease) both;
+  animation: og-fade-rise var(--og-dur-xfast) var(--og-ease) both;
 }
 
 /* One global opt-out: strip all motion for users who ask for reduced motion.
