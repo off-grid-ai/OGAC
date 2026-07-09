@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { addEvalDef, listEvalDefs } from '@/lib/eval-defs';
 import { validateEvalDef } from '@/lib/eval-defs-policy';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,15 +13,17 @@ export async function GET(req: Request) {
   // Association filter — the corrected pipeline_id takes precedence over the legacy app_id.
   //   ?pipelineId=<id> → that pipeline's evals · ?pipelineId=none → org-wide library (unattached).
   //   ?appId=<id>      → that app's evals (legacy) · ?appId=none → org-wide library · omitted → all.
+  // Always scoped to the caller's org so one tenant never lists another tenant's evals.
+  const orgId = await currentOrgId();
   const sp = new URL(req.url).searchParams;
   const pipeRaw = sp.get('pipelineId');
   const appRaw = sp.get('appId');
   const filter =
     pipeRaw !== null
-      ? { pipelineId: pipeRaw === 'none' ? null : pipeRaw }
+      ? { orgId, pipelineId: pipeRaw === 'none' ? null : pipeRaw }
       : appRaw !== null
-        ? { appId: appRaw === 'none' ? null : appRaw }
-        : {};
+        ? { orgId, appId: appRaw === 'none' ? null : appRaw }
+        : { orgId };
   return NextResponse.json({ object: 'list', data: await listEvalDefs(filter) });
 }
 
@@ -33,5 +36,8 @@ export async function POST(req: Request) {
   // Optional pipelineId/appId in the body attaches the eval (else it's an org-wide library eval).
   const appId = typeof body?.appId === 'string' ? body.appId : null;
   const pipelineId = typeof body?.pipelineId === 'string' ? body.pipelineId : null;
-  return NextResponse.json(await addEvalDef(v.value, '', { appId, pipelineId }), { status: 201 });
+  const orgId = await currentOrgId();
+  return NextResponse.json(await addEvalDef(v.value, '', { appId, pipelineId, orgId }), {
+    status: 201,
+  });
 }

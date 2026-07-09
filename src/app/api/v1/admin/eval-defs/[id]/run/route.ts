@@ -14,8 +14,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const def = await getEvalDef(id);
+  const orgId = await currentOrgId();
+  // Org-scoped: a tenant can only run its OWN eval def; another tenant's id resolves to null → 404.
+  const def = await getEvalDef(id, orgId);
   if (!def) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  const result = await runEvalDef(def, await currentOrgId());
+  const result = await runEvalDef(def, orgId);
   return NextResponse.json(result, { status: 201 });
 }
