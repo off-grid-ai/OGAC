@@ -20,6 +20,8 @@ export interface AppRunStepRow {
   refs?: string[];
   detail?: string;
   childRunId?: string;
+  /** SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered). */
+  wouldPerform?: { sink: string; recipient?: string; subject?: string; payloadPreview: string };
   startedAt?: string;
   finishedAt?: string;
 }
