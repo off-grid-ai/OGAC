@@ -17,6 +17,44 @@ Built on **open, transparent foundations** any enterprise can inspect, trust, an
 
 ---
 
+## The thesis (founder, the real one)
+
+Governance, compliance, and regulatory controls are **table stakes**. For any enterprise, those just
+have to be there. They are not the pitch.
+
+The actual pitch is about the enterprise's moat and the speed of the outside world:
+
+- Every enterprise sits on a moat: the context, the data, and the processes inside it. That is what
+  makes it valuable.
+- The world is innovating fast (frontier models). The enterprise needs a way to put that outside
+  innovation to work on its own moat.
+
+Here is the gap nobody has closed. **Individual productivity with AI is solved** (any one person can
+get more done with a chatbot). **Harnessing that at the enterprise level is not.** Off Grid AI is the
+attempt to crack the enterprise level, in three ways:
+
+1. **Empower non-technical people to build.** A person describes a workflow or process in plain
+   English, and the system is smart enough to inherit the org's rules, workflows, data, connectors,
+   policies, and guardrails automatically, and hand them their own lovable ecosystem, with
+   human-in-the-loop, review, and reports, so they do their job better. (This is what the Console
+   does today.)
+
+2. **Deploy intelligence at the nodes / on the edge.** Today an MDM solution only solves governance
+   and compliance on a device. If instead you run AI on-device, at the edge, privately (so it never
+   pushes personal information out, see https://offgridmobileai.co), you can harness the "dark"
+   conversations and context that never reach a server, give people intelligent nudges in the moment,
+   and share organizational knowledge to the right person by RBAC.
+
+3. **Consolidate organizational knowledge into a brain.** Could be as simple as watching the screen,
+   understanding the standard operating procedure for a process, and codifying it, so the knowledge
+   in people's heads and habits becomes something the org owns and reuses.
+
+The three compound: the edge (2) captures the context and the SOPs, the brain (3) consolidates them,
+and the builder (1) lets anyone turn that into governed work. The moat gets amplified, governed by
+default, on infrastructure the enterprise controls.
+
+---
+
 ## The pitch — raw (founder's words)
 
 OGAC is a way for enterprises to become intelligent by running AI in a reliable, compliant, and governed ecosystem.
