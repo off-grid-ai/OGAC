@@ -34,6 +34,7 @@
     "src/lib/feedback-store.ts",
     "src/lib/publish-jobs-store.ts",
     "src/lib/rate-limit-store.ts",
+    "src/lib/resend-domains-store.ts",
     "src/lib/org-knowledge.ts",
     "src/lib/prompt-partials.ts",
     "src/lib/prompts.ts",

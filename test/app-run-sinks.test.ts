@@ -137,7 +137,7 @@ test('email sink — a genuine SMTP failure (configured but send failed) errors 
   });
   const res = await executeStep(spec(), outStep('email', { to: 'a@b' }), PRIOR, CTX, deps);
   assert.equal(res.status, 'error');
-  assert.match(res.detail!, /email sink failed: connection refused/);
+  assert.match(res.detail!, /email sink \(smtp\) failed: connection refused/);
 });
 
 test('console sink is unchanged — records the outcome, no external delivery', async () => {
