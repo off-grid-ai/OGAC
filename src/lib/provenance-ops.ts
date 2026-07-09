@@ -28,9 +28,14 @@ export interface RunVerifyResult extends VerificationVerdict {
  * Returns null only when the run itself is unknown; a run with no provenance yields an 'unsigned'
  * verdict. Never throws — a failure to evaluate the signature degrades to a key-mismatch verdict.
  */
-export async function verifyRunProvenance(runId: string): Promise<RunVerifyResult | null> {
+export async function verifyRunProvenance(
+  runId: string,
+  orgId?: string,
+): Promise<RunVerifyResult | null> {
   const { getAgentRun } = await import('@/lib/agentrun');
-  const run = await getAgentRun(runId);
+  // Org-scope the lookup so provenance verify is not a cross-tenant IDOR and a non-default org's run
+  // resolves (getAgentRun is org-scoped as of Wave 2). Omitting orgId falls back to DEFAULT_ORG.
+  const run = await getAgentRun(runId, orgId);
   if (!run) return null;
 
   const signing = getSigning();

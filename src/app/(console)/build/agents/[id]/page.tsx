@@ -88,7 +88,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   // Name + link it (was a generic "governed pipeline" mention) so the join-key is legible here too.
   const pipeline = await resolveConsumerChip(null, orgId).catch(() => null);
   // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
-  const runs = await listAgentRunsByAgent(id, 8).catch(() => []);
+  const runs = await listAgentRunsByAgent(id, 8, orgId).catch(() => []);
   const done = runs.filter((r) => r.status === 'done').length;
   const tools = agent.custom
     ? (await listTools(orgId).catch(() => []))

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   }
 
   const org = await currentOrgId();
-  const results = await Promise.all(ids.map((id) => verifyRunProvenance(id)));
+  const results = await Promise.all(ids.map((id) => verifyRunProvenance(id, org)));
   const found = results.filter((r): r is NonNullable<typeof r> => r != null);
 
   for (const r of found) {
