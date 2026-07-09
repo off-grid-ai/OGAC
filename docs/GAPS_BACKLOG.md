@@ -772,3 +772,14 @@ Fully diagnosed live. TWO bugs in the node's packaged `Off Grid AI.app --server-
     `test/publish-gate-async.integration.test.ts` — gating→terminal, idempotent double-resolve guard, ungated
     instant publish); clean production build (both routes present). NEW `publish_jobs` table (schema.ts +
     idempotent CREATE in the store) — NOT applied live yet; self-migrates on first use. Owner: console.
+
+## GAP (2026-07-09) — Suraksha insurer tenant: connector endpoints mismatch real containers + source data not seeded
+**Status: OPEN — needs founder/daylight, do NOT blind-seed (shared demo containers, cross-tenant-bleed risk).**
+
+The `org_suraksha` (Suraksha Life) tenant + 3 connectors + 12 data-domains are live in the console DB (applied 2026-07-09, verified 1/3/12). But the tenant is NOT yet demoable — its domains resolve to tables that have no rows for it, and the connector endpoints are wrong:
+
+- **Endpoint mismatch:** `surcon_coreins` was generated as `postgres://coreins:coreins@127.0.0.1:5433/coreins`, but the real demo container (`deploy/onprem/data-sources.yml`) is **`corebank`** (postgres:16, port 5433, container `offgrid-ds-corebank`) — DB/user `coreins` likely don't exist. `surcon_policyadmin` → MySQL :3307 (`policyadmin`) looks right; `surcon_warehouse` → S3 :9010 is MinIO (`offgrid-ds-minio` maps 9010:9000) — plausible but unverified.
+- **Containers not confirmed running:** the `offgrid-ds-*` demo sources are NOT up on S1; they're expected on the S2 data plane (or stopped). Could not cleanly confirm S2 container/DB/table state via the S1→S2 double-hop at low-risk.
+- **Isolation question (the crux):** bharatunion's source data lives in ClickHouse warehouse DB `bharatunion` (via `WAREHOUSE_DB` in `seed-insurer-usecases.mjs`), while `corebank`/`policyadmin` MySQL are SHARED single-DB containers. If Suraksha points at the same shared tables, the two tenants share rows unless separated by DB name / a tenant column. **Must decide the isolation model before seeding** (separate warehouse DB `suraksha` is clean for ClickHouse; the shared OLTP containers need a plan).
+
+**To resolve (daylight):** (1) reconcile the 3 Suraksha connector endpoints against the REAL S2 containers (fix `coreins`→`corebank` etc., verify creds/DBs); (2) decide tenant isolation on the shared OLTP containers; (3) seed the insurer-book source rows for `org_suraksha` (adapt `seed-insurer-usecases.mjs`, likely `WAREHOUSE_DB=suraksha` + a per-tenant OLTP scheme). Only then do the domains return rows and the 15 use cases become authorable end-to-end. Owner: console + data-plane. See SERVER_STATE.md § Suraksha, docs/SESSION_HANDOFF.md.
