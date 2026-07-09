@@ -52,6 +52,8 @@ export interface ExecuteDeps {
     prompt: string;
     forceLocal: boolean;
     caller?: string;
+    /** The effective (policy-clamped) request parameters to forward, e.g. { max_tokens, temperature }. */
+    params?: Record<string, unknown>;
   }) => Promise<GatewayCompletion>;
   /** Guardrail check path (reuse of runChecks + outcomeFromChecks). Returns the raw results + outcome. */
   runGuardrail: (
@@ -124,6 +126,15 @@ export async function executePipelineRun(
   orgId: string,
   caller: string | undefined,
   deps: ExecuteDeps,
+  /**
+   * OPTIONAL deterministic REQUEST-shape gates from the pipeline contract (request-policy.ts). Absent
+   * ⇒ the pre-check no-ops (additive). When present: banned-param / out-of-range temperature|top_p ⇒
+   * BLOCK before the model is touched; max_tokens over the ceiling is CLAMPED and forwarded.
+   */
+  requestPolicy: {
+    requestParamsPolicy?: import('@/lib/request-policy').RequestParamsPolicy;
+    modelRules?: import('@/lib/request-policy').ModelRules;
+  } = {},
 ): Promise<PipelineExecuteResult> {
   const plan: PipelineRunPlan = buildRunPlan(verdict, leashModel, pipeline.defaultModel, deps.defaultModel);
 
@@ -133,6 +144,27 @@ export async function executePipelineRun(
     deps.audit('pipeline.invoke', 'blocked', 'no prompt supplied (input/prompt/messages)', plan.model, 0);
     return { status: 'blocked', runId, reason: 'no prompt supplied — provide `input`, `prompt`, or `messages`', checks: [] };
   }
+
+  // 0. Deterministic REQUEST-POLICY pre-check (config, no ML, no network): validate the request's
+  //    model parameters + the RESOLVED model against the pipeline policy. A hard BLOCK (banned param,
+  //    out-of-range sampling, denylisted/non-allowlisted model) refuses BEFORE any guardrail scan or
+  //    model call; a max_tokens clamp is recorded and the clamped params are forwarded to the gateway.
+  //    Absent policy ⇒ no-op pass (additive). PURE decision from checkRequestPolicy.
+  const { checkRequestPolicy } = await import('@/lib/request-policy');
+  const pre0 = checkRequestPolicy(
+    requestPolicy.requestParamsPolicy,
+    requestPolicy.modelRules,
+    body,
+    plan.model,
+  );
+  if (!pre0.allow) {
+    deps.audit('pipeline.invoke', 'blocked', `request policy: ${pre0.reason}`, plan.model, 0);
+    return { status: 'blocked', runId, reason: pre0.reason, checks: [] };
+  }
+  if (pre0.params.clamped.length > 0) {
+    deps.audit('pipeline.params.clamp', 'redacted', pre0.params.reason, plan.model, 0);
+  }
+  const effectiveParams = pre0.params.params;
 
   // 1. Guardrails (input) — PII + injection + operator rules on the prompt. A 'blocked' verdict refuses.
   const pre = await deps.runGuardrail('pre', prompt, orgId, plan.model);
@@ -180,6 +212,7 @@ export async function executePipelineRun(
       prompt: modelPrompt,
       forceLocal: plan.forceLocal,
       caller,
+      params: effectiveParams,
     });
   } catch (e) {
     deps.audit('pipeline.invoke', 'error', `gateway call failed: ${(e as Error).message}`, plan.model, 0);

@@ -186,6 +186,31 @@ services:
     profiles: [guardrails, all]
     ports: ['127.0.0.1:5001:3000']
 
+  # LLM Guard (Protect AI, MIT) — a NAMED alternative guardrails engine (scanner suite: Anonymize,
+  # Secrets, Sensitive, Toxicity, Bias, BanTopics, PromptInjection, Language, Regex, TokenLimit).
+  # Selected with OFFGRID_ADAPTER_GUARDRAILS=llm-guard; the console reaches it at
+  # OFFGRID_HTTP_GUARDRAIL_URL (POST /analyze/prompt) with the AUTH_TOKEN as _API_KEY.
+  #
+  # Image note: the canonical DOCUMENTED image is `laiyer/llm-guard-api` (Laiyer → Protect AI; the
+  # deploy docs were never re-tagged to a protectai image, and no ghcr image is published). Pinned to
+  # 0.3.16, the latest published tag (pushed 2025-05-19). Heads-up: the upstream repo is ARCHIVED
+  # (EOL) as of mid-2026 — it still runs, but factor that into any long-term dependency. Use the
+  # `-cuda` variant for GPU. Health: GET /healthz (liveness) / /readyz (readiness). Loopback-bound so
+  # only the same-host next-server reaches it — set AUTH_TOKEN in .env before exposing it anywhere.
+  llm-guard:
+    image: laiyer/llm-guard-api:0.3.16
+    profiles: [guardrails, all]
+    environment:
+      - LOG_LEVEL=INFO
+      - AUTH_TOKEN=${LLM_GUARD_AUTH_TOKEN:-change-me}
+    ports: ['127.0.0.1:8000:8000']
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:8000/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
   # ── OBSERVABILITY (metrics/logs/traces — one OTLP wire, any backend) ───────────────
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.106.1
