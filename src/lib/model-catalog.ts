@@ -36,6 +36,7 @@ export type ModelFamily =
   | 'Gemma'
   | 'Mistral'
   | 'DeepSeek'
+  | 'GLM'
   | 'Phi'
   | 'SDXL'
   | 'Off Grid AI'
@@ -47,6 +48,7 @@ export const MODEL_FAMILIES: ModelFamily[] = [
   'Gemma',
   'Mistral',
   'DeepSeek',
+  'GLM',
   'Phi',
   'SDXL',
   'Off Grid AI',
@@ -253,6 +255,54 @@ export const MODEL_CATALOG: ModelSpec[] = [
     paramsB: 7,
     license: 'MIT',
     servedOnFleet: false,
+  },
+  {
+    // DeepSeek's hosted OpenAI-compatible chat model (api.deepseek.com). Points at the latest
+    // DeepSeek-V3-series chat weights; 128K context per DeepSeek's API docs.
+    id: 'deepseek-chat',
+    name: 'DeepSeek Chat',
+    family: 'DeepSeek',
+    contextWindow: 131072, // 128K — DeepSeek API docs
+    modality: 'text',
+    paramsB: null, // hosted alias tracking the latest V3-series weights — active param count not pinned
+    license: null, // API-served; the served checkpoint's license is not fixed at this id
+    servedOnFleet: false,
+    note: 'DeepSeek cloud chat model (api.deepseek.com). Hosted alias — points at the latest V3-series chat weights.',
+  },
+  {
+    // DeepSeek's hosted reasoning ("R1"-style) model. Same 128K context ceiling as deepseek-chat.
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek Reasoner',
+    family: 'DeepSeek',
+    contextWindow: 131072, // 128K — DeepSeek API docs
+    modality: 'text',
+    paramsB: null,
+    license: null,
+    servedOnFleet: false,
+    note: 'DeepSeek cloud reasoning model (api.deepseek.com). Emits chain-of-thought + answer; 128K context.',
+  },
+  // GLM (Zhipu AI / Z.AI)
+  {
+    id: 'glm-4.6',
+    name: 'GLM-4.6',
+    family: 'GLM',
+    contextWindow: 200000, // 200K — Z.AI GLM-4.6 published context
+    modality: 'text',
+    paramsB: 357, // MoE: ~357B total, ~32B active per forward pass
+    license: 'MIT',
+    servedOnFleet: false,
+    note: 'Zhipu/Z.AI cloud model. MoE ~357B total (~32B active). 200K context; up to 128K output.',
+  },
+  {
+    id: 'glm-5.2',
+    name: 'GLM-5.2',
+    family: 'GLM',
+    contextWindow: 1000000, // 1M — Z.AI GLM-5.2 published context (full-window id: glm-5.2[1m])
+    modality: 'text',
+    paramsB: 750, // MoE: ~750B total, ~40B active per token
+    license: 'MIT',
+    servedOnFleet: false,
+    note: 'Zhipu/Z.AI flagship (2026). MoE ~750B total (~40B active); 1M context (full-window variant id "glm-5.2[1m]"). Text spec; multimodality not asserted here.',
   },
   // Phi
   {
