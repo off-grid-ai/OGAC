@@ -92,20 +92,65 @@ export function ReviewDecision({
 
   const alreadyDecided = resolved !== null || !reviewable;
 
+  // The header must reflect the run's REAL state, not stay stuck on "needs your decision" after a
+  // decision already resumed + completed the run (gap G-HITL-3). Prefer the just-made decision
+  // (`resolved`), else infer from the persisted terminal status when we land on an already-resolved
+  // run: done → approved/completed, cancelled/error → rejected/halted.
+  const outcome: 'approve' | 'reject' | null =
+    resolved ??
+    (reviewable
+      ? null
+      : runStatus === 'done'
+        ? 'approve'
+        : runStatus === 'cancelled' || runStatus === 'error'
+          ? 'reject'
+          : null);
+  const decidedApproved = outcome === 'approve';
+  const decidedRejected = outcome === 'reject';
+  const headerTone = decidedApproved
+    ? 'border-primary/40 bg-primary/[0.05]'
+    : decidedRejected
+      ? 'border-destructive/40 bg-destructive/[0.05]'
+      : 'border-amber-500/40 bg-amber-500/[0.05]';
+  const eyebrowTone = decidedApproved
+    ? 'text-primary'
+    : decidedRejected
+      ? 'text-destructive'
+      : 'text-amber-600 dark:text-amber-500';
+  const eyebrowLabel = decidedApproved
+    ? 'approved · the run has continued'
+    : decidedRejected
+      ? 'rejected · the run was halted'
+      : 'needs your decision';
+  const amountTone = decidedApproved
+    ? 'text-primary'
+    : decidedRejected
+      ? 'text-destructive'
+      : 'text-amber-700 dark:text-amber-400';
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
       {/* ── LEFT: the decision, the draft, the why ── */}
       <div className="space-y-5">
-        {/* The decision being asked. */}
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.05] p-5">
-          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-500">
-            <UserCircle className="size-4" weight="fill" /> {detail.appTitle} · needs your decision
+        {/* The decision being asked — or, once decided, its recorded outcome (state-aware header). */}
+        <div className={`rounded-lg border p-5 ${headerTone}`}>
+          <div className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide ${eyebrowTone}`}>
+            {outcome ? (
+              decidedApproved ? (
+                <CheckCircle className="size-4" weight="fill" />
+              ) : (
+                <Warning className="size-4" weight="fill" />
+              )
+            ) : (
+              <UserCircle className="size-4" weight="fill" />
+            )}{' '}
+            {detail.appTitle} · {eyebrowLabel}
           </div>
           <h1 className="mt-2 text-2xl font-semibold leading-tight text-foreground">
             {detail.question}
           </h1>
           {detail.amountLabel ? (
-            <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+            <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${amountTone}`}>
               {detail.amountLabel}
             </p>
           ) : null}
@@ -116,7 +161,8 @@ export function ReviewDecision({
               </span>
             ) : null}
             <span>
-              Paused at <span className="text-foreground">{detail.stepLabel}</span>
+              {outcome ? 'Decision at' : 'Paused at'}{' '}
+              <span className="text-foreground">{detail.stepLabel}</span>
             </span>
             {detail.startedAt ? (
               <span>{new Date(detail.startedAt).toLocaleString('en-IN')}</span>
