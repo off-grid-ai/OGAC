@@ -19,9 +19,11 @@ import { policiesFromEnv } from '@offgrid/policy';
 // the console's Logs explorer has nothing to query.
 process.env.OFFGRID_OPENSEARCH_URL ??= 'http://127.0.0.1:9200';
 
-// API-key gate for the exposed (e.g. Cloudflare-tunnelled) endpoint. Placeholder
-// for quick testing — ROTATE and move to a secret/env for anything real.
-process.env.OFFGRID_GATEWAY_API_KEY ??= 'oglb_7Qk29fP3xR8mZt4w';
+// API-key gate for the exposed (e.g. Cloudflare-tunnelled) endpoint. Set it via the
+// OFFGRID_GATEWAY_API_KEY env var. Never hardcode a live key here — this repo is public.
+if (!process.env.OFFGRID_GATEWAY_API_KEY) {
+  console.warn('[cluster-gateway] OFFGRID_GATEWAY_API_KEY not set — the exposed endpoint will reject requests until you set one.');
+}
 
 // The on-prem fleet pool. Override with OFFGRID_POOL (JSON) without editing code.
 const POOL = [

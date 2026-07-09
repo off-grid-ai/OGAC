@@ -1,71 +1,83 @@
 # Off Grid AI Console
 
-**An open-source platform you run on your own servers that lets non-technical staff build governed
-AI apps on the systems you already have.**
+# AWS for AI.
 
-Local models, your data, your infrastructure. A claims officer or a tax analyst describes a workflow
-in plain English and gets back a working app. Every run is evaluated, guardrailed, audited, and
-signed. No data leaves the building. No engineer in the loop.
+Every piece you need to run AI in a company already exists. A gateway to the models. Evals. Guardrails.
+PII masking. Data pipelines. Audit. Lineage. Knowledge bases. The problem was never the parts. It was
+wiring them into one thing that works, and keeping every team inside the rules.
 
-## Why it exists
+AWS meant you stopped assembling servers. Off Grid AI means you stop assembling AI infrastructure.
+It is one interface where all of it is already set up and connected. You define your organization's
+rules, policies, guardrails, and knowledge once. Everyone builds on top of them. It just works.
 
-Every enterprise hits the same wall with AI. You can have it private, governed, or fast to build.
-Pick two.
+```bash
+git clone <this-repo> && cd console
+make up          # the whole stack comes up, wired together
+npm run dev      # http://localhost:3000
+```
 
-Off Grid AI gives all three:
+That is the setup. It just works. Run it on your own servers or in your cloud, your call.
 
-- **Private.** The models run on your servers. Your data never leaves. Cloud routing is opt-in and
-  masks sensitive fields before anything crosses the wire.
-- **Governed.** Evals, drift, guardrails, and policy run on every request. Every output is audited,
-  cited, and signed. Reversible, and provable to a regulator.
-- **Fast to build.** The person who knows the process builds the app in plain language. It does not
-  sit in the engineering queue.
+---
 
-## When to use it
+## What it is
 
-Use it when a data-sensitive or regulated enterprise wants AI inside real operational workflows
-(claims, underwriting, reconciliation, reporting) and:
+An open-source platform you run on your own servers that makes your enterprise intelligent.
 
-- the data cannot go to a hosted AI,
-- every step has to be auditable, and
-- business teams should build these themselves, on the systems already in place.
+It harnesses the data and context already inside your organization, and lets your people and their
+agents put frontier models to work on it, to raise their productivity, output, and quality. Every
+run is secure, reliable, compliant, and governed, without anyone wiring that up per app.
 
-BFSI is the sharp case. It is not for a public consumer chatbot or a throwaway prototype. The whole
-point is control, governance, and self-hosting.
+Non-technical people build the apps. They describe what they need in plain language and get back a
+working, governed workflow, tested in a sandbox before it touches anything real.
 
-## What you get
+## Set once, use everywhere
 
-- **It is a drop-in.** It connects to the databases, warehouses, and identity you already run. You
-  change nothing about your stack.
-- **Non-technical people build the apps.** They describe the workflow. They never touch code, infra,
-  or a node canvas.
-- **Nothing is tested on production.** Every app is built and run in a sandbox against your evals
-  before it touches a live system.
-- **You stay in control, and can prove it.** A call that is not allowed off the box does not leave.
-  PII is masked. Every run is logged, scored, and stopped on a broken guardrail.
-- **You read every line.** Open source, self-hosted. No hosted service holding your data, no black
-  box, no phone-home.
+This is the part that changes how an enterprise runs AI.
 
-## An example, start to finish
+An administrator defines the organization's rules, policies, guardrails, observability, data
+lineage, and knowledge bases one time. From then on, every employee and every agent inherits them
+automatically. Nobody re-implements governance. Nobody works around it. Nobody ships an app your
+risk team has not already blessed.
 
-A claims officer writes:
+## How it flows
 
-> When a reimbursement claim comes in, pull the employee's policy, check it against the limit, and if
-> it is over 40,000 rupees send it to a manager to approve, then email the outcome.
+```
+   data  ->  gateway  ->  pipelines  ->  agents / apps  ->  compliance & regulations
+ (your        (one         (evals,        (built by         (audited, cited,
+  systems)     governed     drift,         non-technical      signed, reversible,
+               model door)  guardrails,    people in          regulator-ready)
+                            PII, policy)   plain language)
+```
 
-Off Grid AI turns that into a governed multi-step app: it reads the claim, pulls the policy from your
-system, runs the check, pauses for a manager's approval, and emails the result. The claims officer
-built it. Your data stayed put. Every step is on the audit trail. You were not paged.
+- **Data.** It connects to the databases, warehouses, and identity you already run. You change
+  nothing about your stack.
+- **Gateway.** One governed door to every model. Local by default. Cloud routing is opt-in and masks
+  sensitive fields before a byte leaves the box.
+- **Pipelines.** Bind a model, evals, a golden set, policy, guardrails, and drift to a use case once.
+  Everything built on top inherits all of it.
+- **Agents and apps.** The people who know the work build the workflow, in plain language, in a
+  sandbox.
+- **Compliance.** Every run is audited, every answer cited, every output signed. Export it and hand
+  it to a regulator.
+
+## Why it matters
+
+An enterprise reaches its full potential by amplifying its own moat: its data, its people, its
+processes, its reach. Off Grid AI lets it do that through one governed interface, so putting AI to
+work is a thing anyone in the org can do inside the rules, not a project that waits on a platform
+team. Real change reaches people through the enterprises that serve them. This is how those
+enterprises get intelligent.
 
 ## Built on what you already trust
 
 No proprietary runtime to learn. It composes engines your team already knows, each wrapped in
-governance:
+governance. Swap any of them with one environment variable.
 
 | Layer | Engine |
 |---|---|
 | System of record, vectors | Postgres + pgvector |
-| Identity / SSO | Keycloak (OIDC) |
+| Identity / SSO | Keycloak |
 | Durable orchestration | Temporal |
 | Ingestion / ETL / DAG | Airbyte, dbt, Kestra |
 | Warehouse + lineage | ClickHouse, Marquez |
@@ -75,34 +87,25 @@ governance:
 | Vector store | Qdrant or LanceDB |
 | Object store | SeaweedFS |
 
-Swap any of them with one environment variable. Nothing is welded in.
-
 ## Run it
 
 ```bash
-git clone <this-repo> && cd console
+make up            # bring up the backing services (make data for just Postgres + storage)
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # production build
 npm test           # real tests, against a real database
 ```
 
-Bring up the backing services from `deploy/`. `make up` for the full stack, `make data` for just
-Postgres and object storage. To boot you need `DATABASE_URL`, `AUTH_SECRET`, and `AUTH_KEYCLOAK_*`
-(see `.env.example`). Ship to your own fleet with `./deploy/push.sh` after reading `deploy/DEPLOY.md`.
+To boot you need `DATABASE_URL`, `AUTH_SECRET`, and `AUTH_KEYCLOAK_*` (see `.env.example`). Ship to
+your own fleet with `./deploy/push.sh` after reading `deploy/DEPLOY.md`.
 
-## How it is put together
+## When to use it
 
-```
-   your data  ->  the gateway  ->  governed pipelines  ->  apps and agents  ->  the people who do the work
-  (ingest +      (one governed     (evals, drift,           (built in plain     (a trigger arrives,
-   transform)     model door)       guardrails, PII)         language)           it runs governed, result out)
-```
-
-A pipeline binds a model, evals, a golden set, policy, guardrails, and drift to a use case once.
-Every app that consumes it inherits all of it. That is how a non-technical person builds something
-your compliance team will sign off on. Business logic is pure and unit-tested, handlers are thin,
-every backend sits behind a swappable adapter. The rules are in [`docs/ENGINEERING.md`](docs/ENGINEERING.md).
+A data-sensitive or regulated enterprise that wants AI inside real operational workflows (claims,
+underwriting, reconciliation, reporting), cannot send that data to a hosted AI, needs every step
+auditable, and wants business teams to build these themselves. BFSI is the sharp case. It is not for
+a public consumer chatbot or a throwaway prototype.
 
 ## License
 
