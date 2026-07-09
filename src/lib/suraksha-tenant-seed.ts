@@ -68,7 +68,10 @@ export const SURAKSHA_CONNECTORS: ConnectorSpec[] = [
     id: SUR_COREINS,
     name: 'Core Insurance (Postgres)',
     type: 'postgres',
-    endpoint: 'postgres://coreins:coreins@127.0.0.1:5433/coreins',
+    // Isolated per-tenant database `suraksha` on the SHARED Postgres server (same box as bharatunion's
+    // corebank, separate DB) — so the insurer's book never collides with the bank tenant's rows.
+    // Seeded by deploy/onprem/seed-suraksha-dataplane.mjs.
+    endpoint: 'postgres://corebank:corebank@127.0.0.1:5433/suraksha',
     auth: 'password',
     description: 'Policy administration OLTP — policies, premiums, claims, KYC, pricing.',
     status: 'connected',
@@ -77,9 +80,11 @@ export const SURAKSHA_CONNECTORS: ConnectorSpec[] = [
     id: SUR_POLICYADMIN,
     name: 'Advisor & HR Admin (MySQL)',
     type: 'mysql',
-    endpoint: 'mysql://policyadmin:policyadmin@127.0.0.1:3307/policyadmin',
+    // Isolated per-tenant schema `suraksha` on the SHARED MySQL server (same box as bharatunion's
+    // policyadmin, separate schema). Seeded by deploy/onprem/seed-suraksha-dataplane.mjs.
+    endpoint: 'mysql://policyadmin:policyadmin@127.0.0.1:3307/suraksha',
     auth: 'password',
-    description: 'Advisor/agency force + HR — advisors, requisitions, candidates.',
+    description: 'Advisor/agency force + HR — advisors, requisitions, candidates, reimbursement quota.',
     status: 'connected',
   },
   {
@@ -148,6 +153,14 @@ export const SURAKSHA_DOMAINS: DomainSpec[] = [
     opHints: { limit: 20 },
   },
   // ── insurer use-case tools (reframed for the insurer) ──
+  {
+    label: 'reimbursement quota',
+    aliases: ['reimbursement limit', 'expense quota', 'employee quota', 'reimbursement entitlement', 'my quota'],
+    connectorId: SUR_POLICYADMIN,
+    resource: 'employee_quota',
+    useCase: '#1 Reimbursement approval',
+    opHints: { limit: 20 },
+  },
   {
     label: 'pricing rfq',
     aliases: ['quote request', 'pricing quote request', 'rfq', 'group pricing request', 'quote requests'],
