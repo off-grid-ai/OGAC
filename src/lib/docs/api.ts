@@ -39,7 +39,7 @@ token.`,
 
 ## Machine clients (bearer token)
 
-For scripts, services, and SDKs, create a **machine client** in **Access → Machine Clients**. It
+For scripts, services, and SDKs, create a **machine client** under **Governance → Access**. It
 issues a bearer token via the client-credentials grant, scoped to the services you tick. Send it as
 a header:
 
@@ -111,8 +111,8 @@ const resp = await client.chat.completions.create({
 console.log(resp.choices[0].message.content);
 \`\`\`
 
-The response includes an \`x-offgrid-gateway\` header showing which node served the call. Which
-model you can use, and whether a request may reach a cloud model, is governed by your routing rules.`,
+Which model you can use, and whether a request may reach a cloud model, is governed by your routing
+rules — the gateway picks an enabled node for the model and returns the completion unchanged.`,
     },
     {
       slug: 'api/embeddings',
@@ -157,7 +157,7 @@ one authed origin so you can browse them together without CORS or LAN issues.
 - \`/specs/<service>\` returns that service's OpenAPI JSON. The service token names the underlying
   capability — e.g. the vector store, tracing store, secrets store, data lineage, dashboards,
   feature flags, PII detection, and device management. The full set of available tokens is listed on
-  the [API docs & playground](/api-docs) page.
+  the [API docs & playground](/operations/api-docs) page.
 - The console (\`/openapi.json\`) is the platform's own spec, rendered interactively at
   [/docs/api](/docs/api).
 
