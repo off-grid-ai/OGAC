@@ -933,3 +933,28 @@ can be AUTHORED in plain English against real governed tools. Reproducible; idem
 - Env: `OFFGRID_KESTRA_URL=http://127.0.0.1:8945` added to S1 `.env.local`. Edge Caddy reloaded (Caddyfile 8945 block: `127.0.0.1:8945 → offgrid-s2.local:8090`). Workers (agent/app/chat) restarted for the web_search-egress agentrun change.
 - Rate-limit columns present (self-migrated + verified): `api_keys.rate_limit`, `api_keys.token_hash` (+ idx), `org_settings.default_rate_limit`.
 - G-F1 (bearer/service tenant scoping) + user-activity view + prompt observability also deployed.
+
+## Webhook trigger ingress (STAGED — 2026-07-09)
+
+The universal inbound trigger primitive: `POST /api/v1/triggers/<token>` fires a GOVERNED durable run
+of the app/agent a token is bound to. Auth is a per-trigger HMAC signature (`X-Offgrid-Signature:
+sha256=…` over `${X-Offgrid-Timestamp}.${rawBody}`), ±300s window, single-use per signature (nonce),
+tenant-scoped (the fired run executes under the trigger's org). Secret is vaulted in OpenBao (only a
+`secret_ref` in the row).
+
+- **DB (self-migrating, `ensureWebhookTriggerSchema`)**: `webhook_triggers` (id, token, org_id,
+  target_kind app|agent, target_id, secret_ref, enabled, created_at, last_fired_at) + `webhook_nonces`
+  (nonce PK, seen_at; opportunistically pruned). No manual migration — created on first use.
+- **Admin CRUD**: `GET/POST /api/v1/admin/triggers/webhooks`, `PATCH/DELETE …/[id]` (enable/disable/
+  rotate/delete). Create returns the public URL + secret ONCE.
+- **STAGED exposure — needs a supervised apply (NOT live yet):**
+  1. `deploy/onprem/cloudflared-tunnel.yml` — added `hooks.getoffgridai.co → :80`. Apply to the live
+     `~/.cloudflared/config.yml` on S1 + restart cloudflared.
+  2. `deploy/Caddyfile` — added the `hooks.getoffgridai.co` vhost (edge WAF + rate-limit; proxies ONLY
+     `/api/v1/triggers/*` → :3000). Reload Caddy on S1.
+  3. `deploy/onprem/dns-records.sh` — added `hooks` to NAMES. Run to create the CNAME.
+  - Until applied, the route still works behind `onprem-console.getoffgridai.co/api/v1/triggers/<token>`.
+- **Env (optional)**: `OFFGRID_WEBHOOK_BASE_URL=https://hooks.getoffgridai.co` so the admin create
+  response returns an absolute public URL (else it returns a path to prefix with the console host).
+- Cloudflare **Email Routing** on the demo domain can forward inbound mail → a webhook trigger URL, so
+  email-in rides on this same primitive (no IMAP mailbox needed).
