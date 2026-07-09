@@ -16,6 +16,7 @@ const EXTRACT_PROMPT =
 // eslint-disable-next-line complexity
 export async function extractMemory(
   userId: string,
+  orgId: string,
   userText: string,
   assistantText: string,
   model: string,
@@ -43,7 +44,7 @@ export async function extractMemory(
     if (!text || /^\s*none\s*$/i.test(text.trim())) return;
     for (const line of text.split('\n')) {
       const fact = line.replace(/^[-*\d.\s]+/, '').trim();
-      if (fact && !/^none$/i.test(fact)) await addMemory(userId, fact, 'chat');
+      if (fact && !/^none$/i.test(fact)) await addMemory(userId, orgId, fact, 'chat');
     }
   } catch {
     /* best-effort */

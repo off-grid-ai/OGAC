@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createSkill, listSkills, projectAccess } from '@/lib/chat';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-// Org skills — reusable RBAC-scoped assistants. Listing is scoped to the caller's role (admins
-// see all); creation is admin-only. Mirrors the console's other admin-gated resources.
+// Org skills — reusable RBAC-scoped assistants. Listing is scoped to the host-bound tenant
+// (currentOrgId) AND the caller's role (admins see all within their org); creation is admin-only.
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const role = session.user.role ?? 'viewer';
-  return NextResponse.json({ skills: await listSkills(role, session.user.email) });
+  return NextResponse.json({ skills: await listSkills(await currentOrgId(), role, session.user.email) });
 }
 
 // Create an assistant. Admins may publish org-wide assistants (visibility 'org'); non-admins may
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     const access = await projectAccess(session.user.email, body.projectId, session.user.role ?? 'viewer');
     if (!access) return NextResponse.json({ error: 'forbidden: no access to that project' }, { status: 403 });
   }
-  const id = await createSkill(session.user.email, {
+  const id = await createSkill(session.user.email, await currentOrgId(), {
     name: body.name,
     description: body.description,
     systemPrompt: body.systemPrompt,

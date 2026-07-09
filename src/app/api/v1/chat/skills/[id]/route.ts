@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { deleteSkill, getSkill, updateSkill } from '@/lib/chat';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
 // A caller may mutate a skill if they're an admin (org-wide assistants) or the creator of a
-// private one. Non-admins can never publish org-wide (visibility is pinned to 'private').
-async function canMutate(id: string, email: string, role: string) {
+// private one. Non-admins can never publish org-wide (visibility is pinned to 'private'). All
+// lookups/mutations are tenant-scoped by orgId so a caller can only touch THEIR org's skills — a
+// skill in another tenant resolves to null here and the mutation is refused.
+async function canMutate(orgId: string, id: string, email: string, role: string) {
+  const s = await getSkill(orgId, id);
+  if (!s) return false;
   if (role === 'admin') return true;
-  const s = await getSkill(id);
-  return Boolean(s && s.visibility === 'private' && s.createdBy === email);
+  return Boolean(s.visibility === 'private' && s.createdBy === email);
 }
 
 // Edit assistant fields: instructions/model/roles/knowledge project + builder fields
@@ -21,7 +25,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
   const role = session.user.role ?? 'viewer';
-  if (!(await canMutate(id, email, role)))
+  const orgId = await currentOrgId();
+  if (!(await canMutate(orgId, id, email, role)))
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
@@ -54,7 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.visibility !== undefined) {
     patch.visibility = role === 'admin' && body.visibility === 'org' ? 'org' : 'private';
   }
-  await updateSkill(id, patch);
+  await updateSkill(orgId, id, patch);
   return NextResponse.json({ ok: true });
 }
 
@@ -64,8 +69,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
   const role = session.user.role ?? 'viewer';
-  if (!(await canMutate(id, email, role)))
+  const orgId = await currentOrgId();
+  if (!(await canMutate(orgId, id, email, role)))
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  await deleteSkill(id);
+  await deleteSkill(orgId, id);
   return NextResponse.json({ ok: true });
 }

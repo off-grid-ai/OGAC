@@ -725,8 +725,10 @@ export const chatArtifacts = pgTable('chat_artifacts', {
   title: text('title').notNull().default('Untitled artifact'),
   conversationId: text('conversation_id'),
   // Publish/share (Wave 1): when published an artifact is readable at /artifacts/[id]/view.
-  // Org-scoped by default via orgId; published flips it to a stable read-only surface.
-  orgId: text('org_id'),
+  // Tenant scope (Wave 2): every artifact is bound to the org it was saved in, so a user on
+  // tenant A's subdomain never sees tenant B's library. Defaults to 'default'; NOT NULL so the
+  // read filter is total. Self-migrated (backfilled from NULL) via ensureChatSchema.
+  orgId: text('org_id').notNull().default('default'),
   published: boolean('published').notNull().default(false),
   publishedAt: timestamp('published_at', { withTimezone: true }),
   // Points at the current (latest) version row so the library shows head content.

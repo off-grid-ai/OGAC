@@ -19,15 +19,16 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { projectId = null, skillId = null } = await req.json().catch(() => ({}));
   const role = session.user.role ?? 'viewer';
+  const orgId = await currentOrgId();
   // Can't bind a conversation to a project or skill you don't have access to.
   if (projectId && !(await projectAccess(userId, projectId, role)))
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   if (skillId) {
-    const s = await getSkill(skillId);
+    const s = await getSkill(orgId, skillId);
     const permitted =
       s && (role === 'admin' || (s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role))));
     if (!permitted) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
-  const id = await createConversation(userId, await currentOrgId(), projectId, skillId);
+  const id = await createConversation(userId, orgId, projectId, skillId);
   return NextResponse.json({ id });
 }
