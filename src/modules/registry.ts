@@ -25,6 +25,7 @@ export type ModuleId =
   | 'reports'
   | 'lineage'
   | 'regulatory'
+  | 'trust'
   | 'integrations'
   | 'tool-catalog'
   | 'data-domains'
@@ -251,6 +252,14 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Regulatory',
     description: 'DPO view, framework mapping, audit/DPIA exports.',
     route: '/governance/regulatory',
+    service: 'regulatory',
+  },
+  {
+    id: 'trust',
+    label: 'Trust Center',
+    description:
+      'The security & compliance evidence surface for a buyer’s CISO/procurement gate — posture, data governance, AI governance, regulatory mapping, and a compliance-artifact checklist, with a downloadable trust summary.',
+    route: '/governance/trust',
     service: 'regulatory',
   },
   {

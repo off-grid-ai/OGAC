@@ -71,6 +71,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   reports: ScrollText,
   lineage: TreeStructure,
   regulatory: Scale,
+  trust: ShieldCheck,
   integrations: Vault,
   'tool-catalog': Toolbox,
   'data-domains': TreeStructure,

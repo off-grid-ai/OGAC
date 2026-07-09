@@ -39,6 +39,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
   {
     heading: 'Prove',
     tabs: [
+      { id: 'trust', label: 'Trust Center', route: '/governance/trust' },
       { id: 'regulatory', label: 'Regulatory', route: '/governance/regulatory' },
       { id: 'provenance', label: 'Provenance', route: '/governance/provenance' },
       { id: 'exporters', label: 'Export', route: '/governance/exporters' },
