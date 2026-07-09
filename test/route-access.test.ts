@@ -41,6 +41,13 @@ test('isPublicPath: authed console + admin API are NOT public', () => {
   }
 });
 
+test('isPublicPath: the invite-accept page + endpoint are public (invitee has no session yet)', () => {
+  assert.equal(isPublicPath('/invite/accept'), true);
+  assert.equal(isPublicPath('/api/v1/invites/accept'), true);
+  // but the admin-side invite management stays authed
+  assert.equal(isPublicPath('/api/v1/admin/invites'), false);
+});
+
 test('isPublicPath: node device endpoints are public (device-token auth)', () => {
   assert.equal(isPublicPath('/api/v1/devices/enroll'), true);
   assert.equal(isPublicPath('/api/v1/devices/dev_01/policy'), true);
