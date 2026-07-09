@@ -7,8 +7,9 @@ export const governSection: DocSection = {
     {
       slug: 'guides/governance',
       title: 'Governance overview',
-      description: 'Prove to a regulator that your AI is controlled.',
-      body: `Governance is why regulated organizations choose Off Grid AI. It isn't a feature bolted on;
+      description: 'Set the org’s rules once — everyone builds inside them.',
+      body: `**What you'll get:** you define the org's rules once — policy, guardrails, egress, audit —
+and every request everyone makes inherits them automatically. Governance isn't a feature bolted on;
 it is the path every request takes. Each piece below is a surface you operate, not a dashboard you
 watch.
 
@@ -42,8 +43,8 @@ that decide what the platform is allowed to do, so you can set the posture and p
 ## The egress leash
 
 The master switch. Cloud egress ON or OFF decides whether any request can reach a cloud model. With
-it off, a \`cloud\` routing rule is forced to block — customer data physically cannot leave the box.
-The live state is shown here.
+it off, a \`cloud\` routing rule is forced to block — sensitive data can't route to a cloud model,
+whatever anyone asks. The live state is shown here.
 
 ## Routing rules
 
@@ -83,9 +84,15 @@ take effect on the next request.
 
 ## First-party or policy-as-code
 
-The console ships a first-party attribute-based engine. For policy-as-code at scale, point the policy
-adapter at an external policy engine and author rules there; the console falls back to the first-party
-engine if that engine is unreachable, so turning it on is never a hard dependency.`,
+The console ships a built-in attribute-based engine. For policy-as-code at scale, point the policy
+adapter at an external policy engine and author rules there; the console falls back to the built-in
+engine if that engine is unreachable, so turning it on is never a hard dependency.
+
+## What success looks like
+
+You add a deny rule, and the very next request that matches it is refused — visible as a denied
+outcome in the [audit ledger](/docs/guides/audit). One rule, enforced everywhere, with no per-app
+wiring.`,
     },
     {
       slug: 'guides/guardrails',
@@ -112,7 +119,13 @@ encrypt) there too.
 ## In the pipeline
 
 A blocked verdict on input refuses the request; a redaction rewrites it. Output is scanned before it
-leaves and recorded in the audit trail. Every verdict is logged against the request.`,
+leaves and recorded in the audit trail. Every verdict is logged against the request.
+
+## What success looks like
+
+You paste a string with an email and a card number into the test box and watch the active detector
+mask them in place — then every prompt and answer across the platform gets the same treatment,
+because guardrails run in the pipeline everyone shares.`,
     },
     {
       slug: 'guides/access',
@@ -170,14 +183,18 @@ out of code and configuration.
 
 ## How it works
 
-The default store is the process environment. For production, point the secrets adapter at a
-**secrets store** (a KV v2 vault); the console reads and writes through it, and falls back to env if
-it's down.
+For production, point the secrets adapter at your **secrets store**; the console reads and writes
+through it, and falls back to the process environment if the store is unreachable, so nothing breaks.
 
 ## Manage it
 
 On the **Secrets** page, write, list, and remove secrets. Values are write-only from the console —
-only key names are listed back, never the values — so the surface can't leak what it stores.`,
+only key names are listed back, never the values — so the surface can't leak what it stores.
+
+## What success looks like
+
+You write a connector credential and see only its key name listed back, never the value — and a
+connector using it works without the secret ever appearing in code or config.`,
     },
     {
       slug: 'guides/provenance',
@@ -191,16 +208,23 @@ whom, and that it wasn't altered.
 ## What gets signed
 
 Agent-run answers and exported reports carry a signature. Verification is standalone — anyone with
-the public key can check it, offline.
+the public key can check it, offline, long after the fact.
 
 ## Signing options
 
-- **First-party** — an HMAC signature over the payload, tamper-evident with a shared key.
-- **Sigstore** — keyless signing tied to an OIDC identity, verifiable against the public transparency
-  log.
-- **C2PA** — content credentials for images: a detached manifest travels with the file.
+- **Shared-key signature** — a tamper-evident signature over the payload, checked with a shared key.
+  The default, no extra setup.
+- **Identity-bound signing** — keyless signing tied to a verified identity, checkable against a
+  public transparency log for the strongest chain of custody.
+- **Content credentials** — for images, a credential travels with the file, so its origin follows it
+  wherever it goes.
 
-On the **Provenance** page, verify a signed artifact and see its manifest.`,
+On the **Provenance** page, verify a signed artifact and see its manifest.
+
+## What success looks like
+
+You export a report, then verify it on the Provenance page — it confirms who produced it and that
+it hasn't changed since. Hand that report to an auditor and they can check it themselves, offline.`,
     },
     {
       slug: 'guides/regulatory',
