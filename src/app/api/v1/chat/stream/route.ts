@@ -108,7 +108,7 @@ export async function POST(req: Request) {
   const convo = temporary
     ? { id: '', userId, projectId: null, skillId: null }
     : conversationId
-      ? await getConversation(userId, conversationId)
+      ? await getConversation(userId, orgId, conversationId)
       : null;
   if (!convo) return new Response('conversation not found', { status: 404 });
 

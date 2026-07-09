@@ -7,6 +7,7 @@ import {
   renameConversation,
   switchBranch,
 } from '@/lib/chat';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
-  const conversation = await getConversation(userId, id);
+  const conversation = await getConversation(userId, await currentOrgId(), id);
   if (!conversation) return NextResponse.json({ error: 'not found' }, { status: 404 });
   return NextResponse.json({ conversation, messages: await listMessages(id) });
 }
@@ -25,8 +26,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
-  // Ownership check (both actions mutate a conversation the caller must own).
-  if (!(await getConversation(userId, id))) {
+  // Ownership check (both actions mutate a conversation the caller must own, in this tenant).
+  if (!(await getConversation(userId, await currentOrgId(), id))) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
   const { title, branchMessageId, branchDelta } = await req.json().catch(() => ({}));

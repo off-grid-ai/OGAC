@@ -358,6 +358,9 @@ export const users = pgTable('user', {
 export const chatProjects = pgTable('chat_projects', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
+  // Host-bound tenant scope (currentOrgId) — a project belongs to the org the user was in when
+  // they created it, so Workspace projects are tenant-isolated. Defaults to 'default' for pre-tenant rows.
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   systemPrompt: text('system_prompt').notNull().default(''),
@@ -397,6 +400,10 @@ export const chatProjectMemory = pgTable('chat_project_memory', {
 export const chatConversations = pgTable('chat_conversations', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
+  // Host-bound tenant scope (currentOrgId) — the org the user was in when the conversation was
+  // created, so Workspace chat is tenant-isolated (a user on tenant A's subdomain never sees
+  // tenant B's chats). Defaults to 'default' for pre-tenant rows.
+  orgId: text('org_id').notNull().default('default'),
   projectId: text('project_id'), // null = ad-hoc chat
   skillId: text('skill_id'), // optional org skill bound to this conversation
   title: text('title').notNull().default('New chat'),
