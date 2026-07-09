@@ -27,7 +27,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
   // App runs have a richer per-app page — send the operator there.
   if (row.kind === 'app') redirect(row.href);
 
-  const agent = row.kind === 'agent' ? await getAgentRun(row.id) : null;
+  const agent = row.kind === 'agent' ? await getAgentRun(row.id, orgId) : null;
 
   return (
     <div className="w-full space-y-5">

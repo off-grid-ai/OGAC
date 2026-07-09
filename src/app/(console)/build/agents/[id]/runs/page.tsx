@@ -27,10 +27,11 @@ const STATUS_COLOR: Record<string, string> = {
 export default async function AgentRunsPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('agents');
   const { id } = await params;
-  const agent = await resolveAgent(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const agent = await resolveAgent(id, orgId);
   if (!agent) notFound();
   // Degrade gracefully: DB down → empty run history ("No runs yet.") not the whole-page error boundary.
-  const runs = await listAgentRunsByAgent(id, 100).catch(() => []);
+  const runs = await listAgentRunsByAgent(id, 100, orgId).catch(() => []);
 
   return (
     <div className="space-y-6">
