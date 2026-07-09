@@ -99,15 +99,29 @@ work is a thing anyone in the org can do inside the rules, not a project that wa
 team. Real change reaches people through the enterprises that serve them. This is how those
 enterprises get intelligent.
 
-## Batteries included, swappable, honest
+## The governance is ours. The engines are swappable.
 
-No proprietary runtime to learn, and no external service required to start. Every capability ships
-with a first-party default, so `npm run dev` works on its own. When you want the heavy-duty open
-source engine, you point one environment variable at it. The governance is the same either way.
+Two layers, and the distinction matters.
 
-Here is exactly what is wired today, what is a swap-in, and what is still on the way. No inflation.
+**The governance spine is Off Grid AI's own code, always on.** It is not borrowed from a library.
+Every model call runs through it, and it is what a pipeline binds once and every app inherits:
 
-**Wired and governed in-path (on by default)**
+- **Policy + egress enforcement.** Each call resolves to local, cloud, or blocked per the data class
+  and the pipeline's policy. A call that is not allowed off the box does not leave.
+- **Guardrails.** Input and output screening, prompt-injection checks, and a PII-mask requirement,
+  applied in-path, tightening-only from the org default down.
+- **PII handling.** A regex floor runs on every request by default; masking happens before the model.
+- **Evals + drift.** Runs are scored against a golden set and watched for drift.
+- **Provenance + audit.** Every run is signed, cited, and written to an append-only audit log.
+- **FinOps.** Per-key and per-user budgets, pricing, and cost tracking.
+- **Compliance mapping.** Controls mapped to ISO 42001, NIST AI RMF, and the EU AI Act, with DPIA
+  and regulator-ready exports.
+
+None of that requires an external service. `npm run dev` has it on.
+
+**The engines are the swappable backends.** For specific detection, decision, storage, and
+observability steps, Off Grid AI ships a first-party default and lets you point one environment
+variable at a best-in-class open-source engine. Same governance either way.
 
 | Capability | Default, no setup | Swap in (one env var) | In the console |
 |---|---|---|---|
@@ -115,8 +129,11 @@ Here is exactly what is wired today, what is a swap-in, and what is still on the
 | State + audit | [Postgres](https://www.postgresql.org) (append-only audit is always on) | — | everywhere |
 | Identity / SSO | [Keycloak](https://www.keycloak.org) (OIDC) | — | Access |
 | Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Brain, Knowledge |
-| Policy | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
+| Policy decisions | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
 | PII detection | regex floor | [Presidio](https://microsoft.github.io/presidio/) (ML entity detection) | Control |
+| Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
+| Cost + budgets (FinOps) | first-party pricing + budget enforcement | — | Insights |
+| Compliance mapping | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act) + exports | — | Governance |
 | Response cache | in-process | [Redis](https://redis.io) | — |
 | Feature flags | Postgres | [Unleash](https://www.getunleash.io) (reads) | Admin |
 | Secrets | env vars | [OpenBao](https://openbao.org) (KV) | Control |
@@ -124,7 +141,6 @@ Here is exactly what is wired today, what is a swap-in, and what is still on the
 | LLM traces + scores | first-party run trace | [Langfuse](https://langfuse.com) (span waterfall read back into the UI) | Observability |
 | Lineage | audit-reconstructed | [Marquez](https://marquezproject.ai) (OpenLineage graph read back into the UI) | Lineage |
 | Data plane | connect a source, sync it, warehouse it | [Airbyte](https://airbyte.com) sync, [Kestra](https://kestra.io) orchestration, [ClickHouse](https://clickhouse.com) warehouse | Data |
-| Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
 
 **Working, with a caveat we will not hide**
 
