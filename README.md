@@ -106,16 +106,20 @@ Two layers, and the distinction matters.
 **The governance spine is Off Grid AI's own code, always on.** It is not borrowed from a library.
 Every model call runs through it, and it is what a pipeline binds once and every app inherits.
 
-Two kinds of check, both real:
+Three kinds of check, each honest about its cost:
 
-- **Deterministic, in-path, blocking.** On every request: policy and the egress leash (each call
-  resolves to local, cloud, or blocked per the data class), PII masking before the model,
-  prompt-injection and toxicity screening. A call that is not allowed off the box does not leave.
-  Guardrails are tightening-only from the org default down.
-- **LLM-as-judge, on the gateway model.** A gateway model judges each run for faithfulness to its
-  cited sources and answer quality. Grounded runs must cite; the judge scores whether they did.
-  It runs out of band, so it never adds latency to the answer, and feeds the eval and observability
-  layer.
+- **Deterministic, in-path, blocking, no meaningful latency.** Policy and the egress leash (each
+  call resolves to local, cloud, or blocked per the data class), the regex PII floor, request-parameter
+  checks, and model rules. A call that is not allowed off the box does not leave.
+- **ML, in-path, blocking, latency-bearing.** The model-based guardrails (prompt-injection,
+  toxicity, bias, ML PII detection) run on the request before the model answers. They screen and
+  can block, and they do add latency, because they are real inference. Enable per pipeline.
+- **LLM-as-judge, on the gateway model, out of band.** A gateway model judges each run for
+  faithfulness to its cited sources and answer quality. Grounded runs must cite; the judge scores
+  whether they did. It runs after the answer, so it adds no latency, and feeds the eval and
+  observability layer.
+
+Guardrails are tightening-only from the org default down.
 
 On top of that: every run is signed, cited, and written to an append-only audit log; runs are scored
 against a golden set and watched for drift; FinOps tracks per-key and per-user budgets and cost; and
