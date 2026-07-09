@@ -42,6 +42,8 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     tabs: [
       // Global app runs — every app's runs in one list; open one to watch it (3) or review it (4).
       { gate: 'studio', label: 'App runs', route: '/build/apps/runs' },
+      // Cross-app HITL review queue — every run awaiting a human decision you can act on (screen 4).
+      { gate: 'studio', label: 'Review', route: '/build/review' },
       // Durable agent jobs (Temporal) — re-run / cancel / schedule.
       { gate: 'agent-runs', label: 'Jobs', route: '/build/agent-runs' },
       // Outcomes over time across all app runs (screen 5).
