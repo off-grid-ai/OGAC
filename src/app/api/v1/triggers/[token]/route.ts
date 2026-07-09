@@ -15,7 +15,7 @@ import {
   markWebhookFired,
   resolveWebhookSecret,
 } from '@/lib/webhook-triggers';
-import { enforceAppAccess } from '@/lib/app-access';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromMachine } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
@@ -82,7 +82,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (trigger.targetKind === 'app') {
     const app = await getApp(trigger.targetId, orgId);
     if (!app) return NextResponse.json({ error: 'target app not found' }, { status: 404 });
-    const access = await enforceAppAccess({
+    const access = await enforceAppAccessWithSharing({
       appId: trigger.targetId,
       orgId,
       ownerId: app.ownerId,
@@ -122,7 +122,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // agent target
   const agent = await getCustomAgent(trigger.targetId, orgId).catch(() => null);
   if (!agent) return NextResponse.json({ error: 'target agent not found' }, { status: 404 });
-  const agentAccess = await enforceAppAccess({
+  const agentAccess = await enforceAppAccessWithSharing({
     appId: trigger.targetId,
     orgId,
     ownerId: '',
