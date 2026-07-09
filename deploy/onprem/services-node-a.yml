@@ -69,7 +69,10 @@ services:
     cap_add: [IPC_LOCK]
     # PERSISTENT file storage (was BAO_DEV in-memory — lost all secrets on every restart). Comes up
     # SEALED; the boot auto-unseal job (deploy/openbao/*) feeds the Shamir keys so it self-unseals.
-    command: ['server', '-config=/openbao/config/config.hcl']
+    # NOTE: `command: ['server']` only — the image entrypoint auto-adds `-config=/openbao/config`
+    # (the dir) and scans our mounted config.hcl. Passing `-config=<file>` too loads it TWICE →
+    # duplicate tcp listener → "address already in use" crash loop. One config load only.
+    command: ['server']
     environment:
       BAO_ADDR: http://127.0.0.1:8200
     volumes:
