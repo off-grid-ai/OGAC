@@ -23,6 +23,6 @@ export async function DELETE() {
   const session = await auth();
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  await deleteAllConversations(userId);
+  await deleteAllConversations(userId, await currentOrgId());
   return NextResponse.json({ ok: true });
 }
