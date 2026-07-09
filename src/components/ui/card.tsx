@@ -7,9 +7,9 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        // Fade+rise entrance plus a gentle shadow lift on hover. Both are pure CSS and
-        // switch off under `prefers-reduced-motion: reduce`.
-        'og-rise flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm transition-shadow duration-300 ease-out hover:shadow-md',
+        // Gentle shadow lift on hover (pure CSS, off under reduced-motion). No entrance
+        // animation on the base primitive — a page full of cards must not each fade in on mount.
+        'flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm transition-shadow duration-300 ease-out hover:shadow-md',
         className,
       )}
       {...props}
