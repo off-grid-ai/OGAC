@@ -958,3 +958,20 @@ tenant-scoped (the fired run executes under the trigger's org). Secret is vaulte
   response returns an absolute public URL (else it returns a path to prefix with the console host).
 - Cloudflare **Email Routing** on the demo domain can forward inbound mail → a webhook trigger URL, so
   email-in rides on this same primitive (no IMAP mailbox needed).
+
+## OpenBao persistence migration — STAGED, supervised apply (2026-07-09, prod-readiness P0 R1)
+
+**Problem:** OpenBao ran in **dev mode** (in-memory, hardcoded root token `offgrid-dev-token`) — every container restart **wipes all secrets** (connector creds, webhook-trigger secrets, the Resend API key, gateway keys). The consumption layer (webhooks + Resend) stores secrets in the vault, so this must be fixed before it's real.
+
+**Staged fix (in git, NOT yet applied):** `deploy/docker-compose.yml` now has two profiles — `openbao-dev` (dev/local convenience, profile `secrets-dev`) and `openbao` (prod, profiles `secrets`/`all`) running `server -config=/openbao/config/config.hcl` with **file storage** on the `openbao-data` volume (added to backups). Config: `deploy/openbao/config.hcl`.
+
+**Supervised apply procedure (founder holds unseal-key custody):**
+1. `make down` the old dev openbao (note: this discards its in-memory secrets — re-seed after; today prod has few/no critical vaulted secrets since connectors still use legacy plaintext endpoints, so loss is minimal — verify first).
+2. Bring up the persistent service (rsync compose + config to S1, `docker compose --profile secrets up -d openbao`). It comes up **SEALED**.
+3. `bao operator init` → **record the unseal keys + root token securely** (founder custody; NOT in git). Unseal with the threshold of keys.
+4. Enable the KV v2 mount the console expects (`bao secrets enable -path=secret kv-v2` — confirm the path against `src/lib/adapters/secrets.ts`).
+5. Create a **scoped token** (policy limited to the console's secret path), set `OFFGRID_OPENBAO_TOKEN=<scoped>` in the server `.env.local` (remove reliance on the dev root; also fixes the fail-open fallback in `adapters/secrets.ts:39`).
+6. Re-vault any secrets that were in the old dev vault (connector secret_refs, etc.).
+7. Confirm `/openbao/data` is in the nightly backup set.
+
+Until applied, the vault remains ephemeral — acceptable only while no restart-critical secrets live there. Related P0s (fail-open token/signing fallbacks) tracked in `docs/PRODUCTION_READINESS.md`.

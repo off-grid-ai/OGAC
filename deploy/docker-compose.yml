@@ -112,9 +112,11 @@ services:
     volumes: [qdrant:/qdrant/storage]
 
   # ── SECRETS ────────────────────────────────────────────────────────────────────
-  openbao:
+  # DEV/local convenience: in-memory, auto-unsealed, hardcoded root token. Use for `make secrets`
+  # locally ONLY — secrets do NOT survive a restart. Profile `secrets-dev`.
+  openbao-dev:
     image: openbao/openbao:2.1.0
-    profiles: [secrets, all]
+    profiles: [secrets-dev]
     cap_add: [IPC_LOCK]
     environment:
       BAO_DEV_ROOT_TOKEN_ID: offgrid-dev-token
@@ -123,6 +125,27 @@ services:
     healthcheck:
       test: ['CMD', 'bao', 'status', '-address=http://127.0.0.1:8200']
       interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # PROD: PERSISTENT file storage — secrets survive restarts (fixes the audit P0). Comes up SEALED;
+  # first boot needs `bao operator init` + unseal (SUPERVISED — see SERVER_STATE.md § OpenBao
+  # persistence migration). Back up the openbao-data volume. Now the default `secrets`/`all` profile.
+  openbao:
+    image: openbao/openbao:2.1.0
+    profiles: [secrets, all]
+    cap_add: [IPC_LOCK]
+    command: ['server', '-config=/openbao/config/config.hcl']
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+    volumes:
+      - ./openbao/config.hcl:/openbao/config/config.hcl:ro
+      - openbao-data:/openbao/data
+    ports: ['8200:8200']
+    healthcheck:
+      # `initialized=true` once set up; sealed status is fine for the healthcheck (server is up).
+      test: ['CMD', 'bao', 'status', '-address=http://127.0.0.1:8200']
+      interval: 10s
       timeout: 3s
       retries: 12
 
@@ -779,6 +802,7 @@ services:
 
 volumes:
   pgdata:
+  openbao-data: # OpenBao persistent secret store (prod file storage) — INCLUDE IN BACKUPS.
   seaweed:
   qdrant:
   vmdata:
