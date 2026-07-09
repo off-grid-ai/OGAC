@@ -104,7 +104,7 @@ export async function resumeAppRun(
       detail: `rejected by reviewer${noteSuffix}`,
     });
     next = { ...next, status: 'cancelled' };
-    await deps.persist(next, input);
+    await deps.persist(next, input, ctx.orgId);
     const results = priorResultsFromState(next);
     return {
       runId: next.runId,
@@ -126,7 +126,7 @@ export async function resumeAppRun(
     ...(approvedOutput !== undefined ? { output: approvedOutput } : {}),
     detail: `approved by reviewer${noteSuffix}`,
   });
-  await deps.persist(resumed, input);
+  await deps.persist(resumed, input, ctx.orgId);
 
   // Prior context = every step now done (includes the just-approved human step) so a downstream agent
   // sees the reviewer's decision + all upstream outputs, and the aggregate outcome spans the whole run.

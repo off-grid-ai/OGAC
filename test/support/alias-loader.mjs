@@ -14,6 +14,17 @@ const SRC = pathToFileURL(pathResolve(process.cwd(), 'src') + '/').href;
 const NEXT_NAV_STUB = pathToFileURL(
   pathResolve(process.cwd(), 'test/support/next-navigation-stub.mjs'),
 ).href;
+// `next/server` is likewise resolvable only through Next's own tooling under `node --test`. next-auth
+// imports it at load time, so any @/lib whose graph reaches next-auth (agentrun → chat-governance →
+// module-access → @/auth) can't load without this. Same additive rationale as the navigation stub.
+const NEXT_SERVER_STUB = pathToFileURL(
+  pathResolve(process.cwd(), 'test/support/next-server-stub.mjs'),
+).href;
+// `next/headers` (cookies/headers) — same harness-resolution gap; imported at load time by next-auth
+// + @/lib/tenancy. Async no-op accessors; never exercised by the DB-only integration tests.
+const NEXT_HEADERS_STUB = pathToFileURL(
+  pathResolve(process.cwd(), 'test/support/next-headers-stub.mjs'),
+).href;
 
 function isFile(p) {
   try {
@@ -34,6 +45,8 @@ function withExtension(url) {
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/navigation') return nextResolve(NEXT_NAV_STUB, context);
+  if (specifier === 'next/server') return nextResolve(NEXT_SERVER_STUB, context);
+  if (specifier === 'next/headers') return nextResolve(NEXT_HEADERS_STUB, context);
   // "@/..." alias -> src/..., with .ts / index.ts probing.
   if (specifier === '@' || specifier.startsWith('@/')) {
     const rest = specifier === '@' ? '' : specifier.slice(2);

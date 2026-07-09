@@ -17,7 +17,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const prior = await getAgentRun(id);
+  // Resolve the caller's org ONCE and scope the prior-run lookup to it — a rerun may only re-dispatch
+  // a run that belongs to the caller's tenant (a cross-tenant id resolves to 404, IDOR blocked).
+  const orgId = await currentOrgId();
+  const prior = await getAgentRun(id, orgId);
   if (!prior) return NextResponse.json({ error: 'run not found' }, { status: 404 });
   if (!canRerun(prior.status)) {
     return NextResponse.json({ error: `run status ${prior.status} is not re-runnable` }, { status: 409 });
@@ -26,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     agentId: prior.agentId,
     query: prior.query,
     caller: gate.user.email ?? undefined,
-    orgId: await currentOrgId(),
+    orgId,
     actor: actorFromSession(gate),
   });
   // Durable submit accepted but still executing in the worker — 202 with the ids so the client polls.

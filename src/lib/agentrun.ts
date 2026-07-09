@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
 import {
@@ -379,41 +379,53 @@ export async function listAgentRuns(limit = 15, orgId: string = DEFAULT_ORG): Pr
   return rows.map(rowToRun);
 }
 
-// Runs for one agent (its detail page + history).
-export async function listAgentRunsByAgent(agentId: string, limit = 50): Promise<AgentRun[]> {
+// Runs for one agent (its detail page + history). ORG-SCOPED (tenant-isolation): a tenant only ever
+// sees the runs of an agent within its OWN org — a run under another tenant's org never surfaces.
+export async function listAgentRunsByAgent(
+  agentId: string,
+  limit = 50,
+  orgId: string = DEFAULT_ORG,
+): Promise<AgentRun[]> {
   const rows = await db
     .select()
     .from(agentRuns)
-    .where(eq(agentRuns.agentId, agentId))
+    .where(and(eq(agentRuns.agentId, agentId), eq(agentRuns.orgId, orgId)))
     .orderBy(desc(agentRuns.startedAt))
     .limit(limit);
   return rows.map(rowToRun);
 }
 
-// A single run by id (the trace deep-dive page).
-export async function getAgentRun(id: string): Promise<AgentRun | null> {
-  const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, id)).limit(1);
+// A single run by id (the trace deep-dive page). ORG-SCOPED (tenant-isolation): the lookup filters
+// BOTH id AND org, so tenant A can never read tenant B's run by guessing its id (cross-tenant IDOR).
+export async function getAgentRun(id: string, orgId: string = DEFAULT_ORG): Promise<AgentRun | null> {
+  const [row] = await db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, id), eq(agentRuns.orgId, orgId)))
+    .limit(1);
   return row ? rowToRun(row) : null;
 }
 
 // Delete a run record. Returns true if a row was removed. Management action (D): purge a run
-// from the durable-execution history.
-export async function deleteAgentRun(id: string): Promise<boolean> {
+// from the durable-execution history. ORG-SCOPED: a cross-tenant delete-by-id is a no-op (no row
+// matches id AND org), so tenant A can never purge tenant B's run.
+export async function deleteAgentRun(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
   const removed = await db
     .delete(agentRuns)
-    .where(eq(agentRuns.id, id))
+    .where(and(eq(agentRuns.id, id), eq(agentRuns.orgId, orgId)))
     .returning({ id: agentRuns.id });
   return removed.length > 0;
 }
 
 // Cancel an in-flight run (one held at pending_review) → terminal status 'cancelled', answer
 // withheld. Returns the updated run, or null if the run doesn't exist. The caller (route) enforces
-// the state-machine via lib/agent-run-actions before invoking this.
-export async function cancelAgentRun(id: string): Promise<AgentRun | null> {
+// the state-machine via lib/agent-run-actions before invoking this. ORG-SCOPED: a cross-tenant
+// cancel-by-id matches no row (id AND org), so tenant A can never cancel tenant B's run.
+export async function cancelAgentRun(id: string, orgId: string = DEFAULT_ORG): Promise<AgentRun | null> {
   const [row] = await db
     .update(agentRuns)
     .set({ status: 'cancelled', answer: '' })
-    .where(eq(agentRuns.id, id))
+    .where(and(eq(agentRuns.id, id), eq(agentRuns.orgId, orgId)))
     .returning();
   return row ? rowToRun(row) : null;
 }

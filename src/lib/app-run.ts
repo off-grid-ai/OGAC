@@ -171,8 +171,13 @@ export interface AppRunDeps {
     text: string,
     orgId?: string,
   ) => Promise<{ hits: boolean; redacted?: string; entities: string[]; engine: string }>;
-  /** Persist the live app-run state (create on start, update per step). No-op sink is allowed. */
-  persist: (state: AppRunState, input: Record<string, unknown>) => Promise<void>;
+  /**
+   * Persist the live app-run state (create on start, update per step). No-op sink is allowed.
+   * `orgId` is threaded EXPLICITLY (G-ISO-2) so the `app_runs` row is written under the RUN's real
+   * org — not the store's DEFAULT_ORG fallback — so a non-default tenant's run reads back under its
+   * own org (getAppRunView(runId, '<thatorg>')), never lands cross-tenant under 'default'.
+   */
+  persist: (state: AppRunState, input: Record<string, unknown>, orgId: string) => Promise<void>;
   /**
    * Materialize an inline agent (systemPrompt/model/grounded/tools, no agentId) into a real
    * customAgent and return its id. Used by an agent step that has an `inlineAgent` but no `agentId`
@@ -274,14 +279,15 @@ export function defaultDeps(): AppRunDeps {
       const { getPii } = await import('@/lib/adapters/registry');
       return getPii().scan(text, orgId);
     },
-    async persist(state, input) {
+    async persist(state, input, orgId) {
       // Best-effort persistence to the appRuns row so screens 3/4 can read the live trace. Uses an
       // upsert-by-id: create on the first write, update on subsequent ones. Import lazily + swallow
       // errors so a persistence outage never fails the run (the outcome is still returned to the
-      // caller / durable workflow, which owns the authoritative state).
+      // caller / durable workflow, which owns the authoritative state). G-ISO-2: the RUN's org is
+      // threaded through so the row is written under the real tenant, never the DEFAULT_ORG fallback.
       try {
         const { upsertAppRunState } = await import('@/lib/app-run-store');
-        await upsertAppRunState(state, input);
+        await upsertAppRunState(state, input, orgId);
       } catch {
         /* app-run-store not present or DB unreachable — degrade to no-op */
       }
@@ -784,7 +790,7 @@ export async function runApp(
   deps: AppRunDeps = defaultDeps(),
 ): Promise<AppRunOutcome> {
   const state = initState(spec, ctx.runId);
-  await deps.persist(state, input);
+  await deps.persist(state, input, ctx.orgId);
   return driveRunnableSteps(spec, state, [], input, ctx, deps);
 }
 
@@ -818,7 +824,7 @@ export async function driveRunnableSteps(
     for (const step of runnable) {
       // Mark running (for the live screen), then execute.
       state = applyStepResult(state, step.id, { status: 'running' });
-      await deps.persist(state, input);
+      await deps.persist(state, input, ctx.orgId);
 
       const result = await executeStep(spec, step, results, ctx, deps);
       results.push(result);
@@ -830,7 +836,7 @@ export async function driveRunnableSteps(
         childRunId: result.childRunId,
         wouldPerform: result.wouldPerform,
       });
-      await deps.persist(state, input);
+      await deps.persist(state, input, ctx.orgId);
 
       if (result.status === 'error') {
         // Halt the whole run on a step error (the run status is already 'error' via the reducer).
