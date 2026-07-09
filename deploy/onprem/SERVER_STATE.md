@@ -975,3 +975,6 @@ tenant-scoped (the fired run executes under the trigger's org). Secret is vaulte
 7. Confirm `/openbao/data` is in the nightly backup set.
 
 Until applied, the vault remains ephemeral — acceptable only while no restart-critical secrets live there. Related P0s (fail-open token/signing fallbacks) tracked in `docs/PRODUCTION_READINESS.md`.
+
+## Consumption + BFSI wave deployed (2026-07-09, main @ d5d3010)
+Deployed over tunnel: HITL review inbox+decision screen (`/build/review`), BFSI Trust & Security Center (`/governance/trust` + `/api/v1/admin/trust/export`), governed Resend email sink + self-serve sending-domain verify + forward-to-address inbound (`/operations/messaging`), on top of the earlier per-app RBAC/ABAC access policy + webhook ingress. **`RESEND_API_KEY` added to server `.env.local`** (36-char `re_…`, from `mobile/.env.keygen`; NOT in git) + console restarted. Env-only for now — the fuller design vaults it as a per-org `resend_api_key` secret_ref once OpenBao persistence is applied.
