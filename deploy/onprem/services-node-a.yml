@@ -67,9 +67,14 @@ services:
     image: openbao/openbao:2.1.0
     restart: unless-stopped
     cap_add: [IPC_LOCK]
+    # PERSISTENT file storage (was BAO_DEV in-memory — lost all secrets on every restart). Comes up
+    # SEALED; the boot auto-unseal job (deploy/openbao/*) feeds the Shamir keys so it self-unseals.
+    command: ['server', '-config=/openbao/config/config.hcl']
     environment:
-      BAO_DEV_ROOT_TOKEN_ID: offgrid-dev-token
-      BAO_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      BAO_ADDR: http://127.0.0.1:8200
+    volumes:
+      - ./openbao-config.hcl:/openbao/config/config.hcl:ro
+      - openbaodata:/openbao/data
     ports: ['8200:8200']
 
   # ── durable workflows (agents) ──
@@ -152,3 +157,4 @@ volumes:
   qdrant:
   temporaldb:
   marquezdb:
+  openbaodata: # OpenBao persistent secret store (file storage) — survives restarts.
