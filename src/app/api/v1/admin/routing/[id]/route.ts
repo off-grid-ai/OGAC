@@ -12,8 +12,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!b || typeof b.enabled !== 'boolean') {
     return NextResponse.json({ error: 'enabled (boolean) required' }, { status: 400 });
   }
-  await setRoutingRuleEnabled(id, b.enabled);
-  auditFromSession(gate, await currentOrgId(), {
+  const orgP = await currentOrgId();
+  await setRoutingRuleEnabled(id, b.enabled, orgP);
+  auditFromSession(gate, orgP, {
     action: 'routing.change',
     resource: `routing:${id}`,
     outcome: 'ok',
@@ -25,8 +26,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  await deleteRoutingRule(id);
-  auditFromSession(gate, await currentOrgId(), {
+  const org = await currentOrgId();
+  await deleteRoutingRule(id, org);
+  auditFromSession(gate, org, {
     action: 'routing.change',
     resource: `routing:${id}`,
     outcome: 'ok',

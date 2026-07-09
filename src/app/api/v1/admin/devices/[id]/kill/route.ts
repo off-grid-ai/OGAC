@@ -9,11 +9,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const cmd = await queueKill(id);
+  // Tenant-scoped kill: the device must belong to the caller's org, else queueKill returns null
+  // (404) — an admin on tenant A can never kill tenant B's device by id (destructive IDOR — P0).
+  const org = await currentOrgId();
+  const cmd = await queueKill(id, org);
   if (!cmd) {
     return NextResponse.json({ error: 'unknown device' }, { status: 404 });
   }
-  auditFromSession(gate, await currentOrgId(), {
+  auditFromSession(gate, org, {
     action: 'device.kill',
     resource: `device:${id}`,
     outcome: 'ok',

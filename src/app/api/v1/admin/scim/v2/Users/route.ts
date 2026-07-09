@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createConsoleUser, listUsers, type ConsoleUser } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { SCIM_CONTENT, scimAuthorized } from '../../auth';
 
 // SCIM 2.0 User provisioning (RFC 7644). Minimal but spec-shaped: List + Create are implemented so
@@ -38,7 +39,9 @@ function err(detail: string, status: number): NextResponse {
 
 export async function GET(req: Request) {
   if (!scimAuthorized(req)) return err('unauthorized', 401);
-  const users = await listUsers();
+  // Tenant-scoped (SECURITY WAVE 1): the SCIM directory returns only the provisioning credential's
+  // org — was the WHOLE cross-tenant user directory (P0).
+  const users = await listUsers(await currentOrgId());
   return json({
     schemas: [SCHEMA_LIST],
     totalResults: users.length,
@@ -55,9 +58,11 @@ export async function POST(req: Request) {
   const emails = b?.emails as { value?: string }[] | undefined;
   const email = (b?.userName as string | undefined) ?? emails?.[0]?.value;
   if (!email) return err('userName or emails required', 400);
+  // Stamp the provisioning credential's org so the SCIM-created user lands in that tenant.
   const user = await createConsoleUser({
     email,
     name: (b?.displayName as string | undefined) ?? null,
+    orgId: await currentOrgId(),
   });
   return json(scimUser(user), 201);
 }
