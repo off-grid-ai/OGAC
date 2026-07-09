@@ -6,6 +6,9 @@ import { canReview, awaitingStep } from '@/lib/app-runs-view';
 import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { signalAppRun } from '@/lib/adapters/apprun';
 import { getApp } from '@/lib/apps-store';
+import { rebuildAppRunState } from '@/lib/app-run-plan';
+import { resumeAppRun } from '@/lib/app-run-resume';
+import { defaultDeps } from '@/lib/app-run';
 import { captureHitlCorrection } from '@/lib/feedback-store';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
@@ -15,20 +18,23 @@ export const dynamic = 'force-dynamic';
 // ─── App-run REVIEW route (Builder Epic Phase 4A, HITL — screen 4) ────────────────────────────────
 // POST /api/v1/admin/apps/runs/[id]/review { decision:'approve'|'reject', output?, note?, stepId? }
 //
-// Resumes a run PAUSED mid-workflow at a `human` step. The durable AppRunWorkflow is waiting on a
-// `resumeStep` signal (adapters/apprun.signalAppRun); approve → the workflow continues, reject →
-// it halts. We derive the awaiting step from the persisted app_runs row (so the caller need not
-// know the step id), verify the run is actually reviewable (pure canReview), then signal.
+// Resumes a run PAUSED mid-workflow at a `human` step. We derive the awaiting step from the persisted
+// app_runs row (so the caller need not know the step id), verify the run is actually reviewable (pure
+// canReview), then resume it — by WHICHEVER path the run is actually on:
 //
-// GRACEFUL on the two failure modes the brief calls out:
-//   • INLINE run — a run executed in-process (no durable workflow) has ALREADY terminated at the
-//     human pause; there is nothing to resume. signalAppRun reports not_configured (durable off) or
-//     not_found (no live workflow) → we return 409 with a clear message: this run can't be resumed;
-//     re-run the app with the durable runtime enabled to use human-in-the-loop.
-//   • Temporal unreachable — 502 with the degraded reason (the fleet is down); the run stays paused
-//     and can be reviewed again once Temporal is back.
+//   • DURABLE — a live AppRunWorkflow is waiting on a `resumeStep` signal (adapters/apprun.signalAppRun);
+//     approve → the workflow continues, reject → it halts. Tried FIRST.
+//   • INLINE — the run executed in-process (no durable workflow) and terminated at the human pause, so
+//     there is no workflow to signal (signalAppRun reports not_configured or not_found). We then resume
+//     the run IN-PROCESS: apply the decision to the awaiting step and continue the remaining downstream
+//     steps to completion (or the next human pause), persisting per-step state exactly as runApp does.
+//     Approve JUST WORKS; reject halts the run cleanly. No infra/engine internals ever reach the user.
 //
-// SOLID: thin handler — auth, org, load+guard (pure), signal (adapter), audit.
+// Only if a live workflow is genuinely unreachable mid-signal (reason:'unreachable') do we return a
+// 502 with a PLAIN message — the run stays paused and can be reviewed again in a moment.
+//
+// SOLID: thin handler — auth, org, load+guard (pure), resume (durable adapter OR pure inline resume),
+// audit. All scheduling/decision logic is pure (app-run-plan / app-run-resume); no loop lives here.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -94,30 +100,51 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     note: body.note,
   });
 
+  // resumedInline tracks which path completed the review, for the response + audit.
+  let resumedInline = false;
+
   if (!signal.ok) {
-    auditFromSession(gate, orgId, {
-      action: 'app.run.review',
-      resource: `app_run:${id}`,
-      outcome: 'error',
-    });
-    // Distinguish "nothing to resume" (inline / closed workflow) from "fleet down".
+    // "Nothing to resume" (durable off, or no live workflow) ⇒ the run executed INLINE and is paused
+    // in the persisted row. Resume it IN-PROCESS: apply the decision, run the remaining downstream
+    // steps to completion (or the next human pause), persisting per-step state as runApp does. This
+    // is what makes Approve JUST WORK for a non-technical reviewer without the durable runtime.
     if (signal.reason === 'not_configured' || signal.reason === 'not_found') {
+      const app = await getApp(run.appId, orgId);
+      if (!app) {
+        auditFromSession(gate, orgId, {
+          action: 'app.run.review',
+          resource: `app_run:${id}`,
+          outcome: 'error',
+        });
+        // Plain, user-facing — never leaks that the app definition couldn't be loaded internally.
+        return NextResponse.json(
+          { error: "This run couldn't be resumed right now. Please try again in a moment." },
+          { status: 502 },
+        );
+      }
+      const paused = rebuildAppRunState(run.id, run.appId, run.status, run.steps);
+      await resumeAppRun(
+        app,
+        paused,
+        run.input ?? {},
+        { decision: body.decision, output: body.output, note: body.note },
+        { orgId, actor: gate.user.email ?? undefined, runId: run.id },
+        defaultDeps(),
+      );
+      resumedInline = true;
+    } else {
+      // Only a genuine mid-signal outage (Temporal reachable-but-erroring) lands here. PLAIN message —
+      // zero env-var/engine/queue internals. The run stays paused; the reviewer can retry shortly.
+      auditFromSession(gate, orgId, {
+        action: 'app.run.review',
+        resource: `app_run:${id}`,
+        outcome: 'error',
+      });
       return NextResponse.json(
-        {
-          error:
-            'This run cannot be resumed — it ran inline (no durable workflow to signal). ' +
-            'Human-in-the-loop resume requires the durable runtime; re-run the app with ' +
-            'OFFGRID_QUEUE_ENABLED=1 so the run pauses on a resumable workflow.',
-          reason: signal.reason,
-          resumable: false,
-        },
-        { status: 409 },
+        { error: "This run couldn't be resumed right now. Please try again in a moment." },
+        { status: 502 },
       );
     }
-    return NextResponse.json(
-      { error: signal.error ?? 'Temporal unreachable — the run stays paused; try again once it is back.', reason: signal.reason },
-      { status: 502 },
-    );
   }
 
   auditFromSession(gate, orgId, {
@@ -149,6 +176,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ok: true,
     decision: body.decision,
     stepId,
+    resumedInline,
     workflowId: signal.workflowId,
     by: gate.user.email,
     feedbackCaptured,
