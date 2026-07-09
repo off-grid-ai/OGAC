@@ -20,6 +20,7 @@ export type ModuleId =
   | 'tools'
   | 'observability'
   | 'analytics'
+  | 'roi'
   | 'finops'
   | 'accounting'
   | 'reports'
@@ -215,6 +216,14 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Analytics',
     description: 'Usage, cost, latency, and drift across the fleet.',
     route: '/insights/analytics',
+    service: 'analytics',
+  },
+  {
+    id: 'roi',
+    label: 'ROI',
+    description:
+      'Hours and ₹ saved per app and per department — the value each automation returns against its actual AI cost, for renewals and budget justification.',
+    route: '/insights/roi',
     service: 'analytics',
   },
   {
