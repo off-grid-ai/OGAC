@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createConversation, getSkill, listConversations, projectAccess } from '@/lib/chat';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export async function GET() {
   const session = await auth();
   const userId = session?.user?.email;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  return NextResponse.json({ conversations: await listConversations(userId) });
+  return NextResponse.json({ conversations: await listConversations(userId, await currentOrgId()) });
 }
 
 // eslint-disable-next-line complexity
@@ -27,6 +28,6 @@ export async function POST(req: Request) {
       s && (role === 'admin' || (s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role))));
     if (!permitted) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
-  const id = await createConversation(userId, projectId, skillId);
+  const id = await createConversation(userId, await currentOrgId(), projectId, skillId);
   return NextResponse.json({ id });
 }

@@ -98,6 +98,14 @@ export async function ensureChatSchema(): Promise<void> {
   );
   // conversations can be bound to a skill (added post-hoc for existing tables)
   await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
+  // Tenant scope (host-bound org) — makes Workspace chat/projects tenant-isolated. Self-healing so
+  // fresh/legacy DBs get it with no migration step; pre-tenant rows default to 'default'.
+  await db.execute(
+    sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+  );
+  await db.execute(
+    sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+  );
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_memory (
       id text PRIMARY KEY, user_id text NOT NULL, fact text NOT NULL,
@@ -306,17 +314,18 @@ export async function prepareRegenerate(conversationId: string): Promise<string 
 
 const rid = () => crypto.randomUUID();
 
-export async function listConversations(userId: string) {
+export async function listConversations(userId: string, orgId: string) {
   await ensureChatSchema();
   return db
     .select()
     .from(chatConversations)
-    .where(eq(chatConversations.userId, userId))
+    .where(and(eq(chatConversations.userId, userId), eq(chatConversations.orgId, orgId)))
     .orderBy(desc(chatConversations.updatedAt));
 }
 
 export async function createConversation(
   userId: string,
+  orgId: string,
   projectId?: string | null,
   skillId?: string | null,
 ) {
@@ -324,16 +333,22 @@ export async function createConversation(
   const id = rid();
   await db
     .insert(chatConversations)
-    .values({ id, userId, projectId: projectId ?? null, skillId: skillId ?? null });
+    .values({ id, userId, orgId, projectId: projectId ?? null, skillId: skillId ?? null });
   return id;
 }
 
-export async function getConversation(userId: string, id: string) {
+export async function getConversation(userId: string, orgId: string, id: string) {
   await ensureChatSchema();
   const [c] = await db
     .select()
     .from(chatConversations)
-    .where(and(eq(chatConversations.id, id), eq(chatConversations.userId, userId)));
+    .where(
+      and(
+        eq(chatConversations.id, id),
+        eq(chatConversations.userId, userId),
+        eq(chatConversations.orgId, orgId),
+      ),
+    );
   return c ?? null;
 }
 
@@ -465,13 +480,14 @@ export { messagesUpToInclusive };
 // target isn't an editable user message.
 export async function editUserMessage(
   userId: string,
+  orgId: string,
   conversationId: string,
   messageId: string,
   newContent: string,
 ): Promise<ThreadMessage[] | null> {
   await ensureChatSchema();
-  // Ownership: the conversation must belong to the caller.
-  const convo = await getConversation(userId, conversationId);
+  // Ownership: the conversation must belong to the caller AND their current tenant.
+  const convo = await getConversation(userId, orgId, conversationId);
   if (!convo) return null;
   // Operate on the shown (active) path so "everything after" matches what the user sees.
   const path = await listMessages(conversationId);
@@ -546,22 +562,22 @@ export async function deleteConversation(userId: string, id: string) {
 }
 
 // ─── Projects (containers with a system prompt; group conversations) ──────────
-export async function listProjects(userId: string) {
+export async function listProjects(userId: string, orgId: string) {
   await ensureChatSchema();
   const rows = await db
     .select()
     .from(chatProjects)
-    .where(eq(chatProjects.userId, userId))
+    .where(and(eq(chatProjects.userId, userId), eq(chatProjects.orgId, orgId)))
     .orderBy(desc(chatProjects.updatedAt));
   // Enrich each project with its conversation count so the Workspace grid can show "N chats"
-  // without an N+1 fetch. One grouped count query over the user's conversations.
+  // without an N+1 fetch. One grouped count query over the user's conversations (same tenant scope).
   const counts = await db
     .select({
       projectId: chatConversations.projectId,
       n: sql<number>`count(*)::int`,
     })
     .from(chatConversations)
-    .where(eq(chatConversations.userId, userId))
+    .where(and(eq(chatConversations.userId, userId), eq(chatConversations.orgId, orgId)))
     .groupBy(chatConversations.projectId);
   const byProject = new Map(counts.map((c) => [c.projectId, Number(c.n)]));
   return rows.map((p) => ({ ...p, chatCount: byProject.get(p.id) ?? 0 }));
@@ -569,6 +585,7 @@ export async function listProjects(userId: string) {
 
 export async function createProject(
   userId: string,
+  orgId: string,
   name: string,
   systemPrompt = '',
   pipelineId: string | null = null,
@@ -577,7 +594,7 @@ export async function createProject(
   const id = rid();
   await db
     .insert(chatProjects)
-    .values({ id, userId, name: name.slice(0, 120), systemPrompt, pipelineId });
+    .values({ id, userId, orgId, name: name.slice(0, 120), systemPrompt, pipelineId });
   return id;
 }
 
@@ -1016,9 +1033,11 @@ export async function deleteAllConversations(userId: string): Promise<void> {
   await db.delete(chatConversations).where(eq(chatConversations.userId, userId));
 }
 
-export async function exportUserData(userId: string) {
+export async function exportUserData(userId: string, orgId: string) {
   await ensureChatSchema();
-  const conversations = await listConversations(userId);
+  // Tenant-scoped export: the caller gets their data WITHIN the current tenant (conversations +
+  // projects are org-scoped), matching what they can see in this workspace.
+  const conversations = await listConversations(userId, orgId);
   const withMessages = await Promise.all(
     conversations.map(async (c) => ({ ...c, messages: await listMessages(c.id) })),
   );
@@ -1028,7 +1047,7 @@ export async function exportUserData(userId: string) {
     customInstructions: await getCustomInstructions(userId),
     prefs: await getPrefs(userId),
     memory: await listMemory(userId),
-    projects: await listProjects(userId),
+    projects: await listProjects(userId, orgId),
     conversations: withMessages,
   };
 }

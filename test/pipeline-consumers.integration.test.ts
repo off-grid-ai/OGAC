@@ -73,15 +73,16 @@ test('chat project pipeline binding persists + listProjectsByPipeline scopes', {
     '@/lib/chat'
   );
   const USER = 'consumer-test@x.io';
+  const ORG = 'default';
   const created: string[] = [];
   t.after(async () => {
     for (const id of created) await deleteProject(USER, id).catch(() => {});
   });
 
-  const p1 = await createProject(USER, 'Finance chat', '', 'pl_chat1');
-  const p2 = await createProject(USER, 'Ops chat', '', 'pl_chat1');
-  const p3 = await createProject(USER, 'HR chat', '', 'pl_chat2');
-  const p4 = await createProject(USER, 'Ad-hoc', '', null);
+  const p1 = await createProject(USER, ORG, 'Finance chat', '', 'pl_chat1');
+  const p2 = await createProject(USER, ORG, 'Ops chat', '', 'pl_chat1');
+  const p3 = await createProject(USER, ORG, 'HR chat', '', 'pl_chat2');
+  const p4 = await createProject(USER, ORG, 'Ad-hoc', '', null);
   created.push(p1, p2, p3, p4);
 
   assert.equal((await getProjectBinding(p1))?.pipelineId, 'pl_chat1');

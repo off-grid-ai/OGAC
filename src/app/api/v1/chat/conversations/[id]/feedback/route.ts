@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getConversation, getProjectBinding } from '@/lib/chat';
 import { captureChatThumb } from '@/lib/feedback-store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const convo = await getConversation(userId, id);
+  const convo = await getConversation(userId, await currentOrgId(), id);
   if (!convo) return NextResponse.json({ error: 'conversation not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as {
