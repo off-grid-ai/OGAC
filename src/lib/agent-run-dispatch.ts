@@ -65,8 +65,13 @@ export interface DispatchDeps {
   durableEnabled: () => boolean;
   /** Submit to the durable runtime. MUST NOT throw; a submitted:false handle means "run sync". */
   submit: (input: AgentRunWorkflowInput) => Promise<DurableRunHandle>;
-  /** Read a persisted run back by id (durable path reads what the worker persisted). */
-  getRun: (id: string) => Promise<AgentRun | null>;
+  /**
+   * Read a persisted run back by id (durable path reads what the worker persisted). ORG-SCOPED: the
+   * dispatch's own org is threaded so the read-back finds the run the worker persisted under a
+   * NON-default tenant (getAgentRun is now org-scoped for tenant isolation — an unscoped read here
+   * would miss a non-default org's freshly-persisted run).
+   */
+  getRun: (id: string, orgId: string) => Promise<AgentRun | null>;
   /** Run the governed pipeline in-process (the synchronous fallback / default path). */
   runAgent: (
     agentId: string,
@@ -91,9 +96,9 @@ export function defaultDispatchDeps(): DispatchDeps {
       const { getAgentRuntime } = await import('@/lib/adapters/agentruntime');
       return getAgentRuntime().submit(input);
     },
-    getRun: async (id) => {
+    getRun: async (id, orgId) => {
       const { getAgentRun } = await import('@/lib/agentrun');
-      return getAgentRun(id);
+      return getAgentRun(id, orgId);
     },
     runAgent: async (agentId, query, caller, requireReview, orgId, context) => {
       const { runAgent } = await import('@/lib/agentrun');
@@ -138,13 +143,13 @@ export async function dispatchAgentRun(
     if (handle.submitted) {
       if (handle.note === PENDING_NOTE) {
         // The activity persists once it finishes; the run may not exist yet.
-        const existing = await deps.getRun(handle.runId).catch(() => null);
+        const existing = await deps.getRun(handle.runId, orgId).catch(() => null);
         return { run: existing, mode: 'pending', workflowId: handle.workflowId, runId };
       }
       if (handle.status === 'not_found') {
         return { run: null, mode: 'durable', workflowId: handle.workflowId, runId };
       }
-      const run = await deps.getRun(handle.runId);
+      const run = await deps.getRun(handle.runId, orgId);
       return { run, mode: 'durable', workflowId: handle.workflowId, runId };
     }
     // submitted:false → graceful fallback below.
