@@ -46,8 +46,10 @@ async function fleetToken(): Promise<string | undefined> {
   return chooseFleetToken(cred, FLEET_TOKEN);
 }
 
-async function firstPartyDevices(): Promise<MdmDevice[]> {
-  const rows = await listDevices();
+// Tenant-scoped (SECURITY WAVE 1): passes `orgId` through to the store so the native registry only
+// ever surfaces the caller's org's devices. `undefined` ⇒ listDevices defaults to DEFAULT_ORG.
+async function firstPartyDevices(orgId?: string): Promise<MdmDevice[]> {
+  const rows = await listDevices(orgId);
   return rows.map((d) => ({
     id: d.id,
     name: d.name,
@@ -143,8 +145,8 @@ export const fleetDmMdm: MdmPort = {
       'Cross-platform osquery MDM (macOS/Windows/Linux/iOS/Android) over its REST API — inventory, live query, software/CVEs, policies. Falls back to the first-party registry if unreachable.',
   },
   supportsFleet: true,
-  async listDevices() {
-    if (!FLEET_URL) return firstPartyDevices();
+  async listDevices(orgId?: string) {
+    if (!FLEET_URL) return firstPartyDevices(orgId);
     try {
       const data = (await fleetFetch(`${FLEET_API}/hosts`, {}, 5000)) as { hosts?: FleetHost[] };
       return (data.hosts ?? []).map((h) => ({
@@ -156,7 +158,7 @@ export const fleetDmMdm: MdmPort = {
         source: 'fleetdm',
       }));
     } catch {
-      return firstPartyDevices(); // never a hard dependency
+      return firstPartyDevices(orgId); // never a hard dependency
     }
   },
 

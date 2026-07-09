@@ -17,11 +17,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       { status: 400 },
     );
   }
-  const updated = await setUserRole(id, body.role);
+  // Tenant-scoped: the target user must be in the caller's org (cross-tenant privilege change — P0).
+  const org = await currentOrgId();
+  const updated = await setUserRole(id, body.role, org);
   if (!updated) {
     return NextResponse.json({ error: 'unknown user' }, { status: 404 });
   }
-  auditFromSession(gate, await currentOrgId(), {
+  auditFromSession(gate, org, {
     action: 'access.user.change',
     resource: `user:${id}`,
     outcome: 'ok',

@@ -54,8 +54,8 @@ export default async function ControlPage() {
   const [policy, history, users, events, routes] = await Promise.all([
     getOrgPolicy(),
     listPolicyHistory(),
-    listUsers(),
-    listAudit({ limit: 25 }),
+    listUsers(org),
+    listAudit({ limit: 25, orgId: org }),
     listRoutingRules(org),
   ]);
   const baoReady = openBaoConfigured();

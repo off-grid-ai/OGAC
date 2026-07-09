@@ -79,12 +79,81 @@ export async function ensureOrgSchema(): Promise<void> {
     await db.execute(
       sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS chat_pipeline_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb;`,
     );
+    // ─── SECURITY WAVE 1 — org_settings PER-TENANT redesign (P0) ───────────────────────────────
+    // org_settings was a SINGLE shared row (id='org') across ALL tenants: one system prompt + one
+    // governed chat-pipeline allowlist for the whole fleet. It is now keyed by ORG — the `id` column
+    // IS the org id (one row per tenant). Drop the fixed 'org' default and re-home the legacy
+    // singleton onto the DEFAULT_ORG key so the single-tenant deploy keeps its existing config.
+    await db.execute(sql`ALTER TABLE org_settings ALTER COLUMN id DROP DEFAULT;`);
+    // Re-home the legacy singleton onto DEFAULT_ORG. If a 'default' row already exists (a partially
+    // migrated DB), the bare UPDATE would collide on the PK — so drop the stale 'org' row in that
+    // case and only rename it when no 'default' row is present yet. Idempotent + safe to re-run.
+    await db.execute(sql`DELETE FROM org_settings WHERE id = 'org' AND EXISTS (SELECT 1 FROM org_settings WHERE id = 'default');`);
+    await db.execute(sql`UPDATE org_settings SET id = 'default' WHERE id = 'org';`);
+    // ─── SECURITY WAVE 1 — tenant-scope columns on the shared tables (Job A) ────────────────────
+    // Each is idempotent (ADD COLUMN IF NOT EXISTS) so it self-migrates on first use + can be applied
+    // on the server via the pg client (drizzle-kit push hangs over SSH). Defaults to 'default' so
+    // pre-hardening rows/backfill are safe; reads filter on it, writes stamp the caller's org.
+    // Guarded ADD COLUMN: only runs when the table already exists (to_regclass IS NOT NULL). Some of
+    // these tables are created lazily by OTHER modules' own ensure* functions (prompt_library,
+    // prompt_partials, chat_skills, chat_memory), so ADD COLUMN must not hard-fail when a table
+    // hasn't been created yet — the column is added the next time ensureOrgSchema runs after its
+    // owning table exists (both are idempotent). devices/audit_events/abac_rules/routing_rules/
+    // feature_flags/enrollment_tokens are schema.ts tables present after db:push.
+    // `table` is always a hardcoded constant below (never user input), so sql.raw for the identifier
+    // is safe. The DO/to_regclass guard makes the ADD COLUMN a no-op when the table doesn't exist yet.
+    const addOrgCol = (table: string) =>
+      db.execute(
+        sql.raw(
+          `DO $$ BEGIN IF to_regclass('"${table}"') IS NOT NULL THEN ` +
+            `ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default'; ` +
+            `END IF; END $$;`,
+        ),
+      );
+    for (const t of [
+      'devices',
+      'audit_events',
+      'abac_rules',
+      'routing_rules',
+      'prompt_library',
+      'prompt_partials',
+      'chat_skills',
+      'chat_memory',
+      'custom_roles',
+      'enrollment_tokens',
+      // `user` already declares org_id in schema.ts (getUserOrgByEmail relies on it); re-assert it
+      // here so a not-fully-pushed DB self-heals — listUsers/createConsoleUser filter/stamp on it.
+      'user',
+    ]) {
+      await addOrgCol(t);
+    }
+    // feature_flags: add org_id + rebuild the PK from (key) to the composite (org_id, key) so the
+    // same key can coexist per tenant. Idempotent + safe to re-run across restarts + guarded on the
+    // table's existence: rebuild the PK ONLY when the current one isn't already the composite (a DO
+    // block, so re-adding an existing composite PK never errors).
+    await addOrgCol('feature_flags');
+    await db.execute(sql`
+      DO $$
+      BEGIN
+        IF to_regclass('feature_flags') IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM pg_index i
+          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+          WHERE i.indrelid = 'feature_flags'::regclass AND i.indisprimary AND a.attname = 'org_id'
+        ) THEN
+          ALTER TABLE feature_flags DROP CONSTRAINT IF EXISTS feature_flags_pkey;
+          ALTER TABLE feature_flags ADD CONSTRAINT feature_flags_pkey PRIMARY KEY (org_id, key);
+        END IF;
+      END $$;
+    `);
+    // custom_roles: legacy idempotent create omitted org_id — created here (so an upgraded deploy has
+    // the table), then the org_id column is added by the addOrgCol loop above.
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS custom_roles (
         id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
         based_on text NOT NULL DEFAULT 'viewer', capabilities jsonb NOT NULL DEFAULT '[]',
         created_at timestamptz NOT NULL DEFAULT now());
     `);
+    await addOrgCol('custom_roles');
   })();
   return orgEnsure;
 }
@@ -213,28 +282,58 @@ function toCommand(r: CommandRow): Command {
   };
 }
 
-export async function listDevices(): Promise<Device[]> {
-  const rows = await db.select().from(devices);
+// Tenant-scoped: only returns devices for `orgId` (defaults to DEFAULT_ORG so single-tenant callers
+// are unchanged). Without the filter this listed the WHOLE fleet across tenants (P0). Console/admin
+// callers pass currentOrgId().
+export async function listDevices(orgId: string = DEFAULT_ORG): Promise<Device[]> {
+  await ensureOrgSchema();
+  const rows = await db.select().from(devices).where(eq(devices.orgId, orgId));
   return rows.map(toDevice);
 }
 
-export async function getDevice(id: string): Promise<Device | undefined> {
-  const [row] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
+// Org-scoped read of one device. `id`+`org` so another tenant can never read a device by guessing its
+// id (defense-in-depth for the destructive kill/command/role routes). Defaults to DEFAULT_ORG.
+export async function getDevice(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<Device | undefined> {
+  await ensureOrgSchema();
+  const [row] = await db
+    .select()
+    .from(devices)
+    .where(and(eq(devices.id, id), eq(devices.orgId, orgId)))
+    .limit(1);
   return row ? toDevice(row) : undefined;
 }
 
 // Reassign a device's policy ROLE — the per-device dimension that selects which routing rules /
 // policy bundle apply (the policy bundle itself is org-wide; role is what varies per device). This
-// is the console's real "reassign policy" action. Returns the updated Device, or null if unknown.
-export async function updateDeviceRole(id: string, role: string): Promise<Device | null> {
-  const [row] = await db.update(devices).set({ role }).where(eq(devices.id, id)).returning();
+// is the console's real "reassign policy" action. Org-scoped (id+org) so a tenant can't re-role
+// another tenant's device. Returns the updated Device, or null if unknown / cross-org.
+export async function updateDeviceRole(
+  id: string,
+  role: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<Device | null> {
+  await ensureOrgSchema();
+  const [row] = await db
+    .update(devices)
+    .set({ role })
+    .where(and(eq(devices.id, id), eq(devices.orgId, orgId)))
+    .returning();
   return row ? toDevice(row) : null;
 }
 
-export async function createEnrollmentToken(role: string): Promise<EnrollmentToken> {
+// Mint an enrollment token stamped with the issuing admin's org (defaults to DEFAULT_ORG) so the node
+// that redeems it is enrolled into the right tenant.
+export async function createEnrollmentToken(
+  role: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<EnrollmentToken> {
+  await ensureOrgSchema();
   const [row] = await db
     .insert(enrollmentTokens)
-    .values({ token: `enr_${randomUUID().slice(0, 12)}`, role })
+    .values({ token: `enr_${randomUUID().slice(0, 12)}`, role, orgId })
     .returning();
   return { token: row.token, role: row.role, createdAt: iso(row.createdAt), used: row.used };
 }
@@ -267,6 +366,8 @@ export async function enrollDevice(
     .insert(devices)
     .values({
       id: `dev_${randomUUID().slice(0, 6)}`,
+      // Inherit the enrollment token's org so the device lands in the tenant that issued the token.
+      orgId: rec.orgId ?? DEFAULT_ORG,
       name,
       os,
       role: rec.role,
@@ -325,8 +426,12 @@ export async function pushPolicy(
 }
 
 // A node pulling its policy: it converges to the org version and reports in.
+// Data-plane pull: the node authenticates as ITSELF (device token) so this is keyed by device id.
+// It reads the device row directly (not org-scoped getDevice) because the device's identity is the
+// bearer secret, not a console session's org.
 export async function pullPolicyForDevice(id: string): Promise<PolicyBundle | null> {
-  const device = await getDevice(id);
+  await ensureOrgSchema();
+  const [device] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
   if (!device) return null;
   const policy = await getOrgPolicy();
   await db
@@ -336,10 +441,20 @@ export async function pullPolicyForDevice(id: string): Promise<PolicyBundle | nu
   return policy;
 }
 
+// Data-plane append: device-token authed, keyed by the device's own id. Stamps each audit row with
+// the DEVICE's org (looked up from the row) so listAudit can scope by tenant — a device can only
+// ever write into its own org's audit trail.
 export async function appendAudit(
   deviceId: string,
   events: Omit<AuditEvent, 'id' | 'deviceId'>[],
 ): Promise<number> {
+  await ensureOrgSchema();
+  const [device] = await db
+    .select({ orgId: devices.orgId })
+    .from(devices)
+    .where(eq(devices.id, deviceId))
+    .limit(1);
+  const orgId = device?.orgId ?? DEFAULT_ORG;
   await db
     .update(devices)
     .set({ status: 'online', lastSeen: 'just now' })
@@ -348,6 +463,7 @@ export async function appendAudit(
   const rows = events.map((e) => ({
     id: randomUUID(),
     deviceId,
+    orgId,
     ts: new Date(e.ts),
     model: e.model,
     tokens: e.tokens,
@@ -367,20 +483,26 @@ export async function appendAudit(
   return events.length;
 }
 
+// Tenant-scoped: only returns audit events for `orgId` (defaults to DEFAULT_ORG so single-tenant
+// callers are unchanged). Without the filter this returned EVERY tenant's device/gateway audit
+// trail — a compliance-fatal cross-tenant leak (P0). Console/admin callers pass currentOrgId().
 export async function listAudit(opts?: {
   deviceId?: string;
   limit?: number;
+  orgId?: string;
 }): Promise<AuditEvent[]> {
+  await ensureOrgSchema();
   const limit = opts?.limit ?? 100;
-  const base = db.select().from(auditEvents).orderBy(desc(auditEvents.ts)).limit(limit);
-  const rows = opts?.deviceId
-    ? await db
-        .select()
-        .from(auditEvents)
-        .where(eq(auditEvents.deviceId, opts.deviceId))
-        .orderBy(desc(auditEvents.ts))
-        .limit(limit)
-    : await base;
+  const orgId = opts?.orgId ?? DEFAULT_ORG;
+  const where = opts?.deviceId
+    ? and(eq(auditEvents.orgId, orgId), eq(auditEvents.deviceId, opts.deviceId))
+    : eq(auditEvents.orgId, orgId);
+  const rows = await db
+    .select()
+    .from(auditEvents)
+    .where(where)
+    .orderBy(desc(auditEvents.ts))
+    .limit(limit);
   return rows.map(toAudit);
 }
 
@@ -525,8 +647,14 @@ export async function readComplianceActivity(
   return { rows, coverage };
 }
 
-export async function queueKill(deviceId: string): Promise<Command | null> {
-  const device = await getDevice(deviceId);
+// Queue a kill-switch command for a device. Org-scoped: the device must belong to `orgId` (defaults
+// to DEFAULT_ORG), so an admin on tenant A can never kill/wipe tenant B's device by guessing its id
+// (destructive cross-tenant IDOR — P0). Returns null when the device is unknown OR in another org.
+export async function queueKill(
+  deviceId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<Command | null> {
+  const device = await getDevice(deviceId, orgId);
   if (!device) return null;
   const [row] = await db
     .insert(commands)
@@ -556,10 +684,15 @@ export interface ConsoleUser {
   role: string;
 }
 
-export async function listUsers(): Promise<ConsoleUser[]> {
+// Tenant-scoped: only returns users in `orgId` (defaults to DEFAULT_ORG so single-tenant callers are
+// unchanged). Without the filter this returned the WHOLE cross-tenant user directory (P0) — it also
+// feeds IdP/SCIM provisioning. Admin/SCIM callers pass currentOrgId().
+export async function listUsers(orgId: string = DEFAULT_ORG): Promise<ConsoleUser[]> {
+  await ensureOrgSchema();
   return db
     .select({ id: users.id, name: users.name, email: users.email, role: users.role })
-    .from(users);
+    .from(users)
+    .where(eq(users.orgId, orgId));
 }
 
 // The org a user belongs to (tenant membership), looked up by email at sign-in so the JWT can carry
@@ -581,25 +714,41 @@ export async function createConsoleUser(input: {
   email: string;
   name?: string | null;
   role?: string;
+  orgId?: string;
 }): Promise<ConsoleUser> {
+  await ensureOrgSchema();
   const [existing] = await db
     .select({ id: users.id, name: users.name, email: users.email, role: users.role })
     .from(users)
     .where(eq(users.email, input.email))
     .limit(1);
   if (existing) return existing;
+  // Stamp the provisioning caller's org so a SCIM/admin-created user lands in that tenant (not the
+  // shared 'default'). Defaults to DEFAULT_ORG. Email is globally unique — a user has one org.
   const [row] = await db
     .insert(users)
-    .values({ email: input.email, name: input.name ?? null, role: input.role ?? 'viewer' })
+    .values({
+      email: input.email,
+      name: input.name ?? null,
+      role: input.role ?? 'viewer',
+      orgId: input.orgId ?? DEFAULT_ORG,
+    })
     .returning({ id: users.id, name: users.name, email: users.email, role: users.role });
   return row;
 }
 
-export async function setUserRole(id: string, role: string): Promise<ConsoleUser | null> {
+// Org-scoped role change (id+org) so an admin can't re-role a user outside their tenant. Defaults to
+// DEFAULT_ORG. Returns null when the user is unknown OR in another org.
+export async function setUserRole(
+  id: string,
+  role: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<ConsoleUser | null> {
+  await ensureOrgSchema();
   const [row] = await db
     .update(users)
     .set({ role })
-    .where(eq(users.id, id))
+    .where(and(eq(users.id, id), eq(users.orgId, orgId)))
     .returning({ id: users.id, name: users.name, email: users.email, role: users.role });
   return row ?? null;
 }
@@ -915,8 +1064,15 @@ export async function setTenantModules(id: string, modules: string[]): Promise<T
   return row ? toTenant(row) : null;
 }
 
-export async function listAbacRules(): Promise<AbacRule[]> {
-  const rows = await db.select().from(abacRules).orderBy(desc(abacRules.createdAt));
+// Tenant-scoped: ABAC rules are per-org policy (defaults to DEFAULT_ORG). Without the filter every
+// tenant's rules were evaluated together in evaluateAbac — a cross-tenant policy leak.
+export async function listAbacRules(orgId: string = DEFAULT_ORG): Promise<AbacRule[]> {
+  await ensureOrgSchema();
+  const rows = await db
+    .select()
+    .from(abacRules)
+    .where(eq(abacRules.orgId, orgId))
+    .orderBy(desc(abacRules.createdAt));
   return rows.map((r) => ({
     id: r.id,
     role: r.role,
@@ -928,10 +1084,14 @@ export async function listAbacRules(): Promise<AbacRule[]> {
   }));
 }
 
-export async function createAbacRule(rule: Omit<AbacRule, 'id'>): Promise<AbacRule> {
+export async function createAbacRule(
+  rule: Omit<AbacRule, 'id'>,
+  orgId: string = DEFAULT_ORG,
+): Promise<AbacRule> {
+  await ensureOrgSchema();
   const [row] = await db
     .insert(abacRules)
-    .values({ id: `abac_${randomUUID().slice(0, 6)}`, ...rule })
+    .values({ id: `abac_${randomUUID().slice(0, 6)}`, orgId, ...rule })
     .returning();
   return {
     id: row.id,
@@ -944,8 +1104,10 @@ export async function createAbacRule(rule: Omit<AbacRule, 'id'>): Promise<AbacRu
   };
 }
 
-export async function deleteAbacRule(id: string): Promise<void> {
-  await db.delete(abacRules).where(eq(abacRules.id, id));
+// Org-scoped delete (id+org) so a tenant can't delete another org's rule by id. Defaults to DEFAULT_ORG.
+export async function deleteAbacRule(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  await ensureOrgSchema();
+  await db.delete(abacRules).where(and(eq(abacRules.id, id), eq(abacRules.orgId, orgId)));
 }
 
 function ruleMatches(rule: AbacRule, ctx: AbacContext): boolean {
@@ -958,10 +1120,13 @@ function ruleMatches(rule: AbacRule, ctx: AbacContext): boolean {
 }
 
 // ABAC decision: deny-overrides. A matching deny wins; else a matching allow grants; else deny.
+// Org-scoped: only the caller's org rules are evaluated (defaults to DEFAULT_ORG) — a tenant's ABAC
+// decision must never be swayed by another tenant's rules.
 export async function evaluateAbac(
   ctx: AbacContext,
+  orgId: string = DEFAULT_ORG,
 ): Promise<{ allow: boolean; matched: AbacRule[] }> {
-  const rules = await listAbacRules();
+  const rules = await listAbacRules(orgId);
   const matched = rules.filter((r) => ruleMatches(r, ctx));
   if (matched.some((r) => r.effect === 'deny')) return { allow: false, matched };
   return { allow: matched.some((r) => r.effect === 'allow'), matched };
@@ -990,20 +1155,30 @@ export async function listRoutingRules(orgId: string = DEFAULT_ORG): Promise<Rou
 
 export async function createRoutingRule(
   input: Omit<RoutingRule, 'id' | 'enabled'>,
+  orgId: string = DEFAULT_ORG,
 ): Promise<RoutingRule> {
   const [row] = await db
     .insert(routingRules)
-    .values({ id: `route_${randomUUID().slice(0, 8)}`, ...input })
+    .values({ id: `route_${randomUUID().slice(0, 8)}`, orgId, ...input })
     .returning();
   return toRoutingRule(row);
 }
 
-export async function setRoutingRuleEnabled(id: string, enabled: boolean): Promise<void> {
-  await db.update(routingRules).set({ enabled }).where(eq(routingRules.id, id));
+// Org-scoped enable/disable (id+org) so a tenant can't toggle another org's rule by id.
+export async function setRoutingRuleEnabled(
+  id: string,
+  enabled: boolean,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await db
+    .update(routingRules)
+    .set({ enabled })
+    .where(and(eq(routingRules.id, id), eq(routingRules.orgId, orgId)));
 }
 
-export async function deleteRoutingRule(id: string): Promise<void> {
-  await db.delete(routingRules).where(eq(routingRules.id, id));
+// Org-scoped delete (id+org).
+export async function deleteRoutingRule(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  await db.delete(routingRules).where(and(eq(routingRules.id, id), eq(routingRules.orgId, orgId)));
 }
 
 // Re-export the routing-decision type from the pure module so existing importers are unaffected.
@@ -1012,10 +1187,14 @@ export type { RoutingDecision } from '@/lib/routing-policy';
 // Evaluate where a request runs. Thin I/O adapter: fetch the routing rules + org egress switch, then
 // delegate to the PURE decideRouting() (routing-policy.ts) which owns the leash logic — first
 // matching rule by priority wins, and a `cloud` action with egress OFF is downgraded to `block`.
+// Org-scoped: ONLY the caller's org rules are evaluated (defaults to DEFAULT_ORG) — before this fix
+// every tenant's rules were evaluated together, so one tenant's rule could route another's traffic.
 export async function evaluateRouting(ctx: {
   attributes: Record<string, string>;
+  orgId?: string;
 }): Promise<RoutingDecision> {
-  const [rules, policy] = await Promise.all([listRoutingRules(), getOrgPolicy()]);
+  const orgId = ctx.orgId ?? DEFAULT_ORG;
+  const [rules, policy] = await Promise.all([listRoutingRules(orgId), getOrgPolicy()]);
   return decideRouting(rules, ctx.attributes, policy.egressAllowed);
 }
 
@@ -1026,27 +1205,43 @@ export interface FeatureFlag {
   description: string;
 }
 
-export async function listFlags(): Promise<FeatureFlag[]> {
-  const rows = await db.select().from(featureFlags).orderBy(featureFlags.key);
+// Tenant-scoped: flags are per-org (defaults to DEFAULT_ORG). One tenant toggling a capability never
+// flips it for another. The identity is (org_id, key).
+export async function listFlags(orgId: string = DEFAULT_ORG): Promise<FeatureFlag[]> {
+  await ensureOrgSchema();
+  const rows = await db
+    .select()
+    .from(featureFlags)
+    .where(eq(featureFlags.orgId, orgId))
+    .orderBy(featureFlags.key);
   return rows.map((r) => ({ key: r.key, enabled: r.enabled, description: r.description }));
 }
 
-export async function setFlag(key: string, enabled: boolean, description = ''): Promise<void> {
+export async function setFlag(
+  key: string,
+  enabled: boolean,
+  description = '',
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await ensureOrgSchema();
   await db
     .insert(featureFlags)
-    .values({ key, enabled, description })
-    // Upsert: on an existing key, update enabled + description (only overwrite description when a
-    // non-empty one is supplied, so a bare toggle doesn't wipe it).
+    .values({ orgId, key, enabled, description })
+    // Upsert on the COMPOSITE (org_id, key): on an existing per-org key, update enabled + description
+    // (only overwrite description when a non-empty one is supplied, so a bare toggle doesn't wipe it).
     .onConflictDoUpdate({
-      target: featureFlags.key,
+      target: [featureFlags.orgId, featureFlags.key],
       set: description
         ? { enabled, description, updatedAt: new Date() }
         : { enabled, updatedAt: new Date() },
     });
 }
 
-export async function deleteFlag(key: string): Promise<boolean> {
-  const res = await db.delete(featureFlags).where(eq(featureFlags.key, key));
+export async function deleteFlag(key: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
+  await ensureOrgSchema();
+  const res = await db
+    .delete(featureFlags)
+    .where(and(eq(featureFlags.orgId, orgId), eq(featureFlags.key, key)));
   return (res.rowCount ?? 0) > 0;
 }
 
@@ -1056,10 +1251,20 @@ export function flagsForcedOpen(): boolean {
   return process.env.OFFGRID_FLAGS_OPEN === 'true';
 }
 
-// Runtime check with a default. Falls back to the default when the flag is unset.
-export async function isEnabled(key: string, fallback = false): Promise<boolean> {
+// Runtime check with a default. Falls back to the default when the flag is unset. Org-scoped
+// (defaults to DEFAULT_ORG) so a tenant's gate reads only its own flags.
+export async function isEnabled(
+  key: string,
+  fallback = false,
+  orgId: string = DEFAULT_ORG,
+): Promise<boolean> {
   if (flagsForcedOpen()) return true;
-  const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
+  await ensureOrgSchema();
+  const [row] = await db
+    .select()
+    .from(featureFlags)
+    .where(and(eq(featureFlags.orgId, orgId), eq(featureFlags.key, key)))
+    .limit(1);
   return row ? row.enabled : fallback;
 }
 
@@ -1438,18 +1643,27 @@ export async function deleteTool(id: string): Promise<void> {
   await db.delete(tools).where(eq(tools.id, id));
 }
 
-// ─── Org-wide settings (singleton) ────────────────────────────────────────────
-export async function getOrgSystemPrompt(): Promise<string> {
+// ─── Org-wide settings (PER-TENANT) ───────────────────────────────────────────
+// SECURITY WAVE 1 (P0): org_settings was a SINGLE shared row (id='org') across ALL tenants — one
+// system prompt + one chat-pipeline allowlist for the whole fleet. It is now keyed by ORG: the `id`
+// column IS the org id, one row per tenant. Every getter/setter takes `orgId` (defaults to
+// DEFAULT_ORG so single-tenant callers are unchanged); the legacy 'org' row is re-homed onto the
+// DEFAULT_ORG key by ensureOrgSchema. Reads/writes NEVER touch another tenant's config.
+export async function getOrgSystemPrompt(orgId: string = DEFAULT_ORG): Promise<string> {
   await ensureOrgSchema();
-  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'org')).limit(1);
+  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, orgId)).limit(1);
   return row?.systemPrompt ?? '';
 }
 
-export async function setOrgSystemPrompt(text: string, updatedBy: string): Promise<void> {
+export async function setOrgSystemPrompt(
+  text: string,
+  updatedBy: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
   await ensureOrgSchema();
   await db
     .insert(orgSettings)
-    .values({ id: 'org', systemPrompt: text, updatedBy })
+    .values({ id: orgId, systemPrompt: text, updatedBy })
     .onConflictDoUpdate({
       target: orgSettings.id,
       set: { systemPrompt: text, updatedBy, updatedAt: new Date() },
@@ -1460,27 +1674,30 @@ export async function setOrgSystemPrompt(text: string, updatedBy: string): Promi
 // The org-default chat pipeline + the SET of pipelines a user may pick per-project. Admin-owned
 // (routes gate with requireAdmin). Pure resolution/gating lives in chat-pipeline-policy.ts.
 
-/** Read the org's chat-binding governance (default pipeline + available-for-chat allowlist). */
-export async function getChatBindingGovernance(): Promise<ChatBindingGovernance> {
+/** Read the org's chat-binding governance (default pipeline + available-for-chat allowlist). Per-tenant. */
+export async function getChatBindingGovernance(
+  orgId: string = DEFAULT_ORG,
+): Promise<ChatBindingGovernance> {
   await ensureOrgSchema();
-  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'org')).limit(1);
+  const [row] = await db.select().from(orgSettings).where(eq(orgSettings.id, orgId)).limit(1);
   return {
     defaultChatPipelineId: row?.defaultChatPipelineId ?? null,
     allowlist: Array.isArray(row?.chatPipelineAllowlist) ? row.chatPipelineAllowlist : [],
   };
 }
 
-/** Set the org's chat-binding governance (admin-only; validated at the route). Upserts the singleton. */
+/** Set the org's chat-binding governance (admin-only; validated at the route). Upserts the per-tenant row. */
 export async function setChatBindingGovernance(
   gov: ChatBindingGovernance,
   updatedBy: string,
+  orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureOrgSchema();
   const defaultChatPipelineId = gov.defaultChatPipelineId || null;
   const chatPipelineAllowlist = Array.from(new Set((gov.allowlist ?? []).filter(Boolean)));
   await db
     .insert(orgSettings)
-    .values({ id: 'org', defaultChatPipelineId, chatPipelineAllowlist, updatedBy })
+    .values({ id: orgId, defaultChatPipelineId, chatPipelineAllowlist, updatedBy })
     .onConflictDoUpdate({
       target: orgSettings.id,
       set: { defaultChatPipelineId, chatPipelineAllowlist, updatedBy, updatedAt: new Date() },
@@ -1496,9 +1713,15 @@ export interface CustomRole {
   capabilities: string[];
 }
 
-export async function listCustomRoles(): Promise<CustomRole[]> {
+// Tenant-scoped: operator-defined roles are per-org (defaults to DEFAULT_ORG). Without the filter
+// listCustomRoles returned every tenant's roles — a cross-tenant RBAC leak.
+export async function listCustomRoles(orgId: string = DEFAULT_ORG): Promise<CustomRole[]> {
   await ensureOrgSchema();
-  const rows = await db.select().from(customRoles).orderBy(desc(customRoles.createdAt));
+  const rows = await db
+    .select()
+    .from(customRoles)
+    .where(eq(customRoles.orgId, orgId))
+    .orderBy(desc(customRoles.createdAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -1509,11 +1732,19 @@ export async function listCustomRoles(): Promise<CustomRole[]> {
 }
 
 // Resolve a custom role by its name (the value carried in a user's session role). Returns null for
-// built-in roles / unknown names. Used by the runtime permission resolver (lib/roles).
-export async function getCustomRoleByName(name: string): Promise<CustomRole | null> {
+// built-in roles / unknown names. Used by the runtime permission resolver (lib/roles). Org-scoped
+// (name+org, defaults to DEFAULT_ORG) so a user in org A can never resolve org B's role definition.
+export async function getCustomRoleByName(
+  name: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<CustomRole | null> {
   if (!name) return null;
   await ensureOrgSchema();
-  const rows = await db.select().from(customRoles).where(eq(customRoles.name, name)).limit(1);
+  const rows = await db
+    .select()
+    .from(customRoles)
+    .where(and(eq(customRoles.name, name), eq(customRoles.orgId, orgId)))
+    .limit(1);
   const r = rows[0];
   if (!r) return null;
   return {
@@ -1525,17 +1756,21 @@ export async function getCustomRoleByName(name: string): Promise<CustomRole | nu
   };
 }
 
-export async function createCustomRole(input: {
-  name: string;
-  description?: string;
-  basedOn?: string;
-  capabilities?: string[];
-}): Promise<CustomRole> {
+export async function createCustomRole(
+  input: {
+    name: string;
+    description?: string;
+    basedOn?: string;
+    capabilities?: string[];
+  },
+  orgId: string = DEFAULT_ORG,
+): Promise<CustomRole> {
   await ensureOrgSchema();
   const [row] = await db
     .insert(customRoles)
     .values({
       id: `role_${randomUUID().slice(0, 8)}`,
+      orgId,
       name: input.name,
       description: input.description ?? '',
       basedOn: input.basedOn ?? 'viewer',
@@ -1551,9 +1786,10 @@ export async function createCustomRole(input: {
   };
 }
 
-export async function deleteCustomRole(id: string): Promise<void> {
+// Org-scoped delete (id+org, defaults to DEFAULT_ORG) so a tenant can't delete another org's role.
+export async function deleteCustomRole(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureOrgSchema();
-  await db.delete(customRoles).where(eq(customRoles.id, id));
+  await db.delete(customRoles).where(and(eq(customRoles.id, id), eq(customRoles.orgId, orgId)));
 }
 
 // ─── User-authored agents ─────────────────────────────────────────────────────

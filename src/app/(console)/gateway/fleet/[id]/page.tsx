@@ -17,6 +17,7 @@ import {
 import { getMdm } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getDevice, listAudit, listDevices, pullPolicyForDevice } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,12 +130,13 @@ function ActivityCard({ audit }: { audit: Audit }) {
 export default async function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModuleForUser('fleet');
   const { id } = await params;
-  const device = await getDevice(id);
+  const org = await currentOrgId();
+  const device = await getDevice(id, org);
   if (!device) notFound();
   const [policy, audit, allDevices] = await Promise.all([
     pullPolicyForDevice(id),
-    listAudit({ deviceId: id, limit: 25 }),
-    listDevices(),
+    listAudit({ deviceId: id, limit: 25, orgId: org }),
+    listDevices(org),
   ]);
   const knownRoles = [...new Set(allDevices.map((d) => d.role))].filter(Boolean);
   // FleetDM-backed features (software inventory + CVEs, and the real MDM device commands) come from
