@@ -49,10 +49,28 @@ Worst offenders, fix first:
 - **~12 surfaces correctly isolated**: pipelines, gateways, custom agents, apps, app-runs, data-domains, guardrail rules, teams, provit, data-governance, publish-jobs, store.ts registry/connectors/masking. **The correct pattern already exists in-repo** — remediation is replication, not invention.
 - **≥85% coverage gate** enforced by pre-push hook.
 
-## Reliability / ops (audit still landing — interim, from known facts)
+## Reliability / ops / governance-enforcement (audit complete)
 
-- Single control-plane node (S1); git broken on server (rsync-only deploy); one Postgres; intermittent build init-crash; backups staged not confirmed running. Acceptable for controlled/single-tenant; a DR + HA story is needed for customer-operated prod.
+**Governance enforcement is genuinely strong** — one pure authority (`pipeline-enforcement.ts` + `pii-escalation.ts` + `checks.ts`) fires on all four run paths, and durable workers reuse the inline paths verbatim (DRY, sound). Egress leash is least-permissive-wins. Presidio-down fails to the regex floor (correct). BUT three governance gaps that bite even single-tenant:
+- **G1 (P1) — no org-level PII-mask FLOOR:** mask-before-model only fires when a bound pipeline's overlay escalates it. A run with **no bound pipeline sends raw PII to the model.** The pre-check only *records* a redacted verdict for audit; it doesn't substitute text.
+- **G2 (P1) — default chat masks nothing:** the most-used surface sends inbound PII to the model unless a pipeline is bound to the project.
+- **G3 (P1) — guardrail-throw fails OPEN on chat:** if the guardrail/PII layer *throws*, chat/stream falls back to the raw prompt AND skips injection-block, silently.
+- G5 (P2): public pipeline API skips budget + provenance + lineage. G7 (P2): injection detector is one weak regex.
+
+**Reliability/DR P0s (lose data or take the platform down — apply to ANY prod, incl. single-tenant):**
+- **R1 — OpenBao runs in-memory dev mode:** `BAO_DEV_ROOT_TOKEN_ID`, no volume, hardcoded root token `offgrid-dev-token`. **Every container restart wipes ALL secrets** — and connector creds now live ONLY there. Not backed up. → move to persistent (file/raft) storage + back it up + real token.
+- **R2 — backups staged, not running:** `backup.sh` is good (dumps + 14-day retention + off-box) but the LaunchDaemon has `RunAtLoad=false` and there's no evidence it was loaded. Likely **zero automated backups today** → disk loss = total loss.
+- **R3 — S1 is a total SPOF:** DB + secrets + auth + edge + tunnel + app all on one box; single Postgres, no replica; S2 "standby" is cosmetic (shares S1's DB). No rehearsed DR runbook.
+
+**Reliability P1s:** R4 `offgrid-inference` queue worker has no committed launchd plist (won't survive reboot); R5 console + cloudflared run under `nohup`, not supervised (a crash isn't auto-restarted; docs contradict); R6 no Temporal activity heartbeats (a hung LLM call isn't detected early); R7 ~106/338 routes can emit opaque 500s when a dependency is down (RSC pages are fine — one good `error.tsx`); R8 deploy path has no rollback (git broken on server) + manual migrations; R9 durable-run flag inconsistently documented ON vs OFF.
+
 - G-F4 data-quality sidecar still reports the stub on S2 (adapter deployed).
+
+## Revised verdict (all three audits)
+
+- **Demo (you, one tenant): ✅ YES.**
+- **Single-tenant pilot (customer box, `OFFGRID_ORG` pinned): 🟡 ~1 week** — isolation leaks mostly collapse, but you MUST fix R1 (OpenBao persistence), R2 (backups), the secret fail-opens (P1 above), and the PII-floor gaps (G1/G2/G3) — these aren't tenant-specific.
+- **Multi-tenant GA: ❌ 2–3 weeks** — the full isolation remediation epic (schema migrations + scoping sweep + tests) ON TOP of all the single-tenant fixes + a real DR/HA story (Postgres replica, supervised services, rehearsed S1 rebuild).
 
 ## Recommended path
 
