@@ -121,6 +121,13 @@ export interface AppRunWorkflowInput {
    * Null/absent ⇒ no bound pipeline ⇒ legacy allow (the additive guarantee), unchanged.
    */
   pipelineId?: string | null;
+  /**
+   * SHADOW / LIVE run mode (BFSI blast-radius). The dispatch site resolves the effective mode
+   * (app.shadowDefault ∨ requested) via the pure resolveRunMode and threads it here; the workflow
+   * passes it into each executeStepActivity so a shadow run's side-effecting sinks NO-OP on the
+   * WORKER path identically to the inline path. Absent ⇒ 'live' (default, additive).
+   */
+  mode?: 'shadow' | 'live';
 }
 
 /** What the app-run workflow reports back: the persisted run id + its terminal/paused status. */
