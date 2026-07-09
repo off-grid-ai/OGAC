@@ -1,11 +1,13 @@
 import { after, NextResponse } from 'next/server';
 import { listAgentRuns, scoreRun } from '@/lib/agentrun';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
-import { actorFromSession } from '@/lib/audit-actor';
+import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { requireAdmin } from '@/lib/authz';
-import { getChatBindingGovernance } from '@/lib/store';
+import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
 import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
+import { enforceAppAccess } from '@/lib/app-access';
+import { callerFromSession } from '@/lib/app-access-caller';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
 export async function GET(req: Request) {
@@ -30,6 +32,31 @@ export async function POST(req: Request) {
   }
 
   const orgId = await currentOrgId();
+
+  // Per-agent ACCESS CONTROL — every agent (a consumer) is governed. A custom agent has no owner
+  // column, so an unbound policy is least-privilege (admins only). The query is the ABAC attribute
+  // surface. Denied → 403 + reason, audited access.denied. Only enforced for a known custom agent;
+  // a built-in/unknown id falls through to dispatch's own 404 (additive, never breaks existing IDs).
+  const agent = await getCustomAgent(b.agentId, orgId).catch(() => undefined);
+  if (agent) {
+    const caller = await callerFromSession(gate, orgId);
+    const access = await enforceAppAccess({
+      appId: b.agentId,
+      orgId,
+      ownerId: '',
+      caller,
+      action: 'run',
+      requestAttrs: { query: b.query },
+    });
+    if (!access.allow) {
+      auditFromSession(gate, orgId, {
+        action: 'access.denied',
+        resource: `agent:${b.agentId} run`,
+        outcome: 'blocked',
+      });
+      return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
+    }
+  }
 
   // PA-16b — resolve the bound-pipeline CONTRACT this agent run enforces (data allowlist + egress
   // leash + policy/guardrail overlay), most-specific-wins: an agent has no per-agent binding column
