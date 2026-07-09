@@ -29,7 +29,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ wf: str
       { status: 400 },
     );
   }
-  const prior = await getAgentRun(runId);
+  // Scope the correlated-run lookup to the caller's org — a workflow id from another tenant resolves
+  // to 404 (a rerun may only re-dispatch a run that belongs to the caller's tenant; IDOR blocked).
+  const orgId = await currentOrgId();
+  const prior = await getAgentRun(runId, orgId);
   if (!prior) {
     return NextResponse.json(
       { error: `no recorded run ${runId} correlated to this workflow` },
@@ -40,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ wf: str
     agentId: prior.agentId,
     query: prior.query,
     caller: gate.user.email ?? undefined,
-    orgId: await currentOrgId(),
+    orgId,
     actor: actorFromSession(gate),
   });
   // Durable submit accepted but still executing in the worker — 202 with the ids so the client polls.
