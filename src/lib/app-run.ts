@@ -42,6 +42,12 @@ import {
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 import {
+  type RunMode,
+  buildWouldPerform,
+  shadowDetail,
+  shouldIntercept,
+} from '@/lib/app-run-controls';
+import {
   emailEgressVerdict,
   emailMaskingRequired,
   maskEmailForSend,
@@ -61,6 +67,14 @@ export interface AppRunContext {
    * enforcement decisions (enforceDataAccess / enforceModelCall) and perform the deny/route/audit I/O.
    */
   contract?: PipelineContract | null;
+  /**
+   * SHADOW / LIVE run mode (BFSI blast-radius). In 'shadow' any SIDE-EFFECTING step (an output sink
+   * that leaves the box — email/report/whatsapp) is INTERCEPTED: it records what it WOULD have done
+   * and does NOT execute. Read/reason/guardrail steps run normally in both modes. Absent ⇒ 'live'
+   * (default, additive). The route resolves the effective mode (app.shadowDefault ∨ requested) once
+   * via resolveRunMode and threads it here; the executor applies the pure shouldIntercept per step.
+   */
+  mode?: RunMode;
 }
 
 export interface StepResult {
@@ -71,6 +85,12 @@ export interface StepResult {
   refs?: { name: string; position?: number }[];
   detail?: string;
   childRunId?: string;
+  /**
+   * When this step was INTERCEPTED in shadow mode: what it WOULD have performed (sink + recipient +
+   * subject + payload preview). Present only on shadowed side-effecting steps so the trace + review
+   * screen can render the dry-run action clearly. Absent on every executed (live) step.
+   */
+  wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
 }
 
 export interface AppRunOutcome {
@@ -386,6 +406,23 @@ export async function executeStep(
           detail: `awaiting human decision at "${step.label || step.id}"`,
         };
       case 'output':
+        // SHADOW-MODE INTERCEPT (BFSI blast-radius) — an ADDITIONAL gate IN FRONT of the sink's own
+        // egress/PII governance. In shadow, a side-effecting sink (email/report/whatsapp) NO-OPs and
+        // records what it WOULD have sent (recipient/subject/payload preview) instead of delivering.
+        // The console sink is pure record-keeping (never intercepted) and read/reason steps run
+        // normally, so the operator sees the REAL decision the app would make — just no actions fire.
+        if (shouldIntercept(ctx.mode ?? 'live', step)) {
+          const outcome = aggregateOutcome(priorResults);
+          const would = buildWouldPerform(step.sink, step.config, outcome);
+          return {
+            stepId: step.id,
+            kind: 'output',
+            status: 'done',
+            output: outcome,
+            detail: shadowDetail(would),
+            wouldPerform: would,
+          };
+        }
         return await executeOutputStep(spec, step, priorResults, ctx, deps);
       default:
         return errorResult(step, `unknown step kind`);
@@ -770,6 +807,7 @@ export async function runApp(
         refs: result.refs,
         detail: result.detail,
         childRunId: result.childRunId,
+        wouldPerform: result.wouldPerform,
       });
       await deps.persist(state, input);
 
