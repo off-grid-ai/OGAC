@@ -7,6 +7,8 @@ import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { signalAppRun } from '@/lib/adapters/apprun';
 import { getApp } from '@/lib/apps-store';
 import { captureHitlCorrection } from '@/lib/feedback-store';
+import { enforceAppAccess } from '@/lib/app-access';
+import { callerFromSession } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +54,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       { error: `run is ${run.status}, not awaiting a human decision` },
       { status: 409 },
     );
+  }
+
+  // HITL APPROVAL AUTHORITY — an approver must hold the authority the consumer's access policy
+  // requires (approver role/user + threshold). The run's ORIGINAL INPUT is the ABAC surface (a
+  // threshold attribute like `amount` lives there), so an under-authority approver is rejected even
+  // on an approve. Only the `approve` decision is gated here; a `reject` needs no authority (anyone
+  // reviewing may halt a run). Denied → 403 + reason, audited access.denied.
+  if (body.decision === 'approve') {
+    const app = await getApp(run.appId, orgId);
+    const runInput = run.input ?? {};
+    const caller = await callerFromSession(gate, orgId);
+    const access = await enforceAppAccess({
+      appId: run.appId,
+      orgId,
+      ownerId: app?.ownerId ?? '',
+      caller,
+      action: 'approve',
+      requestAttrs: runInput,
+    });
+    if (!access.allow) {
+      auditFromSession(gate, orgId, {
+        action: 'access.denied',
+        resource: `app_run:${id} approve`,
+        outcome: 'blocked',
+      });
+      return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
+    }
   }
 
   // The step to resume — the run's awaiting_human step (or an explicit override that matches it).
