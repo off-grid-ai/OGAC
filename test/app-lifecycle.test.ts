@@ -9,13 +9,18 @@ test('lifecycleTabs: the lifecycle in flow order (+ Quality)', () => {
   const tabs = lifecycleTabs('app_42');
   assert.deepEqual(
     tabs.map((t) => t.tab),
-    ['build', 'input', 'runs', 'review', 'reports', 'quality'],
+    ['build', 'input', 'runs', 'review', 'reports', 'quality', 'access'],
   );
   assert.ok(tabs.every((t) => t.hint.length > 0), 'every tab carries a helper hint');
 });
 
 test('activeTabForPath: the quality tab resolves from its sub-path', () => {
   assert.equal(activeTabForPath('/build/apps/app_42/quality', 'app_42'), 'quality');
+});
+
+test('activeTabForPath: the access tab resolves from its sub-path', () => {
+  assert.equal(activeTabForPath('/build/apps/app_42/access', 'app_42'), 'access');
+  assert.equal(appTabHref('app_42', 'access'), '/build/apps/app_42/access');
 });
 
 test('appTabHref: build is the bare app path; others hang off it', () => {

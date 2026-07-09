@@ -15,6 +15,8 @@ import {
   markWebhookFired,
   resolveWebhookSecret,
 } from '@/lib/webhook-triggers';
+import { enforceAppAccess } from '@/lib/app-access';
+import { callerFromMachine } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,9 +73,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const actor = machineActor(`webhook:${trigger.id}`, trigger.label || 'Webhook trigger');
   const runId = newAppRunId();
 
+  // Per-app ACCESS CONTROL for the machine ingress: a webhook is a `machine`-role caller taking the
+  // `trigger` action. Least-privilege — a token can fire the consumer only if its policy explicitly
+  // admits the `machine` role (or `*`) for `trigger` (or the target is owner-less/admin-scoped and
+  // the machine is not an owner/admin ⇒ denied). Denied → 403 + reason, audited access.denied.
+  const mcaller = callerFromMachine(actor, orgId);
+
   if (trigger.targetKind === 'app') {
     const app = await getApp(trigger.targetId, orgId);
     if (!app) return NextResponse.json({ error: 'target app not found' }, { status: 404 });
+    const access = await enforceAppAccess({
+      appId: trigger.targetId,
+      orgId,
+      ownerId: app.ownerId,
+      caller: mcaller,
+      action: 'trigger',
+      requestAttrs: (input as Record<string, unknown>) ?? {},
+    });
+    if (!access.allow) {
+      recordAudit({
+        actor,
+        org: orgId,
+        action: 'access.denied',
+        resource: `webhook:${trigger.id} app:${trigger.targetId} trigger`,
+        outcome: 'blocked',
+      });
+      return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
+    }
     // Governed exactly like the admin run route: resolve the bound-pipeline contract for THIS org.
     const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
     const contract = await resolveContract(pipelineId, orgId);
@@ -96,6 +122,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // agent target
   const agent = await getCustomAgent(trigger.targetId, orgId).catch(() => null);
   if (!agent) return NextResponse.json({ error: 'target agent not found' }, { status: 404 });
+  const agentAccess = await enforceAppAccess({
+    appId: trigger.targetId,
+    orgId,
+    ownerId: '',
+    caller: mcaller,
+    action: 'trigger',
+    requestAttrs: (input as Record<string, unknown>) ?? {},
+  });
+  if (!agentAccess.allow) {
+    recordAudit({
+      actor,
+      org: orgId,
+      action: 'access.denied',
+      resource: `webhook:${trigger.id} agent:${trigger.targetId} trigger`,
+      outcome: 'blocked',
+    });
+    return NextResponse.json({ error: 'access denied', reason: agentAccess.reason }, { status: 403 });
+  }
   const query = typeof input.input === 'string' && input.input.trim() ? input.input : rawBody;
   const dispatch = await dispatchAgentRun({
     agentId: trigger.targetId,
