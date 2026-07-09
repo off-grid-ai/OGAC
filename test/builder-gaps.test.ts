@@ -33,7 +33,17 @@ test('analyzeGaps: a "No data source" gap becomes a wire-data-source action carr
   assert.equal(items.length, 1);
   assert.equal(items[0].action, 'wire-data-source');
   assert.equal(items[0].phrase, 'invoices');
-  assert.equal(items[0].severity, 'blocker');
+});
+
+test('analyzeGaps: a "No data source" gap is ADVISORY, not a blocker (save-with-gap #128)', () => {
+  // The compiler DROPS the unbindable step, so the spec stays valid + runnable — a first-time,
+  // non-technical user must be able to save and wire the source later. So this gap must NOT block
+  // save. (The blocking case is an unbound step IN the spec — analyzeSpec → bind-step.)
+  const items = analyzeGaps([
+    'No data source declared for "invoices" — add a data-domain mapping to wire this step.',
+  ]);
+  assert.equal(items[0].severity, 'advisory');
+  assert.equal(blockerCount(items), 0);
 });
 
 test('analyzeGaps: an unrecognized gap is surfaced as an advisory review item (never hidden)', () => {
@@ -99,12 +109,34 @@ test('mergeFixIts: de-dupes by id and orders blockers before advisories', () => 
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test('blockerCount: counts only blockers', () => {
+test('blockerCount: counts only blockers (data-source gap is advisory, unbound step is a blocker)', () => {
   const items = mergeFixIts(
+    // both advisories: a dropped-source gap + a review note
     analyzeGaps(['No data source declared for "x" — …', 'advisory']),
-    [],
+    // one real blocker: an unbound connector-query step in the spec
+    analyzeSpec(spec([{ id: 's1', label: 'Read', kind: 'connector-query', domain: '' }])),
   );
   assert.equal(blockerCount(items), 1);
+});
+
+test('save-with-gap: an app whose ONLY issue is a dropped data source has zero blockers', () => {
+  // Non-tech e2e: zero declared domains → compiler drops the connector-query step → the spec is
+  // valid (agent + output) and the only fix-it is the advisory data-source gap. Save must be allowed.
+  const items = mergeFixIts(
+    analyzeGaps(['No data source declared for "expense_claim" — add a data-domain mapping.']),
+    analyzeSpec(
+      spec([
+        { id: 's1', label: 'Decide', kind: 'agent', inlineAgent: { systemPrompt: 'reason', grounded: true } },
+        { id: 's2', label: 'Output', kind: 'output', sink: 'console' },
+      ]),
+    ),
+  );
+  assert.equal(blockerCount(items), 0);
+  // …and the advisory still carries the one-click wire-data-source remedy (resolve-later path).
+  const advisory = items.find((i) => i.action === 'wire-data-source');
+  assert.ok(advisory, 'expected the wire-data-source advisory to remain available');
+  assert.equal(advisory!.severity, 'advisory');
+  assert.equal(advisory!.phrase, 'expense_claim');
 });
 
 test('analyzeSpec(null) is empty', () => {
