@@ -6,6 +6,7 @@ import {
   emptyPromptObservability,
   parsePromptAggsResponse,
 } from '@/lib/prompt-observability';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +26,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   const { id } = await ctx.params;
 
-  // Visibility mirrors the detail page: a user may see an org-visible prompt or their own private one.
-  const p = await getPrompt(id).catch(() => null);
+  // Visibility mirrors the detail page: a user may see an org-visible prompt or their own private one,
+  // scoped to their own org so another tenant's prompt id resolves to null → 404.
+  const p = await getPrompt(id, await currentOrgId()).catch(() => null);
   if (!p || !(p.visibility === 'org' || p.owner === email)) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
