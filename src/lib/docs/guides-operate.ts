@@ -17,11 +17,11 @@ the next action one click away.
 ## What it shows
 
 - **Governance posture** — the policy engine state, guardrail actions in the window, and the live
-  cloud-egress state. At a glance: is the box leashed.
-- **Traffic & health** — request volume, latency p95, and how much of your traffic is served
-  on-prem vs. cloud.
-- **Spend** — cost for the window, the on-prem share (local models cost zero), and any virtual key
-  over budget.
+  cloud-egress state. At a glance: are the org's rules in force.
+- **Traffic & health** — request volume, latency p95, and how much of your traffic is served by your
+  own models vs. cloud.
+- **Spend** — cost for the window, the share served by your own models (which cost zero to run), and
+  any virtual key over budget.
 - **Data & recent activity** — connected data sources and the most recent governed runs.
 
 ## Quick actions
@@ -54,27 +54,31 @@ look before you dig into a specific module.`,
     {
       slug: 'guides/edge',
       title: 'Edge & network',
-      description: 'The reverse proxy and tunnel that expose the platform without open ports.',
-      body: `Edge is the network boundary. A reverse proxy (Caddy) fronts your public subdomains and an
-outbound tunnel exposes them without opening any inbound ports, so the platform stays reachable even
-as your public IP changes.
+      description: 'The one controlled front door to the platform.',
+      body: `**What you'll get:** a single, controlled entry point to the platform. The edge fronts
+your public subdomains and keeps everything behind one front door, so you have one place to see and
+control how the platform is reached.
 
 ## What it covers
 
 - **Subdomain routing** — which public hostname maps to which internal service.
-- **The tunnel** — an outbound-only connection, so nothing inbound is exposed on your network.
-- **Exposure posture** — backends bind to loopback and are only reached through the console;
-  the edge is the one controlled front door.
+- **Exposure posture** — services are reachable only through the edge, so there's one controlled
+  front door rather than many.
+- **Boundary enforcement** — rate limiting and abuse protection are enforced at the edge, before a
+  request ever reaches a service.
 
-Rate limiting and WAF rules live at the edge (Caddy), not in the application, so the boundary is
-enforced before a request ever reaches a service.`,
+## What success looks like
+
+You see each public subdomain mapped to its service, and you know abuse protection runs at the
+boundary — so no request reaches a service without passing the front door first.`,
     },
     {
       slug: 'guides/gateway',
       title: 'AI Gateway & routing',
-      description: 'One endpoint for every model, with the cloud on a leash.',
-      body: `The gateway is the single, OpenAI-compatible endpoint every model call flows through —
-open-weight models on your own nodes, and cloud models when your policy allows.
+      description: 'One endpoint for every model, governed by rules you set once.',
+      body: `**What you'll get:** every model call — your own models and frontier cloud models alike —
+flows through one gateway, governed by the routing rules your org set once. Set the rules once,
+everyone builds on top of them.
 
 ![The AI Gateway — routing rules, per-model cost, and which node served each call](/docs-shots/gateway.png)
 
@@ -82,22 +86,27 @@ open-weight models on your own nodes, and cloud models when your policy allows.
 
 For each request, the first matching routing rule (by priority) decides where it runs:
 
-- **local** — an on-prem model. Data stays on the box.
-- **cloud** — an external model, and only when cloud egress is ON.
+- **local** — a model on your own nodes.
+- **cloud** — a frontier model, and only when cloud egress is ON.
 - **block** — the request is refused.
 
 ## The egress leash
 
 Egress is the master switch. A \`cloud\` rule is forced to **block** whenever egress is off, so a
-rule like \`data_class = PII → block\` means customer data cannot route off-box, whatever anyone
-asks. On the **Control** page you see the live egress state and can test any request against your
-rules before committing them.
+rule like \`data_class = PII → block\` means sensitive data can't route to a cloud model, whatever
+anyone asks. On the **Control** page you see the live egress state and can test any request against
+your rules before committing them.
 
 ## What else it does
 
 Fallback, caching, rate limits, key management, per-model cost, and a live view of which node served
 each call. Because everything flows through it, it's the one place to route, observe, and cost your
-whole model estate.`,
+whole model estate.
+
+## What success looks like
+
+You add a rule, open the routing tester, paste a sample request, and see exactly where it would land
+— local, cloud, or block — before you commit. Every real call then shows which node served it.`,
     },
     {
       slug: 'guides/fleet',
@@ -159,10 +168,15 @@ traces to a real event — an unreachable source shows real zeros, never synthet
 
 - **Cost by model, team, and virtual key**, with request and token counts.
 - **Budgets** — per-key monthly limits; a completion checks the budget before it runs.
-- **On-prem dividend** — local models cost zero, so the savings from running on your own hardware are
-  visible next to any cloud spend.
+- **Your-own-models dividend** — models you run yourself cost zero, so the savings from serving your
+  own models are visible next to any cloud spend.
 
-Manage virtual keys and their budgets from the FinOps surface.`,
+Manage virtual keys and their budgets from the FinOps surface.
+
+## What success looks like
+
+You set a monthly limit on a project's key, and once spend passes it the next paid call is refused
+with a clear reason — while free local calls keep running. The cap holds without you watching it.`,
     },
     {
       slug: 'guides/budgets',
@@ -357,9 +371,8 @@ is disabled.`,
       slug: 'guides/storage',
       title: 'Storage',
       description: 'One object store for every file the platform touches.',
-      body: `Storage is the single file layer for the platform, backed by your own S3-compatible object
-store. Uploaded knowledge, generated images, chat attachments, and exported artifacts all
-live here.
+      body: `**What you'll get:** one place for every file the platform touches. Uploaded knowledge,
+generated images, chat attachments, and exported artifacts all live in a single object store you own.
 
 ![Storage — one object store for knowledge, generated images, attachments, and exports](/docs-shots/storage.png)
 
@@ -375,8 +388,9 @@ There is no other file-storage path — everything the console stores goes throu
       slug: 'guides/data',
       title: 'Data & connectors',
       description: 'Connect your systems of record and keep the data real.',
-      body: `Connectors bring your systems of record into the platform. Off Grid AI ships connectors for
-databases (Postgres, MySQL, MSSQL), object storage (S3), event streams (Kafka), and REST APIs.
+      body: `**What you'll get:** your existing systems, connected into the platform as-is — no need to
+migrate anything. Off Grid AI ships connectors for the common ones (databases, object storage, event
+streams, and REST APIs), so what your org already runs becomes something your AI can use.
 
 ![Data — your systems of record connected, synced, and kept to real row counts](/docs-shots/data.png)
 
@@ -392,7 +406,12 @@ never fabricated. Delete removes it and its history.
 
 A fresh deployment shows real or empty data, nothing invented. Sync counts come from the source;
 metrics trace to real events. When a number can't be read, it's shown as unknown, not guessed. See
-the full list of supported sources in [Integrations](/docs/integrations/catalog).`,
+the full list of supported sources in [Integrations](/docs/integrations/catalog).
+
+## What success looks like
+
+You add a connector, trigger a sync, and see a real row/document count land in the ingest history —
+pulled from the live source. That connected data is then available to ground your assistants.`,
     },
     {
       slug: 'guides/backups',
