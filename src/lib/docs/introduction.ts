@@ -7,43 +7,51 @@ export const introductionSection: DocSection = {
     {
       slug: '',
       title: 'What is Off Grid AI Console',
-      description: 'Your organization’s private AI platform — models, data, and governance on your own hardware.',
-      body: `Off Grid AI Console is your organization's private AI platform. You run capable models on your own
-hardware, connect your own data, and put every request under your own governance. Nothing leaves
-your infrastructure unless you allow it.
+      description: 'The one interface that makes your enterprise intelligent — models, data, and governance already set up and connected.',
+      body: `Off Grid AI Console is the one interface that makes your enterprise intelligent. Everything you
+need to run AI — access to models, evals, guardrails, PII masking, data pipelines, audit, lineage,
+knowledge bases — is already set up and connected. You define your organization's rules, policies,
+and knowledge once, and everyone builds on top of them, inside the rules. It just works.
 
-Most AI platforms make you choose: the frontier models, or your data staying private. Off Grid AI
-removes the trade-off. The intelligence *inside* your org (your documents, systems, and knowledge)
-and the intelligence *outside* it (open-weight and, when you permit it, cloud models) meet on one
-control plane that you own.
+Think of it as AWS for AI. AWS meant you stopped racking servers to ship software; Off Grid AI means
+you stop assembling AI infrastructure to ship intelligence. No stitching together a router here, a
+vector store there, a PII scanner, an eval harness, and an audit log — and praying they agree. It's
+one platform, wired together, that you configure once.
 
 ![The Off Grid AI Console home — health, governance posture, spend, and activity at a glance](/docs-shots/overview.png)
 
 ## What you get
 
-- **A private AI, everywhere.** Chat, projects, and knowledge, answered by models running on
-  your own gateways. No per-seat cost, no prompts sent to a vendor.
+- **AI, everywhere, already governed.** Chat, projects, apps, and agents draw on your models and your
+  knowledge — and every one of them runs inside the same rules you set once. No per-team reinvention.
 - **Your data, made answerable.** Connect core systems, upload documents, and ask questions in plain
   language. Every answer cites the source it came from.
-- **Governed by default.** Policy, PII masking, access control, and a tamper-evident audit trail sit
-  in front of every request. A request only reaches a cloud model if your rules allow it; the default
-  is deny.
-- **One surface to run it all.** Agents, image generation, evals, cost, drift, lineage, and fleet
-  management, in one console.
+- **The rules are set once, then reused.** Policy, PII masking, access control, quality bars, and a
+  tamper-evident audit trail are defined at the org level and inherited by everything built on top —
+  so a new app is governed the moment it exists, without anyone re-doing the work.
+- **One surface to run it all.** Models, agents, image generation, evals, cost, drift, lineage, and
+  fleet management, in one console instead of a dozen contracts.
 
 ## Who it's for
 
-Off Grid AI runs the AI operations for a regulated organization. It serves four people: the platform
+Off Grid AI is how a whole organization runs AI — not just its engineers. A non-technical person in
+tax, accounting, or operations can describe what they need in plain language and get a working,
+governed workflow, tested in a sandbox first. Around them, four people keep it running: the platform
 team keeping it fast and cheap, the compliance officer who has to defend it to a regulator, the
-builder shipping AI features, and the finance owner watching the spend. Each gets a surface built
-for their job.
+builder shipping AI features, and the finance owner watching the spend. Each gets a surface built for
+their job, over the same shared foundation.
 
-## On your infrastructure
+## The flow
 
-Everything runs on hardware you control, on-prem or in your own cloud. The models run on your
-gateway nodes. Your documents are indexed in your own vector store. The audit log is your record.
-When a request is allowed out to a cloud model, that decision is logged and attributable. This is
-not a privacy promise laid over someone else's servers; it is where the software runs.
+Everything moves along one path: your **data** feeds a **gateway** to models, requests run through
+governed **pipelines**, those power **agents and apps** people actually use, and every step is held to
+your **compliance and regulatory** rules. Set that path up once and it carries every use-case you add.
+
+## Runs where you need it
+
+Off Grid AI can run on your own servers or in your own cloud — deployment is flexible, and you choose
+what fits. The point isn't where it runs; the point is that the whole AI stack is already assembled,
+connected, and governed, so your organization ships intelligence instead of building plumbing.
 
 Ready to try it? Start with the [Quickstart](/docs/quickstart).`,
     },
@@ -62,19 +70,19 @@ you already have. No account yet? Ask your admin, or book a call from the sign-i
 
 ## 2. Ask something
 
-Open **Chat**, pick a model, and ask a question. The answer is generated on your own gateway; the
-footer confirms it: *runs on your on-prem gateways, nothing leaves your network*. This is your
-private AI, everywhere.
+Open **Chat**, pick a model, and ask a question. The answer runs through a governed pipeline — the
+footer shows which one — so it's already subject to your org's policy and guardrails without you
+setting anything up. This is AI, everywhere, inside the rules.
 
-![Chat — a private, grounded answer generated on your own gateway](/docs-shots/chat.png)
+![Chat — a governed, grounded answer routed through your org's pipeline](/docs-shots/chat.png)
 
 ## 3. Give it your knowledge
 
-Go to **Knowledge** and upload a document (a policy PDF, an SOP, a spec). Off Grid AI chunks and indexes
-it on your own hardware. Back in Chat, ask a question the document answers; the reply now cites the
+Go to **Knowledge** and upload a document (a policy PDF, an SOP, a spec). Off Grid AI indexes it so
+your models can retrieve it. Back in Chat, ask a question the document answers; the reply now cites the
 source, and it won't invent facts beyond what it retrieved.
 
-![Knowledge — upload a document and Off Grid AI indexes it on your own hardware for cited answers](/docs-shots/knowledge.png)
+![Knowledge — upload a document and Off Grid AI indexes it for cited answers](/docs-shots/knowledge.png)
 
 ## 4. Build an assistant
 
@@ -86,11 +94,11 @@ right there. Publish it to your team.
 
 ## 5. Generate an image
 
-In Chat, pick an image model from the model list and describe what you want. The image is rendered
-on your own image gateway and saved to your storage.
+In Chat, pick an image model from the model list and describe what you want. The image is generated
+through the same governed path and saved to your storage.
 
-That's the loop: ask, ground, build, generate, all on your infrastructure. The guides go capability
-by capability from here.`,
+That's the loop: ask, ground, build, generate — each running on the same shared, governed foundation.
+The guides go capability by capability from here.`,
     },
     {
       slug: 'how-to',
@@ -109,9 +117,9 @@ by capability from here.`,
 
 ## Govern and prove
 
-- **Stop customer data leaving the box.** In [Control](/docs/guides/control), add a routing rule
-  \`data_class = PII → block\` and confirm cloud egress is off. Test it with the routing tester before
-  you commit it.
+- **Set a routing rule everything obeys.** In [Control](/docs/guides/control), add a rule like
+  \`data_class = PII → keep on the approved model\` so sensitive requests always route where you decided.
+  Test it with the routing tester before you commit it.
 - **Catch and mask PII.** Turn on entity-grade PII detection, then test a string on the
   [Guardrails](/docs/guides/guardrails) page to see the live redaction.
 - **Restrict who can do what.** Add rules on the [Policy](/docs/guides/policy) page; deny wins.
@@ -136,35 +144,48 @@ by capability from here.`,
     {
       slug: 'why-off-grid',
       title: 'Why Off Grid AI Console',
-      description: 'Why an integrated, on-prem platform beats a pile of SaaS point tools.',
+      description: 'Why one already-connected platform beats assembling a pile of AI point tools yourself.',
       body: `The AI-infrastructure market is a pile of point tools: one product to route model calls,
 another to trace them, another to test them, another to police them, another to reach your internal
-data. Each is SaaS. Each holds a copy of your prompts and often your data. Each is one more contract
-and one more seam where governance leaks.
+data. Each is a separate contract, a separate integration, and one more seam where the pieces disagree.
+Wiring them into something an enterprise can actually run — and keep running — is a project that never
+ends.
 
-Off Grid AI Console is one platform instead of that pile, running on your own hardware.
+Off Grid AI Console is that whole stack, already assembled and connected, as one platform.
 
-![One control plane — routing, policy, egress, and audit search governed from a single room](/docs-shots/control.png)
+![One control plane — routing, policy, quality, and audit governed from a single room](/docs-shots/control.png)
 
-## The moat is the integration
+## AWS for AI
 
-Anyone can run the individual open-source pieces. The value is that in Off Grid AI they are one product:
-the gateway knows about the policy engine, the policy engine knows about the PII scanner, the
-scanner's verdict lands in the same audit trail your regulator reads, retrieval respects the same
-access rules as chat, and every token's cost is attributed back to the team that spent it. One
-control plane, one identity model, one audit ledger.
+AWS meant you stopped assembling servers to ship software — the infrastructure was already there,
+connected, and ready. Off Grid AI is the same shift for AI: you stop assembling AI infrastructure. The
+model gateway, the pipelines, the guardrails, the evals, the data connectors, the audit and lineage —
+all present and wired together from day one. You don't integrate them; you configure them.
 
-## Built for regulated buyers
+## Set the rules once, everyone builds inside them
 
-For a bank, an insurer, or a hospital, the question isn't "is the AI good" — it's "can I defend this
-to my regulator." That reframes the product: governance isn't a feature added on, it's the reason
-Off Grid AI exists, and it's why the platform wins where a pure developer tool can't.
+This is the core idea. You define your organization's rules, policies, guardrails, and knowledge
+**once**, at the org level — and everything anyone builds on top inherits them automatically. A new
+app is governed the moment it exists. A team can't accidentally ship an ungoverned path, because there
+isn't one. The gateway knows about the policy, the policy knows about the PII masking, the verdict
+lands in the same audit trail, retrieval respects the same access rules as chat, and every token's
+cost is attributed back to the team that spent it. One control plane, one identity model, one audit
+ledger. It just works.
 
-## On-prem by construction
+## It makes the whole enterprise intelligent — not just its engineers
 
-Most competitors are SaaS and structurally cannot offer true on-prem or air-gapped deployment. Off
-Grid is on-prem first; cloud is the exception you gate, not the default you assume. Your data never
-leaves the box unless you decide it should.`,
+Because the foundation is set once and shared, the people who build on it don't have to be technical.
+Someone in tax, accounting, or operations describes what they need in plain language and gets a
+working, governed workflow, tested in a sandbox first. That's the payoff of a platform over a pile of
+tools: the hard parts are already solved, so the reach of AI is the whole organization, not the
+handful of people who could otherwise wire the plumbing.
+
+## Runs where you need it
+
+Off Grid AI can run on your own servers or in your own cloud — deployment is flexible, and that
+flexibility is a convenience, not the pitch. Regulated buyers get a platform they can defend to a
+regulator because governance is built into the foundation, wherever it runs; and the platform is
+**open source**, so anyone can inspect and trust exactly how it works.`,
     },
   ],
 };

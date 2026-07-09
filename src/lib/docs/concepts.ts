@@ -7,33 +7,37 @@ export const conceptsSection: DocSection = {
     {
       slug: 'concepts/architecture',
       title: 'Architecture',
-      description: 'The two intelligence flows and the governance spine between them.',
-      body: `Off Grid AI has a simple shape: two flows of intelligence, with a governance spine between them.
+      description: 'One path from your data to a governed answer — set up once, reused by everything.',
+      body: `Off Grid AI has a simple shape: one path that carries every use-case, with governance built
+into the path rather than bolted onto each app. Data feeds a gateway to models, requests run through
+governed pipelines, and everything is held to the rules you set once.
 
-## Harness the intelligence inside your org
+## Your data, made answerable
 
 Your data lives in systems that can't answer questions. Off Grid AI changes that:
 
 - **Connectors** pull from your systems of record (databases, warehouses, CRM, event streams).
-- **Ingestion** chunks and embeds content on your own hardware into a vector store.
+- **Ingestion** prepares that content so your models can search it.
 - **Retrieval** finds the relevant sources for a question, respecting who is allowed to see what.
 - **Grounded answers** cite the exact source, so a person or an auditor can verify them.
 
-## Leverage the intelligence outside your org
+## One gateway to every model
 
-One OpenAI-compatible gateway fronts every model: open-weight models on your own nodes, and, when
-your policy permits, cloud models. The gateway is the single place model traffic flows through, so
-it's the single place to route, cache, rate-limit, and cost it.
+A single OpenAI-compatible gateway fronts every model your organization can reach — models running on
+your own nodes, and, when your policy permits, cloud models. Because all model traffic flows through
+one place, it's the one place to route, cache, rate-limit, and cost it. Nobody wires up a model
+connection per app; they consume the gateway through a pipeline.
 
-## The governance spine
+## Governance is in the path, not on each app
 
 Every request passes through the same controls: policy, guardrails, identity, secrets, and a
-tamper-evident audit trail. The master switch is egress: a request tagged as sensitive data cannot
-route to a cloud model when egress is off, no matter who asks. The default is deny.
+tamper-evident audit trail. You define these **once** at the org level, and every consumer inherits
+them — so a new app is governed the moment it exists. A routing rule you set (for example, keep
+sensitive requests on an approved model) applies to every request, no matter who asks.
 
-The point is the integration. The gateway that reaches the outside world enforces the same policies
-that protect the inside world, and writes to the same audit trail either way. One control plane,
-one identity model, one record.`,
+That's the point: the integration. The gateway enforces the same policies your data plane respects,
+and writes to the same audit trail either way. One control plane, one identity model, one record —
+set up once, reused by everything built on top.`,
     },
     {
       slug: 'concepts/governed-pipeline',
@@ -47,19 +51,20 @@ happen on any agent run.
 1. **Policy** — an attribute-based check decides whether the request is allowed. A matching deny
    rule stops it here.
 2. **Guardrails (input)** — the prompt is scanned for PII and injection before it moves. A blocked
-   verdict refuses the request; the regex floor is always on, with entity-grade PII detection
+   verdict refuses the request; a baseline scan is always on, with entity-grade PII detection
    layered on when configured.
 3. **Retrieve** — for a grounded request, the relevant sources are pulled from your knowledge, with
    their provenance references.
 4. **Answer** — the model composes a reply from the retrieved sources.
 5. **Ground** — the answer is verified against the sources, producing citations.
 6. **Guardrails (output)** — the reply is scanned before it leaves.
-7. **Audit + provenance** — the whole turn is recorded (model, tokens, whether data left the box,
-   which guardrails fired, the cost key) and can be signed.
+7. **Audit + provenance** — the whole turn is recorded (model, tokens, which model answered, which
+   guardrails fired, the cost key) and can be signed.
 
 Nothing opts out of this. A custom agent you build runs the same pipeline as the built-ins, so it
-inherits every rule you've set. That is why an answer here is defensible: you can show exactly what
-was checked, what was retrieved, and where the answer came from.`,
+inherits every rule you've set once — you don't re-govern each new thing. That is why an answer here
+is defensible: you can show exactly what was checked, what was retrieved, and where the answer came
+from.`,
     },
     {
       slug: 'concepts/pipelines-and-gateways',
@@ -72,9 +77,10 @@ reuse governance instead of re-writing it for every app.
 
 ## Gateways — the model backends
 
-A **gateway** is a place requests go to be answered: your own on-prem cluster, or a cloud provider you
-allow. It carries an egress class — *data stays on-prem* or *data leaves (cloud)* — and its own health.
-Many pipelines can share one gateway. See [Gateways](/docs/guides/gateways).
+A **gateway** is a place requests go to be answered: a model cluster on your own nodes, or a cloud
+provider you allow. It carries a class you can read at a glance — *on your own nodes* or *cloud* — and
+its own health, so routing rules can key off it. Many pipelines can share one gateway; nobody wires a
+model connection per app. See [Gateways](/docs/guides/gateways).
 
 ## Pipelines — the governed contract
 
@@ -134,17 +140,17 @@ org's chats, runs, connectors, or audit records — not by accident, not by a cr
 
 - **One realm, an org claim per user.** Everyone signs in through the same identity provider; each
   user's token carries the org they belong to. The console reads that claim on every request.
-- **An org column on every tenant-scoped table.** Chats, agent runs, connectors, routing rules,
-  studio templates, provit repos, and the rest each carry an \`org_id\`. Every query is filtered to
-  the caller's org at one seam, not re-implemented per route.
+- **An org tag on every tenant-scoped record.** Chats, agent runs, connectors, routing rules,
+  studio templates, provenance records, and the rest each carry an \`org_id\`. Every query is filtered
+  to the caller's org at one seam, not re-implemented per route.
 - **Files namespaced by org.** Objects in your store are pathed by org, so a presigned URL is scoped
   to the org that owns the file.
 
 ## The database backstop
 
 Filtering in the query layer is the primary control; a defense-in-depth backstop sits behind it in
-the database itself. Postgres row-level security policies on the tenant-scoped tables enforce the
-same \`org_id\` boundary, so even a query that forgot the filter still can't cross orgs.
+the database itself. Row-level rules on the tenant-scoped tables enforce the same \`org_id\` boundary
+at the storage layer, so even a query that forgot the filter still can't cross orgs.
 
 The backstop is deliberately a no-op until you opt in: it activates only when the app sets the
 current-org session variable and connects as a non-superuser role, so switching it on changes nothing
@@ -159,32 +165,36 @@ same boundary, so growing from one org to many is a switch, not a migration.`,
     },
     {
       slug: 'concepts/data-sovereignty',
-      title: 'Data sovereignty',
-      description: 'Where your data lives, and what it takes to keep it that way.',
-      body: `Sovereignty here is not a setting — it's where the software runs and how the boundaries are
-enforced.
+      title: 'Where data can go, and who decides',
+      description: 'A routing control you set once that governs where every request is allowed to run.',
+      body: `Off Grid AI's differentiator is the platform itself — the whole AI stack, assembled and
+governed, set up once. *Where* it runs is a deployment choice you make, and *where a given request is
+allowed to go* is a rule you set once and everything obeys. This page is about that control, not a
+privacy pitch: it's one more thing you configure at the org level instead of re-deciding per app.
 
-## What stays on your infrastructure
+## What runs on your side
 
-- **Prompts and answers** — chat and agent traffic is served by your gateway nodes.
-- **Documents and embeddings** — indexed in your own vector store, embedded by a model on your own
-  hardware. No embedding service, no content sent out.
-- **The audit trail** — your record, in your database.
+You choose where the platform lives — your own servers or your own cloud. In either case:
 
-## The egress boundary
+- **Prompts and answers** run through your gateway.
+- **Documents and their search index** live in your store, prepared by a model you run.
+- **The audit trail** is your record, in your database.
 
-The one way data can leave is a cloud-model call, and that is gated. Egress is off by default; a
-routing rule can only send a request to a cloud model when egress is on, and a rule like
-\`data_class = PII → block\` forces sensitive data to stay regardless. Every allowed egress is
-logged and attributable.
+## The routing control
 
-![The egress leash — cloud access off by default, so sensitive data physically cannot leave the box](/docs-shots/control.png)
+Where a request may run is decided by a routing rule, set once at the org level. A rule like
+\`data_class = PII → keep on the approved model\` means sensitive requests always route where you
+decided, no matter who submits them or which app they came from. Cloud access is opt-in: a request
+only reaches a cloud model when a rule allows it, and every such call is logged and attributable.
 
-## Air-gapped
+![The routing control — set once, applied to every request, whoever submits it](/docs-shots/control.png)
 
-Because everything runs on your infrastructure and cloud is opt-in, Off Grid AI can run fully
-air-gapped: no outbound path at all. In that mode, only local models serve requests, and the
-platform works the same — the governance, retrieval, and audit are all local.`,
+## Fully self-contained if you need it
+
+Because you can run every model on your own nodes, Off Grid AI can operate with no outbound path at
+all — useful for an isolated network. In that mode, only your own models serve requests, and the
+platform works exactly the same: the governance, retrieval, evals, and audit are all present. The
+capability is there when a use-case demands it; it isn't the reason to adopt the platform.`,
     },
   ],
 };

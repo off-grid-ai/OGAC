@@ -10,29 +10,29 @@ export const pipelinesGatewaysSection: DocSection = {
     {
       slug: 'guides/gateways',
       title: 'Gateways',
-      description: 'The model backends your pipelines run on — on your own hardware, or cloud when you allow it.',
-      body: `A gateway is a model backend: a place your requests go to be answered. It might be your own
-on-prem cluster, or a cloud provider you have chosen to allow. Your pipelines run *on* a gateway, so
-adding one is how you decide which models your organization can reach at all.
+      description: 'The model backends your pipelines run on — set them up once, and every pipeline reuses them.',
+      body: `A gateway is a model backend: a place your requests go to be answered. It might be a model
+cluster on your own nodes, or a cloud provider you have chosen to allow. Your pipelines run *on* a
+gateway, so setting one up once is how you decide which models your whole organization can reach —
+nobody wires up a model connection per app.
 
-![The Gateways surface — every model backend your pipelines can run on, with honest health and egress](/docs-shots/gateways-list.png)
+![The Gateways surface — every model backend your pipelines can run on, with honest health and class](/docs-shots/gateways-list.png)
 
 ## Why it matters
 
-The gateway is the one place model traffic flows through, so it is the one place you control where
-answers are generated and whether your data ever leaves the building. A gateway carries an **egress
-class** you can read at a glance: *data stays on-prem* (your own nodes) or *data leaves (cloud)*. That
-label is what your pipelines' routing leash keys off — a request tagged as sensitive can be kept on a
-"stays on-prem" gateway no matter who asks.
+The gateway is the one place model traffic flows through, so it is the one place to control where
+answers are generated. A gateway carries a **class** you can read at a glance: *on your own nodes* or
+*cloud*. That label is what your pipelines' routing rule keys off — set once, a request tagged as
+sensitive is kept on the model you approved, no matter who asks or which app made the call.
 
 ## How to use it
 
-Open **Gateways** from the sidebar. You get a card per backend showing its kind, egress class, default
+Open **Gateways** from the sidebar. You get a card per backend showing its kind, class, default
 model, whether it is enabled, and its live health.
 
-- **Add a gateway** — click **Add gateway**, then give it a name, a kind (on-prem cluster, OpenAI,
-  Anthropic, or an OpenAI-compatible provider), a base URL, and a default model. Cloud kinds need a
-  provider key, held in the [secrets](/docs/guides/secrets) vault, never in the record itself.
+- **Add a gateway** — click **Add gateway**, then give it a name, a kind (your own model cluster,
+  OpenAI, Anthropic, or an OpenAI-compatible provider), a base URL, and a default model. Cloud kinds
+  need a provider key, held in the [secrets](/docs/guides/secrets) vault, never in the record itself.
 - **Edit or disable** — open a gateway to change its endpoint, model, or credentials, or flip
   **Enabled** off to take it out of rotation without deleting it. A disabled gateway can't be picked by
   a pipeline.
@@ -40,23 +40,23 @@ model, whether it is enabled, and its live health.
   a known model. If a model isn't in the curated catalog, you'll see *spec unknown* rather than a
   guessed number — the console never invents a spec.
 
-![A gateway detail — endpoint, egress, model catalog, and the pipelines running on it](/docs-shots/gateway-detail.png)
+![A gateway detail — endpoint, class, model catalog, and the pipelines running on it](/docs-shots/gateway-detail.png)
 
 ## When to use it
 
 Add a gateway when you stand up a new model cluster, bring on a new region of nodes, or decide to
 allow a specific cloud provider for the use-cases your policy permits. A bank running KYC and loan
-work entirely on-prem might keep only its on-prem cluster enabled; a team allowed to use a cloud model
-for non-sensitive summarization would add and enable that provider, with the egress leash on its
-pipelines keeping customer data off it.
+work on its own models might keep only that cluster enabled; a team allowed to use a cloud model for
+non-sensitive summarization would add and enable that provider, with the routing rule on its pipelines
+keeping customer data on the approved model.
 
 ## How to check it worked
 
 - The new gateway appears on the **Gateways** list with an honest **health** read: *available*, or
   *degraded* with a node count (for example, "5 of 6 nodes up"), or *not configured* if it still needs
   a key. Health is probed live, not asserted.
-- Open the gateway and confirm the **egress** badge reads what you intend (*data stays on-prem* vs
-  *data leaves (cloud)*).
+- Open the gateway and confirm the **class** badge reads what you intend (*on your own nodes* vs
+  *cloud*).
 - The **Pipelines running on this gateway** panel lists every pipeline bound to it — proof it is now a
   backend your pipelines can pick.`,
     },
@@ -95,9 +95,9 @@ read-only chart.
 
 - **Overview** — the whole contract at a glance: its gateway, routing, data ceiling, policy and
   guardrail posture, quality, and its consumers. Start here.
-- **Gateway & Routing** — which gateway and model it runs on, plus the routing leash: a fallback model
-  and the egress rule (for example, *sensitive data → keep local*). Good means the leash matches the
-  data class the pipeline is allowed to touch.
+- **Gateway & Routing** — which gateway and model it runs on, plus the routing rule: a fallback model
+  and where each class of request may run (for example, *sensitive data → the approved model*). Good
+  means the rule matches the data class the pipeline is allowed to touch.
 - **Policy** — the effective access rules: your org defaults with this pipeline's overrides on top.
   Controls your org has **locked** can only be *tightened* here, never loosened — the badge tells you
   which is which. Every request through the pipeline is checked against the value shown.
@@ -110,7 +110,7 @@ read-only chart.
   user complains.
 - **Observability** — traces for the pipeline's requests: latency, tokens, and each stage of the run.
 - **Audit** — the tamper-evident record of every call through it, with the policy and guardrail
-  decisions and whether data left the box.
+  decisions and which model answered.
 - **Cost** — this pipeline's slice of spend, attributed to its gateway and model. Requests, tokens,
   and cost, keyed to the pipeline.
 - **API** — mint a key and get the endpoint to call the pipeline from outside (see
@@ -129,9 +129,9 @@ contract can only get tighter downstream, never looser.
 ## When to use it
 
 Build a pipeline whenever you have a governed way of calling models you want to reuse or prove. For a
-bank: a **KYC Verification** pipeline that may read the PAN and address domains and must stay on-prem;
-a **Loan Underwriting** pipeline that may read the applicant profile and bureau data; a **Fraud
-Screening** pipeline over transaction data. One pipeline per app or per department is perfectly fine —
+bank: a **KYC Verification** pipeline that may read the PAN and address domains and is pinned to an
+approved model; a **Loan Underwriting** pipeline that may read the applicant profile and bureau data;
+a **Fraud Screening** pipeline over transaction data. One pipeline per app or per department is perfectly fine —
 the pipeline is a hygiene unit, not a forced-sharing one.
 
 ## How to check it worked
