@@ -7,6 +7,8 @@ import {
   workflowToAppSpec,
   isSimpleAgent,
   filterSingleStepApps,
+  appNeedsDataSource,
+  unboundConnectorSteps,
 } from '../src/lib/app-model.ts';
 
 // PURE unit tests for the unified App model (Builder Epic #108, Phase 1A) — no DB, no network.
@@ -286,4 +288,62 @@ test('filterSingleStepApps is empty when there are no single-step apps', () => {
     edges: [{ from: 's1', to: 's2' }],
   });
   assert.deepEqual(filterSingleStepApps([twoStep]), []);
+});
+
+// ─── appNeedsDataSource / unboundConnectorSteps (save-with-gap #128) ──────────────────────────────
+// The pure "does this saved app still need a data source" rule the Input/detail banner reads. Derived
+// from the spec alone (no schema column) — a connector-query step with an empty domain binding.
+
+test('unboundConnectorSteps: returns each connector-query step with no domain binding', () => {
+  const app = simpleAgentApp({
+    steps: [
+      { id: 's1', label: 'Read claims', kind: 'connector-query', domain: '' },
+      { id: 's2', label: 'Read quota', kind: 'connector-query', domain: '   ' },
+      { id: 's3', label: 'Decide', kind: 'agent', inlineAgent: { systemPrompt: 'x', grounded: true } },
+      { id: 's4', label: 'Out', kind: 'output', sink: 'console' },
+    ],
+    edges: [
+      { from: 's1', to: 's2' },
+      { from: 's2', to: 's3' },
+      { from: 's3', to: 's4' },
+    ],
+  });
+  const unbound = unboundConnectorSteps(app);
+  assert.deepEqual(unbound.map((s) => s.id), ['s1', 's2']);
+});
+
+test('appNeedsDataSource: true when a connector-query step has no domain', () => {
+  const app = simpleAgentApp({
+    steps: [
+      { id: 's1', label: 'Read', kind: 'connector-query', domain: '' },
+      { id: 's2', label: 'Out', kind: 'output', sink: 'console' },
+    ],
+    edges: [{ from: 's1', to: 's2' }],
+  });
+  assert.equal(appNeedsDataSource(app), true);
+});
+
+test('appNeedsDataSource: false when every connector-query step is bound', () => {
+  const app = simpleAgentApp({
+    steps: [
+      { id: 's1', label: 'Read', kind: 'connector-query', domain: 'dom_claims' },
+      { id: 's2', label: 'Out', kind: 'output', sink: 'console' },
+    ],
+    edges: [{ from: 's1', to: 's2' }],
+  });
+  assert.equal(appNeedsDataSource(app), false);
+  assert.deepEqual(unboundConnectorSteps(app), []);
+});
+
+test('appNeedsDataSource: false for an app with no connector-query steps at all', () => {
+  // The common save-with-gap outcome: the compiler DROPPED the unbindable step, so the saved app is
+  // just agent + output — it does not "need a data source", it simply reads none. No banner.
+  const app = simpleAgentApp({
+    steps: [
+      { id: 's1', label: 'Decide', kind: 'agent', inlineAgent: { systemPrompt: 'x', grounded: true } },
+      { id: 's2', label: 'Out', kind: 'output', sink: 'console' },
+    ],
+    edges: [{ from: 's1', to: 's2' }],
+  });
+  assert.equal(appNeedsDataSource(app), false);
 });

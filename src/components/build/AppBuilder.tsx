@@ -181,6 +181,12 @@ export function AppBuilder({
     [gaps, spec],
   );
   const blockers = blockerCount(fixIts);
+  // Save-with-gap (#128): a source we couldn't wire from the description is an ADVISORY, not a
+  // blocker — the user can save and run, and add it later. Surface it in the save bar so the choice
+  // is honest (you're saving with a source still to wire) rather than silent.
+  const optionalSourceGaps = fixIts.filter(
+    (f) => f.severity === 'advisory' && f.action === 'wire-data-source',
+  ).length;
 
   const refreshDomains = useCallback(async () => {
     try {
@@ -386,6 +392,11 @@ export function AppBuilder({
                 <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
                   <Warning className="size-3.5" />
                   {validation.errors[0]}
+                </span>
+              ) : optionalSourceGaps > 0 ? (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <CheckCircle className="size-3.5 text-primary" />
+                  Ready to save — you can wire the data source later
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -678,29 +689,52 @@ function DescribePhase({
 }
 
 // ─── The fix-it panel — warnings as one-click actions ────────────────────────────────────────────
+// Two tiers, honestly separated (save-with-gap, #128):
+//   • BLOCKERS must be resolved before Save (a step that would error at run time — e.g. a step in the
+//     app with no source picked, or an agent with no instructions).
+//   • OPTIONAL items you can do now or later. A data source we couldn't wire from your words lands
+//     here: you can still save and run — the app just won't read that source until you add it, which
+//     you can do right here or from the app's screens anytime. This is what lets a first-time,
+//     non-technical user finish and save their app without setting up connectors first.
 function FixItPanel({ items, onAct }: { items: FixIt[]; onAct: (f: FixIt) => void }) {
   const blockers = items.filter((i) => i.severity === 'blocker');
   const advisories = items.filter((i) => i.severity === 'advisory');
+  // Optional items that still carry a one-click remedy (e.g. wire-data-source) get an action button;
+  // pure review notes stay as read-only bullets so nothing is hidden.
+  const optionalActions = advisories.filter((i) => i.action !== 'review');
+  const notes = advisories.filter((i) => i.action === 'review');
   return (
     <div className="rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-4">
       <div className="flex items-center gap-1.5">
         <Warning className="size-4 text-amber-600 dark:text-amber-500" weight="fill" />
         <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
           {blockers.length > 0
-            ? `${blockers.length} thing${blockers.length === 1 ? '' : 's'} to resolve`
-            : 'A few things to review'}
+            ? `${blockers.length} thing${blockers.length === 1 ? '' : 's'} to resolve before saving`
+            : 'You can save now — a few optional things to finish'}
         </span>
       </div>
       {blockers.length > 0 ? (
         <div className="mt-2.5 grid grid-cols-1 gap-2 lg:grid-cols-2">
           {blockers.map((f) => (
-            <FixItRow key={f.id} item={f} onAct={onAct} />
+            <FixItRow key={f.id} item={f} onAct={onAct} tone="blocker" />
           ))}
         </div>
       ) : null}
-      {advisories.length > 0 ? (
+      {optionalActions.length > 0 ? (
+        <div className="mt-2.5 space-y-2 border-t border-amber-500/20 pt-2.5">
+          <p className="text-[11px] text-amber-800 dark:text-amber-300/90">
+            Optional — you can save and run without these, and add them anytime:
+          </p>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {optionalActions.map((f) => (
+              <FixItRow key={f.id} item={f} onAct={onAct} tone="optional" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {notes.length > 0 ? (
         <ul className="mt-2.5 space-y-1 border-t border-amber-500/20 pt-2.5 text-[11px] text-amber-800 dark:text-amber-300/90">
-          {advisories.map((f) => (
+          {notes.map((f) => (
             <li key={f.id} className="flex gap-1.5">
               <span aria-hidden>•</span>
               <span>{f.title}</span>
@@ -712,7 +746,15 @@ function FixItPanel({ items, onAct }: { items: FixIt[]; onAct: (f: FixIt) => voi
   );
 }
 
-function FixItRow({ item, onAct }: { item: FixIt; onAct: (f: FixIt) => void }) {
+function FixItRow({
+  item,
+  onAct,
+  tone,
+}: {
+  item: FixIt;
+  onAct: (f: FixIt) => void;
+  tone: 'blocker' | 'optional';
+}) {
   const cta =
     item.action === 'wire-data-source'
       ? 'Wire a data source'
@@ -728,7 +770,12 @@ function FixItRow({ item, onAct }: { item: FixIt; onAct: (f: FixIt) => void }) {
       <span className="min-w-0 truncate text-xs text-foreground" title={item.title}>
         {item.title}
       </span>
-      <Button size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={() => onAct(item)}>
+      <Button
+        size="sm"
+        variant={tone === 'optional' ? 'outline' : 'default'}
+        className="h-7 shrink-0 gap-1 text-xs"
+        onClick={() => onAct(item)}
+      >
         <Icon className="size-3.5" />
         {cta}
       </Button>
