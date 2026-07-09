@@ -80,6 +80,26 @@ test('getModelSpec is case-insensitive and trims', () => {
   assert.equal(getModelSpec('nope'), undefined);
 });
 
+test('cloud flagship models: DeepSeek + GLM specs are present with real metadata', () => {
+  const dsChat = getModelSpec('deepseek-chat');
+  const dsReason = getModelSpec('deepseek-reasoner');
+  assert.equal(dsChat?.family, 'DeepSeek');
+  assert.equal(dsChat?.contextWindow, 131072); // 128K per DeepSeek API docs
+  assert.equal(dsReason?.family, 'DeepSeek');
+  assert.equal(dsReason?.contextWindow, 131072);
+
+  const glm46 = getModelSpec('glm-4.6');
+  const glm52 = getModelSpec('glm-5.2');
+  assert.equal(glm46?.family, 'GLM');
+  assert.equal(glm46?.contextWindow, 200000); // 200K per Z.AI GLM-4.6
+  assert.equal(glm46?.license, 'MIT');
+  assert.equal(glm52?.family, 'GLM');
+  assert.equal(glm52?.contextWindow, 1000000); // 1M per Z.AI GLM-5.2
+  // GLM is a real, grouped family in the picker.
+  const glmGroup = catalogByFamily().find((g) => g.family === 'GLM');
+  assert.ok(glmGroup && glmGroup.models.length >= 2);
+});
+
 test('catalog covers multiple families and modalities', () => {
   const families = new Set(MODEL_CATALOG.map((m) => m.family));
   assert.ok(families.size >= 4, `expected >=4 families, got ${families.size}`);

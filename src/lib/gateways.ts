@@ -28,6 +28,7 @@ import {
   type GatewayRow,
   type GatewayView,
   egressClassFor,
+  gatewayKindToProviderId,
   mergeGatewayHealth,
   validateMergedGateway,
 } from '@/lib/gateways-policy';
@@ -318,8 +319,9 @@ async function probeCloud(baseUrl: string): Promise<boolean> {
  */
 async function cloudSignal(kind: string): Promise<GatewayHealthSignal> {
   const statuses = cloudProviderStatuses(process.env as Record<string, string | undefined>);
-  // Map a gateway kind → the cloud-provider id it corresponds to. compat ≡ the generic 'compat' provider.
-  const providerId = kind === 'openai' ? 'openai' : kind === 'anthropic' ? 'anthropic' : 'compat';
+  // Map a gateway kind → the cloud-provider id it corresponds to (pure rule; DRY). on-prem never
+  // reaches here (handled by onPremSignal); any non-first-class kind falls back to the generic compat.
+  const providerId = gatewayKindToProviderId(kind) ?? 'compat';
   const s = statuses.find((p) => p.id === providerId);
   if (!s || !s.configured) {
     return { configured: false, reachable: false, status: 'unconfigured', detail: 'not configured' };

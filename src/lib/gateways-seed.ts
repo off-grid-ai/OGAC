@@ -16,8 +16,9 @@ export interface SampleGatewaySpec {
   defaultModel: string;
 }
 
-// The four sample gateways from the plan. baseUrl is left '' for well-known cloud kinds (the actual
-// endpoint lives in cloud-providers.ts env defaults); compat (OpenRouter) needs an explicit URL.
+// The sample gateways every deployment starts with — one per first-class kind (on-prem + the cloud
+// providers openai/anthropic/deepseek/zhipu) plus OpenRouter as a `compat` example. baseUrl carries
+// the well-known endpoint for reference; compat (OpenRouter) needs an explicit URL (no default).
 export const SAMPLE_GATEWAYS: readonly SampleGatewaySpec[] = [
   {
     key: 'onprem-cluster',
@@ -39,6 +40,20 @@ export const SAMPLE_GATEWAYS: readonly SampleGatewaySpec[] = [
     kind: 'anthropic',
     baseUrl: 'https://api.anthropic.com/v1',
     defaultModel: 'claude-3-5-haiku-latest',
+  },
+  {
+    key: 'deepseek',
+    name: 'DeepSeek',
+    kind: 'deepseek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+  },
+  {
+    key: 'zhipu',
+    name: 'Zhipu AI (GLM)',
+    kind: 'zhipu',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    defaultModel: 'glm-4.6',
   },
   {
     key: 'openrouter',
