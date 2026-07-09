@@ -3,6 +3,7 @@ import { getMdm } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
 import type { DeviceCommand } from '@/lib/fleetdm';
 import { queueKill } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +70,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Only the destructive lock/wipe map to the existing kill switch; unlock/refetch have no
   // first-party equivalent (there is no osquery agent to re-collect or an OS lock to reverse).
   if (command === 'lock' || command === 'wipe') {
-    const cmd = await queueKill(id);
+    // Tenant-scoped: the device must belong to the caller's org (destructive cross-tenant IDOR — P0).
+    const cmd = await queueKill(id, await currentOrgId());
     if (!cmd) return NextResponse.json({ error: 'unknown device' }, { status: 404 });
     return NextResponse.json({ backend: mdm.meta.id, command, queued: cmd }, { status: 202 });
   }

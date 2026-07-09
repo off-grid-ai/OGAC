@@ -19,12 +19,16 @@ import { type ModuleId } from '@/modules/registry';
 // `capabilities` (module ids), so granting a custom role module access takes effect.
 export async function resolveEffectivePermissions(
   role: string | undefined,
+  orgId?: string,
 ): Promise<EffectivePermissions> {
   const r = role ?? 'viewer';
   if ((BUILTIN_ROLES as readonly string[]).includes(r) || r === 'compliance') {
     return { role: r, baseRole: r, isCustom: false, modules: new Set(allModuleIds()) };
   }
-  const custom = await getCustomRoleByName(r);
+  // Custom-role resolution is tenant-scoped (SECURITY WAVE 1): a role name resolves to the caller's
+  // org definition only (undefined ⇒ getCustomRoleByName defaults to DEFAULT_ORG). Prevents a user
+  // in org A from inheriting org B's same-named role's capabilities.
+  const custom = await getCustomRoleByName(r, orgId);
   if (!custom) {
     // Unknown role → fail closed to a viewer baseline (no admin plane).
     return { role: r, baseRole: 'viewer', isCustom: false, modules: baselineModules('viewer') };
@@ -39,6 +43,9 @@ export async function resolveEffectivePermissions(
 
 // The built-in role whose ABAC/capability rules apply to this session — custom roles inherit their
 // `based_on`. Used by the RBAC/ABAC gates so a custom role is governed by its base role's rules.
-export async function effectiveBaseRole(role: string | undefined): Promise<string> {
-  return (await resolveEffectivePermissions(role)).baseRole;
+export async function effectiveBaseRole(
+  role: string | undefined,
+  orgId?: string,
+): Promise<string> {
+  return (await resolveEffectivePermissions(role, orgId)).baseRole;
 }

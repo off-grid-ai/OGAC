@@ -32,17 +32,21 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const created = await createRoutingRule({
-    name: b!.name as string,
-    priority: typeof b!.priority === 'number' ? (b!.priority as number) : 100,
-    attribute: b!.attribute as string,
-    operator: b!.operator as string,
-    value: b!.value as string,
-    action: b!.action as string,
-    model: (b!.model as string | undefined) ?? '',
-    fallback: (b!.fallback as string | undefined) ?? '',
-  });
-  auditFromSession(gate, await currentOrgId(), {
+  const org = await currentOrgId();
+  const created = await createRoutingRule(
+    {
+      name: b!.name as string,
+      priority: typeof b!.priority === 'number' ? (b!.priority as number) : 100,
+      attribute: b!.attribute as string,
+      operator: b!.operator as string,
+      value: b!.value as string,
+      action: b!.action as string,
+      model: (b!.model as string | undefined) ?? '',
+      fallback: (b!.fallback as string | undefined) ?? '',
+    },
+    org,
+  );
+  auditFromSession(gate, org, {
     action: 'routing.change',
     resource: `routing:${created.id}`,
     outcome: 'ok',

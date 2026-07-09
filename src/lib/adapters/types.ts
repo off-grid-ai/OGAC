@@ -290,7 +290,10 @@ export interface MdmDevice {
 // Types come from the pure-logic module so the port stays the single contract.
 export interface MdmPort {
   meta: AdapterMeta;
-  listDevices(): Promise<MdmDevice[]>;
+  // `orgId` (optional) scopes the first-party registry to a tenant (SECURITY WAVE 1). The FleetDM
+  // backend is a separate external inventory and ignores it, falling back to the org-scoped
+  // first-party registry when unreachable.
+  listDevices(orgId?: string): Promise<MdmDevice[]>;
   health(): Promise<boolean>;
   // True when this backend can service the live-query / software / policy methods below.
   supportsFleet?: boolean;
