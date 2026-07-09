@@ -44,6 +44,8 @@ export interface StepState {
   detail?: string;
   /** For an agent step: the child agentRuns.id, so the run is traceable/lineage-linked. */
   childRunId?: string;
+  /** When intercepted in SHADOW mode: what the step WOULD have performed (sink/recipient/preview). */
+  wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   startedAt?: string;
   finishedAt?: string;
 }
@@ -169,6 +171,7 @@ export interface StepResultInput {
   refs?: { name: string; position?: number }[];
   detail?: string;
   childRunId?: string;
+  wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
 }
 
 // ─── deriveRunStatus — the aggregate run status from the per-step array (pure) ────────────────────
@@ -205,6 +208,7 @@ export function applyStepResult(
       ...(result.refs !== undefined ? { refs: result.refs } : {}),
       ...(result.detail !== undefined ? { detail: result.detail } : {}),
       ...(result.childRunId !== undefined ? { childRunId: result.childRunId } : {}),
+      ...(result.wouldPerform !== undefined ? { wouldPerform: result.wouldPerform } : {}),
     };
     if (result.status === 'running' && !s.startedAt) next.startedAt = now;
     if (result.status === 'done' || result.status === 'error') {

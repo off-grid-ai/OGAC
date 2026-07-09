@@ -120,6 +120,9 @@ async function trySubmitDurable(
     // (resolveConsumerPipeline → resolveContract); carry its pipelineId so the workflow re-resolves
     // the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy allow.
     pipelineId: ctx.contract?.pipelineId ?? null,
+    // BFSI blast-radius — carry the resolved run mode so the WORKER intercepts side-effecting sinks
+    // on a shadow run identically to the inline path. Default 'live' (additive).
+    mode: ctx.mode ?? 'live',
   };
   try {
     const client = await temporalClient(cfg);

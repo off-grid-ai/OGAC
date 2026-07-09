@@ -9,6 +9,8 @@ import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-pol
 import { resolveContract } from '@/lib/pipeline-contract';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
+import { evaluateBlastRadius, resolveRunMode, type RunMode } from '@/lib/app-run-controls';
+import { getControls, usageFor } from '@/lib/app-run-controls-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +32,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const app = await getApp(id, orgId);
   if (!app) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const body = (await req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
+  const body = (await req.json().catch(() => ({}))) as {
+    input?: Record<string, unknown>;
+    mode?: RunMode;
+  };
   const input = body.input && typeof body.input === 'object' ? body.input : {};
+  const requestedMode: RunMode | undefined = body.mode === 'shadow' ? 'shadow' : undefined;
 
   // Per-app ACCESS CONTROL — the WHO/UNDER-WHAT-CONDITIONS gate, layered before the pipeline
   // contract. The run input doubles as the ABAC request attributes (e.g. amount thresholds). Denied →
@@ -54,6 +60,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
   }
 
+  // BLAST-RADIUS — the per-app safety dials, evaluated at RUN START (BEFORE any step executes). The
+  // kill-switch (disabled), daily run cap, and spend cap are the pure evaluateBlastRadius decision over
+  // the app's controls + the live usage counters (runs-today from app_runs, spend-today from the audit
+  // ledger). Over-cap / disabled ⇒ 429 + a clear reason, audited run.denied. Absent controls row ⇒
+  // DEFAULT_CONTROLS (no caps, enabled) ⇒ behaves exactly as before (additive). Composes WITH the
+  // access + pipeline-contract gates above — an ADDITIONAL gate, not a replacement.
+  const controls = await getControls(id, orgId);
+  const usage = await usageFor(id, orgId, 0);
+  const blast = evaluateBlastRadius(controls, usage);
+  if (!blast.allow) {
+    auditFromSession(gate, orgId, {
+      action: 'app.run.denied',
+      resource: `app:${id} blast-radius:${blast.code}`,
+      outcome: 'blocked',
+    });
+    return NextResponse.json(
+      { error: 'run denied by blast-radius controls', code: blast.code, reason: blast.reason },
+      { status: 429 },
+    );
+  }
+
+  // SHADOW MODE — the effective run mode (most-restrictive-wins): the app's shadowDefault forces
+  // shadow; else an explicit ?mode=shadow request forces it; else live. In shadow the executor
+  // intercepts side-effecting sinks (email/report/whatsapp) and records what they WOULD do.
+  const runMode = resolveRunMode(requestedMode, controls);
+
   const runId = newAppRunId();
 
   // PA-16 — resolve the bound-pipeline CONTRACT this run enforces (data allowlist + egress leash +
@@ -69,6 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     actor: gate.user.email ?? undefined,
     runId,
     contract,
+    mode: runMode,
   });
 
   // Tag the run audit with the resolved pipeline so the per-pipeline audit/FinOps lens lights up. The
@@ -86,7 +119,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   //   • inline  → the full outcome (steps + aggregate) spread in, as before, plus the mode/note so a
   //     HITL app that fell back to inline is honestly flagged (its human step returns awaiting_human
   //     and can't be resumed on the inline path).
-  const base = { object: 'app_run', runId: handle.runId, mode: handle.mode, note: handle.note };
+  const base = {
+    object: 'app_run',
+    runId: handle.runId,
+    mode: handle.mode,
+    runMode,
+    note: handle.note,
+  };
   if (handle.outcome) {
     return NextResponse.json({ ...base, ...handle.outcome });
   }

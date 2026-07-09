@@ -80,6 +80,9 @@ export async function executeStepActivity(
     actor: input.actor?.id ?? input.caller,
     runId: input.runId,
     contract,
+    // Thread the run mode so a SHADOW durable run's side-effecting sinks NO-OP on the worker path
+    // identically to the inline path (executeStep applies the pure shouldIntercept per step).
+    mode: input.mode ?? 'live',
   };
   return executeStep(spec, step, priorResults, ctx, deps);
 }

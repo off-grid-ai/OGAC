@@ -26,6 +26,7 @@ function toRowSteps(steps: StepState[]): AppRunRow['steps'] {
     refs: (s.refs ?? []).map((r) => r.name),
     detail: s.detail,
     childRunId: s.childRunId,
+    wouldPerform: s.wouldPerform,
     startedAt: s.startedAt,
     finishedAt: s.finishedAt,
   }));

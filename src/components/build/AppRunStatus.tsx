@@ -185,10 +185,23 @@ function StepRow({ step, index }: { step: AppRunStepRow; index: number }) {
           <span className="text-xs font-medium text-foreground">{step.label}</span>
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{step.kind}</span>
           <StatusBadge status={step.status} small />
+          {step.wouldPerform ? (
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              SHADOW · would {step.wouldPerform.sink}
+            </span>
+          ) : null}
           <span className="ml-auto text-[10px] text-muted-foreground">
             {describeDuration(step.startedAt, step.finishedAt)}
           </span>
         </div>
+        {step.wouldPerform ? (
+          <div className="mt-1 rounded border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
+            <span className="font-medium text-amber-600 dark:text-amber-400">Would have {step.wouldPerform.sink}</span>
+            {step.wouldPerform.recipient ? <span className="text-muted-foreground"> → {step.wouldPerform.recipient}</span> : null}
+            {step.wouldPerform.subject ? <span className="text-muted-foreground"> · &ldquo;{step.wouldPerform.subject}&rdquo;</span> : null}
+            <span className="text-muted-foreground"> (not sent — dry run)</span>
+          </div>
+        ) : null}
         {step.outcome ? (
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-foreground">
             {step.outcome}

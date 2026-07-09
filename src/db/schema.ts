@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -898,6 +898,13 @@ export const appRuns = pgTable('app_runs', {
       refs?: string[];
       detail?: string;
       childRunId?: string; // agent-step child agentRuns.id, for lineage
+      // SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered).
+      wouldPerform?: {
+        sink: string;
+        recipient?: string;
+        subject?: string;
+        payloadPreview: string;
+      };
       startedAt?: string;
       finishedAt?: string;
     }[]
@@ -934,6 +941,30 @@ export const dataDomains = pgTable('data_domains', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);
+
+// ─── App run controls (SHADOW MODE + BLAST-RADIUS) — the BFSI trust dials ──────
+// Per-app safety controls a cautious operator sets so an autonomous app/agent can be trusted to act:
+//   • enabled          — kill-switch. false ⇒ the app is DISABLED, every run denied at run start.
+//   • shadowDefault    — force SHADOW mode on every run (side-effecting sinks NO-OP + record
+//                        "wouldPerform") until the operator arms it live.
+//   • maxRunsPerDay    — daily run cap (null ⇒ no cap).
+//   • spendCapUsd      — USD spend cap (null ⇒ no cap), measured per `spendCapScope` ('day' | 'run').
+// A sibling row to `apps` (one-to-one by appId), self-migrated by app-run-controls-store.ts. Absent
+// row ⇒ DEFAULT_CONTROLS (enabled, live, no caps) — the app behaves EXACTLY as before (additive).
+// The pure decision layer is app-run-controls.ts (evaluateBlastRadius / resolveRunMode / shadow-intercept).
+export const appRunControls = pgTable('app_run_controls', {
+  appId: text('app_id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  enabled: boolean('enabled').notNull().default(true),
+  shadowDefault: boolean('shadow_default').notNull().default(false),
+  maxRunsPerDay: integer('max_runs_per_day'),
+  spendCapUsd: doublePrecision('spend_cap_usd'),
+  spendCapScope: text('spend_cap_scope').notNull().default('day'), // 'day' | 'run'
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('app_run_controls_org_idx').on(t.orgId)]);
+
+export type AppRunControlsRow = typeof appRunControls.$inferSelect;
+export type NewAppRunControlsRow = typeof appRunControls.$inferInsert;
 
 export type App = typeof apps.$inferSelect;
 export type NewApp = typeof apps.$inferInsert;

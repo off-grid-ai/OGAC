@@ -6,7 +6,15 @@
 // decides which tab a URL selects, and builds the tab hrefs. No React, no router — unit-testable in
 // test/app-lifecycle.test.ts. The AppLifecycleNav component is a thin renderer over `lifecycleTabs`.
 
-export type AppTab = 'build' | 'input' | 'runs' | 'review' | 'reports' | 'quality' | 'access';
+export type AppTab =
+  | 'build'
+  | 'input'
+  | 'runs'
+  | 'review'
+  | 'reports'
+  | 'quality'
+  | 'access'
+  | 'controls';
 
 export interface LifecycleTab {
   tab: AppTab;
@@ -26,6 +34,11 @@ const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
   { tab: 'reports', label: 'Reports', hint: 'Outcomes over time' },
   { tab: 'quality', label: 'Quality', hint: "This pipeline's evals, golden set, and drift — run and gate on them" },
   { tab: 'access', label: 'Access', hint: 'Who may run, trigger, and approve this — and to what limit' },
+  {
+    tab: 'controls',
+    label: 'Safety',
+    hint: 'Shadow-mode dry-runs, daily run + spend caps, and the kill-switch — run it safely before it acts',
+  },
 ];
 
 // ─── appTabHref — the canonical URL for one app tab ──────────────────────────────────────────────
@@ -52,6 +65,15 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
   const rest = pathname.slice(base.length).replace(/^\/+/, '');
   const seg = rest.split('/')[0] ?? '';
   if (!seg) return 'build';
-  const known: AppTab[] = ['build', 'input', 'runs', 'review', 'reports', 'quality', 'access'];
+  const known: AppTab[] = [
+    'build',
+    'input',
+    'runs',
+    'review',
+    'reports',
+    'quality',
+    'access',
+    'controls',
+  ];
   return (known as string[]).includes(seg) ? (seg as AppTab) : 'build';
 }
