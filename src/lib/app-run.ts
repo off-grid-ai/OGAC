@@ -272,7 +272,9 @@ export function defaultDeps(): AppRunDeps {
         model: inline.model,
         tools: inline.tools,
         grounded: inline.grounded,
-      });
+        // Materialize into the RUN's org — else the agent lands in DEFAULT_ORG and the org-scoped
+        // runAgent(…, ctx.orgId) can't resolve it ("unknown agent") on any non-default tenant.
+      }, orgId);
       // Cache back in-memory (this-run reuse) and persist (cross-run dedup).
       step.agentId = created.id;
       if (spec.id) {
