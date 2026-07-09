@@ -41,6 +41,12 @@ import {
 } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
+import {
+  emailEgressVerdict,
+  emailMaskingRequired,
+  maskEmailForSend,
+  selectEmailProvider,
+} from '@/lib/email-sink-governance';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 
@@ -175,12 +181,15 @@ export interface AppRunDeps {
    * when SMTP is unconfigured it returns { configured:false } and the sink records "not configured" —
    * never a fake success.
    */
-  sendEmail: (msg: {
-    to: string;
-    subject: string;
-    text: string;
-    attachments?: { filename: string; contentType: string; bytes: Uint8Array }[];
-  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  sendEmail: (
+    msg: {
+      to: string;
+      subject: string;
+      text: string;
+      attachments?: { filename: string; contentType: string; bytes: Uint8Array }[];
+    },
+    provider?: import('@/lib/email-sink-governance').EmailProvider,
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -301,7 +310,13 @@ export function defaultDeps(): AppRunDeps {
         },
       };
     },
-    async sendEmail(msg) {
+    async sendEmail(msg, provider = 'smtp') {
+      if (provider === 'resend') {
+        const { sendViaResend } = await import('@/lib/adapters/sinks/email-resend');
+        // The run path already masked the body + cleared the egress leash; shape as HTML + tag the send.
+        const res = await sendViaResend(msg, { html: true, tags: { source: 'offgrid_app_run' } });
+        return { ok: res.ok, configured: res.configured, reason: res.reason };
+      }
       const { sendEmail } = await import('@/lib/adapters/sinks/email-smtp');
       return sendEmail(msg);
     },
@@ -627,9 +642,56 @@ async function executeOutputStep(
 
   if (step.sink === 'email') {
     const to = typeof step.config?.to === 'string' ? step.config.to : '';
-    const subject =
+    let subject =
       (typeof step.config?.subject === 'string' && step.config.subject) ||
       `${spec.title || 'App'} run ${ctx.runId}`;
+    const contract = ctx.contract ?? null;
+    const provider = selectEmailProvider(step.config);
+    const enforceCtx = { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract };
+
+    // GOVERNANCE 1 — EGRESS LEASH. A cloud provider (Resend) may only deliver if the bound pipeline's
+    // egress leash permits leaving the box; a local-only pipeline must not fan its result out to a
+    // third-party mailer. SMTP is air-gapped → always allowed. A block ⇒ audited deny, honest step.
+    const egress = emailEgressVerdict(contract, provider);
+    if (!egress.allow) {
+      auditEnforcement(enforceCtx, 'pipeline.egress.block', `sink:email:${provider}`, 'blocked', egress.reason);
+      return errorResult(step, `email delivery blocked by pipeline egress leash: ${egress.reason}`);
+    }
+
+    // GOVERNANCE 2 — PII MASK BEFORE SEND. When the org floor / pipeline overlay requires masking, the
+    // OUTBOUND subject + body are redacted BEFORE they cross the wire (mirrors the model-call path,
+    // reusing the ONE pure applyPiiEscalation authority). Best-effort: a detector outage sends as-is
+    // for the air-gapped SMTP sink, but a CLOUD send is HELD when masking is required and can't run.
+    let text = outcome;
+    const requireMask = emailMaskingRequired(contract);
+    if (requireMask) {
+      try {
+        const [scanSubject, scanText] = await Promise.all([
+          deps.scanPii(subject, ctx.orgId),
+          deps.scanPii(text, ctx.orgId),
+        ]);
+        const masked = maskEmailForSend(subject, text, true, scanSubject, scanText);
+        subject = masked.subject;
+        text = masked.text;
+        if (masked.masked) {
+          auditEnforcement(
+            enforceCtx,
+            'pipeline.pii.mask',
+            `sink:email:${provider}`,
+            'redacted',
+            `masked PII in email subject/body before ${provider} send`,
+          );
+        }
+      } catch (e) {
+        if (provider === 'resend') {
+          // Refuse to leak unmasked PII to a cloud mailer when the detector is down — honest deny.
+          auditEnforcement(enforceCtx, 'pipeline.pii.mask', `sink:email:${provider}`, 'error', 'PII detector unavailable — cloud send held');
+          return errorResult(step, `email send held: PII masking required but the detector is unavailable (${(e as Error).message})`);
+        }
+        /* SMTP (air-gapped): the body stays on-prem — proceed unmasked (leash guarantee holds) */
+      }
+    }
+
     // If a prior report step attached a PDF, include the freshly-rendered report as an attachment.
     let attachments: { filename: string; contentType: string; bytes: Uint8Array }[] | undefined;
     if (step.config?.attachReport === true) {
@@ -640,7 +702,7 @@ async function executeOutputStep(
         /* report render failed — send the text body without the attachment (honest degrade) */
       }
     }
-    const result = await deps.sendEmail({ to, subject, text: outcome, attachments });
+    const result = await deps.sendEmail({ to, subject, text, attachments }, provider);
     if (!result.configured) {
       // Not a failure of the run — the run's outcome is available; delivery is simply not set up.
       // Recorded HONESTLY as "not configured", never a fake success.
@@ -649,18 +711,18 @@ async function executeOutputStep(
         kind: 'output',
         status: 'done',
         output: outcome,
-        detail: `sink: email — NOT CONFIGURED (${result.reason}). Outcome available, not sent.`,
+        detail: `sink: email (${provider}) — NOT CONFIGURED (${result.reason}). Outcome available, not sent.`,
       };
     }
     if (!result.ok) {
-      return errorResult(step, `email sink failed: ${result.reason}`);
+      return errorResult(step, `email sink (${provider}) failed: ${result.reason}`);
     }
     return {
       stepId: step.id,
       kind: 'output',
       status: 'done',
       output: outcome,
-      detail: `sink: email — ${result.reason}`,
+      detail: `sink: email (${provider}) — ${result.reason}`,
     };
   }
 

@@ -125,6 +125,9 @@ export function sidebarActiveIdFor(id: ModuleId): ModuleId | undefined {
 // Longest-prefix wins (checked before falling back to module-route matching).
 const PATH_ALIASES: { prefix: string; moduleId: ModuleId }[] = [
   { prefix: '/build/apps', moduleId: 'studio' },
+  // Email & messaging management (Resend send + sending-domain verify + inbound) lives under
+  // /operations/messaging and gates on the `config` module — keep the Operations → Config row lit.
+  { prefix: '/operations/messaging', moduleId: 'config' },
 ];
 
 // Resolve which sidebar row should be active for a URL, purely — no React, no router. First tries
