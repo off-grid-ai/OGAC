@@ -134,6 +134,17 @@ CREATE INDEX IF NOT EXISTS erasure_tombstones_status_idx ON erasure_tombstones (
 ALTER TABLE connectors ADD COLUMN IF NOT EXISTS secret_ref text;
 ```
 
+**Security Wave 2 tenant-isolation (2026-07-09, #218 wave 2) — PROMPTS / EVALS+GOLDEN / ANALYTICS RULES.** Closed a cross-tenant read+write leak: the prompt library, golden cases, eval definitions, and analytics alert rules / saved views were queried WITHOUT an `org_id` filter, so every tenant could list/get/edit/delete every other tenant's rows (an 'org'-visibility prompt leaked to ALL tenants; a guessed id let one tenant mutate another's). Each surface is now org-scoped in `src/lib` (reads filter on `org_id`, writes stamp the caller's org, update/delete match on `(id AND org_id)`), threaded from the thin routes via `currentOrgId()`. All columns self-migrate on first use (idempotent `ADD COLUMN IF NOT EXISTS` in each module's `ensure*` fn: `prompts.ts`, `evals.ts`, `eval-defs.ts`, `analytics-rules.ts`), so a normal deploy applies them with no manual step. To apply eagerly via psql (`docker exec -i <pg> psql -U offgrid -d offgrid`), replay the reviewed migration `deploy/onprem/migrations/wave2-prompts-analytics-evals-isolation.sql` (guarded on table existence, safe to re-run):
+
+```sql
+-- prompt_library / golden_cases: org_id pre-existed (Wave 1 / earlier); Wave 2 fixes the QUERIES + adds indexes.
+-- eval_definitions / analytics_alert_rules / analytics_saved_views: NEW org_id (had none).
+ALTER TABLE eval_definitions      ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+ALTER TABLE analytics_alert_rules ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+ALTER TABLE analytics_saved_views ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+-- (+ org indexes; full guarded SQL in the migration file)
+```
+
 **Worker restart is required on any deploy that touches a run path** (`agent-run`/`app-run`/`chat` activities) — `next start` reload alone does NOT reload the Temporal workers. They are launchd-managed on S1; restart with:
 
 ```sh

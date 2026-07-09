@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { goldenCases } from '@/db/schema';
 import { searchDocuments } from '@/lib/brain';
@@ -126,27 +126,35 @@ function toGoldenCase(r: GoldenRow): GoldenCase {
 const GOLDEN_COLS = sql`id, name, query, expected, suite, app_id, pipeline_id`;
 
 // Filter — associate by the CORRECTED pipeline_id OR the legacy app_id (see EvalDefFilter). A bare
-// string arg is a legacy appId (back-compat with the shipped app Quality tab).
+// string arg is a legacy appId (back-compat with the shipped app Quality tab). `orgId`, when set, is
+// the TENANT scope: it is ANDed onto every list/get so a tenant never sees another tenant's golden
+// cases (Security Wave 2 — before this, list/get were unscoped and leaked across orgs).
 export interface GoldenFilter {
   appId?: string | null;
   pipelineId?: string | null;
+  orgId?: string;
 }
 
+// Build the WHERE clause from the tenant scope + the association filter, ANDed together so a
+// per-tenant list can additionally be narrowed to a pipeline/app. Returns `WHERE …` or empty.
 function goldenWhere(filter: GoldenFilter) {
+  const conds: ReturnType<typeof sql>[] = [];
+  if (filter.orgId !== undefined) conds.push(sql`org_id = ${filter.orgId}`);
   if (filter.pipelineId !== undefined) {
-    return filter.pipelineId === null
-      ? sql`WHERE pipeline_id IS NULL AND app_id IS NULL`
-      : sql`WHERE pipeline_id = ${filter.pipelineId}`;
+    conds.push(
+      filter.pipelineId === null
+        ? sql`pipeline_id IS NULL AND app_id IS NULL`
+        : sql`pipeline_id = ${filter.pipelineId}`,
+    );
+  } else if (filter.appId !== undefined) {
+    conds.push(filter.appId === null ? sql`app_id IS NULL` : sql`app_id = ${filter.appId}`);
   }
-  if (filter.appId !== undefined) {
-    return filter.appId === null ? sql`WHERE app_id IS NULL` : sql`WHERE app_id = ${filter.appId}`;
-  }
-  return sql``;
+  return conds.length === 0 ? sql`` : sql`WHERE ${sql.join(conds, sql` AND `)}`;
 }
 
 // List golden cases. Accepts EITHER the legacy `appId` string|null (back-compat) OR a GoldenFilter.
 // `{pipelineId}` filters to a pipeline's golden set; `{pipelineId:null}` returns the org-wide library;
-// omitting the arg returns ALL (the global view).
+// `{orgId}` scopes to a tenant; omitting all returns ALL (the internal global view).
 export async function listGoldenCases(arg?: string | null | GoldenFilter): Promise<GoldenCase[]> {
   await ensureEvalsSchema();
   const filter: GoldenFilter =
@@ -157,19 +165,25 @@ export async function listGoldenCases(arg?: string | null | GoldenFilter): Promi
   return rows.map(toGoldenCase);
 }
 
-export async function getGoldenCase(id: string): Promise<GoldenCase | null> {
+// Get one golden case. `orgId`, when provided, scopes the lookup so a case id belonging to another
+// tenant resolves to null (no cross-tenant read/edit/delete via a guessed id).
+export async function getGoldenCase(id: string, orgId?: string): Promise<GoldenCase | null> {
   await ensureEvalsSchema();
+  const orgCond = orgId === undefined ? sql`` : sql` AND org_id = ${orgId}`;
   const { rows } = await db.execute<GoldenRow>(
-    sql`SELECT ${GOLDEN_COLS} FROM golden_cases WHERE id = ${id} LIMIT 1;`,
+    sql`SELECT ${GOLDEN_COLS} FROM golden_cases WHERE id = ${id}${orgCond} LIMIT 1;`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
 
 // Attach a golden case to a pipeline (`pipelineId`) and/or app (`appId`, legacy). Either/both null ⇒
-// an org-wide library case. A bare string arg is a legacy appId (back-compat).
+// an org-wide library case. A bare string arg is a legacy appId (back-compat). `orgId` STAMPS the
+// tenant that owns the row (defaults to the shared 'default' org for internal callers) so it is only
+// ever visible to that tenant.
 export interface AddGoldenTarget {
   appId?: string | null;
   pipelineId?: string | null;
+  orgId?: string;
 }
 
 export async function addGoldenCase(
@@ -181,33 +195,44 @@ export async function addGoldenCase(
     target === null || typeof target === 'string' ? { appId: target } : target;
   const appId = t.appId ?? null;
   const pipelineId = t.pipelineId ?? null;
+  const orgId = t.orgId ?? DEFAULT_ORG;
   const id = `gc_${randomUUID().slice(0, 6)}`;
   const { rows } = await db.execute<GoldenRow>(
-    sql`INSERT INTO golden_cases (id, name, query, expected, suite, app_id, pipeline_id)
-        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite}, ${appId}, ${pipelineId})
+    sql`INSERT INTO golden_cases (id, name, query, expected, suite, app_id, pipeline_id, org_id)
+        VALUES (${id}, ${draft.name}, ${draft.query}, ${draft.expected}, ${draft.suite}, ${appId}, ${pipelineId}, ${orgId})
         RETURNING ${GOLDEN_COLS};`,
   );
   return toGoldenCase(rows[0]);
 }
 
+// Update a golden case. `orgId`, when provided, scopes the UPDATE so a tenant cannot edit another
+// tenant's case even with its id (the WHERE matches no row → returns null → route 404s).
 export async function updateGoldenCase(
   id: string,
   draft: GoldenCaseDraft,
+  orgId?: string,
 ): Promise<GoldenCase | null> {
   await ensureEvalsSchema();
+  const orgCond = orgId === undefined ? sql`` : sql` AND org_id = ${orgId}`;
   const { rows } = await db.execute<GoldenRow>(
     sql`UPDATE golden_cases
         SET name = ${draft.name}, query = ${draft.query}, expected = ${draft.expected},
             suite = ${draft.suite}, updated_at = now()
-        WHERE id = ${id}
+        WHERE id = ${id}${orgCond}
         RETURNING ${GOLDEN_COLS};`,
   );
   return rows[0] ? toGoldenCase(rows[0]) : null;
 }
 
-export async function deleteGoldenCase(id: string): Promise<void> {
+// Delete a golden case. `orgId`, when provided, scopes the DELETE so a tenant cannot delete another
+// tenant's case with a guessed id.
+export async function deleteGoldenCase(id: string, orgId?: string): Promise<void> {
   await ensureEvalsSchema();
-  await db.delete(goldenCases).where(eq(goldenCases.id, id));
+  if (orgId === undefined) {
+    await db.delete(goldenCases).where(eq(goldenCases.id, id));
+    return;
+  }
+  await db.delete(goldenCases).where(and(eq(goldenCases.id, id), eq(goldenCases.orgId, orgId)));
 }
 
 interface EvalRunRow {
@@ -315,7 +340,7 @@ async function evalCase(c: GoldenCase): Promise<EvalResult> {
 
 export async function runEval(orgId: string = DEFAULT_ORG): Promise<EvalRun> {
   await ensureEvalsSchema();
-  const cases = await listGoldenCases();
+  const cases = await listGoldenCases({ orgId });
   const results: EvalResult[] = [];
   for (const c of cases) {
     results.push(await evalCase(c));
