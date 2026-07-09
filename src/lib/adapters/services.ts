@@ -139,6 +139,23 @@ export const GUARDRAIL_ENTRIES: RegEntry[] = [
     },
     health: ping(env.OFFGRID_HTTP_GUARDRAIL_URL),
   },
+  {
+    // LLM Guard (Protect AI) — a NAMED, MIT self-hosted scanner suite on the same seam. Behavior
+    // lives in the PiiPort `llmGuardPii` (adapters/guardrail-provider.ts) — selected via
+    // OFFGRID_ADAPTER_GUARDRAILS=llm-guard; this entry surfaces it in the Integrations UI + reports
+    // live health (GET /healthz). Shares OFFGRID_HTTP_GUARDRAIL_URL/_API_KEY with the generic seam.
+    meta: {
+      id: 'llm-guard',
+      capability: 'guardrails',
+      vendor: 'LLM Guard (Protect AI)',
+      license: 'MIT',
+      render: 'headless',
+      embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
+      description:
+        'Self-hosted LLM Guard scanners — PII/Anonymize, Secrets, Toxicity, Bias, BanTopics, PromptInjection, Language, Regex, TokenLimit — behind the checks port. POSTs to /analyze/prompt, reads {is_valid, scanners, sanitized_prompt}. Configure OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api base) + _API_KEY (AUTH_TOKEN). Falls back to the regex floor when unset or unreachable.',
+    },
+    health: ping(env.OFFGRID_HTTP_GUARDRAIL_URL, '/healthz'),
+  },
 ];
 
 export const RETRIEVAL_ENTRIES: RegEntry[] = [

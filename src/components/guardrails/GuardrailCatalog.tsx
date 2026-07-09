@@ -44,6 +44,7 @@ import { enableGuardrailOnPipeline, pipelinesEnforcingGuardrail } from '@/lib/pi
 const KIND_LABEL: Record<GuardrailKind, string> = {
   'presidio-entity': 'PII / PHI detection',
   'guardrails-validator': 'Behaviour check',
+  'llm-guard-scanner': 'LLM Guard scanner',
 };
 
 const AVAIL_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
@@ -181,7 +182,7 @@ export function GuardrailCatalog({
           >
             All
           </Button>
-          {(['presidio-entity', 'guardrails-validator'] as GuardrailKind[]).map((k) => (
+          {(['presidio-entity', 'guardrails-validator', 'llm-guard-scanner'] as GuardrailKind[]).map((k) => (
             <Button
               key={k}
               size="sm"

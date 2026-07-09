@@ -19,6 +19,7 @@ import {
   normalizeOverlay,
 } from '@/lib/pipeline-governance';
 import { type PipelineContract, enforcementResource } from '@/lib/pipeline-enforcement';
+import { parseModelRules, parseRequestParamsPolicy } from '@/lib/request-policy';
 
 /**
  * Resolve the enforceable contract for a run's bound pipeline. Returns null when:
@@ -36,6 +37,14 @@ export async function resolveContract(
   try {
     const pipeline = await getPipeline(pipelineId, orgId);
     if (!pipeline) return null;
+    // The deterministic REQUEST-shape gates are OPTIONAL slices operators set on the RAW policy
+    // overlay JSON (`requestParams` = param ceilings/bounds/banned-list; `modelRules` = model
+    // allow/denylist). We parse them purely (parse* narrows/validates) and attach when present;
+    // absent/garbage ⇒ undefined ⇒ the pre-checks no-op (additive, no behaviour change).
+    const rawPolicyOverlay =
+      pipeline.policyOverlay && typeof pipeline.policyOverlay === 'object'
+        ? (pipeline.policyOverlay as Record<string, unknown>)
+        : {};
     return {
       pipelineId: pipeline.id,
       dataAllowlist: pipeline.dataAllowlist ?? [],
@@ -44,6 +53,8 @@ export async function resolveContract(
       orgGuardrailDefaults: ORG_GUARDRAIL_DEFAULTS,
       policyOverlay: normalizeOverlay(pipeline.policyOverlay, ORG_POLICY_DEFAULTS),
       guardrailOverlay: normalizeOverlay(pipeline.guardrailOverlay, ORG_GUARDRAIL_DEFAULTS),
+      requestParamsPolicy: parseRequestParamsPolicy(rawPolicyOverlay.requestParams),
+      modelRules: parseModelRules(rawPolicyOverlay.modelRules),
     };
   } catch {
     return null;

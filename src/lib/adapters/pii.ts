@@ -218,6 +218,9 @@ export const presidioPii: PiiPort = {
 // The third guardrails engine: a generic seam for a bring-your-own external HTTP guardrail provider
 // (Lakera / Aporia / …). Behaves as a PiiPort so it slots into the same capability + env switch as
 // Presidio; falls back to the regex floor when unset/unreachable. See adapters/guardrail-provider.ts.
-import { httpGuardrailPii } from './guardrail-provider';
+// LLM Guard (Protect AI, MIT) is a fourth, NAMED engine on the same seam — a self-hosted scanner
+// suite (Anonymize/Secrets/Sensitive/Toxicity/Bias/BanTopics/PromptInjection/Language/Regex/TokenLimit)
+// behind the same PiiPort + env switch (OFFGRID_ADAPTER_GUARDRAILS=llm-guard). See guardrail-provider.ts.
+import { httpGuardrailPii, llmGuardPii } from './guardrail-provider';
 
-export const PII_PORTS: PiiPort[] = [regexPii, presidioPii, httpGuardrailPii];
+export const PII_PORTS: PiiPort[] = [regexPii, presidioPii, httpGuardrailPii, llmGuardPii];
