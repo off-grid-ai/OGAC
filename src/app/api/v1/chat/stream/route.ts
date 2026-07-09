@@ -231,14 +231,14 @@ export async function POST(req: Request) {
   }
   const ci = await getCustomInstructions(userId);
   if (ci.trim()) messages.push({ role: 'system', content: ci });
-  const mem = await memoryBlock(userId);
+  const mem = await memoryBlock(userId, orgId);
   if (mem) messages.push({ role: 'system', content: mem });
   // @-mentioned memories: the user explicitly referenced specific stored facts for this turn — pull
   // them (scoped to the caller so you can only reference your own) and inject as a dedicated block,
   // additive to the whole-memory block above. Best-effort; degrades to no block when none resolve.
   if (mentionRefs?.memoryIds.length) {
     try {
-      const facts = await memoryFactsByIds(userId, mentionRefs.memoryIds);
+      const facts = await memoryFactsByIds(userId, orgId, mentionRefs.memoryIds);
       const block = referencedMemoryBlock(facts);
       if (block) messages.push({ role: 'system', content: block });
     } catch {
@@ -271,7 +271,7 @@ export async function POST(req: Request) {
   // whole thread. Turn skill takes precedence when both are present.
   const activeSkillId = turnSkillId ?? convo.skillId;
   if (activeSkillId) {
-    const skill = await getSkill(activeSkillId);
+    const skill = await getSkill(orgId, activeSkillId);
     if (skill && skill.enabled) {
       if (skill.systemPrompt.trim()) messages.push({ role: 'system', content: skill.systemPrompt });
       skillModel = skill.model ?? '';
@@ -644,7 +644,7 @@ export async function POST(req: Request) {
       // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
       // Temporary chats are never added to memory.
       if (!temporary && full && String(content).trim()) {
-        void extractMemory(userId, String(content), full, effectiveModel);
+        void extractMemory(userId, orgId, String(content), full, effectiveModel);
       }
       // Observability: push a Langfuse trace for this chat turn so the Observability page has real
       // data (plain chat previously emitted none). Fire-and-forget; skips temporary/incognito chats.
