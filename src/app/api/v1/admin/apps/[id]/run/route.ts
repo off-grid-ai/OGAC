@@ -7,6 +7,8 @@ import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
+import { enforceAppAccess } from '@/lib/app-access';
+import { callerFromSession } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +32,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const body = (await req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
   const input = body.input && typeof body.input === 'object' ? body.input : {};
+
+  // Per-app ACCESS CONTROL — the WHO/UNDER-WHAT-CONDITIONS gate, layered before the pipeline
+  // contract. The run input doubles as the ABAC request attributes (e.g. amount thresholds). Denied →
+  // 403 + reason, audited access.denied. Composes WITH (does not replace) org-scope + contract below.
+  const caller = await callerFromSession(gate, orgId);
+  const access = await enforceAppAccess({
+    appId: id,
+    orgId,
+    ownerId: app.ownerId,
+    caller,
+    action: 'run',
+    requestAttrs: input,
+  });
+  if (!access.allow) {
+    auditFromSession(gate, orgId, {
+      action: 'access.denied',
+      resource: `app:${id} run`,
+      outcome: 'blocked',
+    });
+    return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
+  }
 
   const runId = newAppRunId();
 
