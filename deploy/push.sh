@@ -66,7 +66,15 @@ rsync -az --delete -e "ssh -i $SSH_KEY" \
   --exclude 'deploy/console.log' --exclude '.claude' \
   "$CONSOLE_DIR/" "${SSH_USER}@${SERVER}:$REMOTE/console/"
 
-# ── 4. Install deps (only if package.json changed), build, restart ──
+# ── 4. Install deps, build, restart ──
+# Install deps FIRST — the rsync ships the updated package.json but NOT node_modules, so a newly
+# added dependency (e.g. @pdf-lib/fontkit) is absent on the server and the build fails with an
+# opaque webpack "can't resolve" error. `npm install` is idempotent + fast when nothing changed, so
+# run it every deploy. (This was previously only a comment — the actual install was missing, which
+# broke a deploy that added a dep. Now it really runs.)
+say "Installing server deps (npm install)"
+$SSH "cd $REMOTE/console && export PATH=/usr/local/bin:\$PATH && /usr/local/bin/npm install --no-audit --no-fund" 2>&1 | tail -3
+
 say "Building on the server"
 # ALWAYS clean .next first. Incremental builds leave STALE chunk hashes when routes/chunks change:
 # the manifest references chunk files that no longer exist on disk → the browser 400s on
