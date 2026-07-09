@@ -24,9 +24,9 @@ npm run db:push                   # create the schema
 npm run dev                       # http://localhost:3000
 ```
 
-That is the setup. It just works. Needs Docker and Node 20+ — the whole backing stack (47 services:
-Postgres, the gateway, identity, orchestration, vector store, secrets, audit, and more) is one
-`docker compose` bring-up, wired together. Run it on your own servers or in your cloud, your call.
+That is the setup. It just works. Needs Docker and Node 20+. The full backing stack is one
+`docker compose` bring-up, wired together, and every capability has a first-party default so you
+only run the pieces you want. Run it on your own servers or in your cloud, your call.
 
 ---
 
@@ -81,23 +81,44 @@ work is a thing anyone in the org can do inside the rules, not a project that wa
 team. Real change reaches people through the enterprises that serve them. This is how those
 enterprises get intelligent.
 
-## Built on what you already trust
+## Batteries included, swappable, honest
 
-No proprietary runtime to learn. It composes engines your team already knows, each wrapped in
-governance. Swap any of them with one environment variable.
+No proprietary runtime to learn, and no external service required to start. Every capability ships
+with a first-party default, so `npm run dev` works on its own. When you want the heavy-duty open
+source engine, you point one environment variable at it. The governance is the same either way.
 
-| Layer | Engine |
-|---|---|
-| System of record, vectors | Postgres + pgvector |
-| Identity / SSO | Keycloak |
-| Durable orchestration | Temporal |
-| Ingestion / ETL / DAG | Airbyte, dbt, Kestra |
-| Warehouse + lineage | ClickHouse, Marquez |
-| PII detection | Presidio |
-| Secrets | OpenBao |
-| Audit / traces | OpenSearch, Langfuse |
-| Vector store | Qdrant or LanceDB |
-| Object store | SeaweedFS |
+Here is exactly what is wired today, what is a swap-in, and what is still on the way. No inflation.
+
+**Wired and governed in-path (on by default)**
+
+| Capability | Default, no setup | Swap in (one env var) | In the console |
+|---|---|---|---|
+| Model gateway | [Off Grid AI Desktop](https://github.com/off-grid-ai/off-grid-ai-desktop) in gateway mode, OpenAI-compatible, local fleet or cloud | — | Gateway |
+| State + audit | [Postgres](https://www.postgresql.org) (append-only audit is always on) | — | everywhere |
+| Identity / SSO | [Keycloak](https://www.keycloak.org) (OIDC) | — | Access |
+| Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Brain, Knowledge |
+| Policy | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
+| PII detection | regex floor | [Presidio](https://microsoft.github.io/presidio/) (ML entity detection) | Control |
+| Response cache | in-process | [Redis](https://redis.io) | — |
+| Feature flags | Postgres | [Unleash](https://www.getunleash.io) (reads) | Admin |
+| Secrets | env vars | [OpenBao](https://openbao.org) (KV) | Control |
+| Audit search / SIEM | Postgres audit | [OpenSearch](https://opensearch.org) (full-text + dashboards, read back into the UI) | Control |
+| LLM traces + scores | first-party run trace | [Langfuse](https://langfuse.com) (span waterfall read back into the UI) | Observability |
+| Lineage | audit-reconstructed | [Marquez](https://marquezproject.ai) (OpenLineage graph read back into the UI) | Lineage |
+| Data plane | connect a source, sync it, warehouse it | [Airbyte](https://airbyte.com) sync, [Kestra](https://kestra.io) orchestration, [ClickHouse](https://clickhouse.com) warehouse | Data |
+| Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
+
+**Working, with a caveat we will not hide**
+
+- **PII masking** is regex string-replace today. Presidio's ML detection runs in-path; its ML redaction (`/anonymize`) is next, not yet wired.
+- **Durable runs.** Temporal execution visibility is wired (you can see workflow state). Durable execution itself is opt-in (`OFFGRID_QUEUE_ENABLED=1`) and still being hardened. Runs are synchronous by default.
+- **BI dashboards.** [Superset](https://superset.apache.org) embeds on Insights after a one-time `superset init`.
+- **Device fleet.** [FleetDM](https://fleetdm.com) is a read-only host inventory today. It needs a one-time setup.
+- **Deeper data-plane CRUD** (source or destination creation, dbt-orchestrated transforms) is partial. Connector sync and job read-back work now.
+
+**On the roadmap (not built yet)**
+
+Agent frameworks ([CrewAI](https://www.crewai.com) / [Agno](https://www.agno.com)), runtime threat detection (Falco), cloud microVM sandboxing (E2B), full durable execution, the Prove-It test-recording module, the cross-device capture + "Soul" intelligence layer, managed hosting, and the `@offgrid/sdk`. Tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Run it
 
