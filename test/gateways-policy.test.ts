@@ -4,6 +4,7 @@ import {
   GATEWAY_KINDS,
   deriveStatus,
   egressClassFor,
+  gatewayKindToProviderId,
   isGatewayKind,
   mergeGatewayHealth,
   validateGatewayCreate,
@@ -21,6 +22,8 @@ test('egressClassFor: on-prem keeps data on the fleet; every cloud kind means da
   assert.equal(egressClassFor('on-prem'), 'on-prem');
   assert.equal(egressClassFor('openai'), 'cloud');
   assert.equal(egressClassFor('anthropic'), 'cloud');
+  assert.equal(egressClassFor('deepseek'), 'cloud');
+  assert.equal(egressClassFor('zhipu'), 'cloud');
   assert.equal(egressClassFor('compat'), 'cloud');
 });
 
@@ -29,11 +32,30 @@ test('egressClassFor: an unknown kind is conservatively cloud (never silently cl
   assert.equal(egressClassFor(''), 'cloud');
 });
 
-test('isGatewayKind guards the four known kinds only', () => {
+test('isGatewayKind guards the known kinds only', () => {
   for (const k of GATEWAY_KINDS) assert.equal(isGatewayKind(k), true);
+  assert.ok(GATEWAY_KINDS.includes('deepseek'));
+  assert.ok(GATEWAY_KINDS.includes('zhipu'));
   assert.equal(isGatewayKind('nope'), false);
   assert.equal(isGatewayKind(null), false);
   assert.equal(isGatewayKind(42), false);
+});
+
+test('gatewayKindToProviderId: first-class cloud kinds map to their same-named provider', () => {
+  assert.equal(gatewayKindToProviderId('openai'), 'openai');
+  assert.equal(gatewayKindToProviderId('anthropic'), 'anthropic');
+  assert.equal(gatewayKindToProviderId('deepseek'), 'deepseek');
+  assert.equal(gatewayKindToProviderId('zhipu'), 'zhipu');
+});
+
+test('gatewayKindToProviderId: compat + any unknown kind fall back to the generic compat provider', () => {
+  assert.equal(gatewayKindToProviderId('compat'), 'compat');
+  assert.equal(gatewayKindToProviderId('some-future-kind'), 'compat');
+  assert.equal(gatewayKindToProviderId(''), 'compat');
+});
+
+test('gatewayKindToProviderId: on-prem has NO cloud provider (served by the aggregator)', () => {
+  assert.equal(gatewayKindToProviderId('on-prem'), null);
 });
 
 // ─── health merge — configured+reachable ⇒ available; anything less ⇒ NOT ────────────────────────
@@ -226,6 +248,14 @@ test('seed: the four sample gateways plan with derived egress + org-scoped stabl
   assert.equal(byName.get('On-Prem Cluster')!.egressClass, 'on-prem');
   assert.equal(byName.get('OpenAI')!.egressClass, 'cloud');
   assert.equal(byName.get('Anthropic')!.egressClass, 'cloud');
+  assert.equal(byName.get('DeepSeek')!.kind, 'deepseek');
+  assert.equal(byName.get('DeepSeek')!.egressClass, 'cloud');
+  assert.equal(byName.get('DeepSeek')!.baseUrl, 'https://api.deepseek.com/v1');
+  assert.equal(byName.get('DeepSeek')!.defaultModel, 'deepseek-chat');
+  assert.equal(byName.get('Zhipu AI (GLM)')!.kind, 'zhipu');
+  assert.equal(byName.get('Zhipu AI (GLM)')!.egressClass, 'cloud');
+  assert.equal(byName.get('Zhipu AI (GLM)')!.baseUrl, 'https://open.bigmodel.cn/api/paas/v4');
+  assert.equal(byName.get('Zhipu AI (GLM)')!.defaultModel, 'glm-4.6');
   const or = byName.get('OpenRouter')!;
   assert.equal(or.kind, 'compat');
   assert.equal(or.egressClass, 'cloud');
