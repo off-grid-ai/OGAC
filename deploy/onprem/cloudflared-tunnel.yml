@@ -31,6 +31,13 @@ ingress:
     service: ssh://localhost:22
   - hostname: console-api.getoffgridai.co
     service: http://127.0.0.1:80
+  # STAGED (webhook ingress) — the public inbound-trigger surface. Routed through Caddy (:80) so it
+  # gets the edge WAF + per-IP rate limit before the console; Caddy proxies ONLY /api/v1/triggers/*
+  # to :3000 (see deploy/Caddyfile). NOT yet applied to the live ~/.cloudflared/config.yml — needs a
+  # supervised tunnel apply + the `hooks` DNS CNAME (dns-records.sh). The route also works behind the
+  # existing onprem-console host; this dedicated host is just for a clean public webhook URL.
+  - hostname: hooks.getoffgridai.co
+    service: http://127.0.0.1:80
   # PENDING (per-tenant gateway URLs): a per-tenant provisioned gateway is
   # "<slug5><rand5>-gateway.getoffgridai.co" and must route to the aggregator on :8800 — add a
   # MORE-SPECIFIC rule ABOVE the wildcard, e.g.  - hostname: "*-gateway.getoffgridai.co" → :8800.
