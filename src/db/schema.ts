@@ -3,6 +3,11 @@ import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, t
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
   id: text('id').primaryKey(),
+  // Tenant scope: a device belongs to the org it was enrolled under. Without this, listDevices was
+  // global and device kill/command/role routes reached ANY tenant's device by id — a destructive
+  // cross-tenant IDOR (P0). Defaults to 'default' so pre-hardening rows/backfill are safe; set from
+  // the enrolling admin's org on enroll (self-migrated via ensureOrgSchema).
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   os: text('os').notNull(),
   role: text('role').notNull(),
@@ -28,6 +33,11 @@ export const policies = pgTable('policies', {
 
 export const auditEvents = pgTable('audit_events', {
   id: text('id').primaryKey(),
+  // Tenant scope (v1 audit stream). Without it, /api/v1/audit + listAudit returned EVERY tenant's
+  // device/gateway audit trail — compliance-fatal cross-tenant leak (P0). Inherited from the
+  // device's org on append; defaults to 'default' for pre-hardening rows. Self-migrated via
+  // ensureOrgSchema. (The canonical v2 stream `audit_events_v2` already carries `org`.)
+  orgId: text('org_id').notNull().default('default'),
   deviceId: text('device_id').notNull(),
   ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
   model: text('model').notNull(),
@@ -56,6 +66,9 @@ export const apiKeys = pgTable('api_keys', {
 export const enrollmentTokens = pgTable('enrollment_tokens', {
   token: text('token').primaryKey(),
   role: text('role').notNull(),
+  // Tenant scope: the org an enrolling node lands in. Set from the issuing admin's org so a device
+  // enrolled with this token is stamped into the right tenant. Defaults to 'default'. Self-migrated.
+  orgId: text('org_id').notNull().default('default'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   used: boolean('used').notNull().default(false),
 });
@@ -170,6 +183,10 @@ export const tenants = pgTable('tenants', {
 
 export const abacRules = pgTable('abac_rules', {
   id: text('id').primaryKey(),
+  // Tenant scope: ABAC rules are per-org policy. Without it every tenant's rules were evaluated
+  // together (evaluateAbac read the global set) — a cross-tenant policy leak. Defaults to 'default'
+  // for pre-hardening rows; set from the caller's org on create. Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   role: text('role').notNull(),
   attribute: text('attribute').notNull(),
   operator: text('operator').notNull(),
@@ -180,12 +197,21 @@ export const abacRules = pgTable('abac_rules', {
 });
 
 // ─── Feature flags (runtime toggles; the flags capability's first-party store) ────
-export const featureFlags = pgTable('feature_flags', {
-  key: text('key').primaryKey(),
-  enabled: boolean('enabled').notNull().default(true),
-  description: text('description').notNull().default(''),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+// Tenant-scoped: a flag is per-org, so one tenant toggling a capability never flips it for another.
+// The key alone was the PK (global) — a cross-tenant config leak; the identity is now (org_id, key),
+// so the same key coexists per org. Reads/writes default to DEFAULT_ORG (single-tenant unchanged).
+// Self-migrated via ensureOrgSchema (adds org_id + rebuilds the PK to the composite).
+export const featureFlags = pgTable(
+  'feature_flags',
+  {
+    orgId: text('org_id').notNull().default('default'),
+    key: text('key').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    description: text('description').notNull().default(''),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.key] })],
+);
 
 // ─── Prompt registry (templates + versioning) ─────────────────────────────────
 export const prompts = pgTable('prompts', {
@@ -328,6 +354,10 @@ export const orgSettings = pgTable('org_settings', {
 // the set of granted module ids the role may access; `basedOn` names a built-in role it inherits.
 export const customRoles = pgTable('custom_roles', {
   id: text('id').primaryKey(),
+  // Tenant scope: operator-defined roles are per-org. Without org_id listCustomRoles returned every
+  // tenant's roles and getCustomRoleByName could resolve another org's role — a cross-tenant RBAC
+  // leak. Defaults to 'default'; set from the caller's org on create. Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   basedOn: text('based_on').notNull().default('viewer'), // inherits a built-in role's baseline
@@ -434,6 +464,10 @@ export const chatMessages = pgTable('chat_messages', {
 // the skill's system prompt is injected for that conversation. Admin-managed.
 export const chatSkills = pgTable('chat_skills', {
   id: text('id').primaryKey(),
+  // Tenant scope: org skills are published org-wide within ITS org. Without org_id a skill was
+  // visible to every tenant's chat picker. Defaults to 'default'; set from the creator's org.
+  // Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
   systemPrompt: text('system_prompt').notNull().default(''),
@@ -464,6 +498,10 @@ export const chatSkills = pgTable('chat_skills', {
 // Variables are the {{placeholder}} tokens extracted from the content for templating.
 export const promptLibrary = pgTable('prompt_library', {
   id: text('id').primaryKey(),
+  // Tenant scope: an org-visible library prompt is shared within ITS org only. Without org_id an
+  // 'org' prompt leaked to every tenant. Defaults to 'default'; set from the owner's org on create.
+  // Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   title: text('title').notNull().default('Untitled prompt'),
   content: text('content').notNull().default(''),
   tags: jsonb('tags').$type<string[]>().notNull().default([]),
@@ -483,6 +521,10 @@ export const promptLibrary = pgTable('prompt_library', {
 // (ensurePromptPartialSchema) — no migration step on the SSH deploy path.
 export const promptPartials = pgTable('prompt_partials', {
   id: text('id').primaryKey(),
+  // Tenant scope: an org-visible partial composes into ITS org members' prompts only. Without
+  // org_id a shared partial leaked across tenants. Defaults to 'default'; set from the owner's org
+  // on create. Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   name: text('name').notNull(), // reference key used in {{>name}}
   title: text('title').notNull().default(''),
   content: text('content').notNull().default(''),
@@ -504,6 +546,10 @@ export const chatSettings = pgTable('chat_settings', {
 export const chatMemory = pgTable('chat_memory', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
+  // Tenant scope: per-user memory is bound to the org the user was in when it was captured, so a
+  // user on tenant A's subdomain never has tenant B's facts injected. Defaults to 'default'.
+  // Self-migrated via ensureOrgSchema.
+  orgId: text('org_id').notNull().default('default'),
   fact: text('fact').notNull(),
   source: text('source').notNull().default('chat'), // chat | manual
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -993,3 +993,14 @@ DONE, autonomously (founder: "throwaway instance, never real prod data — just 
 
 ## Resend email — verified sender + invite send working (2026-07-09)
 `RESEND_API_KEY` (send-only key from mobile/.env.keygen) + `RESEND_FROM="Off Grid AI <noreply@offgridmobileai.co>"` set in server `.env.local` (NOT git). The Resend account's verified sending domain is **offgridmobileai.co** (getoffgridai.co is NOT authorized on this key; `noreply@`/`hello@`/`support@offgridmobileai.co` work). Real invite emails (branded, with accept link) sent + delivered to mac@example.com + mohammed.ali@example.com via the proper createInvite→sendInviteEmail flow. Fixed a real bug: the Resend sink 422'd on an empty tag value — now drops tags unless name AND value survive sanitizing (`email-resend.ts`, committed 8e206c4).
+
+## SECURITY WAVE 1 — tenant-isolation DB migration (2026-07-09, epic #218)
+Adds an org scope (`org_id`) to the shared control-plane / chat tables that were previously GLOBAL, and rebuilds `feature_flags`' primary key from `(key)` → composite `(org_id, key)`. Closes cross-tenant leaks: devices kill/command/role IDOR (P0), `/api/v1/audit` whole-fleet audit trail (P0), `listUsers` whole-directory (P0), ABAC/routing/custom-role global reads, per-tenant feature flags, and the single shared `org_settings` singleton (now one row PER tenant, `id` IS the org id; legacy `id='org'` re-homed onto `'default'`).
+
+**Migration SQL:** `deploy/onprem/migrations/wave1-tenant-isolation.sql` — the exact idempotent statements. This is the SAME SQL `src/lib/store.ts::ensureOrgSchema()` applies lazily on first use (so a normal request self-migrates), captured standalone so it can be replayed with the pg client (drizzle-kit push hangs over SSH). Safe to re-run.
+
+**Apply on each server (git broken on servers — run directly):**
+```bash
+psql "$DATABASE_URL" -f deploy/onprem/migrations/wave1-tenant-isolation.sql
+```
+Every pre-hardening row is stamped `org_id='default'` by the column default. Guarded on table existence (lazily-created chat tables self-heal on the next run once their owning module creates them). On a partially-migrated DB where a `'default'` org_settings row already coexists with the legacy `'org'` row, the stale `'org'` row is dropped (rather than colliding on the PK) before the rename. Applied to LOCAL Postgres (`offgrid_console`) 2026-07-09; `feature_flags_pkey` now `(org_id, key)`. Not yet applied on the fleet servers — run the psql line above during the #218 deploy.

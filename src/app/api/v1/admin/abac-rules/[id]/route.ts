@@ -8,8 +8,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  await deleteAbacRule(id);
-  auditFromSession(gate, await currentOrgId(), {
+  // Tenant-scoped: only the caller's org rule is deleted (cross-tenant delete-by-id).
+  const org = await currentOrgId();
+  await deleteAbacRule(id, org);
+  auditFromSession(gate, org, {
     action: 'abac.change',
     resource: `abac:${id}`,
     outcome: 'ok',

@@ -24,7 +24,7 @@ export async function resolveConsumerChip(
   boundPipelineId: string | null | undefined,
   orgId: string = DEFAULT_ORG,
 ): Promise<PipelineChipData> {
-  const gov = await getChatBindingGovernance().catch(() => ({
+  const gov = await getChatBindingGovernance(orgId).catch(() => ({
     defaultChatPipelineId: null as string | null,
     allowlist: [] as string[],
   }));
@@ -45,7 +45,7 @@ export async function resolveConsumerChips(
   orgId: string = DEFAULT_ORG,
 ): Promise<PipelineChipData[]> {
   const [gov, pipelines] = await Promise.all([
-    getChatBindingGovernance().catch(() => ({
+    getChatBindingGovernance(orgId).catch(() => ({
       defaultChatPipelineId: null as string | null,
       allowlist: [] as string[],
     })),

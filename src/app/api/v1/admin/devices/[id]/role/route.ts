@@ -27,13 +27,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
-  const before = await getDevice(id);
+  // Tenant-scoped: the device must belong to the caller's org (cross-tenant IDOR — P0).
+  const org = await currentOrgId();
+  const before = await getDevice(id, org);
   if (!before) return NextResponse.json({ error: 'unknown device' }, { status: 404 });
 
-  const updated = await updateDeviceRole(id, role);
+  const updated = await updateDeviceRole(id, role, org);
   if (!updated) return NextResponse.json({ error: 'unknown device' }, { status: 404 });
 
-  auditFromSession(gate, await currentOrgId(), {
+  auditFromSession(gate, org, {
     action: 'device.role.reassign',
     resource: `device:${id}`,
     outcome: 'ok',
