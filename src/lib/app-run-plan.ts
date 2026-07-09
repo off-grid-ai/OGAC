@@ -226,3 +226,62 @@ export function applyStepResult(
 export function completedStepIds(state: AppRunState): string[] {
   return state.steps.filter((s) => s.status === 'done' || s.status === 'skipped').map((s) => s.id);
 }
+
+// ─── The persisted per-step row shape (the inverse target of app-run-store.toRowSteps) ────────────
+// Mirrors schema.ts appRuns.steps jsonb + app-runs-view.AppRunStepRow. Declared here (import-free)
+// so the pure rebuild below can reconstruct an AppRunState from a stored row without a DB import.
+export interface PersistedStepRow {
+  id: string;
+  kind: string;
+  label: string;
+  status: string; // queued|running|awaiting_human|done|error|skipped
+  outcome?: string;
+  refs?: string[];
+  detail?: string;
+  childRunId?: string;
+  wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+const KNOWN_STEP_STATUSES: ReadonlySet<StepRunStatus> = new Set<StepRunStatus>([
+  'queued', 'running', 'awaiting_human', 'done', 'error', 'skipped',
+]);
+
+// ─── rebuildAppRunState — reconstruct the pure AppRunState from a persisted row (PURE, inverse of
+// app-run-store.toRowSteps) ───────────────────────────────────────────────────────────────────────
+// The review route only has the stored `app_runs` row (its jsonb `steps[]` + top-level status). To
+// resume a paused run in-process we must lift that row back into the AppRunState the scheduler/reducer
+// operate on. This is the exact inverse of toRowSteps: `outcome` → `output`, string[] refs → {name}
+// refs, and the run status is recomputed from the steps (deriveRunStatus) unless it is the explicitly-
+// set terminal 'cancelled' (which the reducer never derives). Unknown per-step statuses fall back to
+// 'queued' defensively so a malformed row never crashes the resume.
+export function rebuildAppRunState(
+  runId: string,
+  appId: string,
+  rowStatus: string,
+  rowSteps: PersistedStepRow[],
+): AppRunState {
+  const steps: StepState[] = rowSteps.map((s) => {
+    const status = KNOWN_STEP_STATUSES.has(s.status as StepRunStatus)
+      ? (s.status as StepRunStatus)
+      : 'queued';
+    return {
+      id: s.id,
+      kind: s.kind as AppStepKind,
+      label: s.label,
+      status,
+      ...(s.outcome !== undefined ? { output: s.outcome } : {}),
+      ...(s.refs !== undefined ? { refs: s.refs.map((name) => ({ name })) } : {}),
+      ...(s.detail !== undefined ? { detail: s.detail } : {}),
+      ...(s.childRunId !== undefined ? { childRunId: s.childRunId } : {}),
+      ...(s.wouldPerform !== undefined ? { wouldPerform: s.wouldPerform } : {}),
+      ...(s.startedAt !== undefined ? { startedAt: s.startedAt } : {}),
+      ...(s.finishedAt !== undefined ? { finishedAt: s.finishedAt } : {}),
+    };
+  });
+  // 'cancelled' is set explicitly by the orchestrator and never re-derived; preserve it. Every other
+  // aggregate status is recomputed from the per-step array so it is always consistent with the steps.
+  const status: AppRunStatus = rowStatus === 'cancelled' ? 'cancelled' : deriveRunStatus(steps);
+  return { runId, appId, status, steps };
+}
