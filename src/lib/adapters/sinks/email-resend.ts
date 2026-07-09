@@ -154,7 +154,8 @@ function shapeTags(tags: Record<string, string> | undefined): { name: string; va
   for (const [rawName, rawValue] of Object.entries(tags)) {
     const name = sanitizeTagToken(rawName);
     const value = sanitizeTagToken(rawValue);
-    if (name) out.push({ name, value });
+    // Resend 422s on an empty tag value — drop a tag unless BOTH name and value survive sanitizing.
+    if (name && value) out.push({ name, value });
   }
   return out;
 }
