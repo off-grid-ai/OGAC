@@ -38,15 +38,9 @@ export default async function KnowledgePage() {
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold text-foreground">Organization Knowledge</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            The org-shared corpus retrieved in <strong>chat</strong>: an admin-curated set of
-            collections, indexed on-prem via the gateway and retrieved permission-aware with
-            citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.{' '}
-            <Link
-              href="/build/brain?view=knowledge"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Managing the docs your agents/router retrieve from? → Brain → Agent knowledge base
-            </Link>
+            The org-shared corpus retrieved in <strong>chat</strong> and by your agents: an
+            admin-curated set of collections, indexed on-prem via the gateway and retrieved
+            permission-aware with citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.
           </p>
         </div>
         {isAdmin && <CreateCollectionButton />}
