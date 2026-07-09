@@ -60,8 +60,8 @@ export const GUARDRAIL_CATEGORIES: GuardrailCategory[] = [
 ];
 
 // ─── Kind + engine ────────────────────────────────────────────────────────────────────────────────
-export type GuardrailKind = 'presidio-entity' | 'guardrails-validator';
-export type GuardrailEngine = 'presidio' | 'guardrails-ai';
+export type GuardrailKind = 'presidio-entity' | 'guardrails-validator' | 'llm-guard-scanner';
+export type GuardrailEngine = 'presidio' | 'guardrails-ai' | 'llm-guard';
 
 // ─── GuardrailCatalogItem — one bundled standard guardrail ────────────────────────────────────────
 export interface GuardrailCatalogItem {
@@ -85,6 +85,8 @@ export interface GuardrailCatalogItem {
   defaultEnabled: boolean;
   /** For a validator only: its Guardrails-AI Hub id (informational; no auto-fetch). */
   hubId?: string;
+  /** For an llm-guard-scanner only: the exact LLM Guard scanner class name (e.g. `PromptInjection`). */
+  scanner?: string;
 }
 
 // ─── THE CATALOG — real Presidio entities + curated Guardrails-AI validators ──────────────────────
@@ -481,6 +483,132 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
     defaultEnabled: false,
     description: 'Reject responses that are not valid JSON. Turn this on for structured outputs.',
   },
+
+  // ── LLM Guard scanners (Protect AI, MIT) — one-click, self-hosted ─────────────────────────────────
+  // Enforced by the on-prem LLM Guard engine (OFFGRID_ADAPTER_GUARDRAILS=llm-guard). Each maps to a
+  // real LLM Guard scanner class; the `entity` is the stable UPPER_SNAKE rule token, `scanner` the
+  // exact LLM Guard class name. Copy leads with the capability + outcome (engine named for the
+  // operator's clarity, not as the headline).
+  {
+    id: 'llm-guard-dlp-pii-in',
+    name: 'Mask PII in prompts (LLM Guard)',
+    category: 'Prompt Security',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_ANONYMIZE',
+    scanner: 'Anonymize',
+    defaultEnabled: true,
+    description:
+      'Detect and anonymize personal data (names, emails, cards, national IDs) in prompts before they reach the model. Recommended — stops PII from leaving the box.',
+  },
+  {
+    id: 'llm-guard-secrets',
+    name: 'Block secrets & API keys (LLM Guard)',
+    category: 'Prompt Security',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_SECRETS',
+    scanner: 'Secrets',
+    defaultEnabled: true,
+    description:
+      'Detect API keys, tokens, and credentials in prompts so they never leak into a request. Recommended.',
+  },
+  {
+    id: 'llm-guard-pii-out',
+    name: 'Catch PII in responses (LLM Guard)',
+    category: 'Prompt Security',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_SENSITIVE',
+    scanner: 'Sensitive',
+    defaultEnabled: false,
+    description:
+      'Scan model responses for personal or sensitive data before they reach a user. Turn this on for customer-facing outputs.',
+  },
+  {
+    id: 'llm-guard-prompt-injection',
+    name: 'Block prompt injection (LLM Guard)',
+    category: 'Prompt Security',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_PROMPT_INJECTION',
+    scanner: 'PromptInjection',
+    defaultEnabled: true,
+    description:
+      'Detect attempts to hijack the model with jailbreak or injection instructions. Recommended.',
+  },
+  {
+    id: 'llm-guard-toxicity',
+    name: 'Block toxic language (LLM Guard)',
+    category: 'Content Safety',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_TOXICITY',
+    scanner: 'Toxicity',
+    defaultEnabled: true,
+    description:
+      'Flag toxic or hateful language in prompts and responses. Recommended to keep interactions safe.',
+  },
+  {
+    id: 'llm-guard-bias',
+    name: 'Flag biased output (LLM Guard)',
+    category: 'Content Safety',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_BIAS',
+    scanner: 'Bias',
+    defaultEnabled: false,
+    description:
+      'Flag biased or unbalanced language in model responses. Turn this on for public-facing content.',
+  },
+  {
+    id: 'llm-guard-ban-topics',
+    name: 'Keep off banned topics (LLM Guard)',
+    category: 'Content Safety',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_BAN_TOPICS',
+    scanner: 'BanTopics',
+    defaultEnabled: false,
+    description:
+      'Block prompts or responses that touch topics you disallow. Turn this on with your topic list.',
+  },
+  {
+    id: 'llm-guard-language',
+    name: 'Restrict to allowed languages (LLM Guard)',
+    category: 'Content Safety',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_LANGUAGE',
+    scanner: 'Language',
+    defaultEnabled: false,
+    description:
+      'Detect the language of a prompt or response and flag anything outside your allowed set.',
+  },
+  {
+    id: 'llm-guard-regex',
+    name: 'Custom regex match (LLM Guard)',
+    category: 'Prompt Security',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_REGEX',
+    scanner: 'Regex',
+    defaultEnabled: false,
+    description:
+      'Flag or replace text matching your own regular-expression patterns. Turn this on to enforce a custom rule.',
+  },
+  {
+    id: 'llm-guard-token-limit',
+    name: 'Enforce a token limit (LLM Guard)',
+    category: 'Output Quality',
+    kind: 'llm-guard-scanner',
+    engine: 'llm-guard',
+    entity: 'LLM_GUARD_TOKEN_LIMIT',
+    scanner: 'TokenLimit',
+    defaultEnabled: false,
+    description:
+      'Reject prompts that exceed a maximum token count, before they cost you a call. Turn this on to cap request size.',
+  },
 ];
 
 // ─── Engine availability (PURE) ───────────────────────────────────────────────────────────────────
@@ -494,6 +622,8 @@ export interface EngineStatus {
   presidioReady: boolean;
   /** Guardrails-AI runtime is configured on-prem. */
   guardrailsAiReady: boolean;
+  /** LLM Guard engine is the active guardrails adapter AND configured + reachable. */
+  llmGuardReady?: boolean;
 }
 
 // Entities the always-on regex floor can catch even when Presidio is down.
@@ -525,6 +655,16 @@ export function itemAvailability(
       status: 'fallback',
       detail:
         'Presidio is not configured. The rule is stored and takes effect once Presidio is on.',
+    };
+  }
+  if (item.kind === 'llm-guard-scanner') {
+    if (status.llmGuardReady) {
+      return { status: 'ready', detail: 'Enforced by the on-prem LLM Guard engine.' };
+    }
+    return {
+      status: 'fallback',
+      detail:
+        'The LLM Guard engine is not the active guardrails adapter (or is unreachable). The rule is stored and enforced once it’s on.',
     };
   }
   // guardrails-validator
@@ -624,7 +764,12 @@ export function buildEnablePayload(
   action: EnableAction = 'redact',
 ): EnableRulePayload {
   const act = isEnableAction(action) ? action : 'redact';
-  const engineLabel = item.engine === 'presidio' ? 'Presidio' : 'Guardrails-AI';
+  const engineLabel =
+    item.engine === 'presidio'
+      ? 'Presidio'
+      : item.engine === 'llm-guard'
+        ? 'LLM Guard'
+        : 'Guardrails-AI';
   return {
     matcher: 'entity',
     pattern: item.entity,
