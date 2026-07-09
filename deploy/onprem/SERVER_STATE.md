@@ -1004,3 +1004,16 @@ Adds an org scope (`org_id`) to the shared control-plane / chat tables that were
 psql "$DATABASE_URL" -f deploy/onprem/migrations/wave1-tenant-isolation.sql
 ```
 Every pre-hardening row is stamped `org_id='default'` by the column default. Guarded on table existence (lazily-created chat tables self-heal on the next run once their owning module creates them). On a partially-migrated DB where a `'default'` org_settings row already coexists with the legacy `'org'` row, the stale `'org'` row is dropped (rather than colliding on the PK) before the rename. Applied to LOCAL Postgres (`offgrid_console`) 2026-07-09; `feature_flags_pkey` now `(org_id, key)`. Not yet applied on the fleet servers — run the psql line above during the #218 deploy.
+
+## Multi-tenancy Wave 2 — chat sub-resources + artifacts (#218, 2026-07-09)
+Closes the chat sub-resources still global after Wave 1: chat **memory**, chat **skills** (incl. Actions), chat **artifacts** (list/save/delete/version-history/revert/publish), and `deleteAllConversations` (now constrained to `(user, org)` so a "delete all my chats" wipe can't cross tenants). The app now threads `currentOrgId()` into each and scopes every read/write by `org_id AND user_id`. `chat_conversations`/`chat_projects` scoping from the prior fix is UNCHANGED (still passes its integration test).
+
+**Only NEW column vs Wave 1:** `chat_artifacts.org_id` → backfilled NULL→`'default'` then set `NOT NULL DEFAULT 'default'` (Wave 1 left it nullable + unfiltered, so a user saw the same artifacts library on every tenant subdomain and could touch another tenant's artifact by id). `chat_skills` / `chat_memory` already got `org_id` in Wave 1. `chat_artifact_versions` needs **no** column — scoped transitively via its parent artifact's ownership check.
+
+**Migration SQL:** `deploy/onprem/migrations/wave2-chat-artifacts-isolation.sql` — idempotent, identical to what `src/lib/chat.ts::ensureChatSchema()` applies lazily on first use (a normal chat request self-migrates). Safe to re-run.
+
+**Apply on each server (git broken on servers — run directly):**
+```bash
+psql "$DATABASE_URL" -f deploy/onprem/migrations/wave2-chat-artifacts-isolation.sql
+```
+Applied to LOCAL Postgres (`offgrid_console`) 2026-07-09 (the Wave 2 integration test ran the `ensureChatSchema` self-migration live). Not yet applied on the fleet servers — run the psql line above during the #218 deploy.

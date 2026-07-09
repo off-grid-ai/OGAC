@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { messagesUpToInclusive } from '@/lib/chat-policy';
+import { skillVisibleTo } from '@/lib/chat-skill-policy';
 import { getObjectText, putObject } from '@/lib/files';
 import {
   chatArtifacts,
@@ -123,6 +124,12 @@ export async function ensureChatSchema(): Promise<void> {
   );
   // Wave 1 additive columns: versioning head pointer + publish/share + org scope.
   await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS org_id text;`);
+  // Wave 2 (tenant isolation): the artifacts library was scoped by user only — a user saw the
+  // SAME library on every tenant subdomain. Bind each artifact to its org. Backfill legacy NULLs
+  // to 'default', then pin NOT NULL DEFAULT so the read filter is total and self-heals on deploy.
+  await db.execute(sql`UPDATE chat_artifacts SET org_id = 'default' WHERE org_id IS NULL;`);
+  await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET DEFAULT 'default';`);
+  await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET NOT NULL;`);
   await db.execute(
     sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false;`,
   );
@@ -162,50 +169,55 @@ export async function ensureChatSchema(): Promise<void> {
 }
 
 // ─── Per-user cross-conversation memory ───────────────────────────────────────
-export async function listMemory(userId: string) {
+// TENANT SCOPE (Wave 2): memory is bound to (user, org). A user on tenant A's subdomain must never
+// have tenant B's facts injected, read, or deletable — every list/get/write/delete filters on orgId
+// AND userId, and writes stamp the caller's current org.
+export async function listMemory(userId: string, orgId: string) {
   await ensureChatSchema();
   return db
     .select()
     .from(chatMemory)
-    .where(eq(chatMemory.userId, userId))
+    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.orgId, orgId)))
     .orderBy(desc(chatMemory.createdAt));
 }
 
-export async function addMemory(userId: string, fact: string, source = 'chat') {
+export async function addMemory(userId: string, orgId: string, fact: string, source = 'chat') {
   await ensureChatSchema();
   const f = fact.trim().slice(0, 500);
   if (!f) return;
-  // Skip near-duplicates (exact match) so memory doesn't bloat.
+  // Skip near-duplicates (exact match) so memory doesn't bloat — scoped to (user, org).
   const existing = await db
     .select({ id: chatMemory.id })
     .from(chatMemory)
-    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.fact, f)));
+    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.orgId, orgId), eq(chatMemory.fact, f)));
   if (existing.length) return;
-  await db.insert(chatMemory).values({ id: rid(), userId, fact: f, source });
+  await db.insert(chatMemory).values({ id: rid(), userId, orgId, fact: f, source });
 }
 
-export async function deleteMemory(userId: string, id: string) {
+export async function deleteMemory(userId: string, orgId: string, id: string) {
   await ensureChatSchema();
-  await db.delete(chatMemory).where(and(eq(chatMemory.id, id), eq(chatMemory.userId, userId)));
+  await db
+    .delete(chatMemory)
+    .where(and(eq(chatMemory.id, id), eq(chatMemory.userId, userId), eq(chatMemory.orgId, orgId)));
 }
 
-// Resolve a set of memory fact ids → their text, SCOPED to the owning user (an @-mention can only
-// reference the caller's own memories — the WHERE userId guard prevents referencing someone else's
-// facts by id). Returns the fact strings in no particular order; unknown/other-user ids are dropped.
-export async function memoryFactsByIds(userId: string, ids: string[]): Promise<string[]> {
+// Resolve a set of memory fact ids → their text, SCOPED to the owning (user, org) — an @-mention can
+// only reference the caller's own memories in their CURRENT tenant (the WHERE guard prevents
+// referencing another user's OR another tenant's facts by id). Unknown/foreign ids are dropped.
+export async function memoryFactsByIds(userId: string, orgId: string, ids: string[]): Promise<string[]> {
   const clean = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.length > 0)));
   if (!clean.length) return [];
   await ensureChatSchema();
   const rows = await db
     .select({ fact: chatMemory.fact })
     .from(chatMemory)
-    .where(and(eq(chatMemory.userId, userId), inArray(chatMemory.id, clean)));
+    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.orgId, orgId), inArray(chatMemory.id, clean)));
   return rows.map((r) => r.fact);
 }
 
-// Format the user's memories as a system block injected into every chat.
-export async function memoryBlock(userId: string): Promise<string> {
-  const rows = await listMemory(userId);
+// Format the user's memories (in their current tenant) as a system block injected into every chat.
+export async function memoryBlock(userId: string, orgId: string): Promise<string> {
+  const rows = await listMemory(userId, orgId);
   if (!rows.length) return '';
   return (
     '<user_memory>\nRelevant facts remembered about this user from past conversations:\n' +
@@ -217,32 +229,43 @@ export async function memoryBlock(userId: string): Promise<string> {
 // ─── Org skills (RBAC-scoped reusable assistants) ─────────────────────────────
 // Visible to a user if the skill is enabled AND (no allowedRoles restriction OR the user's role
 // is listed). Admins see all.
+// TENANT SCOPE (Wave 2): org skills are published within ONE org. Without an orgId filter a skill
+// was visible to (and mutable from) every tenant's chat picker. Every list/get/write/delete filters
+// on orgId; create stamps the creator's current org. The pure visibility rule (below) stays pure.
 export async function listSkills(
+  orgId: string,
   role: string,
   userId?: string,
 ): Promise<(typeof chatSkills.$inferSelect)[]> {
   await ensureChatSchema();
-  const all = await db.select().from(chatSkills).orderBy(desc(chatSkills.createdAt));
-  if (role === 'admin') return all;
-  return all.filter((s) => {
-    // Private assistants are visible only to their creator.
-    if (s.visibility === 'private' && s.createdBy !== userId) return false;
-    return s.enabled && (!s.allowedRoles?.length || s.allowedRoles.includes(role));
-  });
+  const all = await db
+    .select()
+    .from(chatSkills)
+    .where(eq(chatSkills.orgId, orgId))
+    .orderBy(desc(chatSkills.createdAt));
+  return all.filter((s) => skillVisibleTo(s, role, userId));
 }
 
-export async function getSkill(id: string) {
+export async function getSkill(orgId: string, id: string) {
   await ensureChatSchema();
-  const [s] = await db.select().from(chatSkills).where(eq(chatSkills.id, id));
+  const [s] = await db
+    .select()
+    .from(chatSkills)
+    .where(and(eq(chatSkills.id, id), eq(chatSkills.orgId, orgId)));
   return s ?? null;
 }
 
 // eslint-disable-next-line complexity
-export async function createSkill(createdBy: string, s: Partial<typeof chatSkills.$inferInsert>) {
+export async function createSkill(
+  createdBy: string,
+  orgId: string,
+  s: Partial<typeof chatSkills.$inferInsert>,
+) {
   await ensureChatSchema();
   const id = rid();
   await db.insert(chatSkills).values({
     id,
+    orgId,
     name: (s.name ?? 'New skill').slice(0, 120),
     description: s.description ?? '',
     systemPrompt: s.systemPrompt ?? '',
@@ -259,14 +282,21 @@ export async function createSkill(createdBy: string, s: Partial<typeof chatSkill
   return id;
 }
 
-export async function updateSkill(id: string, patch: Partial<typeof chatSkills.$inferInsert>) {
+export async function updateSkill(
+  orgId: string,
+  id: string,
+  patch: Partial<typeof chatSkills.$inferInsert>,
+) {
   await ensureChatSchema();
-  await db.update(chatSkills).set(patch).where(eq(chatSkills.id, id));
+  await db
+    .update(chatSkills)
+    .set(patch)
+    .where(and(eq(chatSkills.id, id), eq(chatSkills.orgId, orgId)));
 }
 
-export async function deleteSkill(id: string) {
+export async function deleteSkill(orgId: string, id: string) {
   await ensureChatSchema();
-  await db.delete(chatSkills).where(eq(chatSkills.id, id));
+  await db.delete(chatSkills).where(and(eq(chatSkills.id, id), eq(chatSkills.orgId, orgId)));
 }
 
 export async function getCustomInstructions(userId: string): Promise<string> {
@@ -800,12 +830,16 @@ async function bodyOf(row: { codeKey?: string | null; code?: string | null }): P
   return row.code ?? '';
 }
 
-export async function listArtifacts(userId: string) {
+// TENANT SCOPE (Wave 2): the artifacts library is bound to (user, org). Without an orgId filter a
+// user saw the SAME library on every tenant subdomain, and tenant A could read/delete/revert/publish
+// tenant B's artifacts by id. Every list/get/write/delete filters on orgId AND userId; save stamps
+// the caller's current org. Versions are scoped transitively via their parent artifact's ownership.
+export async function listArtifacts(userId: string, orgId: string) {
   await ensureChatSchema();
   const rows = await db
     .select()
     .from(chatArtifacts)
-    .where(eq(chatArtifacts.userId, userId))
+    .where(and(eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
     .orderBy(desc(chatArtifacts.updatedAt));
   return Promise.all(rows.map(async (r) => ({ ...r, code: await bodyOf(r) })));
 }
@@ -816,24 +850,27 @@ export async function listArtifacts(userId: string) {
 // eslint-disable-next-line complexity
 export async function saveArtifact(
   userId: string,
+  orgId: string,
   a: {
     kind: string;
     code: string;
     language?: string | null;
     title?: string;
     conversationId?: string | null;
-    orgId?: string | null;
   },
 ) {
   await ensureChatSchema();
   const code = String(a.code ?? '');
   const title = (a.title ?? 'Untitled artifact').slice(0, 200);
+  // Dedupe/version within the SAME (user, org): re-saving a title in tenant A must not collide with
+  // a same-titled artifact the user has in tenant B.
   const [existing] = await db
     .select()
     .from(chatArtifacts)
     .where(
       and(
         eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.orgId, orgId),
         eq(chatArtifacts.title, title),
         a.conversationId
           ? eq(chatArtifacts.conversationId, a.conversationId)
@@ -888,7 +925,7 @@ export async function saveArtifact(
     language: a.language ?? null,
     title,
     conversationId: a.conversationId ?? null,
-    orgId: a.orgId ?? null,
+    orgId,
     currentVersion: 1,
   });
   await db.insert(chatArtifactVersions).values({
@@ -904,12 +941,12 @@ export async function saveArtifact(
   return id;
 }
 
-export async function deleteArtifact(userId: string, id: string) {
+export async function deleteArtifact(userId: string, orgId: string, id: string) {
   await ensureChatSchema();
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
     .limit(1);
   if (!owned) return;
   await db.delete(chatArtifactVersions).where(eq(chatArtifactVersions.artifactId, id));
@@ -917,12 +954,12 @@ export async function deleteArtifact(userId: string, id: string) {
 }
 
 // Full version history for an owned artifact (newest first).
-export async function listArtifactVersions(userId: string, id: string) {
+export async function listArtifactVersions(userId: string, orgId: string, id: string) {
   await ensureChatSchema();
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
     .limit(1);
   if (!owned) return null;
   const rows = await db
@@ -934,12 +971,12 @@ export async function listArtifactVersions(userId: string, id: string) {
 }
 
 // Revert: copy an existing version's content forward as a new head version.
-export async function revertArtifact(userId: string, id: string, version: number) {
+export async function revertArtifact(userId: string, orgId: string, id: string, version: number) {
   await ensureChatSchema();
   const [art] = await db
     .select()
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
     .limit(1);
   if (!art) return null;
   const [target] = await db
@@ -978,12 +1015,12 @@ export async function revertArtifact(userId: string, id: string, version: number
 }
 
 // Toggle publish state. Published artifacts render at the read-only /artifacts/[id]/view route.
-export async function setArtifactPublished(userId: string, id: string, published: boolean) {
+export async function setArtifactPublished(userId: string, orgId: string, id: string, published: boolean) {
   await ensureChatSchema();
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId)))
+    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
     .limit(1);
   if (!owned) return false;
   await db
@@ -1021,16 +1058,21 @@ export async function setPrefs(userId: string, prefs: Record<string, unknown>): 
 }
 
 // ─── Data & privacy: bulk export / delete of the user's chats ─────────────────
-export async function deleteAllConversations(userId: string): Promise<void> {
+// TENANT SCOPE (Wave 2): "delete all my chats" must stay WITHIN the current tenant — a wipe on
+// tenant A's subdomain must leave the user's tenant-B chats intact. Constrained to (user, org):
+// only rows for THIS org are selected and deleted; other tenants' conversations are untouched.
+export async function deleteAllConversations(userId: string, orgId: string): Promise<void> {
   await ensureChatSchema();
   const rows = await db
     .select({ id: chatConversations.id })
     .from(chatConversations)
-    .where(eq(chatConversations.userId, userId));
+    .where(and(eq(chatConversations.userId, userId), eq(chatConversations.orgId, orgId)));
   for (const r of rows) {
     await db.delete(chatMessages).where(eq(chatMessages.conversationId, r.id));
   }
-  await db.delete(chatConversations).where(eq(chatConversations.userId, userId));
+  await db
+    .delete(chatConversations)
+    .where(and(eq(chatConversations.userId, userId), eq(chatConversations.orgId, orgId)));
 }
 
 export async function exportUserData(userId: string, orgId: string) {
@@ -1046,7 +1088,7 @@ export async function exportUserData(userId: string, orgId: string) {
     user: userId,
     customInstructions: await getCustomInstructions(userId),
     prefs: await getPrefs(userId),
-    memory: await listMemory(userId),
+    memory: await listMemory(userId, orgId),
     projects: await listProjects(userId, orgId),
     conversations: withMessages,
   };
