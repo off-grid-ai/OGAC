@@ -120,6 +120,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     binding.orgId,
     `pipeline-key:${binding.keyId}`,
     deps,
+    // The deterministic request-shape gates (param ceilings/bounds/banned list + model allow/denylist)
+    // ride on the same resolved contract — enforced in-path before the model call.
+    { requestParamsPolicy: contract?.requestParamsPolicy, modelRules: contract?.modelRules },
   );
 
   // A guardrail block (or a missing prompt) → 403; the input never reached the model.

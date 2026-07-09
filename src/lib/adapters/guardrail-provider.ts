@@ -87,6 +87,76 @@ export function normalizeGuardrailResponse(
   return { hits, entities, redacted, engine };
 }
 
+// ─── LLM Guard (Protect AI, MIT) — a NAMED provider on the same seam ────────────────────────────────
+//
+// LLM Guard ships a self-hostable API server (`llm-guard-api`, FastAPI). Its verdict JSON differs from
+// the generic {flagged, entities?} shape, so it gets its own PURE mapper (below) and a thin adapter
+// (llmGuardPii) — but it reuses ALL the shared plumbing (timeout, error diagnosis, fail-open to the
+// regex floor) and the same PiiResult contract + env switches. Selected with
+// OFFGRID_ADAPTER_GUARDRAILS=llm-guard; configured with OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY).
+//
+// LLM Guard's response (POST /analyze/prompt):
+//   { is_valid: boolean, scanners: { "<ScannerName>": <risk score 0..1>, … }, sanitized_prompt: "…" }
+// The mapping:
+//   • hits          — a scan "hit" when the verdict is NOT valid (is_valid === false). LLM Guard's
+//     `is_valid` is `all(scanner passed)`, so is_valid===false means at least one scanner tripped.
+//   • entities      — the names of the scanners that flagged. A scanner is considered to have flagged
+//     when its risk score exceeds `scoreThreshold` (default 0.5), OR — when is_valid is false but no
+//     score cleared the bar (some scanners report a boolean-ish 0/1) — every non-zero scanner. When
+//     is_valid is false and nothing else is nameable we synthesize a single `GUARDRAIL` label so the
+//     verdict is still legible (mirrors the generic mapper).
+//   • redacted      — LLM Guard's `sanitized_prompt` (Anonymize rewrites PII in place); else the
+//     original text (we never invent a redaction the engine didn't make).
+export interface RawLlmGuardResponse {
+  is_valid?: unknown;
+  scanners?: unknown;
+  sanitized_prompt?: unknown;
+  sanitized_output?: unknown;
+}
+
+// The default risk-score above which a scanner counts as "flagged". LLM Guard scores are 0..1.
+const LLM_GUARD_SCORE_THRESHOLD = 0.5;
+
+// Extract { name: score } pairs from the scanners object, keeping only finite numeric scores.
+function scannerScores(v: unknown): Array<[string, number]> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return [];
+  return Object.entries(v as Record<string, unknown>).filter(
+    (pair): pair is [string, number] => typeof pair[1] === 'number' && Number.isFinite(pair[1]),
+  );
+}
+
+/**
+ * Map an LLM Guard `/analyze/*` response onto the console's normalized PiiResult. PURE — zero I/O.
+ * `threshold` is the risk-score at/above which a scanner is treated as a flag (default 0.5).
+ */
+export function normalizeLlmGuardResponse(
+  original: string,
+  raw: RawLlmGuardResponse | null | undefined,
+  threshold: number = LLM_GUARD_SCORE_THRESHOLD,
+  engine = 'llm-guard',
+): PiiResult {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  // is_valid may be absent (treat as valid) or a real boolean. Only an explicit `false` is a fail.
+  const invalid = r.is_valid === false || r.is_valid === 'false';
+  const scores = scannerScores(r.scanners);
+  // Scanners over the threshold are the primary signal. If the verdict is invalid but nothing cleared
+  // the bar, fall back to any scanner with a non-zero score so we still name what tripped.
+  let flaggedScanners = scores.filter(([, s]) => s >= threshold).map(([name]) => name);
+  if (invalid && flaggedScanners.length === 0) {
+    flaggedScanners = scores.filter(([, s]) => s > 0).map(([name]) => name);
+  }
+  const hits = invalid || flaggedScanners.length > 0;
+  const entities =
+    flaggedScanners.length > 0 ? flaggedScanners : hits ? ['GUARDRAIL'] : [];
+  const sanitized =
+    typeof r.sanitized_prompt === 'string'
+      ? r.sanitized_prompt
+      : typeof r.sanitized_output === 'string'
+        ? r.sanitized_output
+        : original;
+  return { hits, entities, redacted: sanitized, engine };
+}
+
 // Flatten an unknown thrown value into a diagnosable one-liner — fetch() hides the useful bit
 // (ECONNREFUSED / ETIMEDOUT / ENOTFOUND) on `err.cause.code`, not `err.message`. Surface it.
 function describeError(err: unknown): string {
@@ -166,6 +236,79 @@ export const httpGuardrailPii: PiiPort = {
       // A HEAD/GET to the base is the cheapest liveness signal; a provider without one still returns
       // *some* status, which is enough to distinguish "reachable" from "socket refused".
       const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(2500) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+// Strip a trailing slash so `${base}/analyze/prompt` never doubles up.
+function trimTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+// POST the prompt to LLM Guard's /analyze/prompt and return its raw JSON. Throws on non-2xx / network
+// so the caller can fail open to the regex floor (mirrors postGuardrail / presidioAnalyze).
+async function postLlmGuard(
+  base: string,
+  apiKey: string | undefined,
+  text: string,
+): Promise<RawLlmGuardResponse> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  // llm-guard-api authenticates with a bearer AUTH_TOKEN when configured.
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const res = await fetch(`${trimTrailingSlash(base)}/analyze/prompt`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ prompt: text }),
+    signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`llm-guard POST ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+  }
+  return (await res.json()) as RawLlmGuardResponse;
+}
+
+// LLM Guard (Protect AI) as a NAMED provider behind the guardrails PiiPort. Selected with
+// OFFGRID_ADAPTER_GUARDRAILS=llm-guard; configured with OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api
+// base, e.g. http://llm-guard:8000) + optional OFFGRID_HTTP_GUARDRAIL_API_KEY (the server's
+// AUTH_TOKEN). Not configured / unreachable ⇒ honest fall-through to the regex floor (never a hard
+// dependency — same contract as the Presidio + http-guardrail adapters).
+export const llmGuardPii: PiiPort = {
+  meta: {
+    id: 'llm-guard',
+    capability: 'guardrails',
+    vendor: 'LLM Guard (Protect AI)',
+    license: 'MIT',
+    render: 'headless',
+    embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
+    description:
+      'Self-hosted LLM Guard scanners (PII/Anonymize, Secrets, Toxicity, Bias, BanTopics, PromptInjection, Language, Regex, TokenLimit) behind the checks port. POSTs the text to /analyze/prompt and reads {is_valid, scanners, sanitized_prompt}. Configure OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY = AUTH_TOKEN). Falls back to the regex floor when unset or unreachable.',
+  },
+  async scan(text) {
+    const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
+    if (!url) return regexScan(text);
+    try {
+      const raw = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, text);
+      return normalizeLlmGuardResponse(text, raw);
+    } catch (err) {
+      console.warn(
+        '[llm-guard] provider call failed, degrading to regex floor:',
+        describeError(err),
+      );
+      return regexScan(text);
+    }
+  },
+  async health() {
+    const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
+    if (!url) return false;
+    try {
+      // llm-guard-api exposes GET /healthz (liveness); a 200 there is the true "reachable" signal.
+      const res = await fetch(`${trimTrailingSlash(url)}/healthz`, {
+        signal: AbortSignal.timeout(2500),
+      });
       return res.ok;
     } catch {
       return false;

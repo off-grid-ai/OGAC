@@ -67,8 +67,17 @@ export interface GuardrailsDemo {
   engine: string; // the engine that produced this demo result
 }
 
+// The normalized active-guardrails engine. 'presidio' + 'llm-guard' are the remote detectors (they
+// reach a service and can be unreachable); every other adapter id normalizes to the always-on 'regex'
+// floor. (The generic bring-your-own 'http-guardrail' seam also normalizes to a remote engine.)
+export type GuardrailsEngine = 'presidio' | 'llm-guard' | 'http-guardrail' | 'regex';
+
+// The remote engines — reach a backing service, so they are "configured" only once a URL is set and
+// can be "unreachable". Everything else is the always-on regex floor.
+const REMOTE_ENGINES: readonly GuardrailsEngine[] = ['presidio', 'llm-guard', 'http-guardrail'];
+
 export interface GuardrailsView {
-  engine: 'presidio' | 'regex'; // the active guardrails engine (normalized)
+  engine: GuardrailsEngine; // the active guardrails engine (normalized)
   adapterId: string; // the raw active adapter id (e.g. 'checks' | 'presidio')
   vendor: string;
   license: string;
@@ -101,10 +110,18 @@ function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' && v.trim() ? v : fallback;
 }
 
-// The active adapter id → the normalized engine. Presidio is the only non-regex engine; every
-// other id (the first-party 'checks' spine, unknown, absent) normalizes to the regex floor.
-function engineOf(adapterId: string): 'presidio' | 'regex' {
-  return adapterId === 'presidio' ? 'presidio' : 'regex';
+// The active adapter id → the normalized engine. The remote detectors (Presidio, LLM Guard, the
+// generic http-guardrail seam) keep their own id; every other id (the first-party 'checks' spine,
+// unknown, absent) normalizes to the always-on regex floor.
+function engineOf(adapterId: string): GuardrailsEngine {
+  return (REMOTE_ENGINES as readonly string[]).includes(adapterId)
+    ? (adapterId as GuardrailsEngine)
+    : 'regex';
+}
+
+// A remote engine reaches a backing service (can be unreachable + needs a configured URL).
+function isRemoteEngine(engine: GuardrailsEngine): boolean {
+  return (REMOTE_ENGINES as readonly string[]).includes(engine);
 }
 
 function normalizeDemo(raw: RawScanResult | null | undefined, input: string): GuardrailsDemo | undefined {
@@ -140,17 +157,29 @@ export function buildGuardrailsView(
   const engine = engineOf(adapterId);
   // Only Presidio reaches a remote; it's "configured" once its embedUrl is set. The regex floor
   // needs no backing service, so it is configured by definition.
-  const configured = engine === 'presidio' ? Boolean(str(m.embedUrl)) : true;
+  const remote = isRemoteEngine(engine);
+  // A remote engine is "configured" once its backing service URL (embedUrl) is set; the regex floor
+  // needs no service, so it is configured by definition.
+  const configured = remote ? Boolean(str(m.embedUrl)) : true;
   return {
     engine,
     adapterId,
     vendor: str(m.vendor, engine === 'presidio' ? 'Microsoft Presidio' : 'Off Grid AI checks spine'),
     license: str(m.license, engine === 'presidio' ? 'MIT' : 'first-party'),
     description: str(m.description),
-    // The always-on regex floor is reachable by definition; only Presidio can be unreachable.
-    reachable: engine === 'presidio' ? reachable === true : true,
+    // The always-on regex floor is reachable by definition; only a remote engine can be unreachable.
+    reachable: remote ? reachable === true : true,
     configured,
-    entityTypes: [...(engine === 'presidio' ? PRESIDIO_ENTITY_TYPES : REGEX_ENTITY_TYPES)],
+    // Presidio enumerates its predefined entity types; the scanner-based remotes (LLM Guard / the
+    // generic seam) don't expose a fixed entity list, so we surface none rather than overclaim; the
+    // regex floor surfaces the two it can catch.
+    entityTypes: [
+      ...(engine === 'presidio'
+        ? PRESIDIO_ENTITY_TYPES
+        : remote
+          ? []
+          : REGEX_ENTITY_TYPES),
+    ],
     demo: normalizeDemo(demo, demoInput),
   };
 }
