@@ -104,18 +104,22 @@ enterprises get intelligent.
 Two layers, and the distinction matters.
 
 **The governance spine is Off Grid AI's own code, always on.** It is not borrowed from a library.
-Every model call runs through it, and it is what a pipeline binds once and every app inherits:
+Every model call runs through it, and it is what a pipeline binds once and every app inherits.
 
-- **Policy + egress enforcement.** Each call resolves to local, cloud, or blocked per the data class
-  and the pipeline's policy. A call that is not allowed off the box does not leave.
-- **Guardrails.** Input and output screening, prompt-injection checks, and a PII-mask requirement,
-  applied in-path, tightening-only from the org default down.
-- **PII handling.** A regex floor runs on every request by default; masking happens before the model.
-- **Evals + drift.** Runs are scored against a golden set and watched for drift.
-- **Provenance + audit.** Every run is signed, cited, and written to an append-only audit log.
-- **FinOps.** Per-key and per-user budgets, pricing, and cost tracking.
-- **Compliance mapping.** Controls mapped to ISO 42001, NIST AI RMF, and the EU AI Act, with DPIA
-  and regulator-ready exports.
+Two kinds of check, both real:
+
+- **Deterministic, in-path, blocking.** On every request: policy and the egress leash (each call
+  resolves to local, cloud, or blocked per the data class), PII masking before the model,
+  prompt-injection and toxicity screening. A call that is not allowed off the box does not leave.
+  Guardrails are tightening-only from the org default down.
+- **LLM-as-judge, on the gateway model.** A gateway model judges each run for faithfulness to its
+  cited sources and answer quality. Grounded runs must cite; the judge scores whether they did.
+  It runs out of band, so it never adds latency to the answer, and feeds the eval and observability
+  layer.
+
+On top of that: every run is signed, cited, and written to an append-only audit log; runs are scored
+against a golden set and watched for drift; FinOps tracks per-key and per-user budgets and cost; and
+controls map to ISO 42001, NIST AI RMF, and the EU AI Act with DPIA and regulator-ready exports.
 
 None of that requires an external service. `npm run dev` has it on.
 
@@ -130,7 +134,7 @@ variable at a best-in-class open-source engine. Same governance either way.
 | Identity / SSO | [Keycloak](https://www.keycloak.org) (OIDC) | — | Access |
 | Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Brain, Knowledge |
 | Policy decisions | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
-| PII detection | regex floor | [Presidio](https://microsoft.github.io/presidio/) (ML entity detection) | Control |
+| Guardrails (screen prompts + responses) | regex floor (PII detect + mask) | [Presidio](https://microsoft.github.io/presidio/) (ML PII) or an external guard over HTTP ([Lakera](https://www.lakera.ai), [Aporia](https://www.aporia.com), self-hosted) | Control |
 | Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
 | Cost + budgets (FinOps) | first-party pricing + budget enforcement | — | Insights |
 | Compliance mapping | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act) + exports | — | Governance |
@@ -145,6 +149,7 @@ variable at a best-in-class open-source engine. Same governance either way.
 **Working, with a caveat we will not hide**
 
 - **PII masking** is regex string-replace today. Presidio's ML detection runs in-path; its ML redaction (`/anonymize`) is next, not yet wired.
+- **External guardrail engines** (Lakera, Aporia, Prompt-Security) plug into a generic HTTP seam that ships and works today. A named-vendor mapping is one config plus at most one field-map, documented, not a pre-built branded integration per vendor.
 - **Durable runs.** Temporal execution visibility is wired (you can see workflow state). Durable execution itself is opt-in (`OFFGRID_QUEUE_ENABLED=1`) and still being hardened. Runs are synchronous by default.
 - **BI dashboards.** [Superset](https://superset.apache.org) embeds on Insights after a one-time `superset init`.
 - **Device fleet.** [FleetDM](https://fleetdm.com) is a read-only host inventory today. It needs a one-time setup.
