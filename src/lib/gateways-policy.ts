@@ -12,17 +12,42 @@
 // The DB I/O + probe fan-out live in gateways.ts (the adapter). This file can never, by
 // construction, touch the network or the DB.
 
-/** The four kinds of model-serving endpoint a pipeline can run on. */
-export type GatewayKind = 'on-prem' | 'openai' | 'anthropic' | 'compat';
+/**
+ * The kinds of model-serving endpoint a pipeline can run on. `on-prem` = the fleet aggregator;
+ * `openai`/`anthropic`/`deepseek`/`zhipu` = first-class cloud providers (each maps to a provider
+ * spec in cloud-providers.ts); `compat` = the escape hatch for ANY other OpenAI-compatible base.
+ */
+export type GatewayKind = 'on-prem' | 'openai' | 'anthropic' | 'deepseek' | 'zhipu' | 'compat';
 
 /** Where a gateway sends data: on-prem = stays on the fleet; cloud = leaves the network. */
 export type EgressClass = 'on-prem' | 'cloud';
 
-export const GATEWAY_KINDS: readonly GatewayKind[] = ['on-prem', 'openai', 'anthropic', 'compat'];
+export const GATEWAY_KINDS: readonly GatewayKind[] = [
+  'on-prem',
+  'openai',
+  'anthropic',
+  'deepseek',
+  'zhipu',
+  'compat',
+];
 
-/** True iff the string is one of the four known gateway kinds. */
+/** True iff the string is one of the known gateway kinds. */
 export function isGatewayKind(v: unknown): v is GatewayKind {
   return typeof v === 'string' && (GATEWAY_KINDS as readonly string[]).includes(v);
+}
+
+/**
+ * Map a gateway KIND → the cloud-providers.ts provider id whose env config + probe describe it.
+ * PURE. A first-class cloud kind (openai/anthropic/deepseek/zhipu) maps to the same-named provider;
+ * every other kind (including the generic `compat` escape hatch, and any future/unknown kind) maps
+ * to the generic `compat` provider. `on-prem` has NO cloud provider — it is served by the aggregator,
+ * so this returns null for it (callers must not look it up in cloud-providers). Defined once here so
+ * the adapter never re-implements the kind→provider decision (DRY).
+ */
+const FIRST_CLASS_CLOUD_KINDS: readonly GatewayKind[] = ['openai', 'anthropic', 'deepseek', 'zhipu'];
+export function gatewayKindToProviderId(kind: string): string | null {
+  if (kind === 'on-prem') return null;
+  return (FIRST_CLASS_CLOUD_KINDS as readonly string[]).includes(kind) ? kind : 'compat';
 }
 
 /**

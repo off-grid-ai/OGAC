@@ -74,11 +74,38 @@ const SPECS: readonly ProviderSpec[] = [
     defaultModelFallback: 'claude-3-5-haiku-latest',
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    baseUrlKey: 'OFFGRID_CLOUD_DEEPSEEK_BASE_URL',
+    apiKeyKey: 'OFFGRID_CLOUD_DEEPSEEK_API_KEY',
+    // DeepSeek's OpenAI-compatible endpoint (https://api-docs.deepseek.com).
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    prefixes: ['deepseek/', 'deepseek:', 'deepseek-'],
+    defaultModelKey: 'OFFGRID_CLOUD_DEEPSEEK_MODEL',
+    defaultModelFallback: 'deepseek-chat',
+  },
+  {
+    id: 'zhipu',
+    label: 'Zhipu AI (GLM)',
+    baseUrlKey: 'OFFGRID_CLOUD_ZHIPU_BASE_URL',
+    apiKeyKey: 'OFFGRID_CLOUD_ZHIPU_API_KEY',
+    // Zhipu / Z.AI GLM OpenAI-compatible endpoint. `open.bigmodel.cn/api/paas/v4` is the
+    // (legacy China) base; the international base is `https://api.z.ai/api/paas/v4`. Overridable
+    // via OFFGRID_CLOUD_ZHIPU_BASE_URL for the international / self-hosted endpoint.
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    prefixes: ['zhipu/', 'zhipu:', 'glm/', 'glm:', 'glm-'],
+    defaultModelKey: 'OFFGRID_CLOUD_ZHIPU_MODEL',
+    defaultModelFallback: 'glm-4.6',
+  },
+  {
     id: 'compat',
     label: 'OpenAI-compatible',
     baseUrlKey: 'OFFGRID_CLOUD_COMPAT_BASE_URL',
     apiKeyKey: 'OFFGRID_CLOUD_COMPAT_API_KEY',
     defaultBaseUrl: '', // required — a generic proxy has no well-known URL
+    // The ESCAPE HATCH for arbitrary gateways: point at ANY OpenAI-compatible base (vLLM, OpenRouter,
+    // a self-hosted cloud, another gateway) that has no first-class spec above. base URL is REQUIRED
+    // (no well-known default) so it can never route blind.
     prefixes: ['compat/', 'compat:', 'cloud/', 'cloud:'],
     defaultModelKey: 'OFFGRID_CLOUD_COMPAT_MODEL',
     defaultModelFallback: '',
