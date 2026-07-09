@@ -125,6 +125,9 @@ export function sidebarActiveIdFor(id: ModuleId): ModuleId | undefined {
 // Longest-prefix wins (checked before falling back to module-route matching).
 const PATH_ALIASES: { prefix: string; moduleId: ModuleId }[] = [
   { prefix: '/build/apps', moduleId: 'studio' },
+  // The cross-app HITL review queue (/build/review) belongs to the Build surface and gates on
+  // `studio`, but routes outside /build/apps — keep the Build → Studio row lit while reviewing.
+  { prefix: '/build/review', moduleId: 'studio' },
 ];
 
 // Resolve which sidebar row should be active for a URL, purely — no React, no router. First tries
