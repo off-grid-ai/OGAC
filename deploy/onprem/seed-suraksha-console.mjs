@@ -31,8 +31,8 @@ const TENANT = {
 };
 
 const CONNECTORS = [
-  { id: 'surcon_coreins', name: 'Core Insurance (Postgres)', type: 'postgres', endpoint: 'postgres://coreins:coreins@127.0.0.1:5433/coreins', auth: 'password', description: 'Policy administration OLTP — policies, premiums, claims, KYC, pricing.', status: 'connected' },
-  { id: 'surcon_policyadmin', name: 'Advisor & HR Admin (MySQL)', type: 'mysql', endpoint: 'mysql://policyadmin:policyadmin@127.0.0.1:3307/policyadmin', auth: 'password', description: 'Advisor/agency force + HR — advisors, requisitions, candidates.', status: 'connected' },
+  { id: 'surcon_coreins', name: 'Core Insurance (Postgres)', type: 'postgres', endpoint: 'postgres://corebank:corebank@127.0.0.1:5433/suraksha', auth: 'password', description: 'Policy administration OLTP — policies, premiums, claims, KYC, pricing.', status: 'connected' },
+  { id: 'surcon_policyadmin', name: 'Advisor & HR Admin (MySQL)', type: 'mysql', endpoint: 'mysql://policyadmin:policyadmin@127.0.0.1:3307/suraksha', auth: 'password', description: 'Advisor/agency force + HR — advisors, requisitions, candidates, reimbursement quota.', status: 'connected' },
   { id: 'surcon_warehouse', name: 'Data Warehouse', type: 's3', endpoint: 'http://127.0.0.1:9010', auth: 'none', description: 'Analytics warehouse for the Suraksha Life book.', status: 'connected' },
 ];
 
@@ -43,6 +43,7 @@ const DOMAINS = [
   { slug: 'claims', label: 'claims', aliases: ['claim', 'death claims', 'claim register', 'fnol', 'first notice of loss'], connectorId: 'surcon_coreins', resource: 'claims', opHints: { limit: 25 } },
   { slug: 'advisors', label: 'advisors', aliases: ['advisor', 'agents', 'agency force', 'distributors', 'the advisor'], connectorId: 'surcon_policyadmin', resource: 'advisors', opHints: { limit: 25 } },
   { slug: 'kyc_documents', label: 'kyc documents', aliases: ['kyc', 'kyc docs', 'know your customer', 'identity documents', 'kyc document'], connectorId: 'surcon_coreins', resource: 'kyc_documents', opHints: { limit: 20 } },
+  { slug: 'reimbursement_quota', label: 'reimbursement quota', aliases: ['reimbursement limit', 'expense quota', 'employee quota', 'reimbursement entitlement', 'my quota'], connectorId: 'surcon_policyadmin', resource: 'employee_quota', opHints: { limit: 20 } },
   { slug: 'pricing_rfq', label: 'pricing rfq', aliases: ['quote request', 'pricing quote request', 'rfq', 'group pricing request', 'quote requests'], connectorId: 'surcon_coreins', resource: 'pricing_rfq', opHints: { limit: 20 } },
   { slug: 'pricing_rate_card', label: 'pricing rate card', aliases: ['rate card', 'pricing checklist', 'premium rates', 'pricing model rates'], connectorId: 'surcon_coreins', resource: 'pricing_rate_card', opHints: { limit: 40 } },
   { slug: 'helpdesk_cases', label: 'helpdesk cases', aliases: ['ps helpdesk', 'helpdesk mailbox', 'support cases', 'service requests', 'helpdesk case'], connectorId: 'surcon_coreins', resource: 'helpdesk_cases', opHints: { limit: 20 } },
