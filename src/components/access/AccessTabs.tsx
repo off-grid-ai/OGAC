@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { IdpList } from '@/components/access/IdpList';
+import { InvitesList } from '@/components/access/InvitesList';
 import { MachineClientsList } from '@/components/access/MachineClientsList';
 import { MfaPanel } from '@/components/access/MfaPanel';
 import { RealmLifetimes } from '@/components/access/RealmLifetimes';
@@ -11,7 +12,7 @@ import { TeamsDepartments } from '@/components/access/TeamsDepartments';
 import { UsersList } from '@/components/access/UsersList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TABS = ['users', 'teams', 'clients', 'roles', 'sessions', 'mfa', 'idp', 'realm'] as const;
+const TABS = ['users', 'invites', 'teams', 'clients', 'roles', 'sessions', 'mfa', 'idp', 'realm'] as const;
 type TabValue = (typeof TABS)[number];
 
 export function AccessTabs() {
@@ -31,6 +32,7 @@ export function AccessTabs() {
     <Tabs value={active} onValueChange={onChange}>
       <TabsList>
         <TabsTrigger value="users">Users</TabsTrigger>
+        <TabsTrigger value="invites">Invitations</TabsTrigger>
         <TabsTrigger value="teams">Teams &amp; Departments</TabsTrigger>
         <TabsTrigger value="clients">Machine Clients</TabsTrigger>
         <TabsTrigger value="roles">Roles</TabsTrigger>
@@ -41,6 +43,9 @@ export function AccessTabs() {
       </TabsList>
       <TabsContent value="users" className="space-y-4">
         <UsersList />
+      </TabsContent>
+      <TabsContent value="invites" className="space-y-4">
+        <InvitesList />
       </TabsContent>
       <TabsContent value="teams" className="space-y-4">
         <TeamsDepartments />
