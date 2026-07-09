@@ -5,10 +5,64 @@ export const selfHostingSection: DocSection = {
   label: 'Self-hosting',
   pages: [
     {
+      slug: 'self-hosting/getting-started',
+      title: 'Getting started',
+      description: 'Clone, bring up the stack, run the console.',
+      body: `Off Grid AI is one interface with everything already set up and connected — you stand up
+your own instance and set your org's rules once. Getting a local instance running is three steps.
+
+## 1. Clone and configure
+
+Copy the example environment file and fill in the values you need:
+
+\`\`\`bash
+git clone <your-repo-url> off-grid-ai
+cd off-grid-ai/console
+cp .env.example .env.local
+\`\`\`
+
+The defaults in \`.env.example\` work out of the box for local development — a Postgres URL, an SSO
+placeholder, and a gateway URL. See [Configuration](/docs/self-hosting/configuration) for what each
+group does and how to swap a backend.
+
+## 2. Bring up the stack
+
+The supporting services (Postgres, object storage, secrets, identity) run from the \`deploy/\`
+directory. Start what you need:
+
+\`\`\`bash
+cd deploy && make up        # full stack
+# or a subset:
+make data                   # Postgres + object storage
+make secrets                # secrets store only
+make identity               # self-hosted SSO only
+\`\`\`
+
+Then push the database schema:
+
+\`\`\`bash
+cd ../console && npm run db:push
+\`\`\`
+
+## 3. Run the console
+
+\`\`\`bash
+npm run dev                 # dev server on :3000
+# or a production build:
+npm run build && npm start
+\`\`\`
+
+Open the console, sign in, and everything is wired: the model gateway, retrieval, policy, secrets,
+and audit are all reachable through one surface. Connect a [data source](/docs/integrations/catalog)
+and set your [routing rules](/docs/guides/policy) once — from there it just works.`,
+    },
+    {
       slug: 'self-hosting/deployment',
       title: 'Deployment',
-      description: 'The shape of an Off Grid AI deployment on your own hardware.',
-      body: `Off Grid AI runs on hardware you control. A deployment has three kinds of machine:
+      description: 'The shape of an Off Grid AI deployment on your own servers or your cloud.',
+      body: `Off Grid AI runs wherever you run it — your own servers or your cloud account. The
+topology is the same either way: one interface with everything set up and connected. A deployment
+has three kinds of machine:
 
 - **Control plane** — the console, identity, database, object storage, and the model aggregator.
 - **Gateway nodes** — the machines that run the models (chat, vision, and image). Add or drain nodes
@@ -25,13 +79,14 @@ A reverse proxy (Caddy) fronts the public subdomains, and an outbound tunnel exp
 opening inbound ports — so the platform is reachable even as the network's public IP changes. The
 model API, the console, and the docs are each served through it.
 
-## Air-gapped
+## Self-contained by default
 
-With cloud egress off and only local models in the pool, the whole platform runs with no outbound
-path. Governance, retrieval, and audit are all local, so nothing about the product depends on the
-internet.
+The platform doesn't depend on any hosted Off Grid AI service to run — governance, retrieval, and
+audit all live inside your deployment. Point routing at only the models in your own pool and it runs
+with no outbound path at all; open cloud egress and the same rules govern which requests may reach a
+cloud model. You set that once, for the whole org, and it applies everywhere.
 
-This page is a map; your deployment's exact runbook lives with your platform team.`,
+This page is a map; the exact host list and network layout are specific to your deployment.`,
     },
     {
       slug: 'self-hosting/configuration',
