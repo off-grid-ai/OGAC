@@ -19,7 +19,7 @@ export async function GET() {
   const availableIds = availableChatPipelines(gov);
   const nameById = new Map((await listPipelines(orgId).catch(() => [])).map((p) => [p.id, p.name]));
   return NextResponse.json({
-    projects: await listProjects(userId),
+    projects: await listProjects(userId, orgId),
     chatBinding: {
       defaultChatPipelineId: gov.defaultChatPipelineId,
       available: availableIds,
@@ -39,6 +39,6 @@ export async function POST(req: Request) {
   if (!isChatPipelineAllowed(pipelineId ?? null, gov)) {
     return NextResponse.json({ error: 'pipeline not available for chat' }, { status: 403 });
   }
-  const id = await createProject(userId, name, systemPrompt, pipelineId ?? null);
+  const id = await createProject(userId, await currentOrgId(), name, systemPrompt, pipelineId ?? null);
   return NextResponse.json({ id });
 }
