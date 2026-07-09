@@ -60,7 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // Brain. It RUNS ON a gateway (Gateway & Fleet) and is CONSUMED BY the builder surfaces. Studio
     // stays FIRST — it's the Build group's landing row that the /apps/* surfaces + Build secondaries
     // alias to (see sidebarActiveIdFor); reordering that would relight the sidebar for those routes.
-    primary: ['studio', 'pipelines', 'brain'],
+    primary: ['studio', 'pipelines'],
     secondary: ['agents', 'tools', 'tool-catalog', 'agent-runs', 'evals', 'sandbox', 'provit'],
   },
   {

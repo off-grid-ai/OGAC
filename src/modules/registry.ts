@@ -174,13 +174,6 @@ export const MODULES: readonly ModuleDef[] = [
     service: 'ingest',
   },
   {
-    id: 'brain',
-    label: 'Brain',
-    description: 'Ingestion→retrieval (RAG): KB, SOPs, citations.',
-    route: '/build/brain',
-    service: 'brain',
-  },
-  {
     id: 'agents',
     label: 'Agents',
     description: 'Pre-built AI agent use cases.',

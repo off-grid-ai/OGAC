@@ -33,7 +33,6 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     // built-in primitives.
     tabs: [
       { gate: 'studio', label: 'Studio', route: '/build/studio' },
-      { gate: 'brain', label: 'Brain', route: '/build/brain' },
       { gate: 'tools', label: 'Tools', route: '/build/tools' },
     ],
   },
