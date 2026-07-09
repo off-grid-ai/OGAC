@@ -41,8 +41,8 @@ function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPr
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      // Cross-fade the panel in when it becomes active. Radix unmounts inactive panels,
-      // so `data-[state=active]:og-fade-in` replays the fade+rise on each tab switch.
+      // Quick opacity-only fade (120ms, no rise) when the panel becomes active. Radix unmounts
+      // inactive panels; a tab switch must never move content vertically.
       className={cn('flex-1 outline-none data-[state=active]:og-fade-in', className)}
       {...props}
     />

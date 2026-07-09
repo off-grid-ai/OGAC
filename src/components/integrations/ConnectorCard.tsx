@@ -24,7 +24,7 @@ export interface ConnectorCardData {
 
 export function ConnectorCard({ connector }: { connector: ConnectorCardData }) {
   return (
-    <div className="og-rise flex flex-col justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm transition-shadow duration-300 ease-out hover:shadow-md">
+    <div className="flex flex-col justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm transition-shadow duration-300 ease-out hover:shadow-md">
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
