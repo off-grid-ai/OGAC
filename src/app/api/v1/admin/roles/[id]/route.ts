@@ -8,8 +8,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  await deleteCustomRole(id);
-  auditFromSession(gate, await currentOrgId(), {
+  // Tenant-scoped: only the caller's org role is deleted (cross-tenant delete-by-id — P0).
+  const org = await currentOrgId();
+  await deleteCustomRole(id, org);
+  auditFromSession(gate, org, {
     action: 'access.role.change',
     resource: `role:${id}`,
     outcome: 'ok',

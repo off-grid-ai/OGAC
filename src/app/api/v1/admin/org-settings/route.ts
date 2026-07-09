@@ -14,9 +14,11 @@ import {
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
+  // Per-tenant (SECURITY WAVE 1): read only the caller's org settings — was a single shared row.
+  const org = await currentOrgId();
   const [systemPrompt, chatBinding] = await Promise.all([
-    getOrgSystemPrompt(),
-    getChatBindingGovernance(),
+    getOrgSystemPrompt(org),
+    getChatBindingGovernance(org),
   ]);
   return NextResponse.json({ systemPrompt, chatBinding });
 }
@@ -42,7 +44,7 @@ export async function PUT(req: Request) {
     if (typeof b.systemPrompt !== 'string') {
       return NextResponse.json({ error: 'systemPrompt must be a string' }, { status: 400 });
     }
-    await setOrgSystemPrompt(b.systemPrompt, by);
+    await setOrgSystemPrompt(b.systemPrompt, by, org);
     auditFromSession(gate, org, {
       action: 'org.settings.change',
       resource: 'org:system-prompt',
@@ -59,7 +61,7 @@ export async function PUT(req: Request) {
     const allowlist = Array.isArray(b.chatPipelineAllowlist)
       ? b.chatPipelineAllowlist.filter((x): x is string => typeof x === 'string')
       : [];
-    await setChatBindingGovernance({ defaultChatPipelineId, allowlist }, by);
+    await setChatBindingGovernance({ defaultChatPipelineId, allowlist }, by, org);
     auditFromSession(gate, org, {
       action: 'org.settings.change',
       resource: 'org:chat-pipeline-binding',

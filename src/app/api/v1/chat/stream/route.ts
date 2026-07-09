@@ -224,7 +224,7 @@ export async function POST(req: Request) {
   // Org-wide instructions: an admin-set system prompt injected into EVERY chat as the
   // highest-precedence system block, BEFORE per-user custom instructions. Best-effort.
   try {
-    const orgPrompt = await getOrgSystemPrompt();
+    const orgPrompt = await getOrgSystemPrompt(orgId);
     if (orgPrompt.trim()) messages.push({ role: 'system', content: orgPrompt });
   } catch {
     /* org settings optional — chat still answers without them */

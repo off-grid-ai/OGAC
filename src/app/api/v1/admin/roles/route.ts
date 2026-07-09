@@ -9,7 +9,8 @@ const BASE_ROLES = ['viewer', 'operator', 'admin'];
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listCustomRoles() });
+  // Tenant-scoped (SECURITY WAVE 1): returns only the caller's org roles.
+  return NextResponse.json({ object: 'list', data: await listCustomRoles(await currentOrgId()) });
 }
 
 // eslint-disable-next-line complexity
@@ -26,13 +27,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'basedOn must be viewer | operator | admin' }, { status: 400 });
   }
   const caps = Array.isArray(b?.capabilities) ? (b!.capabilities as string[]) : [];
-  const created = await createCustomRole({
-    name,
-    description: (b?.description as string | undefined) ?? '',
-    basedOn,
-    capabilities: caps,
-  });
-  auditFromSession(gate, await currentOrgId(), {
+  const org = await currentOrgId();
+  const created = await createCustomRole(
+    {
+      name,
+      description: (b?.description as string | undefined) ?? '',
+      basedOn,
+      capabilities: caps,
+    },
+    org,
+  );
+  auditFromSession(gate, org, {
     action: 'access.role.change',
     resource: `role:${created.id}`,
     outcome: 'ok',

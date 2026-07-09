@@ -54,12 +54,12 @@ export default async function AdminPage() {
   const [tenants, rules, bindings, flags, orgPrompt, customRoles, chatBinding, pipelines] =
     await Promise.all([
       listTenants(),
-      listAbacRules(),
+      listAbacRules(orgId),
       listBindings(true),
-      listFlags(),
-      getOrgSystemPrompt(),
-      listCustomRoles(),
-      getChatBindingGovernance(),
+      listFlags(orgId),
+      getOrgSystemPrompt(orgId),
+      listCustomRoles(orgId),
+      getChatBindingGovernance(orgId),
       listPipelines(orgId).catch(() => []),
     ]);
   const sellable = MODULES.filter((m) => !m.internal).map((m) => ({ id: m.id, label: m.label }));
