@@ -1,50 +1,70 @@
-// Pure class-string logic for the mobile stat RAIL primitive (see components/ui/StatRail.tsx).
+// PURE StatRail class builder — ZERO imports, ZERO I/O, fully unit-testable.
 //
-// The founder's mobile rule: a band of stat cards must NOT collapse into a tall single-column
-// stack (more vertical scroll = worse). On mobile it becomes a compact HORIZONTAL rail that
-// scrolls sideways with snap; from the chosen breakpoint up it reverts to the EXACT desktop grid
-// that shipped before, so wide screens are unchanged.
+// A "stat rail" is a band of small stat cards. On a phone there isn't room for a 3–6 column grid,
+// so below the restore breakpoint the band becomes a single horizontal-scroll row (each card keeps
+// a sane min-width and the row scrolls sideways — no vertical stack that eats the fold). At and
+// above the breakpoint it snaps back to the exact desktop grid it always was, so desktop density is
+// untouched.
 //
-// This is a zero-IO, unit-testable string builder. The React wrapper just applies its output.
-//
-// IMPORTANT (Tailwind v4): every returned class must appear as a COMPLETE literal in source so the
-// JIT scanner emits it — no runtime-interpolated class fragments (`${at}:grid-cols-${n}` would be
-// dropped). Hence the full-string lookup tables below.
+// This module only computes class strings — the <StatRail> wrapper (src/components/ui/StatRail.tsx)
+// applies them. Every class is written as a FULL LITERAL string (no runtime interpolation into the
+// class name) so the Tailwind v4 JIT can statically see and emit each utility.
 
-export type StatRailBreakpoint = 'sm' | 'md' | 'lg';
+// How many columns the band restores to on desktop.
+export type StatRailCols = 2 | 3 | 4 | 6;
 
-/** How many columns the restored desktop grid uses. */
-export type StatRailCols = 2 | 3 | 4;
+// The breakpoint at which the rail stops scrolling and becomes the desktop grid.
+export type StatRailBreakpoint = 'sm' | 'md' | 'lg' | 'xl';
 
-// Mobile rail: a horizontal flex track, snap, scrollbar hidden, tight gap, negative-margin so the
-// cards can bleed to the page padding edge and scroll fully. Reuses the repo's established
-// scrollbar-hiding idiom (see ui/cards-carousel.tsx). Each direct child gets a fixed-ish min width,
-// never shrinks, and snaps to start — so the band reads as a single compact row within one fold.
-const MOBILE_RAIL =
-  '-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] ' +
-  '[&::-webkit-scrollbar]:hidden [&>*]:min-w-[8.5rem] [&>*]:shrink-0 [&>*]:snap-start';
+// Mobile rail (below the restore breakpoint): a horizontal flex row that scrolls sideways. Each
+// direct child is given a floor width via the wrapper; here we own the scroll container + gap.
+const RAIL_BASE = 'flex gap-3 overflow-x-auto';
 
-// At/above the breakpoint the container becomes a grid again and every rail affordance is undone,
-// so desktop renders byte-for-byte the prior layout. Full literals, one per breakpoint.
-const DESKTOP_RESET: Record<StatRailBreakpoint, string> = {
-  sm: 'sm:mx-0 sm:grid sm:snap-none sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 sm:[&>*]:min-w-0 sm:[&>*]:shrink',
-  md: 'md:mx-0 md:grid md:snap-none md:gap-4 md:overflow-visible md:px-0 md:pb-0 md:[&>*]:min-w-0 md:[&>*]:shrink',
-  lg: 'lg:mx-0 lg:grid lg:snap-none lg:gap-4 lg:overflow-visible lg:px-0 lg:pb-0 lg:[&>*]:min-w-0 lg:[&>*]:shrink',
+// The grid columns to restore at each breakpoint × col count. Full literal strings only.
+const GRID_RESTORE: Record<StatRailBreakpoint, Record<StatRailCols, string>> = {
+  sm: {
+    2: 'sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-x-visible',
+    3: 'sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-x-visible',
+    4: 'sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-x-visible',
+    6: 'sm:grid sm:grid-cols-6 sm:gap-3 sm:overflow-x-visible',
+  },
+  md: {
+    2: 'md:grid md:grid-cols-2 md:gap-3 md:overflow-x-visible',
+    3: 'md:grid md:grid-cols-3 md:gap-3 md:overflow-x-visible',
+    4: 'md:grid md:grid-cols-4 md:gap-3 md:overflow-x-visible',
+    6: 'md:grid md:grid-cols-6 md:gap-3 md:overflow-x-visible',
+  },
+  lg: {
+    2: 'lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-x-visible',
+    3: 'lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-x-visible',
+    4: 'lg:grid lg:grid-cols-4 lg:gap-3 lg:overflow-x-visible',
+    6: 'lg:grid lg:grid-cols-6 lg:gap-3 lg:overflow-x-visible',
+  },
+  xl: {
+    2: 'xl:grid xl:grid-cols-2 xl:gap-3 xl:overflow-x-visible',
+    3: 'xl:grid xl:grid-cols-3 xl:gap-3 xl:overflow-x-visible',
+    4: 'xl:grid xl:grid-cols-4 xl:gap-3 xl:overflow-x-visible',
+    6: 'xl:grid xl:grid-cols-6 xl:gap-3 xl:overflow-x-visible',
+  },
 };
 
-// The column count restored at the breakpoint. Full literals per (breakpoint, cols).
-const DESKTOP_COLS: Record<StatRailBreakpoint, Record<StatRailCols, string>> = {
-  sm: { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' },
-  md: { 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' },
-  lg: { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' },
+// Per-item min-width floor for the mobile rail so cards don't collapse — cleared once the grid
+// restores (the grid sizes columns itself). Full literal strings only.
+const ITEM_MIN_WIDTH: Record<StatRailBreakpoint, string> = {
+  sm: 'min-w-[9rem] shrink-0 sm:min-w-0 sm:shrink',
+  md: 'min-w-[9rem] shrink-0 md:min-w-0 md:shrink',
+  lg: 'min-w-[9rem] shrink-0 lg:min-w-0 lg:shrink',
+  xl: 'min-w-[9rem] shrink-0 xl:min-w-0 xl:shrink',
 };
 
-/**
- * Full container class string for a stat rail.
- *
- * @param at    breakpoint at/above which the desktop grid returns (default 'lg').
- * @param cols  columns in the restored desktop grid (default 4).
- */
-export function statRailClasses(at: StatRailBreakpoint = 'lg', cols: StatRailCols = 4): string {
-  return `${MOBILE_RAIL} ${DESKTOP_RESET[at]} ${DESKTOP_COLS[at][cols]}`;
+// Classes for the RAIL CONTAINER: horizontal scroll on mobile, restored to a `cols`-column grid at
+// and above `at`. `at` defaults to 'sm', `cols` to 3.
+export function statRailClasses(at: StatRailBreakpoint = 'sm', cols: StatRailCols = 3): string {
+  return `${RAIL_BASE} ${GRID_RESTORE[at][cols]}`;
+}
+
+// Classes for EACH ITEM in the rail: a min-width floor on mobile, cleared at/above `at` so the grid
+// column sizing takes over. `at` defaults to 'sm'.
+export function statRailItemClasses(at: StatRailBreakpoint = 'sm'): string {
+  return ITEM_MIN_WIDTH[at];
 }
