@@ -6,7 +6,7 @@ import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { FlowDiagram } from '@/app/_landing/flow-diagram';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
-import { SeeItLive } from '@/app/_landing/see-it-live';
+import { BookCallDialog } from '@/components/auth/BookCallDialog';
 import { AuroraText } from '@/components/ui/aurora-text';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
@@ -139,8 +139,8 @@ export default function LandingPage() {
                 </p>
               </BlurFade>
               <BlurFade delay={0.32} inView>
-                <div className="mt-7">
-                  <SeeItLive />
+                <div className="mt-7 flex max-w-xs">
+                  <BookCallDialog label="Book a demo" variant="default" size="lg" className="w-full" />
                 </div>
               </BlurFade>
               <BlurFade delay={0.4} inView>
