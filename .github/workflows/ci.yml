@@ -1,9 +1,14 @@
 name: CI
 
-# The same gate the pre-push hook enforces locally, now enforced in CI on every push + PR:
-# typecheck, tests, coverage >= 85% on all of statements/branches/functions/lines/conditions
-# (c8 --check-coverage, thresholds in .c8rc.json), and a clean production build.
-# A push/PR that drops below the bar fails here, not just on a developer's machine.
+# The same aggressive quality gate (#226) the pre-push hook enforces locally,
+# now enforced in CI on every push + PR. BLOCKING: typecheck, tests + coverage
+# >= 85% on all of statements/branches/functions/lines/conditions (c8, thresholds
+# in .c8rc.json), depcruise (no eager-value cycles / boundary breaks), jscpd
+# (duplication under threshold), knip (no dead files / dep drift), gitleaks
+# (no committed secrets), audit-ci (no HIGH/CRITICAL advisories), docs:links
+# (no broken internal doc links), and a clean production build. REPORT-ONLY
+# (continue-on-error, ratchet later): format:check, lint:typed. A push/PR that
+# drops below the bar fails here, not just on a developer's machine.
 
 on:
   push:
@@ -23,6 +28,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: console
+          # gitleaks scans commit history; a full clone (fetch-depth 0) lets it
+          # diff the whole range, not just the tip.
+          fetch-depth: 0
+
+      # Secret scan — the always-on backstop for the local `npm run security:secrets`.
+      # Runs the maintained gitleaks-action over the repo (history + working tree)
+      # with our allowlist (.gitleaks.toml). Fails the job on any REAL leaked secret.
+      # The local pre-push script no-ops when the gitleaks binary is absent; THIS
+      # job is the gate that always runs, so nothing slips through.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Point the action at our allowlist config (dev/demo placeholders,
+          # local compose defaults, synthetic BFSI demo values).
+          GITLEAKS_CONFIG: ${{ github.workspace }}/console/.gitleaks.toml
+          # The action scans the repo checked out at $GITHUB_WORKSPACE; our repo
+          # is under ./console, so scope the scan there.
+          GITLEAKS_SOURCE: ${{ github.workspace }}/console
+          # No license needed for public repos / gitleaks OSS action usage.
+          GITHUB_TOKEN: ${{ github.token }}
 
       # The @offgrid/* deps are file: links to the sibling shared monorepo. CI needs it
       # checked out as a sibling so `npm ci` can resolve them (mirrors the local layout).
@@ -72,6 +97,40 @@ jobs:
       - name: jscpd DRY gate (code duplication under threshold)
         working-directory: console
         run: npm run jscpd
+
+      # Dead-code / dependency-drift gate: fails on dead files, unused or
+      # undeclared (unlisted) dependencies, or missing binaries. Scope + the
+      # intentional ignore list live in knip.json. (Unused EXPORTS are excluded
+      # from this gate — in a Next.js + barrel-export codebase they are dominated
+      # by false positives; see docs/ENGINEERING.md § Quality gate.)
+      - name: knip dead-code gate (no dead files / dep drift)
+        working-directory: console
+        run: npm run knip
+
+      # Dependency vulnerability gate: fails on any HIGH/CRITICAL npm advisory.
+      # Threshold + moderate-advisory rationale in audit-ci.jsonc.
+      - name: Dependency audit gate (no HIGH/CRITICAL advisories)
+        working-directory: console
+        run: npm run security:audit
+
+      # Docs gate: fails on a broken INTERNAL (relative) markdown link; external
+      # links are reported as warnings only (network-flaky). Rules: src/lib/doc-links.ts.
+      - name: Docs dead-link gate (internal links)
+        working-directory: console
+        run: npm run docs:links
+
+      # ── REPORT-ONLY (continue-on-error) — surfaced, not blocking ────────────
+      # Known large pre-existing baselines whose one-shot fix is out of scope for
+      # a single change; ratcheted to blocking once burned down (see the same
+      # steps in .githooks/pre-push and docs/ENGINEERING.md § Quality gate).
+      - name: (report) Prettier format drift
+        working-directory: console
+        continue-on-error: true
+        run: npm run format:check
+      - name: (report) Typed lint — no-unnecessary-condition
+        working-directory: console
+        continue-on-error: true
+        run: npm run lint:typed
 
       - name: Production build
         working-directory: console

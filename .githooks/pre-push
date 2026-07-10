@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 #
-# Off Grid Console — pre-push gate.
+# Off Grid Console — pre-push gate (aggressive quality gate, #226).
+#
+# The full local mirror of CI. BLOCKING gates (fail the push): typecheck,
+# coverage:check, depcruise, jscpd, knip, security:secrets (gitleaks),
+# security:audit (audit-ci HIGH/CRITICAL), docs:links (internal). REPORT-ONLY
+# (run, never block, ratchet later): format:check, lint:typed. See the two
+# labelled sections below for the exact commands + rationale.
 #
 # Blocks a push unless the code typechecks AND the unit-testable logic layer
 # (`src/lib` pure logic + adapters' pure paths, per .c8rc.json's include/exclude)
@@ -37,6 +43,9 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# ── BLOCKING gates: any non-zero exit here blocks the push ────────────────────
+# These are all GREEN on the current tree; a regression fails the push.
+
 echo "pre-push: typecheck…"
 npm run --silent typecheck
 
@@ -49,4 +58,37 @@ npm run --silent depcruise
 echo "pre-push: jscpd (code duplication ≤ threshold — DRY §C)…"
 npm run --silent jscpd
 
-echo "pre-push: OK — typecheck clean, coverage above the bar, dependency graph clean, duplication under the bar."
+echo "pre-push: knip (no dead files / unused or undeclared deps / missing binaries)…"
+npm run --silent knip
+
+echo "pre-push: security:secrets (gitleaks — no committed secrets; no-op if binary absent)…"
+npm run --silent security:secrets
+
+echo "pre-push: security:audit (no HIGH/CRITICAL dependency advisories)…"
+npm run --silent security:audit
+
+echo "pre-push: docs:links (no broken INTERNAL doc links; external links warn-only)…"
+npm run --silent docs:links
+
+# ── REPORT-ONLY steps: run for visibility, never block ────────────────────────
+# These carry a KNOWN, LARGE pre-existing baseline that is NOT a regression and
+# whose one-shot fix is a repo-wide reformat / defensive-check audit out of scope
+# for a single change. They follow the same baseline-then-ratchet contract as the
+# blocking gates above: surfaced on every push, ratcheted to blocking once the
+# baseline is burned down (tracked in docs/GAPS_BACKLOG.md). `|| true` keeps them
+# non-blocking; drop the `|| true` to promote a step to a hard gate.
+#
+#   • format:check — Prettier. ~870 files predate the printWidth:100 style; a
+#     bulk `prettier --write` is a separate, reviewable change.
+#   • lint:typed  — @typescript-eslint/no-unnecessary-condition. Type-aware, but
+#     without `noUncheckedIndexedAccess` (which itself adds 300+ type errors) it
+#     flags correct defensive checks on JSON/index/cast boundaries as false
+#     positives. Kept as a report until that tsconfig ratchet lands.
+
+echo "pre-push: (report) format:check — Prettier drift, non-blocking…"
+npm run --silent format:check || true
+
+echo "pre-push: (report) lint:typed — type-aware no-unnecessary-condition, non-blocking…"
+npm run --silent lint:typed || true
+
+echo "pre-push: OK — typecheck, coverage, depcruise, jscpd, knip, secrets, audit, and doc-links all clean."
