@@ -59,6 +59,18 @@ export default async function FleetPage() {
 
   return (
     <div className="space-y-6">
+      <Card className="border-primary/20 bg-primary/5 shadow-sm">
+        <CardContent className="flex items-start gap-3 py-4">
+          <Badge variant="secondary" className="mt-0.5 bg-primary/10 text-primary">
+            Coming soon
+          </Badge>
+          <p className="text-xs text-muted-foreground">
+            Device inventory and health read back live. Enrollment and device commands (lock, wipe,
+            configuration push) are coming soon.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
           MDM backend
