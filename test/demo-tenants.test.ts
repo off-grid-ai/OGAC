@@ -5,6 +5,7 @@ import {
   DEMO_TENANTS,
   demoTenantHref,
   isDemoTenantSlug,
+  isSafeConsoleHref,
 } from '../src/lib/demo-tenants.ts';
 
 // Real inputs, no mocks — pure link/allow-list rules for the public demo tenants. The apex defaults
@@ -27,7 +28,10 @@ test('isDemoTenantSlug: true only for a known demo slug', () => {
 });
 
 test('consoleUrl: DEEP-LINKS the console overview (the See-it-live target), no double slash', () => {
-  assert.equal(consoleUrl('bharatunion'), 'https://bharatunion-onprem-console.getoffgridai.co/overview');
+  assert.equal(
+    consoleUrl('bharatunion'),
+    'https://bharatunion-onprem-console.getoffgridai.co/overview',
+  );
   assert.equal(consoleUrl('suraksha'), 'https://suraksha-onprem-console.getoffgridai.co/overview');
   // exactly one slash between host and path
   assert.doesNotMatch(consoleUrl('bharatunion'), /\.co\/\/overview/);
@@ -42,7 +46,24 @@ test('demoTenantHref: returns the /overview deep-link for a known demo, and it s
   assert.ok(u.hostname.endsWith('.getoffgridai.co'));
   assert.equal(u.pathname, '/overview');
 
-  assert.equal(demoTenantHref('suraksha'), 'https://suraksha-onprem-console.getoffgridai.co/overview');
+  assert.equal(
+    demoTenantHref('suraksha'),
+    'https://suraksha-onprem-console.getoffgridai.co/overview',
+  );
+});
+
+test('isSafeConsoleHref: accepts an apex /overview https URL, rejects off-suite/wrong-path/malformed', () => {
+  assert.equal(isSafeConsoleHref('https://x-onprem-console.getoffgridai.co/overview'), true);
+  assert.equal(isSafeConsoleHref('https://getoffgridai.co/overview'), true);
+  // wrong scheme
+  assert.equal(isSafeConsoleHref('http://x-onprem-console.getoffgridai.co/overview'), false);
+  // off-suite host
+  assert.equal(isSafeConsoleHref('https://evil.example.com/overview'), false);
+  // wrong path
+  assert.equal(isSafeConsoleHref('https://x-onprem-console.getoffgridai.co/admin'), false);
+  // malformed — exercises the catch/false branch directly
+  assert.equal(isSafeConsoleHref('not a url'), false);
+  assert.equal(isSafeConsoleHref(''), false);
 });
 
 test('demoTenantHref: null for an unknown/blank/absent slug (never links off-suite)', () => {
