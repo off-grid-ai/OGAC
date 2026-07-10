@@ -74,6 +74,13 @@ lineage, and knowledge bases one time. From then on, every employee and every ag
 automatically. Nobody re-implements governance. Nobody works around it. Nobody ships an app your
 risk team has not already blessed.
 
+![One governed door to every model: route, guardrail, observe, and kill every call from one place](public/docs-shots/gateway.png)
+
+The rules live in one place and travel with every call, so moving fast and staying inside policy
+stop being a trade-off.
+
+![The policy engine every app inherits: who can use which model, data, and tool, provably enforced](public/docs-shots/policy.png)
+
 ## How it flows
 
 ```
@@ -102,6 +109,10 @@ reversible account.
   sandbox.
 - **Compliance.** Every run is audited, every answer cited, every output signed. Export it and hand
   it to a regulator.
+
+![Every call, cost, and outcome on one observable record, per user, team, and project](public/docs-shots/observability.png)
+
+**[Take the live product tour →](https://onprem-console.getoffgridai.co/docs)** — the whole product, screen by screen, running on real data. Or **[open the console](https://onprem-console.getoffgridai.co)** and click around read-only.
 
 ## Why it matters
 
