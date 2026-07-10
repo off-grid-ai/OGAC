@@ -17,14 +17,27 @@ import {
 const CAL_EMBED =
   'https://cal.com/mohammed-ali-chherawalla-jlvdhw/discovery-off-grid-ai-console-provit?embed=true&theme=auto';
 
-export function BookCallDialog() {
+// Reused on the signin page (default "Book a call", outline) AND the marketing landing (label
+// "Book a demo", primary emerald CTA) — one booking dialog, no duplication. The trigger's label +
+// styling are props; the cal.com embed is identical.
+export function BookCallDialog({
+  label = 'Book a call',
+  variant = 'outline',
+  size = 'sm',
+  className = 'w-full',
+}: {
+  label?: string;
+  variant?: 'outline' | 'default';
+  size?: 'sm' | 'default' | 'lg';
+  className?: string;
+} = {}) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full">
-          Book a call
+        <Button variant={variant} size={size} className={className}>
+          {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl p-0">
