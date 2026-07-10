@@ -144,29 +144,6 @@ A run's id ties it together across the [audit ledger](/docs/guides/audit), the
 them.`,
     },
     {
-      slug: 'guides/brain',
-      title: 'Brain',
-      description: 'The power-user workbench - documents, retrieval, tools, router, and evals in one place.',
-      body: `Brain is the workbench for the person tuning the retrieval-and-reasoning core directly. Where
-[Knowledge](/docs/guides/knowledge) and [Studio](/docs/guides/studio) hide the machinery, Brain
-exposes it, so you can inspect and tune each part.
-
-![Brain - documents, retrieval, tools, router, and evals in one power-user workbench](/docs-shots/brain.png)
-
-## What it exposes
-
-- **Documents** - ingest and manage the corpus Brain retrieves from, and search it directly.
-- **Retrieval** - run a query and see the chunks that come back, to check what a grounded answer
-  would draw on.
-- **Grounding verifier** - check an answer against its sources on demand.
-- **Tools** - register and toggle the tools an agent can call.
-- **Router** - try a prompt against the routing rules and see where it would land.
-- **Prompts & golden cases** - manage reusable prompts and the eval golden set, and run an eval.
-
-Brain is for builders and platform operators who want the controls in the open. Everything it runs
-still flows through the same governed pipeline as the rest of the console.`,
-    },
-    {
       slug: 'guides/retrieval',
       title: 'Retrieval',
       description: 'Inspect and tune the index behind every grounded answer.',

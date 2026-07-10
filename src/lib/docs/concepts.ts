@@ -115,8 +115,8 @@ deployment enables the set you bought; the console shows only those.
 
 - **Workspace** - where people use AI: Chat, Projects, Artifacts, Prompts, Knowledge, Storage,
   Studio.
-- **Intelligence** - Agents, Agent runs, Brain, Evals, Sandbox.
-- **Gateway & Fleet** - the model gateway, the nodes that serve models, and the network edge.
+- **Intelligence** - Agents, Agent runs, Evals, Sandbox.
+- **Gateway & nodes** - the model gateway, the nodes that serve models, and the network edge.
 - **Data** - connectors, ingestion, retrieval, and lineage.
 - **Governance** - policy, guardrails, access, secrets, regulatory, provenance.
 - **Insights** - observability, analytics, cost, drift, security events.
