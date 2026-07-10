@@ -50,8 +50,9 @@ export async function POST(req: Request) {
   } catch (e) {
     const { deleteConnector } = await import('@/lib/store');
     await deleteConnector(created.id, orgId).catch(() => undefined);
+    console.error('vault write failed on connector create:', e);
     return NextResponse.json(
-      { error: `Could not store the credential securely: ${(e as Error).message}` },
+      { error: 'Could not store the credential securely. Please try again.' },
       { status: 502 },
     );
   }
