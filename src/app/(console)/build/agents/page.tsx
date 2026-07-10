@@ -3,6 +3,7 @@ import { AgentsGrid, type AgentCardModel } from '@/components/agents/AgentsGrid'
 import { CreateAgentButton } from '@/components/agents/CreateAgentButton';
 import { AppsList } from '@/components/build/AppsList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { agentActivity, listManagedAgents } from '@/lib/agents';
 import { filterSingleStepApps } from '@/lib/app-model';
 import { listApps } from '@/lib/apps-store';
@@ -91,12 +92,12 @@ export default async function AgentsPage() {
       </div>
 
       {/* Stat band — agent-scoped (not the app-wide Studio band). */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatRail>
         <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
         <Stat label="Single-step apps" value={singleStepApps.length} />
         <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
         <Stat label="Grounded in the Brain" value={`${activity.groundedShare}%`} />
-      </div>
+      </StatRail>
 
       {/* The agent roster — each card links to its own detail (/build/agents/[id]). */}
       <div className="space-y-2">

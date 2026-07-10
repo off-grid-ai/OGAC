@@ -3,6 +3,7 @@ import { KeysTable } from '@/components/finops/KeysTable';
 import { TokenBudgets } from '@/components/finops/TokenBudgets';
 import { GatewayCost } from '@/components/gateway/GatewayCost';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   Table,
   TableBody,
@@ -64,12 +65,12 @@ export default async function FinOpsPage({
         <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
       </div>
 
-      <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+      <StatRail>
         <Stat label="Spend (all time)" value={usd(f.totals.costUsd)} />
         <Stat label="Requests" value={f.totals.requests.toLocaleString()} />
         <Stat label="Tokens" value={f.totals.tokens.toLocaleString()} />
         <Stat label="Ran on-device" value={`${f.totals.localShare}%`} />
-      </div>
+      </StatRail>
 
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">

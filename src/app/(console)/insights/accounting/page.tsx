@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Coins, CurrencyDollar, Users, FolderSimple } from '@phosphor-icons/react/dist/ssr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   Table,
   TableBody,
@@ -102,12 +103,12 @@ export default async function AccountingPage({
       </div>
 
       {/* Org totals */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatRail>
         <Stat label="Total spend" value={usd(a.totals.costUsd)} icon={CurrencyDollar} />
         <Stat label="Total tokens" value={num(a.totals.tokens)} icon={Coins} />
         <Stat label="Users" value={num(a.byActor.length)} icon={Users} />
         <Stat label="Projects" value={num(a.byProject.length)} icon={FolderSimple} />
-      </div>
+      </StatRail>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Top users by tokens + spend */}
