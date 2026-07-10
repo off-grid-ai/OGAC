@@ -212,7 +212,7 @@ wants these behind product terms.
 Structure/hero kept as crafted. Facts verified against reality + `mission_vision.md`; the
 `data → gateway → pipelines → agents/apps → compliance` narrative matches. Corrections:
 
-- **Node version drift**: the Node badge says ≥22; two prose lines said "Node 20+". The runtime is
+- **Node version drift**: the Node badge says ≥22; one prose line said "Node 20+". The runtime is
   Node 22+ (server runs node22; `package.json`/badge say 22). Corrected the prose to "Node 22+".
   - Before (line ~37): `Needs Docker and Node 20+.`
   - After: `Needs Docker and Node 22+.`

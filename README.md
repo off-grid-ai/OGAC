@@ -34,7 +34,7 @@ npm run db:push                   # create the schema
 npm run dev                       # http://localhost:3000
 ```
 
-That is the setup. It just works. Needs Docker and Node 20+. The full backing stack is one
+That is the setup. It just works. Needs Docker and Node 22+. The full backing stack is one
 `docker compose` bring-up, wired together, and every capability has a first-party default so you
 only run the pieces you want. Run it on your own servers or in your cloud, your call.
 
@@ -148,7 +148,7 @@ variable at a best-in-class open-source engine. Same governance either way.
 | Model gateway | [Off Grid AI Desktop](https://github.com/off-grid-ai/off-grid-ai-desktop) in gateway mode, OpenAI-compatible, local fleet or cloud | — | Gateway |
 | State + audit | [Postgres](https://www.postgresql.org) (append-only audit is always on) | — | everywhere |
 | Identity / SSO | [Keycloak](https://www.keycloak.org) (OIDC) | — | Access |
-| Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Brain, Knowledge |
+| Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Knowledge, Retrieval |
 | Policy decisions | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
 | Guardrails (screen prompts + responses) | regex floor (PII detect + mask) | [Presidio](https://microsoft.github.io/presidio/) (ML PII) or an external guard over HTTP ([Lakera](https://www.lakera.ai), [Aporia](https://www.aporia.com), self-hosted) | Control |
 | Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
