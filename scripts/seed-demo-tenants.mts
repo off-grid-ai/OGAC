@@ -40,6 +40,7 @@ import {
   BHARAT_PROFILE,
   SURAKSHA_PROFILE,
   TOUR_PROFILES,
+  viewerEmailEnvKey,
   type TenantProfile,
   agentRunId,
   appsFor,
@@ -357,7 +358,12 @@ async function seedChat(profile: TenantProfile): Promise<void> {
     await db
       .insert(chatConversations)
       .values({ id: cid, userId: profile.viewerEmail, orgId: profile.orgId, title: conv.title, model: conv.model })
-      .onConflictDoNothing({ target: chatConversations.id });
+      // Reconcile ownership on re-run: an earlier seed may have written these deterministic-id rows
+      // under a placeholder userId. Upsert userId (+ title/model) so they land on the REAL viewer.
+      .onConflictDoUpdate({
+        target: chatConversations.id,
+        set: { userId: profile.viewerEmail, title: conv.title, model: conv.model },
+      });
     for (let i = 0; i < conv.messages.length; i++) {
       const m = conv.messages[i];
       await db
@@ -435,8 +441,15 @@ async function seedProfile(profile: TenantProfile, now: number): Promise<void> {
 
 async function main(): Promise<number> {
   const only = process.env.OFFGRID_SEED_TENANT;
-  const profiles = only ? TOUR_PROFILES.filter((p) => p.orgId === only) : TOUR_PROFILES;
-  if (only && profiles.length === 0) throw new Error(`unknown OFFGRID_SEED_TENANT "${only}" (expected org_bharat or org_suraksha)`);
+  const selected = only ? TOUR_PROFILES.filter((p) => p.orgId === only) : TOUR_PROFILES;
+  if (only && selected.length === 0) throw new Error(`unknown OFFGRID_SEED_TENANT "${only}" (expected org_bharat or org_suraksha)`);
+  // Own per-user rows (chat, the viewer user itself) under the REAL login email from env — the same
+  // identity the tenant's viewer signs in with (session.user.email). Without this, seeded chat is
+  // owned by a placeholder that never matches the session and the Chat surface reads empty.
+  const profiles = selected.map((p) => {
+    const email = process.env[viewerEmailEnvKey(p.slug)];
+    return email ? { ...p, viewerEmail: email } : p;
+  });
   const now = Date.now();
   // A thrown tenant (e.g. assertAllowed) must not stop the OTHER tenant from seeding.
   for (const p of profiles) {
