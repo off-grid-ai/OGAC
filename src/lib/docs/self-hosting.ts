@@ -66,9 +66,9 @@ has three kinds of machine:
 
 - **Control plane** - the console, identity, database, object storage, and the model aggregator.
 - **Gateway nodes** - the machines that run the models (chat, vision, and image). Add or drain nodes
-  from the [Fleet](/docs/guides/fleet) surface.
+  from the [AI Gateway](/docs/guides/gateway).
 
-![Fleet - the nodes that serve your models, their roles, and enable or drain each one](/docs-shots/fleet.png)
+![The AI Gateway - the nodes that serve your models, their roles, and enable or drain each one](/docs-shots/gateway.png)
 
 - **Auxiliary services** - observability, feature flags, PII detection, and BI, each swappable behind
   a capability port.
@@ -135,9 +135,9 @@ exact per-service settings.`,
       description: 'Add capacity by adding nodes; drain without downtime.',
       body: `Scale the model tier by adding gateway nodes. The aggregator round-robins across the
 enabled nodes for a given model, so more nodes means more throughput without config changes beyond
-registering them in [Fleet](/docs/guides/fleet).
+registering them on the [AI Gateway](/docs/guides/gateway).
 
-![Scale by adding nodes - the aggregator round-robins the enabled nodes for a model](/docs-shots/fleet.png)
+![Scale by adding nodes - the aggregator round-robins the enabled nodes for a model](/docs-shots/gateway.png)
 
 - **Add capacity** - register a node, assign it a model, enable it. It joins the routing pool.
 - **Drain** - disable a node to take it out of rotation for maintenance without removing it.

@@ -110,24 +110,26 @@ You add a rule, open the routing tester, paste a sample request, and see exactly
     },
     {
       slug: 'guides/fleet',
-      title: 'Fleet',
-      description: 'Run the nodes and models that serve your AI.',
-      body: `Fleet is how you run the hardware behind the platform. A single source-of-truth table
-holds your topology; everything downstream is derived from it.
+      title: 'Model nodes',
+      description: 'Run the nodes and models that serve your AI, right from the gateway.',
+      body: `The nodes that serve your models are managed on the [AI Gateway](/docs/guides/gateway).
+Each node shows its health, the model it runs, and its role, and you act on it in place - no separate
+console to keep in sync.
 
-![Fleet - nodes, their roles, the model each serves, and enable/disable](/docs-shots/fleet.png)
+![The AI Gateway - the nodes serving each model, their role, and their live health](/docs-shots/gateway.png)
 
 ## What you manage
 
 - **Nodes** - each gateway node, its role (chat, vision, image, server, spare), the model it serves,
   and whether it's enabled.
-- **Models per node** - edit a node's model, context size, or enable/disable it from the console; the
-  change saves to the database and is pushed to the node.
-- **Routing pool** - the aggregator reads its routing pool from this source of truth, so the console
-  is where you decide what the fleet looks like.
+- **Model per node** - swap the model a node runs, or restart it, straight from its card. The action
+  runs for real against the node, not just a saved preference.
+- **Enable / drain** - disable a node to take it out of rotation for maintenance without removing it,
+  then re-enable it when it's back. The aggregator round-robins the enabled nodes for a model, so
+  draining one shifts traffic to the rest.
 
-Draining a node (disable) takes it out of rotation without removing it, so you can service hardware
-without editing config by hand.`,
+The gateway is the source of truth for what the model estate looks like, so this is the one place you
+decide which nodes serve which models.`,
     },
     {
       slug: 'guides/observability',
