@@ -210,7 +210,13 @@ a public consumer chatbot or a throwaway prototype.
 
 ## License
 
-Open source under AGPL-3.0. The entire platform. Nothing held back, nothing gated.
+Open source under **AGPL-3.0** ([`LICENSE`](LICENSE)) — the entire platform, nothing held back,
+nothing gated. Run it on your own infrastructure at any scale for free. If you modify it and serve
+it to users over a network, AGPL asks you to publish those modifications under the same license.
+
+Need to keep your modifications private, embed it in a closed-source product, or get a warranty,
+indemnity, and support SLA? A **commercial license** (same code, no copyleft obligation) is
+available — see [`COMMERCIAL.md`](COMMERCIAL.md) or email mac@getoffgridai.co.
 
 ---
 
