@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// The gateway aggregator (S1 :8800) records every proxied call — per-gateway counters and a
-// rolling log of recent requests. This route proxies that feed so the console can render live
-// gateway traffic without the browser reaching the aggregator directly. Returns null-ish shape
-// when the gateway is a plain single node (no /traffic endpoint) so the UI can hide the panel.
+// The gateway (LiteLLM proxy) records every proxied call — per-gateway counters and a rolling log
+// of recent requests. This route proxies that feed so the console can render live gateway traffic
+// without the browser reaching the gateway directly. Returns null-ish shape when the gateway is a
+// plain single node (no /traffic endpoint) so the UI can hide the panel.
 const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 export async function GET() {
