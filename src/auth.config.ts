@@ -27,6 +27,24 @@ export const devLoginEnabled = env.AUTH_DEV_LOGIN === 'true' && env.NODE_ENV !==
 // IdP page. Available whenever the identity backend (Keycloak) is configured.
 export const passwordEnabled = keycloakEnabled;
 
+// Edge-safe org-claim reader for the OIDC (keycloak-oidc) jwt branch. Mirrors identity's `orgFrom`
+// claim shapes (top-level `org` > `organization` string > `organization` group array), but is kept
+// local here on purpose: this config is shared with the Edge middleware, and importing the server-only
+// identity module (fetch/Buffer, dynamically imported by the Credentials provider) would drag it into
+// the Edge bundle. The ROPC/password path — the one in production — resolves org via orgFrom on the
+// AppUser; this branch is the harmless future-proof twin for a real OIDC redirect flow.
+function orgClaim(p: Record<string, unknown>): string | undefined {
+  const org = p['org'];
+  if (typeof org === 'string' && org.trim()) return org.trim();
+  const organization = p['organization'];
+  if (typeof organization === 'string' && organization.trim()) return organization.trim();
+  if (Array.isArray(organization)) {
+    const first = organization.find((v) => typeof v === 'string' && v.trim());
+    if (typeof first === 'string') return first.trim();
+  }
+  return undefined;
+}
+
 const providers: Provider[] = [];
 if (googleEnabled) providers.push(Google);
 if (microsoftEnabled) {
@@ -114,9 +132,16 @@ export const authConfig = {
         // Also accept a top-level `role` claim if set in Keycloak's token mapper.
         const direct = typeof kc['role'] === 'string' ? kc['role'] : null;
         token.role = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
+        // Carry the tenant org if the OIDC token maps it (harmless, future-proof — the ROPC/password
+        // path below is the one in use today). Same claim shapes as identity's orgFrom.
+        const oidcOrg = orgClaim(kc);
+        if (oidcOrg) token.org = oidcOrg;
       } else if (user) {
-        // Non-Keycloak sign-in (dev credentials, Google, Microsoft): use DB role.
+        // Non-Keycloak sign-in (dev credentials, Google, Microsoft) and the console-owned
+        // password/ROPC path: use the role + org the identity seam resolved onto the AppUser.
+        // Preserve an already-bound token.org across refreshes when this call carries none.
         token.role = (user as { role?: string }).role ?? 'viewer';
+        token.org = (user as { org?: string }).org ?? token.org;
       }
       // Founder/bootstrap escape hatch — applies to EVERY provider and every token
       // refresh: any email in OFFGRID_ADMIN_EMAILS is always admin. Solves the
@@ -133,7 +158,11 @@ export const authConfig = {
       return token;
     },
     session({ session, token }) {
-      if (session.user) session.user.role = token.role as string | undefined;
+      if (session.user) {
+        session.user.role = token.role as string | undefined;
+        // Propagate the tenant org so tenancy binding (bindTenantOrg) sees actorOrg on this session.
+        session.user.org = token.org as string | undefined;
+      }
       return session;
     },
   },

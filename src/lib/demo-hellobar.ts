@@ -66,33 +66,73 @@ export function readDemoBanner(role: string | null | undefined): DemoBannerModel
 // shows the read-only note (never crashing, just without creds). Same DemoBannerModel shape so the
 // note copy is shared (DRY) with the authed hellobar.
 
+// There are TWO demo tenants (bharatunion, suraksha), each with its OWN read-only viewer login, so
+// the signin banner must surface the RIGHT tenant's creds for the host the visitor arrived on. The
+// resolver reads a per-slug override first and falls back to the generic pair — so a single-tenant
+// deploy still works with just the generic vars, and a multi-tenant deploy overrides per tenant.
+
+export interface DemoCreds {
+  email: string;
+  password: string;
+}
+
+// The subset of process.env the resolver reads. Passed in (not read here) so the rule is PURE and
+// unit-testable without touching the real environment.
+export interface DemoCredsEnv {
+  [key: string]: string | undefined;
+}
+
+// The per-slug env var key for a tenant's viewer email/password, e.g. bharatunion →
+// OFFGRID_DEMO_VIEWER_BHARATUNION_EMAIL. Uppercased; only [A-Z0-9_] survive so a slug can never
+// smuggle a foreign env key.
+function slugEnvKey(slug: string, field: 'EMAIL' | 'PASSWORD'): string {
+  const safe = slug.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+  return `OFFGRID_DEMO_VIEWER_${safe}_${field}`;
+}
+
+const pick = (v: string | undefined): string | null => {
+  const t = typeof v === 'string' ? v.trim() : '';
+  return t.length > 0 ? t : null;
+};
+
+/**
+ * Resolve the viewer creds to show for a demo tenant. Precedence, per field, first non-empty wins:
+ *   1. the per-slug override — OFFGRID_DEMO_VIEWER_<SLUG>_EMAIL / _PASSWORD,
+ *   2. the generic fallback — OFFGRID_DEMO_VIEWER_EMAIL / _PASSWORD.
+ * Returns null when the slug is absent, or when NEITHER a full email+password pair resolves (so the
+ * banner still renders the read-only note but shows no half-set creds). Pure — slug + env in, out.
+ */
+export function resolveDemoCreds(slug: string | null | undefined, env: DemoCredsEnv): DemoCreds | null {
+  if (!slug) return null;
+  const email = pick(env[slugEnvKey(slug, 'EMAIL')]) ?? pick(env.OFFGRID_DEMO_VIEWER_EMAIL);
+  const password = pick(env[slugEnvKey(slug, 'PASSWORD')]) ?? pick(env.OFFGRID_DEMO_VIEWER_PASSWORD);
+  if (!email || !password) return null;
+  return { email, password };
+}
+
 export interface SigninDemoBannerInput {
-  isTenantHost: boolean; // the request host is a demo tenant subdomain (from tenantSlugFromHost)
-  email: string | null | undefined; // OFFGRID_DEMO_VIEWER_EMAIL
-  password: string | null | undefined; // OFFGRID_DEMO_VIEWER_PASSWORD
+  slug: string | null | undefined; // the demo tenant slug (from tenantSlugFromHost), or null off-host
+  creds: DemoCreds | null; // the resolved per-tenant creds, or null when unset/not a demo host
 }
 
 /**
- * Decide the signin-page demo banner. Shows on a demo tenant host regardless of session (the visitor
- * is logged out). Credentials pass through when set, else null (note still shown). Pure.
+ * Decide the signin-page demo banner. Shows on a demo tenant host (slug present) regardless of
+ * session (the visitor is logged out). The resolved per-tenant creds pass through when set, else null
+ * (note still shown). Pure.
  */
 export function buildSigninDemoBanner(input: SigninDemoBannerInput): DemoBannerModel {
   return {
-    show: input.isTenantHost,
-    email: clean(input.email),
-    password: clean(input.password),
+    show: Boolean(input.slug),
+    email: clean(input.creds?.email),
+    password: clean(input.creds?.password),
     note: DEMO_READONLY_NOTE,
   };
 }
 
 /**
- * The impure reader for the signin banner: resolve the model from process env given whether the
- * request host is a demo tenant. Thin — reads the two env vars, delegates to the pure builder.
+ * The impure reader for the signin banner: resolve the model from process env given the demo tenant
+ * slug for this host. Thin — resolves the per-tenant creds and delegates to the pure builder.
  */
-export function readSigninDemoBanner(isTenantHost: boolean): DemoBannerModel {
-  return buildSigninDemoBanner({
-    isTenantHost,
-    email: process.env.OFFGRID_DEMO_VIEWER_EMAIL,
-    password: process.env.OFFGRID_DEMO_VIEWER_PASSWORD,
-  });
+export function readSigninDemoBanner(slug: string | null | undefined): DemoBannerModel {
+  return buildSigninDemoBanner({ slug, creds: resolveDemoCreds(slug, process.env) });
 }

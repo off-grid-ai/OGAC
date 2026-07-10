@@ -12,6 +12,11 @@ export interface AppUser {
   email?: string;
   name?: string;
   role: string;
+  // The caller's tenant organisation, read from the access-token claims. Drives tenant-org binding
+  // (tenancy-policy `bindTenantOrg`): a viewer whose token claims org=org_bharat binds to the
+  // bharatunion tenant's data on that subdomain (tenantOrg === actorOrg). Undefined when the token
+  // carries no org claim, in which case the caller falls back to the default org.
+  org?: string;
 }
 
 export interface IdentityProvider {
@@ -40,6 +45,24 @@ function roleFrom(p: Record<string, unknown>): string {
   );
   const all = [...realm, ...resource];
   return all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer';
+}
+
+// Read the caller's tenant org from the access-token claims. First non-empty of, in order:
+//   1. a top-level `org` claim (the canonical mapper output),
+//   2. an `organization` claim (alternative single-value mapper),
+//   3. the first entry of an `organization` GROUP claim (an array, e.g. Keycloak group membership).
+// Returns undefined when none is present, so the caller falls back to the default org (no binding).
+// Pure — a decoded payload in, the org string (or undefined) out; unit-testable in isolation.
+export function orgFrom(p: Record<string, unknown>): string | undefined {
+  const org = p['org'];
+  if (typeof org === 'string' && org.trim()) return org.trim();
+  const organization = p['organization'];
+  if (typeof organization === 'string' && organization.trim()) return organization.trim();
+  if (Array.isArray(organization)) {
+    const first = organization.find((v) => typeof v === 'string' && v.trim());
+    if (typeof first === 'string') return first.trim();
+  }
+  return undefined;
 }
 
 // Keycloak implementation via Direct Access Grant (ROPC): POST the credentials to the
@@ -75,6 +98,7 @@ const keycloakIdentity: IdentityProvider = {
         email: (p['email'] as string) ?? (p['preferred_username'] as string) ?? username,
         name: (p['name'] as string) ?? (p['preferred_username'] as string) ?? username,
         role: roleFrom(p),
+        org: orgFrom(p),
       };
     } catch {
       return null;
