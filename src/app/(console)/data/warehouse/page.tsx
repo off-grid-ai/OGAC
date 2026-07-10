@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
+import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 import {
   filterTables,
   formatBytes,
@@ -33,9 +34,12 @@ export default async function WarehousePage({
   await requireModuleForUser('data');
   const { q = '' } = await searchParams;
 
+  // TENANCY: scope the catalog to the viewer's own warehouse database (their tenant slug) so a
+  // tenant sees only its tables — never another tenant's (or global desktop-app junk).
+  const scope = await currentWarehouseDatabase();
   const [healthy, tablesRaw] = await Promise.all([
     clickhouseWarehouse.health(),
-    clickhouseWarehouse.listTables(),
+    clickhouseWarehouse.listTables(scope),
   ]);
   const tables = tablesRaw as WarehouseTable[];
   const filtered = filterTables(tables, q);

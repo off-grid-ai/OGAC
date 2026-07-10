@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
 import { listFiles, publicUrlFor, saveFile } from '@/lib/files';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,14 +38,18 @@ export async function POST(req: Request): Promise<Response> {
     mime = ct || mime;
   }
 
-  const meta = await saveFile({ name, mime, bytes, visibility, owner });
+  // TENANCY: key the upload under the caller's org so it's isolated to that tenant's Storage view.
+  const orgId = await currentOrgId();
+  const meta = await saveFile({ name, mime, bytes, visibility, owner, orgId });
   return NextResponse.json({ ...meta, url: urlFor(meta.id) }, { status: 201 });
 }
 
-// GET /api/v1/files — list the caller's files.
+// GET /api/v1/files — list the caller's TENANT's files. Org-scoped so org_bharat sees only bank
+// files and org_suraksha only insurer files — never each other's, nor global desktop-app junk.
 export async function GET(req: Request): Promise<Response> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  const files = (await listFiles(gate.user.email ?? 'unknown')).map((f) => ({ ...f, url: urlFor(f.id) }));
+  const orgId = await currentOrgId();
+  const files = (await listFiles(gate.user.email ?? 'unknown', { orgId })).map((f) => ({ ...f, url: urlFor(f.id) }));
   return NextResponse.json({ files });
 }
