@@ -25,11 +25,7 @@
     "@next/env",
     "postcss",
     "server-only",
-    "eslint",
     "eslint-config-next",
-    "@typescript-eslint/parser",
-    "@typescript-eslint/eslint-plugin",
-    "markdown-link-check",
     "tailwindcss"
   ],
   "ignoreExportsUsedInFile": true,
