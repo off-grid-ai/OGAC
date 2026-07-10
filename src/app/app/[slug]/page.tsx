@@ -1,32 +1,33 @@
-import { and, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
-import { db } from '@/db';
-import { studioTemplates } from '@/db/schema';
+import { getAppBySlug } from '@/lib/apps-store';
+import { resolveDeployedApp } from '@/lib/deployed-app';
 import { DeployedApp } from '@/components/studio/DeployedApp';
 
 export const dynamic = 'force-dynamic';
 
-// A DEPLOYED Studio app (S2) — served at /app/<slug>, no console chrome. This is the
-// Lovable-style shareable surface: a published agent app anyone with the link can use.
+// A DEPLOYED app (S2) — served at /app/<slug>, no console chrome. This is the Lovable-style
+// shareable surface: a published builder app anyone with the link can use. The app lives in the
+// `apps` table (the ONE build artifact — see lib/app-model.ts); the SAME table the run endpoint
+// (POST /api/v1/app/<slug>/run → getAppBySlug) resolves, so page + run stay on one source of truth.
+// A slug that isn't a PUBLISHED app 404s (unpublished apps are never served publicly).
 export default async function DeployedAppPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [tpl] = await db
-    .select({ title: studioTemplates.title, summary: studioTemplates.summary, slug: studioTemplates.slug })
-    .from(studioTemplates)
-    .where(and(eq(studioTemplates.slug, slug), eq(studioTemplates.published, true)))
-    .limit(1);
-  if (!tpl?.slug) notFound();
+  const app = await getAppBySlug(slug);
+  const resolved = resolveDeployedApp(app);
+  if (!resolved) notFound();
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-4 py-8">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">{tpl.title}</h1>
-        {tpl.summary ? <p className="mt-1 text-sm text-muted-foreground">{tpl.summary}</p> : null}
+        <h1 className="text-xl font-semibold text-foreground">{resolved.title}</h1>
+        {resolved.summary ? (
+          <p className="mt-1 text-sm text-muted-foreground">{resolved.summary}</p>
+        ) : null}
         <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
           Off Grid AI · deployed app · runs governed on-prem
         </p>
       </header>
-      <DeployedApp slug={tpl.slug} />
+      <DeployedApp slug={resolved.slug} />
     </div>
   );
 }
