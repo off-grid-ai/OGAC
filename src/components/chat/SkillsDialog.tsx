@@ -172,7 +172,7 @@ export function SkillsDialog({
                 onChange={(e) => setEditing({ ...editing, systemPrompt: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Model (optional)</Label>
                 <select
@@ -225,7 +225,9 @@ export function SkillsDialog({
                     onClick={() =>
                       setEditing({
                         ...editing,
-                        conversationStarters: editing.conversationStarters.filter((_, j) => j !== i),
+                        conversationStarters: editing.conversationStarters.filter(
+                          (_, j) => j !== i,
+                        ),
                       })
                     }
                   />
@@ -321,7 +323,7 @@ export function SkillsDialog({
                 This is a private assistant, visible only to you.
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-border bg-background px-1 pt-2 pb-1">
               <Button variant="outline" size="sm" onClick={() => setEditing(null)}>
                 Cancel
               </Button>
@@ -337,7 +339,11 @@ export function SkillsDialog({
               variant="outline"
               className="w-full justify-start gap-2"
               onClick={() =>
-                setEditing({ ...empty, visibility: isAdmin ? 'org' : 'private', createdBy: userEmail })
+                setEditing({
+                  ...empty,
+                  visibility: isAdmin ? 'org' : 'private',
+                  createdBy: userEmail,
+                })
               }
             >
               <Plus className="size-4" /> {isAdmin ? 'New assistant' : 'New private assistant'}

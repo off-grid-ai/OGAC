@@ -136,17 +136,16 @@ export function AgentFormPanel({
     }
     setBusy(true);
     try {
-      const res = await fetch(
-        editId ? `/api/v1/admin/agents/${editId}` : '/api/v1/admin/agents',
-        {
-          method: editId ? 'PUT' : 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(draft),
-        },
-      );
+      const res = await fetch(editId ? `/api/v1/admin/agents/${editId}` : '/api/v1/admin/agents', {
+        method: editId ? 'PUT' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
       if (!res.ok) throw new Error('failed');
       toast.success(
-        editId ? `Saved "${draft.name}"` : `Created "${draft.name}" — runs through the governed pipeline`,
+        editId
+          ? `Saved "${draft.name}"`
+          : `Created "${draft.name}" — runs through the governed pipeline`,
       );
       setPanel(null);
       router.refresh();
@@ -163,13 +162,13 @@ export function AgentFormPanel({
         <SheetHeader>
           <SheetTitle>{editId ? 'Edit agent' : 'Create an agent'}</SheetTitle>
           <SheetDescription>
-            Give it a job, ground it in your knowledge, and grant it tools to act with. Every run
-            is governed by the policy, guardrails, model routing, and grounding on this console —
+            Give it a job, ground it in your knowledge, and grant it tools to act with. Every run is
+            governed by the policy, guardrails, model routing, and grounding on this console —
             automatically.
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="agent-name">
                 Name <span className="text-destructive">*</span>
@@ -211,11 +210,11 @@ export function AgentFormPanel({
               <p className="text-[11px] text-destructive">{errors.systemPrompt}</p>
             ) : null}
             <p className="text-[11px] text-muted-foreground">
-              This becomes the agent&apos;s system prompt. Grounding is enforced on top — it can&apos;t
-              invent facts beyond the retrieved sources.
+              This becomes the agent&apos;s system prompt. Grounding is enforced on top — it
+              can&apos;t invent facts beyond the retrieved sources.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="agent-model">Model (optional)</Label>
               <Input
