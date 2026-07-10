@@ -56,6 +56,14 @@ jobs:
         working-directory: console
         run: npm run coverage:check
 
+      # Static architecture gate: fails on any ERROR-level dependency-cruiser
+      # violation — above all an eager-value circular import (the Node-22-only
+      # TDZ prod-build crash class). WARN findings (type-only cycles, orphans)
+      # are advisory and do not fail the job. Ruleset: .dependency-cruiser.js.
+      - name: Dependency-cruiser gate (no circular imports / boundary breaks)
+        working-directory: console
+        run: npm run depcruise
+
       - name: Production build
         working-directory: console
         run: npm run build
