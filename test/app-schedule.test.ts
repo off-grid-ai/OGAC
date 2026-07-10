@@ -167,3 +167,66 @@ test('SCHEDULE_PRESETS: every preset cron is itself valid', () => {
     assert.equal(v.ok, true, `${p.cron} should be valid`);
   }
 });
+
+// ─── branch-completeness edges (both arms of every gate) ─────────────────────────────────────────
+test('isValidTimezone: nullish input is false (the `tz ?? ""` arm)', () => {
+  assert.equal(isValidTimezone(null as unknown as string), false);
+  assert.equal(isValidTimezone(undefined as unknown as string), false);
+});
+
+test('expandCron: nullish spec → null (the `spec ?? ""` arm); a CRON_TZ prefix is stripped', () => {
+  assert.equal(expandCron(null as unknown as string), null);
+  assert.equal(expandCron(undefined as unknown as string), null);
+  // CRON_TZ=/TZ= prefix is stripped before parsing (I/O syntax tolerated by the evaluator).
+  assert.ok(expandCron('CRON_TZ=Asia/Kolkata 0 9 * * *'));
+  assert.ok(expandCron('TZ=UTC @daily'));
+});
+
+test('expandCron: 7 means Sunday in the dow field, folded to 0 (standard-cron spelling)', () => {
+  // Both 0 and 7 mean Sunday in standard cron. A bare "7" folds to 0; a range "5-7" folds its 7→0.
+  const bare = expandCron('0 0 * * 7')!;
+  assert.ok(bare.dow.has(0) && bare.dow.size === 1, 'bare 7 → {0}');
+  const range = expandCron('0 0 * * 5-7')!;
+  assert.ok(range.dow.has(5) && range.dow.has(6) && range.dow.has(0), '5-7 covers Fri, Sat, Sunday(0)');
+});
+
+test('nextFireTimes: a dow=7 (Sunday) schedule fires on Sundays', () => {
+  // 2026-03-01 is a Sunday. "0 0 * * 7" (Sunday midnight UTC) → the 1st, 8th, 15th.
+  const from = new Date('2026-02-28T00:00:00.000Z');
+  const fires = nextFireTimes({ cron: '0 0 * * 7', timezone: 'UTC', enabled: true }, 2, from);
+  assert.deepEqual(fires, ['2026-03-01T00:00:00.000Z', '2026-03-08T00:00:00.000Z']);
+});
+
+test('nextFireTimes: dom-only cron fires by day-of-month regardless of weekday (AND-side, dow "*")', () => {
+  // "0 0 15 * *" — midnight on the 15th. dom restricted, dow '*' → domMatch && dowMatch (dowMatch true).
+  const from = new Date('2026-03-01T00:00:00.000Z');
+  const fires = nextFireTimes({ cron: '0 0 15 * *', timezone: 'UTC', enabled: true }, 2, from);
+  assert.deepEqual(fires, ['2026-03-15T00:00:00.000Z', '2026-04-15T00:00:00.000Z']);
+});
+
+test('nextFireTimes: dom AND dow both restricted → fires on EITHER (standard-cron OR semantics)', () => {
+  // "0 0 13 * 5" — the 13th OR any Friday, at midnight UTC. March 2026: Fri 6th, then the 13th
+  // (both the 13th AND a Friday), then Fri 20th. Proves the OR branch (domAndDowRestricted).
+  const from = new Date('2026-03-01T00:00:00.000Z');
+  const fires = nextFireTimes({ cron: '0 0 13 * 5', timezone: 'UTC', enabled: true }, 3, from);
+  assert.deepEqual(fires, [
+    '2026-03-06T00:00:00.000Z',
+    '2026-03-13T00:00:00.000Z',
+    '2026-03-20T00:00:00.000Z',
+  ]);
+});
+
+test('nextFireTimes: a never-matching spec (Feb 30th) returns [] within the bounded horizon', () => {
+  // Feb 30th never exists → the minute-walker exhausts its ~400-day bound and returns nothing.
+  const from = new Date('2026-01-01T00:00:00.000Z');
+  const fires = nextFireTimes({ cron: '0 0 30 2 *', timezone: 'UTC', enabled: true }, 1, from);
+  assert.deepEqual(fires, []);
+});
+
+test('nextFireTimes: midnight fires correctly (the Intl hour "24"→0 normalization)', () => {
+  // "@daily" is 0 0 * * * — a midnight fire exercises the `hour === 24 ? 0` guard for zones/locales
+  // where Intl emits "24" for 00:00.
+  const from = new Date('2026-03-01T05:00:00.000Z');
+  const fires = nextFireTimes({ cron: '@daily', timezone: 'UTC', enabled: true }, 1, from);
+  assert.equal(fires[0], '2026-03-02T00:00:00.000Z');
+});
