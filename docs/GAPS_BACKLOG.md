@@ -973,3 +973,16 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## Adversarial QA — Settings / Configuration (wave2 HEAD 7ea13b8, worktree)
+
+Confirmed breaks + violations from a settings/config adversary sweep. Red tests (skipped) in
+`test/adversarial-settings-config.test.ts`; full report `docs/adversarial/settings.md`.
+
+- [ ] **G-ADV-SET-1** (HIGH) — Config host round-trip is lossy: an edited host field is persisted as `127.0.0.1` instead of the real LAN IP/mDNS target (`src/lib/config.ts:57,87` + `src/lib/display-host.ts` `toConnectHost`). Breaks connectivity on any deployment where the console isn't co-located with S1. Red: G-ADV-SET-1.
+- [ ] **G-ADV-SET-3** (HIGH) — Typing a new backend at an unknown private IP (e.g. `10.0.0.5`) into a host field persists `127.0.0.1`, discarding the input entirely (`display-host.isPrivateIPv4` → S1 → loopback). Red: G-ADV-SET-3.
+- [ ] **G-ADV-SET-5** (MEDIUM-HIGH) — `/api/v1/admin/config/reveal` returns the RAW value for host-bearing keys (`route.ts:17` → `config.ts:69`), leaking `127.0.0.1`/raw IP the config list masks to mDNS — founder no-raw-host directive violation + list/reveal drift. Also `route.ts:22` redacts for viewers without checking the key's `secret` flag (over-redacts non-secrets).
+- [ ] **G-ADV-SET-4** (MEDIUM) — Connector PATCH (`connectors/[id]/route.ts:16`) validates only `auth`; it does NOT reuse `validateConnectorCreate`, so an edit can set a bogus type / malformed endpoint and persist with 200 (validation asymmetry + DRY break). Red: G-ADV-SET-4.
+- [ ] **G-ADV-SET-2** (LOW) — Config host round-trip is not idempotent (trailing-slash normalization drift), making dirty-detection/audit diffs unreliable. Red: G-ADV-SET-2.
+- [ ] **G-ADV-SET-6** (LOW) — `RoiOrgDefaults`/`AppRoiCard` show a stale "current" value seeded once from props, never re-seeded after a successful save (state-consistency, not data loss).
+- [ ] **G-ADV-SET-DRY** (LOW) — Rate-limit normalization duplicated 3× (`KeyRateLimit.tsx:50`, `keys/[id]/route.ts`, `rate-limit-store.ts`); realm-lifetimes validation duplicated (component + `keycloak-realm.ts`); `KcAdminOp`/`OP_ROLE` restated twice.
