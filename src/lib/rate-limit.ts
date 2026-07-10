@@ -51,10 +51,16 @@ export function checkRateLimit(
 ): RateLimitResult {
   const windowMs = config.windowMs > 0 ? config.windowMs : RATE_WINDOW_MS;
   const limit = Math.floor(config.limit);
+  // A non-finite clock (NaN/±Infinity — e.g. a bad `Date.now()` shim or an unparsed header) would
+  // otherwise poison the bucket: `now + windowMs` becomes NaN, so `resetAt` is NaN, and every later
+  // `now > entry.resetAt` compares against NaN (always false) → the window NEVER resets and the
+  // bucket denies FOREVER. Clamp a non-finite clock to 0 so `resetAt` stays finite (= windowMs) and
+  // a subsequent real timestamp resets the window normally. (G-ADV-GW-1)
+  const t = Number.isFinite(now) ? now : 0;
   const entry = counters.get(key);
 
-  if (!entry || now > entry.resetAt) {
-    const resetAt = now + windowMs;
+  if (!entry || t > entry.resetAt) {
+    const resetAt = t + windowMs;
     counters.set(key, { count: 1, resetAt });
     // A zero/negative limit denies even the first request.
     if (limit <= 0) {
@@ -64,7 +70,7 @@ export function checkRateLimit(
   }
 
   entry.count += 1;
-  const retryAfterSec = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+  const retryAfterSec = Math.max(1, Math.ceil((entry.resetAt - t) / 1000));
   if (entry.count > limit) {
     return { allow: false, retryAfterSec, remaining: 0 };
   }
