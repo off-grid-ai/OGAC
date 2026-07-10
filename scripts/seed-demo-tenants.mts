@@ -43,6 +43,7 @@ import {
   type TenantProfile,
   agentRunId,
   appsFor,
+  buildAppGraph,
   agentsFor,
   evalRunId,
   goldenId,
@@ -244,14 +245,16 @@ async function seedApps(profile: TenantProfile, ownerId: string, pipelineByName:
   const byTitle = new Map(existing.map((a) => [a.title.trim().toLowerCase(), a.id]));
   for (const spec of appsFor(profile)) {
     const pipelineId = pipelineByName.get(spec.pipelineName) ?? null;
-    const steps = spec.steps.map((s, i) => ({ id: `s${i}`, kind: s.kind, label: s.label, config: { domain: s.domain, op: s.op, systemPrompt: s.systemPrompt, sink: s.sink } }));
-    const edges = steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id }));
+    // Build VALID AppSteps/edges via the pure seam (top-level domain/sink/inlineAgent — the shape
+    // validateAppSpec requires). buildAppGraph is unit-tested against the real validator.
+    const { steps, edges } = buildAppGraph(spec);
     let id = byTitle.get(spec.title.trim().toLowerCase());
     if (!id) {
       const app = await createApp(profile.orgId, ownerId, { title: spec.title, summary: spec.summary, visibility: 'org', steps, edges, pipelineId });
       id = app.id;
     } else {
-      await updateApp(id, profile.orgId, { pipelineId }); // self-heal the binding on re-run.
+      // Self-heal on re-run: re-push the valid steps/edges + binding (updateApp re-validates the whole spec).
+      await updateApp(id, profile.orgId, { steps, edges, pipelineId });
     }
     // App runs — one per status from the app's run counts; a stable id per (app,n).
     const statuses = runStatuses(spec);
@@ -375,36 +378,86 @@ function flagInfra(profile: TenantProfile): void {
   }
 }
 
+// ─── RESILIENCE — one bad surface must never nuke the rest ─────────────────────────────────────────
+// Each surface-seed runs in its own try/catch: on failure we log a WARN and CONTINUE to the next
+// surface (and, in main, the next tenant), then print a summary. A per-tenant run therefore attempts
+// EVERY surface even if an earlier one throws — the demo lights up as far as the live infra allows,
+// instead of a single connector/embedder error aborting the whole run (the pre-fix behaviour).
+interface SurfaceResult {
+  org: string;
+  surface: string;
+  ok: boolean;
+  error?: string;
+}
+const results: SurfaceResult[] = [];
+
+/** Run one surface-seed step, capturing success/failure without aborting the run. */
+async function runSurface(org: string, surface: string, fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+    results.push({ org, surface, ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log(`WARN ${surface} failed: ${msg}`);
+    results.push({ org, surface, ok: false, error: msg });
+  }
+}
+
 async function seedProfile(profile: TenantProfile, now: number): Promise<void> {
   assertAllowed(profile.orgId);
   const id = identity(profile);
   const ownerId = profile.viewerEmail;
-  log(`── seeding ${profile.orgId} (${id.name}, ${profile.flavour}) ──`);
-  await seedTenant(profile, id);
-  await seedGateways(profile);
-  const pipelineByName = await seedPipelines(profile, ownerId);
-  await seedConnectors(profile, id);
-  await seedCatalog(profile);
-  await seedGovernance(profile);
-  await seedAccess(profile);
-  await seedTools(profile);
-  await seedAgents(profile);
-  await seedApps(profile, ownerId, pipelineByName);
-  await seedAgentRuns(profile, now);
-  await seedEvals(profile, pipelineByName, now);
-  await seedKnowledge(profile, ownerId);
-  await seedChat(profile);
+  const org = profile.orgId;
+  log(`── seeding ${org} (${id.name}, ${profile.flavour}) ──`);
+  // Pipelines return the name→id map two later surfaces bind against. If it fails, keep an empty map
+  // so apps/evals still attempt (their bindings resolve to null — an honest unbound state, not a crash).
+  let pipelineByName = new Map<string, string>();
+  await runSurface(org, 'tenant', () => seedTenant(profile, id));
+  await runSurface(org, 'gateways', () => seedGateways(profile));
+  await runSurface(org, 'pipelines', async () => {
+    pipelineByName = await seedPipelines(profile, ownerId);
+  });
+  await runSurface(org, 'connectors', () => seedConnectors(profile, id));
+  await runSurface(org, 'catalog', () => seedCatalog(profile));
+  await runSurface(org, 'governance', () => seedGovernance(profile));
+  await runSurface(org, 'access', () => seedAccess(profile));
+  await runSurface(org, 'tools', () => seedTools(profile));
+  await runSurface(org, 'agents', () => seedAgents(profile));
+  await runSurface(org, 'apps', () => seedApps(profile, ownerId, pipelineByName));
+  await runSurface(org, 'agent_runs', () => seedAgentRuns(profile, now));
+  await runSurface(org, 'evals', () => seedEvals(profile, pipelineByName, now));
+  await runSurface(org, 'knowledge', () => seedKnowledge(profile, ownerId));
+  await runSurface(org, 'chat', () => seedChat(profile));
   flagInfra(profile);
-  log(`✓ ${profile.orgId} done`);
+  const failed = results.filter((r) => r.org === org && !r.ok);
+  log(failed.length ? `⚠ ${org} done with ${failed.length} surface(s) failed` : `✓ ${org} done`);
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<number> {
   const only = process.env.OFFGRID_SEED_TENANT;
   const profiles = only ? TOUR_PROFILES.filter((p) => p.orgId === only) : TOUR_PROFILES;
   if (only && profiles.length === 0) throw new Error(`unknown OFFGRID_SEED_TENANT "${only}" (expected org_bharat or org_suraksha)`);
   const now = Date.now();
-  for (const p of profiles) await seedProfile(p, now);
+  // A thrown tenant (e.g. assertAllowed) must not stop the OTHER tenant from seeding.
+  for (const p of profiles) {
+    try {
+      await seedProfile(p, now);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log(`WARN tenant ${p.orgId} aborted before completion: ${msg}`);
+      results.push({ org: p.orgId, surface: '(tenant-level)', ok: false, error: msg });
+    }
+  }
 
+  log('');
+  log('════ SUMMARY — surfaces seeded per tenant ════');
+  for (const p of profiles) {
+    const rows = results.filter((r) => r.org === p.orgId);
+    const ok = rows.filter((r) => r.ok).map((r) => r.surface);
+    const bad = rows.filter((r) => !r.ok);
+    log(`  ${p.orgId}: ${ok.length} ok${bad.length ? `, ${bad.length} FAILED` : ''}`);
+    for (const b of bad) log(`    ✗ ${b.surface}: ${b.error}`);
+  }
   log('');
   log('════ FLAGGED — needs your infra (not written by this script) ════');
   for (const f of flags) log(`  • ${f}`);
@@ -415,11 +468,15 @@ async function main(): Promise<void> {
   log('  To light those charts, ship the run corpus to OpenSearch too (buildRunCorpus in');
   log('  src/lib/demo/telemetry.ts) — or run real traffic through the gateway. FLAG: needs OpenSearch.');
   log('done.');
+  // Non-zero exit if ANY surface failed (the run still attempted everything) so the operator notices —
+  // but every surface for both tenants has already been attempted, never short-circuited.
+  return results.some((r) => !r.ok) ? 1 : 0;
 }
 
 main()
-  .then(() => process.exit(0))
+  .then((code) => process.exit(code))
   .catch((err) => {
+    // Only reached for a truly unexpected top-level error (main's own body), never a surface failure.
     console.error('[seed:tenants] FAILED:', err instanceof Error ? (err.stack ?? err.message) : err);
     process.exit(1);
   });
