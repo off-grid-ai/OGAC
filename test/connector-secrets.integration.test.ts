@@ -22,7 +22,7 @@ test('connector secret_ref column self-migrates + round-trips', { skip: dbUp ? f
   const { eq } = await import('drizzle-orm');
 
   t.after(async () => {
-    for (const c of await listConnectors(ORG)) await deleteConnector(c.id);
+    for (const c of await listConnectors(ORG)) await deleteConnector(c.id, ORG);
   });
 
   // The additive column must exist (idempotent ALTER … ADD COLUMN IF NOT EXISTS).

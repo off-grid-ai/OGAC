@@ -19,7 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!client) return NextResponse.json({ error: 'not found' }, { status: 404 });
     return NextResponse.json({ configured: true, client });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error(`GET client ${id} failed:`, err);
+    return NextResponse.json({ error: 'service unavailable' }, { status: 500 });
   }
 }
 
@@ -46,6 +47,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       resource: `client:${id}`,
       outcome: 'error',
     });
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error(`DELETE client ${id} failed:`, err);
+    return NextResponse.json({ error: 'service unavailable' }, { status: 500 });
   }
 }

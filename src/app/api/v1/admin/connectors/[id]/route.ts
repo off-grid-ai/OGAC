@@ -25,13 +25,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { endpoint: cleanEndpoint, secret: peeledSecret } =
     rawEndpoint !== undefined ? splitEndpointSecret(rawEndpoint) : { endpoint: undefined, secret: null };
 
-  const updated = await updateConnector(id, {
-    name: body.name as string | undefined,
-    type: body.type as string | undefined,
-    endpoint: cleanEndpoint,
-    auth: body.auth as string | undefined,
-    description: body.description as string | undefined,
-  });
+  // Scope the mutation to the caller's org — a guessed id from another tenant resolves to no row
+  // (→ 404), never a cross-tenant edit (P1 IDOR fix).
+  const orgId = await currentOrgId();
+  const updated = await updateConnector(
+    id,
+    {
+      name: body.name as string | undefined,
+      type: body.type as string | undefined,
+      endpoint: cleanEndpoint,
+      auth: body.auth as string | undefined,
+      description: body.description as string | undefined,
+    },
+    orgId,
+  );
   if (!updated) return NextResponse.json({ error: 'unknown connector' }, { status: 404 });
 
   // Vault the peeled credential (if any) AFTER the row update succeeds, so a rotated password from an
@@ -41,13 +48,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     try {
       await persistConnectorSecret(id, peeledSecret);
     } catch (e) {
+      console.error('vault write failed on connector update:', e);
       return NextResponse.json(
-        { error: `Connector updated but the credential could not be vaulted: ${(e as Error).message}` },
+        { error: 'Connector updated but the credential could not be vaulted. Please retry.' },
         { status: 502 },
       );
     }
   }
-  auditFromSession(gate, await currentOrgId(), {
+  auditFromSession(gate, orgId, {
     action: 'connector.update',
     resource: `connector:${id}`,
     outcome: 'ok',
@@ -59,8 +67,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  await deleteConnector(id);
-  auditFromSession(gate, await currentOrgId(), {
+  // Scope the delete (row + ingest-job cascade) to the caller's org — org A cannot delete org B's
+  // connector via a guessed id (P1 IDOR fix).
+  const orgId = await currentOrgId();
+  await deleteConnector(id, orgId);
+  auditFromSession(gate, orgId, {
     action: 'connector.delete',
     resource: `connector:${id}`,
     outcome: 'ok',
