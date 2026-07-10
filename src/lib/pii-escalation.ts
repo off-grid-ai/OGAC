@@ -82,3 +82,43 @@ export function applyPiiEscalation(
   const redacted = maskTextForModel(text, scan);
   return { text: redacted, masked: redacted !== text, required: true };
 }
+
+/** The terminal decision for a PII-mask attempt that may have FAILED (the masker threw). */
+export interface PiiMaskDecision {
+  /** true ⇒ masking was required but the masker errored ⇒ the run must BLOCK (never emit raw text). */
+  block: boolean;
+  /** The text safe to forward (the redacted form, or the original when masking wasn't required). */
+  text: string;
+  /** true ⇒ a raw→redacted substitution was actually applied. */
+  masked: boolean;
+  /** Reason when blocked (the masker error), else null. */
+  reason: string | null;
+}
+
+/**
+ * FAIL-CLOSED PII masking (SECURITY #236 fix 2). PURE. Given whether masking is required, the raw
+ * text, and the result of the (possibly failed) scan, decide the terminal outcome:
+ *   • not required            ⇒ { block:false, text (unchanged), masked:false }.
+ *   • required + scan ok       ⇒ apply the escalation; forward the redacted text.
+ *   • required + scan ERRORED  ⇒ { block:true }: masking was mandated but could not run, so the raw
+ *     (unmasked) text must NEVER be emitted — the run blocks. This is the invariant the old inline
+ *     `catch { /* send unmasked *\/ }` violated (fail-open PII leak).
+ *
+ * `scanResult` is a discriminated result so the caller's try/catch around the (I/O) scan is thin:
+ * pass { ok:true, scan } on success or { ok:false, error } when the masker threw. One authority,
+ * reused by every run path — no path re-decides "what happens when the masker dies".
+ */
+export function maskOrBlock(
+  required: boolean,
+  text: string,
+  scanResult: { ok: true; scan: PiiScanLike } | { ok: false; error: unknown },
+): PiiMaskDecision {
+  if (!required) return { block: false, text, masked: false, reason: null };
+  if (!scanResult.ok) {
+    const reason =
+      scanResult.error instanceof Error ? scanResult.error.message : String(scanResult.error);
+    return { block: true, text, masked: false, reason: `PII masking required but the masker failed: ${reason}` };
+  }
+  const esc = applyPiiEscalation(text, true, scanResult.scan);
+  return { block: false, text: esc.text, masked: esc.masked, reason: null };
+}
