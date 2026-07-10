@@ -93,6 +93,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       { status: 202 },
     );
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    // Never surface the internal error text (may carry endpoint/stack detail) to an app caller —
+    // log server-side, return a generic message.
+    console.error('app run failed:', e);
+    return NextResponse.json({ error: 'application error' }, { status: 500 });
   }
 }

@@ -48,8 +48,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     try {
       await persistConnectorSecret(id, peeledSecret);
     } catch (e) {
+      console.error('vault write failed on connector update:', e);
       return NextResponse.json(
-        { error: `Connector updated but the credential could not be vaulted: ${(e as Error).message}` },
+        { error: 'Connector updated but the credential could not be vaulted. Please retry.' },
         { status: 502 },
       );
     }
