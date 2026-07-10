@@ -131,7 +131,7 @@ rest when you're ready.`,
     {
       slug: 'concepts/multi-tenancy',
       title: 'Multi-tenancy & isolation',
-      description: 'How one deployment serves many orgs without one ever seeing another's data.',
+      description: 'How one deployment serves many orgs without one ever seeing another\'s data.',
       body: `One Off Grid AI deployment can serve several organizations at once, each fully walled off from
 the others. The point of isolation is simple: a valid login for one org must never return another
 org's chats, runs, connectors, or audit records - not by accident, not by a crafted request.

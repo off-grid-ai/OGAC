@@ -7,7 +7,7 @@ export const operateSection: DocSection = {
     {
       slug: 'guides/overview',
       title: 'Overview (home)',
-      description: 'The operator's landing page - health, governance posture, cost, and quick actions.',
+      description: 'The operator\'s landing page - health, governance posture, cost, and quick actions.',
       body: `Overview is where an operator lands. Instead of a flat list of modules, it answers the
 three questions you have every morning - is my AI healthy, is it safe, what is it costing - and puts
 the next action one click away.
