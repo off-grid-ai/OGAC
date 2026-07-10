@@ -12,12 +12,12 @@ import {
   LatencyChart,
   ModelTokensChart,
 } from '@/components/analytics/AnalyticsCharts';
-import { SupersetEmbed } from '@/components/analytics/SupersetEmbed';
+import { NativeSupersetPanel } from '@/components/analytics/NativeSupersetPanel';
 import { GatewayUsage } from '@/components/gateway/GatewayUsage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
-import { supersetBase } from '@/lib/superset';
+import { safeSupersetDashboard } from '@/lib/superset-data';
 import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
