@@ -51,7 +51,7 @@ test('the configured store host is allowed', () => {
 test('arbitrary external / internal hosts are REJECTED by default (SSRF defense)', () => {
   const cases = [
     'http://169.254.169.254/latest/meta-data', // cloud metadata SSRF classic
-    'http://127.0.0.1:8200/v1/sys', // an internal service that is NOT the store
+    'http://10.10.0.9:8200/v1/sys', // an internal (RFC-1918) service that is NOT the store
     'https://attacker.example.com',
     'http://10.0.0.5:6333',
   ];
