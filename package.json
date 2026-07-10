@@ -30,6 +30,8 @@
     "depcruise": "depcruise src scripts --config .dependency-cruiser.js",
     "depcruise:report": "depcruise src scripts --config .dependency-cruiser.js --output-type err-long",
     "depcruise:graph": "depcruise src --config .dependency-cruiser.js --output-type dot | dot -T svg -o docs/dependency-graph.svg",
+    "jscpd": "jscpd --config .jscpd.json",
+    "jscpd:report": "jscpd --config .jscpd.json --reporters html,console",
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {
@@ -86,6 +88,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.6",
+    "jscpd": "^5.0.12",
     "playwright": "^1.61.1",
     "prettier": "^3.4.2",
     "tailwindcss": "^4.0.0",

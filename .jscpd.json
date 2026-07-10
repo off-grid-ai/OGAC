@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kucherenko/jscpd/master/packages/jscpd/schema.json",
+  "//": "Off Grid Console — jscpd (copy/paste detector) config. Mechanically enforces CLAUDE.md hygiene §C DRY ('duplicated logic that drifts is a defect'). Mirrors the dependency-cruiser adoption: config + scripts + pre-push + CI + an honest, ratcheting baseline. See docs/GAPS_BACKLOG.md (G-CPD-*) for the clone burn-down list.",
+  "path": ["src/lib", "src/app", "src/components"],
+  "ignore": [
+    "test/**",
+    "**/*.d.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    ".next/**",
+    "node_modules/**",
+    "coverage/**",
+    "public/scalar.standalone.js",
+    "**/*.generated.*"
+  ],
+  "format": ["typescript", "tsx", "javascript"],
+  "//min": "Detection floor tuned to flag real shared logic, not trivial boilerplate. 8 lines / 70 tokens is jscpd's sensible mid-range: below this you catch import blocks, prop-type lists and JSX scaffolding (noise); above it you miss genuinely duplicated helpers.",
+  "minLines": 8,
+  "minTokens": 70,
+  "//reporters": "console for the pre-push/CI gate signal, json for machine-readable stats, html for the founder-facing report.",
+  "reporters": ["console", "json", "html"],
+  "output": "./coverage/jscpd/",
+  "//threshold": "Baseline-then-ratchet: set at or JUST ABOVE the current REAL duplication % so hygiene can only improve, never regress. NOT zero (that would fail immediately on an existing codebase). BASELINE 2026-07-10 = 2.08% duplicated lines (2.57% tokens; 256 clones over 1152 files). Set to 2.5 — a small margin above 2.08% so incidental reformatting doesn't false-trip, while any new duplicated helper pushes over and blocks. Ratchet this DOWN as G-CPD-* clones are extracted (see docs/GAPS_BACKLOG.md).",
+  "threshold": 2.5,
+  "absolute": true,
+  "gitignore": true
+}
