@@ -994,3 +994,127 @@ surface{RSC,API-GET,API-write} × method{GET,POST,PATCH,DELETE,PUT}. Verified LI
 - viewer × own-host × overview → own-org data only, write blocked ✓
 UNTESTED intersections logged for follow-up: bearer/service-token × tenant-host (data-plane org binding);
 no-org viewer × tenant-host (binds to default — should it be denied?); admin × cross-tenant (intended: allowed).
+
+## Adversarial audit — CONSOLE DATA (connectors / warehouse / ETL / catalog / retention / RTBF / lineage) (2026-07-10)
+Found by the SMART QA ADVERSARY pass on branch `adv-data-qa` (off wave2 HEAD 2599cd8). RED tests
+(`test.skip`, ADVERSARIAL, un-skip when fixed): `test/adversarial-data.test.ts` (G-ADV-DATA-1..5,
+pure-provable). Repro details below; live probes were READ-ONLY — destructive/mutation vectors were
+proven at the pure/model layer or reserved for a local temp DB, NEVER run against the seeded demo.
+
+### G-ADV-DATA-4 — HIGH — RTBF subject-erasure DELETE is not org-scoped (destructive cross-tenant erasure)
+`src/app/api/v1/admin/erasure-requests/route.ts:23-37` executes each console-plane step as
+`DELETE FROM <table> WHERE <column> = <subject>` with NO `org_id` predicate. The plan
+(`src/lib/erasure.ts` `planErasure` → `PlanStep {store,table,column,match,value}`) carries no org
+identifier, and `ERASURE_CATALOG` (erasure.ts:40-50) targets SHARED physical tables (`chat_messages`,
+`chat_conversations`, `audit_events`, `api_keys`, …) keyed only by subject. The route fetches `org`
+(line 51) and uses it to scope catalog reads + the request record, but NOT the DELETE. So an RTBF
+issued by org A for `foo@example.com` deletes that subject's rows across EVERY tenant sharing those
+tables. Root cause is provable purely: the plan is identical no matter who calls — no org scope can
+enter the statement. The route comment ("identifiers are catalog constants … subject value bound")
+only defends against SQL injection, not tenant scope.
+REPRO (local temp DB only — do NOT run vs demo): seed two orgs' rows for the same subject email in
+`chat_messages`; POST /api/v1/admin/erasure-requests {subject} as org A; assert org B's rows are
+also deleted. RED unit proof: G-ADV-DATA-4 (PlanStep has no orgId).
+FIX: thread `orgId` into `PlanStep` and add `AND org_id = $org` to the executed DELETE (all
+SUBJECT_TABLES carry org_id); update `planErasure` to take orgId; add the two-org integration test.
+
+### G-ADV-DATA-1 — HIGH — warehouse read-only guard bypassed by ClickHouse table functions (SSRF / local-file read / exfil)
+`src/lib/warehouse-model.ts:138 guardReadOnlySql` allows any statement whose leader is a read verb
+and that contains no FORBIDDEN write/DDL token (127-131). ClickHouse *table functions* — `url()`,
+`file()`, `s3()`, `mysql()`, `postgresql()`, `remoteSecure()` — are reachable from a leading SELECT
+and are NOT in FORBIDDEN_TOKENS. `clickhouseWarehouse.query()` (adapters/warehouse.ts:166) runs the
+guarded SQL verbatim. So an operator-typed "read" via /api/v1/admin/warehouse/query can make the
+warehouse: SSRF an internal/attacker URL incl. the cloud metadata endpoint
+(`SELECT * FROM url('http://169.254.169.254/…',…)`), read local files off the ClickHouse box
+(`file('/etc/passwd',…)`), or exfiltrate to S3/HTTP. Proven: guard returns ok:true for all. (Note
+`remote(...,system.tables)` is incidentally blocked only because `system.tables` trips the SYSTEM
+token — also a false-positive that blocks legit system-table reads.)
+RED unit proof: G-ADV-DATA-1.
+FIX: after the leader/forbidden-token scan, reject any statement whose token stream contains a
+table-function name from a denylist (url|file|s3|hdfs|mysql|postgresql|mongodb|remote|remoteSecure|
+jdbc|odbc|executable|urlCluster|s3Cluster…) — or, better, run /query under a locked-down ClickHouse
+role with those functions disabled. Un-skip G-ADV-DATA-1.
+
+### G-ADV-DATA-2 — HIGH — connector endpoint has no SSRF/private-address guard (create + PATCH)
+`src/lib/connector-policy.ts:151 validateRest` accepts ANY http(s) URL; `validateSql`
+(policy.ts:117) accepts any charset-valid `HOST_RE` host — so `169.254.169.254`, `localhost`,
+`10.0.0.5`, `127.0.0.1:6379` are all valid endpoints. The exec layer (`connector-exec.ts`
+`testConnection`/`recordCount`/`execConnectorQuery`/`listResources`) then fetch()/connect()s to that
+endpoint FROM the server with no allowlist, and for REST returns the response body to the caller via
+recordCount/execConnectorQuery. Delivery is via the connector `test`/`sync`/`resources` routes using
+the STORED endpoint. Worse: PATCH (`connectors/[id]/route.ts:31`) runs NO validation on `type`/
+`endpoint` at all (no `validateConnectorCreate`, no `detectDialect`) — it only splits an embedded
+secret and range-checks `auth`. So even if create is later hardened, PATCH re-opens the SSRF and can
+persist a bogus `type` that silently breaks the connector (this extends/confirms G-ADV-SET-4).
+RED unit proof: G-ADV-DATA-2 (create accepts hostile endpoints).
+FIX: a shared pure `isSafeConnectorEndpoint()` (reject loopback, link-local 169.254/16, RFC-1918,
+::1, .internal, and resolve-time rebind protection at fetch) reused by BOTH `validateConnectorCreate`
+AND the PATCH path; make PATCH run the full create validation (DRY). Un-skip G-ADV-DATA-2.
+
+### G-ADV-DATA-5 — HIGH — warehouse reads have no tenant isolation (cross-org ClickHouse read)
+Neither warehouse read path scopes to the caller's org. `warehouse/query/route.ts:28` fetches
+`currentOrgId()` only for the audit line, never to scope the SQL — `query()` runs any guarded SELECT
+across ALL ClickHouse databases. `warehouse/[table]/route.ts` doesn't even import currentOrgId and
+reads any `db.table` by name via `tableStats`/`sample`. `isSafeIdentifier` deliberately ALLOWS a
+`database.table` qualifier (warehouse-model.ts:14), which is exactly the cross-org vector: any admin
+reads `bharatunion_db.accounts` etc. System DBs are excluded from LISTING only (buildListTablesSql),
+not from reads.
+RED unit proof: G-ADV-DATA-5 (guard allows a cross-org qualified SELECT). Integration repro (local
+ClickHouse w/ two org DBs) noted in docs/adversarial/data.md — NOT run vs the live demo.
+FIX: map org → allowed ClickHouse database(s); constrain /query to the caller's database (or a
+read-only role scoped to it) and validate the `[table]` name resolves within the caller's org DB.
+
+### G-ADV-DATA-3 — MED — ETL cron validator is range-blind (scheduled job that can never fire)
+`src/lib/etl-job.ts:75 CRON_FIELD` regex accepts `\d+` with no bounds, so `isValidCron('99 99 99 99
+99')`, `'88 * * * *'` (minute 88), `'* 25 * * *'` (hour 25) all return true. `validateJobDraft`/
+`validateDagSpec` therefore let a scheduled job save "valid" with a cron that never fires — a silent
+data-movement gap, or a confusing downstream rejection from Kestra/Airbyte.
+RED unit proof: G-ADV-DATA-3.
+FIX: range-check each field (min 0-59, hour 0-23, dom 1-31, mon 1-12, dow 0-7) in the pure validator.
+
+### G-ADV-DATA-6 — MED — retention "delete/anonymize/archive" never executes (delete that should happen but doesn't)
+`src/lib/data-retention.ts` is pure evaluation only: `evaluateRetention` computes
+`dueForDisposal`/`state:'due'` but NO code path in `src/app` consumes it to actually delete/anonymize/
+archive the asset (grep hits only display pages + the policy-persist route
+`data-assets/[id]/retention/route.ts`). A retention rule that says `delete` and is past window results
+in zero disposal — the warehouse/lake data is never purged. Also a CRUD-completeness gap (no "run
+disposal now" action). Honestly the module comment says the S2 engine executes it, but no such
+executor exists in the console.
+FIX: a disposal executor route/job that scans due assets and runs the org-scoped purge, or clearly
+mark retention as advisory-only in the UI until the engine lands.
+
+### G-ADV-DATA-7 — MED — ETL DAG can reference another org's connector, unvalidated, executed via Kestra
+`validateDagSpec` (etl-job.ts:537) only checks a source node HAS a `connectorId`, never that it
+exists in the caller's org. The direct-copy run path is mitigated at run time (`runJob` resolves via
+`listConnectors(orgId)` and throws "not found" — etl-jobs-store.ts:313), but the Kestra path
+`runJobViaKestra` compiles `job.dag`'s `connectorId`/`joinConnectorId` into a deployed flow
+(etl-jobs-store.ts:396 `compileToKestraFlow`) with no org-ownership check. A job authored with a
+foreign connector id in the DAG is deployed/executed against that connector.
+FIX: validate every DAG `connectorId`/`joinConnectorId` belongs to the caller's org at create/update
+(and again before Kestra deploy), reusing one org-ownership helper (DRY).
+
+### G-ADV-DATA-8 / -9 — LOW — classification cross-ref + lineage global namespace
+-8: `data-catalog-store.ts:248 setClassification` writes a classification for `assetId` under the
+caller's org without first verifying the asset belongs to that org (`getAsset(assetId, orgId)` guard
+missing). Lands under the caller's org so it can't corrupt another org's posture, but creates an
+orphan/cross-ref row. -9: lineage uses a single global namespace `offgrid-console` (lineage.ts:10,
+`chooseNamespace`) — all orgs' lineage co-mingled and readable by any admin (shared-by-design; flag
+as an SoC/tenancy gap, not a hard break).
+
+### Robust-verified ✓ (attacked, held)
+- Kestra/Airbyte adapters: URLs env-sourced (no caller-controlled SSRF); degrade gracefully when the
+  backend is down (health→false, ops→null/[]/"not configured"), never throw into a route.
+- Lineage READ paths (`fetchLineageGraph`/`readLineageView`/`readDataset`) never throw when Marquez
+  is down — return `{configured,data,error}`; write routes fail-closed 503 when unconfigured (#222 OK).
+- Cyclic/dangling ETL DAG rejected (`topoOrder` → null → validator error); `derive` expression
+  injection guarded (`isSafeExpression`); ETL job CRUD/run is org-scoped.
+- SQL identifier interpolation guarded by SAFE_IDENTIFIER in both connector-exec and warehouse-model
+  (the injection surface is closed even though the SSRF/tenancy surfaces above are not).
+
+### SOLID / DRY / SoC tells (why these break)
+- Validation not reused: connector create-validation (`validateConnectorCreate`) is bypassed entirely
+  by PATCH → drift + SSRF re-entry (G-ADV-DATA-2, extends G-ADV-SET-4 DRY finding).
+- One missing seam: there is no shared `isSafeConnectorEndpoint`/`isPrivateAddress` rule — the SSRF
+  guard that should be one pure helper reused by create+PATCH+exec simply doesn't exist.
+- Tenancy not a cross-cutting invariant: catalog/ETL are org-scoped but warehouse reads and the RTBF
+  DELETE are org-blind — org scope is applied ad hoc per route instead of a single enforced seam.
