@@ -1,5 +1,5 @@
 {
-  "reporter": ["text-summary", "text"],
+  "reporter": ["text-summary", "text", "json-summary", "lcov"],
   "all": true,
   "src": ["src/lib"],
   "include": ["src/lib/**/*.ts"],
