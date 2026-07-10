@@ -122,7 +122,7 @@ const GROUPS: FeatureGroup[] = [
     title: 'One pane of glass over the whole estate',
     tagline: 'Where humans meet the agents — and where you keep control.',
     features: [
-      { name: 'Fleet control', value: '“MDM for AI” open source — provision, govern, and observe every AI-enabled device from one console.' },
+      { name: 'Fleet control (coming soon)', value: '“MDM for AI” — provision, govern, and observe every AI-enabled device from one console. Agent-enrolled inventory works today; full MDM control is coming soon.' },
       { name: 'FinOps + virtual keys', value: 'Issue keys with budgets; per-user / project cost and chargeback — no surprise token bills.' },
       { name: 'BI / data exploration', value: 'Explore usage and data in built-in dashboards — without exporting it.' },
       { name: 'Agents & Reports', value: 'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) ready to run and govern.' },
@@ -155,7 +155,7 @@ const FIELD_FORCE: Angle[] = [
   {
     icon: Broadcast,
     title: 'Govern thousands of edge devices from one screen',
-    body: 'Push policy down, pull audit up, and kill-switch on demand across the whole fleet. Your workforce runs AI on their devices; you keep visibility and control of every call and every byte that leaves.',
+    body: 'Push policy down, pull audit up, and kill-switch on demand across your estate. Your workforce runs AI on their devices; you keep visibility and control of every call and every byte that leaves.',
   },
   {
     icon: Lock,
