@@ -4,6 +4,10 @@ import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import Keycloak from 'next-auth/providers/keycloak';
 import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
+// Pure, zero-IO org-claim reader — safe in the Edge-shared config (single source of truth, DRY with
+// the identity ROPC path). The OIDC branch below maps org from the token; the ROPC/password path (in
+// production) resolves it on the AppUser via the same reader.
+import { orgFromClaims } from '@/lib/auth/org-claim';
 
 // Each SSO provider self-activates only when its credentials are present in env — an
 // unconfigured provider would otherwise crash the whole auth handler. See .env.example.
@@ -26,24 +30,6 @@ export const devLoginEnabled = env.AUTH_DEV_LOGIN === 'true' && env.NODE_ENV !==
 // (Keycloak ROPC today) so the console renders its OWN form, no redirect to a hosted
 // IdP page. Available whenever the identity backend (Keycloak) is configured.
 export const passwordEnabled = keycloakEnabled;
-
-// Edge-safe org-claim reader for the OIDC (keycloak-oidc) jwt branch. Mirrors identity's `orgFrom`
-// claim shapes (top-level `org` > `organization` string > `organization` group array), but is kept
-// local here on purpose: this config is shared with the Edge middleware, and importing the server-only
-// identity module (fetch/Buffer, dynamically imported by the Credentials provider) would drag it into
-// the Edge bundle. The ROPC/password path — the one in production — resolves org via orgFrom on the
-// AppUser; this branch is the harmless future-proof twin for a real OIDC redirect flow.
-function orgClaim(p: Record<string, unknown>): string | undefined {
-  const org = p['org'];
-  if (typeof org === 'string' && org.trim()) return org.trim();
-  const organization = p['organization'];
-  if (typeof organization === 'string' && organization.trim()) return organization.trim();
-  if (Array.isArray(organization)) {
-    const first = organization.find((v) => typeof v === 'string' && v.trim());
-    if (typeof first === 'string') return first.trim();
-  }
-  return undefined;
-}
 
 const providers: Provider[] = [];
 if (googleEnabled) providers.push(Google);
@@ -134,7 +120,7 @@ export const authConfig = {
         token.role = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
         // Carry the tenant org if the OIDC token maps it (harmless, future-proof — the ROPC/password
         // path below is the one in use today). Same claim shapes as identity's orgFrom.
-        const oidcOrg = orgClaim(kc);
+        const oidcOrg = orgFromClaims(kc);
         if (oidcOrg) token.org = oidcOrg;
       } else if (user) {
         // Non-Keycloak sign-in (dev credentials, Google, Microsoft) and the console-owned
