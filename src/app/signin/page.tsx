@@ -90,10 +90,10 @@ export default async function SignInPage({
   ].filter((p) => p.enabled);
 
   // The demo-credentials banner is decided server-side: the request host (trusted, set by Cloudflare)
-  // tells us whether this is a demo tenant subdomain, and env holds the read-only creds. The visitor
-  // is logged out at signin, so this is host-gated (not role-gated like the authed hellobar).
+  // gives the demo tenant SLUG, which picks that tenant's own read-only viewer creds from env. The
+  // visitor is logged out at signin, so this is host-gated (not role-gated like the authed hellobar).
   const host = (await headers()).get('host');
-  const demoBanner = readSigninDemoBanner(tenantSlugFromHost(host) !== null);
+  const demoBanner = readSigninDemoBanner(tenantSlugFromHost(host));
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
