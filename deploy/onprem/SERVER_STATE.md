@@ -1094,3 +1094,30 @@ http-guardrail seam:
   `0.3.16` exists on Docker Hub (pushed 2025-05-19).
 - **New env vars** (`deploy/.env.example`): `OFFGRID_HTTP_GUARDRAIL_URL`, `OFFGRID_HTTP_GUARDRAIL_API_KEY`,
   `LLM_GUARD_AUTH_TOKEN`.
+
+## Public read-only demo viewers (2026-07-10, task #229) — LIVE + VERIFIED
+
+Two per-tenant read-only viewer accounts power the public live demo (anyone can log in via the
+signin-page creds banner, tour the real seeded product, view everything incl. admin, write nothing).
+
+**Keycloak (realm `offgrid`, container `offgrid-console-keycloak-1`):**
+- Users: `demo-bank@getoffgridai.co` (attr `org=org_bharat`), `demo-insurer@getoffgridai.co`
+  (attr `org=org_suraksha`). Password `OffGridDemo2026!`. No admin/editor role ⇒ resolves to `viewer`.
+- Realm user-profile `unmanagedAttributePolicy=ENABLED` (KC26 declarative profile otherwise DROPS the
+  custom `org` attribute — this was the gotcha; set via `kcadm update users/profile -r offgrid -s`).
+- Protocol mapper `org-attr` on client `offgrid-console` (oidc-usermodel-attribute-mapper):
+  user attribute `org` → token claim `org` (id+access+userinfo). The console's org-claim reader
+  (src/lib/auth/org-claim.ts) reads claim `org` → session.user.org → bindTenantOrg hard-binds the
+  tenant subdomain's org for that viewer (isolation preserved: a viewer only binds to its own org).
+- Replay: create users + set attr + `kcadm set-password`; ensure unmanaged policy ENABLED; create the
+  org-attr mapper on offgrid-console. (An earlier groundwork user `demo@getoffgridai.co` exists — unused.)
+
+**Console env (`/Users/admin/offgrid/console/.env.local`):**
+`OFFGRID_DEMO_VIEWER_BHARATUNION_EMAIL/_PASSWORD`, `OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL/_PASSWORD`,
++ generic fallback `OFFGRID_DEMO_VIEWER_EMAIL/_PASSWORD`. Read by src/lib/demo-hellobar.ts
+(resolveDemoCreds → host-aware signin banner).
+
+**Verified live 2026-07-10:** login as each viewer on its tenant subdomain → role=viewer, org bound
+correctly (org_bharat / org_suraksha), sees that tenant's data, write POST → 403. Tenant root `/`
+307-redirects to `/overview` on the SAME tenant host (middleware rebuilds origin from trusted Host —
+req.nextUrl.origin resolves to apex behind the tunnel). Apex `/` still serves the marketing landing.
