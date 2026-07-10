@@ -35,6 +35,15 @@ RSYNC="rsync -az -e \"ssh -i $SSH_KEY\""
 # @offgrid/* packages the console file:-links (keep in sync with package.json)
 SHARED_PKGS=(analytics finops policy vectordb speech)
 
+# The console is supervised by the admin LaunchAgent `co.getoffgridai.console`
+# (start-console.sh → npm start → next start on :3000, KeepAlive). NEVER pkill+nohup
+# a fresh `next start` — that fights the supervisor (which respawns its own copy on
+# KeepAlive), leaving TWO servers racing for :3000. On 2026-07-10 that produced 684
+# EADDRINUSE lines and a 3-day-old ROOT-owned next-server that pkill (run as admin)
+# could not kill, serving stale code behind a Cloudflare 502. Restart = kickstart the
+# agent; the supervisor owns the one true process. Stale/root listeners are cleared first.
+CONSOLE_AGENT="${CONSOLE_AGENT:-co.getoffgridai.console}"
+
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # ── 1. Sync shared packages (dist + package.json, no node_modules/src churn) ──
@@ -81,13 +90,81 @@ say "Building on the server"
 # /_next/static/chunks/* → ChunkLoadError / "Something went wrong here" on navigation. A clean build
 # regenerates a self-consistent manifest+chunks. (Cost: ~30s longer build; worth it — this trap has
 # broken prod twice.)
-$SSH "cd $REMOTE/console && rm -rf .next && $NODE node_modules/.bin/next build" 2>&1 | tail -8
+# Drop a marker the moment the build finishes: any :3000 process whose start-time
+# predates it is serving the OLD build and must be cleared (see the restart block).
+$SSH "cd $REMOTE/console && rm -rf .next && $NODE node_modules/.bin/next build && touch deploy/.build-done" 2>&1 | tail -8
 
-say "Restarting console (no pm2 — plain backgrounded next start)"
-$SSH "pkill -f 'next-server' 2>/dev/null; pkill -f 'next start' 2>/dev/null; sleep 2; \
-  cd $REMOTE/console && NODE_ENV=production nohup $NODE node_modules/.bin/next start -H 0.0.0.0 -p $PORT >> deploy/console.log 2>&1 & echo started"
+# ── 5. Restart via the launchd supervisor — clear stale/root listeners, then verify ──
+# This whole block runs ON the server as a single remote script so process inspection
+# (lsof/ps/kill) and the launchctl call happen in one place. It is idempotent + safe to
+# re-run: killing a stale/root process, then kickstarting the agent, converges to exactly
+# one fresh listener regardless of the starting state.
+say "Restarting console via launchd ($CONSOLE_AGENT) — clearing any stale/root listener on :$PORT"
+$SSH "PORT='$PORT' AGENT='$CONSOLE_AGENT' MARKER='$REMOTE/console/deploy/.build-done' bash -s" <<'REMOTE_RESTART'
+set -u
+fail() { printf 'DEPLOY-FAIL: %s\n' "$*" >&2; exit 1; }
 
-sleep 5
+# Build-done epoch — the cutoff. A listener started before this is serving stale code.
+BUILD_EPOCH="$(/usr/bin/stat -f %m "$MARKER" 2>/dev/null || echo 0)"
+
+# Start epoch of a pid, in seconds since the epoch. macOS `ps -o lstart=` prints an
+# absolute date we convert with `date -j -f`; robust across the DHCP/tz churn on this box.
+pid_start_epoch() {
+  local pid="$1" lstart
+  lstart="$(/bin/ps -o lstart= -p "$pid" 2>/dev/null | /usr/bin/sed 's/^ *//')"
+  [ -n "$lstart" ] || { echo 0; return; }
+  /bin/date -j -f '%a %b %e %T %Y' "$lstart" +%s 2>/dev/null || echo 0
+}
+
+# Clear stale/duplicate/root-owned listeners BEFORE start. Never leave two supervisors bound.
+clear_stale() {
+  local pids pid owner start
+  pids="$(/usr/sbin/lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null || true)"
+  for pid in $pids; do
+    owner="$(/bin/ps -o user= -p "$pid" 2>/dev/null | /usr/bin/sed 's/^ *//')"
+    start="$(pid_start_epoch "$pid")"
+    if [ "$owner" = "root" ]; then
+      echo "  :$PORT held by ROOT pid $pid (started epoch $start) — sudo kill -9 (today's culprit class)"
+      /usr/bin/sudo -n /bin/kill -9 "$pid" 2>/dev/null \
+        || fail "root pid $pid on :$PORT could not be killed (sudo -n failed) — clear it by hand"
+    elif [ "$start" -lt "$BUILD_EPOCH" ]; then
+      echo "  :$PORT held by STALE pid $pid (started $start < build $BUILD_EPOCH) — kill -9"
+      /bin/kill -9 "$pid" 2>/dev/null || /usr/bin/sudo -n /bin/kill -9 "$pid" 2>/dev/null \
+        || fail "stale pid $pid on :$PORT could not be killed"
+    else
+      # A current-build process the supervisor already owns — kickstart -k will replace it.
+      echo "  :$PORT held by pid $pid (owner $owner, started $start ≥ build) — supervisor will replace"
+    fi
+  done
+}
+
+clear_stale
+# Give the kernel a beat to release the socket after any kill.
+sleep 2
+clear_stale   # idempotent second pass: a KeepAlive supervisor may have respawned a stale child
+
+echo "  kickstart -k gui/$(id -u)/$AGENT"
+/bin/launchctl kickstart -k "gui/$(id -u)/$AGENT" \
+  || fail "launchctl kickstart of $AGENT failed — is the LaunchAgent installed? (recover.sh reinstalls it)"
+
+# ── Verify: EXACTLY ONE listener on :$PORT, started AFTER the build ──
+ok=""
+for i in $(seq 1 30); do
+  pids="$(/usr/sbin/lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | /usr/bin/sort -u || true)"
+  n="$(printf '%s\n' "$pids" | /usr/bin/grep -c . || true)"
+  if [ "$n" -eq 1 ]; then
+    start="$(pid_start_epoch "$pids")"
+    if [ "$start" -ge "$BUILD_EPOCH" ]; then ok=1; break; fi
+  fi
+  sleep 2
+done
+[ -n "$ok" ] || {
+  echo "  listeners on :$PORT now:"; /usr/sbin/lsof -i:"$PORT" -sTCP:LISTEN 2>/dev/null || true
+  fail "did NOT converge to one fresh listener on :$PORT after 60s (n=${n:-?}, start=${start:-?}, build=$BUILD_EPOCH) — stale build or two supervisors still racing"
+}
+echo "  VERIFIED: one listener (pid $pids) on :$PORT, started $start ≥ build $BUILD_EPOCH (serving the NEW build)"
+REMOTE_RESTART
+
 say "Health check"
 $SSH "curl -s -o /dev/null -w 'signin: %{http_code}\n' http://localhost:$PORT/signin"
 
