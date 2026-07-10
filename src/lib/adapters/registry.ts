@@ -22,7 +22,10 @@ import {
   RETRIEVAL_ENTRIES,
   SANDBOX,
   SIEM,
+  jaegerEntry,
   langfuseEntry,
+  victoriaLogsEntry,
+  victoriaMetricsEntry,
 } from './services';
 import { SIGNING_PORTS } from './signing';
 import type {
@@ -144,7 +147,13 @@ function portEntries<T extends { meta: AdapterMeta; health?: () => Promise<boole
 // service, so the UI shows real connection status.
 const ALL: Record<Capability, RegEntry[]> = {
   inference: portEntries(INFERENCE),
-  observability: [...portEntries(OBSERVABILITY), langfuseEntry],
+  observability: [
+    ...portEntries(OBSERVABILITY),
+    langfuseEntry,
+    victoriaMetricsEntry,
+    victoriaLogsEntry,
+    jaegerEntry,
+  ],
   secrets: portEntries(SECRETS),
   grounding: portEntries(GROUNDING),
   guardrails: GUARDRAIL_ENTRIES,
@@ -184,4 +193,3 @@ export async function listBindings(withHealth = false): Promise<CapabilityBindin
     }),
   );
 }
-

@@ -365,3 +365,50 @@ export const langfuseEntry: RegEntry = {
   },
   health: ping(env.OFFGRID_LANGFUSE_URL, '/api/public/health'),
 };
+
+// Platform-telemetry observability adapters — the metrics/logs/traces backends fed by the OTel
+// collector (one OTLP wire, any backend). Each is read back into the console's Platform-health page
+// (src/lib/victoria-metrics.ts / victoria-logs.ts / jaeger.ts) AND surfaced here in Integrations
+// with live health, exactly like Langfuse. VictoriaMetrics/VictoriaLogs expose a `/health` endpoint;
+// Jaeger's query UI answers `/`.
+export const victoriaMetricsEntry: RegEntry = {
+  meta: {
+    id: 'victoriametrics',
+    capability: 'observability',
+    vendor: 'VictoriaMetrics',
+    license: 'Apache-2.0',
+    render: 'headless',
+    embedUrl: env.OFFGRID_VICTORIAMETRICS_URL,
+    description:
+      'Platform metrics (request/error rate, latency, service up) — PromQL/MetricsQL over the OTLP metrics stream. Read back on the Platform-health page.',
+  },
+  health: ping(env.OFFGRID_VICTORIAMETRICS_URL, '/health'),
+};
+
+export const victoriaLogsEntry: RegEntry = {
+  meta: {
+    id: 'victorialogs',
+    capability: 'observability',
+    vendor: 'VictoriaLogs',
+    license: 'Apache-2.0',
+    render: 'headless',
+    embedUrl: env.OFFGRID_VICTORIALOGS_URL,
+    description:
+      'Platform logs — LogsQL search over the OTLP/log-shipper stream. Searchable on the Platform-health page.',
+  },
+  health: ping(env.OFFGRID_VICTORIALOGS_URL, '/health'),
+};
+
+export const jaegerEntry: RegEntry = {
+  meta: {
+    id: 'jaeger',
+    capability: 'observability',
+    vendor: 'Jaeger',
+    license: 'Apache-2.0',
+    render: 'embed',
+    embedUrl: env.OFFGRID_JAEGER_WEB_URL ?? env.OFFGRID_JAEGER_URL,
+    description:
+      'Distributed traces — services + recent traces read back into the console, deep-linking to the Jaeger UI for the full waterfall.',
+  },
+  health: ping(env.OFFGRID_JAEGER_URL, '/'),
+};
