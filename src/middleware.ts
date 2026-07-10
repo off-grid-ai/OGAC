@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
-import { isPublicFileGet, isPublicPath, tenantSlugFromHost } from '@/lib/route-access';
+import {
+  isPublicFileGet,
+  isPublicPath,
+  isTenantRootRedirect,
+  tenantSlugFromHost,
+} from '@/lib/route-access';
 import { isViewerWriteAttempt, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 import {
   checkRateLimit as decideRateLimit,
@@ -186,6 +191,15 @@ export default auth(async (req) => {
   // (2) Per-key configured limit — enforced ON TOP of the floor when a key/bearer is present.
   const keyBreach = await checkKeyLimit(req);
   if (keyBreach !== null) return tooManyRequests(keyBreach, pathname);
+  // A DEMO TENANT subdomain at "/" is its console, not the marketing landing: redirect the root to
+  // /overview so a visitor arrives AT that tenant's console. A logged-out visitor is then sent by the
+  // auth guard below to /signin?callbackUrl=/overview, so signin IS the tenant home. The apex host
+  // (no tenant slug) is unaffected and keeps rendering the landing. Runs BEFORE isPublicPath so the
+  // public "/" rule doesn't short-circuit it. Only "/" is redirected — every other tenant path (incl.
+  // /overview and /docs) falls through untouched.
+  if (isTenantRootRedirect(req.headers.get('host') ?? req.nextUrl.hostname, pathname)) {
+    return NextResponse.redirect(new URL('/overview', req.nextUrl.origin));
+  }
   if (isPublicPath(pathname)) return withCors(pass(), pathname);
   if (isPublicFileGet(req.method, pathname)) return pass();
   if (isApiBearer(req)) return withCors(pass(), pathname);

@@ -4,6 +4,7 @@ import {
   gatewayFromHost,
   isPublicFileGet,
   isPublicPath,
+  isTenantRootRedirect,
   tenantSlugFromHost,
 } from '../src/lib/route-access.ts';
 import { tenantGatewayHost } from '../src/lib/tenant-domain.ts';
@@ -79,6 +80,30 @@ test('tenantSlugFromHost: case-insensitive on the host', () => {
     tenantSlugFromHost('BharatUnion-OnPrem-Console.getoffgridai.co'),
     'bharatunion',
   );
+});
+
+// ─── isTenantRootRedirect — tenant "/" goes to the console, apex "/" stays the landing ─────────────
+
+test('isTenantRootRedirect: a tenant host at "/" redirects (signin becomes the tenant home)', () => {
+  assert.equal(isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/'), true);
+  assert.equal(isTenantRootRedirect('suraksha-onprem-console.getoffgridai.co', '/'), true);
+});
+
+test('isTenantRootRedirect: the APEX host at "/" does NOT redirect (keeps the landing)', () => {
+  assert.equal(isTenantRootRedirect('onprem-console.getoffgridai.co', '/'), false);
+  assert.equal(isTenantRootRedirect('getoffgridai.co', '/'), false);
+});
+
+test('isTenantRootRedirect: a tenant host at a non-root path does NOT redirect', () => {
+  assert.equal(isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/overview'), false);
+  assert.equal(isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/docs'), false);
+  assert.equal(isTenantRootRedirect('suraksha-onprem-console.getoffgridai.co', '/signin'), false);
+});
+
+test('isTenantRootRedirect: null/empty host never redirects', () => {
+  assert.equal(isTenantRootRedirect(null, '/'), false);
+  assert.equal(isTenantRootRedirect(undefined, '/'), false);
+  assert.equal(isTenantRootRedirect('', '/'), false);
 });
 
 // ─── PA-15: gatewayFromHost — the per-tenant gateway edge resolver ─────────────────────────────────
