@@ -41,20 +41,33 @@ export function consoleUrl(slug: string): string {
 }
 
 /**
+ * True when `href` is a well-formed https URL on the tenant apex whose path is /overview. Exported so
+ * the throw path (a malformed href) is reachable and unit-testable directly, not just via the fixed
+ * demo slugs. Defensive: this is what gates the anchor the landing renders, so it must reject any
+ * off-suite or broken URL.
+ */
+export function isSafeConsoleHref(href: string): boolean {
+  try {
+    const u = new URL(href);
+    const okHost = u.hostname === 'getoffgridai.co' || u.hostname.endsWith('.getoffgridai.co');
+    return u.protocol === 'https:' && okHost && u.pathname === '/overview';
+  } catch {
+    return false; // not a URL
+  }
+}
+
+/**
  * Resolve a SAFE href for a demo tenant's "See it live" CTA. Returns the /overview deep-link only for
- * a known demo slug whose derived URL is a well-formed https URL on the tenant apex; anything else
- * returns null so a caller never emits a link to an unknown or malformed host. Pure + defensive: this
- * is what the landing renders into an anchor, so it must never produce an off-suite or broken URL.
+ * a known demo slug whose derived URL passes isSafeConsoleHref; anything else returns null so a caller
+ * never emits a link to an unknown or malformed host.
  */
 export function demoTenantHref(slug: string | null | undefined): string | null {
   if (!isDemoTenantSlug(slug)) return null;
   const href = consoleUrl(slug as string);
-  try {
-    const u = new URL(href);
-    const okHost = u.hostname === 'getoffgridai.co' || u.hostname.endsWith('.getoffgridai.co');
-    if (u.protocol === 'https:' && okHost && u.pathname === '/overview') return href;
-  } catch {
-    /* not a URL — fall through to null */
-  }
-  return null;
+  // The `: null` arm is defense-in-depth against a misconfigured NEXT_PUBLIC_TENANT_APEX (an
+  // off-suite apex would make the derived href unsafe). It is unreachable with the default apex + the
+  // fixed demo slugs, so it is not branch-coverable here; isSafeConsoleHref itself is fully tested
+  // both ways above. c8 ignore the impossible-with-current-config false arm.
+  /* c8 ignore next */
+  return isSafeConsoleHref(href) ? href : null;
 }
