@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ScrollableTabs } from '@/components/build/ScrollableTabs';
 import { SubNav } from '@/components/nav/SubNav';
 import { activeTabForPath, pipelineTabs } from '@/lib/pipeline-detail';
-import { cn } from '@/lib/utils';
 
 // ─── PipelineDetailNav — the per-pipeline scoped SubNav band (mirrors AppLifecycleNav) ────────────
 //
@@ -33,26 +33,11 @@ export function PipelineDetailNav({ pipelineId, name }: { pipelineId: string; na
             {name}
           </span>
         </div>
-        <nav className="flex flex-wrap items-center gap-1">
-          {tabs.map((t) => {
-            const isActive = t.tab === active;
-            return (
-              <Link
-                key={t.tab}
-                href={t.href}
-                aria-current={isActive ? 'page' : undefined}
-                className={cn(
-                  'rounded-md px-2.5 py-1 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <ScrollableTabs
+          aria-label="Pipeline sections"
+          tabs={tabs.map((t) => ({ key: t.tab, label: t.label, href: t.href }))}
+          active={active}
+        />
         {activeHint ? <p className="text-[11px] text-muted-foreground">{activeHint}</p> : null}
       </div>
     </SubNav>
