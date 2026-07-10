@@ -127,6 +127,60 @@ module.exports = {
       to: { path: '^src/app/api/.+/route\\.tsx?$' },
     },
 
+    // ── 2b. RATCHET (#226): additional boundary rules, all CLEAN today → ERROR ──
+
+    // Production code must never import a TEST file. A test is a leaf that
+    // depends on src, never the reverse — an src→test edge means a test helper
+    // leaked into shipped code (it would drag test-only deps into the bundle and
+    // couples prod to test scaffolding). Baseline: 0 → ERROR.
+    {
+      name: 'no-src-to-test',
+      comment:
+        'Application code (src/**) must not import a test file (*.test.ts[x] / ' +
+        'test/**). Tests depend on src, never the reverse. Baseline: 0 → ERROR.',
+      severity: 'error',
+      from: { path: '^src/', pathNot: '\\.(test|spec)\\.[jt]sx?$' },
+      to: { path: '(\\.(test|spec)\\.[jt]sx?$)|(^test/)' },
+    },
+
+    // The pure logic layer (src/lib) must not depend on PRESENTATION
+    // (src/components). Dependencies point components → lib, never lib →
+    // components — otherwise pure/unit-testable business logic drags in React
+    // component modules (and their DOM/JSX deps), breaking the zero-IO coverage
+    // seam. Type-only edges are excluded: a `import type { Foo }` is erased at
+    // build (the one existing case, src/lib/pipeline-chip.ts importing a shared
+    // ChipData TYPE, is harmless). Baseline: 0 value edges → ERROR.
+    {
+      name: 'lib-no-components',
+      comment:
+        'Pure logic (src/lib) must not import presentation (src/components) as a ' +
+        'value edge — deps point components→lib. Type-only imports are allowed ' +
+        '(erased at build). Baseline: 0 value edges → ERROR.',
+      severity: 'error',
+      from: { path: '^src/lib/' },
+      to: {
+        path: '^src/components/',
+        dependencyTypesNot: ['type-only'],
+      },
+    },
+
+    // src/lib must not import the Temporal WORKER modules (src/worker/**). The
+    // worker runs in a SEPARATE process (a determinism-sandboxed workflow bundle)
+    // launched by scripts/*-worker.mts; app code talks to it through the durable
+    // SUBMITTER adapters (src/lib/*-durable.ts + src/lib/adapters/*runtime.ts),
+    // never by importing the workflow/activity modules directly (that would pull
+    // the worker runtime into the Next bundle). Baseline: 0 → ERROR.
+    {
+      name: 'no-lib-to-worker',
+      comment:
+        'src/lib must not import the Temporal worker modules (src/worker/**) — the ' +
+        'worker is a separate process reached via the durable submitter adapters. ' +
+        'Baseline: 0 → ERROR.',
+      severity: 'error',
+      from: { path: '^src/lib/' },
+      to: { path: '^src/worker/' },
+    },
+
     // ── 3. RETIRED / BANNED MODULES ─────────────────────────────────────────
     // The clustered aggregator was killed — LiteLLM is the door now. Nothing in
     // application code (src/**) or live scripts may import the retired entrypoints.
