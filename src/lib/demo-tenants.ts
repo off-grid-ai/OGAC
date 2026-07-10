@@ -29,7 +29,9 @@ export interface DemoTenant {
 // The public console URL for a demo tenant. Derived from the slug so it stays in lockstep with the
 // on-prem hostnames (bharatunion-onprem-console…, suraksha-onprem-console…).
 function consoleUrl(slug: string): string {
-  return `https://${slug}-${DEMO_HOST_SUFFIX}/`;
+  // Deep-link the console overview, not the tenant root: a visitor should land IN the product
+  // (a logged-out visitor is bounced to that tenant's signin), never on a second marketing page.
+  return `https://${slug}-${DEMO_HOST_SUFFIX}/overview`;
 }
 
 function toDemoTenant(profile: TenantProfile, industryLabel: string, name: string): DemoTenant {

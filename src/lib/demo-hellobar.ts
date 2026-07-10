@@ -56,3 +56,43 @@ export function readDemoBanner(role: string | null | undefined): DemoBannerModel
     password: process.env.OFFGRID_DEMO_VIEWER_PASSWORD,
   });
 }
+
+// ─── Signin-context variant ────────────────────────────────────────────────────────────────────────
+// The authed console hellobar (above) is role-gated: it shows only for a VIEWER session. But the
+// signin page is where a logged-OUT visitor needs the read-only credentials to sign in at all — there
+// is no session yet, so role gating cannot apply. Instead the signin banner shows when the host is a
+// demo tenant subdomain (so the creds only surface on the public demo, not a real tenant's signin) and
+// the creds are configured in env. When the host is a demo tenant but the creds are unset, it still
+// shows the read-only note (never crashing, just without creds). Same DemoBannerModel shape so the
+// note copy is shared (DRY) with the authed hellobar.
+
+export interface SigninDemoBannerInput {
+  isTenantHost: boolean; // the request host is a demo tenant subdomain (from tenantSlugFromHost)
+  email: string | null | undefined; // OFFGRID_DEMO_VIEWER_EMAIL
+  password: string | null | undefined; // OFFGRID_DEMO_VIEWER_PASSWORD
+}
+
+/**
+ * Decide the signin-page demo banner. Shows on a demo tenant host regardless of session (the visitor
+ * is logged out). Credentials pass through when set, else null (note still shown). Pure.
+ */
+export function buildSigninDemoBanner(input: SigninDemoBannerInput): DemoBannerModel {
+  return {
+    show: input.isTenantHost,
+    email: clean(input.email),
+    password: clean(input.password),
+    note: DEMO_READONLY_NOTE,
+  };
+}
+
+/**
+ * The impure reader for the signin banner: resolve the model from process env given whether the
+ * request host is a demo tenant. Thin — reads the two env vars, delegates to the pure builder.
+ */
+export function readSigninDemoBanner(isTenantHost: boolean): DemoBannerModel {
+  return buildSigninDemoBanner({
+    isTenantHost,
+    email: process.env.OFFGRID_DEMO_VIEWER_EMAIL,
+    password: process.env.OFFGRID_DEMO_VIEWER_PASSWORD,
+  });
+}
