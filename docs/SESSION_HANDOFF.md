@@ -1,9 +1,44 @@
 # Session handoff — 2026-07-10 LATE (landing polish + WHOLE-APP MOBILE) — READ THIS FIRST
 
-**Git state right now:** branch `wave2-tenant-isolation-prompts-analytics-evals` @ `2edae9e`, working tree
-CLEAN, pushed to origin (backup) this session. It = remote `main` (`7ea13b8`, the killer landing merge)
-+ ONE commit `2edae9e` (regenerated hero sketch PNG). So `main` can fast-forward to include the diagram.
-The killer landing IS live/merged on main; hero PNG only needs FF+deploy.
+**Git state right now:** branch `wave2-tenant-isolation-prompts-analytics-evals` @ `cfe8dc2`, tree CLEAN,
+pushed to origin. ALL of this session's work is merged onto wave2 + on remote. `main` is still at
+`7ea13b8` (older) — wave2 is ahead by the whole landing+mobile batch; merge wave2→main (PR) when ready.
+
+**ALL 9 BATCHES MERGED + PUSHED + GATE-GREEN + DEPLOYING (cfe8dc2):**
+Assembled gate green — build compiled, 3316 tests pass / 0 fail, depcruise 0 errors, jscpd 2.00% (<2.5%).
+1. Landing light+dark theming + smooth flow beam (brand tokens flip on next-themes, nav ThemeToggle, dark-default).
+2. Hero sketch regen — all 5 canonical facets (data→gateway→pipelines→agents/apps→compliance).
+3. Landing pass 2 (#230 DONE): short/low-scroll (killed 5-card bento), product-tour centerpiece, "Are you a
+   bank/insurer? See it live" CTAs -> bharatunion-onprem-console + suraksha-onprem-console (both 200), CIO
+   proof strip (1 interface/0 eng tickets/100% traffic/4 frameworks), carousel click-to-zoom + promote-to-hero
+   (URL-driven ?shot=), phosphor-only, agentic restrained motion (magnetic/decrypt), "control+no-lockin+one
+   coherent system" copy (NOT infra-you-own). New pure libs at 100%: demo-tenants, landing-hero, motion/magnetic, motion/decrypt.
+4-9. WHOLE-APP MOBILE epic (#231 DONE) — M1 shell sidebar->drawer+hamburger (pure drawerReducer 100%),
+   M2 stat bands->horizontal StatRail rails, M3 form field-grids stack + sticky save, M4 build detail
+   ScrollableTabs + canvas desktop-gate, M5 workspace CardRail + chat conversation drawer, M6 governance+ops
+   rails, M7 (#232 DONE) 44px touch targets (Input/Button h-11 sm:h-9) + StatRail cols:6/xl extension.
+   Principles applied: minimize vertical scroll, lists=horizontal rails, fold-aware, 390/320 both themes.
+   Shared primitives: src/components/ui/StatRail.tsx (+ src/lib/stat-rail.ts, cols 2|3|4|6, at sm|md|lg|xl),
+   src/components/workspace/CardRail.tsx, src/components/build/ScrollableTabs.tsx, src/lib/mobile-nav.ts.
+
+**MERGE NOTE (M7):** M7's base predated M2 so it re-created StatRail -> add/add conflict resolved by hand
+(commit cfe8dc2): took M7's SUPERSET stat-rail.ts + test (cols:6/xl), kept M2's wrapper defaults at='lg'
+cols=4 (7 pages call bare <StatRail>). typecheck + 8 stat-rail tests + full gate green after.
+
+**DEPLOY IN FLIGHT:** `SERVER=offgrid-tunnel SSH_USER=admin bash deploy/push.sh` (task bz475cdc0). After it
+lands: verify onprem-console.getoffgridai.co / at desktop AND mobile width (390px) in both themes; confirm
+the see-it-live links + drawer nav + rails. If 502: stale root next-server on :3000 -> sudo -n kill -9,
+launchctl kickstart -k gui/501/co.getoffgridai.console (NEVER pkill+nohup).
+
+**REMAINING (not started):** full-app mobile VISUAL sweep on the live deploy (each agent verified its own
+surface in isolation; a cross-module live pass at 390/320 both themes is still owed). #226 aggressive gate.
+#229 public demo finish (seed live DB both tenants, hellobar creds, README screenshots). ON HOLD: insurer (#207/#216).
+
+---
+
+(historical below)
+
+**Earlier git state:** branch @ `2edae9e` = remote `main` (`7ea13b8`) + hero PNG.
 
 **4 AGENTS RUNNING when the session ended (their worktree branches persist ON DISK — committed work
 survives; resume by finding each branch, reviewing, gating, merging). All were told: incremental commits,
