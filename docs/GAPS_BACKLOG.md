@@ -973,3 +973,41 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## Adversarial QA — Pipelines (G-ADV-PIPE-*)
+**Status: OPEN.** Found by adversarial bug-hunt (docs/adversarial/pipelines.md). RED tests in
+`test/pipelines-adversarial.test.ts` (`.skip`, proven to fail when un-skipped). Assert terminal artifacts
+(the execution plan / the resolved contract) from the real seams.
+
+- **G-ADV-PIPE-1 (HIGH) — LOCAL egress leash does not enforce a local MODEL.** `buildRunPlan`
+  (`src/lib/pipeline-run-plan.ts:70`) / `chooseModel` (`:50`) pick the model by string precedence and never
+  classify it local-vs-cloud, so a `forceLocal`/`egress:'local'` plan can name a CLOUD model (e.g. the
+  pipeline's cloud `defaultModel` when the routing rule pins no local model). `pipeline-execute-wiring.ts:61`
+  only sends an advisory `metadata:{egress:'local'}` hint to the gateway — it does not force a local model.
+  Result: a PII-locked pipeline can send the raw prompt to a cloud model while reporting `egress:'local'`,
+  contradicting the module's own docstring. FIX: classify the resolved model's egress and, under forceLocal,
+  force a local model or refuse (block) — never silently plan cloud.
+
+- **G-ADV-PIPE-2 (HIGH) — deprecated/archived bound pipeline still governs consumer runs.**
+  `resolveContract` (`src/lib/pipeline-contract.ts:32`) → `getPipeline` (`src/lib/pipelines.ts:279`) applies NO
+  lifecycle-status filter; the consumer resolvers (`pipeline-run-glue.ts:32/71`) + app/trigger/email routes
+  don't check status. So the deprecate-hint promise ("consumers fall back to the org default",
+  `pipeline-lifecycle-model.ts:110/143`) is not honoured on chat/agent/app — the stale contract keeps
+  enforcing. ASYMMETRY: the public run route (`api/v1/pipeline/[id]/run/route.ts:64`) DOES gate `published`,
+  the internal paths don't. FIX: put an `isConsumable(status)` gate on the shared `resolveContract` seam (or
+  a pure rule both the resolver and route call), not duplicated in one route.
+
+- **G-ADV-PIPE-3 (MED/HIGH) — draft/in_review pipeline governs+runs on internal consumers.** Same missing
+  status gate: an app/agent/chat bound to a still-draft pipeline resolves + enforces its contract, bypassing
+  M1's release gate (publish-iff-evals-pass) and the public route's `published` check. Un-approved governance
+  runs live. FIX: same seam as G-ADV-PIPE-2.
+
+- **SoC note:** lifecycle status is enforced in exactly one inline place (public run route) instead of on the
+  DRY enforcement seam every consumer shares — the root cause of G-ADV-PIPE-2/3. Contract enforcement itself
+  IS one shared seam (good, no `type===` switch); the STATUS gate just wasn't put on it.
+
+- **Open questions (⚠️, not yet exercised):** (a) deleted-GATEWAY × bound pipeline — the executor calls the
+  env `GATEWAY_URL`, not the bound gateway's URL; the bound gateway is echoed as metadata only, so a
+  bound-then-deleted gateway may not change routing at all (binding possibly cosmetic — worth confirming).
+  (b) concurrent edit vs publish/deprecate — version bump is last-write-wins, no optimistic lock observed.
+  (c) route-level role gating for lifecycle transitions not re-probed (pure `allowedTransitions` RBAC is sound).
