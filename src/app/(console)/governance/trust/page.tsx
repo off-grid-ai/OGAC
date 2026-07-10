@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { StatRail } from '@/components/ui/StatRail';
 import { requireModuleForUser } from '@/lib/module-access';
 import {
   buildPosture,
@@ -134,8 +135,8 @@ export default async function TrustCenterPage() {
         </Card>
       </div>
 
-      {/* Pillar rollup band */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Pillar rollup band — horizontal rail on mobile, restored 4-col grid on desktop. */}
+      <StatRail cols={4}>
         {summary.pillars
           .filter((p) => p.total > 0)
           .map((p) => (
@@ -156,7 +157,7 @@ export default async function TrustCenterPage() {
               </CardContent>
             </Card>
           ))}
-      </div>
+      </StatRail>
 
       {/* Posture pillars — each a grid of items */}
       {posturePillars.map((pillar) => {

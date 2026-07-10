@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle, Clock, PauseCircle, Pulse, XCircle } from '@pho
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import { StatRail } from '@/components/ui/StatRail';
 import { getAgentRun } from '@/lib/agentrun';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -54,15 +55,15 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {/* Metadata band */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Metadata band — horizontal rail on mobile, restored 4-col grid at sm+ (desktop unchanged). */}
+      <StatRail at="sm" cols={4}>
         <Meta label="Kind" value={kindLabel(row.kind)} />
         <Meta label="Started" value={row.startedAt ? new Date(row.startedAt).toLocaleString() : '—'} />
         <Meta label="Duration" value={describeDuration(row.durationMs)} />
         <Meta label="Pipeline" value={row.pipeline} mono />
         <Meta label="Actor" value={row.actor || '—'} />
         <Meta label="Status" value={statusLabel(row.status)} />
-      </div>
+      </StatRail>
 
       {/* Agent run — recorded step timeline + answer + checks */}
       {agent ? (
