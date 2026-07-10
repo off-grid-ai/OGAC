@@ -15,6 +15,7 @@ import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   Table,
   TableBody,
@@ -297,7 +298,7 @@ export default async function ObservabilityPage({
         </div>
       ))}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatRail>
         {stats.map((s) => (
           <Card key={s.label} className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -311,7 +312,7 @@ export default async function ObservabilityPage({
             </CardContent>
           </Card>
         ))}
-      </div>
+      </StatRail>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
