@@ -88,3 +88,6 @@ Adversarial QA complete for 8 domains: Tenant-isolation · Chat · Gateway · Se
 ## Observability / Insights  (queued)
 ## Consumption (triggers → run → sinks)  (queued)
 ## Secrets / config  (queued)
+
+## Insights / Analytics org-scoping (found wave2-D, 2026-07-10)
+- [ ] Analytics/FinOps/Observability/Drift read OpenSearch WITHOUT an org filter (`analytics.ts`, `analytics-aggs.ts` aggregate ALL docs) → a tenant sees COMBINED cross-tenant traffic/cost, not just its own. Demo docs are now org-tagged (wave2-D) so the fix is reader-side: apply `currentOrgId()` as an OpenSearch filter on every analytics query. Cross-tenant leak → folds into security cluster #236. `(src/lib/analytics.ts, analytics-aggs.ts, gateway analytics/logs routes | G-ADV-OBS-ORG)`
