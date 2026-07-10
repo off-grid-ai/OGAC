@@ -27,102 +27,102 @@ import { INTEGRATIONS } from '@/lib/integrations';
 import { MODULE_ICONS } from '@/modules/icons';
 import { MODULES } from '@/modules/registry';
 
-// The spine — how work flows through the platform: data → gateway → pipelines → apps | agents.
+// The spine - how work flows through the platform: data → gateway → pipelines → apps | agents.
 const SPINE = [
   {
     icon: Database,
     step: 'Data',
     title: 'One governed source of truth',
-    body: 'Connect the systems you already run and pull them into one governed source of truth — so every decision downstream runs on complete, current, permissioned data, not a stale export.',
+    body: 'Connect the systems you already run and pull them into one governed source of truth, so every decision downstream runs on complete, current, permissioned data, not a stale export.',
   },
   {
     icon: PlugsConnected,
     step: 'Gateway',
     title: 'One smart gateway',
-    body: 'Every model call — on your own hardware or the cloud — routes through a single gateway: observed, cost-tracked, rate-limited, with an egress leash you decide. One place to see where your AI spend and risk actually live.',
+    body: 'Every model call, on your own hardware or in your cloud, routes through a single gateway: observed, cost-tracked, rate-limited, with an egress leash you decide. One place to see where your AI spend and risk actually live.',
   },
   {
     icon: GitBranch,
     step: 'Pipelines',
     title: 'Governance travels with the work',
-    body: 'Guardrails, redaction, evals, and provenance are built into reusable, composable pipelines — inherited by everything you build, never bolted on after. Solve reliability and security once, at the pipeline, not in every project.',
+    body: 'Guardrails, redaction, evals, and provenance are built into reusable, composable pipelines, inherited by everything you build, never bolted on after. Solve reliability and security once, at the pipeline, not in every project.',
   },
   {
     icon: Robot,
     step: 'Apps & agents',
     title: 'Put to work',
-    body: 'Consume a governed pipeline as an app with a human in the loop, or an agent that runs on its own and reports back — driven by real triggers and real tools.',
+    body: 'Consume a governed pipeline as an app with a human in the loop, or an agent that runs on its own and reports back, driven by real triggers and real tools.',
   },
 ];
 
-// The unlock — anyone builds.
+// The unlock - anyone builds.
 const UNLOCK = [
   {
     icon: Sparkle,
     title: 'Describe it in plain language',
-    body: 'A person on your finance, claims, or lending team writes what the work is — no engineer, no code.',
+    body: 'A person on your finance, claims, or lending team writes what the work is - no engineer, no code.',
   },
   {
     icon: ShieldCheck,
     title: 'It inherits your governance',
-    body: 'The automation is born on a pipeline: your rules, your connectors, your data, your guardrails — governed by construction.',
+    body: 'The automation is born on a pipeline: your rules, your connectors, your data, your guardrails - governed by construction.',
   },
   {
     icon: Robot,
-    title: 'It runs — overseen or autonomous',
+    title: 'It runs - overseen or autonomous',
     body: 'Ships as an app a person approves, or an agent that runs on a schedule and reports back. Same people, far more done.',
   },
 ];
 
-// Governed by construction — the trust spine every pipeline carries.
+// Governed by construction - the trust spine every pipeline carries.
 const GOVERNANCE = [
   {
     icon: ShieldCheck,
     title: 'Guardrails & redaction',
-    body: 'Prompt-injection, toxicity, and schema checks on every call — and PII masked before the model ever sees it, enforced, not suggested.',
+    body: 'Prompt-injection, toxicity, and schema checks on every call, and PII masked before the model ever sees it, enforced, not suggested.',
   },
   {
     icon: Gauge,
     title: 'Evals, faithfulness & drift',
-    body: 'Offline evals, live scoring on real traffic, and drift detection — so you know the agents still do a good job, and catch the one that regressed and when.',
+    body: 'Offline evals, live scoring on real traffic, and drift detection, so you know the agents still do a good job, and catch the one that regressed and when.',
   },
   {
     icon: SealCheck,
     title: 'Signed provenance',
-    body: 'Every output carries a signed, offline-verifiable record (ed25519); images get C2PA Content Credentials. Prove what was produced, by whom, unaltered — with only a public key.',
+    body: 'Every output carries a signed, offline-verifiable record (ed25519); images get C2PA Content Credentials. Prove what was produced, by whom, unaltered, with only a public key.',
   },
   {
     icon: ScrollText,
     title: 'Durable & auditable',
-    body: 'Runs survive restarts and resume where they left off. Every model call, tool call, and byte of egress is logged — a record you can hand a regulator.',
+    body: 'Runs survive restarts and resume where they left off. Every model call, tool call, and byte of egress is logged, a record you can hand a regulator.',
   },
 ];
 
-// On your terms — the non-negotiables.
+// Why it holds up - the AWS-for-AI promise: it just works, set once, swappable, for everyone.
 const PILLARS = [
   {
-    icon: Lock,
-    title: 'On-prem & yours',
-    body: 'Runs on your own infrastructure. Models can run on-device; your data never leaves your control.',
+    icon: Gauge,
+    title: 'Works out of the box',
+    body: 'The whole stack is set up and connected. One bring-up, no assembly. You stop thinking about how to run AI safely and start putting it to work.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Set once, use everywhere',
+    body: 'An admin defines the rules, policies, guardrails, and lineage a single time. Every employee and every agent inherits them automatically. Nobody re-implements governance.',
   },
   {
     icon: PlugsConnected,
-    title: 'Drop-in',
-    body: 'Works with the systems you already run, as-is. No rip-and-replace — connect what you have and make it intelligent.',
-  },
-  {
-    icon: Code,
-    title: 'Open & transparent',
-    body: 'Open source, so anyone can inspect and trust it. Every AI action is observable, attributable, and reversible.',
+    title: 'Swappable, no lock-in',
+    body: 'Every capability ships with a first-party default and swaps to a best-in-class open engine with one environment variable. Runs on your servers or in your cloud, your call.',
   },
   {
     icon: UsersThree,
     title: 'For everyone',
-    body: 'Accessible to every employee, not just engineers — the whole workforce builds, safely, inside the same guardrails.',
+    body: 'Accessible to every employee, not just engineers. The whole workforce builds, safely, inside the same guardrails.',
   },
 ];
 
-// Show the capability LAYERS, not the underlying engine names — the ethos is "open foundations,
+// Show the capability LAYERS, not the underlying engine names - the ethos is "open foundations,
 // no lock-in", carried by the layers we govern, without parading which OSS engine powers each.
 const CAPABILITY_LAYERS = INTEGRATIONS.map((l) => l.layer);
 
@@ -169,20 +169,21 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-3xl px-6 py-24 text-center">
           <BlurFade delay={0.05} inView>
             <div className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs shadow-sm">
-              <AnimatedShinyText>On your infrastructure · open source · yours</AnimatedShinyText>
+              <AnimatedShinyText>AWS for AI · open source · works out of the box</AnimatedShinyText>
             </div>
           </BlurFade>
           <BlurFade delay={0.15} inView>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Become an intelligent enterprise, without compromising.
+              AWS for AI. Make your enterprise intelligent, on one interface that just works.
             </h1>
           </BlurFade>
           <BlurFade delay={0.3} inView>
             <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground">
-              Aggregate your data into one governed source of truth, put one smart gateway in front
-              of every model, and let anyone turn the work they already do into a governed app or
-              agent — in plain language. Your data stays yours. You keep control. And you can prove
-              it.
+              Every piece to run AI in a company already exists: a gateway to the models, evals,
+              guardrails, PII masking, data pipelines, audit, lineage. The hard part was wiring them
+              into one thing that works, and keeping every team inside the rules. Off Grid AI is that
+              one interface, already set up and connected. Set your rules once, and anyone builds
+              governed apps and agents in plain language.
             </p>
           </BlurFade>
           <BlurFade delay={0.45} inView>
@@ -201,10 +202,10 @@ export default function LandingPage() {
           <BlurFade delay={0.55} inView>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <Lock className="size-3.5 text-primary" /> On-prem
+                <Gauge className="size-3.5 text-primary" /> Works out of the box
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-primary" /> Every call policy-checked
+                <ShieldCheck className="size-3.5 text-primary" /> Every call governed
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Code className="size-3.5 text-primary" /> Open source
@@ -214,7 +215,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* The spine — data → gateway → pipelines → apps | agents */}
+      {/* The spine - data → gateway → pipelines → apps | agents */}
       <section className="border-b border-border">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <BlurFade inView>
@@ -225,7 +226,7 @@ export default function LandingPage() {
               One governed path, end to end
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              Every part of the AI problem — data, model access, governance, delivery — solved once,
+              Every part of the AI problem - data, model access, governance, delivery - solved once,
               in one place, so the work is reliable and compliant by default.
             </p>
           </BlurFade>
@@ -256,7 +257,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* The unlock — anyone builds */}
+      {/* The unlock - anyone builds */}
       <section className="border-b border-border bg-card/40">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <BlurFade inView>
@@ -266,7 +267,7 @@ export default function LandingPage() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
               Not another tool for engineers. A person describes the process they run today in plain
-              language and gets back a working, governed automation — your own build-anything studio
+              language and gets back a working, governed automation - your own build-anything studio
               that inherits your rules, connectors, and data. You&apos;re not speeding up a few
               engineers; you&apos;re giving every employee an agent workforce, safe by construction.
             </p>
@@ -299,7 +300,7 @@ export default function LandingPage() {
               Governed by construction, not by review
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              The trust spine every pipeline carries — so autonomy never means losing control, and
+              The trust spine every pipeline carries - so autonomy never means losing control, and
               compliance isn&apos;t a meeting three weeks later.
             </p>
           </BlurFade>
@@ -329,9 +330,9 @@ export default function LandingPage() {
       <section className="border-b border-border bg-card/40">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">On your terms</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">Why it holds up</p>
             <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Intelligence that works the way you already do
+              Set up once, and it just works
             </h2>
           </BlurFade>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -350,7 +351,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Capabilities — the planes, adoptable on their own */}
+      {/* Capabilities - the planes, adoptable on their own */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <BlurFade inView>
           <p className="font-mono text-xs uppercase tracking-widest text-primary">Capabilities</p>
@@ -359,7 +360,7 @@ export default function LandingPage() {
           </h2>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
             From ingestion to consumption to the regulatory wrapper. Each capability is API-first and
-            adoptable on its own — take the whole platform, or start with one and add the rest when
+            adoptable on its own - take the whole platform, or start with one and add the rest when
             you&apos;re ready.
           </p>
         </BlurFade>
@@ -389,7 +390,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Under the hood — one architecture exhibit for the technical buyer */}
+      {/* Under the hood - one architecture exhibit for the technical buyer */}
       <section className="border-t border-border bg-card/40">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <BlurFade inView>
@@ -398,8 +399,8 @@ export default function LandingPage() {
               A complete, governed AI estate
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              The reference architecture for production AI — data plane, model plane, control plane,
-              consumption, and the org &amp; regulatory wrapper — and exactly how Off Grid AI maps
+              The reference architecture for production AI - data plane, model plane, control plane,
+              consumption, and the org &amp; regulatory wrapper - and exactly how Off Grid AI maps
               onto it.
             </p>
           </BlurFade>
@@ -429,7 +430,7 @@ export default function LandingPage() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
               We stand on open standards and the best of the open ecosystem, woven into one governed
-              platform — so you can inspect every layer, trust it, and run it yourself. Nothing to be
+              platform - so you can inspect every layer, trust it, and run it yourself. Nothing to be
               locked into.
             </p>
           </BlurFade>
@@ -465,7 +466,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <BlurFade inView>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Become an intelligent enterprise — on your own grid.
+              Become an intelligent enterprise, without compromising.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
               Open the console and see it running, or book a call and we&apos;ll walk your team
@@ -488,8 +489,8 @@ export default function LandingPage() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-xs text-muted-foreground">
-          <span>Off Grid AI · a private AI, everywhere — on your infrastructure</span>
-          <span>AGPL-3.0 · your data, your control</span>
+          <span>Off Grid AI · AWS for AI · open source</span>
+          <span>AGPL-3.0 · set once, use everywhere</span>
         </div>
       </footer>
     </div>
