@@ -23,6 +23,7 @@ import {
   parseLifecycleXml,
   type LifecycleRule,
 } from './storage-lifecycle';
+import { orgFilePrefix, isKeyInOrg } from './files-tenancy';
 
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';
@@ -94,6 +95,13 @@ function safeName(name: string): string {
   return (name || 'file').replace(/[/\\]+/g, '_').slice(0, 200);
 }
 
+// Encode an object key for the S3 URL path, PRESERVING slashes so a tenant-prefixed key
+// (`orgs/<org>/uuid-name`) addresses the right object instead of a single `%2F`-mangled key. A
+// slash-free key encodes identically to encodeURIComponent, so pre-existing flat keys are unchanged.
+function keyPath(id: string): string {
+  return id.split('/').map(encodeURIComponent).join('/');
+}
+
 // Low-level object put/get at a caller-chosen key — for content the console addresses by a
 // deterministic path (e.g. artifact bodies at artifacts/<id>/v<n>), as opposed to saveFile's
 // random-keyed uploads. Same single bucket; SeaweedFS remains the only file-storage layer.
@@ -117,11 +125,14 @@ export async function saveFile(o: {
   bytes: Buffer;
   visibility: string;
   owner: string;
+  // TENANCY: the owning org. When set (a real tenant), the object is keyed under that org's prefix
+  // (`orgs/<orgId>/…`) so listFiles can isolate it. Absent / 'default' → the bucket root (unchanged).
+  orgId?: string | null;
 }): Promise<FileMeta> {
   await ensureFileSchema();
   const visibility = o.visibility === 'public' ? 'public' : 'private';
-  const id = `${crypto.randomUUID()}-${safeName(o.name)}`;
-  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, {
+  const id = `${orgFilePrefix(o.orgId)}${crypto.randomUUID()}-${safeName(o.name)}`;
+  const res = await s3Fetch(`${base}/${keyPath(id)}`, {
     method: 'PUT',
     headers: {
       'content-type': o.mime || mimeFromName(o.name),
@@ -137,7 +148,7 @@ export async function saveFile(o: {
 }
 
 export async function getFileMeta(id: string): Promise<FileMeta | null> {
-  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, { method: 'HEAD' });
+  const res = await s3Fetch(`${base}/${keyPath(id)}`, { method: 'HEAD' });
   if (!res.ok) return null;
   const h = res.headers;
   const metaName = h.get('x-amz-meta-name');
@@ -153,18 +164,27 @@ export async function getFileMeta(id: string): Promise<FileMeta | null> {
 }
 
 export async function readFileBytes(id: string): Promise<Buffer | null> {
-  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`);
+  const res = await s3Fetch(`${base}/${keyPath(id)}`);
   if (!res.ok) return null;
   return Buffer.from(await res.arrayBuffer());
 }
 
-// List the WHOLE bucket (shared media store) — files uploaded via the UI and files pushed
-// straight to the bucket both appear. `owner` is accepted for signature compatibility but no
-// longer filters: the store is a single shared namespace. Cheap listing derives mime from the
-// extension and treats objects as public (the default) — a per-object HEAD would be N calls.
-export async function listFiles(_owner: string): Promise<FileMeta[]> {
+// List files in the media store. `owner` is accepted for signature compatibility but no longer
+// filters. Cheap listing derives mime from the extension and treats objects as public (the default)
+// — a per-object HEAD would be N calls.
+//
+// TENANCY: pass `opts.orgId` to isolate a tenant. A real org lists ONLY its prefix (`orgs/<orgId>/`)
+// via the native S3 `prefix` param — so a tenant never sees another tenant's files or global
+// desktop-app junk (qwythos9b frames, todo-demo), which live at the bucket root. The default /
+// single-tenant org (no orgId, or 'default') lists the WHOLE bucket, unchanged (provit + erasure-
+// lake callers that pass no org keep their bucket-wide view). Belt-and-braces: even under a prefix
+// query we re-check each key with the pure isKeyInOrg rule so a mis-scoped result can't leak.
+export async function listFiles(_owner: string, opts?: { orgId?: string | null }): Promise<FileMeta[]> {
   await ensureFileSchema();
-  const res = await s3Fetch(`${base}?list-type=2&max-keys=1000`);
+  const orgId = opts?.orgId ?? null;
+  const prefix = orgFilePrefix(orgId);
+  const q = `${base}?list-type=2&max-keys=1000${prefix ? `&prefix=${encodeURIComponent(prefix)}` : ''}`;
+  const res = await s3Fetch(q);
   if (!res.ok) return [];
   const xml = await res.text();
   const out: FileMeta[] = [];
@@ -172,6 +192,9 @@ export async function listFiles(_owner: string): Promise<FileMeta[]> {
     const block = m[1];
     const key = block.match(/<Key>([\s\S]*?)<\/Key>/)?.[1];
     if (!key) continue;
+    // Belt-and-braces: the prefix query already scopes this, but re-apply the pure org rule so a
+    // stray out-of-prefix key can never leak into a tenant's list.
+    if (!isKeyInOrg(key, orgId)) continue;
     const size = Number(block.match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0);
     const lm = block.match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1];
     const name = (key.split('/').pop() ?? key).replace(/^[0-9a-f-]{36}-/, '');
@@ -195,10 +218,10 @@ export async function setVisibility(id: string, visibility: string, owner: strin
   const meta = await getFileMeta(id);
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return null;
   const v = visibility === 'public' ? 'public' : 'private';
-  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, {
+  const res = await s3Fetch(`${base}/${keyPath(id)}`, {
     method: 'PUT',
     headers: {
-      'x-amz-copy-source': `/${BUCKET}/${encodeURIComponent(id)}`,
+      'x-amz-copy-source': `/${BUCKET}/${keyPath(id)}`,
       'x-amz-metadata-directive': 'REPLACE',
       'content-type': meta.mime,
       'x-amz-meta-name': encodeURIComponent(meta.name),
@@ -213,7 +236,7 @@ export async function setVisibility(id: string, visibility: string, owner: strin
 export async function deleteFile(id: string, owner: string, isAdmin: boolean): Promise<boolean> {
   const meta = await getFileMeta(id);
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return false;
-  const res = await s3Fetch(`${base}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await s3Fetch(`${base}/${keyPath(id)}`, { method: 'DELETE' });
   return res.ok;
 }
 
