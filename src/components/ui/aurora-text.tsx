@@ -14,7 +14,7 @@ interface AuroraTextProps {
 export const AuroraText = memo(function AuroraText({
   children,
   className = '',
-  colors = ['#34D399', '#059669', '#6EE7B7', '#34D399'],
+  colors = ['#34D399', '#059669', '#10B981', '#047857'],
   speed = 1,
 }: AuroraTextProps) {
   const style: CSSProperties = {

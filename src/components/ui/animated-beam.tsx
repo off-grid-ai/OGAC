@@ -63,7 +63,9 @@ export function AnimatedBeam({
       const d = `M ${x1},${y1} Q ${(x1 + x2) / 2},${midY} ${x2},${y2}`;
       const len = pathRef.current?.getTotalLength() ?? Math.hypot(x2 - x1, y2 - y1);
       setGeo((prev) =>
-        prev.w === c.width && prev.h === c.height && prev.d === d ? prev : { w: c.width, h: c.height, d, len },
+        prev.w === c.width && prev.h === c.height && prev.d === d
+          ? prev
+          : { w: c.width, h: c.height, d, len },
       );
     };
 
@@ -101,7 +103,13 @@ export function AnimatedBeam({
       aria-hidden="true"
     >
       {/* Static wire - the resting connection. */}
-      <path ref={pathRef} d={geo.d} stroke="var(--og-border)" strokeWidth={1.5} strokeLinecap="round" />
+      <path
+        ref={pathRef}
+        d={geo.d}
+        stroke="var(--og-border)"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
       {/* Travelling emerald pulse: a dashed overlay whose offset animates on the compositor. */}
       {geo.len > 0 && (
         <path
