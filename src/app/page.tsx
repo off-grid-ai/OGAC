@@ -98,10 +98,7 @@ function Nav() {
 
 export default function LandingPage() {
   return (
-    <div
-      data-theme="dark"
-      className="dark min-h-screen bg-[#0a0a0a] text-white"
-    >
+    <div data-theme="dark" className="og-landing dark min-h-screen bg-[#0a0a0a] text-white">
       <Nav />
 
       {/* ── Hero: the thesis, over the sketch that IS the pitch ────────────── */}
