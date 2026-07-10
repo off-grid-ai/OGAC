@@ -9,10 +9,8 @@ Do not open a public GitHub issue for a security vulnerability. Public disclosur
 Report it privately by email to:
 
 ```
-security@example.com
+mac@example.com
 ```
-
-Note: this address is a placeholder. Set a real, monitored security contact before the repository goes public, and update this file with it.
 
 When you report, include as much of the following as you can:
 

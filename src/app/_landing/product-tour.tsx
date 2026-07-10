@@ -1,39 +1,17 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { useCallback } from 'react';
-import { resolveShot, togglePromoted, type TourShot } from '@/lib/landing-hero';
+import { type TourShot } from '@/lib/landing-hero';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { CardsCarousel } from '@/components/ui/cards-carousel';
 import { ContainerScroll } from '@/components/ui/container-scroll';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
 
-// The centerpiece: the whole real product, live. The top stage shows one product shot; the rail
-// below lets a visitor click any surface to zoom it full-res OR promote it onto the stage. The
-// promoted shot is held in the URL (?shot=<id>) so the tour is deep-linkable and Back-coherent
-// (the nav rule). The pure decisions (resolve / toggle / active index) live in lib/landing-hero.
+// The centerpiece: the whole real product, live. The top stage shows the lead product shot on the
+// macOS scroll-rotate frame; the rail below lets a visitor tap any surface to open it full screen.
+// Presentation only - holds no state or logic.
 export function ProductTour({ shots }: { shots: TourShot[] }) {
-  const router = useRouter();
-  const params = useSearchParams();
-  const shotParam = params.get('shot');
-
-  const hero = resolveShot(shots, shotParam);
-  // The rail marks a card "on stage" only when the URL explicitly promoted a known shot - not the
-  // default fallback. resolveShot returning a shot whose id equals the param proves it was explicit.
-  const promotedId = hero.id === shotParam ? hero.id : null;
-
-  const promote = useCallback(
-    (id: string) => {
-      const next = togglePromoted(shotParam, id);
-      const qs = new URLSearchParams(Array.from(params.entries()));
-      if (next) qs.set('shot', next);
-      else qs.delete('shot');
-      const query = qs.toString();
-      router.push(query ? `/?${query}#tour` : '/#tour', { scroll: false });
-    },
-    [params, router, shotParam],
-  );
+  const hero = shots[0];
 
   return (
     <div id="tour" className="scroll-mt-20">
@@ -53,23 +31,24 @@ export function ProductTour({ shots }: { shots: TourShot[] }) {
           </div>
         }
       >
-        <Image
-          key={hero.id}
-          src={hero.src}
-          alt={hero.alt}
-          width={1600}
-          height={1000}
-          priority
-          className="og-fade-in h-auto w-full"
-        />
+        {hero ? (
+          <Image
+            src={hero.src}
+            alt={hero.alt}
+            width={1600}
+            height={1000}
+            priority
+            className="h-auto w-full"
+          />
+        ) : null}
       </ContainerScroll>
 
       <BlurFade inView>
         <div className="mt-10">
           <p className="mb-4 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Tap a surface to zoom, or send it to the stage above
+            Tap any surface to open it full screen
           </p>
-          <CardsCarousel cards={shots} onPromote={promote} promotedId={promotedId} />
+          <CardsCarousel cards={shots} />
         </div>
       </BlurFade>
 

@@ -60,10 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-`conduct@example.com`.
-
-Note: this address is a placeholder. Set a real, monitored contact before the
-repository goes public, and update this file with it.
+`mac@example.com`.
 
 All complaints will be reviewed and investigated promptly and fairly.
 
