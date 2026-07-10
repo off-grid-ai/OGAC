@@ -150,7 +150,7 @@ store. The prompt and the image never leave your infrastructure.`,
     {
       slug: 'api/service-specs',
       title: 'Service specs',
-      description: 'Every underlying service's OpenAPI, through one origin.',
+      description: 'Every underlying service\'s OpenAPI, through one origin.',
       body: `Each integrated service publishes its own OpenAPI document. Off Grid AI proxies them through
 one authed origin so you can browse them together without CORS or LAN issues.
 

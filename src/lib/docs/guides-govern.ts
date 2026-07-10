@@ -7,7 +7,7 @@ export const governSection: DocSection = {
     {
       slug: 'guides/governance',
       title: 'Governance overview',
-      description: 'Set the org's rules once - everyone builds inside them.',
+      description: 'Set the org\'s rules once - everyone builds inside them.',
       body: `**What you'll get:** you define the org's rules once - policy, guardrails, egress, audit -
 and every request everyone makes inherits them automatically. Governance isn't a feature bolted on;
 it is the path every request takes. Each piece below is a surface you operate, not a dashboard you
@@ -199,7 +199,7 @@ connector using it works without the secret ever appearing in code or config.`,
     {
       slug: 'guides/provenance',
       title: 'Provenance',
-      description: 'Sign answers and reports so they're verifiable, tamper-evident, and yours.',
+      description: 'Sign answers and reports so they\'re verifiable, tamper-evident, and yours.',
       body: `Provenance makes an output verifiable after the fact: you can prove what was produced, by
 whom, and that it wasn't altered.
 
