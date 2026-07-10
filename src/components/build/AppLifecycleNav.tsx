@@ -55,9 +55,7 @@ export function AppLifecycleNav({
             className="w-full md:ml-auto md:w-auto"
           />
         </div>
-        {activeHint ? (
-          <p className="text-[11px] text-muted-foreground">{activeHint}</p>
-        ) : null}
+        {activeHint ? <p className="text-[11px] text-muted-foreground">{activeHint}</p> : null}
       </div>
     </SubNav>
   );
