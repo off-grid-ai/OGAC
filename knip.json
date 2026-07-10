@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,loading,error,global-error,not-found,route,template,default,sitemap,robots,manifest,opengraph-image,twitter-image,icon,apple-icon}.{ts,tsx}",
+    "src/middleware.ts",
+    "src/instrumentation.ts",
+    "src/worker/**/*.{ts,tsx}",
+    "scripts/**/*.{mjs,mts,js,ts}",
+    "test/**/*.{test,integration.test}.{ts,tsx}",
+    "test/support/**/*.{ts,mjs}",
+    "next.config.mjs",
+    "drizzle.config.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["packages/**", ".next/**", "public/**", "drizzle/**", "coverage/**", "node_modules/**"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": []
+}
