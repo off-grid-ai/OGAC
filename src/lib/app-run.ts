@@ -40,7 +40,7 @@ import {
   enforceModelCall,
 } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
-import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
+import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import {
   type RunMode,
   buildWouldPerform,
@@ -263,15 +263,12 @@ export function defaultDeps(): AppRunDeps {
       };
     },
     async runGuardrail(text, orgId) {
-      const { runChecks, outcomeFromChecks } = await import('@/lib/checks');
-      // Pass the explicit orgId into the check context so the PII port scopes its deep config
-      // without `headers()` on the worker path (gap #121).
-      const checks = await runChecks('pre', { phase: 'pre', input: text, orgId });
-      const outcome = outcomeFromChecks(checks);
-      return {
-        blocked: outcome === 'blocked',
-        detail: checks.map((c) => `${c.name}:${c.verdict}`).join(' '),
-      };
+      // Route through the SHARED fail-CLOSED seam (G-ADV-GOV-3): a screen that THROWS or TIMES OUT is
+      // a BLOCK, never a swallowed error that lets the accumulated output flow to the next step. The
+      // explicit orgId scopes the PII deep config without `headers()` on the worker path (gap #121).
+      const { screenGuardrail } = await import('@/lib/guardrail-seam');
+      const screen = await screenGuardrail('pre', { input: text, orgId });
+      return { blocked: screen.outcome === 'blocked', detail: screen.detail };
     },
     async scanPii(text, orgId) {
       // Reuse the SAME guardrails PII port the agent/chat/pipeline paths use (regex floor by default,
@@ -487,21 +484,36 @@ async function executeAgentStep(
   let query = buildAgentQuery(step, priorResults);
   const requireMasking = effectivePiiMasking(false, modelVerdict);
   if (requireMasking) {
+    // FAIL CLOSED (SECURITY #236 fix 2): masking is MANDATED for this call, so a masker that errors
+    // must BLOCK the step — the raw (unmasked) query must NEVER reach the model. The pure maskOrBlock
+    // is the ONE authority: on a scan throw it returns { block:true }; only a successful scan yields
+    // forwardable (redacted) text. The old `catch { /* send unmasked */ }` was a fail-open PII leak.
+    let scanResult: { ok: true; scan: Awaited<ReturnType<AppRunDeps['scanPii']>> } | { ok: false; error: unknown };
     try {
-      const scan = await deps.scanPii(query, ctx.orgId);
-      const esc = applyPiiEscalation(query, requireMasking, scan);
-      if (esc.masked) {
-        query = esc.text;
-        auditEnforcement(
-          { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
-          'pipeline.pii.mask',
-          `model:agent:${agentId}`,
-          'redacted',
-          `masked ${scan.entities.join(', ')} (${scan.engine}) before model call`,
-        );
-      }
-    } catch {
-      /* detector unavailable — send the query unmasked (leash guarantees still hold) */
+      scanResult = { ok: true, scan: await deps.scanPii(query, ctx.orgId) };
+    } catch (err) {
+      scanResult = { ok: false, error: err };
+    }
+    const decision = maskOrBlock(requireMasking, query, scanResult);
+    if (decision.block) {
+      auditEnforcement(
+        { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+        'pipeline.pii.mask',
+        `model:agent:${agentId}`,
+        'error',
+        decision.reason ?? 'PII masking failed',
+      );
+      return errorResult(step, `agent step blocked: ${decision.reason}`);
+    }
+    query = decision.text;
+    if (decision.masked && scanResult.ok) {
+      auditEnforcement(
+        { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+        'pipeline.pii.mask',
+        `model:agent:${agentId}`,
+        'redacted',
+        `masked ${scanResult.scan.entities.join(', ')} (${scanResult.scan.engine}) before model call`,
+      );
     }
   }
   const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId);
