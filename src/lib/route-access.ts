@@ -53,6 +53,20 @@ export function tenantSlugFromHost(host: string | null | undefined): string | nu
   return m ? m[1] : null;
 }
 
+// The public demo tenants render their SIGNIN page (not the marketing landing) at the root: visiting
+// a tenant subdomain's "/" should feel like arriving AT that tenant's console, not on a second
+// marketing page. So on a tenant host, "/" redirects to the console overview; the auth guard then
+// sends a logged-out visitor to /signin (making signin the effective tenant home) and, after login,
+// they land on /overview. The APEX host (no tenant slug, e.g. onprem-console.getoffgridai.co) keeps
+// rendering the landing at "/", so this returns false there. PURE (host + path in, boolean out) so
+// the corner cases are unit-testable without the edge runtime.
+export function isTenantRootRedirect(
+  host: string | null | undefined,
+  pathname: string,
+): boolean {
+  return pathname === '/' && tenantSlugFromHost(host) !== null;
+}
+
 // A per-tenant PROVISIONED gateway host is "<slug5><rand5>-gateway.<apex>" (see tenantGatewayHost in
 // tenant-domain.ts): a 10-char label = 5 chars of the tenant slug + a 5-char unguessable random
 // suffix, then the fixed "-gateway" group. This is the mirror of tenantSlugFromHost for the GATEWAY
