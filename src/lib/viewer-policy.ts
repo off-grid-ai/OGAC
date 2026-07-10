@@ -73,3 +73,30 @@ export const VIEWER_FORBIDDEN_BODY = {
   error: 'forbidden',
   reason: 'read-only demo: this account can view everything but cannot make changes',
 } as const;
+
+// The three terminal decisions a gate can reach for an already-authenticated principal. The impure
+// gates (authz.ts) translate these into an HTTP response; keeping the DECISION pure means the whole
+// security rule is unit-testable without the auth/Next chain.
+export type GateDecision = 'allow' | 'forbid-viewer-write' | 'forbid';
+
+/**
+ * The WRITER gate decision (requireWriter): any authenticated principal may proceed UNLESS it is a
+ * viewer, who is forbidden. Pure — role in, decision out.
+ */
+export function decideWriterGate(role: string | null | undefined): GateDecision {
+  return canWrite(role) ? 'allow' : 'forbid-viewer-write';
+}
+
+/**
+ * The ADMIN gate decision (requireAdmin): an admin always proceeds; a viewer proceeds ONLY on a safe
+ * (non-mutating) method so it can view the admin plane but never mutate it; every other role is
+ * forbidden. Pure — role + method in, decision out.
+ */
+export function decideAdminGate(
+  role: string | null | undefined,
+  method: string | null | undefined,
+): GateDecision {
+  if (role === 'admin') return 'allow';
+  if (isViewer(role)) return isMutatingMethod(method) ? 'forbid-viewer-write' : 'allow';
+  return 'forbid';
+}

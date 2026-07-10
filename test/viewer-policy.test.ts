@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   canWrite,
+  decideAdminGate,
+  decideWriterGate,
   isMutatingMethod,
   isViewer,
   isViewerWriteAttempt,
@@ -83,4 +85,28 @@ test('redactSecretForViewer: viewer sees the placeholder for a real value, keeps
 test('VIEWER_FORBIDDEN_BODY: the 403 body names the read-only demo reason without a secret', () => {
   assert.equal(VIEWER_FORBIDDEN_BODY.error, 'forbidden');
   assert.match(VIEWER_FORBIDDEN_BODY.reason, /read-only/);
+});
+
+test('decideWriterGate: viewer is forbidden, every writer proceeds', () => {
+  assert.equal(decideWriterGate('viewer'), 'forbid-viewer-write');
+  assert.equal(decideWriterGate('admin'), 'allow');
+  assert.equal(decideWriterGate('operator'), 'allow');
+  assert.equal(decideWriterGate('compliance'), 'allow');
+  assert.equal(decideWriterGate(undefined), 'allow');
+});
+
+test('decideAdminGate: admin always allowed; viewer read-only; others forbidden — all arms', () => {
+  // admin: allowed regardless of method
+  assert.equal(decideAdminGate('admin', 'GET'), 'allow');
+  assert.equal(decideAdminGate('admin', 'DELETE'), 'allow');
+  // viewer: safe read allowed (view the admin plane), mutating forbidden as a viewer-write
+  assert.equal(decideAdminGate('viewer', 'GET'), 'allow');
+  assert.equal(decideAdminGate('viewer', 'HEAD'), 'allow');
+  assert.equal(decideAdminGate('viewer', 'POST'), 'forbid-viewer-write');
+  assert.equal(decideAdminGate('viewer', 'PATCH'), 'forbid-viewer-write');
+  assert.equal(decideAdminGate('viewer', 'DELETE'), 'forbid-viewer-write');
+  // any other role: forbidden from the admin plane, even on a read
+  assert.equal(decideAdminGate('operator', 'GET'), 'forbid');
+  assert.equal(decideAdminGate('compliance', 'GET'), 'forbid');
+  assert.equal(decideAdminGate(undefined, 'GET'), 'forbid');
 });
