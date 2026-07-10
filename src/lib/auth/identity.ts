@@ -7,6 +7,10 @@
 // touching the UI or NextAuth wiring. No user-facing reference to Keycloak lives
 // outside this file.
 
+import { orgFromClaims } from './org-claim';
+// Re-exported so the identity seam stays the one import surface for the ROPC path (and its test).
+export { orgFromClaims as orgFrom } from './org-claim';
+
 export interface AppUser {
   id: string;
   email?: string;
@@ -47,24 +51,6 @@ function roleFrom(p: Record<string, unknown>): string {
   return all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer';
 }
 
-// Read the caller's tenant org from the access-token claims. First non-empty of, in order:
-//   1. a top-level `org` claim (the canonical mapper output),
-//   2. an `organization` claim (alternative single-value mapper),
-//   3. the first entry of an `organization` GROUP claim (an array, e.g. Keycloak group membership).
-// Returns undefined when none is present, so the caller falls back to the default org (no binding).
-// Pure — a decoded payload in, the org string (or undefined) out; unit-testable in isolation.
-export function orgFrom(p: Record<string, unknown>): string | undefined {
-  const org = p['org'];
-  if (typeof org === 'string' && org.trim()) return org.trim();
-  const organization = p['organization'];
-  if (typeof organization === 'string' && organization.trim()) return organization.trim();
-  if (Array.isArray(organization)) {
-    const first = organization.find((v) => typeof v === 'string' && v.trim());
-    if (typeof first === 'string') return first.trim();
-  }
-  return undefined;
-}
-
 // Keycloak implementation via Direct Access Grant (ROPC): POST the credentials to the
 // realm token endpoint; on success read identity + role from the access token.
 const keycloakIdentity: IdentityProvider = {
@@ -98,7 +84,7 @@ const keycloakIdentity: IdentityProvider = {
         email: (p['email'] as string) ?? (p['preferred_username'] as string) ?? username,
         name: (p['name'] as string) ?? (p['preferred_username'] as string) ?? username,
         role: roleFrom(p),
-        org: orgFrom(p),
+        org: orgFromClaims(p),
       };
     } catch {
       return null;
