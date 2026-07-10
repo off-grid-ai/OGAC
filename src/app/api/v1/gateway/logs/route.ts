@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { analyticsScopeFilters } from '@/lib/analytics-aggs';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +27,9 @@ export async function GET(req: NextRequest) {
   const size = Math.min(Number(p.get('size')) || 50, 200);
   const from = Math.max(Number(p.get('from')) || 0, 0);
 
-  const filter: unknown[] = [];
+  // TENANT ISOLATION (G-ADV-OBS-ORG): every logs query is scoped to the caller's org via an `org`
+  // term — without it the explorer would surface another tenant's request bodies/outputs.
+  const filter: unknown[] = [...analyticsScopeFilters(await currentOrgId())];
   for (const field of ['gateway', 'model', 'kind', 'caller'] as const) {
     const v = p.get(field);
     if (v) filter.push({ term: { [`${field}.keyword`]: v } });

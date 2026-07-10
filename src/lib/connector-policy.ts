@@ -1,15 +1,17 @@
-// PURE connector-credential policy — ZERO imports, ZERO I/O, fully unit-testable AND client-safe.
+// PURE connector-credential policy — ZERO I/O, fully unit-testable AND client-safe. Its only import
+// is the sibling pure, zero-import SSRF host guard (connector-endpoint.ts) — no server-only graph, so
+// it still rides into the client Add-connector form without dragging `pg`/the DB into the browser.
 //
 // This is the deciding half of the connector self-serve create path (the I/O half — the OpenBao
-// write + secret_ref column — lives in connector-secrets.ts, which imports this). It is kept import-
-// free so it can be pulled into a CLIENT component (the Add-connector form) without dragging the
-// server-only `pg`/DB graph into the browser bundle.
+// write + secret_ref column — lives in connector-secrets.ts, which imports this).
 //
 // What it decides:
 //   • the connector-type catalog (which types create+query today vs. coming-soon)
 //   • per-type field validation (SQL host/port/db/user/password; REST base URL + api key)
 //   • the CREDENTIAL-FREE endpoint the row stores (never the password/token)
+//   • the SSRF host guard on every endpoint (create AND update reject private/link-local/loopback)
 //   • splicing a vault-resolved secret back into the endpoint at query time
+import { isPublicEndpointHost, isPublicHost } from '@/lib/connector-endpoint';
 
 // ─── The connector-type catalog ───────────────────────────────────────────────
 // The queryable ('ready') set MUST match the dialects connector-exec.ts / detectDialect can reach.
@@ -129,6 +131,9 @@ function validateSql(def: ConnectorTypeDef, input: SqlConnectorInput, name: stri
   }
   if (!host) errors.push('A host is required.');
   else if (!HOST_RE.test(host)) errors.push('Host contains invalid characters.');
+  // SSRF: refuse a loopback / link-local / metadata / RFC-1918 host — the server would otherwise
+  // open a connection into the private control plane. (G-ADV-DATA-2)
+  else if (!isPublicHost(host)) errors.push('Host must be a public address (private/loopback hosts are blocked).');
   if (!database) errors.push('A database name is required.');
   if (!user) errors.push('A username is required.');
   if (!password) errors.push('A password is required.');
@@ -164,6 +169,11 @@ function validateRest(def: ConnectorTypeDef, input: RestConnectorInput, name: st
     if (u && u.protocol !== 'http:' && u.protocol !== 'https:') {
       errors.push('Base URL must use http:// or https://.');
     }
+    // SSRF: refuse a loopback / link-local / metadata / RFC-1918 endpoint — the REST test/resources
+    // path would otherwise fetch() the internal control plane. (G-ADV-DATA-2)
+    if (u && !isPublicEndpointHost(baseUrl)) {
+      errors.push('Base URL must be a public address (private/loopback hosts are blocked).');
+    }
   }
   if (errors.length) return { ok: false, value: null, errors };
   return {
@@ -198,6 +208,62 @@ export function validateConnectorCreate(input: ConnectorCreateInput): CreateVali
     return { ok: false, value: null, errors: ['A connector name is required.', ...base.errors] };
   }
   return base;
+}
+
+// ─── The PATCH validator — DRY with create, so the edit path can't bypass validation ──────────────
+// A PATCH is PARTIAL: only the fields present in the body are validated, but they are validated with
+// the SAME rules create uses (creatable-type check + http/https-only + the SSRF host guard). Without
+// this, PATCH /connectors/[id] forwarded body.type / body.endpoint straight to the store — letting an
+// edit set a coming-soon/garbage type or repoint the endpoint at file:// / a metadata IP (G-ADV-DATA-2
+// / G-ADV-DATA-3). Pure — the single gate the PATCH route runs before touching the store.
+export interface ConnectorUpdateInput {
+  type?: unknown;
+  endpoint?: unknown;
+}
+
+export interface UpdateValidation {
+  ok: boolean;
+  errors: string[];
+}
+
+// The endpoint schemes an edit may set: http(s) for REST, plus the SQL connection schemes the create
+// path builds. Anything else (file:, gopher:, ftp:, data:, …) is refused — matching create, which
+// only ever produces one of these. Kept in-file (small, stable) to preserve the zero-server-import rule.
+const UPDATE_ALLOWED_SCHEMES = new Set([
+  'http:', 'https:', 'postgres:', 'postgresql:', 'mysql:', 'mariadb:', 'mssql:', 'sqlserver:',
+]);
+
+export function validateConnectorUpdate(patch: ConnectorUpdateInput): UpdateValidation {
+  const errors: string[] = [];
+  // A `type` in the body must be a creatable ('ready') type — exactly the create rule.
+  if (patch.type !== undefined) {
+    const def = connectorTypeDef(str(patch.type));
+    if (!def) errors.push('Unknown connector type.');
+    else if (def.status !== 'ready') errors.push(`${def.label} connectors are not available yet.`);
+  }
+  // An `endpoint` in the body must parse, use an allowed scheme (http(s) or a SQL scheme), and pass
+  // the SSRF host guard — the same scheme + host discipline create enforces, so PATCH can't repoint a
+  // connector at file:// / a metadata IP / a private host.
+  if (patch.endpoint !== undefined) {
+    const endpoint = str(patch.endpoint);
+    if (!endpoint) {
+      errors.push('Endpoint must not be empty.');
+    } else {
+      let u: URL | null = null;
+      try {
+        u = new URL(endpoint);
+      } catch {
+        errors.push('Endpoint must be a valid URL.');
+      }
+      if (u && !UPDATE_ALLOWED_SCHEMES.has(u.protocol)) {
+        errors.push('Endpoint must use http:// or https:// (or a supported database URL).');
+      }
+      if (u && !isPublicEndpointHost(endpoint)) {
+        errors.push('Endpoint must be a public address (private/loopback hosts are blocked).');
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 // ─── The vault key path for a connector's secret ───────────────────────────────
