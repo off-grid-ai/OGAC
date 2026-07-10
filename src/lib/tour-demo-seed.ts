@@ -26,6 +26,7 @@
 // Drift + regulatory coverage DERIVE from console-DB rows we DO seed here (eval_runs + adoption).
 
 import { egressClassFor, type GatewayKind } from '@/lib/gateways-policy';
+import type { AppStep, AppEdge, OutputStep } from '@/lib/app-model';
 
 // ─── Deterministic id helper (FNV-1a → 12 hex, matches seed-bharat-catalog.mjs) ───────────────────
 /** Stable 12-hex digest of a key. Deterministic (no randomUUID) ⇒ the seed is idempotent. */
@@ -280,6 +281,61 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
 /** The apps for a profile — bank vs insurer. */
 export function appsFor(profile: TenantProfile): readonly AppSpecSeed[] {
   return profile.flavour === 'bank' ? BANK_APPS : INSURER_APPS;
+}
+
+// ─── AppSpecSeed → AppSpec steps/edges (PURE) — the seam that MUST satisfy validateAppSpec ─────────
+// WHY this exists: the seed writes apps through createApp/updateApp, which run validateAppSpec
+// (src/lib/app-model.ts). That validator reads each field at the step's TOP level — a connector-query
+// needs `step.domain`, an agent needs `step.agentId` OR `step.inlineAgent.systemPrompt`, an output
+// needs `step.sink`. A prior mapping stuffed everything under `step.config`, so every seeded app spec
+// failed validation ("needs a domain binding / needs agentId or inlineAgent / needs a sink") and the
+// whole run aborted at seedApps. Keeping this mapping PURE + unit-tested against the REAL validator is
+// the fails-before/passes-after proof, and DRY (the .mts runner imports it — never re-implements it).
+const OUTPUT_SINKS: readonly OutputStep['sink'][] = ['console', 'report', 'email', 'whatsapp'];
+
+/** Normalise a seed sink label to a valid OutputStep sink (SHADOW-safe default: 'report'). */
+function toSink(sink: string | undefined): OutputStep['sink'] {
+  return (OUTPUT_SINKS as readonly string[]).includes(sink ?? '')
+    ? (sink as OutputStep['sink'])
+    : 'report';
+}
+
+/**
+ * Map one app's ordered AppStepSpec[] to concrete AppStep[] whose shape passes validateAppSpec.
+ * Ids are `s0..sN` (positional) so buildAppEdges can wire a linear chain that mirrors step order.
+ */
+export function buildAppSteps(spec: AppSpecSeed): AppStep[] {
+  return spec.steps.map((s, i): AppStep => {
+    const id = `s${i}`;
+    switch (s.kind) {
+      case 'connector-query':
+        // domain is the LABEL binding validateStepShape requires at the top level.
+        return { id, kind: 'connector-query', label: s.label, domain: s.domain ?? '', op: 'read' };
+      case 'agent':
+        // No pre-existing agent id at spec time ⇒ an inlineAgent carrying the systemPrompt (grounded).
+        return {
+          id,
+          kind: 'agent',
+          label: s.label,
+          inlineAgent: { systemPrompt: s.systemPrompt ?? s.label, grounded: true },
+        };
+      case 'human':
+        return { id, kind: 'human', label: s.label };
+      case 'output':
+        return { id, kind: 'output', label: s.label, sink: toSink(s.sink) };
+    }
+  });
+}
+
+/** Wire a linear chain over the built steps (s0→s1→…→sN): exactly one entry, all reachable. */
+export function buildAppEdges(steps: AppStep[]): AppEdge[] {
+  return steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id }));
+}
+
+/** Convenience: both halves of a valid app graph for a seed spec. */
+export function buildAppGraph(spec: AppSpecSeed): { steps: AppStep[]; edges: AppEdge[] } {
+  const steps = buildAppSteps(spec);
+  return { steps, edges: buildAppEdges(steps) };
 }
 
 // ── Custom agents (Studio "agents" list, `custom_agents`) — 4 per tenant ──
