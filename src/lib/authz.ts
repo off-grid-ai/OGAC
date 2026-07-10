@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { machineConsoleRole } from '@/lib/auth/machine-roles';
-import { getTokenVerifier } from '@/lib/auth/token-verifier';
 import { canWrite, isMutatingMethod, isViewer, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 
 // Shared authorization gates for API route handlers. There is ONE key flow: a machine
@@ -34,6 +33,9 @@ function breakGlass(token: string): AuthzSession | null {
 // The canonical key flow: verify a Keycloak service-account (or user) JWT via the seam.
 async function fromToken(token: string): Promise<AuthzSession | null> {
   if (!token) return null;
+  // Lazy — the JWKS verifier is only needed on the bearer path, so we don't drag its module into
+  // every authz call (and the session/read path stays independent of it).
+  const { getTokenVerifier } = await import('@/lib/auth/token-verifier');
   const verifier = getTokenVerifier();
   if (!verifier) return null;
   const p = await verifier.verify(token);
