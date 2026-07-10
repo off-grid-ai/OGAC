@@ -27,7 +27,14 @@ Each bullet: **the flow** → what breaks (the terminal thing the user sees/does
 
 ## Chat  (adversarial agent running — findings will land here)
 ## Builder / Studio / Projects  (adversarial agent running)
-## Gateway / Model settings  (adversarial agent running)
+## Gateway / Model settings  (adversarial pass complete — red tests on worktree-agent-ae1cd749)
+- [ ] HIGH: a NaN clock permanently wedges a rate-limit bucket — `resetAt=NaN`, `now > NaN` always false → key/IP denied FOREVER with `retryAfterSec=NaN`, never self-heals (self-DoS, fail-closed). `(src/lib/rate-limit.ts:56 — no guard on now | G-ADV-GW-1)`
+- [ ] MED: cloud route mis-selects provider on a mid-string token — `my-local-model:openai:v2` → routes to openai with corrupted model "v2" (substring match, not anchored). `(src/lib/cloud-providers.ts:187 selectCloudProvider | G-ADV-GW-3)`
+- [ ] LOW/MED: PATCH a non-compat gateway with `baseUrl:''` → persists an empty baseUrl (unusable row), no error (emptiness guard only checks kind==='compat'). `(src/lib/…/gateways.ts:198 updateGateway | G-ADV-GW-4)`
+- [ ] SEC: per-IP rate floor trusts client `x-forwarded-for` when `cf-connecting-ip` absent → off-Cloudflare, rotating XFF bypasses the floor. `(middleware clientIp | G-ADV-GW-5)`
+- [ ] SCALE: rate-limit counters are module-level in-memory maps → per-instance, not shared; a scaled/multi-instance deploy multiplies the effective limit. `(src/middleware.ts counters | G-ADV-GW-10)`
+- [ ] revocation fails OPEN on a resolver DB error (edge admits a revoked key at the floor during a DB hiccup; Keycloak at aggregator is the real gate). `(G-ADV-GW-6)` · no DB uniqueness on gateway baseUrl/hostname → silent duplicates `(G-ADV-GW-7)` · `isGatewayApiKey` looser than `parseApiKey` `(G-ADV-GW-8)` · gateway-keys POST passes `ownerOrg` to Keycloak unvalidated `(G-ADV-GW-9)`
+> Robust-verified ✓ (tried, held): rate-limit boundary (60th ok/61st denied), egress leash (cloud&&!allowed→block, both decideRouting+planCloudRoute), disable, API-key parse/verify, bound-to-deleted-gateway → clean error not fake 200, viewer write-block + requireAdmin on all gateway routes.
 ## Settings / Configuration  (adversarial agent running)
 ## Pipelines  (queued)
 ## Data / ETL / Connectors  (queued)
