@@ -35,3 +35,4 @@ deploy/onprem/ragas-sidecar/.env
 # Python bytecode
 __pycache__/
 *.pyc
+.shots/
