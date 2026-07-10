@@ -15,6 +15,25 @@ Real change reaches the **population** through the enterprises that serve it —
 Intelligence woven into how they already operate, **working with the systems they already run, as-is** — without asking them to change a thing.
 Built on **open, transparent foundations** any enterprise can inspect, trust, and run for themselves.
 
+## Who this is for, and the feeling it must land (the buyer)
+
+We are selling to the **CIO, CTO, VP of Engineering, and CISO** at a serious enterprise. Every word of
+customer-facing copy (landing, docs, README) is written so that person feels, in one read:
+
+> "I want to be the biggest and the best in my industry. To get there I have to put AI to work across
+> the company. These people give me a safe way to do exactly that, without losing out on anything."
+
+That is the whole job. Break it down:
+- **The ambition is theirs, not ours.** They want to win their industry. AI is how. Lead with that
+  outcome, not with our features.
+- **"Safe" is the unlock, not the pitch.** Governance, security, and compliance are what let them move
+  fast without fear. They are table stakes framed as the thing that removes the risk of moving. Never
+  sell safety as the headline; sell the speed and reach that safety makes possible.
+- **"Without losing out at all"** is the promise: no rip-and-replace, no lock-in, no giving up control,
+  no waiting on a platform team, no choosing between fast and safe. They get all of it.
+- The feeling on the page is confidence and relief: *this solves my problem, and it is obviously the
+  responsible choice.* Simple, proof-first, not busy. Fewer words, more show.
+
 ---
 
 ## The thesis (founder, the real one)
