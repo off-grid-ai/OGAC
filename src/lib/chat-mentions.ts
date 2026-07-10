@@ -129,17 +129,34 @@ export function buildRefsPayload(refs: MentionRef[]): RefsPayload | null {
   return { memoryIds, kb };
 }
 
+// ─── Context-block safety: neutralize untrusted text so it can't break out of a tag ──────────
+// Untrusted, user-controlled strings (a stored memory fact, an uploaded filename, extracted file
+// text) get interpolated into XML-ish system blocks (`<file>`, `<referenced_memory>`). Without
+// escaping, a crafted value can close the wrapper tag early and inject its own instructions into
+// what the model reads as trusted system context (a prompt-injection / context-boundary break).
+// Neutralizing the angle brackets (and the quote, for attribute values) removes every tag boundary
+// a payload could introduce, so the wrapper's own tags stay the ONLY structural tokens. One rule,
+// reused by every context-block builder (DRY). Pure.
+export function neutralizeForContextBlock(value: string): string {
+  return (value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // ─── Server-side: format referenced memory facts as a system block ────────────
 // Mirrors chat.ts memoryBlock(), but for the EXPLICITLY @-mentioned facts of a single turn (not the
 // user's whole memory). Empty in → empty out (no block injected). Pure: the caller resolves ids →
-// facts from the DB, then formats here.
+// facts from the DB, then formats here. Each fact is a stored user-controlled string, so it is
+// neutralized before interpolation — a fact can't close </referenced_memory> or inject <system>.
 export function referencedMemoryBlock(facts: string[]): string {
   const clean = facts.map((f) => f.trim()).filter(Boolean);
   if (!clean.length) return '';
   return (
     '<referenced_memory>\n' +
     'The user explicitly referenced these remembered facts for this message. Use them as context:\n' +
-    clean.map((f) => `- ${f}`).join('\n') +
+    clean.map((f) => `- ${neutralizeForContextBlock(f)}`).join('\n') +
     '\n</referenced_memory>'
   );
 }
