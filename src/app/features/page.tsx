@@ -124,7 +124,7 @@ const GROUPS: FeatureGroup[] = [
     features: [
       { name: 'Fleet control', value: '“MDM for AI” open source — provision, govern, and observe every AI-enabled device from one console.' },
       { name: 'FinOps + virtual keys', value: 'Issue keys with budgets; per-user / project cost and chargeback — no surprise token bills.' },
-      { name: 'BI / data exploration', value: 'Explore usage and data with Superset — without exporting it.' },
+      { name: 'BI / data exploration', value: 'Explore usage and data in built-in dashboards — without exporting it.' },
       { name: 'Agents & Reports', value: 'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) ready to run and govern.' },
     ],
   },
