@@ -25,12 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { OrgContextSummary } from '@/lib/org-context';
-import {
-  type AppSpec,
-  type AppStepKind,
-  type TriggerKind,
-  validateAppSpec,
-} from '@/lib/app-model';
+import { type AppSpec, type AppStepKind, type TriggerKind, validateAppSpec } from '@/lib/app-model';
 import {
   addStep,
   moveStep,
@@ -59,10 +54,7 @@ import {
 import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import { InheritanceBanner } from '@/components/build/InheritanceBanner';
 import { StudioCanvas } from '@/components/studio/StudioCanvas';
-import {
-  DomainFormPanel,
-  type ConnectorOption,
-} from '@/components/data-domains/DomainFormPanel';
+import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
 
 // ─── AppBuilder (Builder Epic #115) — the USABLE guided BUILD screen ──────────────────────────────
 //
@@ -90,11 +82,11 @@ type View = 'guided' | 'visual';
 const EXAMPLES: { label: string; text: string }[] = [
   {
     label: 'Reimbursement approval',
-    text: 'Reimbursement approval — read the invoice, check the employee\'s reimbursement quota, decide if they\'ve exceeded it and are eligible, then have a manager approve or reject.',
+    text: "Reimbursement approval — read the invoice, check the employee's reimbursement quota, decide if they've exceeded it and are eligible, then have a manager approve or reject.",
   },
   {
     label: 'Support triage',
-    text: 'Read the customer\'s recent tickets, classify the issue and its urgency, draft a reply grounded in our policies, then email it.',
+    text: "Read the customer's recent tickets, classify the issue and its urgency, draft a reply grounded in our policies, then email it.",
   },
   {
     label: 'Simple assistant',
@@ -176,10 +168,7 @@ export function AppBuilder({
   const validation = useMemo(() => (spec ? validateAppSpec(spec) : null), [spec]);
 
   // The single fix-it list: compiler gaps (phrase-based) + live spec analysis (step-based), merged.
-  const fixIts = useMemo(
-    () => mergeFixIts(analyzeGaps(gaps), analyzeSpec(spec)),
-    [gaps, spec],
-  );
+  const fixIts = useMemo(() => mergeFixIts(analyzeGaps(gaps), analyzeSpec(spec)), [gaps, spec]);
   const blockers = blockerCount(fixIts);
   // Save-with-gap (#128): a source we couldn't wire from the description is an ADVISORY, not a
   // blocker — the user can save and run, and add it later. Surface it in the save bar so the choice
@@ -196,9 +185,7 @@ export function AppBuilder({
         data: { id: string; label: string; connectorId?: string; resource?: string }[];
       };
       setDomains(
-        data
-          .filter((d) => d.connectorId && d.resource)
-          .map((d) => ({ id: d.id, label: d.label })),
+        data.filter((d) => d.connectorId && d.resource).map((d) => ({ id: d.id, label: d.label })),
       );
     } catch {
       /* transient; picker keeps last-known domains */
@@ -355,16 +342,42 @@ export function AppBuilder({
               onSpec={setSpec}
             />
           ) : (
-            <Card className="shadow-sm">
-              <CardContent className="p-3">
-                <StudioCanvas
-                  domains={domains}
-                  agents={agents}
-                  initialSpec={spec}
-                  onSpecChange={(next) => setSpec(next)}
-                />
-              </CardContent>
-            </Card>
+            <>
+              {/* Mobile: the drag-and-connect node canvas needs pointer precision and width it can't
+                  get on a phone. Rather than ship a broken canvas, point back to Guided (fully usable
+                  on mobile) and note the canvas is a desktop surface. */}
+              <Card className="shadow-sm md:hidden">
+                <CardContent className="space-y-3 p-4 text-center">
+                  <TreeStructure className="mx-auto size-6 text-muted-foreground" />
+                  <p className="text-sm text-foreground">
+                    The visual canvas is best on a larger screen
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Dragging and connecting steps needs a wide screen. On your phone, edit this app
+                    in Guided view — it does everything the canvas does, one step at a time.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11"
+                    onClick={() => setParam('view', 'guided')}
+                  >
+                    <ListChecks className="size-3.5" />
+                    Switch to Guided
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card className="hidden shadow-sm md:block">
+                <CardContent className="p-3">
+                  <StudioCanvas
+                    domains={domains}
+                    agents={agents}
+                    initialSpec={spec}
+                    onSpecChange={(next) => setSpec(next)}
+                  />
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Save bar */}
@@ -599,8 +612,8 @@ function GuidedRefine({
             ))}
             {pipelines.length === 0 ? (
               <p className="px-1 pt-1 text-[11px] text-muted-foreground">
-                No pipelines defined yet — the org default applies. Create pipelines under Governance
-                to offer specific ones here.
+                No pipelines defined yet — the org default applies. Create pipelines under
+                Governance to offer specific ones here.
               </p>
             ) : null}
           </CardContent>
@@ -800,8 +813,8 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
         onClick={() => onChange('guided')}
         className={
           view === 'guided'
-            ? 'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary'
-            : 'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground'
+            ? 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary md:min-h-0'
+            : 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
         }
         aria-pressed={view === 'guided'}
       >
@@ -813,8 +826,8 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
         onClick={() => onChange('visual')}
         className={
           view === 'visual'
-            ? 'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary'
-            : 'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground'
+            ? 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary md:min-h-0'
+            : 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
         }
         aria-pressed={view === 'visual'}
       >
