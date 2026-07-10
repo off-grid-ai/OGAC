@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
+import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 import {
   bareTableName,
   deriveResultColumns,
@@ -41,9 +42,12 @@ export default async function WarehouseTableDetailPage({
   const name = decodeURIComponent(raw);
   if (!isSafeIdentifier(name)) notFound();
 
+  // TENANCY: scope the detail read to the viewer's warehouse database. A bare name resolves within
+  // it; a cross-tenant `otherdb.table` is denied (both stats + sample return null → notFound).
+  const scope = await currentWarehouseDatabase();
   const [stats, sample] = await Promise.all([
-    clickhouseWarehouse.tableStats(name),
-    clickhouseWarehouse.sample(name, 50),
+    clickhouseWarehouse.tableStats(name, scope),
+    clickhouseWarehouse.sample(name, 50, scope),
   ]);
 
   if (!stats && !sample) notFound();
