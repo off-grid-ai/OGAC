@@ -229,10 +229,29 @@ survive reboot/crash.
   was *configured* for it (tunnel + Caddy → :3100) but the source/process were absent and nothing
   listened on :3100; redeployed + put under launchd so it stays up. Restart: `sudo launchctl
   kickstart -k system/co.getoffgridai.landing`.
-- Note: the **console** itself (`:3000`) still runs as a plain backgrounded `next start` (no launchd),
-  restarted by `deploy/push.sh` (pkill + relaunch). The aggregator (`co.getoffgridai.aggregator`),
-  edge Caddy (`co.getoffgridai.edge`), app-worker (`co.getoffgridai.app-worker`), and Provit
-  (`co.getoffgridai.provit`) are the other launchd jobs.
+- **`co.getoffgridai.console`** — the **console** itself on `:3000`. A **user LaunchAgent**
+  (`~/Library/LaunchAgents/`, runs as `admin`, `KeepAlive` + `RunAtLoad`) → `start-console.sh`
+  (sources `.env` so `next start` gets DATABASE_URL/Keycloak/etc. + sets PATH so `node` resolves)
+  → `npm start` → `next start` on :3000. Log `deploy/console.log`. **Restart (the ONLY correct
+  way):** `launchctl kickstart -k gui/$(id -u)/co.getoffgridai.console` — this is what
+  `deploy/push.sh` and `recover.sh` do. (S2 has the same agent installed as a warm standby; console
+  is single-instance on S1 — 2 active break NextAuth, see HANDBOOK §7.)
+  - **⚠️ NEVER restart it with `pkill next-server` + `nohup next start`.** That fights the KeepAlive
+    supervisor, which respawns its OWN copy the instant you kill it, leaving TWO servers racing for
+    :3000. It also cannot kill a **root-owned** stale next-server (an admin `pkill` has no permission),
+    so a stale process survives every attempt and keeps serving old code.
+  - **INCIDENT 2026-07-10 (Cloudflare 502 outage):** a **Jul-7 (3-day-old) ROOT-owned `next-server`**
+    was still bound to :3000 serving 3-day-stale code; the fresh deploy's next-server lost the bind and
+    logged **684 `EADDRINUSE` lines** in `console.log`; the edge/tunnel returned **502**. Root cause:
+    `push.sh`'s old `pkill + nohup` restart (a) fought this LaunchAgent and (b) could not kill the
+    root-owned process as `admin`. **Fix (committed):** `push.sh` now (1) clears any stale/duplicate
+    listener on :3000 first — `lsof -ti:3000 -sTCP:LISTEN`, and `sudo -n kill -9` any pid that is
+    root-owned or started before the just-finished build (marker `deploy/.build-done`), (2) restarts
+    with `launchctl kickstart -k`, (3) VERIFIES exactly one listener on :3000 whose start-time is ≥ the
+    build (serving the NEW build), failing loud otherwise. `sudo -n` works non-interactively on this box
+    (passwordless sudo). If it ever recurs manually: `lsof -i:3000 -sTCP:LISTEN` → `sudo -n kill -9 <root/stale pid>` → kickstart.
+- The aggregator (`co.getoffgridai.aggregator`), edge Caddy (`co.getoffgridai.edge`), app-worker
+  (`co.getoffgridai.app-worker`), and Provit (`co.getoffgridai.provit`) are the other launchd jobs.
 
 ## Docker containers (S1 OrbStack — daemon already initialised, no GUI first-run)
 
