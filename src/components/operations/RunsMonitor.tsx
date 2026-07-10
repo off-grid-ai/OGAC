@@ -15,6 +15,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   type RunKind,
   type RunRow,
@@ -199,14 +200,14 @@ export function RunsMonitor({ initial }: { initial: RunsResponse }) {
       </div>
 
       {/* Summary band */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <StatRail at="lg" cols={6}>
         <Stat label="Total" value={s.total} />
         <Stat label="Live" value={s.live} tone="active" />
         <Stat label="Running" value={s.byStatus.running} tone="active" />
         <Stat label="Awaiting review" value={s.byStatus.paused} tone="warn" />
         <Stat label="Succeeded" value={s.byStatus.succeeded} tone="success" />
         <Stat label="Failed" value={s.byStatus.failed} tone="error" />
-      </div>
+      </StatRail>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
