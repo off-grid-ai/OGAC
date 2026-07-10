@@ -1,5 +1,6 @@
 import { SealCheck, Warning } from '@phosphor-icons/react/dist/ssr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { getSigning } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { readProvenanceView } from '@/lib/provenance-view';
@@ -34,9 +35,10 @@ export default async function ProvenancePage() {
         </div>
       </div>
 
-      {/* Stat band + signing-key control side by side on wide screens (fill the width). */}
+      {/* Stat band + signing-key control side by side on wide screens (fill the width). On mobile
+          the stat band is a horizontal rail (StatRail), never a tall stack. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
+        <StatRail at="sm" cols={3} className="lg:col-span-2">
           {stats.map((s) => (
             <Card key={s.label} className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -50,7 +52,7 @@ export default async function ProvenancePage() {
               </CardContent>
             </Card>
           ))}
-        </div>
+        </StatRail>
         <div className="lg:col-span-1">
           <RotateKeyControl algorithm={signing.algorithm} currentPublicKey={signing.publicKey()} />
         </div>
