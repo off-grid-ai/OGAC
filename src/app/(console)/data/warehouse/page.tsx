@@ -4,6 +4,7 @@ import { DataPlaneHealthBand } from '@/components/data/DataPlaneHealthBand';
 import { WarehouseSearch } from '@/components/data/WarehouseSearch';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
 import {
   filterTables,
@@ -61,12 +62,12 @@ export default async function WarehousePage({
       </div>
 
       {/* Stat band. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatRail at="sm">
         <Stat label="Tables" value={String(tables.length)} />
         <Stat label="Databases" value={String(new Set(tables.map((t) => t.database ?? 'default')).size)} />
         <Stat label="Total rows" value={formatRows(totalRows)} />
         <Stat label="On disk" value={formatBytes(totalBytes)} />
-      </div>
+      </StatRail>
 
       {!healthy && tables.length === 0 ? (
         <Card>
