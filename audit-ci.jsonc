@@ -1,0 +1,45 @@
+// Off Grid Console — dependency vulnerability gate (#226).
+//
+// `npm run security:audit` runs audit-ci against the npm advisory database and
+// FAILS the build (locally via pre-push, and in CI) on any HIGH or CRITICAL
+// vulnerability in the dependency tree. It is the automated backstop for
+// "don't ship a known-exploitable dependency."
+//
+// Threshold rationale — why HIGH, not moderate:
+//   The tree currently carries 16 MODERATE advisories, every one of them in a
+//   DEV or transitive-build dependency that never reaches the running server:
+//     • esbuild / @esbuild-kit/* — the dev-server request advisory (dev only).
+//     • @temporalio/* + protobufjs — the worker SDK's proto codegen (build/dev).
+//     • postcss — build-time CSS stringify XSS (never runs at request time).
+//     • js-yaml — quadratic-DoS on hostile merge keys (we parse only our own
+//       trusted deploy YAML, never attacker-supplied input).
+//   None is reachable from a request path in production. Gating on `moderate`
+//   would block every push on accepted, non-exploitable dev-tooling noise, so
+//   the bar is HIGH/CRITICAL — the class that actually warrants stopping a ship.
+//   Re-audit the moderates whenever the lockfile changes; ratchet to `moderate`
+//   once they are upgraded away (tracked in docs/GAPS_BACKLOG.md).
+{
+  // Fail on high and above (high, critical). Moderate/low are reported by
+  // `npm audit` but do not block — see rationale above.
+  "high": true,
+  "critical": true,
+
+  // Skip dev-only advisories? No — audit the full tree so a prod-reachable high
+  // is never masked by living under devDependencies. We keep the tree honest and
+  // rely on the severity threshold, not on hiding dev deps.
+  "skip-dev": false,
+
+  // Fail the run if a listed allowlisted advisory is NOT actually present
+  // (keeps the allowlist from silently rotting). No allowlist entries yet — the
+  // HIGH/CRITICAL count is zero, so nothing is suppressed.
+  "allowlist": [],
+
+  // Use the npm registry advisory source.
+  "package-manager": "npm",
+
+  // Show the advisory URLs in output so a failing run is actionable.
+  "report-type": "important",
+
+  // Retry transient registry failures rather than flaking the gate.
+  "retry-count": 3
+}
