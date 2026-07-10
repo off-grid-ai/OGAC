@@ -38,7 +38,7 @@ export function Hellobar({ model }: { model: DemoBannerModel }) {
   const hasCreds = Boolean(model.email || model.password);
 
   return (
-    <div className="flex w-full items-center gap-3 border-b border-primary/25 bg-primary/[0.06] px-6 py-2">
+    <div className="flex w-full items-center gap-3 border-b border-primary/25 bg-primary/[0.06] px-4 py-2 md:px-6">
       <Eye className="size-4 shrink-0 text-primary" weight="regular" />
       <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-[11px] font-medium uppercase tracking-wide text-primary/80">
@@ -48,15 +48,15 @@ export function Hellobar({ model }: { model: DemoBannerModel }) {
         {hasCreds ? (
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             {model.email ? (
-              <span className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
+              <span className="inline-flex max-w-full items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
                 <span className="uppercase tracking-wide text-muted-foreground">email</span>
-                <code className="text-foreground">{model.email}</code>
+                <code className="break-all text-foreground">{model.email}</code>
               </span>
             ) : null}
             {model.password ? (
-              <span className="inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
+              <span className="inline-flex max-w-full items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5">
                 <span className="uppercase tracking-wide text-muted-foreground">password</span>
-                <code className="text-foreground">{model.password}</code>
+                <code className="break-all text-foreground">{model.password}</code>
               </span>
             ) : null}
           </span>
