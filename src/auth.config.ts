@@ -47,9 +47,20 @@ if (passwordEnabled) {
       id: 'password',
       name: 'Off Grid AI',
       credentials: { username: { label: 'Email' }, password: { label: 'Password', type: 'password' } },
-      authorize: async (creds) => {
+      authorize: async (creds, request) => {
         const { authenticatePassword } = await import('@/lib/auth/identity');
-        return authenticatePassword(String(creds?.username ?? ''), String(creds?.password ?? ''));
+        const user = await authenticatePassword(
+          String(creds?.username ?? ''),
+          String(creds?.password ?? ''),
+        );
+        if (!user) return null;
+        // Tenant-login gate: on a tenant subdomain, only a member of THAT tenant (or an admin) may
+        // sign in — so the same credentials can't log into both the bank and the insurer host. A
+        // non-member is rejected like a bad password (null), never disclosing the cross-tenant
+        // account. Node-only lookup, imported dynamically so it stays out of the edge bundle.
+        const host = request?.headers?.get?.('host') ?? null;
+        const { gateTenantLogin } = await import('@/lib/auth/tenant-login');
+        return gateTenantLogin(host, user);
       },
     }),
   );

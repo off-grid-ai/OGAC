@@ -41,3 +41,21 @@ export function bindTenantOrg(
   }
   return tenantOrg ?? actorOrg;
 }
+
+/**
+ * LOGIN gate for a tenant subdomain (distinct from bindTenantOrg's data-scoping). A person may
+ * sign IN on a tenant's host ONLY if they are a platform admin OR a member of THAT tenant's org.
+ * So the SAME credentials cannot log into both the bank host and the insurer host — each tenant is
+ * its own island, and a non-member login is rejected exactly like a bad password (the caller returns
+ * null → the standard invalid-credentials UX), never revealing the account exists on another tenant.
+ * Off a tenant subdomain (`tenantOrg` null — apex / single-tenant deploy) there is no gate: allowed.
+ */
+export function mayLoginToTenant(
+  tenantOrg: string | null,
+  userOrg: string | null | undefined,
+  role: string | undefined,
+): boolean {
+  if (!tenantOrg) return true;
+  if (role === 'admin') return true;
+  return !!userOrg && userOrg === tenantOrg;
+}
