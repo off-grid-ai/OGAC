@@ -973,3 +973,57 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## ADVERSARIAL — BUILDER / STUDIO break-test (2026-07-10, worktree off wave2 HEAD, read-only live)
+
+Full ledger + repros: `docs/adversarial/builder.md`. RED tests (`.skip`-gated, ADVERSARIAL, proven
+red 8/8 with skip removed): `test/adversarial-builder-cycle.test.ts`,
+`test/adversarial-builder-resume-drift.test.ts`, `test/adversarial-builder-payload.test.ts`.
+
+- **G-ADV-BUILD-1 (HIGH) — validator accepts a cyclic app; cycle guard lives only in the canvas editor.**
+  `validateAppSpec` (`src/lib/app-model.ts:129`) checks single-entry + reachability but NOT acyclicity.
+  The only cycle guard is `app-builder.wouldCreateStepCycle`/`addEdge` (`src/lib/app-builder.ts:60,90`) —
+  the canvas path. `apps-store.createApp`/`updateApp` + the executor trust the validator, so a reachable
+  cycle (`e→a→b→a`) or self-loop (`a→a`) saved via direct POST/PATCH `/api/v1/admin/apps[/id]`, NL
+  compose, or `workflowToAppSpec` is accepted (201). `app-compile.ts` has no DAG check either. Fix:
+  add an acyclicity check to `validateAppSpec` (the single authority) — DRY the cycle rule from
+  app-builder into the model. Repro: `test/adversarial-builder-cycle.test.ts`.
+
+- **G-ADV-BUILD-2 (HIGH) — a cyclic app WEDGES into a terminal `running` (never done, never error).**
+  `runApp` on a reachable cycle terminates with `status:'running'`; only the entry ran, cycle steps
+  stuck `queued`. `nextRunnableSteps` never returns a cycle node (predecessors never all `done`);
+  `driveRunnableSteps`' bounded loop exits and `finalize`/`deriveRunStatus` (`app-run.ts:859`,
+  `app-run-plan.ts:181`) return the non-terminal `running`. Persisted `app_runs` row is
+  `{status:'running', steps:[…queued]}` forever — no honest failure surfaced. Closed by fixing
+  G-ADV-BUILD-1 (reject cycles pre-run); belt-and-braces: `finalize` should map a stalled non-terminal
+  to `error`. Repro: `test/adversarial-builder-cycle.test.ts`.
+
+- **G-ADV-BUILD-3 (HIGH) — HITL resume re-executes an added step N times on spec-drift.**
+  If the app is edited (a step appended) while a run sits paused at a human step, approving fires the
+  added side-effecting sink up to `steps.length+1` times (proven: 6 emails for one approve). The review
+  route (`apps/runs/[id]/review/route.ts:112,125`) rebuilds state from the OLD run row but drives
+  `driveRunnableSteps` over the CURRENT edited spec; `applyStepResult` (`app-run-plan.ts:202`) silently
+  no-ops for a step absent from `state.steps`, so it never records `done` and re-runs each iteration.
+  Fix: reconcile `state.steps` against `spec.steps` on resume (or pin the run to its spec snapshot);
+  guard `applyStepResult` to error on an unknown stepId. Repro: `test/adversarial-builder-resume-drift.test.ts`.
+
+- **G-ADV-BUILD-4 (MEDIUM, ⚠️ untested e2e) — concurrent HITL approve is a check-then-act race (inline path).**
+  The review route reads the row + `canReview`, then resumes, with no row-level transition lock; two
+  concurrent approves can both resume → double side-effects on the inline path (the durable Temporal
+  signal path is idempotent). Fix: compare-and-set `WHERE status='awaiting_human'` before resume.
+
+- **G-ADV-BUILD-5 (MEDIUM) — webhook payload clamping is top-level-only; nested content passes unbounded.**
+  `sanitizeBody` (`src/lib/trigger-dispatch.ts:132`) only clamps top-level string values. A 5MB nested
+  string, a 200k-element array, or 5000-deep nesting pass whole into the governed pipeline input,
+  contradicting the module's "stays small and typed" guarantee. The public route also buffers the full
+  body pre-HMAC (`triggers/[token]/route.ts:41`). Fix: recursive bound (depth + node/element count +
+  per-string clamp) in `sanitizeBody`; cap request body size at the edge. Repro:
+  `test/adversarial-builder-payload.test.ts`.
+
+- **G-ADV-BUILD-6 (LOW, ⚠️ defense-in-depth) — app→app depth cap inert on the real path.**
+  `invokeAppTool` (`adapters/tool-primitives.ts:269`) enforces `MAX_APP_TOOL_DEPTH` only when
+  `ctx.depth !== undefined`, but the recursive `submitAppRun` (line 295) threads neither `depth` nor
+  `callerAppId` into the child run, and `agentrun.ts:288` passes the agent id as `callerAppId` with no
+  depth. The org-wide static `detectAppToolCycles` still blocks mutual references (no hard infinite
+  loop), but the depth bound for a long acyclic chain never arms. Fix: thread `depth+1` + the true
+  caller app id through `submitAppRun` → the child agent step.
