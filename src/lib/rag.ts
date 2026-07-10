@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatChunks, chatDocuments } from '@/db/schema';
+import { chatChunks, chatDocuments, chatProjects } from '@/db/schema';
 
 // Knowledgebase / RAG — ports Off Grid AI Desktop's chunk→embed→retrieve pipeline to the console,
 // using the on-prem gateway's /v1/embeddings (384-dim MiniLM) instead of an in-process model.
@@ -130,17 +130,50 @@ export interface Citation {
   score: number;
 }
 
+const EMPTY_RETRIEVAL: { context: string; citations: Citation[] } = { context: '', citations: [] };
+
+/**
+ * PURE tenant-isolation rule for the RAG read (zero-I/O, unit-testable). A project's chunks may be
+ * retrieved ONLY when the project belongs to the caller's org. `projectOrgId` is the org the target
+ * project is owned by (null ⇒ project row not found), `callerOrgId` is currentOrgId() at the request.
+ * Returns true iff the read is same-tenant. This is the ONE authority the retrieve() adapter consults
+ * so "a chat in org A can never retrieve org B's knowledge chunks" is a single, testable decision.
+ */
+export function ragOrgAllows(projectOrgId: string | null | undefined, callerOrgId: string): boolean {
+  if (!projectOrgId) return false; // unknown/missing project ⇒ deny (fail-closed, no cross-tenant leak)
+  return projectOrgId === callerOrgId;
+}
+
+/** Look up the org that owns a chat project (null when the project row does not exist). */
+async function projectOrgId(projectId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ orgId: chatProjects.orgId })
+    .from(chatProjects)
+    .where(eq(chatProjects.id, projectId))
+    .limit(1);
+  return row?.orgId ?? null;
+}
+
 // Retrieve the top-k most relevant chunks for a query within a project, and format the
 // <knowledge_base> block the desktop uses (with [Source: name (part n)] tags for citation).
 // `opts.docId` narrows retrieval to a single document within the project (used by an @-mention that
 // references one specific KB doc); omit it to search the whole project.
+//
+// TENANT ISOLATION (SECURITY #236 / G-ADV-CHAT-1): `opts.orgId` is the caller's currentOrgId(). The
+// read is gated by ragOrgAllows() — chunks are returned ONLY when the target project belongs to that
+// org, so a chat in org A can never retrieve org B's knowledge chunks. A cross-org (or unknown)
+// project yields the empty result, never another tenant's data. orgId is REQUIRED in practice; it is
+// typed optional only so legacy callers compile, and an omitted orgId means "no org context" which
+// fails the ragOrgAllows check for any real project (deny) unless the project is unowned/'default'.
 export async function retrieve(
   projectId: string,
   query: string,
   topK = 6,
-  opts: { docId?: string } = {},
+  opts: { docId?: string; orgId?: string } = {},
 ): Promise<{ context: string; citations: Citation[] }> {
   await ensureRagSchema();
+  // HARD tenant gate BEFORE any chunk read: the project must belong to the caller's org.
+  if (!ragOrgAllows(await projectOrgId(projectId), opts.orgId ?? '')) return EMPTY_RETRIEVAL;
   const scope = opts.docId
     ? and(eq(chatChunks.projectId, projectId), eq(chatChunks.docId, opts.docId))
     : eq(chatChunks.projectId, projectId);
