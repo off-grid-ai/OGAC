@@ -16,7 +16,6 @@
     "smoke:api": "node scripts/smoke.mjs --api",
     "smoke:prod": "bash deploy/smoke-prod.sh",
     "regression": "npm run coverage:check && npm run test:integration && npm run smoke:api",
-    "smoke:api": "node scripts/smoke.mjs --api",
     "worker:agents": "tsx scripts/temporal-worker.mts",
     "worker:apps": "tsx scripts/app-worker.mts",
     "worker:chat": "tsx scripts/chat-worker.mts",
@@ -28,6 +27,9 @@
     "test:integration": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.integration.test.ts",
     "coverage": "c8 --config .c8rc.json node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "coverage:check": "c8 --config .c8rc.json --check-coverage node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
+    "depcruise": "depcruise src scripts --config .dependency-cruiser.js",
+    "depcruise:report": "depcruise src scripts --config .dependency-cruiser.js --output-type err-long",
+    "depcruise:graph": "depcruise src --config .dependency-cruiser.js --output-type dot | dot -T svg -o docs/dependency-graph.svg",
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {
@@ -79,6 +81,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "c8": "^11.0.0",
+    "dependency-cruiser": "^18.0.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.18.0",
