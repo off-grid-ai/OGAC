@@ -1,0 +1,48 @@
+name: SonarCloud
+
+# Static analysis (bugs, code smells, security hotspots, duplication, coverage) on every push to
+# main and every PR. Requires the SONAR_TOKEN repository secret (SonarCloud -> project -> analysis
+# method -> GitHub Actions) and the project imported at https://sonarcloud.io under org `off-grid-ai`.
+# The scan step is gated on the token being present, so this workflow never fails the repo before
+# that one-time setup is done.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarcloud:
+    name: Analyze
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for accurate blame / new-code detection
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install deps
+        if: env.SONAR_TOKEN != ''
+        run: npm ci
+
+      # Coverage is best-effort: generate the lcov Sonar reads, but never fail the scan on the
+      # coverage gate here (CI's own gate enforces the threshold).
+      - name: Coverage (lcov for Sonar)
+        if: env.SONAR_TOKEN != ''
+        run: npm run coverage || true
+
+      - name: SonarCloud scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
