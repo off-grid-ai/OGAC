@@ -20,6 +20,7 @@ import {
 } from '@/lib/pipeline-governance';
 import { type PipelineContract, enforcementResource } from '@/lib/pipeline-enforcement';
 import { parseModelRules, parseRequestParamsPolicy } from '@/lib/request-policy';
+import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 
 /**
  * Resolve the enforceable contract for a run's bound pipeline. Returns null when:
@@ -37,6 +38,13 @@ export async function resolveContract(
   try {
     const pipeline = await getPipeline(pipelineId, orgId);
     if (!pipeline) return null;
+    // LIFECYCLE GATE (G-ADV-PIPE-2/3): only a PUBLISHED pipeline may govern a consumer run. A
+    // deprecated/archived pipeline (retired → fall back to org default) or a draft/in_review one
+    // (never approved/gate-passed → the release gate must not be bypassable on the internal paths)
+    // resolves to null here — exactly the "fall back to legacy / org default" path a missing binding
+    // takes. ONE gate on the ONE seam every internal consumer (chat/agent/app/trigger) flows through,
+    // mirroring the public run route's `status !== 'published'` 409.
+    if (!isConsumable(pipeline.status)) return null;
     // The deterministic REQUEST-shape gates are OPTIONAL slices operators set on the RAW policy
     // overlay JSON (`requestParams` = param ceilings/bounds/banned-list; `modelRules` = model
     // allow/denylist). We parse them purely (parse* narrows/validates) and attach when present;
