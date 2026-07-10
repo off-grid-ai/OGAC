@@ -65,13 +65,15 @@ test('statRailItemClasses floors width on mobile and clears it at the restore br
   for (const at of ALL_AT) {
     const c = statRailItemClasses(at);
     assert.ok(c.includes('min-w-[9rem]'), `${at} missing mobile min-width`);
+    assert.ok(c.includes('shrink-0'), `${at} missing mobile shrink-0`);
     assert.ok(c.includes(`${at}:min-w-0`), `${at} missing restore clear`);
+    assert.ok(c.includes(`${at}:shrink`), `${at} missing restore shrink`);
   }
 });
 
-test('statRailItemClasses covers the new at:\'xl\' arm', () => {
+test("statRailItemClasses covers the new at:'xl' arm", () => {
   const c = statRailItemClasses('xl');
-  assert.equal(c, 'min-w-[9rem] xl:min-w-0');
+  assert.equal(c, 'min-w-[9rem] shrink-0 xl:min-w-0 xl:shrink');
 });
 
 test('statRailItemClasses defaults to at="sm"', () => {

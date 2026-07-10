@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   Table,
   TableBody,
@@ -151,7 +152,7 @@ export default async function RegulatoryPage({
           <ActivityRangeControls from={fromDate} to={toDate} />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <StatRail at="lg" cols={6}>
             <Stat label="Events" value={String(activity.totals.events)} />
             <Stat label="Actors" value={String(activity.totals.actors)} />
             <Stat
@@ -166,7 +167,7 @@ export default async function RegulatoryPage({
               value={`${activity.provenance.coveragePct}%`}
               sub={`${activity.provenance.signed}/${activity.provenance.runs} runs signed`}
             />
-          </div>
+          </StatRail>
 
           {activity.byActor.length > 0 && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -51,10 +51,10 @@ const GRID_RESTORE: Record<StatRailBreakpoint, Record<StatRailCols, string>> = {
 // Per-item min-width floor for the mobile rail so cards don't collapse — cleared once the grid
 // restores (the grid sizes columns itself). Full literal strings only.
 const ITEM_MIN_WIDTH: Record<StatRailBreakpoint, string> = {
-  sm: 'min-w-[9rem] sm:min-w-0',
-  md: 'min-w-[9rem] md:min-w-0',
-  lg: 'min-w-[9rem] lg:min-w-0',
-  xl: 'min-w-[9rem] xl:min-w-0',
+  sm: 'min-w-[9rem] shrink-0 sm:min-w-0 sm:shrink',
+  md: 'min-w-[9rem] shrink-0 md:min-w-0 md:shrink',
+  lg: 'min-w-[9rem] shrink-0 lg:min-w-0 lg:shrink',
+  xl: 'min-w-[9rem] shrink-0 xl:min-w-0 xl:shrink',
 };
 
 // Classes for the RAIL CONTAINER: horizontal scroll on mobile, restored to a `cols`-column grid at
