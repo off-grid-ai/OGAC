@@ -973,3 +973,48 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## Adversarial break-test — Console Chat (2026-07-10)
+**Status: OPEN.** Full analysis + repro + terminal artifact + root-cause (file:line) in
+`docs/adversarial/chat.md`. RED tests in `test/adversarial-chat-*.ts` (all `.skip`'d so the shared
+suite stays green; each verified to fail when un-skipped). Confirmed breaks:
+
+- **G-ADV-CHAT-4 (CRITICAL, `console`) — RAG retrieval not org-scoped (cross-org document leak).**
+  `chat_documents`/`chat_chunks` have no `org_id`; `retrieve()` (`src/lib/rag.ts:137`) filters only by
+  `project_id`; the stream route (`stream/route.ts:269,288`) never validates `convo.projectId`'s org.
+  A multi-org user creating an org-B conversation pointing at an org-A project (`projectAccess` gates
+  by userId, not org) grounds the answer on — and cites — org A's confidential docs.
+  RED: `test/adversarial-chat-rag-cross-org.integration.test.ts`.
+- **G-ADV-CHAT-5 (HIGH, `console`) — inbound guardrail fails OPEN on engine error.**
+  `stream/route.ts:153` `runInboundGuardrails(...).catch(() => null)` + `:158`/`:182`: a THROWN
+  guardrail (engine down/misconfig) → `null` → turn allowed + ORIGINAL unredacted message forwarded to
+  the model. The underlying fn fails CLOSED; the route's swallow inverts it.
+  RED: `test/adversarial-chat-guardrail-failopen.test.ts`.
+- **G-ADV-CHAT-1 (HIGH, `console`) — attachment context-block break-out.** `attachmentBlock`
+  (`src/lib/chat-attach.ts`) interpolates filename + text into `<file name="…">…</file>` with no
+  escaping → a crafted attachment closes `</attached_files>` early + injects `<system>` instructions.
+  RED: `test/adversarial-chat-context-injection.test.ts`.
+- **G-ADV-CHAT-2 (HIGH, `console`) — referenced-memory context-block break-out.**
+  `referencedMemoryBlock` (`src/lib/chat-mentions.ts`) — same missing escaping; a stored fact with
+  `</referenced_memory><system>…` injects into trusted context. (Also affects `memoryBlock`.)
+  RED: `test/adversarial-chat-context-injection.test.ts`.
+- **G-ADV-CHAT-3 (MEDIUM/HIGH, `console`) — OD14 control-token leak (render + TTS).** No control-token
+  stripper anywhere in the chat content path; react-markdown renders `<function=…>`/`<think>`/
+  `<tool_call>`/`<|im_start|>` as literal visible text (proven via renderToStaticMarkup), and
+  `textForSpeech` (`chat-audio.ts:217`) reads them aloud (incl. a leaked `<think>` chain-of-thought).
+  Fix seam: a shared pure `stripControlTokens()` used by the render path + `textForSpeech`.
+  RED (TTS half runnable): `test/adversarial-chat-control-token-leak.test.ts`.
+- **G-ADV-CHAT-6 (MEDIUM, `console`) — stop mid-stream doesn't cancel the server run.** Client
+  `stop()` aborts only the browser fetch; `stream/route.ts` never observes `req.signal`, so it reads
+  the upstream to completion and STILL persists the full answer + dispatches the durable run →
+  client/server divergence on refresh + an orphaned Temporal run. (Not isolated into a RED test this
+  pass — needs the route + fake upstream.)
+
+**Untested intersections (honest non-coverage — read as NOT covered, not as safe):** tool-approval
+HMAC token replay (fn-A token reused for fn-B); MCP/tool timeout mid-call; HITL resume after approval;
+concurrent/rapid-send ordering under races; client SSE malformed-frame handling (unguarded
+`JSON.parse` at `ChatWorkspace.tsx:~1000` — no per-frame try/catch, unlike the server); budget bypass
+via `estimateTokens` under-count (CJK/emoji); `renameConversation` cross-org (userId-only scope);
+`extractFile` malformed-base64 throw; `deriveTitle` control-char passthrough; STT empty/garbage audio;
+viewer-role composer (button not gated on role/streaming — guard in `send()` prevents dup rows, so
+UX/affordance gap only). See the coverage ledger in `docs/adversarial/chat.md`.
