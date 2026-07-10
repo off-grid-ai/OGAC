@@ -24,6 +24,9 @@ import {
   goldenId,
   evalRunId,
   collectionId,
+  knowledgeDocId,
+  agentRunId,
+  gatewayEgress,
   teamId,
   planById,
   runStatuses,
@@ -67,6 +70,19 @@ test('ids are deterministic and namespaced by org (no cross-tenant collision)', 
   assert.match(evalRunId('org_bharat', 'kyc-rekyc', 0), /^eval_[0-9a-f]{12}$/);
   assert.match(collectionId('org_bharat', 'policies'), /^kc_[0-9a-f]{12}$/);
   assert.match(teamId('org_bharat', 'risk'), /^team_[0-9a-f]{12}$/);
+});
+
+test('agentRunId / knowledgeDocId are deterministic and namespaced', () => {
+  assert.match(agentRunId('org_bharat', 'kyc-analyst', 0), /^ar_[0-9a-f]{12}$/);
+  assert.equal(agentRunId('org_bharat', 'kyc-analyst', 0), agentRunId('org_bharat', 'kyc-analyst', 0));
+  assert.notEqual(agentRunId('org_bharat', 'kyc-analyst', 0), agentRunId('org_bharat', 'kyc-analyst', 1));
+  assert.match(knowledgeDocId('org_bharat', 'policies', 'kyc'), /^kd_[0-9a-f]{12}$/);
+  assert.notEqual(knowledgeDocId('org_bharat', 'policies', 'kyc'), knowledgeDocId('org_bharat', 'policies', 'lending'));
+});
+
+test('gatewayEgress derives egress class from kind (on-prem stays local, cloud egresses)', () => {
+  assert.equal(gatewayEgress('on-prem'), 'on-prem');
+  assert.equal(gatewayEgress('openai'), 'cloud');
 });
 
 test('appRunId is distinct per index (N runs per app are unique + stable)', () => {
