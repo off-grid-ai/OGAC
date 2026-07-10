@@ -10,6 +10,7 @@ import { EnrollDeviceButton } from '@/components/fleet/EnrollDeviceButton';
 import { FleetTools } from '@/components/fleet/FleetTools';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import {
   Table,
   TableBody,
@@ -70,7 +71,7 @@ export default async function FleetPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatRail>
         {stats.map((s) => (
           <Card key={s.label} className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -84,7 +85,7 @@ export default async function FleetPage() {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </StatRail>
 
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">

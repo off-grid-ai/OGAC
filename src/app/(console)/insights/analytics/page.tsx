@@ -15,6 +15,7 @@ import {
 import { NativeSupersetPanel } from '@/components/analytics/NativeSupersetPanel';
 import { GatewayUsage } from '@/components/gateway/GatewayUsage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
 import { safeSupersetDashboard } from '@/lib/superset-data';
@@ -81,7 +82,7 @@ export default async function AnalyticsPage({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatRail>
         {stats.map((s) => (
           <Card key={s.label} className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -95,7 +96,7 @@ export default async function AnalyticsPage({
             </CardContent>
           </Card>
         ))}
-      </div>
+      </StatRail>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
