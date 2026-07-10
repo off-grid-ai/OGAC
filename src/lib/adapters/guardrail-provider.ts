@@ -1,100 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Third-party guardrail PROVIDER seam.
+// LLM Guard (Protect AI, MIT) — THE authoritative content-guardrail engine.
 //
-// The console ships two guardrails engines out of the box — the always-on regex floor and Microsoft
-// Presidio (src/lib/adapters/pii.ts). This module adds a THIRD, generic seam so an EXTERNAL guardrail
-// engine (Lakera Guard, Aporia, Prompt-Security, a self-hosted classifier, …) can be plugged in by
-// CONFIG ALONE — no code change per vendor. It mirrors the Presidio adapter exactly: it implements
-// the same `PiiPort` contract, registers in the same `guardrails` capability, and is selected with
-// the same env switch `OFFGRID_ADAPTER_GUARDRAILS=http-guardrail`.
+// Founder decision (DRY consolidation): the console relies COMPLETELY on LLM Guard for content
+// guardrails — PII/DLP, secrets, prompt-injection, toxicity, language. The four-engine seam (regex
+// floor, Presidio, a generic BYO http-guardrail, LLM Guard) collapsed to ONE real engine. The DIP
+// port (PiiPort) stays so the checks spine is engine-agnostic, but LLM Guard is the only backing.
 //
 // SOLID seam:
-//   • normalizeGuardrailResponse() — PURE, zero-IO, exhaustively unit-testable. Maps an external
-//     provider's JSON response onto the console's normalized PiiResult verdict. Named vendors differ
-//     only in their JSON shape, so ALL that a new vendor needs is (usually) a tweak here or a mapper
-//     — the network plumbing below is shared.
-//   • httpGuardrailPii — the thin I/O adapter: POST the text to the configured provider and normalize
-//     the answer. Best-effort BY DESIGN: not configured (no URL) OR the provider is unreachable ⇒
-//     degrade to the always-on regex floor, so turning an external provider on can never harden into
-//     a hard dependency (the same fail-open contract as the Presidio adapter).
+//   • normalizeLlmGuardResponse() — PURE, zero-IO, exhaustively unit-testable. Maps LLM Guard's
+//     /analyze verdict JSON onto the console's normalized PiiResult.
+//   • llmGuardPii — the thin I/O adapter: POST the text + the console-generated scanner config (which
+//     folds in the India recognizers — see llm-guard-config.ts) and normalize the answer.
 //
-// HOW A NAMED VENDOR SLOTS IN (documented, not built — we ship ONE generic provider as proof):
-//   Lakera / Aporia / Prompt-Security all expose "POST text → verdict JSON". Point
-//   OFFGRID_HTTP_GUARDRAIL_URL at the vendor's endpoint, set OFFGRID_HTTP_GUARDRAIL_API_KEY, and (if
-//   its JSON differs from the generic {flagged, entities?, redacted?} shape) add a one-line field
-//   mapping in normalizeGuardrailResponse. No new adapter, no registry surgery — one config + at most
-//   one mapper. That is the whole point of the seam.
+// FAIL CLOSED (a guardrail must not be bypassable by killing the engine):
+//   • CONFIGURED (URL set) but unreachable / errored ⇒ return `{ blocked:true }` — the run is DENIED
+//     with a clear reason. There is NO silent fall-open to a weaker regex floor.
+//   • NOT configured (no URL) ⇒ return `{ configured:false }` — an explicit "guardrails not
+//     configured" state the UI surfaces. The step did not screen; it never pretends it did.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-import { regexScan } from './pii-regex';
+import { buildLlmGuardScannerConfig, type LlmGuardScannerConfig } from '../llm-guard-config';
+import type { NormalizedRecognizer } from '../presidio-recognizers';
 import type { PiiPort, PiiResult } from './types';
 
 const env = process.env;
 
 // A fetch timeout that survives environments where AbortSignal.timeout is unavailable-ish; 6s is
-// generous for a remote classifier while still bounded so a hung provider can't stall a run.
+// generous for a remote classifier while still bounded so a hung engine can't stall a run.
 const CHECK_TIMEOUT_MS = 6000;
 
-// The loose response shape a generic HTTP guardrail provider returns. Every field is optional/unknown
-// so a malformed body degrades to "clean pass" rather than throwing on the run path.
-//   • flagged / blocked / block — truthy ⇒ the provider found something (a policy violation / PII).
-//   • entities — the labels the provider matched (mapped straight onto PiiResult.entities).
-//   • redacted / sanitized — a provider-sanitized form of the text, if it offers one.
-export interface RawGuardrailResponse {
-  flagged?: unknown;
-  blocked?: unknown;
-  block?: unknown;
-  entities?: unknown;
-  categories?: unknown;
-  redacted?: unknown;
-  sanitized?: unknown;
-}
-
-function asBool(v: unknown): boolean {
-  return v === true || v === 'true' || v === 1;
-}
-
-function asStringArray(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
-}
-
-/**
- * Map a generic external-provider response onto the console's normalized PiiResult. PURE — zero I/O.
- *
- * The provider is considered to have "hit" when it flagged/blocked the text OR it named any entity/
- * category. A named entity list is surfaced verbatim (so the audit shows what the vendor matched);
- * when the provider flagged without naming entities we synthesize a single `GUARDRAIL` label so the
- * verdict is still legible. A provider-supplied redaction/sanitization is preferred; otherwise the
- * original text is echoed back (this adapter does not invent redactions the provider didn't make).
- */
-export function normalizeGuardrailResponse(
-  original: string,
-  raw: RawGuardrailResponse | null | undefined,
-  engine = 'http-guardrail',
-): PiiResult {
-  const r = raw && typeof raw === 'object' ? raw : {};
-  const flagged = asBool(r.flagged) || asBool(r.blocked) || asBool(r.block);
-  const named = [...asStringArray(r.entities), ...asStringArray(r.categories)];
-  const entities = named.length > 0 ? named : flagged ? ['GUARDRAIL'] : [];
-  const hits = entities.length > 0;
-  const redacted =
-    typeof r.redacted === 'string'
-      ? r.redacted
-      : typeof r.sanitized === 'string'
-        ? r.sanitized
-        : original;
-  return { hits, entities, redacted, engine };
-}
-
-// ─── LLM Guard (Protect AI, MIT) — a NAMED provider on the same seam ────────────────────────────────
-//
-// LLM Guard ships a self-hostable API server (`llm-guard-api`, FastAPI). Its verdict JSON differs from
-// the generic {flagged, entities?} shape, so it gets its own PURE mapper (below) and a thin adapter
-// (llmGuardPii) — but it reuses ALL the shared plumbing (timeout, error diagnosis, fail-open to the
-// regex floor) and the same PiiResult contract + env switches. Selected with
-// OFFGRID_ADAPTER_GUARDRAILS=llm-guard; configured with OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY).
-//
 // LLM Guard's response (POST /analyze/prompt):
 //   { is_valid: boolean, scanners: { "<ScannerName>": <risk score 0..1>, … }, sanitized_prompt: "…" }
 // The mapping:
@@ -104,7 +38,7 @@ export function normalizeGuardrailResponse(
 //     when its risk score exceeds `scoreThreshold` (default 0.5), OR — when is_valid is false but no
 //     score cleared the bar (some scanners report a boolean-ish 0/1) — every non-zero scanner. When
 //     is_valid is false and nothing else is nameable we synthesize a single `GUARDRAIL` label so the
-//     verdict is still legible (mirrors the generic mapper).
+//     verdict is still legible.
 //   • redacted      — LLM Guard's `sanitized_prompt` (Anonymize rewrites PII in place); else the
 //     original text (we never invent a redaction the engine didn't make).
 export interface RawLlmGuardResponse {
@@ -128,6 +62,7 @@ function scannerScores(v: unknown): Array<[string, number]> {
 /**
  * Map an LLM Guard `/analyze/*` response onto the console's normalized PiiResult. PURE — zero I/O.
  * `threshold` is the risk-score at/above which a scanner is treated as a flag (default 0.5).
+ * A successfully-parsed engine answer is always `configured:true` (the engine screened this run).
  */
 export function normalizeLlmGuardResponse(
   original: string,
@@ -146,15 +81,14 @@ export function normalizeLlmGuardResponse(
     flaggedScanners = scores.filter(([, s]) => s > 0).map(([name]) => name);
   }
   const hits = invalid || flaggedScanners.length > 0;
-  const entities =
-    flaggedScanners.length > 0 ? flaggedScanners : hits ? ['GUARDRAIL'] : [];
+  const entities = flaggedScanners.length > 0 ? flaggedScanners : hits ? ['GUARDRAIL'] : [];
   const sanitized =
     typeof r.sanitized_prompt === 'string'
       ? r.sanitized_prompt
       : typeof r.sanitized_output === 'string'
         ? r.sanitized_output
         : original;
-  return { hits, entities, redacted: sanitized, engine };
+  return { hits, entities, redacted: sanitized, engine, configured: true };
 }
 
 // Flatten an unknown thrown value into a diagnosable one-liner — fetch() hides the useful bit
@@ -171,89 +105,18 @@ function describeError(err: unknown): string {
   return String(err);
 }
 
-// POST the text to the configured provider and return its raw JSON. Throws on a non-2xx / network
-// error so the caller can decide to fail open to the regex floor (mirrors presidioAnalyze).
-async function postGuardrail(
-  url: string,
-  apiKey: string | undefined,
-  text: string,
-): Promise<RawGuardrailResponse> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  // Bearer is the near-universal scheme (Lakera/Aporia/OpenAI-style). A vendor that wants a custom
-  // header is one line in a mapper — but the seam's default covers the common case with no code.
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ input: text, text }),
-    signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(
-      `http-guardrail POST ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`,
-    );
-  }
-  return (await res.json()) as RawGuardrailResponse;
-}
-
-// The generic external HTTP guardrail provider, behind the guardrails PiiPort. Selected with
-// OFFGRID_ADAPTER_GUARDRAILS=http-guardrail; configured with OFFGRID_HTTP_GUARDRAIL_URL (+ optional
-// _API_KEY). Not configured ⇒ honest fall-through to the regex floor (never a hard dependency).
-export const httpGuardrailPii: PiiPort = {
-  meta: {
-    id: 'http-guardrail',
-    capability: 'guardrails',
-    vendor: 'External HTTP guardrail provider',
-    license: 'third-party (bring-your-own)',
-    render: 'headless',
-    embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
-    description:
-      'Generic seam for a third-party guardrail engine (Lakera / Aporia / Prompt-Security / self-hosted). POSTs the text and reads a verdict. Configure with OFFGRID_HTTP_GUARDRAIL_URL + _API_KEY; a named vendor slots in via a one-line field mapping. Falls back to the regex floor when unset or unreachable.',
-  },
-  async scan(text) {
-    const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
-    // Honest "not configured": no URL ⇒ the regex floor answers. The UI reports this as "not
-    // configured yet" (calm) rather than "down" via the registry's `configured` flag.
-    if (!url) return regexScan(text);
-    try {
-      const raw = await postGuardrail(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, text);
-      return normalizeGuardrailResponse(text, raw);
-    } catch (err) {
-      // Provider unreachable / errored — degrade to the regex floor and log the concrete reason so
-      // "why regex?" is answerable from the logs, not guessed at.
-      console.warn(
-        '[http-guardrail] provider call failed, degrading to regex floor:',
-        describeError(err),
-      );
-      return regexScan(text);
-    }
-  },
-  async health() {
-    const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
-    if (!url) return false;
-    try {
-      // A HEAD/GET to the base is the cheapest liveness signal; a provider without one still returns
-      // *some* status, which is enough to distinguish "reachable" from "socket refused".
-      const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(2500) });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  },
-};
-
 // Strip a trailing slash so `${base}/analyze/prompt` never doubles up.
 function trimTrailingSlash(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
-// POST the prompt to LLM Guard's /analyze/prompt and return its raw JSON. Throws on non-2xx / network
-// so the caller can fail open to the regex floor (mirrors postGuardrail / presidioAnalyze).
+// POST the prompt + the console's scanner config to LLM Guard's /analyze/prompt and return its raw
+// JSON. Throws on non-2xx / network so the caller can FAIL CLOSED (block the run).
 async function postLlmGuard(
   base: string,
   apiKey: string | undefined,
   text: string,
+  scanners: LlmGuardScannerConfig,
 ): Promise<RawLlmGuardResponse> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   // llm-guard-api authenticates with a bearer AUTH_TOKEN when configured.
@@ -261,7 +124,9 @@ async function postLlmGuard(
   const res = await fetch(`${trimTrailingSlash(base)}/analyze/prompt`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ prompt: text }),
+    // `scanners` carries the console's scanner config INCLUDING the folded-in India recognizers, so
+    // the engine screens Indian PII (PAN/Aadhaar/IFSC/UPI) it would otherwise miss (G-LG-2).
+    body: JSON.stringify({ prompt: text, scanners }),
     signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   });
   if (!res.ok) {
@@ -271,11 +136,34 @@ async function postLlmGuard(
   return (await res.json()) as RawLlmGuardResponse;
 }
 
-// LLM Guard (Protect AI) as a NAMED provider behind the guardrails PiiPort. Selected with
-// OFFGRID_ADAPTER_GUARDRAILS=llm-guard; configured with OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api
-// base, e.g. http://llm-guard:8000) + optional OFFGRID_HTTP_GUARDRAIL_API_KEY (the server's
-// AUTH_TOKEN). Not configured / unreachable ⇒ honest fall-through to the regex floor (never a hard
-// dependency — same contract as the Presidio + http-guardrail adapters).
+// The blocked (fail-closed) verdict returned when LLM Guard is CONFIGURED but unreachable. PURE.
+// A blocked result is a HIT (something is wrong) + `blocked:true` so the checks spine denies the run.
+export function guardrailUnavailable(reason: string, engine = 'llm-guard'): PiiResult {
+  return {
+    hits: true,
+    blocked: true,
+    configured: true,
+    entities: ['GUARDRAIL_UNAVAILABLE'],
+    redacted: `[guardrail unavailable: ${reason}]`,
+    engine,
+  };
+}
+
+// The not-configured verdict — no engine URL. The step did NOT screen; it says so honestly. PURE.
+export function guardrailNotConfigured(engine = 'llm-guard'): PiiResult {
+  return { hits: false, configured: false, entities: [], engine };
+}
+
+// LLM Guard (Protect AI) as THE guardrails engine behind the PiiPort. Selected by default (registry);
+// configured with OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api base, e.g. http://llm-guard:8000) +
+// optional OFFGRID_HTTP_GUARDRAIL_API_KEY (the server's AUTH_TOKEN).
+//
+// FAIL CLOSED: configured + unreachable ⇒ the run is BLOCKED (never a silent fall-open). NOT
+// configured ⇒ an explicit "not configured" state (never a faked clean pass).
+//
+// `orgId` scopes the org's custom recognizers, which are folded into the scanner config ALONGSIDE
+// the always-on India defaults. Loading them is best-effort — a config-load failure degrades to
+// "India defaults only" (still a real screen), NOT to a bypass.
 export const llmGuardPii: PiiPort = {
   meta: {
     id: 'llm-guard',
@@ -285,20 +173,24 @@ export const llmGuardPii: PiiPort = {
     render: 'headless',
     embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
     description:
-      'Self-hosted LLM Guard scanners (PII/Anonymize, Secrets, Toxicity, Bias, BanTopics, PromptInjection, Language, Regex, TokenLimit) behind the checks port. POSTs the text to /analyze/prompt and reads {is_valid, scanners, sanitized_prompt}. Configure OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY = AUTH_TOKEN). Falls back to the regex floor when unset or unreachable.',
+      'The authoritative content-guardrail engine — self-hosted LLM Guard scanners (PII/Anonymize with the India recognizers folded in, Secrets, PromptInjection, Toxicity, Bias, BanTopics, Language, Regex, TokenLimit). POSTs the text + the console scanner config to /analyze/prompt. FAIL CLOSED: configured + unreachable blocks the run; not configured is surfaced as "guardrails not configured" (never a silent fall-open). Configure OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY = AUTH_TOKEN).',
   },
-  async scan(text) {
+  async scan(text, orgId) {
     const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
-    if (!url) return regexScan(text);
+    // Honest "not configured": no URL ⇒ the step did NOT screen. The UI reports this as "guardrails
+    // not configured yet" (calm) via the registry's `configured` flag. Never a faked clean pass.
+    if (!url) return guardrailNotConfigured();
+
+    const scanners = await loadScannerConfig(orgId);
     try {
-      const raw = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, text);
+      const raw = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, text, scanners);
       return normalizeLlmGuardResponse(text, raw);
     } catch (err) {
-      console.warn(
-        '[llm-guard] provider call failed, degrading to regex floor:',
-        describeError(err),
-      );
-      return regexScan(text);
+      // FAIL CLOSED — configured but the engine could not screen. Block the run with a clear reason;
+      // log the concrete cause so "why blocked?" is answerable from the logs, not guessed at.
+      const reason = describeError(err);
+      console.error('[llm-guard] engine unreachable — FAILING CLOSED (run blocked):', reason);
+      return guardrailUnavailable(reason);
     }
   },
   async health() {
@@ -315,3 +207,23 @@ export const llmGuardPii: PiiPort = {
     }
   },
 };
+
+// Best-effort load of the org's custom recognizers, folded into the scanner config alongside the
+// India defaults. A load failure (no DB, missing table, no request scope) degrades to "defaults
+// only" — it NEVER throws (which would be caught by scan()'s fail-closed and wrongly block a run for
+// a config-load hiccup). Isolated so scan() stays thin.
+async function loadScannerConfig(orgId?: string): Promise<LlmGuardScannerConfig> {
+  let recognizers: NormalizedRecognizer[] = [];
+  try {
+    const { listRecognizers } = await import('../presidio-recognizers');
+    const resolvedOrg =
+      orgId && orgId.trim()
+        ? orgId.trim()
+        : await (await import('../tenancy')).currentOrgId();
+    const recs = await listRecognizers(resolvedOrg);
+    recognizers = recs as unknown as NormalizedRecognizer[];
+  } catch (err) {
+    console.warn('[llm-guard] recognizer load failed, using India defaults only:', describeError(err));
+  }
+  return buildLlmGuardScannerConfig(recognizers);
+}

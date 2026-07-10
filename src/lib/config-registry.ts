@@ -54,8 +54,8 @@ export function configConnectValue(def: Pick<ConfigKeyDef, 'hostValue'>, value: 
 
 export const CONFIG_REGISTRY: ConfigKeyDef[] = [
   // ── AI Gateway ──
-  { key: 'OFFGRID_GATEWAY_URL', group: 'AI Gateway', label: 'Gateway URL', type: 'url', secret: false, restartRequired: true, hostValue: true, default: 'http://offgrid-s1.local:8800', description: 'The OpenAI-compatible aggregator the console calls for all inference.' },
-  { key: 'OFFGRID_GATEWAY_API_KEY', group: 'AI Gateway', label: 'Gateway API key', type: 'string', secret: true, restartRequired: true, description: 'Static key sent as x-api-key to the aggregator. Must match the aggregator plist.' },
+  { key: 'OFFGRID_GATEWAY_URL', group: 'AI Gateway', label: 'Gateway URL', type: 'url', secret: false, restartRequired: true, hostValue: true, default: 'http://offgrid-s1.local:4000', description: 'The OpenAI-compatible gateway the console calls for all inference (the LiteLLM proxy).' },
+  { key: 'OFFGRID_GATEWAY_API_KEY', group: 'AI Gateway', label: 'Gateway API key', type: 'string', secret: true, restartRequired: true, description: 'Static key sent as x-api-key to the gateway. Must match the LiteLLM proxy key.' },
 
   // ── Database ──
   { key: 'DATABASE_URL', group: 'Database', label: 'Postgres URL', type: 'string', secret: true, restartRequired: true, description: 'Console state + audit + chat. postgres://user:pass@host:5432/db' },

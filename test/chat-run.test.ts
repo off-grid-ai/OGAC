@@ -87,26 +87,92 @@ test('runInboundGuardrails — a prompt-injection message is BLOCKED (matches th
   assert.equal(injection?.verdict, 'blocked');
 });
 
-test('runInboundGuardrails — PII (email) is REDACTED before the model when the contract requires masking', async () => {
+// LLM Guard is THE guardrail engine now. Configure it (stub the /analyze/prompt call) so the masking
+// path runs the REAL engine adapter → normalizeLlmGuardResponse → applyPiiEscalation, end to end. The
+// stub returns LLM Guard's Anonymize sanitized_prompt (the engine rewrites the PII in place).
+function withLlmGuard<T>(sanitized: (prompt: string) => string, fn: () => Promise<T>): Promise<T> {
+  const realFetch = globalThis.fetch;
+  process.env.OFFGRID_HTTP_GUARDRAIL_URL = 'http://127.0.0.1:8000';
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const prompt = init?.body ? (JSON.parse(String(init.body)).prompt as string) : '';
+    return new Response(
+      JSON.stringify({
+        is_valid: false,
+        scanners: { Anonymize: 1.0 },
+        sanitized_prompt: sanitized(prompt),
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }) as typeof fetch;
+  return fn().finally(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  });
+}
+
+test('runInboundGuardrails — PII (email) is REDACTED before the model when the contract requires masking (LLM Guard)', async () => {
   const msg = 'please email the report to arjun.mehta@corebank.in today';
-  const r = await runInboundGuardrails(msg, 'gemma-local', { requireMasking: true });
+  const r = await withLlmGuard(
+    (p) => p.replace('arjun.mehta@corebank.in', '[REDACTED_EMAIL]'),
+    () => runInboundGuardrails(msg, 'gemma-local', { requireMasking: true }),
+  );
   assert.equal(r.blocked, false);
   assert.equal(r.redacted, true);
-  // The email is gone from the model-facing text; the regex floor substitutes a placeholder.
+  // The email is gone from the model-facing text; LLM Guard's Anonymize sanitized it in place.
   assert.ok(!r.text.includes('arjun.mehta@corebank.in'), 'email must be redacted from model input');
-  assert.ok(r.text.includes('[EMAIL]'));
+  assert.ok(r.text.includes('[REDACTED_EMAIL]'));
   // The PII verdict is recorded regardless (audit trail shows PII was present).
   const pii = r.checks.find((c) => c.name === 'pii');
   assert.equal(pii?.verdict, 'redacted');
 });
 
-test('runInboundGuardrails — PII present but masking NOT required ⇒ text passes through unredacted', async () => {
+test('runInboundGuardrails — PII present but masking NOT required ⇒ text passes through unredacted (LLM Guard)', async () => {
   const msg = 'contact arjun.mehta@corebank.in';
-  const r = await runInboundGuardrails(msg, 'gemma-local', { requireMasking: false });
+  const r = await withLlmGuard(
+    (p) => p.replace('arjun.mehta@corebank.in', '[REDACTED_EMAIL]'),
+    () => runInboundGuardrails(msg, 'gemma-local', { requireMasking: false }),
+  );
   assert.equal(r.redacted, false);
   assert.equal(r.text, msg); // model sees the original when the contract doesn't force masking
   // …but the guardrail STILL recorded that PII was detected (the verdict is 'redacted' from the scan).
   assert.equal(r.checks.find((c) => c.name === 'pii')?.verdict, 'redacted');
+});
+
+test('runInboundGuardrails — FAIL CLOSED: LLM Guard configured but UNREACHABLE ⇒ the run is BLOCKED', async () => {
+  // The terminal, run-level assertion for fail-closed: with the engine CONFIGURED (URL set) but the
+  // network refusing, the whole inbound guardrail step must come back blocked — a killed engine can
+  // NOT bypass the guardrail. Asserts the real outcome (r.blocked), driven through runChecks →
+  // piiVerdict → outcomeFromChecks, not a mock call.
+  const realFetch = globalThis.fetch;
+  process.env.OFFGRID_HTTP_GUARDRAIL_URL = 'http://127.0.0.1:8000';
+  globalThis.fetch = (async () => {
+    throw new Error('ECONNREFUSED');
+  }) as typeof fetch;
+  try {
+    const r = await runInboundGuardrails('a perfectly benign question', 'gemma-local', {
+      requireMasking: false,
+    });
+    assert.equal(r.blocked, true, 'configured + unreachable ⇒ the run is blocked (fail-closed)');
+    const pii = r.checks.find((c) => c.name === 'pii');
+    assert.equal(pii?.verdict, 'blocked', 'the pii check reports blocked, not pass');
+    assert.match(pii?.detail ?? '', /fail-closed/, 'the blocked reason is surfaced');
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  }
+});
+
+test('runInboundGuardrails — NOT configured ⇒ surfaced as warn (NOT screened), run NOT blocked', async () => {
+  // No OFFGRID_HTTP_GUARDRAIL_URL. The pii check must warn (honest "not screened"), and because
+  // nothing was turned on to enforce, the run is NOT blocked — but the state is visible in the trace.
+  delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  const r = await runInboundGuardrails('any message at all', 'gemma-local', {
+    requireMasking: false,
+  });
+  assert.equal(r.blocked, false, 'not-configured never blocks — nothing was turned on');
+  const pii = r.checks.find((c) => c.name === 'pii');
+  assert.equal(pii?.verdict, 'warn', 'not-configured is surfaced as warn, never a faked pass');
+  assert.match(pii?.detail ?? '', /not configured/, 'the not-configured reason is surfaced');
 });
 
 // ── W2: provenance (real signing port) ──────────────────────────────────────────────────────────

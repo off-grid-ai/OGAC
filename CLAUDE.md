@@ -1,6 +1,6 @@
 # Off Grid Console — developer guide
 
-Next.js 15 app. The AI gateway runs separately (aggregator at `<control-plane-host>:8800` on-prem).
+Next.js 15 app. The AI gateway runs separately (the LiteLLM proxy at `<control-plane-host>:4000` on-prem).
 
 ## Engineering standards (non-negotiable)
 

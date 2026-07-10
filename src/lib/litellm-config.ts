@@ -11,8 +11,8 @@
 // mounted config.yaml. Because it is pure it can be unit-tested against fixed pools/providers and can
 // never, by construction, leak a key into a log (it only emits `os.environ/…` references for keys).
 //
-// DRY: the fleet pool comes from scripts/fleet-pool.mjs (also consumed by cluster-gateway.mjs); the
-// cloud provider shape comes from cloud-providers.ts (CloudProviderConfig). Nothing is re-declared.
+// DRY: the fleet pool comes from scripts/fleet-pool.mjs (its single source of truth); the cloud
+// provider shape comes from cloud-providers.ts (CloudProviderConfig). Nothing is re-declared.
 import { FLEET_POOL } from '../../scripts/fleet-pool.mjs';
 import type { CloudProviderConfig } from './cloud-providers';
 

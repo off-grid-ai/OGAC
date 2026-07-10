@@ -41,14 +41,14 @@ export default async function GuardrailsPage({
     listPipelines(orgId).catch(() => []),
   ]);
 
-  // Honest engine status for the catalog's per-item availability badges: an engine is "ready" only
-  // when it is the ACTIVE guardrails adapter AND configured AND reachable; else entities degrade to
-  // the regex floor / stored intent. No Guardrails-AI runtime is wired yet, so validators are stored
-  // intent. LLM Guard scanners are "ready" once LLM Guard is the active, reachable engine.
+  // Honest engine status for the catalog's per-item availability badges. LLM Guard is THE
+  // authoritative content-guardrail engine: PII entities + scanners are "ready" once LLM Guard is the
+  // active, configured, reachable engine. No Guardrails-AI runtime is wired yet, so the legacy
+  // second-opinion validators are stored intent.
+  const llmGuardReady = view.engine === 'llm-guard' && view.configured && view.reachable;
   const engineStatus = {
-    presidioReady: view.engine === 'presidio' && view.configured && view.reachable,
     guardrailsAiReady: false,
-    llmGuardReady: view.engine === 'llm-guard' && view.configured && view.reachable,
+    llmGuardReady,
   };
 
   return (
