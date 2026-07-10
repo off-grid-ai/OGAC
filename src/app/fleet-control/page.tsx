@@ -164,15 +164,16 @@ export default function FleetControlPage() {
           <BlurFade inView>
             <Badge variant="secondary" className="bg-primary/10 text-primary">
               <Broadcast className="mr-1 size-3.5" />
-              Fleet Control
+              Fleet Control · Coming soon
             </Badge>
             <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
               Everything fleet control already means —{' '}
               <span className="text-primary">plus the intelligence only Off Grid AI adds.</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              A complete, competitive frontline fleet-control system on open source, self-hosted, with Off Grid AI’s field-force intelligence layered on top — across desktop and
-              mobile, on your own infrastructure.
+              Agent-enrolled inventory, live osquery, and software/CVE visibility work today; full MDM
+              control (lock/wipe, config profiles) is coming soon — with Off Grid AI’s field-force
+              intelligence layered on top, across desktop and mobile, on your own infrastructure.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild>
