@@ -7,18 +7,13 @@ import { Button } from '@/components/ui/button';
 export function CtaButtons({ githubLabel = 'GitHub' }: { githubLabel?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button asChild size="lg" className="bg-[#34D399] text-black hover:bg-[#6EE7B7]">
+      <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
         <Link href="/overview">
           Open the console
           <ArrowRight className="size-4" weight="bold" />
         </Link>
       </Button>
-      <Button
-        asChild
-        size="lg"
-        variant="outline"
-        className="border-white/15 bg-transparent text-white hover:bg-white/5"
-      >
+      <Button asChild size="lg" variant="outline">
         <a href="https://github.com/off-grid-ai/console" target="_blank" rel="noopener noreferrer">
           <GithubLogo className="size-4" />
           {githubLabel}

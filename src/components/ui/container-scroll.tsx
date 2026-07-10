@@ -28,11 +28,9 @@ export function ContainerScroll({ header, children }: ContainerScrollProps) {
         <div className="mx-auto max-w-3xl">{header}</div>
         <motion.div
           style={{ rotateX: rotate, scale, translateY }}
-          className="mx-auto mt-10 w-full max-w-6xl rounded-xl border border-white/10 bg-[#0f0f0f] p-2 shadow-[0_24px_80px_-24px_rgba(52,211,153,0.35)]"
+          className="mx-auto mt-10 w-full max-w-6xl rounded-xl border border-border bg-card p-2 shadow-[0_24px_80px_-24px_rgba(5,150,105,0.28)]"
         >
-          <div className="relative overflow-hidden rounded-lg border border-white/[0.06]">
-            {children}
-          </div>
+          <div className="relative overflow-hidden rounded-lg border border-border">{children}</div>
         </motion.div>
       </div>
     </div>

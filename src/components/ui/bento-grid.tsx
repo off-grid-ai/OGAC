@@ -22,19 +22,19 @@ export function BentoTile({ icon: Icon, title, body, className }: BentoTileProps
   return (
     <div
       className={cn(
-        'group relative overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0f] p-5 transition-colors hover:border-[#34D399]/40',
+        'group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40',
         className,
       )}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-[radial-gradient(closest-side,rgba(52,211,153,0.14),transparent)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-[radial-gradient(closest-side,var(--og-primary),transparent)] opacity-0 transition-opacity duration-500 group-hover:opacity-[0.12]"
       />
-      <div className="relative flex size-9 items-center justify-center rounded-lg border border-white/10 bg-[#34D399]/10 text-[#34D399]">
+      <div className="relative flex size-9 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
         <Icon className="size-4" weight="bold" />
       </div>
-      <h3 className="relative mt-4 text-sm font-semibold text-white">{title}</h3>
-      <p className="relative mt-1.5 text-sm leading-relaxed text-white/55">{body}</p>
+      <h3 className="relative mt-4 text-sm font-semibold text-foreground">{title}</h3>
+      <p className="relative mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
     </div>
   );
 }
