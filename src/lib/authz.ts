@@ -45,7 +45,13 @@ async function fromToken(token: string): Promise<AuthzSession | null> {
   // a bare svc-<service> scope role does NOT (least-privilege — see lib/auth/machine-roles). User tokens
   // keep the role resolved from their session claims untouched.
   const role = p.kind === 'service' ? machineConsoleRole(p.realmRoles, p.role) : p.role;
-  return { user: { email: p.email ?? p.clientId ?? p.subject, name: p.clientId ?? p.email ?? 'Service', role } };
+  return {
+    user: {
+      email: p.email ?? p.clientId ?? p.subject,
+      name: p.clientId ?? p.email ?? 'Service',
+      role,
+    },
+  };
 }
 
 // Any authenticated principal (session, service-account JWT, or break-glass token).
@@ -73,7 +79,8 @@ export async function requireAdmin(req?: Request): Promise<AuthzSession | NextRe
   if (gate instanceof NextResponse) return gate;
   const decision = decideAdminGate(gate.user.role, req?.method);
   if (decision === 'allow') return gate;
-  if (decision === 'forbid-viewer-write') return NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 });
+  if (decision === 'forbid-viewer-write')
+    return NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 });
   return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 }
 
