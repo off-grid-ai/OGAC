@@ -973,3 +973,24 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## G-SEC-VIEWER-1 — connector endpoint strings expose inline creds to the read-only viewer
+Found by adversarial /hygiene audit (2026-07-10, tenant-isolation). `/api/v1/admin/connectors` returns
+`endpoint` connection strings with embedded credentials (e.g. `postgres://corebank:corebank@127.0.0.1:5433/corebank`)
+UNREDACTED to a `viewer` session. The dedicated secret store IS safe (values hidden, `config/reveal` → 403
+for viewer), but connector endpoints bypass `redactSecretForViewer`. Demo impact LOW (values are demo creds on
+the viewer's OWN org connector — isolation holds, no cross-tenant leak), but it's a real redaction gap: a viewer
+"can view everything but see NO secrets" is violated for embedded connector creds.
+FIX: run connector `endpoint`/auth fields through `redactSecretForViewer` (or mask the userinfo of any URL) in
+the connectors reader when the session is a viewer. Add an adversarial test: viewer GET /api/v1/admin/connectors →
+endpoint userinfo is `••••••••`, host/db still visible.
+
+## Adversarial audit ledger — tenant isolation (2026-07-10) — intersections TESTED
+axes: actor{unauth,viewer,admin,bearer} × host{bank,insurer,apex} × session-origin{own,other,none} ×
+surface{RSC,API-GET,API-write} × method{GET,POST,PATCH,DELETE,PUT}. Verified LIVE:
+- unauth × tenant-host × API-GET → 401 ✓ · forged x-offgrid-tenant-slug → 401 (middleware strips) ✓
+- viewer × own-host × {POST,PATCH,DELETE,PUT} → all 403 ✓ · viewer × config/reveal → 403 ✓
+- viewer(bank-session) × insurer-host × API-GET → 401 (host-scoped cookie, no bleed) ✓
+- viewer × own-host × overview → own-org data only, write blocked ✓
+UNTESTED intersections logged for follow-up: bearer/service-token × tenant-host (data-plane org binding);
+no-org viewer × tenant-host (binds to default — should it be denied?); admin × cross-tenant (intended: allowed).
