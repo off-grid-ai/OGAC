@@ -678,7 +678,7 @@ export function StorageBrowser() {
       <BucketPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
 
       {/* Stats row */}
-      <div className="flex items-center gap-6 font-mono text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground sm:gap-x-6">
         <span>{files.length} file{files.length !== 1 ? 's' : ''}</span>
         <span>{files.filter((f) => f.visibility === 'public').length} public</span>
         <span>{formatBytes(files.reduce((s, f) => s + f.size, 0))} total</span>
