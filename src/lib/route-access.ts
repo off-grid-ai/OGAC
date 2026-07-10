@@ -60,10 +60,7 @@ export function tenantSlugFromHost(host: string | null | undefined): string | nu
 // they land on /overview. The APEX host (no tenant slug, e.g. onprem-console.getoffgridai.co) keeps
 // rendering the landing at "/", so this returns false there. PURE (host + path in, boolean out) so
 // the corner cases are unit-testable without the edge runtime.
-export function isTenantRootRedirect(
-  host: string | null | undefined,
-  pathname: string,
-): boolean {
+export function isTenantRootRedirect(host: string | null | undefined, pathname: string): boolean {
   return pathname === '/' && tenantSlugFromHost(host) !== null;
 }
 
