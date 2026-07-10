@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { machineConsoleRole } from '@/lib/auth/machine-roles';
-import { canWrite, isMutatingMethod, isViewer, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
+import { decideAdminGate, decideWriterGate, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 
 // Shared authorization gates for API route handlers. There is ONE key flow: a machine
 // presents a Keycloak service-account JWT as `Authorization: Bearer <jwt>` and it is
@@ -71,8 +71,9 @@ export async function requireUser(req?: Request): Promise<AuthzSession | NextRes
 export async function requireAdmin(req?: Request): Promise<AuthzSession | NextResponse> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  if (gate.user.role === 'admin') return gate;
-  if (isViewer(gate.user.role) && !isMutatingMethod(req?.method)) return gate;
+  const decision = decideAdminGate(gate.user.role, req?.method);
+  if (decision === 'allow') return gate;
+  if (decision === 'forbid-viewer-write') return NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 });
   return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 }
 
@@ -84,7 +85,7 @@ export async function requireAdmin(req?: Request): Promise<AuthzSession | NextRe
 export async function requireWriter(req?: Request): Promise<AuthzSession | NextResponse> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  if (!canWrite(gate.user.role)) {
+  if (decideWriterGate(gate.user.role) !== 'allow') {
     return NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 });
   }
   return gate;

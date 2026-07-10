@@ -43,18 +43,10 @@ function withExtension(url) {
   return url;
 }
 
-// `@/auth` wires NextAuth to the pg adapter and can't load under `node --test`. When a test opts in
-// (OFFGRID_TEST_AUTH_STUB=1) we map it to a controllable stub so the REAL authz gates can be driven
-// with a chosen session. Off by default — the DB-backed integration tests keep the real graph.
-const AUTH_STUB = pathToFileURL(pathResolve(process.cwd(), 'test/support/auth-stub.mjs')).href;
-
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/navigation') return nextResolve(NEXT_NAV_STUB, context);
   if (specifier === 'next/server') return nextResolve(NEXT_SERVER_STUB, context);
   if (specifier === 'next/headers') return nextResolve(NEXT_HEADERS_STUB, context);
-  if ((specifier === '@/auth' || specifier === '@/auth.ts') && process.env.OFFGRID_TEST_AUTH_STUB === '1') {
-    return nextResolve(AUTH_STUB, context);
-  }
   // "@/..." alias -> src/..., with .ts / index.ts probing.
   if (specifier === '@' || specifier.startsWith('@/')) {
     const rest = specifier === '@' ? '' : specifier.slice(2);

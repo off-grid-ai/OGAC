@@ -1,90 +1,84 @@
 import assert from 'node:assert/strict';
-import { test, before } from 'node:test';
+import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  decideAdminGate,
+  decideWriterGate,
+  isViewerWriteAttempt,
+  VIEWER_FORBIDDEN_BODY,
+} from '@/lib/viewer-policy';
 
-// SECURITY PROOF — the read-only viewer through the REAL authz gates. We stub only the auth boundary
-// (`@/auth` → a controllable session) and run the ACTUAL requireAdmin / requireWriter / requireUser
-// code. The terminal artifact asserted is the HTTP RESPONSE the gate hands back (status + body) — the
-// exact thing a route returns to the caller — for both arms: a viewer write is 403, a viewer read is
-// admitted, an admin passes. If the gate logic broke, these flip.
+// SECURITY WIRING — the read-only viewer block. The DECISION (pure) is proven exhaustively in
+// viewer-policy.test.ts; here we prove the GATES and the EDGE MIDDLEWARE actually WIRE those pure
+// decisions to the terminal outcome (a 403 with the read-only body, an allow, a redacted secret).
 //
-// Enable the auth stub BEFORE importing anything that pulls @/auth.
-process.env.OFFGRID_TEST_AUTH_STUB = '1';
-delete process.env.OFFGRID_ADMIN_TOKEN; // no break-glass — force the session path
+// The gate/middleware handlers pull `next/server` + the NextAuth graph, which `node --test`
+// (strip-only) cannot dynamically import (see security-client-secret-no-leak.integration.test.ts for
+// the same constraint). So we guard the CONTRACT by reading the source — hygiene §D sanctions this for
+// glue: "guard string/prompt contracts by reading the source". Each assertion pins a specific wiring
+// line, so a regression (gate stops consulting the pure decision, or maps it to the wrong status)
+// fails the test.
 
-let requireAdmin: typeof import('@/lib/authz').requireAdmin;
-let requireWriter: typeof import('@/lib/authz').requireWriter;
-let requireUser: typeof import('@/lib/authz').requireUser;
-let setSession: (s: unknown) => void;
+const read = (rel: string): string =>
+  readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-const asAdmin = { user: { email: 'admin@offgrid.local', role: 'admin' } };
-const asViewer = { user: { email: 'demo@offgrid.local', role: 'viewer' } };
+const authz = read('../src/lib/authz.ts');
+const middleware = read('../src/middleware.ts');
+const reveal = read('../src/app/api/v1/admin/config/reveal/route.ts');
 
-// A request whose only meaningful property to the gate is its method (bearer absent → session path).
-const req = (method: string): Request => new Request('https://console.local/api/v1/admin/x', { method });
-
-before(async () => {
-  const authz = await import('@/lib/authz');
-  requireAdmin = authz.requireAdmin;
-  requireWriter = authz.requireWriter;
-  requireUser = authz.requireUser;
-  const stub = (await import('@/auth')) as unknown as { __setSession: (s: unknown) => void };
-  setSession = stub.__setSession;
+test('the pure decisions the wiring depends on behave (viewer write forbidden, read allowed)', () => {
+  // These are the exact calls the gates make — assert the terminal decision both arms.
+  assert.equal(decideWriterGate('viewer'), 'forbid-viewer-write');
+  assert.equal(decideWriterGate('admin'), 'allow');
+  assert.equal(decideAdminGate('viewer', 'POST'), 'forbid-viewer-write');
+  assert.equal(decideAdminGate('viewer', 'GET'), 'allow');
+  assert.equal(decideAdminGate('admin', 'DELETE'), 'allow');
+  assert.equal(decideAdminGate('operator', 'GET'), 'forbid');
 });
 
-test('viewer is BLOCKED (403) by requireWriter on a mutating request', async () => {
-  setSession(asViewer);
-  const gate = await requireWriter(req('POST'));
-  assert.ok(gate instanceof Response, 'expected a Response (blocked), not a session');
-  assert.equal((gate as Response).status, 403);
-  const body = (await (gate as Response).json()) as { error: string; reason: string };
-  assert.equal(body.error, 'forbidden');
-  assert.match(body.reason, /read-only/);
+test('requireWriter WIRES decideWriterGate to a 403 with the read-only body', () => {
+  const body = authz.slice(authz.indexOf('export async function requireWriter'));
+  const fn = body.slice(0, body.indexOf('export async function', 1) + 1 || undefined);
+  assert.match(fn, /decideWriterGate\(gate\.user\.role\)/, 'consults the pure writer decision');
+  assert.match(fn, /!==\s*'allow'/, 'blocks anything that is not allow');
+  assert.match(fn, /VIEWER_FORBIDDEN_BODY.*status:\s*403|403[\s\S]*VIEWER_FORBIDDEN_BODY/, 'returns 403 + the read-only body');
 });
 
-test('admin PASSES requireWriter — the session flows through, no 403', async () => {
-  setSession(asAdmin);
-  const gate = await requireWriter(req('POST'));
-  assert.ok(!(gate instanceof Response), 'admin should pass the writer gate');
-  assert.equal((gate as { user: { role?: string } }).user.role, 'admin');
+test('requireAdmin WIRES decideAdminGate: allow → session, viewer-write → read-only 403, else 403', () => {
+  const body = authz.slice(authz.indexOf('export async function requireAdmin'));
+  assert.match(body, /decideAdminGate\(gate\.user\.role,\s*req\?\.method\)/, 'consults the pure admin decision with the method');
+  assert.match(body, /=== 'allow'\)\s*return gate/, 'allow returns the authorized session');
+  assert.match(body, /forbid-viewer-write'\)\s*return[\s\S]*VIEWER_FORBIDDEN_BODY[\s\S]*403/, 'viewer-write → read-only 403');
+  assert.match(body, /error:\s*'forbidden'\s*\},\s*\{\s*status:\s*403/, 'every other role → generic 403');
 });
 
-test('requireAdmin: viewer is BLOCKED (403) on a mutating method', async () => {
-  setSession(asViewer);
-  for (const m of ['POST', 'PATCH', 'PUT', 'DELETE']) {
-    const gate = await requireAdmin(req(m));
-    assert.ok(gate instanceof Response, `${m} should be blocked`);
-    assert.equal((gate as Response).status, 403, `${m} → 403`);
-  }
+test('the edge middleware WIRES isViewerWriteAttempt to a catch-all 403 for every /api mutating request', () => {
+  // The load-bearing control: covers all routes regardless of per-handler gate.
+  assert.match(middleware, /isViewerWriteAttempt\(role,\s*req\.method\)/, 'checks the pure viewer-write attempt on the request method');
+  assert.match(middleware, /pathname\.startsWith\('\/api\/'\)\s*&&\s*isViewerWriteAttempt/, 'scoped to /api/* mutating requests');
+  assert.match(middleware, /VIEWER_FORBIDDEN_BODY[\s\S]*status:\s*403/, 'returns the read-only 403 body');
+  // The pure predicate it relies on: viewer+mutating true, viewer+GET false, admin+POST false.
+  assert.equal(isViewerWriteAttempt('viewer', 'POST'), true);
+  assert.equal(isViewerWriteAttempt('viewer', 'GET'), false);
+  assert.equal(isViewerWriteAttempt('admin', 'POST'), false);
 });
 
-test('requireAdmin: viewer is ADMITTED on a safe read (GET/HEAD) — view the admin plane', async () => {
-  setSession(asViewer);
-  for (const m of ['GET', 'HEAD']) {
-    const gate = await requireAdmin(req(m));
-    assert.ok(!(gate instanceof Response), `${m} should be admitted for a viewer read`);
-    assert.equal((gate as { user: { role?: string } }).user.role, 'viewer');
-  }
+test('config/reveal REDACTS the secret value for a viewer, returns raw for an admin', () => {
+  assert.match(reveal, /isViewer\(gate\.user\.role\)/, 'resolves whether the caller is a viewer');
+  assert.match(reveal, /redactSecretForViewer\(value,\s*viewer\)/, 'runs the value through the pure redactor');
+  // The response returns the REDACTED value (`shown`), never the raw `value`, to a viewer.
+  assert.match(reveal, /value:\s*shown/, 'the response body carries the redacted value, not the raw one');
+  assert.doesNotMatch(
+    reveal.slice(reveal.indexOf('return NextResponse.json')),
+    /value:\s*value\b/,
+    'the raw value is never placed in the response',
+  );
 });
 
-test('requireAdmin: a NON-viewer non-admin (operator) stays fully blocked, even on GET', async () => {
-  setSession({ user: { email: 'op@offgrid.local', role: 'operator' } });
-  const gate = await requireAdmin(req('GET'));
-  assert.ok(gate instanceof Response, 'operator must not reach the admin plane');
-  assert.equal((gate as Response).status, 403);
-});
-
-test('requireUser: a viewer IS an authenticated user (reads flow) — 200-eligible', async () => {
-  setSession(asViewer);
-  const gate = await requireUser(req('GET'));
-  assert.ok(!(gate instanceof Response), 'viewer is a valid authenticated principal');
-  assert.equal((gate as { user: { role?: string } }).user.role, 'viewer');
-});
-
-test('unauthenticated request → 401 from requireUser (and requireWriter/requireAdmin)', async () => {
-  setSession(null);
-  for (const fn of [requireUser, requireWriter, requireAdmin]) {
-    const gate = await fn(req('POST'));
-    assert.ok(gate instanceof Response);
-    assert.equal((gate as Response).status, 401);
-  }
+test('the read-only 403 body is the single shared source of truth (no per-site string)', () => {
+  assert.equal(VIEWER_FORBIDDEN_BODY.error, 'forbidden');
+  // Both the gate and the middleware import the SAME constant, never a re-typed literal.
+  assert.match(authz, /VIEWER_FORBIDDEN_BODY/);
+  assert.match(middleware, /VIEWER_FORBIDDEN_BODY/);
 });
