@@ -94,7 +94,7 @@ Write a function in `src/lib/`. Call that function from the API route. This keep
 
 ### 9. Environment parity
 
-Code written against the local docker-compose stack (`deploy/docker-compose.yml`) must work identically against the on-prem fleet (`127.0.0.1` / `192.168.1.60`). If it only works locally, it is not done.
+Code written against the local docker-compose stack (`deploy/docker-compose.yml`) must work identically against the on-prem fleet (`<control-plane-host>` / `<aux-host>`). If it only works locally, it is not done.
 
 ### 10. No new top-level pages without a module registration
 
