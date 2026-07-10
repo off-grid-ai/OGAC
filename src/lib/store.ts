@@ -121,6 +121,11 @@ export async function ensureOrgSchema(): Promise<void> {
       'chat_memory',
       'custom_roles',
       'enrollment_tokens',
+      // masking_rules + api_keys declare org_id in schema.ts and the P1 IDOR fixes scope their
+      // mutations on it — re-assert it here so a DB whose tables predate the column self-heals
+      // (setMaskingRuleEnabled / setApiKeyEnabled / setKeyRateLimit filter on org_id).
+      'masking_rules',
+      'api_keys',
       // `user` already declares org_id in schema.ts (getUserOrgByEmail relies on it); re-assert it
       // here so a not-fully-pushed DB self-heals — listUsers/createConsoleUser filter/stamp on it.
       'user',
