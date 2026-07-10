@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:dead-code": "ESLINT_USE_FLAT_CONFIG=false eslint --no-cache --no-ignore --ignore-pattern 'src/components/ui/**' --rule '{\"complexity\":\"off\",\"no-console\":\"off\",\"import/order\":\"off\",\"react/no-unescaped-entities\":\"off\",\"react-hooks/rules-of-hooks\":\"off\"}' 'src/**/*.ts' 'src/**/*.tsx'",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
