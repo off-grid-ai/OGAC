@@ -87,7 +87,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   // ── Internal fleet services (LAN — probed by their direct IP:port) ───────────
   {
     id: 'keycloak',
-    label: 'Keycloak',
+    label: 'Identity & SSO',
     description: 'Identity & access management — SSO, realm, service accounts.',
     url: process.env.OFFGRID_KEYCLOAK_URL ?? 'http://127.0.0.1:8080',
     healthPath: '/health/ready',
@@ -96,7 +96,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'qdrant',
-    label: 'Qdrant',
+    label: 'Vector Search',
     description: 'Vector store — Brain / RAG retrieval backend.',
     url: process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333',
     healthPath: '/healthz',
@@ -120,7 +120,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'langfuse',
-    label: 'Langfuse',
+    label: 'Observability & Tracing',
     description: 'LLM observability — traces, eval scores, session replay.',
     // On g6 (aux tier). The console can't reach the LAN directly, so it goes through the S1
     // edge-Caddy loopback proxy (8931→offgrid-g6.local:3030). Env override sets this on S1.
@@ -140,7 +140,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'opa',
-    label: 'OPA',
+    label: 'Policy Engine',
     description: 'Open Policy Agent — ABAC policy evaluation.',
     url: process.env.OFFGRID_OPA_URL ?? 'http://127.0.0.1:8181',
     healthPath: '/health',
@@ -149,7 +149,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'openbao',
-    label: 'OpenBao',
+    label: 'Secrets Vault',
     description: 'Secrets vault — API keys, credentials, rotation.',
     url: process.env.OFFGRID_OPENBAO_URL ?? 'http://127.0.0.1:8200',
     healthPath: '/v1/sys/health',
@@ -177,7 +177,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'presidio',
-    label: 'Presidio',
+    label: 'PII Detection & Redaction',
     description: 'PII detection & anonymisation — data masking for ingest.',
     // On g6 (LAN). The console can't reach it directly; it needs an edge-Caddy loopback proxy
     // (8938 staged in the Caddyfile, pending an edge reload). Env override points at the loopback.
