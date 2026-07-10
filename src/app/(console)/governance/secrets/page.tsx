@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { DynamicDbPanel } from '@/components/secrets/DynamicDbPanel';
 import { LeasesPanel } from '@/components/secrets/LeasesPanel';
 import { SealControl } from '@/components/secrets/SealControl';
@@ -85,8 +86,8 @@ export default async function SecretsPage() {
         </Card>
       ) : null}
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Summary tiles — horizontal rail on mobile, restored 4-col grid on desktop. */}
+      <StatRail cols={4}>
         <SummaryTile
           icon={<ShieldCheck className="size-4" />}
           label="Reachable"
@@ -119,7 +120,7 @@ export default async function SecretsPage() {
           tone="muted"
           sub={view.clusterName ?? (view.standby === true ? 'standby node' : 'active node')}
         />
-      </div>
+      </StatRail>
 
       {/* Key management — names only, write-only values, versioning/rotation, delete with confirmation */}
       <SecretsManagerNav configured={view.configured} sealed={sealed} />
