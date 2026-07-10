@@ -23,6 +23,39 @@
 // `deviceId`— legacy audit docs key the subject as `actor:<id>` in device_id; we match by suffix.
 export type MatchKind = 'email' | 'actorPrefixed';
 
+// ── TENANT SCOPING (SECURITY #236 fix 3 — RTBF cross-tenant) ─────────────────────────────────────
+// A DSAR erasure runs under ONE org (the requesting admin's). Historically the DELETE matched ONLY
+// the subject value (an email/user_id), so erasing a subject in org A also deleted that subject's
+// rows in org B — and an admin of A could wipe B's data. Every step now carries HOW it is scoped to
+// the requesting org, so the executor can never reach a foreign tenant's rows:
+//   • { kind:'column' }     — the table has its own org column → the DELETE ANDs `<col> = <org>`.
+//   • { kind:'parent' }     — the table has no org column but a FK to an org-scoped parent → the
+//                              DELETE ANDs `<childKey> IN (SELECT <parentKey> FROM <parentTable>
+//                              WHERE org_id = <org>)`, so only rows whose parent is in THIS org go.
+//   • { kind:'membership' } — a user-GLOBAL table (per-person preferences, no org column and no
+//                              org-scoped parent). It is erased ONLY when the subject is a MEMBER of
+//                              the requesting org (they own at least one org-scoped row here), so an
+//                              admin of A can never wipe the global prefs of a person who exists only
+//                              in B. When the subject is not a member of the org, the step is skipped.
+export type OrgScope =
+  | { kind: 'column'; column: string }
+  | {
+      kind: 'parent';
+      parentTable: string;
+      parentKey: string;
+      childKey: string;
+      /**
+       * Where the SUBJECT is matched. 'child' (default) — the child table has its own subject column
+       * (the step's `column`) and the parent supplies only the org scope. 'parent' — the child has NO
+       * subject column (e.g. chat_messages has no user_id), so BOTH the subject AND the org are matched
+       * on the parent (delete every child whose parent is the subject's + in this org).
+       */
+      subjectOn?: 'child' | 'parent';
+      /** The subject column ON THE PARENT (only used when subjectOn === 'parent'). */
+      parentSubjectColumn?: string;
+    }
+  | { kind: 'membership' };
+
 export interface ErasureTarget {
   /** Human label for the store (what the operator sees). */
   store: string;
@@ -32,21 +65,28 @@ export interface ErasureTarget {
   column: string;
   /** How the subject id maps onto the column value. */
   match: MatchKind;
+  /** How this table's DELETE is confined to the requesting org (RTBF cross-tenant guard). */
+  orgScope: OrgScope;
 }
 
 // The subject-bearing tables the console owns and CAN erase via its own db handle. Every entry maps
-// a subject (email/id) onto a concrete table+column. Ordered so dependent rows (messages) are listed
-// before their parents (conversations) — the executor deletes in this order.
+// a subject (email/id) onto a concrete table+column AND declares its org scope. Ordered so dependent
+// rows (messages) are listed before their parents (conversations) — the executor deletes in order.
 export const ERASURE_CATALOG: readonly ErasureTarget[] = [
-  { store: 'Chat messages', table: 'chat_messages', column: 'user_id', match: 'email' },
-  { store: 'Chat conversations', table: 'chat_conversations', column: 'user_id', match: 'email' },
-  { store: 'Chat memory', table: 'chat_memory', column: 'user_id', match: 'email' },
-  { store: 'Chat documents', table: 'chat_documents', column: 'user_id', match: 'email' },
-  { store: 'Chat settings', table: 'chat_settings', column: 'user_id', match: 'email' },
-  { store: 'Chat preferences', table: 'chat_prefs', column: 'user_id', match: 'email' },
-  { store: 'Project membership', table: 'chat_project_members', column: 'user_id', match: 'email' },
-  { store: 'API keys (subject)', table: 'api_keys', column: 'subject', match: 'email' },
-  { store: 'Audit attribution', table: 'audit_events', column: 'key_id', match: 'email' },
+  // chat_messages has NO org column AND no subject column — match the subject AND the org on its
+  // parent conversation (delete every message whose conversation is the subject's, in this org).
+  { store: 'Chat messages', table: 'chat_messages', column: 'user_id', match: 'email', orgScope: { kind: 'parent', parentTable: 'chat_conversations', parentKey: 'id', childKey: 'conversation_id', subjectOn: 'parent', parentSubjectColumn: 'user_id' } },
+  { store: 'Chat conversations', table: 'chat_conversations', column: 'user_id', match: 'email', orgScope: { kind: 'column', column: 'org_id' } },
+  { store: 'Chat memory', table: 'chat_memory', column: 'user_id', match: 'email', orgScope: { kind: 'column', column: 'org_id' } },
+  // chat_documents has no org column — scope through its project's org.
+  { store: 'Chat documents', table: 'chat_documents', column: 'user_id', match: 'email', orgScope: { kind: 'parent', parentTable: 'chat_projects', parentKey: 'id', childKey: 'project_id' } },
+  // chat_settings / chat_prefs are user-GLOBAL (per-person, no org) — erase only for an org member.
+  { store: 'Chat settings', table: 'chat_settings', column: 'user_id', match: 'email', orgScope: { kind: 'membership' } },
+  { store: 'Chat preferences', table: 'chat_prefs', column: 'user_id', match: 'email', orgScope: { kind: 'membership' } },
+  // chat_project_members has no org column — scope through the project's org.
+  { store: 'Project membership', table: 'chat_project_members', column: 'user_id', match: 'email', orgScope: { kind: 'parent', parentTable: 'chat_projects', parentKey: 'id', childKey: 'project_id' } },
+  { store: 'API keys (subject)', table: 'api_keys', column: 'subject', match: 'email', orgScope: { kind: 'column', column: 'org_id' } },
+  { store: 'Audit attribution', table: 'audit_events', column: 'key_id', match: 'email', orgScope: { kind: 'column', column: 'org_id' } },
 ] as const;
 
 // Stores whose erasure genuinely needs a new store.ts / external-service seam this module can't
@@ -65,22 +105,36 @@ export interface PlanStep {
   match: MatchKind;
   /** The literal value to match the column against. */
   value: string;
+  /** The org this erasure is confined to (RTBF cross-tenant guard). */
+  orgId: string;
+  /** How this step is scoped to `orgId`. */
+  orgScope: OrgScope;
 }
 
 export interface ErasurePlan {
   subject: string;
+  orgId: string;
   steps: PlanStep[];
   deferred: string[];
 }
 
-/** Build the erasure plan for a subject. PURE — never throws; trims/validates the subject. */
+/**
+ * Build the erasure plan for a subject WITHIN an org. PURE — never throws; trims/validates inputs.
+ * `orgId` confines every step to one tenant (RTBF cross-tenant, SECURITY #236 fix 3) so an erasure
+ * can never reach another tenant's rows. It is stamped onto each step and bound into the org filter
+ * at execution. A blank org is inherently fail-closed at execution: the org filter becomes
+ * `org_id = ''` (matches nothing) and the membership probe finds no member (skips), so no row is ever
+ * deleted unscoped. Defaults to '' so scope-display callers (which only read table names) still work.
+ */
 export function planErasure(
   subject: string,
+  orgId: string = '',
   catalog: readonly ErasureTarget[] = ERASURE_CATALOG,
   deferred: readonly string[] = DEFERRED_STORES,
 ): ErasurePlan {
   const s = (subject ?? '').trim();
-  if (!s) return { subject: '', steps: [], deferred: [...deferred] };
+  const org = (orgId ?? '').trim();
+  if (!s) return { subject: '', orgId: org, steps: [], deferred: [...deferred] };
   const steps: PlanStep[] = catalog.map((t) => ({
     store: t.store,
     table: t.table,
@@ -88,8 +142,66 @@ export function planErasure(
     match: t.match,
     // actorPrefixed columns store `actor:<id>`; email columns store the id verbatim.
     value: t.match === 'actorPrefixed' ? `actor:${s}` : s,
+    orgId: org,
+    orgScope: t.orgScope,
   }));
-  return { subject: s, steps, deferred: [...deferred] };
+  return { subject: s, orgId: org, steps, deferred: [...deferred] };
+}
+
+// ── Pure SQL shaping — the org-scoped WHERE, in ONE testable place ──────────────────────────────
+// The route builds the actual `sql` template; this decides the SHAPE of the org confinement so the
+// "never reach a foreign tenant" rule is unit-testable without a DB. Table/column/parent identifiers
+// come only from the catalog (never user input); the subject VALUE + org are always bound params.
+export interface ErasureWhere {
+  /** The SQL WHERE clause with `%SUBJECT%` and `%ORG%` placeholders for the bound params. */
+  clause: string;
+  /**
+   * For a 'membership' step: the subject IS erased only when a member of the org — this is the probe
+   * the executor must run first (does the subject own any org-scoped row in this org?). null for
+   * non-membership steps (they are always org-confined by their own clause).
+   */
+  membershipProbe: string | null;
+}
+
+/**
+ * Build the org-confined WHERE shape for a plan step. PURE. `%SUBJECT%`/`%ORG%` are placeholders the
+ * executor replaces with BOUND parameters (never string-interpolated). Identifiers are catalog
+ * constants (safe). This is the whole cross-tenant confinement rule, isolated for unit tests:
+ *   • column               → `<subjectCol> = %SUBJECT% AND <orgCol> = %ORG%`
+ *   • parent (subjectOn     → `<subjectCol> = %SUBJECT% AND <childKey> IN (SELECT <parentKey> FROM
+ *     'child')                <parent> WHERE org_id = %ORG%)`
+ *   • parent (subjectOn     → `<childKey> IN (SELECT <parentKey> FROM <parent> WHERE
+ *     'parent')              <parentSubjectColumn> = %SUBJECT% AND org_id = %ORG%)` — the child has NO
+ *                            subject column (e.g. chat_messages), so subject AND org match the parent.
+ *   • membership           → `<subjectCol> = %SUBJECT%` guarded by a membership probe (member only).
+ */
+export function buildErasureWhere(step: PlanStep): ErasureWhere {
+  const subj = `${step.column} = %SUBJECT%`;
+  if (step.orgScope.kind === 'column') {
+    return { clause: `${subj} AND ${step.orgScope.column} = %ORG%`, membershipProbe: null };
+  }
+  if (step.orgScope.kind === 'parent') {
+    const { parentTable, parentKey, childKey, subjectOn, parentSubjectColumn } = step.orgScope;
+    if (subjectOn === 'parent') {
+      // The child has no subject column — match subject AND org on the parent so only the subject's
+      // children in THIS org are deleted (never another tenant's, never another person's).
+      const psc = parentSubjectColumn ?? 'user_id';
+      return {
+        clause: `${childKey} IN (SELECT ${parentKey} FROM ${parentTable} WHERE ${psc} = %SUBJECT% AND org_id = %ORG%)`,
+        membershipProbe: null,
+      };
+    }
+    return {
+      clause: `${subj} AND ${childKey} IN (SELECT ${parentKey} FROM ${parentTable} WHERE org_id = %ORG%)`,
+      membershipProbe: null,
+    };
+  }
+  // membership: a user-global table. The executor deletes the subject's row ONLY when the membership
+  // probe finds the subject owns at least one org-scoped row in this org (a conversation).
+  return {
+    clause: subj,
+    membershipProbe: `SELECT 1 FROM chat_conversations WHERE user_id = %SUBJECT% AND org_id = %ORG% LIMIT 1`,
+  };
 }
 
 // ── Executor result shaping (pure) ──────────────────────────────────────────────

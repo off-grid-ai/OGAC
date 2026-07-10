@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { sql } from 'drizzle-orm';
-import { db } from '@/db';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { assetPosture, listAssets, listErasureRequests, recordErasureRequest } from '@/lib/data-catalog-store';
-import { planErasure, propagateErasure, summarizeErasure, type PlanStep, type StepResult } from '@/lib/erasure';
+import { planErasure, propagateErasure, summarizeErasure, type StepResult } from '@/lib/erasure';
+import { executeErasureStep } from '@/lib/erasure-execute';
 import { deriveAssetPosture } from '@/lib/data-classification';
 import { resolveRtbfScope, type RtbfAsset } from '@/lib/data-rtbf';
 import { toClassification, listClassifications } from '@/lib/data-catalog-store';
@@ -14,27 +13,11 @@ export const dynamic = 'force-dynamic';
 
 // RTBF / subject-erasure REQUESTS (M4). GET → the durable request records for the org. POST → run a
 // full right-to-be-forgotten: resolve the cross-plane scope (console + warehouse + vector + lineage),
-// EXECUTE the console-plane deletes now (reusing the DSAR planner), and RECORD the request as an
-// auditable artifact with the resolved scope. Warehouse/vector/lineage purge is DEFERRED to the S2
-// data engine — the request honestly reports what ran vs. what waits.
-
-// Execute one console-plane plan step as a parameterized DELETE (identifiers are catalog constants,
-// never user input; the subject value is always bound). Never throws — a failing step is captured.
-async function executeStep(step: PlanStep): Promise<StepResult> {
-  try {
-    const res = (await db.execute(
-      sql`DELETE FROM ${sql.raw(step.table)} WHERE ${sql.raw(step.column)} = ${step.value}`,
-    )) as unknown as { rowCount?: number | null };
-    return { store: step.store, table: step.table, deleted: res.rowCount ?? 0, error: null };
-  } catch (e) {
-    return {
-      store: step.store,
-      table: step.table,
-      deleted: 0,
-      error: e instanceof Error ? e.message : 'delete failed',
-    };
-  }
-}
+// EXECUTE the console-plane deletes now (reusing the DSAR planner + the shared ORG-CONFINED executor
+// — DRY with /erasure), and RECORD the request as an auditable artifact with the resolved scope.
+// RTBF cross-tenant (SECURITY #236 fix 3): the console-plane deletes are confined to the requesting
+// org. Warehouse/vector/lineage purge is DEFERRED to the S2 data engine — the request honestly
+// reports what ran vs. what waits.
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
@@ -51,7 +34,8 @@ export async function POST(req: Request) {
   const org = await currentOrgId();
 
   // Resolve the full cross-plane scope from the pure planner + the org's PII-bearing catalog assets.
-  const plan = planErasure(subject);
+  // The plan is org-confined (RTBF cross-tenant) so its console-plane DELETEs can't reach another org.
+  const plan = planErasure(subject, org);
   const assets = await listAssets(org);
   const rtbfAssets: RtbfAsset[] = [];
   for (const a of assets) {
@@ -64,7 +48,7 @@ export async function POST(req: Request) {
 
   // Execute the console-plane steps now (dependents ordered before parents in the catalog).
   const results: StepResult[] = [];
-  for (const step of plan.steps) results.push(await executeStep(step));
+  for (const step of plan.steps) results.push(await executeErasureStep(step));
   const report = summarizeErasure(plan.subject, results, plan.deferred);
 
   // Propagate to the external planes (vector index, data lake, device replicas) for REAL — each

@@ -35,8 +35,14 @@ test('planErasure: dependent rows (messages) are ordered before their parents (c
 });
 
 test('planErasure: actorPrefixed targets prefix the subject with actor:', () => {
-  const plan = planErasure('carol@corp.in', [
-    { store: 'Legacy audit', table: 'audit_events', column: 'device_id', match: 'actorPrefixed' },
+  const plan = planErasure('carol@corp.in', 'org_carol', [
+    {
+      store: 'Legacy audit',
+      table: 'audit_events',
+      column: 'device_id',
+      match: 'actorPrefixed',
+      orgScope: { kind: 'column', column: 'org_id' },
+    },
   ]);
   assert.equal(plan.steps[0].value, 'actor:carol@corp.in');
 });
