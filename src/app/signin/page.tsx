@@ -224,7 +224,7 @@ export default async function SignInPage({
             </div>
 
             <p className="pt-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
-              On-prem · Secure
+              One control plane · no lock-in
             </p>
           </CardContent>
         </Card>
