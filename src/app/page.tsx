@@ -4,14 +4,9 @@ import {
   Database,
   GitBranch,
   Gauge,
-  Lock,
   PlugsConnected,
   Robot,
-  Scroll as ScrollText,
-  SealCheck,
   ShieldCheck,
-  Sparkle,
-  UsersThree,
 } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -19,111 +14,72 @@ import { AnimatedShinyText } from '@/components/ui/animated-shiny-text';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MagicCard } from '@/components/ui/magic-card';
 import { Marquee } from '@/components/ui/marquee';
 import { Particles } from '@/components/ui/particles';
 import { INTEGRATIONS } from '@/lib/integrations';
-import { MODULE_ICONS } from '@/modules/icons';
-import { MODULES } from '@/modules/registry';
 
-// The spine - how work flows through the platform: data → gateway → pipelines → apps | agents.
-const SPINE = [
+// The path work takes through the platform. Headline + one line each, no paragraphs.
+const FLOW = [
   {
     icon: Database,
     step: 'Data',
-    title: 'One governed source of truth',
-    body: 'Connect the systems you already run and pull them into one governed source of truth, so every decision downstream runs on complete, current, permissioned data, not a stale export.',
+    title: 'One source of truth',
+    body: 'Connect the systems you already run. No stale exports.',
   },
   {
     icon: PlugsConnected,
-    step: 'Gateway',
-    title: 'One smart gateway',
-    body: 'Every model call, on your own hardware or in your cloud, routes through a single gateway: observed, cost-tracked, rate-limited, with an egress leash you decide. One place to see where your AI spend and risk actually live.',
+    step: 'Gateways',
+    title: 'Gateways you control',
+    body: 'One or many. Each pipeline binds the one it needs, observed and cost-tracked.',
   },
   {
     icon: GitBranch,
     step: 'Pipelines',
-    title: 'Governance travels with the work',
-    body: 'Guardrails, redaction, evals, and provenance are built into reusable, composable pipelines, inherited by everything you build, never bolted on after. Solve reliability and security once, at the pipeline, not in every project.',
+    title: 'Governance in the pipe',
+    body: 'Guardrails, redaction, evals, and provenance built in. Solve it once.',
   },
   {
     icon: Robot,
     step: 'Apps & agents',
     title: 'Put to work',
-    body: 'Consume a governed pipeline as an app with a human in the loop, or an agent that runs on its own and reports back, driven by real triggers and real tools.',
+    body: 'Run it as an app a person approves, or an agent that runs on its own.',
   },
 ];
 
-// The unlock - anyone builds.
-const UNLOCK = [
+// Show the product working. Real screenshots + one tight caption each.
+const GALLERY = [
   {
-    icon: Sparkle,
-    title: 'Describe it in plain language',
-    body: 'A person on your finance, claims, or lending team writes what the work is - no engineer, no code.',
+    src: '/docs-shots/studio.png',
+    alt: 'The Studio: apps and agents a business team builds in plain language',
+    eyebrow: 'Build',
+    title: 'Anyone builds. In plain language.',
+    body: 'A person on finance, claims, or lending describes the work. No engineer, no code.',
   },
   {
-    icon: ShieldCheck,
-    title: 'It inherits your governance',
-    body: 'The automation is born on a pipeline: your rules, your connectors, your data, your guardrails - governed by construction.',
+    src: '/docs-shots/app-review.png',
+    alt: 'The review inbox: a run paused for a human to approve, reject, or edit',
+    eyebrow: 'Oversee',
+    title: 'A human decides where it matters.',
+    body: 'A run pauses for approval, then resumes and finishes on its own.',
   },
   {
-    icon: Robot,
-    title: 'It runs - overseen or autonomous',
-    body: 'Ships as an app a person approves, or an agent that runs on a schedule and reports back. Same people, far more done.',
-  },
-];
-
-// Governed by construction - the trust spine every pipeline carries.
-const GOVERNANCE = [
-  {
-    icon: ShieldCheck,
-    title: 'Guardrails & redaction',
-    body: 'Prompt-injection, toxicity, and schema checks on every call, and PII masked before the model ever sees it, enforced, not suggested.',
+    src: '/docs-shots/gateways-list.png',
+    alt: 'The gateway list: several model-serving gateways, on-prem and cloud, each with its own health and egress',
+    eyebrow: 'Route',
+    title: 'Many gateways, one console.',
+    body: 'Local fleet or a cloud provider. Every call observed, cost-tracked, on an egress leash you set.',
   },
   {
-    icon: Gauge,
-    title: 'Evals, faithfulness & drift',
-    body: 'Offline evals, live scoring on real traffic, and drift detection, so you know the agents still do a good job, and catch the one that regressed and when.',
-  },
-  {
-    icon: SealCheck,
-    title: 'Signed provenance',
-    body: 'Every output carries a signed, offline-verifiable record (ed25519); images get C2PA Content Credentials. Prove what was produced, by whom, unaltered, with only a public key.',
-  },
-  {
-    icon: ScrollText,
-    title: 'Durable & auditable',
-    body: 'Runs survive restarts and resume where they left off. Every model call, tool call, and byte of egress is logged, a record you can hand a regulator.',
+    src: '/docs-shots/observability.png',
+    alt: 'Observability: live eval scores, drift detection, and per-run traces',
+    eyebrow: 'Watch',
+    title: 'You see when one regresses.',
+    body: 'Offline evals, live scoring on real traffic, and drift caught the moment it starts.',
   },
 ];
 
-// Why it holds up - the AWS-for-AI promise: it just works, set once, swappable, for everyone.
-const PILLARS = [
-  {
-    icon: Gauge,
-    title: 'Works out of the box',
-    body: 'The whole stack is set up and connected. One bring-up, no assembly. You stop thinking about how to run AI safely and start putting it to work.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Set once, use everywhere',
-    body: 'An admin defines the rules, policies, guardrails, and lineage a single time. Every employee and every agent inherits them automatically. Nobody re-implements governance.',
-  },
-  {
-    icon: PlugsConnected,
-    title: 'Swappable, no lock-in',
-    body: 'Every capability ships with a first-party default and swaps to a best-in-class open engine with one environment variable. Runs on your servers or in your cloud, your call.',
-  },
-  {
-    icon: UsersThree,
-    title: 'For everyone',
-    body: 'Accessible to every employee, not just engineers. The whole workforce builds, safely, inside the same guardrails.',
-  },
-];
-
-// Show the capability LAYERS, not the underlying engine names - the ethos is "open foundations,
-// no lock-in", carried by the layers we govern, without parading which OSS engine powers each.
+// The capability layers, not the engine names.
 const CAPABILITY_LAYERS = INTEGRATIONS.map((l) => l.layer);
 
 function Nav() {
@@ -157,7 +113,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Nav />
 
-      {/* Hero */}
+      {/* Hero - a short thesis over the flow diagram, the visual it stands on */}
       <section
         className="relative overflow-hidden border-b border-border"
         style={{
@@ -165,73 +121,84 @@ export default function LandingPage() {
             'radial-gradient(circle at 50% -10%, rgba(5,150,105,0.10), transparent 55%)',
         }}
       >
-        <Particles className="absolute inset-0" quantity={90} ease={70} color="#059669" />
-        <div className="relative z-10 mx-auto max-w-3xl px-6 py-24 text-center">
-          <BlurFade delay={0.05} inView>
-            <div className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs shadow-sm">
-              <AnimatedShinyText>AWS for AI · open source · works out of the box</AnimatedShinyText>
+        <Particles className="absolute inset-0" quantity={70} ease={70} color="#059669" />
+        <div className="relative z-10 mx-auto max-w-6xl px-6 py-16 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.15fr]">
+            <div className="max-w-xl">
+              <BlurFade delay={0.05} inView>
+                <div className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs shadow-sm">
+                  <AnimatedShinyText>AWS for AI · open source</AnimatedShinyText>
+                </div>
+              </BlurFade>
+              <BlurFade delay={0.15} inView>
+                <h1 className="mt-5 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+                  Make your enterprise intelligent, on one interface that just works.
+                </h1>
+              </BlurFade>
+              <BlurFade delay={0.3} inView>
+                <p className="mt-5 text-base text-muted-foreground">
+                  Set your rules once. Anyone builds governed apps and agents in plain language.
+                </p>
+              </BlurFade>
+              <BlurFade delay={0.45} inView>
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <Button asChild size="lg">
+                    <Link href="/overview">
+                      Open console
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild size="lg" variant="outline">
+                    <a href="/docs" target="_blank" rel="noopener noreferrer">
+                      Read the docs
+                    </a>
+                  </Button>
+                </div>
+              </BlurFade>
+              <BlurFade delay={0.55} inView>
+                <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Gauge className="size-3.5 text-primary" /> Works out of the box
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldCheck className="size-3.5 text-primary" /> Every call governed
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Code className="size-3.5 text-primary" /> Open source
+                  </span>
+                </div>
+              </BlurFade>
             </div>
-          </BlurFade>
-          <BlurFade delay={0.15} inView>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              AWS for AI. Make your enterprise intelligent, on one interface that just works.
-            </h1>
-          </BlurFade>
-          <BlurFade delay={0.3} inView>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground">
-              Every piece to run AI in a company already exists: a gateway to the models, evals,
-              guardrails, PII masking, data pipelines, audit, lineage. The hard part was wiring them
-              into one thing that works, and keeping every team inside the rules. Off Grid AI is that
-              one interface, already set up and connected. Set your rules once, and anyone builds
-              governed apps and agents in plain language.
-            </p>
-          </BlurFade>
-          <BlurFade delay={0.45} inView>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg">
-                <Link href="/overview">
-                  Open console
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/signin">Book a call</Link>
-              </Button>
-            </div>
-          </BlurFade>
-          <BlurFade delay={0.55} inView>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Gauge className="size-3.5 text-primary" /> Works out of the box
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-primary" /> Every call governed
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Code className="size-3.5 text-primary" /> Open source
-              </span>
-            </div>
-          </BlurFade>
+            <BlurFade delay={0.25} inView>
+              <div className="relative overflow-hidden rounded-xl border border-border bg-[#111] p-2 shadow-sm">
+                <Image
+                  src="/diagrams/flow/flow-people.png"
+                  alt="Your data into governed gateways, through composable pipelines, out to apps and agents your people build in plain language, on infrastructure you own"
+                  width={1280}
+                  height={720}
+                  className="h-auto w-full rounded-lg"
+                  priority
+                />
+                <BorderBeam duration={12} size={280} colorFrom="#34d399" colorTo="#059669" />
+              </div>
+            </BlurFade>
+          </div>
         </div>
       </section>
 
-      {/* The spine - data → gateway → pipelines → apps | agents */}
+      {/* The flow - four tight steps, one line each */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-6xl px-6 py-16">
           <BlurFade inView>
             <p className="font-mono text-xs uppercase tracking-widest text-primary">
-              Data → Gateway → Pipelines → Apps &amp; Agents
+              Data → Gateways → Pipelines → Apps &amp; Agents
             </p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
               One governed path, end to end
             </h2>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              Every part of the AI problem - data, model access, governance, delivery - solved once,
-              in one place, so the work is reliable and compliant by default.
-            </p>
           </BlurFade>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {SPINE.map((s, i) => (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {FLOW.map((s, i) => (
               <BlurFade key={s.step} delay={0.06 * i} inView>
                 <MagicCard
                   gradientFrom="#34d399"
@@ -257,33 +224,37 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* The unlock - anyone builds */}
+      {/* See it work - real screenshots, alternating image + short caption */}
       <section className="border-b border-border bg-card/40">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-6xl px-6 py-16">
           <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">The unlock</p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Anyone builds. Everything stays governed.
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">See it work</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              The product, running
             </h2>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              Not another tool for engineers. A person describes the process they run today in plain
-              language and gets back a working, governed automation - your own build-anything studio
-              that inherits your rules, connectors, and data. You&apos;re not speeding up a few
-              engineers; you&apos;re giving every employee an agent workforce, safe by construction.
-            </p>
           </BlurFade>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {UNLOCK.map((u, i) => (
-              <BlurFade key={u.title} delay={0.06 * i} inView>
-                <div className="h-full rounded-xl border border-border bg-background p-6 shadow-sm">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <u.icon className="size-5" />
+          <div className="mt-10 flex flex-col gap-14">
+            {GALLERY.map((g, i) => (
+              <BlurFade key={g.src} delay={0.04 * i} inView>
+                <div className="grid items-center gap-6 lg:grid-cols-[1fr_1.6fr]">
+                  <div className={i % 2 === 1 ? 'lg:order-last' : ''}>
+                    <p className="font-mono text-xs uppercase tracking-widest text-primary">
+                      {g.eyebrow}
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+                      {g.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{g.body}</p>
                   </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="font-mono text-xs text-primary">{i + 1}</span>
-                    <h3 className="text-base font-semibold text-foreground">{u.title}</h3>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{u.body}</p>
+                  <figure className="relative overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+                    <Image
+                      src={g.src}
+                      alt={g.alt}
+                      width={1600}
+                      height={1000}
+                      className="h-auto w-full"
+                    />
+                  </figure>
                 </div>
               </BlurFade>
             ))}
@@ -291,150 +262,77 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Governed by construction */}
+      {/* Governed by construction - compliance diagram + tight points */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">Governed</p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Governed by construction, not by review
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              The trust spine every pipeline carries - so autonomy never means losing control, and
-              compliance isn&apos;t a meeting three weeks later.
-            </p>
-          </BlurFade>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {GOVERNANCE.map((g, i) => (
-              <BlurFade key={g.title} delay={0.06 * i} inView>
-                <MagicCard
-                  gradientFrom="#34d399"
-                  gradientTo="#059669"
-                  gradientColor="rgba(52,211,153,0.12)"
-                  gradientOpacity={0.5}
-                  className="h-full rounded-xl border border-border p-6 shadow-sm"
-                >
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <g.icon className="size-5" />
-                  </div>
-                  <h3 className="mt-4 text-base font-semibold text-foreground">{g.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{g.body}</p>
-                </MagicCard>
-              </BlurFade>
-            ))}
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <BlurFade inView>
+              <p className="font-mono text-xs uppercase tracking-widest text-primary">Governed</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Compliance travels with every run
+              </h2>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Not a stage you bolt on at the end. Every run is signed, cited, and scored. One that
+                fails a check is stopped. Hand a regulator a complete, reversible account.
+              </p>
+              <ul className="mt-6 grid gap-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 shrink-0 text-primary" /> Guardrails and PII masking
+                  on every call
+                </li>
+                <li className="flex items-center gap-2">
+                  <Gauge className="size-4 shrink-0 text-primary" /> Live scoring and drift on real
+                  traffic
+                </li>
+                <li className="flex items-center gap-2">
+                  <GitBranch className="size-4 shrink-0 text-primary" /> Signed provenance,
+                  audit-ready exports
+                </li>
+              </ul>
+            </BlurFade>
+            <BlurFade delay={0.15} inView>
+              <div className="relative overflow-hidden rounded-xl border border-border bg-[#111] p-2 shadow-sm">
+                <Image
+                  src="/diagrams/flow/flow-compliance.png"
+                  alt="Every finished run becomes a signed, cited, scored record; a run that fails a check is stopped; audit-ready evidence exports for a regulator"
+                  width={1280}
+                  height={720}
+                  className="h-auto w-full rounded-lg"
+                />
+              </div>
+            </BlurFade>
           </div>
         </div>
       </section>
 
-      {/* On your terms */}
+      {/* Under the hood + open foundations - one compact band */}
       <section className="border-b border-border bg-card/40">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+        <div className="mx-auto max-w-6xl px-6 py-16">
           <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">Why it holds up</p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Set up once, and it just works
-            </h2>
-          </BlurFade>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PILLARS.map((p, i) => (
-              <BlurFade key={p.title} delay={0.06 * i} inView>
-                <Card className="h-full shadow-sm">
-                  <CardHeader className="pb-2">
-                    <p.icon className="size-5 text-primary" />
-                    <CardTitle className="mt-2 text-sm">{p.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">{p.body}</CardContent>
-                </Card>
-              </BlurFade>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Capabilities - the planes, adoptable on their own */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <BlurFade inView>
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">Capabilities</p>
-          <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-            Everything the estate needs, in one console
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-            From ingestion to consumption to the regulatory wrapper. Each capability is API-first and
-            adoptable on its own - take the whole platform, or start with one and add the rest when
-            you&apos;re ready.
-          </p>
-        </BlurFade>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {MODULES.filter((m) => !m.internal).map((m, i) => {
-            const Icon = MODULE_ICONS[m.id];
-            return (
-              <BlurFade key={m.id} delay={0.03 * i} inView>
-                <MagicCard
-                  gradientFrom="#34d399"
-                  gradientTo="#059669"
-                  gradientColor="rgba(52,211,153,0.12)"
-                  gradientOpacity={0.5}
-                  className="h-full rounded-xl border border-border p-5 shadow-sm transition-transform duration-200 hover:-translate-y-1"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Icon className="size-5" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{m.label}</span>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">{m.description}</p>
-                </MagicCard>
-              </BlurFade>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Under the hood - one architecture exhibit for the technical buyer */}
-      <section className="border-t border-border bg-card/40">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">Under the hood</p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              A complete, governed AI estate
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">
+              Under the hood
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              Open foundations, no lock-in
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              The reference architecture for production AI - data plane, model plane, control plane,
-              consumption, and the org &amp; regulatory wrapper - and exactly how Off Grid AI maps
-              onto it.
+              Every capability ships with a first-party default and swaps to a best-in-class open
+              engine with one environment variable. Runs on your servers or in your cloud.
             </p>
           </BlurFade>
           <BlurFade inView>
             <div className="relative mt-8 overflow-hidden rounded-xl border border-border bg-[#ffffff] p-3 shadow-sm">
               <Image
                 src="/diagrams/01-full-architecture.jpg"
-                alt="Full governed AI architecture"
+                alt="Full governed AI architecture: data plane, model plane, control plane, consumption, and the org and regulatory wrapper"
                 width={1376}
                 height={768}
                 className="h-auto w-full rounded-lg"
-                priority
               />
               <BorderBeam duration={10} size={340} colorFrom="#34d399" colorTo="#059669" />
             </div>
           </BlurFade>
-        </div>
-      </section>
-
-      {/* Open foundations */}
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <BlurFade inView>
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">Open</p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Open foundations, no lock-in
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-              We stand on open standards and the best of the open ecosystem, woven into one governed
-              platform - so you can inspect every layer, trust it, and run it yourself. Nothing to be
-              locked into.
-            </p>
-          </BlurFade>
-          <div className="relative mt-8 flex flex-col gap-3 overflow-hidden">
+          <div className="relative mt-8 overflow-hidden">
             <Marquee pauseOnHover className="[--duration:45s] [--gap:0.6rem]">
               {CAPABILITY_LAYERS.map((t, i) => (
                 <span
@@ -445,32 +343,21 @@ export default function LandingPage() {
                 </span>
               ))}
             </Marquee>
-            <Marquee reverse pauseOnHover className="[--duration:45s] [--gap:0.6rem]">
-              {CAPABILITY_LAYERS.map((t, i) => (
-                <span
-                  key={`${t}-${i}`}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm"
-                >
-                  {t}
-                </span>
-              ))}
-            </Marquee>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-card to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-card to-transparent" />
           </div>
         </div>
       </section>
 
       {/* Close */}
-      <section className="border-b border-border bg-card/40">
+      <section className="border-b border-border">
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <BlurFade inView>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               Become an intelligent enterprise, without compromising.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-              Open the console and see it running, or book a call and we&apos;ll walk your team
-              through it.
+              Open the console and see it running, or read the docs and run it yourself.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg">
@@ -480,7 +367,13 @@ export default function LandingPage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href="/signin">Book a call</Link>
+                <a
+                  href="https://github.com/off-grid-ai/console"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
               </Button>
             </div>
           </BlurFade>
