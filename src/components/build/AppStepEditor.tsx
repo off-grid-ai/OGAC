@@ -63,7 +63,15 @@ const KIND_META: Record<AppStepKind, { icon: React.ReactNode; noun: string }> = 
   output: { icon: <FileText className="size-4" />, noun: 'Output result' },
 };
 
-const SINKS: OutputStep['sink'][] = ['console', 'report', 'email', 'whatsapp'];
+// Delivery sinks the operator can pick. report + email DELIVER for real (signed PDF report; SMTP or
+// Resend email — honest "not configured" when the channel isn't set up). WhatsApp is not wired yet, so
+// it is shown but marked "coming soon" + disabled — we never fake a send we can't make.
+const SINKS: { sink: OutputStep['sink']; label: string; comingSoon?: boolean }[] = [
+  { sink: 'console', label: 'Console (record the result)' },
+  { sink: 'report', label: 'Report (signed PDF)' },
+  { sink: 'email', label: 'Email' },
+  { sink: 'whatsapp', label: 'WhatsApp — coming soon', comingSoon: true },
+];
 
 export function AppStepEditor({
   step,
@@ -164,14 +172,15 @@ export function AppStepEditor({
               className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
             >
               {SINKS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+                <option key={s.sink} value={s.sink} disabled={s.comingSoon}>
+                  {s.label}
                 </option>
               ))}
             </select>
             <p className="text-[11px] text-muted-foreground">
-              report / email / whatsapp delivery lands in a later phase — the outcome is always
-              recorded to the console.
+              Report renders a signed PDF; Email delivers via your on-prem SMTP or Resend (it reports
+              &ldquo;not configured&rdquo; honestly if neither is set up). WhatsApp is coming soon. The
+              outcome is always recorded to the console.
             </p>
           </div>
         ) : null}

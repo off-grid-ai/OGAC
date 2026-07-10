@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { appScheduleId, cronFromTrigger, scheduleApp, syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
+import {
+  appScheduleId,
+  cronFromTrigger,
+  cronWithTimezone,
+  scheduleApp,
+  scheduleConfigFromTrigger,
+  scheduleRuntimeConfigured,
+  syncAppSchedule,
+  unscheduleApp,
+} from '@/lib/app-schedules';
 
 // ─── cronFromTrigger — PURE extraction of the cron a schedule trigger carries ─────────────────────
 
@@ -26,6 +35,41 @@ test('cronFromTrigger returns null for a schedule trigger with no/blank cron', (
 test('appScheduleId is stable + sanitized per app (re-scheduling replaces, not duplicates)', () => {
   assert.equal(appScheduleId('app123'), appScheduleId('app123'));
   assert.match(appScheduleId('app123'), /appsched-app123/);
+});
+
+// ─── scheduleConfigFromTrigger — the FULL {cron,timezone,enabled} the I/O bridge honors ──────────
+test('scheduleConfigFromTrigger returns null for non-schedule / no-cron triggers', () => {
+  assert.equal(scheduleConfigFromTrigger({ kind: 'on-demand' }), null);
+  assert.equal(scheduleConfigFromTrigger({ kind: 'schedule' }), null);
+  assert.equal(scheduleConfigFromTrigger({ kind: 'schedule', config: {} }), null);
+  assert.equal(scheduleConfigFromTrigger(null), null);
+});
+
+test('scheduleConfigFromTrigger reads cron + timezone + enabled (defaults applied)', () => {
+  const cfg = scheduleConfigFromTrigger({
+    kind: 'schedule',
+    config: { cron: '0 9 * * 1', timezone: 'Asia/Kolkata', enabled: false },
+  });
+  assert.deepEqual(cfg, { cron: '0 9 * * 1', timezone: 'Asia/Kolkata', enabled: false });
+  // enabled omitted → armed by default
+  assert.equal(scheduleConfigFromTrigger({ kind: 'schedule', config: { cron: '@daily' } })!.enabled, true);
+});
+
+// ─── cronWithTimezone — the Temporal CRON_TZ prefix ──────────────────────────────────────────────
+test('cronWithTimezone prefixes a non-UTC zone; UTC is left bare', () => {
+  assert.equal(cronWithTimezone('0 9 * * 1', 'Asia/Kolkata'), 'CRON_TZ=Asia/Kolkata 0 9 * * 1');
+  assert.equal(cronWithTimezone('0 9 * * 1', 'UTC'), '0 9 * * 1');
+  assert.equal(cronWithTimezone('0 9 * * 1', ''), '0 9 * * 1');
+});
+
+test('scheduleRuntimeConfigured reflects the durable-runtime env', () => {
+  const prior = { ...process.env };
+  delete process.env.OFFGRID_QUEUE_ENABLED;
+  delete process.env.OFFGRID_ADAPTER_APPRUNTIME;
+  assert.equal(scheduleRuntimeConfigured(), false);
+  process.env.OFFGRID_ADAPTER_APPRUNTIME = 'temporal';
+  assert.equal(scheduleRuntimeConfigured(), true);
+  Object.assign(process.env, prior);
 });
 
 // ─── scheduleApp / syncAppSchedule wiring — graceful when the durable runtime is off ──────────────
