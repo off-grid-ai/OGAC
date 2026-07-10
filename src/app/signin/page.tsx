@@ -64,17 +64,26 @@ async function absoluteCallback(raw: FormDataEntryValue | null): Promise<string>
 async function withPassword(formData: FormData): Promise<void> {
   'use server';
   const redirectTo = await absoluteCallback(formData.get('callbackUrl'));
+  const username = String(formData.get('username') ?? '');
+  const password = String(formData.get('password') ?? '');
+  const errorRedirect = `/signin?error=1&callbackUrl=${encodeURIComponent(String(formData.get('callbackUrl') ?? ''))}`;
+  // TENANT-LOGIN GATE (Node-only, so it can hit the DB — the edge-shared authorize cannot). On a
+  // tenant subdomain, only a member of THAT tenant (or an admin) may sign in, so the same creds
+  // can't log into both the bank and the insurer host. A non-member is rejected exactly like a bad
+  // password (same error redirect), never disclosing the account exists on another tenant. The
+  // subsequent signIn re-authenticates through the normal path.
+  {
+    const { authenticatePassword } = await import('@/lib/auth/identity');
+    const { gateTenantLogin } = await import('@/lib/auth/tenant-login');
+    const host = (await headers()).get('host');
+    const candidate = await authenticatePassword(username, password).catch(() => null);
+    if (candidate && !(await gateTenantLogin(host, candidate))) redirect(errorRedirect);
+  }
   try {
-    await signIn('password', {
-      username: String(formData.get('username') ?? ''),
-      password: String(formData.get('password') ?? ''),
-      redirectTo,
-    });
+    await signIn('password', { username, password, redirectTo });
   } catch (e) {
     if (e instanceof AuthError) {
-      redirect(
-        `/signin?error=1&callbackUrl=${encodeURIComponent(String(formData.get('callbackUrl') ?? ''))}`,
-      );
+      redirect(errorRedirect);
     }
     throw e; // success path throws NEXT_REDIRECT — must propagate
   }
