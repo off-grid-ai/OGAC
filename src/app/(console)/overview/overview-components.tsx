@@ -2,12 +2,15 @@ import { ArrowRight, ShieldCheck, ShieldSlash, Sparkle } from '@phosphor-icons/r
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { NumberTicker } from '@/components/ui/number-ticker';
 import type { BlockingDecision, HomeTile, OperatorHome } from '@/lib/overview-synthesis';
 import { cn } from '@/lib/utils';
 
 // Presentational pieces for the operator home. Pure render — every datum comes from the synthesized
 // OperatorHome view-model (src/lib/overview-synthesis.ts); nothing fetches or decides here. Page
-// motion (og-page-enter) is applied globally by PageTransition, so these don't animate themselves.
+// motion (og-page-enter) is applied globally by PageTransition. The one exception is the stat value,
+// which counts up via NumberTicker (data-is-alive) — a reference use of the interaction-design
+// primitive; the count-up logic is pure (src/lib/motion/count-up.ts) and honors reduced motion.
 
 const TONE: Record<HomeTile['tone'], string> = {
   good: 'text-primary',
@@ -23,7 +26,9 @@ export function TileCard({ t }: { t: HomeTile }) {
       className="group rounded-lg border border-border bg-card p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{t.label}</div>
-      <div className={cn('mt-1.5 text-2xl font-semibold tabular-nums', TONE[t.tone])}>{t.value}</div>
+      <div className={cn('mt-1.5 text-2xl font-semibold tabular-nums', TONE[t.tone])}>
+        <NumberTicker value={t.value} />
+      </div>
       {t.hint ? <div className="mt-1 text-xs text-muted-foreground">{t.hint}</div> : null}
     </Link>
   );
