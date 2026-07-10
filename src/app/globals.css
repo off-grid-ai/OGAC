@@ -244,6 +244,19 @@
   animation: og-aurora linear infinite;
 }
 
+/* The landing is deliberately the dark terminal theme regardless of the app's light default.
+   Tailwind v4 freezes @theme color tokens at :root (light), so `text-white`, `bg-white/*`,
+   `border-white/*`, and the semantic `*-foreground`/`*-background` utilities would resolve to
+   light values. Re-point exactly those tokens to their dark values for the landing subtree;
+   CSS custom properties cascade at use-time, so every utility below inherits the fix. */
+.og-landing {
+  --color-white: #ffffff;
+  --color-black: #0a0a0a;
+  --color-foreground: #ffffff;
+  --color-background: #0a0a0a;
+  --color-border: rgba(255, 255, 255, 0.1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
