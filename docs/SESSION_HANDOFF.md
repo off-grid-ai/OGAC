@@ -1,4 +1,54 @@
-# Session handoff — 2026-07-10 (session hit limit mid-wave) — READ THIS FIRST
+# Session handoff — 2026-07-10 LATE (landing polish + WHOLE-APP MOBILE) — READ THIS FIRST
+
+**Git state right now:** branch `wave2-tenant-isolation-prompts-analytics-evals` @ `2edae9e`, working tree
+CLEAN, pushed to origin (backup) this session. It = remote `main` (`7ea13b8`, the killer landing merge)
++ ONE commit `2edae9e` (regenerated hero sketch PNG). So `main` can fast-forward to include the diagram.
+The killer landing IS live/merged on main; hero PNG only needs FF+deploy.
+
+**4 AGENTS RUNNING when the session ended (their worktree branches persist ON DISK — committed work
+survives; resume by finding each branch, reviewing, gating, merging). All were told: incremental commits,
+worktree-isolated, do NOT push/deploy (orchestrator merges).**
+- LANDING light+dark theming + fix janky flow beam: **DONE + MERGED** into wave2 @ `9c95dac` (agent
+  a8d6bfb, gates all green, both themes verified, beam fixed via compositor stroke-dashoffset). Light =
+  brand tokens flipping on next-themes; nav ThemeToggle; dark-by-default first visit. Screenshots in
+  scratchpad hero/flow/bento/close/full-{dark,light}.png. This UNBLOCKS landing pass 2 (#230) — fire it next.
+- `agent-a0f047b821d9a261b` — MOBILE M1 shell: sidebar->drawer/hamburger, responsive Topbar
+  (layout.tsx, Sidebar.tsx, Topbar.tsx, UserMenu, Hellobar). P0 — everything mobile layers on it.
+- `agent-a9f3d6fa918ec435e` — MOBILE M2: stat bands -> DENSE HORIZONTAL RAILS (not tall stacks) across
+  insights/*, gateway/fleet, data/warehouse, build/agents; extract one shared StatRail (DRY).
+- `agent-a4abc12cb276bac6a` — MOBILE M3: forms/sheets/modals responsive (fields stack, FormSheet
+  full-width + sticky Save); fix the shared FormSheet primitive once.
+DONE this session: hero diagram regen (2edae9e, merged to branch, approved).
+
+**QUEUED (task #230) — LANDING PASS 2, fires after agent-a8d6bfb lands (same files, sequential):**
+short + LOW-SCROLL (kill the 5-card governance bento); PRODUCT-TOUR is the value -> live demo centerpiece;
+"Are you a bank/insurer? See it live" CTAs to the 2 demo tenants (bank=bharatunion, insurer=suraksha
+subdomains, verify 200 first); proof strip reframed to CIO OUTCOMES (1 interface / 0 eng tickets / 100%
+traffic governed / 4 frameworks) NOT eng-vanity; carousel click-to-zoom lightbox + promote-to-hero;
+PHOSPHOR icons only (no lucide); RICHER agentic micro-interactions (restrained, docs/INTERACTION_DESIGN.md);
+fix "without losing out" copy = CONTROL + NO LOCK-IN + ONE COHERENT SYSTEM (NOT "infra you own"; runs
+cloud OR on-prem); mobile gate (390+320px both themes). Full spec in task #230 + memory
+project-landing-positioning.
+
+**QUEUED (task #231) — WHOLE-APP MOBILE epic. Founder: the ENTIRE console must be mobile-optimised for the
+public demo. Principles (memory feedback-mobile-design-principles): minimize vertical scroll, lists scroll
+HORIZONTALLY (rails), fold-aware real-estate density, NOT naive 1-col stacking. Batches M1/M2/M3 launched
+(above). NEXT ROLLING WINDOW after they land: M4 detail pages + builders + tabs; M5 workspace
+(chat/knowledge/projects/prompts/storage); M6 governance + operations + policy editor. Recon map (shell
+desktop-locked, tables already have overflow-x-auto) in agent a394c743 output.**
+
+**Also answered this session (no action):** PostHog is wired GLOBALLY (official snippet in root
+src/app/layout.tsx = every page + /docs/api separately; autocapture+pageviews on). Optional future:
+posthog.identify() on login.
+
+**RESUME ORDER:** (1) check the 4 agent branches, review+gate+merge each disjoint set, push. (2) FF main to
+2edae9e + deploy hero. (3) fire landing pass 2 (#230) once landing agent merged. (4) launch mobile M4/M5/M6.
+(5) after ALL mobile merged: full-app mobile verify at 390+320 both themes, deploy. Deploy =
+`SERVER=offgrid-tunnel SSH_USER=admin bash deploy/push.sh` then launchctl kickstart (NEVER pkill+nohup).
+
+---
+
+# Session handoff — 2026-07-10 (session hit limit mid-wave) — earlier
 
 `main` = remote (`ec10e1d`); all merged work pushed. Roadmap: `docs/PRODUCTION_READINESS_ROADMAP.md`.
 
