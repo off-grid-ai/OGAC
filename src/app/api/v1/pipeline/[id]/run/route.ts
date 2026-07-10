@@ -8,6 +8,7 @@ import { deriveEgress } from '@/lib/pipelines-policy';
 import { verifyPipelineKey } from '@/lib/pipeline-api-keys';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
 import { resolveContract } from '@/lib/pipeline-contract';
+import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 import { enforceModelCall } from '@/lib/pipeline-enforcement';
 import { executePipelineRun } from '@/lib/pipeline-execute';
 import { defaultExecuteDeps } from '@/lib/pipeline-execute-wiring';
@@ -61,7 +62,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // ── 2. Load the pipeline, org-scoped to the key's org; it must exist AND be published ───────────
   const pipeline = await getPipeline(id, binding.orgId);
   if (!pipeline) return NextResponse.json({ error: 'unknown pipeline' }, { status: 404 });
-  if (pipeline.status !== 'published') {
+  if (!isConsumable(pipeline.status)) {
     return NextResponse.json({ error: 'pipeline is not published' }, { status: 409 });
   }
 
