@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Broadcast,
   GithubLogo,
   Path,
@@ -10,6 +9,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
+import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { FlowDiagram } from '@/app/_landing/flow-diagram';
 import { AuroraText } from '@/components/ui/aurora-text';
 import { BentoGrid, BentoTile } from '@/components/ui/bento-grid';
@@ -130,32 +130,8 @@ export default function LandingPage() {
                 </p>
               </BlurFade>
               <BlurFade delay={0.36} inView>
-                <div className="mt-9 flex flex-wrap items-center gap-3">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-[#34D399] text-black hover:bg-[#6EE7B7]"
-                  >
-                    <Link href="/overview">
-                      Open the console
-                      <ArrowRight className="size-4" weight="bold" />
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    size="lg"
-                    variant="outline"
-                    className="border-white/15 bg-transparent text-white hover:bg-white/5"
-                  >
-                    <a
-                      href="https://github.com/off-grid-ai/console"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <GithubLogo className="size-4" />
-                      View the source
-                    </a>
-                  </Button>
+                <div className="mt-9">
+                  <CtaButtons githubLabel="View the source" />
                 </div>
               </BlurFade>
             </div>
@@ -333,32 +309,8 @@ export default function LandingPage() {
                 </p>
               </BlurFade>
               <BlurFade delay={0.15} inView>
-                <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-[#34D399] text-black hover:bg-[#6EE7B7]"
-                  >
-                    <Link href="/overview">
-                      Open the console
-                      <ArrowRight className="size-4" weight="bold" />
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    size="lg"
-                    variant="outline"
-                    className="border-white/15 bg-transparent text-white hover:bg-white/5"
-                  >
-                    <a
-                      href="https://github.com/off-grid-ai/console"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <GithubLogo className="size-4" />
-                      GitHub
-                    </a>
-                  </Button>
+                <div className="mt-8">
+                  <CtaButtons />
                 </div>
               </BlurFade>
             </div>
