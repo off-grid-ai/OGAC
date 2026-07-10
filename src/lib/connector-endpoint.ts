@@ -58,3 +58,100 @@ export function splitEndpointSecret(endpoint: string): SplitEndpoint {
   const sanitized = u.toString().replace(/:@/, '@');
   return { endpoint: sanitized, secret };
 }
+
+// ─── SSRF host guard (G-ADV-DATA-2) ────────────────────────────────────────────
+// A connector's `endpoint` is fetched server-side (REST fetch, or a pg/mysql/mssql connect) by the
+// admin test / resources / sync / query paths. Without a host guard, a connector whose endpoint is
+// the cloud metadata IP (169.254.169.254), a loopback (127.0.0.1 / localhost / ::1) or an RFC-1918
+// private address (10./172.16-31./192.168., link-local 169.254.) is an admin-gated SSRF pivot into
+// the private control plane (the internal warehouse, the vault, cloud metadata). This is the pure
+// rule the create + update validators apply so BOTH paths reject a private host before storing or
+// fetching. Kept here (zero-import) so it rides into the client Add-connector form.
+
+// Hostnames that always resolve to the local machine.
+const LOOPBACK_HOSTNAMES = new Set(['localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback']);
+
+// Strip an IPv6 zone id and surrounding brackets so `[fe80::1%eth0]` compares as `fe80::1`.
+function normalizeHost(rawHost: string): string {
+  let h = rawHost.trim().toLowerCase();
+  if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1);
+  const zone = h.indexOf('%');
+  if (zone >= 0) h = h.slice(0, zone);
+  return h;
+}
+
+// Parse a dotted-quad IPv4 into its four octets, or null if it isn't one. Rejects octets > 255 and
+// non-numeric parts so a hostname like `a.b.c.d` isn't mistaken for an IP.
+function ipv4Octets(host: string): [number, number, number, number] | null {
+  const parts = host.split('.');
+  if (parts.length !== 4) return null;
+  const nums: number[] = [];
+  for (const p of parts) {
+    if (!/^\d{1,3}$/.test(p)) return null;
+    const n = Number(p);
+    if (n > 255) return null;
+    nums.push(n);
+  }
+  return nums as [number, number, number, number];
+}
+
+// True for an IPv4 that MUST NOT be reachable from the server: loopback (127.), link-local +
+// metadata (169.254., which includes 169.254.169.254), RFC-1918 private (10., 172.16-31.,
+// 192.168.), "this host" (0.), and carrier-grade NAT (100.64-127.).
+function isPrivateIpv4([a, b]: [number, number, number, number]): boolean {
+  if (a === 127) return true; // loopback
+  if (a === 10) return true; // RFC-1918
+  if (a === 0) return true; // "this host"
+  if (a === 169 && b === 254) return true; // link-local + cloud metadata (169.254.169.254)
+  if (a === 172 && b >= 16 && b <= 31) return true; // RFC-1918
+  if (a === 192 && b === 168) return true; // RFC-1918
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  return false;
+}
+
+// True for an IPv6 literal that MUST NOT be reachable: loopback (::1), unspecified (::), link-local
+// (fe80::/10), unique-local (fc00::/7), and IPv4-mapped (::ffff:a.b.c.d) that maps to a private v4.
+function isPrivateIpv6(host: string): boolean {
+  if (host === '::1' || host === '::') return true;
+  if (host.startsWith('fe8') || host.startsWith('fe9') || host.startsWith('fea') || host.startsWith('feb')) {
+    return true; // fe80::/10 link-local
+  }
+  if (host.startsWith('fc') || host.startsWith('fd')) return true; // fc00::/7 unique-local
+  const mapped = host.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (mapped) {
+    const oct = ipv4Octets(mapped[1]);
+    return oct ? isPrivateIpv4(oct) : true;
+  }
+  return false;
+}
+
+/**
+ * Is this HOSTNAME (already extracted from a URL) safe to reach from the server? Rejects loopback
+ * hostnames and IPv4/IPv6 loopback/link-local/private/metadata literals. A public DNS name (not
+ * resolvable purely here) is allowed — the deterministic literal + well-known-name checks are the
+ * defense-in-depth layer this pure guard owns.
+ */
+export function isPublicHost(host: string): boolean {
+  const h = normalizeHost(host);
+  if (!h) return false;
+  if (LOOPBACK_HOSTNAMES.has(h)) return false;
+  const v4 = ipv4Octets(h);
+  if (v4) return !isPrivateIpv4(v4);
+  if (h.includes(':')) return !isPrivateIpv6(h);
+  return true;
+}
+
+/**
+ * Is this ENDPOINT (a full URL string) safe to fetch/connect server-side? Parses the URL and applies
+ * isPublicHost to its hostname. An unparseable endpoint is rejected (false) — a connector we can't
+ * parse a host from must not be stored or reached. The scheme is validated separately by the
+ * create/update validators; this owns the host-reachability half.
+ */
+export function isPublicEndpointHost(endpoint: string): boolean {
+  try {
+    const u = new URL(endpoint);
+    return isPublicHost(u.hostname);
+  } catch {
+    return false;
+  }
+}
