@@ -101,9 +101,14 @@ live across two seeded tenants. View everything, write nothing.
 - **P5.4** Genericize `.env.example` + both `CLAUDE.md` (internal IPs / hosts).
 - **P5.5** Landing page inherits the README philosophy + deployed (IN PROGRESS).
 
-## Phase 6 - "Battle-tested" proof (earns the claim)
+## Phase 6 - "Battle-tested" proof (earns the claim) - ON HOLD
 
-- **P6.1 (#207/#216)** Author + auto-test the insurer 15 use cases via the real NL builder path in Suraksha.
+**DO NOT START. Founder-gated.** The insurer 15 use cases are explicitly on hold (2026-07-10). The founder
+will test the 2 apps already built + pushed, give feedback, we act on that feedback first, and only
+then - on the founder's explicit go - do we consider the insurer set. Do not author insurer use cases until told.
+
+- **P6.1 (#207/#216) [HOLD]** Author + auto-test the insurer 15 use cases via the real NL builder path in
+  Suraksha - blocked on founder feedback on the 2 existing apps + an explicit go-ahead.
 - **P6.2** A golden thread: one real use case exercised through every wired service, verified.
 
 ---
