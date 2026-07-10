@@ -1,4 +1,5 @@
 import { inflateSync } from 'node:zlib';
+import { neutralizeForContextBlock } from './chat-mentions';
 
 // Ad-hoc chat file attachments — server-side text extraction so PDF/CSV/TXT/MD attachments can be
 // injected as context for a single turn (parity with ChatGPT/Claude file attach). No new
@@ -80,8 +81,15 @@ export function extractFile(name: string, mime: string, dataBase64: string): Ext
 export function attachmentBlock(files: Extracted[]): string {
   const usable = files.filter((f) => f.text.trim());
   if (!usable.length) return '';
+  // Both the filename (an attribute value) and the extracted text are untrusted, user-controlled
+  // content. Neutralize them so a crafted name/body can't close the `name="…"` attribute, the
+  // <file> tag, or the <attached_files> wrapper and inject its own <system> instruction into what
+  // the model reads as trusted context (prompt-injection / context-boundary break).
   const body = usable
-    .map((f) => `<file name="${f.name}">\n${f.text}\n</file>`)
+    .map(
+      (f) =>
+        `<file name="${neutralizeForContextBlock(f.name)}">\n${neutralizeForContextBlock(f.text)}\n</file>`,
+    )
     .join('\n\n');
   return `<attached_files>\nThe user attached these files to this message. Use them as context:\n\n${body}\n</attached_files>`;
 }
