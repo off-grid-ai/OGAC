@@ -7,7 +7,7 @@ export const buildSection: DocSection = {
     {
       slug: 'guides/chat',
       title: 'Chat',
-      description: 'Your org's AI, everywhere - grounded, governed, and inside the rules by default.',
+      description: 'Your org\'s AI, everywhere - grounded, governed, and inside the rules by default.',
       body: `**What you'll get:** a chat that already knows your org's rules. Every answer runs through
 the same governed pipeline your admin set up once, grounded in your knowledge - nothing to configure.
 
