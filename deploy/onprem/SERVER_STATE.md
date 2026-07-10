@@ -1155,4 +1155,8 @@ Ran on the server against live infra (idempotent, org-guarded to org_bharat/org_
 4. `scripts/seed-tenant-secrets.mts --write` → OpenBao: 2 secrets each under `secret/<org>/`.
 All idempotent/re-runnable. Verified live: Overview/Studio/Knowledge/Storage/Pipelines/Governance populated + distinct per tenant.
 RESIDUAL RESOLVED (2026-07-11): Chat now populates per tenant — the seed owns convos under the REAL viewer email (OFFGRID_DEMO_VIEWER_<SLUG>_EMAIL) and upserts ownership on re-run; verified live (bank: NEFT/dunning/KYC; insurer: FNOL/policy/lapse).
-RESIDUAL (open): Analytics empty until the OpenSearch analytics reader org-filter ships (#236, in flight) — the org-tagged docs are already indexed.
+RESIDUAL RESOLVED (2026-07-11): Analytics now populates per tenant — the OpenSearch analytics reader org-filter (#236 Sec-C) shipped + deployed; verified live (bank & insurer each show only their own traffic/cost, no empty state).
+
+## Security cluster #236 deployed live (2026-07-11)
+All launch-blocker isolation fixes merged to wave2 + deployed (build VERIFIED serving on :3000):
+cross-org RAG leak (chat retrieval hard org-gated, fail-closed); guardrail fail-open→fail-closed (chat + shared seam for agent-run/app-run); RTBF cross-tenant erasure (org-scoped DELETE + fixed a duplicated unscoped DELETE + a nonexistent chat_messages.user_id column); PII-mask fail-closed; connector SSRF (metadata-IP/RFC-1918 on create AND the previously-unvalidated PATCH); rate-limit NaN-clock wedge; analytics cross-tenant leak (org term on every OpenSearch query). Full suite 3481/3481 pass, clean build. Live-verified read-only: analytics per-tenant isolation. Write/delete attacks (connector SSRF, RTBF) proven by red-first integration tests, not run destructively against live.
