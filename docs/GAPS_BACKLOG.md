@@ -955,3 +955,21 @@ from the working tree; it is gitignored, absent from HEAD, and never committed (
 **Positives verified:** Drizzle params everywhere (no SQL injection surface); requireAdmin on all
 admin routes; vectordb SSRF allowlist; device-audit token gate; 60/min rate limiter; audit
 canonicalization; list/read ops org-scoped. Posture: solid, with the above P1s to close before public multi-tenant.
+
+## Tour-demo seed (Phase 2.2/2.3) — analytics/FinOps telemetry backfill
+**Status: OPEN (data-plane, out of console-DB scope).** `deploy/onprem/seed-tour-demo.mjs` populates
+every CONSOLE-DB tour surface for both demo tenants (apps, runs, agents, governance, guardrails,
+regulatory adoption, evals+drift history, knowledge, teams, viewer users). But the **Insights /
+Analytics + FinOps** charts read gateway telemetry from **OpenSearch** (`offgrid-gateway` index), NOT
+Postgres (`analytics.ts` / `finops.ts`). Those charts will show zeros until a telemetry backfill
+writes synthetic gateway-call docs (model, tokens, ms, caller, project=pipeline tag) per tenant.
+Drift + regulatory coverage DO render (they derive from the seeded `eval_runs` + `compliance_adoption`).
+Next: a small OpenSearch backfill emitter (mirror `buildAggsQuery` field names) writing ~30 days of
+synthetic on-prem + cloud calls per tenant. Honest until then: analytics is the one surface not yet fed.
+
+## Tour-demo viewer users — Keycloak credential provisioning
+**Status: OPEN (identity-plane).** The seed writes the console-DB `user` row (role=viewer, org-scoped)
+for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes through **Keycloak** (ROPC,
+`authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
+must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
+that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
