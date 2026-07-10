@@ -87,7 +87,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   // ── Internal fleet services (LAN — probed by their direct IP:port) ───────────
   {
     id: 'keycloak',
-    label: 'Keycloak',
+    label: 'Identity & SSO',
     description: 'Identity & access management — SSO, realm, service accounts.',
     url: process.env.OFFGRID_KEYCLOAK_URL ?? 'http://127.0.0.1:8080',
     healthPath: '/health/ready',
@@ -96,7 +96,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'qdrant',
-    label: 'Qdrant',
+    label: 'Vector Search',
     description: 'Vector store — Brain / RAG retrieval backend.',
     url: process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333',
     healthPath: '/healthz',
@@ -105,7 +105,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'opensearch',
-    label: 'OpenSearch',
+    label: 'Log Search & SIEM',
     description: 'SIEM / log search — gateway analytics, audit logs, dashboards.',
     // Runs in the offgrid-services-a stack ON S1 → reached over loopback (127.0.0.1). These S1-
     // local services are loopback-bound (not LAN-reachable) for hardening; the console reaches
@@ -120,7 +120,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'langfuse',
-    label: 'Langfuse',
+    label: 'Observability & Tracing',
     description: 'LLM observability — traces, eval scores, session replay.',
     // On g6 (aux tier). The console can't reach the LAN directly, so it goes through the S1
     // edge-Caddy loopback proxy (8931→offgrid-g6.local:3030). Env override sets this on S1.
@@ -131,7 +131,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'temporal',
-    label: 'Temporal',
+    label: 'Durable Workflows',
     description: 'Durable workflows — agent runs, long-running tasks.',
     url: process.env.OFFGRID_TEMPORAL_UI_URL ?? 'http://127.0.0.1:8081',
     healthPath: '/',
@@ -140,7 +140,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'opa',
-    label: 'OPA',
+    label: 'Policy Engine',
     description: 'Open Policy Agent — ABAC policy evaluation.',
     url: process.env.OFFGRID_OPA_URL ?? 'http://127.0.0.1:8181',
     healthPath: '/health',
@@ -149,7 +149,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'openbao',
-    label: 'OpenBao',
+    label: 'Secrets Vault',
     description: 'Secrets vault — API keys, credentials, rotation.',
     url: process.env.OFFGRID_OPENBAO_URL ?? 'http://127.0.0.1:8200',
     healthPath: '/v1/sys/health',
@@ -158,7 +158,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'marquez',
-    label: 'Marquez',
+    label: 'Data Lineage',
     description: 'Data lineage — OpenLineage-compatible source→answer provenance.',
     url: process.env.OFFGRID_MARQUEZ_URL ?? 'http://127.0.0.1:9000',
     healthPath: '/api/v1/namespaces',
@@ -167,7 +167,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'unleash',
-    label: 'Unleash',
+    label: 'Feature Flags',
     description: 'Feature flags — capability toggles per org / user.',
     // On g6 — via the S1 edge-Caddy loopback proxy (8932→offgrid-g6.local:4242). Env override on S1.
     url: process.env.OFFGRID_UNLEASH_URL ?? 'http://127.0.0.1:8932',
@@ -177,7 +177,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'presidio',
-    label: 'Presidio',
+    label: 'PII Detection & Redaction',
     description: 'PII detection & anonymisation — data masking for ingest.',
     // On g6 (LAN). The console can't reach it directly; it needs an edge-Caddy loopback proxy
     // (8938 staged in the Caddyfile, pending an edge reload). Env override points at the loopback.
@@ -223,7 +223,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'superset',
-    label: 'Superset',
+    label: 'BI & Dashboards',
     description: 'BI & data exploration — SQL Lab, pivot/transpose, embeddable dashboards.',
     // bi profile in compose (:8088). On g6 — via the S1 edge-Caddy loopback proxy
     // (8933→offgrid-g6.local:8088), mirroring langfuse/unleash. Env override sets this on S1.
@@ -234,7 +234,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'fleetdm',
-    label: 'FleetDM',
+    label: 'Device Management',
     description:
       'osquery-based device fleet - host inventory, live/scheduled queries, software + CVE visibility, and policy/compliance posture (available today). Device CONTROL (lock / wipe / config-profile push / settings enforcement) is coming soon; advanced MDM control is Fleet Premium, separately licensed.',
     // mdm profile in compose (:8070). On g6 — via the S1 edge-Caddy loopback proxy
@@ -246,7 +246,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'evidently',
-    label: 'Evidently',
+    label: 'Drift Monitoring',
     description: 'Drift & data-quality sidecar — the console\'s drift adapter runs PSI/quality suites through it.',
     // qa profile in compose (:8001). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
     // Health is the sidecar root '/' (see deploy/sidecars/drift/app.py @app.get("/")).
@@ -257,7 +257,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   },
   {
     id: 'ragas',
-    label: 'Ragas',
+    label: 'RAG Evaluation',
     description: 'RAG-eval sidecar — the console\'s evals adapter computes retrieval-quality metrics through it.',
     // qa profile in compose (:8002). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
     // Health is the sidecar's /health endpoint (see the compose healthcheck for ragas).
@@ -327,43 +327,43 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   // reason. They render muted "Optional" + the reason, NOT a red outage.
   {
     id: 'victoriametrics',
-    label: 'VictoriaMetrics',
+    label: 'Metrics Store',
     description: 'Metrics store (observability profile) — canonical in compose, not run on this fleet.',
     url: process.env.OFFGRID_VICTORIAMETRICS_URL ?? 'not-deployed://victoriametrics',
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces',
+    fallbackLabel: 'not deployed here — log search + observability cover logs/traces on this fleet',
   },
   {
     id: 'victorialogs',
-    label: 'VictoriaLogs',
+    label: 'Log Store',
     description: 'Log store (observability profile) — canonical in compose, not run on this fleet.',
     url: process.env.OFFGRID_VICTORIALOGS_URL ?? 'not-deployed://victorialogs',
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'not deployed here — this fleet uses OpenSearch for log/audit search',
+    fallbackLabel: 'not deployed here — the log search & SIEM plane covers log/audit search',
   },
   {
     id: 'otel-collector',
-    label: 'OTel Collector',
+    label: 'Telemetry Collector',
     description: 'OpenTelemetry collector (observability profile) — canonical in compose, not run on this fleet.',
     url: process.env.OFFGRID_OTEL_URL ?? 'not-deployed://otel-collector',
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'not deployed here — the console fans OTLP spans straight to Langfuse',
+    fallbackLabel: 'not deployed here — the console fans OTLP spans straight to the tracing plane',
   },
   {
     id: 'jaeger',
-    label: 'Jaeger',
+    label: 'Trace Explorer',
     description: 'Distributed-trace UI (observability profile) — canonical in compose, not run on this fleet.',
     url: process.env.OFFGRID_JAEGER_URL ?? 'not-deployed://jaeger',
     auth: 'session',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'not deployed here — Langfuse is the trace backend on this fleet',
+    fallbackLabel: 'not deployed here — the observability & tracing plane is the trace backend on this fleet',
   },
 ];
 
