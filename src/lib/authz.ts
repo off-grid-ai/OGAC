@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { machineConsoleRole } from '@/lib/auth/machine-roles';
 import { getTokenVerifier } from '@/lib/auth/token-verifier';
+import { canWrite, isMutatingMethod, isViewer, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 
 // Shared authorization gates for API route handlers. There is ONE key flow: a machine
 // presents a Keycloak service-account JWT as `Authorization: Bearer <jwt>` and it is
@@ -58,11 +59,31 @@ export async function requireUser(req?: Request): Promise<AuthzSession | NextRes
 }
 
 // Admin-only surface. 403 for non-admins, 401 when unauthenticated.
+//
+// The read-only VIEWER is the one exception: it may READ every admin surface (the public live demo
+// shows the full admin plane) but never MUTATE. So a viewer passes this gate on a SAFE method
+// (GET/HEAD) and is rejected 403 on any mutating method — the same read-everything / write-nothing
+// rule the edge middleware enforces, applied here so a viewer's admin GETs (e.g. config reveal,
+// which the middleware lets through as a read) actually reach the handler. Every OTHER non-admin
+// role stays fully blocked from the admin plane, unchanged.
 export async function requireAdmin(req?: Request): Promise<AuthzSession | NextResponse> {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
-  if (gate.user.role !== 'admin') {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  if (gate.user.role === 'admin') return gate;
+  if (isViewer(gate.user.role) && !isMutatingMethod(req?.method)) return gate;
+  return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+}
+
+// Any authenticated principal who is allowed to WRITE — i.e. not the read-only viewer role. This is
+// the per-handler defense-in-depth for mutating handlers that only need `requireUser` (not full
+// admin): a viewer is rejected 403 BEFORE any effect, alongside the edge middleware's catch-all
+// method block. The write DECISION is the pure `canWrite` predicate (single source of truth); this
+// gate is only the request adapter around it.
+export async function requireWriter(req?: Request): Promise<AuthzSession | NextResponse> {
+  const gate = await requireUser(req);
+  if (gate instanceof NextResponse) return gate;
+  if (!canWrite(gate.user.role)) {
+    return NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 });
   }
   return gate;
 }
