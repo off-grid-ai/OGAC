@@ -47,9 +47,23 @@ function safeCallback(raw: FormDataEntryValue | null): string {
 // Owned login: the console authenticates username/password through the identity seam
 // (Keycloak ROPC server-side) — the browser never leaves the console, no hosted IdP
 // page, no internal IP leak. SSO buttons appear only when explicitly configured.
+// Resolve the post-login destination as an ABSOLUTE URL on the CURRENT host. The session cookie is
+// host-scoped (no shared cookie domain — each tenant subdomain is its own island), so a relative
+// redirectTo that NextAuth resolves against the apex origin (which happens behind the Cloudflare
+// tunnel) would land the user on a host that has no session and bounce them back to signin. Pinning
+// the redirect to the request's own Host header keeps login on the tenant that signed in.
+async function absoluteCallback(raw: FormDataEntryValue | null): Promise<string> {
+  const path = safeCallback(raw);
+  const h = await headers();
+  const host = h.get('host');
+  if (!host) return path;
+  const proto = h.get('x-forwarded-proto') ?? 'https';
+  return `${proto}://${host}${path}`;
+}
+
 async function withPassword(formData: FormData): Promise<void> {
   'use server';
-  const redirectTo = safeCallback(formData.get('callbackUrl'));
+  const redirectTo = await absoluteCallback(formData.get('callbackUrl'));
   try {
     await signIn('password', {
       username: String(formData.get('username') ?? ''),
@@ -67,15 +81,15 @@ async function withPassword(formData: FormData): Promise<void> {
 }
 async function withGoogle(formData: FormData): Promise<void> {
   'use server';
-  await signIn('google', { redirectTo: safeCallback(formData.get('callbackUrl')) });
+  await signIn('google', { redirectTo: await absoluteCallback(formData.get('callbackUrl')) });
 }
 async function withMicrosoft(formData: FormData): Promise<void> {
   'use server';
-  await signIn('microsoft-entra-id', { redirectTo: safeCallback(formData.get('callbackUrl')) });
+  await signIn('microsoft-entra-id', { redirectTo: await absoluteCallback(formData.get('callbackUrl')) });
 }
 async function withDev(formData: FormData): Promise<void> {
   'use server';
-  await signIn('dev', { redirectTo: safeCallback(formData.get('callbackUrl')) });
+  await signIn('dev', { redirectTo: await absoluteCallback(formData.get('callbackUrl')) });
 }
 
 // eslint-disable-next-line complexity
