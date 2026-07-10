@@ -50,6 +50,14 @@ export interface TenantProfile {
   viewerName: string;
 }
 
+// The env var that holds a tenant's real read-only viewer login email — the SINGLE source of truth
+// for who signs in (OFFGRID_DEMO_VIEWER_<SLUG>_EMAIL, set in .env.local on the server). Chat and other
+// per-user seed rows MUST be owned by this exact identity, or the logged-in viewer (keyed on
+// session.user.email) sees none of them. Pure: derives the key, does not read the environment.
+export function viewerEmailEnvKey(slug: string): string {
+  return `OFFGRID_DEMO_VIEWER_${slug.toUpperCase().replace(/[^A-Z0-9]/g, '')}_EMAIL`;
+}
+
 export const BHARAT_PROFILE: TenantProfile = {
   orgId: 'org_bharat',
   slug: 'bharatunion',
