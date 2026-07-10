@@ -97,7 +97,6 @@
     "eslint-config-next": "^15.1.6",
     "jscpd": "^5.0.12",
     "knip": "^5.88.1",
-    "markdown-link-check": "^3.14.2",
     "playwright": "^1.61.1",
     "prettier": "^3.4.2",
     "tailwindcss": "^4.0.0",
