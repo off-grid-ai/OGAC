@@ -24,25 +24,14 @@ jobs:
         with:
           path: console
 
-      # The @offgrid/* deps are file: links to the sibling shared monorepo. CI needs it
-      # checked out as a sibling so `npm ci` can resolve them (mirrors the local layout).
-      - name: Checkout shared monorepo (@offgrid/* deps)
-        uses: actions/checkout@v4
-        with:
-          repository: off-grid-ai/shared
-          path: shared
-          token: ${{ secrets.SHARED_REPO_TOKEN || github.token }}
-
+      # The @offgrid/* packages are vendored in-repo under console/packages/ (with prebuilt
+      # dist), so `npm ci` resolves the file: deps locally — no private-repo checkout needed.
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: console/package-lock.json
-
-      - name: Build @offgrid packages
-        working-directory: shared
-        run: npm ci && npm run build
 
       - name: Install console deps
         working-directory: console

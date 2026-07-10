@@ -1,0 +1,59 @@
+{
+  "name": "@offgrid/gateway",
+  "version": "0.1.0",
+  "description": "Off Grid AI's local, OpenAI-compatible gateway — run open models (text, vision, image, voice, speech) on-device, behind one API. Embeddable in Electron or run standalone.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "offgrid-gateway": "./dist/cli.js",
+    "offgrid-gateway-cluster": "./dist/cluster-cli.js",
+    "offgrid-gateway-queue": "./dist/queue-cli.js"
+  },
+  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./queue": {
+      "types": "./dist/queue/index.d.ts",
+      "import": "./dist/queue/index.js",
+      "require": "./dist/queue/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts src/cluster-cli.ts src/queue-cli.ts src/queue/index.ts src/queue/worker.ts src/queue/workflow.ts --format esm,cjs --dts --clean --no-splitting --external @temporalio/client --external @temporalio/worker --external @temporalio/workflow --external @temporalio/activity",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "async-mutex": "^0.5.0",
+    "@temporalio/activity": "^1.11.0",
+    "@temporalio/client": "^1.11.0",
+    "@temporalio/worker": "^1.11.0",
+    "@temporalio/workflow": "^1.11.0"
+  },
+  "peerDependencies": {
+    "@xenova/transformers": "*",
+    "sharp": "*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/off-grid-ai/gateway.git"
+  }
+}
