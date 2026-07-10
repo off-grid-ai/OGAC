@@ -14,6 +14,7 @@ export type AppTab =
   | 'reports'
   | 'quality'
   | 'access'
+  | 'schedule'
   | 'controls';
 
 export interface LifecycleTab {
@@ -34,6 +35,11 @@ const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
   { tab: 'reports', label: 'Reports', hint: 'Outcomes over time' },
   { tab: 'quality', label: 'Quality', hint: "This pipeline's evals, golden set, and drift — run and gate on them" },
   { tab: 'access', label: 'Access', hint: 'Who may run, trigger, and approve this — and to what limit' },
+  {
+    tab: 'schedule',
+    label: 'Schedule',
+    hint: 'Set when this runs on its own — a recurring time, timezone, and the next fire',
+  },
   {
     tab: 'controls',
     label: 'Safety',
@@ -73,6 +79,7 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
     'reports',
     'quality',
     'access',
+    'schedule',
     'controls',
   ];
   return (known as string[]).includes(seg) ? (seg as AppTab) : 'build';
