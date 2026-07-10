@@ -95,7 +95,7 @@ export default async function StudioPage() {
         <Stat label="Apps" value={apps.length} />
         <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
         <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
-        <Stat label="Grounded in the Brain" value={`${activity.groundedShare}%`} />
+        <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
       </div>
 
       {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
