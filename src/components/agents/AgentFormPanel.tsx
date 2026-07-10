@@ -243,7 +243,7 @@ export function AgentFormPanel({
           </div>
           <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
             <div>
-              <Label htmlFor="agent-grounded">Grounded in the Brain</Label>
+              <Label htmlFor="agent-grounded">Grounded in org knowledge</Label>
               <p className="text-[11px] text-muted-foreground">
                 Retrieve + cite sources, and verify the answer against them.
               </p>
