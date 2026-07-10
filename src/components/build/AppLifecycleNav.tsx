@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ScrollableTabs } from '@/components/build/ScrollableTabs';
 import { SubNav } from '@/components/nav/SubNav';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { activeTabForPath, lifecycleTabs } from '@/lib/app-lifecycle';
-import { cn } from '@/lib/utils';
 
 // ─── AppLifecycleNav (Builder Epic #116) — the per-app scoped SubNav band ─────────────────────────
 //
@@ -46,30 +46,16 @@ export function AppLifecycleNav({
             {title}
           </span>
           {pipeline ? <PipelineChip pipeline={pipeline} size="xs" /> : null}
-          <nav className="ml-auto flex flex-wrap items-center gap-1">
-            {tabs.map((t) => {
-              const isActive = t.tab === active;
-              return (
-                <Link
-                  key={t.tab}
-                  href={t.href}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 text-sm transition-colors',
-                    isActive
-                      ? 'bg-primary/10 font-medium text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  {t.label}
-                </Link>
-              );
-            })}
-          </nav>
+          {/* On mobile the rail takes a full row and scrolls sideways; on desktop (md+) it keeps its
+              original inline-right position (ml-auto, wrapping) so wide screens are unchanged. */}
+          <ScrollableTabs
+            aria-label="App lifecycle"
+            tabs={tabs.map((t) => ({ key: t.tab, label: t.label, href: t.href }))}
+            active={active}
+            className="w-full md:ml-auto md:w-auto"
+          />
         </div>
-        {activeHint ? (
-          <p className="text-[11px] text-muted-foreground">{activeHint}</p>
-        ) : null}
+        {activeHint ? <p className="text-[11px] text-muted-foreground">{activeHint}</p> : null}
       </div>
     </SubNav>
   );

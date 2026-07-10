@@ -42,39 +42,43 @@ function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] 
     );
   }
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Query</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Checks</TableHead>
-          <TableHead>Signed</TableHead>
-          <TableHead className="w-10" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {runs.map((r) => (
-          <TableRow key={r.id}>
-            <TableCell className="max-w-md truncate text-foreground">{r.query}</TableCell>
-            <TableCell>
-              <Badge variant="secondary" className={STATUS_COLOR[r.status] ?? ''}>
-                {r.status}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-muted-foreground">{r.checks.length}</TableCell>
-            <TableCell className="text-muted-foreground">{r.provenance?.algorithm ?? '—'}</TableCell>
-            <TableCell>
-              <Link
-                href={`/build/agents/${agentId}/runs/${r.id}`}
-                className="text-xs text-primary hover:underline"
-              >
-                trace →
-              </Link>
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Query</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Checks</TableHead>
+            <TableHead>Signed</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {runs.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell className="max-w-md truncate text-foreground">{r.query}</TableCell>
+              <TableCell>
+                <Badge variant="secondary" className={STATUS_COLOR[r.status] ?? ''}>
+                  {r.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground">{r.checks.length}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {r.provenance?.algorithm ?? '—'}
+              </TableCell>
+              <TableCell>
+                <Link
+                  href={`/build/agents/${agentId}/runs/${r.id}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  trace →
+                </Link>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -120,7 +124,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         All agents
       </Link>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-center gap-3">
           <Robot className="size-6 text-primary" />
           <div>
@@ -155,8 +159,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             ) : (
               <p className="text-sm text-muted-foreground">
                 Built-in agent — answers from retrieved sources via the shared system prompt. Its
-                governing pipeline (see the &quot;Runs on&quot; chip above) applies policy, guardrails,
-                grounding, and provenance.
+                governing pipeline (see the &quot;Runs on&quot; chip above) applies policy,
+                guardrails, grounding, and provenance.
               </p>
             )}
           </CardContent>
@@ -171,7 +175,9 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <Row label="Model" value={agent.model || 'gateway default'} />
             <Row label="Grounded" value={agent.grounded ? 'yes' : 'no'} />
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Tools</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Tools
+              </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 {agent.tools.length ? (
                   agent.tools.map((t) => (
@@ -185,7 +191,9 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Needs</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Needs
+              </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 {agent.planes.length ? (
                   agent.planes.map((p) => (
