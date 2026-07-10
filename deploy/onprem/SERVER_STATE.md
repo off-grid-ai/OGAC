@@ -1146,3 +1146,12 @@ else is internal / single-user, so acceptable. Replay: ensure AUTH_COOKIE_DOMAIN
 Verified live 2026-07-10: bank + insurer viewers each log in ON their own subdomain, land on-host,
 bound to the right org, write→403; a session from one tenant on the other tenant's host → that
 tenant's own signin (no cross-tenant data, no awareness).
+
+## Demo tenants fully seeded (2026-07-10, epic #235) — every screen, per-tenant
+Ran on the server against live infra (idempotent, org-guarded to org_bharat/org_suraksha only):
+1. `node --import tsx scripts/seed-demo-tenants.mts` → Postgres, BOTH tenants: gateways·pipelines·connectors·domains·tools·agents·apps(bound)·app_runs·agent_runs·evals·knowledge·chat·governance·teams. Bank=57 runs/$0.077/qwen2.5:14b; Insurer=51 runs/$0.466/llama3.1:70b (distinct books).
+2. `scripts/seed-tenant-telemetry-opensearch.mts` → OpenSearch `offgrid-gateway`: 57+51 org-tagged docs (Analytics/FinOps/Observability/Drift).
+3. `scripts/seed-tenant-files.mts` → object store: 3 bank + 3 insurer files under `orgs/<org>/demo/`.
+4. `scripts/seed-tenant-secrets.mts --write` → OpenBao: 2 secrets each under `secret/<org>/`.
+All idempotent/re-runnable. Verified live: Overview/Studio/Knowledge/Storage/Pipelines/Governance populated + distinct per tenant.
+RESIDUALS (open): Chat list shows empty (convos seeded under seed user, not the viewer — needs user/org-scope reconcile); Analytics empty until the OpenSearch reader org-filter ships (security cluster #236 Sec-C, in flight).
