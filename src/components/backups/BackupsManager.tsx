@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/Pagination';
+import { StatRail } from '@/components/ui/StatRail';
 import { formatAge, formatBytes } from '@/lib/backups-view';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -333,8 +334,8 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
         </Card>
       ) : null}
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Summary tiles — horizontal rail on mobile, restored 4-col grid on desktop. */}
+      <StatRail cols={4}>
         <SummaryTile
           icon={<Clock className="size-4" />}
           label="Latest backup"
@@ -359,7 +360,7 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
           value={data.offBoxEnabled ? 'Enabled' : 'Disabled'}
           sub={data.offBoxEnabled ? (config.offBoxTarget ?? '') : 'no peer configured'}
         />
-      </div>
+      </StatRail>
 
       {/* Schedule status */}
       <Card className="shadow-sm">
