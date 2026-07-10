@@ -304,7 +304,9 @@ test('gatewayDecompose: a fetch that throws is caught → null (catch arm)', asy
 
 // ─── defaultDeps.loadDomains — runs the real org-context assembler over the DB ─────────────────────
 
-test('defaultDeps.loadDomains: returns an array (only connector-bound domains) for a real org', async () => {
+// Hits real Postgres (the org-context assembler) — skip where no DB is provisioned (CI unit lane);
+// exercised locally + in the integration lane, and loadDomains is I/O glue (outside the coverage bar).
+test('defaultDeps.loadDomains: returns an array (only connector-bound domains) for a real org', { skip: !process.env.DATABASE_URL }, async () => {
   const domains = await defaultDeps.loadDomains('default');
   assert.ok(Array.isArray(domains));
   // Every returned domain MUST carry a connector + resource (the filter arm) — the honesty guarantee.
