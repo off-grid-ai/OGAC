@@ -1,6 +1,13 @@
 import { type AuditEvent } from '@/lib/store';
-import { buildAggsQuery, emptyAnalytics, parseAggsResponse } from '@/lib/analytics-aggs';
+import {
+  analyticsScopeFilters,
+  buildAggsQuery,
+  emptyAnalytics,
+  parseAggsResponse,
+  scopedQuery,
+} from '@/lib/analytics-aggs';
 import { type Analytics } from '@/lib/analytics-types';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Analytics now reads REAL gateway traffic from OpenSearch (index offgrid-gateway — the same
 // durable sink the gateway usage/logs views use), NOT the seeded Postgres audit table. Empty or
@@ -20,11 +27,10 @@ const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 export type { Analytics, DayPoint, ModelStat, Signal } from '@/lib/analytics-types';
 
 export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditEvent[]> {
-  // Optional server-side narrowing to one pipeline's slice — the gateway docs carry the pipeline
-  // attribution in `project` (PA-12), so filter on `project.keyword` when a tag is supplied.
-  const query = pipelineTag
-    ? { bool: { filter: [{ term: { 'project.keyword': pipelineTag } }] } }
-    : { match_all: {} };
+  // TENANT ISOLATION (G-ADV-OBS-ORG): scope the raw-doc read to the caller's org via an `org` term,
+  // plus the optional pipeline narrowing (`project.keyword`). Without the org term a tenant's FinOps
+  // cost model would count another tenant's traffic.
+  const query = scopedQuery(analyticsScopeFilters(await currentOrgId(), pipelineTag));
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
@@ -62,10 +68,12 @@ export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditE
 // path). The output shape is byte-identical to the previous JS-loop implementation.
 export async function computeAnalytics(pipelineTag?: string | null): Promise<Analytics> {
   try {
+    // TENANT ISOLATION (G-ADV-OBS-ORG): scope the whole aggregation to the caller's org.
+    const org = await currentOrgId();
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildAggsQuery(Date.now(), pipelineTag)),
+      body: JSON.stringify(buildAggsQuery(Date.now(), pipelineTag, org)),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });
