@@ -1,12 +1,12 @@
 // Walkthrough capture: log in via Keycloak, screenshot every console feature.
-// Usage: BASE=http://127.0.0.1 KC_USER=mac@example.com KC_PASS=changeme \
+// Usage: BASE=http://127.0.0.1 KC_USER=mac@getoffgridai.co KC_PASS=changeme \
 //        OUT=/tmp/shots node scripts/shoot-walkthrough.mjs
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.BASE || 'http://127.0.0.1';
 const OUT = process.env.OUT || '/tmp/shots';
-const KC_USER = process.env.KC_USER || 'mac@example.com';
+const KC_USER = process.env.KC_USER || 'mac@getoffgridai.co';
 const KC_PASS = process.env.KC_PASS || 'changeme';
 mkdirSync(OUT, { recursive: true });
 

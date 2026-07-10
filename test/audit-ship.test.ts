@@ -9,7 +9,7 @@ import { correlationIds } from '../src/lib/correlation.ts';
 
 test('auditEventToDoc flattens actor + carries the canonical fields for term-aggs', () => {
   const ev = buildAuditEvent({
-    actor: { type: 'user', id: 'mac@example.com', label: 'Mac' },
+    actor: { type: 'user', id: 'mac@getoffgridai.co', label: 'Mac' },
     org: 'acme',
     project: 'proj-1',
     action: 'chat.send',
@@ -19,9 +19,9 @@ test('auditEventToDoc flattens actor + carries the canonical fields for term-agg
     outcome: 'ok',
   });
   const doc = auditEventToDoc(ev);
-  assert.equal(doc.actorId, 'mac@example.com');
+  assert.equal(doc.actorId, 'mac@getoffgridai.co');
   assert.equal(doc.actorType, 'user');
-  assert.deepEqual(doc.actor, { type: 'user', id: 'mac@example.com', label: 'Mac' });
+  assert.deepEqual(doc.actor, { type: 'user', id: 'mac@getoffgridai.co', label: 'Mac' });
   assert.equal(doc.action, 'chat.send');
   assert.equal(doc.org, 'acme');
   assert.equal(doc.project, 'proj-1');

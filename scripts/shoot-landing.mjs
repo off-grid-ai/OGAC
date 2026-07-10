@@ -2,7 +2,7 @@
 // for a uniform gallery, and captures the product surfaces the landing page features. Modeled on
 // scripts/shoot-walkthrough.mjs (login flow) + desktop/scripts/screenshots-pro.mjs (clean framing).
 //
-//   BASE=https://onprem-console.getoffgridai.co KC_USER=mac@example.com KC_PASS=changeme \
+//   BASE=https://onprem-console.getoffgridai.co KC_USER=mac@getoffgridai.co KC_PASS=changeme \
 //   OUT=/tmp/landing-shots node scripts/shoot-landing.mjs
 //
 // Viewport shots (not full-page) so each reads like a framed product hero. High DPI for crisp retina.
@@ -11,7 +11,7 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.BASE || 'https://onprem-console.getoffgridai.co';
 const OUT = process.env.OUT || '/tmp/landing-shots';
-const KC_USER = process.env.KC_USER || 'mac@example.com';
+const KC_USER = process.env.KC_USER || 'mac@getoffgridai.co';
 const KC_PASS = process.env.KC_PASS || 'changeme';
 const REIMB = process.env.REIMB_APP || 'app_bdd24eab';
 mkdirSync(OUT, { recursive: true });

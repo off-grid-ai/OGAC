@@ -15,13 +15,13 @@ import {
 
 test('buildAuditEvent produces the canonical shape with required fields', () => {
   const ev = buildAuditEvent({
-    actor: { type: 'user', id: 'mac@example.com', label: 'Mac' },
+    actor: { type: 'user', id: 'mac@getoffgridai.co', label: 'Mac' },
     org: 'acme',
     action: 'chat.send',
     outcome: 'ok',
   });
   assert.equal(ev.actor.type, 'user');
-  assert.equal(ev.actor.id, 'mac@example.com');
+  assert.equal(ev.actor.id, 'mac@getoffgridai.co');
   assert.equal(ev.org, 'acme');
   assert.equal(ev.action, 'chat.send');
   assert.equal(ev.outcome, 'ok');
@@ -152,9 +152,9 @@ test('buildAuditEvent maps a run status passed as outcome', () => {
 });
 
 test('actorFrom: email → user, clientId(no email) → machine, neither → unknown user', () => {
-  assert.deepEqual(actorFrom({ email: 'mac@example.com', name: 'Mac' }), {
+  assert.deepEqual(actorFrom({ email: 'mac@getoffgridai.co', name: 'Mac' }), {
     type: 'user',
-    id: 'mac@example.com',
+    id: 'mac@getoffgridai.co',
     label: 'Mac',
   });
   assert.deepEqual(actorFrom({ clientId: 'svc-runner', name: 'Runner' }), {

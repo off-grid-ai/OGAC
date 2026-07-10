@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.BASE || 'https://onprem-console.getoffgridai.co';
 const OUT = process.env.OUT || '/private/tmp/claude-501/-Users-user-wednesday-off-grid-ai-console/323d0eb2-d030-4591-b755-1399e29a3fc6/scratchpad/shots';
-const USER = process.env.USER_EMAIL || 'mac@example.com';
+const USER = process.env.USER_EMAIL || 'mac@getoffgridai.co';
 const PASS = process.env.PASS || 'changeme';
 const PID = process.env.PID || 'pl_seed_default_loan-underwriting';
 

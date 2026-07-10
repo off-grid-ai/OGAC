@@ -343,7 +343,7 @@ MUST include live vision verification, not just build/typecheck/test. Logged for
 
 - **#36 (P1) — Access → Sessions shows "No active sessions" while the user IS logged in.**
   *Where:* `src/components/access/SessionsPanel.tsx` + `src/lib/keycloak-realm.ts` (session lookup).
-  *Why:* the active-session query returns empty for `mac@example.com` despite a live session — likely
+  *Why:* the active-session query returns empty for `mac@getoffgridai.co` despite a live session — likely
   wrong Keycloak endpoint (user-sessions vs client-sessions) or missing admin scope. Fix + verify a
   live session renders (IP mDNS'd), and "Log out everywhere" works.
 - **#37 (P1) — Access → Federation: "Keycloak error: HTTP 403 Forbidden" listing identity providers.**

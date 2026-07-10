@@ -85,7 +85,7 @@ test('mergeActivity joins an audit event to its content row by runId (no doublin
       audit: [
         {
           ts: '2026-07-02T09:00:00Z',
-          actorId: 'mac@example.com',
+          actorId: 'mac@getoffgridai.co',
           action: 'agent.run',
           outcome: 'blocked',
           model: 'gemma-local',
