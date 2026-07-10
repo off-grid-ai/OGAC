@@ -1,6 +1,6 @@
 // Pure decision for the landing "product tour": which product shot is showing in the top hero, and
 // which surface a lightbox is opened on. Both are driven from the URL (?shot=<id>) so the tour is
-// deep-linkable and Back-coherent (the nav rule) — this module turns the raw query value into the
+// deep-linkable and Back-coherent (the nav rule) -  this module turns the raw query value into the
 // resolved shot, with zero IO so it is unit-testable and reused by both the hero and the carousel.
 
 export interface TourShot {
@@ -14,7 +14,7 @@ export interface TourShot {
 
 /**
  * Resolve the shot a given ?shot= value points at. An unknown, empty, or absent value falls back to
- * the default (index 0) — the tour always shows a real screenshot, never a blank hero.
+ * the default (index 0) -  the tour always shows a real screenshot, never a blank hero.
  */
 export function resolveShot(shots: readonly TourShot[], id: string | null | undefined): TourShot {
   if (shots.length === 0) throw new Error('resolveShot: shots must not be empty');
@@ -22,7 +22,7 @@ export function resolveShot(shots: readonly TourShot[], id: string | null | unde
   return found ?? shots[0];
 }
 
-/** The index of the resolved shot — for marking the active card in the rail. */
+/** The index of the resolved shot -  for marking the active card in the rail. */
 export function activeShotIndex(shots: readonly TourShot[], id: string | null | undefined): number {
   if (shots.length === 0) return 0;
   const i = id ? shots.findIndex((s) => s.id === id) : -1;

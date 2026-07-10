@@ -74,17 +74,17 @@ const PROOF: { value: string; label: string }[] = [
 function Nav() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[100rem] items-center justify-between px-4 sm:px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
+      <div className="mx-auto flex h-14 max-w-[100rem] items-center justify-between gap-2 px-4 sm:px-6">
+        <div className="flex min-w-0 shrink items-center gap-2 sm:gap-2.5">
           <Image src="/logo.png" alt="Off Grid AI" width={24} height={24} priority />
-          <span className="text-sm font-medium text-foreground">Off Grid AI</span>
+          <span className="truncate text-sm font-medium text-foreground">Off Grid AI</span>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:inline">
             Console
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <ThemeToggle />
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <a
               href="https://github.com/off-grid-ai/console"
               target="_blank"
@@ -94,7 +94,11 @@ function Nav() {
               <span className="hidden sm:inline">GitHub</span>
             </a>
           </Button>
-          <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button
+            asChild
+            size="sm"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
             <Link href="/overview">Open console</Link>
           </Button>
         </div>

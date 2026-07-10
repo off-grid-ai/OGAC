@@ -1,5 +1,5 @@
 // Pure logic for a "decrypt" text reveal: a headline word resolves from scrambled glyphs to its
-// final characters, left to right, as if a system is decoding it — an intelligent-system accent,
+// final characters, left to right, as if a system is decoding it -  an intelligent-system accent,
 // not a toy. Zero IO: given the target text and a progress value 0..1, return the frame to paint.
 // The .tsx drives `progress` from a rAF/timer; reduced motion just renders the final text.
 
@@ -19,7 +19,7 @@ export function decryptFrame(text: string, progress: number, seed = 0): string {
     if (i < resolved || ch === ' ') {
       out += ch;
     } else {
-      // Deterministic pseudo-random glyph for (i, seed) — no Math.random so tests are stable.
+      // Deterministic pseudo-random glyph for (i, seed) -  no Math.random so tests are stable.
       const idx = (i * 73 + seed * 31 + i * i) % GLYPHS.length;
       out += GLYPHS[idx];
     }

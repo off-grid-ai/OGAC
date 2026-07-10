@@ -1,16 +1,16 @@
 // Pure geometry for a "magnetic" hover-intent control: as the pointer approaches an element, the
 // element eases a small distance TOWARD the pointer (transform only), giving the CTA a sense of
-// intent — it reaches for you. Zero IO, unit-testable; the .tsx reads the element rect and applies
+// intent -  it reaches for you. Zero IO, unit-testable; the .tsx reads the element rect and applies
 // the returned translate. Reduced motion is honored by the caller returning {0,0} (see identity).
 
 export interface MagneticInput {
   /** Pointer position relative to the element's centre, in px. */
   dx: number;
   dy: number;
-  /** Half-extent of the element (px) — the pull is measured against the element's own size. */
+  /** Half-extent of the element (px) -  the pull is measured against the element's own size. */
   halfWidth: number;
   halfHeight: number;
-  /** Fraction of the offset the element travels (0..1). Small by design — restraint. */
+  /** Fraction of the offset the element travels (0..1). Small by design -  restraint. */
   strength?: number;
   /** Beyond this multiple of the half-extent the pull is zero (pointer is too far to matter). */
   radiusFactor?: number;
