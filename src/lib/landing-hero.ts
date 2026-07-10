@@ -40,3 +40,23 @@ export function togglePromoted(
 ): string | null {
   return currentId === clickedId ? null : clickedId;
 }
+
+/**
+ * The focus-trap decision for a lightbox / modal on a Tab keypress: given the ordered focusable
+ * elements and which one currently holds focus, return the element focus should WRAP to (and thus
+ * the default should be prevented), or null to let the browser move focus normally. Kept pure (no
+ * DOM access, indices only) so the wrap logic is unit-testable without a real focus trap.
+ *
+ * - Tab on the last element wraps to the first; Shift+Tab on the first wraps to the last.
+ * - Any other position returns null (no interception), as does an empty set.
+ */
+export function nextFocusTarget(
+  count: number,
+  activeIndex: number,
+  shiftKey: boolean,
+): 'first' | 'last' | null {
+  if (count === 0) return null;
+  if (shiftKey && activeIndex === 0) return 'last';
+  if (!shiftKey && activeIndex === count - 1) return 'first';
+  return null;
+}
