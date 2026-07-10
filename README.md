@@ -163,7 +163,7 @@ variable at a best-in-class open-source engine. Same governance either way.
 - **External guardrail engines** (Lakera, Aporia, Prompt-Security) plug into a generic HTTP seam that ships and works today. A named-vendor mapping is one config plus at most one field-map, documented, not a pre-built branded integration per vendor.
 - **Durable runs.** Temporal execution visibility is wired (you can see workflow state). Durable execution itself is opt-in (`OFFGRID_QUEUE_ENABLED=1`) and still being hardened. Runs are synchronous by default.
 - **BI dashboards.** [Superset](https://superset.apache.org) embeds on Insights after a one-time `superset init`.
-- **Device fleet.** [FleetDM](https://fleetdm.com) is a read-only host inventory today. It needs a one-time setup.
+- **Device fleet.** Host inventory, live osquery, software/CVE, and policies work today via [Fleet](https://fleetdm.com)'s open-source core (agent-enrolled). Full **MDM control (lock/wipe/config profiles, Apple APNs) is coming soon**, and some advanced MDM/RBAC is Fleet Premium (separately licensed).
 - **Deeper data-plane CRUD** (source or destination creation, dbt-orchestrated transforms) is partial. Connector sync and job read-back work now.
 
 **On the roadmap (not built yet)**
