@@ -829,10 +829,15 @@ LLM Guard (`laiyer/llm-guard-api:0.3.16`) deployed + screened a live payload thr
   toxicity/bias are heavy transformers. Ran only with a trimmed PII+Secrets config + 6g cap. A
   production deploy of the full suite needs a sized host (or GPU). Compose service should document
   a minimal-scanner default + a "full suite needs N GB" note.
-- **G-LG-2 (console, P1):** stock Anonymize did NOT catch the Indian PAN (`ABCDE1234F` passed). The
-  console's first-party Presidio `in-pan`/`aadhaar` recognizers are what close this — confirm the
-  LLM Guard scanner config the console generates includes the India recognizers, else BFSI-India PII
-  leaks past the engine's defaults.
+- **G-LG-2 (console, P1) ✅ RESOLVED (code+wired, unit-verified):** stock Anonymize did NOT catch the
+  Indian PAN (`ABCDE1234F` passed). Closed by `src/lib/llm-guard-config.ts` — a pure generator that
+  folds the India recognizers (`IN_PAN`/`IN_AADHAAR`/`IN_IFSC`/`UPI_ID`) from the shared
+  `DEFAULT_RECOGNIZERS` (presidio-recognizers.ts) into the Anonymize scanner's `recognizer_conf`, so
+  the scanner config the console POSTs to LLM Guard on every scan carries them. DRY: one source of the
+  India patterns, two consumers (the generator + the existing Presidio path's mergeWithDefaults). The
+  adapter (`guardrail-provider.ts`) attaches this config to `/analyze/prompt`. Proven by
+  `test/guardrail-provider.test.ts` ("the POSTed scanner config INCLUDES the India recognizers") +
+  `test/llm-guard-config.test.ts`. Live fleet re-verify tracked under G-LG-3.
 - **G-LG-3 (console, P1):** engine screening is verified; the console ROUTING a governed run through
   it (`OFFGRID_ADAPTER_GUARDRAILS=llm-guard` → guardrail step → masked in run trace + audit) is
   code+wired, NOT yet live-verified on the fleet (needs the new console code deployed). Verify
@@ -842,7 +847,7 @@ LLM Guard (`laiyer/llm-guard-api:0.3.16`) deployed + screened a live payload thr
 
 ## 2026-07-10 — Model gateway → LiteLLM Proxy (Stage 1 landed; Stage 2 = vLLM GPU serving, OPEN)
 
-- **[G-GW-LITELLM-1] ✅ CODE+WIRED (not live-verified) — LiteLLM Proxy as the AWS-grade router replacing the hand-rolled aggregator on the model door (Stage 1).** LiteLLM (OpenAI-compatible) drops in behind the existing `OFFGRID_GATEWAY_URL` seam with NO console routing-logic change. Added: pure `src/lib/litellm-config.ts` (fleet pool + cloud providers → generated `config.yaml`, unit-tested), pure `src/lib/litellm-log-shape.ts` (LiteLLM callback → the SAME `TrafficRecord`/`offgrid-gateway` index the Traffic/Logs UI already reads), thin adapter `src/lib/litellm.ts` (graceful `configured:false`, mirrors victoria-metrics.ts), `GET /api/v1/gateway/router` + AI Gateway → **Router** tab (`GatewayRouter`) showing per-deployment health + budgets, `litellm` observability entry in Integrations, `litellm` compose service + committed sample `deploy/litellm-config.yaml` + `.env.example` vars. The fleet pool is now the shared SSOT `scripts/fleet-pool.mjs` (consumed by BOTH `cluster-gateway.mjs` and the config generator — DRY). **Left OPEN for the fleet owner:** live cutover (`OFFGRID_GATEWAY_URL=http://litellm:4000`) + verification that LB/failover/budgets/logging work end-to-end on the 8-node fleet; the aggregator stays the active door + fallback until then. The custom OpenSearch logging-callback shim (the thin process that CALLS `litellmPayloadToTrafficRecord` and POSTs to the index) is declared in config as `otel`/custom but the concrete callback module is a deploy-side wiring task, not yet written.
+- **[G-GW-LITELLM-1] ✅ CODE+WIRED (not live-verified) — LiteLLM Proxy as the AWS-grade router replacing the hand-rolled aggregator on the model door (Stage 1).** LiteLLM (OpenAI-compatible) drops in behind the existing `OFFGRID_GATEWAY_URL` seam with NO console routing-logic change. Added: pure `src/lib/litellm-config.ts` (fleet pool + cloud providers → generated `config.yaml`, unit-tested), pure `src/lib/litellm-log-shape.ts` (LiteLLM callback → the SAME `TrafficRecord`/`offgrid-gateway` index the Traffic/Logs UI already reads), thin adapter `src/lib/litellm.ts` (graceful `configured:false`, mirrors victoria-metrics.ts), `GET /api/v1/gateway/router` + AI Gateway → **Router** tab (`GatewayRouter`) showing per-deployment health + budgets, `litellm` observability entry in Integrations, `litellm` compose service + committed sample `deploy/litellm-config.yaml` + `.env.example` vars. The fleet pool is the shared SSOT `scripts/fleet-pool.mjs` (consumed by the config generator — DRY). The retired hand-rolled runner `scripts/cluster-gateway.mjs` has been DELETED; LiteLLM (:4000) is the gateway. **Left OPEN for the fleet owner:** live cutover (`OFFGRID_GATEWAY_URL=http://litellm:4000`) + verification that LB/failover/budgets/logging work end-to-end on the 8-node fleet. The custom OpenSearch logging-callback shim (the thin process that CALLS `litellmPayloadToTrafficRecord` and POSTs to the index) is declared in config as `otel`/custom but the concrete callback module is a deploy-side wiring task, not yet written.
 - **[G-GW-VLLM-2] (P1, `infra`) — Stage 2: vLLM GPU model serving behind LiteLLM.** This round is Stage 1 ONLY (LiteLLM router over the existing llama.cpp fleet nodes on :7878). Stage 2 is standing up vLLM (or TGI) as a GPU-backed OpenAI-compatible serving backend for the larger models and registering those deployments in the LiteLLM `model_list` (a new provider-kind + pool source). NOT built here — logged so it isn't lost. Depends on GPU capacity on the fleet + the Stage-1 cutover being verified live first.
 
 ---
