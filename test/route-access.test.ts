@@ -37,7 +37,12 @@ test('isPublicPath: marketing/docs/auth surfaces are public', () => {
 });
 
 test('isPublicPath: authed console + admin API are NOT public', () => {
-  for (const p of ['/gateway/fleet', '/operations/admin', '/api/v1/admin/tenants', '/workspace/chat']) {
+  for (const p of [
+    '/gateway/fleet',
+    '/operations/admin',
+    '/api/v1/admin/tenants',
+    '/workspace/chat',
+  ]) {
     assert.equal(isPublicPath(p), false, `${p} should require auth`);
   }
 });
@@ -58,14 +63,8 @@ test('isPublicPath: node device endpoints are public (device-token auth)', () =>
 });
 
 test('tenantSlugFromHost: extracts the slug from a first-level tenant subdomain', () => {
-  assert.equal(
-    tenantSlugFromHost('bharatunion-onprem-console.getoffgridai.co'),
-    'bharatunion',
-  );
-  assert.equal(
-    tenantSlugFromHost('wednesdaysol-onprem-console.getoffgridai.co'),
-    'wednesdaysol',
-  );
+  assert.equal(tenantSlugFromHost('bharatunion-onprem-console.getoffgridai.co'), 'bharatunion');
+  assert.equal(tenantSlugFromHost('wednesdaysol-onprem-console.getoffgridai.co'), 'wednesdaysol');
 });
 
 test('tenantSlugFromHost: null for the bare console host and unrelated hosts', () => {
@@ -76,10 +75,7 @@ test('tenantSlugFromHost: null for the bare console host and unrelated hosts', (
 });
 
 test('tenantSlugFromHost: case-insensitive on the host', () => {
-  assert.equal(
-    tenantSlugFromHost('BharatUnion-OnPrem-Console.getoffgridai.co'),
-    'bharatunion',
-  );
+  assert.equal(tenantSlugFromHost('BharatUnion-OnPrem-Console.getoffgridai.co'), 'bharatunion');
 });
 
 // ─── isTenantRootRedirect — tenant "/" goes to the console, apex "/" stays the landing ─────────────
@@ -95,7 +91,10 @@ test('isTenantRootRedirect: the APEX host at "/" does NOT redirect (keeps the la
 });
 
 test('isTenantRootRedirect: a tenant host at a non-root path does NOT redirect', () => {
-  assert.equal(isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/overview'), false);
+  assert.equal(
+    isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/overview'),
+    false,
+  );
   assert.equal(isTenantRootRedirect('bharatunion-onprem-console.getoffgridai.co', '/docs'), false);
   assert.equal(isTenantRootRedirect('suraksha-onprem-console.getoffgridai.co', '/signin'), false);
 });
@@ -131,8 +130,16 @@ test('gatewayFromHost: case-insensitive on the host', () => {
 });
 
 test('gatewayFromHost: rejects the SHARED gateway + non-matching hosts (null)', () => {
-  assert.equal(gatewayFromHost('gateway.getoffgridai.co'), null, 'shared gateway is not per-tenant');
-  assert.equal(gatewayFromHost('bharatunion-onprem-console.getoffgridai.co'), null, 'a console host');
+  assert.equal(
+    gatewayFromHost('gateway.getoffgridai.co'),
+    null,
+    'shared gateway is not per-tenant',
+  );
+  assert.equal(
+    gatewayFromHost('bharatunion-onprem-console.getoffgridai.co'),
+    null,
+    'a console host',
+  );
   assert.equal(gatewayFromHost('getoffgridai.co'), null);
   // Wrong label length (label must be exactly 10 alphanumerics before -gateway).
   assert.equal(gatewayFromHost('short-gateway.getoffgridai.co'), null, 'label too short');
