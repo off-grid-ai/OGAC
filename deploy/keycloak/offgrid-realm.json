@@ -237,36 +237,36 @@
       "realmRoles": ["svc-superset"]
     },
     {
-      "username": "mohammed.ali@example.com",
+      "username": "admin@getoffgridai.co",
       "enabled": true,
-      "email": "mohammed.ali@example.com",
+      "email": "admin@getoffgridai.co",
       "emailVerified": true,
       "firstName": "Mohammed",
       "lastName": "Ali",
       "credentials": [
-        { "type": "password", "value": "changeme", "temporary": true }
+        { "type": "password", "value": "ChangeMe123!", "temporary": true }
       ]
     },
     {
-      "username": "diksha.sharma@example.com",
+      "username": "analyst@getoffgridai.co",
       "enabled": true,
-      "email": "diksha.sharma@example.com",
+      "email": "analyst@getoffgridai.co",
       "emailVerified": true,
       "firstName": "Diksha",
       "lastName": "Sharma",
       "credentials": [
-        { "type": "password", "value": "changeme", "temporary": true }
+        { "type": "password", "value": "ChangeMe123!", "temporary": true }
       ]
     },
     {
-      "username": "ali@example.com",
+      "username": "member@getoffgridai.co",
       "enabled": true,
-      "email": "ali@example.com",
+      "email": "member@getoffgridai.co",
       "emailVerified": true,
       "firstName": "Ali",
       "lastName": "",
       "credentials": [
-        { "type": "password", "value": "changeme", "temporary": true }
+        { "type": "password", "value": "ChangeMe123!", "temporary": true }
       ]
     }
   ]

@@ -25,11 +25,11 @@ test('buildRunAuditDoc carries run metadata and defaults', () => {
     agentId: 'support-bot',
     outcome: 'blocked',
     model: 'gemma-local',
-    caller: 'mac@example.com',
+    caller: 'mac@getoffgridai.co',
   });
   assert.equal(doc.deviceId, 'agent:support-bot');
   assert.equal(doc.outcome, 'blocked');
-  assert.equal(doc.keyId, 'mac@example.com');
+  assert.equal(doc.keyId, 'mac@getoffgridai.co');
   assert.equal(doc.tokens, 0); // defaulted
   assert.equal(doc.leftDevice, true);
   assert.equal(typeof doc.ts, 'string');

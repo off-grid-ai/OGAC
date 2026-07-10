@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || 'https://onprem-console.getoffgridai.co';
 const OUT = process.env.OUT || join(__dirname, '..', 'public', 'docs-shots');
-const USER = process.env.USER_EMAIL || 'mac@example.com';
+const USER = process.env.USER_EMAIL || 'mac@getoffgridai.co';
 const PASS = process.env.PASS || 'changeme';
 
 mkdirSync(OUT, { recursive: true });

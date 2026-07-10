@@ -20,7 +20,7 @@ Where they run: **S1 (127.0.0.1)** — OpenSearch, Qdrant, OPA, OpenBao, Marquez
 | Service | Purpose | Console integration | Depth |
 |---|---|---|---|
 | **Postgres/pgvector** | Console state + append-only audit + vector store | All module state, audit, FinOps, agent runs, chat | 🟢 |
-| **Keycloak** | Identity / SSO (OIDC) | The login path; `@example.com` restricted | 🟢 |
+| **Keycloak** | Identity / SSO (OIDC) | The login path; `@your-company.example` restricted | 🟢 |
 | **OPA** | Policy-as-code decisions | `POST /v1/data/offgrid/authz` per agent run + fallback | 🟢 |
 | **Presidio** | PII detection / redaction | `/analyze` per request; redaction is regex (not `/anonymize`) | 🟢 / 🟡 |
 | **Redis** | Response cache + rate limiting | get/set response cache (active) | 🟢 |
@@ -46,7 +46,7 @@ Where they run: **S1 (127.0.0.1)** — OpenSearch, Qdrant, OPA, OpenBao, Marquez
 events (which feed Analytics/FinOps/Regulatory), agent-run traces. **🟢 fully used.**
 
 ### Keycloak — identity / SSO
-**Purpose:** who can log in. OIDC realm `offgrid`, restricted to `@example.com`.
+**Purpose:** who can log in. OIDC realm `offgrid`, restricted to `@your-company.example`.
 **Exposed:** OIDC (authorize/token/userinfo), admin API, SCIM.
 **Console consumes:** the sign-in flow (NextAuth → Keycloak). Roles come from the user record.
 **Available, not wired:** SCIM group→role auto-provisioning (stub endpoint exists). **🟢.**

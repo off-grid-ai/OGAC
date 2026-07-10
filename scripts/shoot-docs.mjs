@@ -2,7 +2,7 @@
 // forces LIGHT theme for a uniform gallery, and captures every surface + key detail/flow screens at
 // high DPI. Output -> public/docs-shots/ (the convention the /docs pages already reference).
 //
-//   BASE=https://onprem-console.getoffgridai.co USER=mac@example.com PASS=changeme \
+//   BASE=https://onprem-console.getoffgridai.co USER=you@example.com PASS=your-password \
 //   OUT=public/docs-shots node scripts/shoot-docs.mjs [only-slug ...]
 //
 // Modeled on desktop/scripts/screenshots-pro.mjs (clean framing, light mode) + the proven login flow.
@@ -11,7 +11,7 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.BASE || 'https://onprem-console.getoffgridai.co';
 const OUT = process.env.OUT || 'public/docs-shots';
-const USER = process.env.USER_EMAIL || process.env.USER || 'mac@example.com';
+const USER = process.env.USER_EMAIL || process.env.USER || 'mac@getoffgridai.co';
 const PASS = process.env.PASS || 'changeme';
 const REIMB = process.env.REIMB_APP || 'app_bdd24eab';
 const only = process.argv.slice(2);

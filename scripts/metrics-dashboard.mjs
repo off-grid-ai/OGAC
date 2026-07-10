@@ -99,7 +99,7 @@ const BOOK = `
 <tr><td>Gateway (aggregator)</td><td><code>http://127.0.0.1:8800/v1</code></td></tr>
 <tr><td>Gateway traffic (live)</td><td><code>http://127.0.0.1/gateway</code> — in the console: per-gateway calls, latency, tokens</td></tr>
 <tr><td>Keycloak</td><td><code>http://127.0.0.1:8080</code> · admin <code>admin/offgrid-dev</code></td></tr></table>
-<p>Console login: <code>mac@ · mohammed.ali@ · diksha.sharma@ · ali@example.com</code> / <code>changeme</code>. Use a fresh window after any restart.</p>
+<p>Console login: use your configured admin account. Use a fresh window after any restart.</p>
 
 <h2>3 · SERVICES (how each stays up)</h2>
 <ul>

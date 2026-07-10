@@ -51,7 +51,7 @@ Legend: **Yes** = actively used · **Partial** = wired shallow / available but n
 | Impersonation | Admin acts as user | No | — |
 | Account console | User self-service creds | No | — |
 | Back/front-channel logout | Coordinated single logout | No | Basic signout only |
-| `@example.com` domain restriction | Restrict realm login to domain | Yes | Enforced |
+| `@your-company.example` domain restriction | Restrict realm login to domain | Yes | Enforced |
 
 ### Open Policy Agent (OPA)
 | Capability | App-layer | Used? | Notes/gap |

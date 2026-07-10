@@ -20,7 +20,7 @@ const rows: ActivityRow[] = [
   {
     ts: '2026-07-01T10:00:00.000Z',
     actorType: 'user',
-    actorId: 'mac@example.com',
+    actorId: 'mac@getoffgridai.co',
     actorLabel: 'Mac',
     org: 'default',
     project: 'finance',
@@ -34,7 +34,7 @@ const rows: ActivityRow[] = [
   {
     ts: '2026-07-02T10:00:00.000Z',
     actorType: 'user',
-    actorId: 'mac@example.com',
+    actorId: 'mac@getoffgridai.co',
     actorLabel: 'Mac',
     action: 'agent.run',
     model: 'cloud-claude',

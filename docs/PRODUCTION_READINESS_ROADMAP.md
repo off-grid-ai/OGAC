@@ -96,7 +96,7 @@ live across two seeded tenants. View everything, write nothing.
   git submodule.
 - **P5.2** Rewrite git history (filter-repo) to purge secrets/IPs per `docs/SECRET_INVENTORY.md`;
   force-push (breaks existing clones - deliberate, supervised).
-- **P5.3** Rotate the leaked `oglb_` gateway key + the `changeme` / dev-default credentials named
+- **P5.3** Rotate the leaked `oglb_` gateway key + the dev-default credentials named
   in SECRET_INVENTORY.
 - **P5.4** Genericize `.env.example` + both `CLAUDE.md` (internal IPs / hosts).
 - **P5.5** Landing page inherits the README philosophy + deployed (IN PROGRESS).
