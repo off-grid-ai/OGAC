@@ -4,15 +4,18 @@
 // hand-write regex to turn on the protections everyone needs. Bundle the STANDARD guardrails so a
 // non-technical operator ONE-CLICK enables them.
 //
-// Two kinds of standard guardrail ship here:
-//   1. `presidio-entity`  — a PII/PHI entity type that Presidio's analyzer already knows how to
-//      detect out of the box (PERSON, EMAIL_ADDRESS, US_SSN, IBAN_CODE, country packs, …). The
-//      operator just picks WHICH entities to detect — no regex, no config. Presidio ships these
-//      recognizers; enabling one means "detect + mask this entity in this org."
-//   2. `guardrails-validator` — a curated Guardrails-AI Hub validator (toxic-language, detect-PII,
-//      detect-prompt-injection, secrets-present, competitor-check, …). A behavioural check that
-//      runs on-prem via the Guardrails-AI runtime; the console records the org's intent to enforce
-//      it.
+// LLM Guard is THE authoritative content-guardrail engine. Its Anonymize scanner uses Presidio under
+// the hood (so it recognizes the standard PII entities below) AND carries the India recognizers the
+// console folds into the scanner config (llm-guard-config.ts). Three kinds of standard guardrail ship:
+//   1. `presidio-entity`  — a PII/PHI entity type (PERSON, EMAIL_ADDRESS, US_SSN, IBAN_CODE, the IN_*
+//      packs, …). The operator picks WHICH entities to mask — no regex, no config. Enabling one means
+//      "detect + mask this entity", ENFORCED by LLM Guard's Anonymize scanner (the entity name is a
+//      Presidio recognizer LLM Guard runs).
+//   2. `llm-guard-scanner` — a specific LLM Guard scanner class (Anonymize, Secrets, PromptInjection,
+//      Toxicity, Bias, BanTopics, Language, Regex, TokenLimit) enabled directly.
+//   3. `guardrails-validator` — a curated Guardrails-AI Hub validator (a LEGACY second-opinion check
+//      that runs on-prem via the Guardrails-AI runtime; distinct from the authoritative LLM Guard
+//      engine). The console records the org's intent to enforce it.
 //
 // ── HOW ENABLING WRITES THROUGH THE EXISTING PATH (no new storage) ────────────────────────────────
 // Enabling a catalog item does NOT introduce a new store. It writes a row through the EXISTING
@@ -25,9 +28,10 @@
 // path, one audit trail, and the existing GuardrailRules table/UI already manages what we enable.
 //
 // ── AIR-GAP SAFETY ────────────────────────────────────────────────────────────────────────────────
-// Everything here runs ON-PREM. Presidio entities are detected by the local Presidio analyzer.
-// Guardrails-AI validators run in the local Guardrails runtime. Nothing in this catalog reaches the
-// public internet — no item declares network egress, and the payload builder writes only local rows.
+// Everything here runs ON-PREM. PII entities + LLM Guard scanners are enforced by the self-hosted
+// LLM Guard engine (its Anonymize scanner runs Presidio locally). Guardrails-AI validators run in the
+// local Guardrails runtime. Nothing in this catalog reaches the public internet — no item declares
+// network egress, and the payload builder writes only local rows.
 //
 // ── GROUNDED — REAL entities/validators ONLY (do NOT invent) ─────────────────────────────────────
 //   • Presidio predefined recognizers — microsoft.github.io/presidio (Supported entities):
