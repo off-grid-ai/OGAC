@@ -1,4 +1,68 @@
-# Session handoff — 2026-07-10 LATE (landing polish + WHOLE-APP MOBILE) — READ THIS FIRST
+# Session handoff — 2026-07-10 LATEST (demo entry + landing fixes + fan-out) — READ THIS FIRST
+
+**Git: `wave2-tenant-isolation-prompts-analytics-evals` @ `5a883bd`, CLEAN, pushed to origin.** This is
+all merged work. `main` still older — merge wave2→main (PR) when ready. Fresh session: `git fetch` first.
+
+**MERGED + PUSHED since the block below:** landing light/dark+beam, 5-facet hero, landing pass 2, whole-app
+mobile M1-M7, landing bug fixes (static tour stage, lightbox scroll-restore + lightbox height-fit
+`0d8eca5`, compliance diagram → "cloud or on-prem"), demo entry (tenant root→signin, See-it-live→
+/overview, signin header + creds banner), services→capability-name relabel (`5a883bd`). All deployed to
+onprem-console ONCE earlier (landing verified live both themes); the LATER merges are NOT yet deployed.
+
+**3 AGENT BRANCHES PUSHED TO REMOTE (committed progress safe) — resume = fetch + review + merge + gate + push:**
+- `worktree-agent-a9a3b00edc4c203e9` (@4a7fe6a, **CODE-COMPLETE**) — AUTH ORG-PROPAGATION + per-tenant demo
+  creds. 3 commits: orgFrom() reads per-user org claim off KC token; jwt+session callbacks propagate
+  token.org→session.user.org; resolveDemoCreds() per-tenant signin banner. MERGE THIS FIRST. It edits
+  src/lib/auth/identity.ts, src/auth.config.ts, src/lib/demo-hellobar.ts, src/app/signin/page.tsx. Read its
+  task output for the EXACT org claim name it reads (needed for the KC mapper below).
+- `worktree-agent-afe90be70ec4e6868` (@099386d, PARTIAL) — #226 aggressive gate (knip/audit-ci/
+  markdown-link-check/typed-lint devDeps+scripts added; more triage likely pending). May still be running.
+- `worktree-agent-a93be6632c34c3053` (@88e4dcc, PARTIAL) — release publishability scaffolding (issue/PR
+  templates + CLA done; SECURITY/CONTRIBUTING/.env.example audit + PUBLISHABILITY_REPORT.md pending). May
+  still be running.
+
+**#233 FLEET COPY (do RIGHT AFTER merging a9a3b — same file signin/page.tsx):** (1) line ~119 subtitle drop
+"fleet": "Sign in to your control plane: models, data, agents, and governance." (2) lines ~30/43 default
+post-signin redirect is `/gateway/fleet` → change to `/overview` (else a demo viewer lands on coming-soon
+Fleet). Also sweep landing/demo nav for "Fleet" (coming-soon, not live).
+
+**DEMO LIVE-PROVISIONING (server half of #229 — THE thing that makes the demo actually show data):**
+Live facts (verified this session): KC container `offgrid-console-keycloak-1` realm `offgrid`, admin
+`admin`/(pw in container env KEYCLOAK_ADMIN_PASSWORD, 11 chars); console dir `/Users/admin/offgrid/console`,
+runtime env = `.env.local` (NOT .env.production); DB container `offgrid-console-postgres-1` db
+`offgrid_console`; tenants bharatunion→`org_bharat`, suraksha→`org_suraksha`; `OFFGRID_ORG` UNSET; ROPC
+(directAccessGrants) enabled on client `offgrid-console`. A user with NO admin/editor role resolves to
+role=`viewer`. Org-binding rule (tenancy-policy.ts, DO NOT weaken): a viewer sees a tenant's data ONLY if
+session.user.org == that tenant org → hence the a9a3b org-claim work + per-tenant viewers.
+  TODO once a9a3b merged + you know the claim name:
+  1. Create TWO KC viewer users in realm offgrid: demo-bharat@getoffgridai.co (org attr=org_bharat),
+     demo-suraksha@getoffgridai.co (org attr=org_suraksha), each a set password. (A generic
+     demo@getoffgridai.co / OffGridDemo2026 was already created this session as groundwork — repurpose or
+     delete; per-tenant is what's needed.)
+  2. Add a KC protocol mapper on client `offgrid-console` mapping user-attribute `org` → the token claim
+     name a9a3b's identity.ts reads.
+  3. Set env in /Users/admin/offgrid/console/.env.local: OFFGRID_DEMO_VIEWER_BHARATUNION_EMAIL/_PASSWORD +
+     OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL/_PASSWORD (+ generic fallback OFFGRID_DEMO_VIEWER_EMAIL/_PASSWORD).
+  4. Deploy: `SERVER=offgrid-tunnel SSH_USER=admin bash deploy/push.sh` → launchctl kickstart -k
+     gui/501/co.getoffgridai.console (NEVER pkill+nohup; kill stale root :3000 with sudo -n kill -9).
+  5. VERIFY LIVE: viewer logs in on bharatunion-onprem-console + suraksha-onprem-console → sees seeded
+     data, writes 403, lands on /overview. Document all of this in deploy/onprem/SERVER_STATE.md.
+
+**THEN auto-launch (need the live seeded+authenticated console): #222 fresh README/docs screenshots;
+cross-module mobile sweep 390/320 both themes; QA/platform-integration+docs sweep (operating-model, after
+this merge wave).**
+
+**FANNED OUT / DIRECTIVE (2026-07-10): founder said "create agents to do everything EXCEPT insurer".** Running/
+done above. NOT auto-started (report, don't build blind): supervised irreversible (history scrub, key
+rotation, repo-split — a93be6's PUBLISHABILITY_REPORT enumerates them); insurer #207/#216 (excluded); big epics
+#199 (NL-builder empowerment) + #217 (consumption/BFSI, insurer-adjacent) — decompose into their own agent waves
+only on explicit go.
+
+**GitHub repo Website field** already set to https://onprem-console.getoffgridai.co (gh repo edit, verified).
+
+---
+
+# Session handoff — 2026-07-10 LATE (landing polish + WHOLE-APP MOBILE)
 
 **Git state right now:** branch `wave2-tenant-isolation-prompts-analytics-evals` @ `cfe8dc2`, tree CLEAN,
 pushed to origin. ALL of this session's work is merged onto wave2 + on remote. `main` is still at
