@@ -1121,3 +1121,28 @@ signin-page creds banner, tour the real seeded product, view everything incl. ad
 correctly (org_bharat / org_suraksha), sees that tenant's data, write POST → 403. Tenant root `/`
 307-redirects to `/overview` on the SAME tenant host (middleware rebuilds origin from trusted Host —
 req.nextUrl.origin resolves to apex behind the tunnel). Apex `/` still serves the marketing landing.
+
+## Host-scoped session cookies (2026-07-10, task #229) — tenants are session-isolated
+
+`AUTH_COOKIE_DOMAIN` was REMOVED from `/Users/admin/offgrid/console/.env.local` (was
+`.getoffgridai.co`). Reason: a shared cookie domain let ONE login span every `*.getoffgridai.co`
+subdomain, so a bank-tenant session was silently honored on the insurer subdomain (showed the user's
+own bank data there). No data leak (bindTenantOrg scoped correctly) but it made two separate tenants
+feel like one shared system — a demo-credibility problem. With the var removed, auth.config.ts omits
+the cookie `domain`, so the session cookie is HOST-SCOPED: each tenant subdomain is its own session
+island. A foreign session simply does not exist on another tenant's host → the middleware redirects
+it to THAT tenant's own /signin (no awareness of any other tenant).
+
+Consequence handled: NextAuth resolved the relative post-login `redirectTo` against the apex origin
+(Cloudflare tunnel), which with host-scoped cookies landed the user on a cookie-less host → signin
+loop. Fixed in code (src/app/signin/page.tsx `absoluteCallback`): the post-login redirect is pinned
+to the request's own Host header, so login stays on the tenant that signed in.
+
+Tradeoff (accepted, founder 2026-07-10): cross-subdomain SSO convenience is gone (signing into the
+console no longer auto-auths sibling services like provit/status via a shared cookie). Everything
+else is internal / single-user, so acceptable. Replay: ensure AUTH_COOKIE_DOMAIN is UNSET in
+.env.local; restart via `launchctl kickstart -k gui/501/co.getoffgridai.console`.
+
+Verified live 2026-07-10: bank + insurer viewers each log in ON their own subdomain, land on-host,
+bound to the right org, write→403; a session from one tenant on the other tenant's host → that
+tenant's own signin (no cross-tenant data, no awareness).
