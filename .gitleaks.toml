@@ -1,0 +1,61 @@
+# Off Grid Console — gitleaks config (secret detection).
+#
+# Part of the aggressive quality gate (#226). `npm run security:secrets` runs
+# gitleaks in DETECT mode over the working tree; CI runs the gitleaks-action.
+# We extend gitleaks' bundled rules (via `useDefault`) and add a small allowlist
+# for the KNOWN, INTENTIONAL non-secrets in this repo (dev/demo placeholders,
+# the local docker-compose default creds, synthetic BFSI demo values) so the gate
+# fires on REAL leaked secrets, not on documented dev defaults.
+
+title = "Off Grid Console gitleaks config"
+
+[extend]
+# Start from gitleaks' maintained rule set (AWS keys, GCP, private keys, JWTs,
+# high-entropy generic secrets, provider tokens, etc.), then layer our allowlist.
+useDefault = true
+
+[allowlist]
+description = "Known intentional non-secrets: dev/demo placeholders, local compose defaults, synthetic demo data, docs."
+# Files/paths that are documentation, lockfiles, fixtures, or local-only dev config.
+paths = [
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.local\.example$''',
+  '''(^|/)deploy/.*\.example$''',
+  # Synthetic BFSI demo seed data (fake PAN/IFSC/account numbers, not secrets).
+  '''(^|/)scripts/seed-.*\.(mjs|mts|ts)$''',
+  '''(^|/)src/lib/.*-seed\.ts$''',
+  '''(^|/)src/db/seed.*\.ts$''',
+  # Docs: runbooks reference placeholder tokens/URLs by design.
+  '''(^|/).*\.md$''',
+  # Local/on-prem dev compose + service manifests: Langfuse dev ENCRYPTION_KEY
+  # (dummy 1234…), dev SALT, langfuse:langfuse DB creds — all local-only dev
+  # defaults, rotated in the never-committed .env.production. Not real secrets.
+  '''(^|/)deploy/docker-compose\.ya?ml$''',
+  '''(^|/)deploy/onprem/services-node-.*\.ya?ml$''',
+  # Verify/setup scripts: pass a dev token via -H from an env var / dev default.
+  '''(^|/)deploy/.*\.sh$''',
+  # Test fixtures: hard-coded fake tokens/keys the unit tests assert against.
+  '''(^|/)test/.*\.ts$''',
+]
+# Regexes for values that look like secrets but are documented dev defaults.
+regexes = [
+  # The local docker-compose Postgres default (offgrid:offgrid) — dev only; prod
+  # rotates it in .env.production (never committed). Documented in CLAUDE.md.
+  '''offgrid:offgrid''',
+  # Documented on-prem dev token used across runbooks/verify scripts.
+  '''offgrid-dev-token''',
+  '''offgrid-dev-salt''',
+  # The obvious dummy Langfuse encryption key (repeated 1234567890abcdef).
+  '''(1234567890abcdef){2,}''',
+  # Common placeholder tokens used in docs/examples.
+  '''(?i)(your|example|placeholder|changeme|dev-only|test)[-_]?(token|secret|key|password)''',
+  '''<[A-Z_]+>''',
+]
+# Stopwords reduce false positives on high-entropy-looking but benign strings.
+stopwords = [
+  "example",
+  "placeholder",
+  "changeme",
+  "localhost",
+]
