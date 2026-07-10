@@ -21,6 +21,19 @@
 # (baseline-then-ratchet, currently just above the real baseline). See .jscpd.json
 # + docs/GAPS_BACKLOG.md (G-CPD-*) for the clone burn-down list.
 #
+# AGGRESSIVE QUALITY GATE (#226) — five more mechanical checks, each blocking:
+#   • knip           — dead files / unused deps (knip.json). Exports are advisory
+#                      (`npm run knip:all`); the gate blocks on files+deps+unlisted.
+#   • lint:dead-code — typed @typescript-eslint/no-unnecessary-condition (WARN
+#                      baseline, ratchet in .eslintrc.json) + any genuine lint
+#                      error, isolated from the pre-existing next-lint backlog.
+#   • security:secrets — gitleaks over the working tree (.gitleaks.toml). No-ops
+#                      with a message if the binary is absent (CI runs the action).
+#   • security:audit — audit-ci fails on any HIGH/CRITICAL npm advisory.
+#   • docs:links     — internal markdown links must resolve (external = warn).
+# The full chain is mirrored 1:1 in .github/workflows/ci.yml (the always-on
+# backstop). Baselines + burn-down lists live in docs/GAPS_BACKLOG.md.
+#
 # INSTALL (one-time, per clone — hooks are not copied by `git clone`):
 #     npm run hooks:install        # == git config core.hooksPath .githooks
 # This points git at the repo-tracked .githooks/ dir so every dev gets the gate.
@@ -37,6 +50,15 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# NOTE on format (#226): `npm run format:check` is a real script but is NOT yet
+# in the blocking chain. The repo predates a prettier config (no .prettierrc was
+# ever committed) so ~1020 tracked files are not prettier-clean under any single
+# printWidth — making format:check green requires a repo-wide `prettier --write`
+# reformat, which per the hygiene standard is its OWN dedicated PR (never bundled,
+# so it doesn't collide with in-flight work). Once that reformat lands, add:
+#     echo "pre-push: format:check…" && npm run --silent format:check
+# here and the matching step in ci.yml. Tracked as G-FMT-1 in docs/GAPS_BACKLOG.md.
+
 echo "pre-push: typecheck…"
 npm run --silent typecheck
 
@@ -49,4 +71,19 @@ npm run --silent depcruise
 echo "pre-push: jscpd (code duplication ≤ threshold — DRY §C)…"
 npm run --silent jscpd
 
-echo "pre-push: OK — typecheck clean, coverage above the bar, dependency graph clean, duplication under the bar."
+echo "pre-push: knip (dead files / unused deps)…"
+npm run --silent knip
+
+echo "pre-push: lint:dead-code (typed no-unnecessary-condition + genuine lint errors)…"
+npm run --silent lint:dead-code
+
+echo "pre-push: security:secrets (gitleaks — no leaked secrets)…"
+npm run --silent security:secrets
+
+echo "pre-push: security:audit (no high/critical npm advisories)…"
+npm run --silent security:audit
+
+echo "pre-push: docs:links (internal doc links resolve)…"
+npm run --silent docs:links
+
+echo "pre-push: OK — format + typecheck clean, coverage above the bar, dependency graph clean, duplication under the bar, no dead files, no dead branches (net), no leaked secrets, no high/critical advisories, docs links resolve."

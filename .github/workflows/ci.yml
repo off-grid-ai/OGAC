@@ -1,8 +1,11 @@
 name: CI
 
-# The same gate the pre-push hook enforces locally, now enforced in CI on every push + PR:
-# typecheck, tests, coverage >= 85% on all of statements/branches/functions/lines/conditions
-# (c8 --check-coverage, thresholds in .c8rc.json), and a clean production build.
+# The same gate the pre-push hook enforces locally, now enforced in CI on every push + PR.
+# The full chain (#226 aggressive quality gate): typecheck, tests + coverage
+# >= 85% on all of statements/branches/functions/lines/conditions (c8 --check-coverage,
+# .c8rc.json), depcruise (no circular imports / boundary breaks), jscpd (DRY), knip (dead
+# files / unused deps), typed dead-branch lint (no-unnecessary-condition), gitleaks (secrets),
+# audit-ci (no high/critical advisories), docs dead-link check, and a clean production build.
 # A push/PR that drops below the bar fails here, not just on a developer's machine.
 
 on:
@@ -48,6 +51,10 @@ jobs:
         working-directory: console
         run: npm ci
 
+      # NOTE (#226): format:check is deferred from the blocking chain until the
+      # one-off repo-wide `prettier --write` reformat lands as its own PR (the
+      # repo predates a prettier config; ~1020 files are not prettier-clean).
+      # Tracked as G-FMT-1 in docs/GAPS_BACKLOG.md. Add the step here once green.
       - name: Typecheck
         working-directory: console
         run: npm run typecheck
@@ -72,6 +79,47 @@ jobs:
       - name: jscpd DRY gate (code duplication under threshold)
         working-directory: console
         run: npm run jscpd
+
+      # Dead-code gate (#226): knip fails on dead files / unused (dev)deps /
+      # unlisted deps (knip.json). Unused EXPORTS are advisory (`npm run
+      # knip:all`) — knip proved false-positive on dynamically-imported /
+      # source-read exports, so bulk deletion is unsafe; tracked as G-KNIP-*.
+      - name: knip dead-code gate (dead files / unused deps)
+        working-directory: console
+        run: npm run knip
+
+      # Typed dead-branch gate (#226): @typescript-eslint/no-unnecessary-condition
+      # (type-aware). WARN baseline (ratchet in .eslintrc.json); this step fails
+      # only on a genuine lint ERROR, isolated from the pre-existing next-lint
+      # (import-order/complexity) backlog. Burn-down: G-UNC-*.
+      - name: Typed dead-branch lint gate
+        working-directory: console
+        run: npm run lint:dead-code
+
+      # Secret gate (#226): the gitleaks-action is the always-on CI backstop for
+      # the local `npm run security:secrets` script. Scans the working tree with
+      # the repo's allowlist (.gitleaks.toml).
+      - name: gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: ${{ github.workspace }}/console/.gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+        with:
+          # Point the action at the console subdir (repo is checked out to console/).
+          args: --source console --config console/.gitleaks.toml --no-git --redact --verbose
+
+      # Dependency advisory gate (#226): fails on any HIGH/CRITICAL npm advisory
+      # (audit-ci.jsonc). Moderate/low are reported, not blocking. Burn-down:
+      # G-AUDIT-*.
+      - name: audit-ci advisory gate (no high/critical)
+        working-directory: console
+        run: npm run security:audit
+
+      # Docs dead-link gate (#226): internal markdown links must resolve;
+      # external links are counted, not fetched.
+      - name: docs dead-link gate
+        working-directory: console
+        run: npm run docs:links
 
       - name: Production build
         working-directory: console
