@@ -138,6 +138,43 @@ test('runInboundGuardrails — PII present but masking NOT required ⇒ text pas
   assert.equal(r.checks.find((c) => c.name === 'pii')?.verdict, 'redacted');
 });
 
+test('runInboundGuardrails — FAIL CLOSED: LLM Guard configured but UNREACHABLE ⇒ the run is BLOCKED', async () => {
+  // The terminal, run-level assertion for fail-closed: with the engine CONFIGURED (URL set) but the
+  // network refusing, the whole inbound guardrail step must come back blocked — a killed engine can
+  // NOT bypass the guardrail. Asserts the real outcome (r.blocked), driven through runChecks →
+  // piiVerdict → outcomeFromChecks, not a mock call.
+  const realFetch = globalThis.fetch;
+  process.env.OFFGRID_HTTP_GUARDRAIL_URL = 'http://127.0.0.1:8000';
+  globalThis.fetch = (async () => {
+    throw new Error('ECONNREFUSED');
+  }) as typeof fetch;
+  try {
+    const r = await runInboundGuardrails('a perfectly benign question', 'gemma-local', {
+      requireMasking: false,
+    });
+    assert.equal(r.blocked, true, 'configured + unreachable ⇒ the run is blocked (fail-closed)');
+    const pii = r.checks.find((c) => c.name === 'pii');
+    assert.equal(pii?.verdict, 'blocked', 'the pii check reports blocked, not pass');
+    assert.match(pii?.detail ?? '', /fail-closed/, 'the blocked reason is surfaced');
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  }
+});
+
+test('runInboundGuardrails — NOT configured ⇒ surfaced as warn (NOT screened), run NOT blocked', async () => {
+  // No OFFGRID_HTTP_GUARDRAIL_URL. The pii check must warn (honest "not screened"), and because
+  // nothing was turned on to enforce, the run is NOT blocked — but the state is visible in the trace.
+  delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  const r = await runInboundGuardrails('any message at all', 'gemma-local', {
+    requireMasking: false,
+  });
+  assert.equal(r.blocked, false, 'not-configured never blocks — nothing was turned on');
+  const pii = r.checks.find((c) => c.name === 'pii');
+  assert.equal(pii?.verdict, 'warn', 'not-configured is surfaced as warn, never a faked pass');
+  assert.match(pii?.detail ?? '', /not configured/, 'the not-configured reason is surfaced');
+});
+
 // ── W2: provenance (real signing port) ──────────────────────────────────────────────────────────
 
 test('signChatAnswer — produces a real signature bound to the run id', () => {
