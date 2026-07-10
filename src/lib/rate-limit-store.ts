@@ -11,6 +11,7 @@
 import { sql } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import { db } from '@/db';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 let rlEnsure: Promise<void> | null = null;
 export async function ensureRateLimitSchema(): Promise<void> {
@@ -54,11 +55,20 @@ function normalizeLimit(rateLimit: number | null | undefined): number | null {
     : null;
 }
 
-/** Set (or clear, with null) a key's per-minute rate limit. */
-export async function setKeyRateLimit(id: string, rateLimit: number | null): Promise<void> {
+/**
+ * Set (or clear, with null) a key's per-minute rate limit. Tenant-scoped: the UPDATE only lands when
+ * the key belongs to `orgId`, so org A cannot throttle (DoS) org B's key via a guessed id — P1 IDOR.
+ */
+export async function setKeyRateLimit(
+  id: string,
+  rateLimit: number | null,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
   await ensureRateLimitSchema();
   await db.execute(
-    sql`UPDATE api_keys SET rate_limit = ${normalizeLimit(rateLimit)} WHERE id = ${id};`,
+    sql`UPDATE api_keys SET rate_limit = ${normalizeLimit(
+      rateLimit,
+    )} WHERE id = ${id} AND org_id = ${orgId};`,
   );
 }
 
@@ -88,10 +98,15 @@ function toLimit(v: unknown): number | null {
   return typeof v === 'number' ? v : v == null ? null : Number(v);
 }
 
-/** Read one key's configured per-minute rate limit (null = unset). For the admin UI. */
-export async function getKeyRateLimit(id: string): Promise<number | null> {
+/**
+ * Read one key's configured per-minute rate limit (null = unset). For the admin UI. Tenant-scoped:
+ * a cross-org id resolves to no row → null, so org A cannot read org B's configured limit — P1 IDOR.
+ */
+export async function getKeyRateLimit(id: string, orgId: string = DEFAULT_ORG): Promise<number | null> {
   await ensureRateLimitSchema();
-  const res = await db.execute(sql`SELECT rate_limit FROM api_keys WHERE id = ${id} LIMIT 1;`);
+  const res = await db.execute(
+    sql`SELECT rate_limit FROM api_keys WHERE id = ${id} AND org_id = ${orgId} LIMIT 1;`,
+  );
   return toLimit(firstRow(res)?.rate_limit);
 }
 
