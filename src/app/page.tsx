@@ -85,6 +85,9 @@ function Nav() {
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <ThemeToggle />
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Link href="/docs">Docs</Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <a
               href="https://github.com/off-grid-ai/console"
               target="_blank"
