@@ -11,7 +11,9 @@ From your Mac (the coordinator), not the server:
 ./deploy/push.sh
 ```
 
-That rsyncs source + the `@offgrid/*` packages, rebuilds, and restarts. Done.
+That rsyncs source + the `@offgrid/*` packages, rebuilds, and restarts the console
+**via its launchd supervisor** (`co.getoffgridai.console`), after clearing any stale or
+root-owned process squatting on :3000 and verifying exactly one fresh listener. Done.
 
 ---
 
@@ -115,11 +117,14 @@ rsync -az --delete -e "ssh -i $KEY" \
   --exclude deploy/console.log --exclude .claude \
   ./ $SRV:$R/console/
 
-# 4. build + restart (full node path — SSH PATH is minimal, `npx`/`next` not found)
-ssh -i $KEY $SRV "cd $R/console && /usr/local/bin/node node_modules/.bin/next build"
-ssh -i $KEY $SRV "pkill -f next-server; sleep 2; cd $R/console && \
-  NODE_ENV=production nohup /usr/local/bin/node node_modules/.bin/next start \
-  -H 0.0.0.0 -p 3000 >> deploy/console.log 2>&1 & echo started"
+# 4. build + restart via the LaunchAgent supervisor (full node path — SSH PATH is minimal)
+ssh -i $KEY $SRV "cd $R/console && rm -rf .next && /usr/local/bin/node node_modules/.bin/next build && touch deploy/.build-done"
+# clear any stale/duplicate listener on :3000 (incl. a ROOT-owned one — see the trap below), THEN restart:
+ssh -i $KEY $SRV 'for p in $(lsof -ti:3000 -sTCP:LISTEN); do \
+  if [ "$(ps -o user= -p $p)" = root ]; then sudo -n kill -9 $p; fi; done; \
+  launchctl kickstart -k gui/$(id -u)/co.getoffgridai.console'
+# verify: exactly ONE listener on :3000, started AFTER the build
+ssh -i $KEY $SRV 'lsof -i:3000 -sTCP:LISTEN'   # expect a single next-server row
 ```
 
 ### Gotchas baked into the above
@@ -127,8 +132,22 @@ ssh -i $KEY $SRV "pkill -f next-server; sleep 2; cd $R/console && \
   `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`) — `node`, `npm`, `npx`, `next` are all
   "not found". Always call node by absolute path and run `next` via
   `node_modules/.bin/next`.
-- **No pm2**: the console is a plain backgrounded `next start`. Restart = `pkill -f
-  next-server` then re-launch. Logs go to `deploy/console.log`.
+- **The console is a launchd LaunchAgent, NOT a plain backgrounded process.** It is
+  supervised by `co.getoffgridai.console` (`~/Library/LaunchAgents/`, `KeepAlive`) which
+  runs `start-console.sh` → `npm start` → `next start` on :3000. **Restart = `launchctl
+  kickstart -k gui/$(id -u)/co.getoffgridai.console`** — NOT `pkill + nohup next start`.
+  `pkill`ing and relaunching by hand FIGHTS the supervisor: it respawns its own copy on
+  KeepAlive, so you end up with two servers racing for :3000. Logs: `deploy/console.log`.
+- **Stale / ROOT-owned :3000 process is the deploy-killer (2026-07-10 outage).** A
+  next-server from a *prior* deploy — sometimes **root-owned** (it survives an admin
+  `pkill`) — can stay bound to :3000 and serve **stale code** while the new one loses the
+  bind (hundreds of `EADDRINUSE` in `console.log` → Cloudflare 502). **Before restarting,
+  clear it:** `lsof -ti:3000 -sTCP:LISTEN`, and for any listener that is root-owned or
+  whose start-time predates this build, `sudo -n kill -9 <pid>` (passwordless sudo works
+  non-interactively on this box). Then kickstart. `push.sh` does exactly this
+  (build-marker at `deploy/.build-done` is the "predates the build" cutoff) and then
+  **verifies exactly one listener on :3000 whose start-time is ≥ the build**, failing loud
+  otherwise — never leave two supervisors bound.
 
 ---
 
@@ -160,6 +179,19 @@ ssh -i ~/.ssh/id_ed25519 admin@127.0.0.1 \
 A protected page (e.g. `/storage`) returns **307** (redirect to signin) when
 unauthenticated — that means the route exists. **404 means the build is stale** (you
 hit trap #1 or #2).
+
+**Confirm the RIGHT process is serving** (the 2026-07-10 outage was a stale/root
+next-server holding :3000 while the new build lost the bind):
+
+```bash
+ssh -i ~/.ssh/id_ed25519 admin@127.0.0.1 'lsof -i:3000 -sTCP:LISTEN'   # expect ONE next-server, owner admin
+ssh -i ~/.ssh/id_ed25519 admin@127.0.0.1 'ps -o pid,user,lstart -p $(lsof -ti:3000 -sTCP:LISTEN)'  # started AFTER the build
+```
+
+Two rows here, or one owned by `root`/started before your build, = the stale-process
+trap: `sudo -n kill -9 <pid>` the offender, then
+`launchctl kickstart -k gui/$(id -u)/co.getoffgridai.console`. (`push.sh` does this
+automatically and fails loud if it can't converge to one fresh listener.)
 
 ---
 
