@@ -115,7 +115,6 @@
     "src/lib/status.ts",
     "src/lib/embeds.ts",
     "src/lib/handbook.ts",
-    "src/lib/prompt-intel.ts",
 
     "// provenance-signing-crypto: server-only signing/verify + provit broker — network + crypto + external Provit API; no unit-testable branches.",
     "src/lib/sigstore.ts",

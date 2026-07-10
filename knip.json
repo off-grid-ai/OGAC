@@ -1,0 +1,39 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/worker/**/*.ts",
+    "scripts/**/*.{mjs,mts,ts,js}",
+    "test/**/*.test.ts",
+    "test/support/**/*.{mjs,ts}"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,mts,ts,js}", "test/**/*.ts"],
+  "ignore": [
+    "src/components/ui/**",
+    "src/db/seed.ts",
+    "src/components/brain/BrainNav.tsx",
+    "src/lib/adapters/triggers/whatsapp-onprem.ts",
+    "src/lib/suraksha-tenant-seed.ts"
+  ],
+  "ignoreBinaries": ["dot"],
+  "ignoreDependencies": [
+    "@offgrid/analytics",
+    "@offgrid/finops",
+    "@offgrid/gateway",
+    "@offgrid/policy",
+    "@offgrid/speech",
+    "@offgrid/vectordb",
+    "@next/env",
+    "postcss",
+    "server-only",
+    "eslint",
+    "eslint-config-next",
+    "@typescript-eslint/parser",
+    "@typescript-eslint/eslint-plugin",
+    "markdown-link-check",
+    "tailwindcss"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "paths": {
+    "@/*": ["./src/*"]
+  }
+}

@@ -17,7 +17,7 @@ import { getUserOrgByEmail } from '@/lib/store';
 const baseJwt = authConfig.callbacks?.jwt;
 const baseSession = authConfig.callbacks?.session;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn } = NextAuth({
   ...authConfig,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
