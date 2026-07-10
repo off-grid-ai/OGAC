@@ -844,3 +844,39 @@ LLM Guard (`laiyer/llm-guard-api:0.3.16`) deployed + screened a live payload thr
 
 - **[G-GW-LITELLM-1] ✅ CODE+WIRED (not live-verified) — LiteLLM Proxy as the AWS-grade router replacing the hand-rolled aggregator on the model door (Stage 1).** LiteLLM (OpenAI-compatible) drops in behind the existing `OFFGRID_GATEWAY_URL` seam with NO console routing-logic change. Added: pure `src/lib/litellm-config.ts` (fleet pool + cloud providers → generated `config.yaml`, unit-tested), pure `src/lib/litellm-log-shape.ts` (LiteLLM callback → the SAME `TrafficRecord`/`offgrid-gateway` index the Traffic/Logs UI already reads), thin adapter `src/lib/litellm.ts` (graceful `configured:false`, mirrors victoria-metrics.ts), `GET /api/v1/gateway/router` + AI Gateway → **Router** tab (`GatewayRouter`) showing per-deployment health + budgets, `litellm` observability entry in Integrations, `litellm` compose service + committed sample `deploy/litellm-config.yaml` + `.env.example` vars. The fleet pool is now the shared SSOT `scripts/fleet-pool.mjs` (consumed by BOTH `cluster-gateway.mjs` and the config generator — DRY). **Left OPEN for the fleet owner:** live cutover (`OFFGRID_GATEWAY_URL=http://litellm:4000`) + verification that LB/failover/budgets/logging work end-to-end on the 8-node fleet; the aggregator stays the active door + fallback until then. The custom OpenSearch logging-callback shim (the thin process that CALLS `litellmPayloadToTrafficRecord` and POSTs to the index) is declared in config as `otel`/custom but the concrete callback module is a deploy-side wiring task, not yet written.
 - **[G-GW-VLLM-2] (P1, `infra`) — Stage 2: vLLM GPU model serving behind LiteLLM.** This round is Stage 1 ONLY (LiteLLM router over the existing llama.cpp fleet nodes on :7878). Stage 2 is standing up vLLM (or TGI) as a GPU-backed OpenAI-compatible serving backend for the larger models and registering those deployments in the LiteLLM `model_list` (a new provider-kind + pool source). NOT built here — logged so it isn't lost. Depends on GPU capacity on the fleet + the Stage-1 cutover being verified live first.
+
+---
+
+## 2026-07-10 — dependency-cruiser adopted (architecture enforced statically); WARN backlog
+
+Adopted `dependency-cruiser` v18 (`.dependency-cruiser.js`, wired into pre-push + CI as `npm run
+depcruise`) to mechanically enforce the ports-and-adapters boundaries and — the load-bearing rule —
+catch eager-value circular imports (the Node-22-only TDZ prod-build crash class) before deploy.
+
+**Baseline is CLEAN on every ERROR-level rule:** 0 eager-value circular imports, 0 pure-lib→IO
+boundary breaks, 0 lib→app breaks, 0 route→route imports, 0 imports of the retired aggregator. The
+items below are WARN-level (advisory, non-blocking) — a real but low-priority burn-down:
+
+- **[G-DC-1] (P2, `console`) — 4 type-only import cycles.** Import cycles that close ONLY through
+  `import type` edges (erased at build → runtime-safe, NOT the TDZ bug, hence WARN not ERROR). Ratchet
+  `no-circular-type-only` to ERROR once cleared. The cycles:
+  - `brain.ts → qdrant.ts → brain.ts`
+  - `adapters/policy.ts → store.ts → checks.ts → adapters/registry.ts → adapters/policy.ts`
+  - `adapters/mdm.ts → store.ts → checks.ts → adapters/registry.ts → adapters/mdm.ts`
+  - `adapters/flags.ts → store.ts → checks.ts → adapters/registry.ts → adapters/flags.ts`
+  Common spine: the `adapters/registry.ts ↔ adapters/*` port wiring and the `store ↔ checks` pair. Fix
+  by moving the shared TYPES into a leaf `*-types.ts` module both sides import (breaks the type cycle
+  without touching runtime code).
+- **[G-DC-2] (P2, `console`) — 5 orphan modules** (nothing in `src/`/`scripts/` imports them;
+  `test/` is excluded from the scan, so some may be test-only fixtures — verify before deleting):
+  `src/lib/suraksha-tenant-seed.ts`, `src/lib/data-domains-insurer-seed.ts` (likely seed scripts invoked
+  via tsx, not imported — may need a `scripts/`-style pathNot exception rather than deletion),
+  `src/lib/rls-policy.ts`, `src/lib/prompt-intel.ts`, `src/lib/litellm-log-shape.ts` (the last three
+  are pure modules that MAY be consumed only from `test/` or wired dynamically — confirm each is
+  genuinely dead before removing; if test-only, they still count as covered logic).
+
+**Note (not a gap):** two `no-non-package-json` findings in a *bare* worktree checkout — `server-only`
+(a virtual the Next compiler aliases to `next/dist/compiled/server-only`) and `@offgrid/gateway/queue`
+(a valid subpath export whose `./dist` only exists after the shared monorepo is built) — are
+environment artifacts, not missing deps. Both resolve in CI + on the server; both are covered by a
+narrow documented `pathNot` exception in the ruleset, so the rule stays ERROR for everything else.
