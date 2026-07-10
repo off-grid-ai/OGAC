@@ -140,7 +140,7 @@ export default async function SignInPage({
             />
             <CardTitle className="text-base">Off Grid AI Console</CardTitle>
             <CardDescription>
-              Sign in to your control plane: fleet, models, data, agents, and governance.
+              Sign in to your control plane: gateways, models, data, agents, and governance.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
