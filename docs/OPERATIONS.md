@@ -50,7 +50,7 @@ every OSS container and the console still audits, logs traffic, and enforces gua
 | **Control**                         | `control`, `admin`             | **audit log**, **guardrail policy engine**, RBAC + ABAC, kill switch                                         |
 | **AI**                              | `gateway`, `brain`, `agents`   | gateway routing, retrieval, grounding, golden-set evals, **pre-built AI agent use cases**                    |
 | **Regulatory**                      | `regulatory`, `reports`        | compliance posture, framework coverage, DPIA/report exports                                                  |
-| **Consumption** (Fleet + use cases) | `fleet`, `analytics`, `agents` | device enrollment, commands, traffic analytics, **the pre-built AI agent use cases frontline users consume** |
+| **Consumption** (Fleet + use cases) | `fleet`, `analytics`, `agents` | device enrollment, inventory & policies (MDM control commands coming soon), traffic analytics, **the pre-built AI agent use cases frontline users consume** |
 
 `agents` deliberately spans two layers: it's an **AI-plane capability** (a runtime over the
 gateway + Brain) and the **consumption-layer application** — the pre-built use cases (sales
@@ -393,6 +393,10 @@ All follow the capability-port rule: a first-party default that always works + a
   flag (default OFF) enables ephemeral, `--network none`, resource-capped containers. `/admin/sandbox/run`.
 - **Fleet Control (MDM)** — default first-party registry. `OFFGRID_ADAPTER_MDM=fleetdm` +
   `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`; `make mdm` (Fleet `:8070`, then create a token with
-  `fleetctl`). **Verify:** `GET /admin/mdm/devices` (shows `backend`), FleetDM `/healthz`.
+  `fleetctl`). **Verify:** `GET /admin/mdm/devices` (shows `backend`), FleetDM `/healthz`. Inventory,
+  live osquery, software + CVE visibility, and policies are live. Device CONTROL commands (lock /
+  wipe / config-profile push / settings enforcement) are coming soon - rendered disabled with a
+  "Coming soon" label, never fired. Advanced MDM control is Fleet Premium, separately licensed. The
+  first-party kill switch stays live regardless.
 - **The interaction pipeline** (`agentrun.ts`) fires policy → guardrails → ground → provenance on
   every run; inspect a run's `steps[]` + `checks[]` + `provenance` via `GET /admin/agents/runs`.

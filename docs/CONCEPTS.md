@@ -165,5 +165,8 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 ## Fleet Control (`/handbook/fleet-control`)
 
 - **What:** device fleet management (FleetDM/osquery, MIT core) + Off Grid's field-force intelligence.
+  Inventory, live queries, software + CVE visibility, and policies work today. Device CONTROL - the
+  MDM commands that act on a device (lock / wipe / config-profile push / settings enforcement) - is
+  coming soon (advanced MDM control is Fleet Premium, separately licensed).
 - **Who:** Platform / Frontline ops. **How:** `OFFGRID_ADAPTER_MDM=fleetdm` + `make mdm`;
-  `/admin/mdm/devices`. **Why:** manage every AI-enabled device *and* coach the workforce on it.
+  `/admin/mdm/devices`. **Why:** see every AI-enabled device *and* coach the workforce on it.

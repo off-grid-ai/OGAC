@@ -18,12 +18,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { DeviceCommand, DeviceCommandResult } from '@/lib/fleetdm';
+import {
+  type DeviceCommand,
+  type DeviceCommandResult,
+  isMdmControlCommand,
+  mdmControlAvailable,
+} from '@/lib/fleetdm';
 
-// Device actions. Always offers the first-party kill switch. When the active MDM is FleetDM
-// (`fleet`), it also exposes the real FleetDM MDM commands — lock / unlock / wipe / refetch — each
-// routed through /api/v1/admin/devices/{id}/command. Destructive commands confirm first
-// (delete-confirm style) since they're irreversible on the device.
+// Whether the MDM CONTROL tier (lock / unlock / wipe) is shipping. Read once so the render and the
+// click-guard agree, and so it flips in a single place when control lands.
+const CONTROL_AVAILABLE = mdmControlAvailable();
+
+// Device actions. Always offers the first-party kill switch, and (on a FleetDM host) `refetch` -
+// the free-tier re-collect of host vitals, which is inventory, not control.
+//
+// The MDM CONTROL commands - lock / unlock / wipe - ACT on the device. That tier is COMING SOON for
+// public release, so those items render disabled with a "Coming soon" label and never fire a
+// request. When it ships, `mdmControlAvailable()` flips and the same items become live (destructive
+// ones confirm first, since they're irreversible on the device).
 export function DeviceActions({
   deviceId,
   name,
@@ -48,6 +60,8 @@ export function DeviceActions({
   }
 
   async function command(cmd: DeviceCommand, confirmMsg?: string) {
+    // Control commands (lock/unlock/wipe) are coming soon - never fire a request while gated.
+    if (isMdmControlCommand(cmd) && !CONTROL_AVAILABLE) return;
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     const res = await fetch(`/api/v1/admin/devices/${deviceId}/command`, {
       method: 'POST',
@@ -80,28 +94,44 @@ export function DeviceActions({
       <DropdownMenuContent align="end">
         {fleet ? (
           <>
+            {/* Refetch is inventory (re-collect host vitals), free tier - always live. */}
             <DropdownMenuItem onClick={() => command('refetch')}>
               <ArrowClockwise className="size-4" />
               Refetch
             </DropdownMenuItem>
+            {/* Lock / unlock / wipe ACT on the device (MDM control) - coming soon, so disabled. */}
             <DropdownMenuItem
-              onClick={() => command('lock', `Lock "${name}"? It becomes unusable until unlocked.`)}
+              disabled={!CONTROL_AVAILABLE}
+              onClick={() =>
+                CONTROL_AVAILABLE
+                  ? command('lock', `Lock "${name}"? It becomes unusable until unlocked.`)
+                  : undefined
+              }
             >
               <Lock className="size-4" />
               Lock
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => command('unlock')}>
-              <LockKeyOpen className="size-4" />
-              Unlock
+              {CONTROL_AVAILABLE ? null : <ComingSoon />}
             </DropdownMenuItem>
             <DropdownMenuItem
+              disabled={!CONTROL_AVAILABLE}
+              onClick={() => (CONTROL_AVAILABLE ? command('unlock') : undefined)}
+            >
+              <LockKeyOpen className="size-4" />
+              Unlock
+              {CONTROL_AVAILABLE ? null : <ComingSoon />}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!CONTROL_AVAILABLE}
               onClick={() =>
-                command('wipe', `Wipe "${name}"? This erases the device and CANNOT be undone.`)
+                CONTROL_AVAILABLE
+                  ? command('wipe', `Wipe "${name}"? This erases the device and CANNOT be undone.`)
+                  : undefined
               }
-              className="text-destructive focus:text-destructive"
+              className={CONTROL_AVAILABLE ? 'text-destructive focus:text-destructive' : undefined}
             >
               <Trash className="size-4" />
               Wipe
+              {CONTROL_AVAILABLE ? null : <ComingSoon />}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
@@ -112,5 +142,14 @@ export function DeviceActions({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+// The quiet uppercase "Coming soon" whisper shown on a gated control item.
+function ComingSoon() {
+  return (
+    <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground">
+      Coming soon
+    </span>
   );
 }

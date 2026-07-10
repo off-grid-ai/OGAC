@@ -215,3 +215,9 @@ curl -s "$BASE/api/v1/admin/mdm/devices" -H "authorization: Bearer $TOKEN"   # {
 ```
 Point at FleetDM with `OFFGRID_ADAPTER_MDM=fleetdm` + `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`
 (`make mdm`; see RUNBOOKS for the `fleetctl` token steps). Falls back to the registry if unreachable.
+
+Inventory, live osquery, software + CVE visibility, and policies work today. Device CONTROL - the
+MDM commands that act on a device (lock / wipe / config-profile push / settings enforcement) - is
+coming soon: in the console those actions render disabled with a "Coming soon" label rather than
+firing. Advanced MDM control is Fleet Premium, separately licensed. The first-party kill switch
+(`POST /api/v1/admin/devices/{id}/kill`) is unaffected and works today.

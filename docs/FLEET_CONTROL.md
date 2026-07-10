@@ -9,17 +9,25 @@ See it as a page: **[/fleet-control](/fleet-control)**.
 
 ## Act 1 — baseline device fleet (FleetDM + osquery, MIT core)
 
-The table stakes, delivered on permissive OSS, self-hosted, no per-device licence:
+The table stakes, delivered on permissive OSS, self-hosted, no per-device licence.
 
-- **Device inventory & health** — hardware, OS, software, users, disk-encryption status, per device.
-- **Live & scheduled queries** — ask any question across the whole fleet in real time (osquery).
-- **Policies & compliance** — pass/fail posture per device → a fleet compliance score.
-- **Software & patch management**, **configuration & MDM commands** (lock / wipe / profiles).
-- **Vulnerability visibility** (software ↔ CVEs) · **GitOps & targeting** (labels/teams as code) ·
-  **audit, webhooks, dashboards**.
+**Available today (agent-enrolled):**
 
-*Fleet Free (MIT core) covers inventory, live/scheduled queries, policies, GitOps, scripts. Vuln
-mgmt + advanced MDM profiles lean Fleet Premium (paid) — we stay on the MIT core.*
+- **Device inventory & health** - hardware, OS, software, users, disk-encryption status, per device.
+- **Live & scheduled queries** - ask any question across the whole fleet in real time (osquery).
+- **Policies & compliance** - pass/fail posture per device becomes a fleet compliance score.
+- **Software visibility & vulnerability mapping** (software to CVEs).
+- **GitOps & targeting** (labels/teams as code) · **audit, webhooks, dashboards**.
+
+**Coming soon - device CONTROL (MDM commands):** the actions that reach out and change a device -
+**lock**, **wipe**, **config-profile push**, **settings enforcement**, and **Apple APNs
+enrollment**. These render in a "coming soon" state in the console today (the action is visible but
+disabled) so nothing silently no-ops. The inventory, queries, and policies above stay live.
+
+*Fleet Free (MIT core) covers inventory, live/scheduled queries, policies, GitOps, and scripts.
+Advanced MDM control (config profiles, richer device-action RBAC) leans Fleet Premium, which is
+paid and separately licensed - we stay on the MIT core, so control ships when the self-hostable
+path is real.*
 
 **Wiring:** the `mdm` capability port — `OFFGRID_ADAPTER_MDM=fleetdm`, `OFFGRID_FLEET_URL`,
 `OFFGRID_FLEET_TOKEN`. Bring it up with `make mdm` (Fleet + MySQL + Redis on `:8070`); the console
