@@ -12,7 +12,10 @@
     "offgrid-gateway-cluster": "./dist/cluster-cli.js",
     "offgrid-gateway-queue": "./dist/queue-cli.js"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,13 +28,9 @@
       "require": "./dist/queue/index.cjs"
     }
   },
-  "scripts": {
-    "build": "tsup src/index.ts src/cli.ts src/cluster-cli.ts src/queue-cli.ts src/queue/index.ts src/queue/worker.ts src/queue/workflow.ts --format esm,cjs --dts --clean --no-splitting --external @temporalio/client --external @temporalio/worker --external @temporalio/workflow --external @temporalio/activity",
-    "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
-    "typecheck": "tsc --noEmit"
+  "engines": {
+    "node": ">=20"
   },
-  "engines": { "node": ">=20" },
   "dependencies": {
     "async-mutex": "^0.5.0",
     "@temporalio/activity": "^1.11.0",
@@ -42,12 +41,6 @@
   "peerDependencies": {
     "@xenova/transformers": "*",
     "sharp": "*"
-  },
-  "devDependencies": {
-    "tsup": "^8.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

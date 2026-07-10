@@ -14,12 +14,9 @@
       "require": "./dist/index.js"
     }
   },
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
-    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
-    "typecheck": "tsc --noEmit"
-  },
+  "files": [
+    "dist"
+  ],
   "peerDependencies": {
     "@lancedb/lancedb": "*"
   },
@@ -27,9 +24,5 @@
     "@lancedb/lancedb": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
   }
 }
