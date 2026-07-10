@@ -13,7 +13,7 @@ import { AnimatedBeam } from '@/components/ui/animated-beam';
 type IconType = ComponentType<{ className?: string; weight?: 'regular' | 'bold' | 'duotone' }>;
 
 // The product's thesis, made kinetic: five real pipeline stages wired together by
-// traveling emerald beams. The connection metaphor IS the pitch — many tools, one path.
+// traveling emerald beams. The connection metaphor IS the pitch - many tools, one path.
 interface Stage {
   key: string;
   n: string;
@@ -27,7 +27,13 @@ const STAGES: Stage[] = [
   { key: 'gateway', n: '02', label: 'Gateways', icon: PlugsConnected, note: 'The model door' },
   { key: 'pipelines', n: '03', label: 'Pipelines', icon: GitBranch, note: 'Governed, once' },
   { key: 'apps', n: '04', label: 'Apps & agents', icon: Robot, note: 'Built in plain language' },
-  { key: 'compliance', n: '05', label: 'Compliance', icon: SealCheck, note: 'Signed, cited, audited' },
+  {
+    key: 'compliance',
+    n: '05',
+    label: 'Compliance',
+    icon: SealCheck,
+    note: 'Signed, cited, audited',
+  },
 ];
 
 function StageNode({

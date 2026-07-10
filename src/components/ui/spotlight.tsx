@@ -18,8 +18,8 @@ export function Spotlight({ className }: SpotlightProps) {
       transition={{ duration: 1.4, ease: 'easeOut' }}
       className={cn('pointer-events-none absolute inset-0 z-0 overflow-hidden', className)}
     >
-      <div className="absolute left-0 top-0 h-[140%] w-[60%] -translate-y-1/2 bg-[radial-gradient(closest-side,rgba(52,211,153,0.16),transparent)] blur-2xl" />
-      <div className="absolute bottom-0 right-0 h-[140%] w-[55%] translate-y-1/3 bg-[radial-gradient(closest-side,rgba(5,150,105,0.12),transparent)] blur-2xl" />
+      <div className="absolute left-0 top-0 h-[140%] w-[60%] -translate-y-1/2 bg-[radial-gradient(closest-side,var(--og-spotlight-a),transparent)] blur-2xl" />
+      <div className="absolute bottom-0 right-0 h-[140%] w-[55%] translate-y-1/3 bg-[radial-gradient(closest-side,var(--og-spotlight-b),transparent)] blur-2xl" />
     </motion.div>
   );
 }
