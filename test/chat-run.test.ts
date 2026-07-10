@@ -87,22 +87,51 @@ test('runInboundGuardrails — a prompt-injection message is BLOCKED (matches th
   assert.equal(injection?.verdict, 'blocked');
 });
 
-test('runInboundGuardrails — PII (email) is REDACTED before the model when the contract requires masking', async () => {
+// LLM Guard is THE guardrail engine now. Configure it (stub the /analyze/prompt call) so the masking
+// path runs the REAL engine adapter → normalizeLlmGuardResponse → applyPiiEscalation, end to end. The
+// stub returns LLM Guard's Anonymize sanitized_prompt (the engine rewrites the PII in place).
+function withLlmGuard<T>(sanitized: (prompt: string) => string, fn: () => Promise<T>): Promise<T> {
+  const realFetch = globalThis.fetch;
+  process.env.OFFGRID_HTTP_GUARDRAIL_URL = 'http://127.0.0.1:8000';
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const prompt = init?.body ? (JSON.parse(String(init.body)).prompt as string) : '';
+    return new Response(
+      JSON.stringify({
+        is_valid: false,
+        scanners: { Anonymize: 1.0 },
+        sanitized_prompt: sanitized(prompt),
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }) as typeof fetch;
+  return fn().finally(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.OFFGRID_HTTP_GUARDRAIL_URL;
+  });
+}
+
+test('runInboundGuardrails — PII (email) is REDACTED before the model when the contract requires masking (LLM Guard)', async () => {
   const msg = 'please email the report to arjun.mehta@corebank.in today';
-  const r = await runInboundGuardrails(msg, 'gemma-local', { requireMasking: true });
+  const r = await withLlmGuard(
+    (p) => p.replace('arjun.mehta@corebank.in', '[REDACTED_EMAIL]'),
+    () => runInboundGuardrails(msg, 'gemma-local', { requireMasking: true }),
+  );
   assert.equal(r.blocked, false);
   assert.equal(r.redacted, true);
-  // The email is gone from the model-facing text; the regex floor substitutes a placeholder.
+  // The email is gone from the model-facing text; LLM Guard's Anonymize sanitized it in place.
   assert.ok(!r.text.includes('arjun.mehta@corebank.in'), 'email must be redacted from model input');
-  assert.ok(r.text.includes('[EMAIL]'));
+  assert.ok(r.text.includes('[REDACTED_EMAIL]'));
   // The PII verdict is recorded regardless (audit trail shows PII was present).
   const pii = r.checks.find((c) => c.name === 'pii');
   assert.equal(pii?.verdict, 'redacted');
 });
 
-test('runInboundGuardrails — PII present but masking NOT required ⇒ text passes through unredacted', async () => {
+test('runInboundGuardrails — PII present but masking NOT required ⇒ text passes through unredacted (LLM Guard)', async () => {
   const msg = 'contact arjun.mehta@corebank.in';
-  const r = await runInboundGuardrails(msg, 'gemma-local', { requireMasking: false });
+  const r = await withLlmGuard(
+    (p) => p.replace('arjun.mehta@corebank.in', '[REDACTED_EMAIL]'),
+    () => runInboundGuardrails(msg, 'gemma-local', { requireMasking: false }),
+  );
   assert.equal(r.redacted, false);
   assert.equal(r.text, msg); // model sees the original when the contract doesn't force masking
   // …but the guardrail STILL recorded that PII was detected (the verdict is 'redacted' from the scan).

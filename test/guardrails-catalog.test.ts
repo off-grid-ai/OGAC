@@ -133,18 +133,23 @@ test('filterCatalog respects category + kind, does not mutate input', () => {
   assert.deepEqual(GUARDRAIL_CATALOG, before, 'input mutated');
 });
 
-// ─── Availability (honest engine gating) ──────────────────────────────────────────────────────────
-test('presidio entity: ready when presidio configured', () => {
+// ─── Availability (honest engine gating — LLM Guard is THE engine) ─────────────────────────────────
+test('PII entity: ready when LLM Guard is the active engine (enforced by Anonymize)', () => {
   const item = getGuardrailItem('person')!;
-  assert.equal(itemAvailability(item, { presidioReady: true, guardrailsAiReady: false }).status, 'ready');
+  const avail = itemAvailability(item, { guardrailsAiReady: false, llmGuardReady: true });
+  assert.equal(avail.status, 'ready');
+  assert.match(avail.detail, /LLM Guard/);
 });
 
-test('presidio entity: floor for email/phone when presidio down, fallback otherwise', () => {
-  const off = { presidioReady: false, guardrailsAiReady: false };
-  assert.equal(itemAvailability(getGuardrailItem('email')!, off).status, 'floor');
-  assert.equal(itemAvailability(getGuardrailItem('phone')!, off).status, 'floor');
+test('PII entity: fallback (stored intent) when LLM Guard is not configured', () => {
+  const off = { guardrailsAiReady: false, llmGuardReady: false };
+  // No silent regex-floor "floor" status any more — LLM Guard is the sole engine, so an unconfigured
+  // engine means the rule is stored and enforced once LLM Guard is on.
+  assert.equal(itemAvailability(getGuardrailItem('email')!, off).status, 'fallback');
+  assert.equal(itemAvailability(getGuardrailItem('phone')!, off).status, 'fallback');
   assert.equal(itemAvailability(getGuardrailItem('us-ssn')!, off).status, 'fallback');
-  // floor entities are exactly the two the regex floor covers
+  assert.equal(itemAvailability(getGuardrailItem('in-pan')!, off).status, 'fallback');
+  // The regex-floor entity constant is still the data-movement detector's coverage (informational).
   for (const e of REGEX_FLOOR_ENTITIES) {
     assert.ok(['EMAIL_ADDRESS', 'PHONE_NUMBER'].includes(e));
   }
