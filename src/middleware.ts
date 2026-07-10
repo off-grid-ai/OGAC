@@ -197,8 +197,16 @@ export default auth(async (req) => {
   // (no tenant slug) is unaffected and keeps rendering the landing. Runs BEFORE isPublicPath so the
   // public "/" rule doesn't short-circuit it. Only "/" is redirected — every other tenant path (incl.
   // /overview and /docs) falls through untouched.
+  // Behind the Cloudflare tunnel, req.nextUrl.origin resolves to the APEX host, which would strip the
+  // tenant subdomain on a redirect (bharatunion-… -> apex). Rebuild the origin from the TRUSTED Host
+  // header (+ forwarded proto) so a tenant redirect STAYS on that tenant's host.
+  const trustedOrigin = (() => {
+    const host = req.headers.get('host') ?? req.nextUrl.host;
+    const proto = req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '');
+    return `${proto}://${host}`;
+  })();
   if (isTenantRootRedirect(req.headers.get('host') ?? req.nextUrl.hostname, pathname)) {
-    return NextResponse.redirect(new URL('/overview', req.nextUrl.origin));
+    return NextResponse.redirect(new URL('/overview', trustedOrigin));
   }
   if (isPublicPath(pathname)) return withCors(pass(), pathname);
   if (isPublicFileGet(req.method, pathname)) return pass();
@@ -209,7 +217,7 @@ export default auth(async (req) => {
     if (pathname.startsWith('/api/')) {
       return withCors(NextResponse.json({ error: 'unauthorized' }, { status: 401 }), pathname);
     }
-    const signin = new URL('/signin', req.nextUrl.origin);
+    const signin = new URL('/signin', trustedOrigin);
     signin.searchParams.set('callbackUrl', pathname + req.nextUrl.search);
     return NextResponse.redirect(signin);
   }
