@@ -14,6 +14,13 @@
 # on errors only; WARN-level findings (type-only cycles, orphans) are advisory
 # and do NOT block. See .dependency-cruiser.js for the ruleset + rationale.
 #
+# It ALSO runs jscpd (`npm run jscpd`) — the copy/paste detector — to block a
+# push if code duplication climbs past the ratcheting threshold in .jscpd.json,
+# mechanically enforcing CLAUDE.md hygiene §C DRY ("duplicated logic that drifts
+# is a defect"). jscpd exits non-zero only when duplication exceeds the threshold
+# (baseline-then-ratchet, currently just above the real baseline). See .jscpd.json
+# + docs/GAPS_BACKLOG.md (G-CPD-*) for the clone burn-down list.
+#
 # INSTALL (one-time, per clone — hooks are not copied by `git clone`):
 #     npm run hooks:install        # == git config core.hooksPath .githooks
 # This points git at the repo-tracked .githooks/ dir so every dev gets the gate.
@@ -39,4 +46,7 @@ npm run --silent coverage:check
 echo "pre-push: depcruise (no eager-value circular imports / boundary breaks)…"
 npm run --silent depcruise
 
-echo "pre-push: OK — typecheck clean, coverage above the bar, dependency graph clean."
+echo "pre-push: jscpd (code duplication ≤ threshold — DRY §C)…"
+npm run --silent jscpd
+
+echo "pre-push: OK — typecheck clean, coverage above the bar, dependency graph clean, duplication under the bar."

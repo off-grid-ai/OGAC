@@ -64,6 +64,15 @@ jobs:
         working-directory: console
         run: npm run depcruise
 
+      # DRY gate: fails only when code duplication exceeds the ratcheting
+      # threshold in .jscpd.json — mechanically enforcing CLAUDE.md hygiene §C
+      # ("duplicated logic that drifts is a defect"). Baseline-then-ratchet:
+      # the threshold sits just above the real baseline and is ratcheted DOWN
+      # as G-CPD-* clones are extracted (see docs/GAPS_BACKLOG.md).
+      - name: jscpd DRY gate (code duplication under threshold)
+        working-directory: console
+        run: npm run jscpd
+
       - name: Production build
         working-directory: console
         run: npm run build
