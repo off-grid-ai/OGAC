@@ -15,6 +15,10 @@
   --og-border-light: #eef0f2;
   --og-border-focus: #059669;
   --og-error: #dc2626;
+  /* Landing hero spotlight sweeps - restrained on white so they read as a faint tint,
+     never a dirty smudge. Deeper emerald + low alpha for the light ground. */
+  --og-spotlight-a: rgba(5, 150, 105, 0.1);
+  --og-spotlight-b: rgba(4, 120, 87, 0.07);
   color-scheme: light;
 }
 
@@ -30,6 +34,9 @@
   --og-border-light: #2a2a2a;
   --og-border-focus: #34d399;
   --og-error: #c75050;
+  /* Brighter emerald glow on the near-black ground - the killer dark look. */
+  --og-spotlight-a: rgba(52, 211, 153, 0.16);
+  --og-spotlight-b: rgba(5, 150, 105, 0.12);
   color-scheme: dark;
 }
 
@@ -114,11 +121,7 @@
 @keyframes og-enter {
   from {
     opacity: var(--tw-enter-opacity, 1);
-    transform: translate3d(
-        var(--tw-enter-translate-x, 0),
-        var(--tw-enter-translate-y, 0),
-        0
-      )
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
       scale(var(--tw-enter-scale, 1));
   }
 }
@@ -126,11 +129,7 @@
 @keyframes og-exit {
   to {
     opacity: var(--tw-exit-opacity, 1);
-    transform: translate3d(
-        var(--tw-exit-translate-x, 0),
-        var(--tw-exit-translate-y, 0),
-        0
-      )
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
       scale(var(--tw-exit-scale, 1));
   }
 }
@@ -244,17 +243,27 @@
   animation: og-aurora linear infinite;
 }
 
-/* The landing is deliberately the dark terminal theme regardless of the app's light default.
-   Tailwind v4 freezes @theme color tokens at :root (light), so `text-white`, `bg-white/*`,
-   `border-white/*`, and the semantic `*-foreground`/`*-background` utilities would resolve to
-   light values. Re-point exactly those tokens to their dark values for the landing subtree;
-   CSS custom properties cascade at use-time, so every utility below inherits the fix. */
-.og-landing {
-  --color-white: #ffffff;
-  --color-black: #0a0a0a;
-  --color-foreground: #ffffff;
-  --color-background: #0a0a0a;
-  --color-border: rgba(255, 255, 255, 0.1);
+/* Flow-diagram beam pulse: an emerald dash segment slides along a fixed wire. Driven by
+   stroke-dashoffset (compositor-friendly, GPU-composited) so it never restarts when React
+   re-renders the SVG - the previous motion-driven gradient keyframes reset mid-flight on
+   any parent re-render, which read as a stutter. The dash pattern is set inline per-path
+   (`--beam-dash` visible segment, `--beam-len` gap = full path length); we animate the
+   offset from `len + dash` (segment off the start) to `0` (segment off the end). Held at
+   rest under reduced motion by the global block below. */
+@keyframes og-beam-travel {
+  from {
+    stroke-dashoffset: calc((var(--beam-len) + var(--beam-dash)) * 1px);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.og-beam-pulse {
+  animation-name: og-beam-travel;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  will-change: stroke-dashoffset;
 }
 
 @media (prefers-reduced-motion: reduce) {
