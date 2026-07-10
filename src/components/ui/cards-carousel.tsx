@@ -3,6 +3,7 @@
 import { ArrowsOut, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { nextFocusTarget } from '@/lib/landing-hero';
 import { cn } from '@/lib/utils';
 
 // A horizontal, scroll-snapping rail of real product surfaces. Each card can be (a) opened in a
@@ -157,11 +158,20 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  // Lock body scroll for the life of the overlay ONLY - a mount/unmount effect with no deps, so a
+  // parent re-render (e.g. the rail's onScroll updating atStart/atEnd) can never re-run it and leave
+  // the lock stranded. prevOverflow is captured once at mount and restored once at unmount, so
+  // closing (esc / backdrop / button) always restores page scroll.
   useEffect(() => {
-    closeRef.current?.focus();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
 
+  useEffect(() => {
+    closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -172,21 +182,14 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
         'button, a[href], [tabindex]:not([tabindex="-1"])',
       );
       if (!focusables || focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      const activeIndex = Array.from(focusables).indexOf(document.activeElement as HTMLElement);
+      const target = nextFocusTarget(focusables.length, activeIndex, e.shiftKey);
+      if (!target) return;
+      e.preventDefault();
+      (target === 'first' ? focusables[0] : focusables[focusables.length - 1]).focus();
     };
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return (

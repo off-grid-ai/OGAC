@@ -261,7 +261,7 @@ export default function LandingPage() {
               <figure className="relative overflow-hidden rounded-2xl border border-border bg-[#f4f2ec] p-1.5 shadow-[0_30px_120px_-30px_rgba(5,150,105,0.22)]">
                 <Image
                   src="/diagrams/flow/flow-compliance.png"
-                  alt="Compliance travels with every run: each run is signed, cited and scored; one that fails a check is stopped; audit-ready evidence exports for a regulator."
+                  alt="Compliance travels with every run: each run is signed, cited and scored; one that fails a check is stopped; audit-ready evidence exports for a regulator. Cloud or on-prem, the control stays with you."
                   width={1280}
                   height={720}
                   className="h-auto w-full rounded-xl"
