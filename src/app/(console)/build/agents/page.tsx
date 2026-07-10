@@ -95,7 +95,7 @@ export default async function AgentsPage() {
         <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
         <Stat label="Single-step apps" value={singleStepApps.length} />
         <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
-        <Stat label="Grounded in the Brain" value={`${activity.groundedShare}%`} />
+        <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
       </div>
 
       {/* The agent roster — each card links to its own detail (/build/agents/[id]). */}
