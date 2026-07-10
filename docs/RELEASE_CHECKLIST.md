@@ -14,7 +14,7 @@ Run this before the repository is made public. Every item is a gate. Do not publ
 - [ ] **SUPERVISED, REQUIRED before public:** git history scrubbed of every secret listed as must-scrub in `docs/SECRET_INVENTORY.md`. A secret removed from the tree but left in history is still leaked.
 - [ ] **SUPERVISED, REQUIRED before public:** every credential listed as must-rotate in `docs/SECRET_INVENTORY.md` is rotated. Assume anything that was ever committed is compromised.
 - [ ] `.env.example` is generic. No real hosts, IPs, keys, tokens, or passwords. Placeholders only.
-- [x] Security contacts in `SECURITY.md` and `CODE_OF_CONDUCT.md` are set to a real, monitored address (`mac@example.com`).
+- [x] Security contacts in `SECURITY.md` and `CODE_OF_CONDUCT.md` are set to a real, monitored address (`mac@getoffgridai.co`).
 
 ## Internal infrastructure genericized
 

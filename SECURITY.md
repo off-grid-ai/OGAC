@@ -9,7 +9,7 @@ Do not open a public GitHub issue for a security vulnerability. Public disclosur
 Report it privately by email to:
 
 ```
-mac@example.com
+mac@getoffgridai.co
 ```
 
 When you report, include as much of the following as you can:
