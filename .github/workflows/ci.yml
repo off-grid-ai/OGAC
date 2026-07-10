@@ -1,0 +1,61 @@
+name: CI
+
+# The same gate the pre-push hook enforces locally, now enforced in CI on every push + PR:
+# typecheck, tests, coverage >= 85% on all of statements/branches/functions/lines/conditions
+# (c8 --check-coverage, thresholds in .c8rc.json), and a clean production build.
+# A push/PR that drops below the bar fails here, not just on a developer's machine.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout console
+        uses: actions/checkout@v4
+        with:
+          path: console
+
+      # The @offgrid/* deps are file: links to the sibling shared monorepo. CI needs it
+      # checked out as a sibling so `npm ci` can resolve them (mirrors the local layout).
+      - name: Checkout shared monorepo (@offgrid/* deps)
+        uses: actions/checkout@v4
+        with:
+          repository: off-grid-ai/shared
+          path: shared
+          token: ${{ secrets.SHARED_REPO_TOKEN || github.token }}
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - name: Build @offgrid packages
+        working-directory: shared
+        run: npm ci && npm run build
+
+      - name: Install console deps
+        working-directory: console
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: console
+        run: npm run typecheck
+
+      - name: Tests + coverage gate (>=85% all dimensions, enforced)
+        working-directory: console
+        run: npm run coverage:check
+
+      - name: Production build
+        working-directory: console
+        run: npm run build

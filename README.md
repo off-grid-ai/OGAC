@@ -3,6 +3,13 @@
   <h1>Off Grid AI Console</h1>
   <h3>AWS for AI. Make your enterprise intelligent, on one interface that just works.</h3>
   <p>Open source. Set your rules once. Everyone builds governed AI on top.</p>
+  <p>
+    <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <img src="https://img.shields.io/badge/coverage-%E2%89%A585%25-brightgreen" alt="Coverage: enforced &#8805;85% on statements, branches, functions, lines, conditions" />
+    <img src="https://img.shields.io/badge/tests-node--test-blue" alt="Tests: node --test" />
+    <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0" />
+    <img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen" alt="Node 22+" />
+  </p>
 </div>
 
 ![The flow: your data into one governed gateway, through composable pipelines, out to apps and agents your people build in plain language](docs/assets/diagrams/flow-people.png)
