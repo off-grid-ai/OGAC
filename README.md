@@ -5,7 +5,10 @@
   <p>Open source. Set your rules once. Everyone builds governed AI on top.</p>
   <p>
     <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <img src="https://img.shields.io/badge/coverage-%E2%89%A585%25-brightgreen" alt="Coverage: enforced &#8805;85% on statements, branches, functions, lines, conditions" />
+    <img src="https://img.shields.io/badge/coverage-97%25-brightgreen" alt="Coverage: 97% statements &amp; lines" />
+    <img src="https://img.shields.io/badge/branches-89%25-brightgreen" alt="Branch coverage: 89%" />
+    <img src="https://img.shields.io/badge/functions-97%25-brightgreen" alt="Function coverage: 97%" />
+    <img src="https://img.shields.io/badge/gate-%E2%89%A585%25%20enforced-blue" alt="Coverage gate: enforced &#8805;85% on all dimensions in pre-push + CI" />
     <img src="https://img.shields.io/badge/tests-node--test-blue" alt="Tests: node --test" />
     <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0" />
     <img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen" alt="Node 22+" />
