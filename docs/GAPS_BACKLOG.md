@@ -880,3 +880,48 @@ items below are WARN-level (advisory, non-blocking) — a real but low-priority 
 (a valid subpath export whose `./dist` only exists after the shared monorepo is built) — are
 environment artifacts, not missing deps. Both resolve in CI + on the server; both are covered by a
 narrow documented `pathNot` exception in the ruleset, so the rule stays ERROR for everything else.
+
+## 2026-07-10 — jscpd adopted (DRY §C enforced statically); clone burn-down backlog
+
+Adopted `jscpd` v5.0.12 (`.jscpd.json`, wired into pre-push + CI as `npm run jscpd`, ordered
+`coverage:check → depcruise → jscpd → build`) to mechanically enforce CLAUDE.md hygiene §C DRY
+("duplicated logic that drifts is a defect"). Scans `src/lib`, `src/app`, `src/components`;
+`min-lines: 8`, `min-tokens: 70`; reporters console + json + html → `coverage/jscpd/`.
+
+**HONEST baseline (2026-07-10):** **2.08% duplicated lines** (2.57% tokens) — 256 clones across 1152
+analyzed files (167,933 lines). **Threshold set to 2.5** — just above the 2.08% real baseline (a
+small margin so incidental reformatting doesn't false-trip, while any new duplicated helper pushes
+over and blocks). NOT set to 0 (would fail immediately on an existing codebase) and NOT set
+artificially high to hide duplication. **Ratchet-down intent:** as the G-CPD items below are
+extracted, lower `threshold` in `.jscpd.json` toward the new real number.
+
+These are the meaningful cross-file clones worth extracting into a shared helper (incidental
+JSX-scaffolding / import-block matches are excluded — this is the real-DRY-violation subset).
+**Detect + baseline + gate + log only — the extraction itself is separate DRY work, not this task.**
+
+- **[G-CPD-1] (P2, `console`) — RAG chunk/embed logic duplicated `org-knowledge.ts` ↔ `rag.ts`.**
+  `src/lib/org-knowledge.ts:71-100` ↔ `src/lib/rag.ts:42-71` (30 lines / 279 tokens) and
+  `org-knowledge.ts:312-322` ↔ `rag.ts:172-182` (11 lines). Two pure `src/lib` modules sharing the
+  same retrieval/embedding block — the highest-value extraction (pure logic, easy to unit-test the
+  shared helper). Extract into one shared function both import.
+- **[G-CPD-2] (P2, `console`) — eval runner logic duplicated `adapters/evals.ts` ↔ `eval-runner.ts`.**
+  `src/lib/adapters/evals.ts:201-228` ↔ `src/lib/eval-runner.ts:39-63` (28 lines / 208 tokens). Shared
+  eval-execution block across the adapter and the runner; lift into one helper.
+- **[G-CPD-3] (P2, `console`) — near-identical admin route handlers.** Sibling routes copy-paste the
+  same auth+parse+dispatch scaffold: `access/users/[id]/mfa` ↔ `.../roles` (route.ts, 33L/212T);
+  `pipelines/[id]/owner` ↔ `pipelines/[id]/team` (24L/189T); `eval-defs` ↔ `golden-cases` (24L/139T);
+  `erasure-requests` ↔ `erasure` (27L/135T); `gateway/analytics` ↔ `gateway/finops` (24L/186T). Extract
+  a shared handler factory / helper in `src/lib` (routes stay thin leaves per the boundary rule).
+- **[G-CPD-4] (P2, `console`) — the `/build/apps/[id]/*` detail pages duplicate their non-`[id]`
+  siblings.** `apps/[id]/reports` ↔ `apps/reports` (36L/263T + 24L/158T), `apps/[id]/runs` ↔
+  `apps/runs` (28L/227T). Same page body rendered for the scoped and unscoped variants — factor the
+  shared body into one component both routes render.
+- **[G-CPD-5] (P2, `console`) — shared component scaffolds.** Nav components `DataNav.tsx` ↔
+  `GovernanceNav.tsx` (41L/227T — the largest single clone); quality panels `AppQualityPanel.tsx` ↔
+  `pipelines/governance/PipelineQualityPanel.tsx` (two blocks, 29L + 24L); manager pairs
+  `EvalDefsManager` ↔ `GoldenCasesManager` (34L), `PipelineEditSheet` ↔ `PipelinesManager` (26L); and
+  add-button pairs `AddAbacRuleButton` ↔ `AddGovernanceButton` (24L). Extract shared presentational
+  primitives (a generic Nav / QualityPanel / add-entity-button) parameterized by props.
+
+Full clone list (all 256, incl. incidental) is in the generated report: `coverage/jscpd/jscpd-report.html`
+(regenerate with `npm run jscpd:report`) and `coverage/jscpd/jscpd-report.json` (both gitignored).
