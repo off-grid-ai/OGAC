@@ -973,3 +973,41 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## G-ADV-GOV-1 — chat inbound guardrail FAILS OPEN on a thrown engine error
+**Status: OPEN (HIGH — core promise).** `src/app/api/v1/chat/stream/route.ts:156` wraps the inbound
+guardrail in `runInboundGuardrails(...).catch(() => null)`. On ANY thrown error (the seam is
+fail-closed for network outages — it returns `{blocked:true}` instead of throwing — but a bug in
+`runChecks` iteration, `getPii().scan()` on the masking branch at `chat-run.ts:138`,
+`applyPiiEscalation`, or a recognizer-config load that escapes will throw), `inbound===null`, so:
+(A) `inbound?.blocked` is falsy → the injection block is BYPASSED; (B) `modelContent = inbound?.text
+?? String(content)` → the RAW, unredacted prompt (incl. PAN/Aadhaar) is sent to the model. A
+guardrail a thrown error can silently disable is not a guardrail. Proof: RED test G-ADV-GOV-1 in
+`test/adversarial-governance-failopen.test.ts` (fails when un-skipped). Root cause = DRY: the chat
+copy of guardrail invocation is the ONLY run-path that swallows the call (agent `agentrun.ts:529` +
+pipeline `pipeline-execute.ts:170` let a throw propagate → run errors = fail-closed). Fix = one
+enforced seam whose contract is "a failed screen is a BLOCK, never null" — un-skip the RED test after.
+
+## G-ADV-GOV-2 — chat outbound guardrail verdicts silently DROPPED on engine error
+**Status: OPEN (MED — audit integrity).** `src/app/api/v1/chat/stream/route.ts:677`
+`runOutboundGuardrails(...).catch(() => [])` returns `[]` on a throw, so the run/audit record shows a
+CLEAN outbound screen that never ran. Compounded: tokens already streamed to the client BEFORE this
+scan runs, so chat egress DLP is observational-only and its failure is invisible. Proof: RED test
+G-ADV-GOV-2. Fix with the same enforced-seam contract as G-ADV-GOV-1 (a failed scan records an honest
+warn/blocked verdict, never `[]`).
+
+## G-ADV-GOV-3 — app-run has NO mandatory inbound guardrail floor
+**Status: OPEN (LOW / SoC).** `src/lib/app-run.ts:399-434` dispatches step kinds; the `guardrail`
+step is OPTIONAL (fires only if the app author added one). Injection/PII screening on the app
+boundary exists only transitively via a nested agent step's `runAgent` (which has the mandatory
+floor). A `connector-query → output` or inline-model app can carry the untrusted app `input` with no
+injection screen — inconsistent with the agent/pipeline paths that screen EVERY run. Should be a
+mandatory floor at the app entry, mirroring `agentrun.ts` step-2.
+
+## G-ADV-GOV-4 — PII mask on app-run/pipeline sends UNMASKED prompt on a detector throw
+**Status: OPEN (LOW).** `src/lib/app-run.ts:503-504` and `src/lib/pipeline-execute.ts:201-203` wrap
+the PII-mask substitution in `try { … } catch { /* send unmasked */ }`. A detector *throw* (distinct
+from the seam's fail-closed block) sends the prompt to the model unmasked. Best-effort by design
+("leash guarantees still hold"), but on an escalated-masking pipeline this is raw PII reaching the
+(local) model when the operator asked for it to be masked. Decide: fail-closed (block) vs the current
+best-effort, and make it consistent + explicit.
