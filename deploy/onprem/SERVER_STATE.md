@@ -1154,4 +1154,5 @@ Ran on the server against live infra (idempotent, org-guarded to org_bharat/org_
 3. `scripts/seed-tenant-files.mts` → object store: 3 bank + 3 insurer files under `orgs/<org>/demo/`.
 4. `scripts/seed-tenant-secrets.mts --write` → OpenBao: 2 secrets each under `secret/<org>/`.
 All idempotent/re-runnable. Verified live: Overview/Studio/Knowledge/Storage/Pipelines/Governance populated + distinct per tenant.
-RESIDUALS (open): Chat list shows empty (convos seeded under seed user, not the viewer — needs user/org-scope reconcile); Analytics empty until the OpenSearch reader org-filter ships (security cluster #236 Sec-C, in flight).
+RESIDUAL RESOLVED (2026-07-11): Chat now populates per tenant — the seed owns convos under the REAL viewer email (OFFGRID_DEMO_VIEWER_<SLUG>_EMAIL) and upserts ownership on re-run; verified live (bank: NEFT/dunning/KYC; insurer: FNOL/policy/lapse).
+RESIDUAL (open): Analytics empty until the OpenSearch analytics reader org-filter ships (#236, in flight) — the org-tagged docs are already indexed.
