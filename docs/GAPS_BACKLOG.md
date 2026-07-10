@@ -994,3 +994,36 @@ surface{RSC,API-GET,API-write} × method{GET,POST,PATCH,DELETE,PUT}. Verified LI
 - viewer × own-host × overview → own-org data only, write blocked ✓
 UNTESTED intersections logged for follow-up: bearer/service-token × tenant-host (data-plane org binding);
 no-org viewer × tenant-host (binds to default — should it be denied?); admin × cross-tenant (intended: allowed).
+
+## G-DEMO-SHOTS-1 — guardrails "engine unreachable" + "LLM Guard" label leak (blocks 3 doc screenshots)
+Found during README/docs screenshot re-shoot (#222, 2026-07-11) from the live BANK demo
+(bharatunion-onprem-console). The ML/PII guardrails engine is DOWN on the live demo, and the UI
+copy names it "LLM-GUARD" / "LLM Guard". This surfaces on THREE screenshotted surfaces:
+- `/overview` — "PII GUARDRAILS: LLM-GUARD — engine unreachable" (red card)
+- `/governance/guardrails` — "PII detection: unreachable", "the engine is unreachable, so only the
+  regex floor applies", "LLM Guard scanner" button label
+Two defects, both violating the hide-the-OSS-engine rule + the "no broken/empty state in demo" bar:
+1. INFRA: bring the guardrails engine back up on the live demo so it reads "reachable/enforcing".
+2. COPY: rename the user-facing "LLM Guard"/"LLM-GUARD" strings to a product term (e.g. "PII & content
+   guardrails") — an OSS engine name must never appear in-product.
+Impact: overview.png, guardrails.png cannot pass screenshot verification (banned name + broken state)
+until fixed. Current shots captured for freshness but marked NOT-verified.
+
+## G-DEMO-SHOTS-2 — retrieval page hardcodes "Qdrant"/"lancedb" + shows 0 vectors (blocks 1 doc screenshot)
+Found #222. `/data/retrieval` copy exposes engine names: "served by the built-in embedded store
+(lancedb)", "An external vector database (Qdrant) is optional", "OFFGRID_ADAPTER_RETRIEVAL=qdrant",
+"OFFGRID_QDRANT_URL", plus "TOTAL VECTORS: 0" (empty state). Violates the hide-the-OSS-engine rule and
+the no-empty-state bar.
+FIX: (1) rewrite copy to product terms (e.g. "on-prem vector store" — never "Qdrant/lancedb/qdrant env
+vars" in-product); (2) seed the demo retrieval store so TOTAL VECTORS > 0.
+Impact: retrieval.png cannot pass verification until fixed. Current shot captured for freshness, NOT-verified.
+
+## G-DEMO-SHOTS-3 — AI Gateway model catalog shows seed model id "qwythos-9b" (banned name)
+Found #222. `/gateway/ai` Overview/Traffic/Cloud tabs list a fleet-served model whose display id is
+"qwythos-9b" — a banned internal/OSS-flavored name. Every gateway tab either shows it (Overview/Traffic/
+Cloud) or is empty (Router "not wired" + mentions "LiteLLM Proxy"; Logs 0 matches; Tuning emptyish).
+gateway.png was captured from the Traffic tab (richest honest view) but "qwythos-9b" still appears as a
+small model label.
+FIX: rename the seed model display id from "qwythos-9b" to a real model name (e.g. its underlying
+Qwen id) in the fleet/model catalog seed; also fix the Router-tab "LiteLLM Proxy" copy to a product term.
+Impact: gateway.png shows a banned model label; NOT fully verified until the seed id is renamed.
