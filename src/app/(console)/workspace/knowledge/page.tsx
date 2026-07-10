@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
 import { QuickAddDocument } from '@/components/knowledge/QuickAddDocument';
+import { CardRail } from '@/components/workspace/CardRail';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -55,11 +56,11 @@ export default async function KnowledgePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <CardRail>
           {collections.map((c, i) => (
             <Card
               key={c.id}
-              className="group relative flex flex-col shadow-sm transition-colors hover:border-primary/50"
+              className="group relative flex h-full flex-col shadow-sm transition-colors hover:border-primary/50"
             >
               <CardHeader className="flex flex-row items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -113,7 +114,7 @@ export default async function KnowledgePage() {
               </CardContent>
             </Card>
           ))}
-        </div>
+        </CardRail>
       )}
     </div>
   );

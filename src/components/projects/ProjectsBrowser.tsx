@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { CardRail } from '@/components/workspace/CardRail';
 import { accentHue, initials, preview, relativeTime } from '@/lib/workspace-grid';
 import { cn } from '@/lib/utils';
 
@@ -121,11 +122,11 @@ export function ProjectsBrowser() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <CardRail>
           {filtered.map((p) => (
             <ProjectCard key={p.id} p={p} onDelete={() => remove(p.id, p.name)} />
           ))}
-        </div>
+        </CardRail>
       )}
 
       {shared.length ? (
@@ -137,11 +138,11 @@ export function ProjectsBrowser() {
               Projects other people gave you access to.
             </span>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <CardRail>
             {shared.map((p) => (
               <ProjectCard key={p.id} p={p} badge={p.canEdit ? 'edit' : 'view'} />
             ))}
-          </div>
+          </CardRail>
         </div>
       ) : null}
     </div>
@@ -160,7 +161,7 @@ function ProjectCard({
   const hue = accentHue(p.id || p.name);
   const instr = preview(p.systemPrompt || p.description, 130);
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
       <span
         aria-hidden
         className="h-1 w-full shrink-0"
