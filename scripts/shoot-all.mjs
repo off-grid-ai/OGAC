@@ -97,7 +97,10 @@ async function resolveConcrete(page, template) {
 
 async function shoot(page, route, url, rec) {
   const errors = [];
-  const onErr = (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); };
+  // Ignore harmless third-party noise: the Cloudflare web-analytics beacon trips a CSP
+  // report on every page — it's not an app error, so it must not flip `ok` to false.
+  const isNoise = (t) => /cloudflareinsights\.com|beacon\.min\.js/i.test(t);
+  const onErr = (m) => { if (m.type() === 'error' && !isNoise(m.text())) errors.push(m.text().slice(0, 200)); };
   page.on('console', onErr);
   let status = 0;
   try {
