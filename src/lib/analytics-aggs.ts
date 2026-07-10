@@ -32,18 +32,45 @@ function avgLatency(sumMs: number, count: number): number {
 const LATENCY_PCT = { percentiles: { field: 'ms', percents: [50, 95] } };
 
 /**
+ * TENANT ISOLATION (G-ADV-OBS-ORG): build the OpenSearch `bool.filter` array that scopes an
+ * analytics query to one org (+ an optional pipeline). Every analytics/logs query MUST carry the org
+ * term or a tenant sees combined cross-tenant traffic/cost. Pure + exported so the raw-doc reader,
+ * the aggregation builder, and the gateway logs/analytics routes all scope IDENTICALLY (DRY). An
+ * empty/absent org means "no org scoping" (single-tenant / the default org that isn't stamped),
+ * matching how other org-scoped surfaces treat the default org.
+ */
+export function analyticsScopeFilters(
+  org?: string | null,
+  pipelineTag?: string | null,
+): Record<string, unknown>[] {
+  const filters: Record<string, unknown>[] = [];
+  if (org) filters.push({ term: { org } });
+  if (pipelineTag) filters.push({ term: { 'project.keyword': pipelineTag } });
+  return filters;
+}
+
+// Turn a filter array into a query clause: a bool/filter when there's anything to scope on, else
+// match_all. Shared so the raw-doc reader and the aggregation builder agree.
+export function scopedQuery(filters: Record<string, unknown>[]): Record<string, unknown> {
+  return filters.length ? { bool: { filter: filters } } : { match_all: {} };
+}
+
+/**
  * The single `size:0` aggregation query that replaces fetching raw docs.
  * `nowMs` is injected (not read from Date.now here) so the builder stays pure and testable.
- * An optional `pipelineTag` (`pipeline:<id>`) narrows the whole rollup to one pipeline's slice — the
+ * `org` scopes the whole rollup to the caller's tenant (G-ADV-OBS-ORG) via an `org` term filter.
+ * An optional `pipelineTag` (`pipeline:<id>`) narrows the rollup to one pipeline's slice — the
  * gateway docs carry the pipeline attribution in `project` (PA-12), so we filter on `project.keyword`.
  */
-export function buildAggsQuery(nowMs: number, pipelineTag?: string | null): Record<string, unknown> {
+export function buildAggsQuery(
+  nowMs: number,
+  pipelineTag?: string | null,
+  org?: string | null,
+): Record<string, unknown> {
   const recentGteIso = new Date(nowMs - RECENT_MS).toISOString();
   return {
     size: 0,
-    query: pipelineTag
-      ? { bool: { filter: [{ term: { 'project.keyword': pipelineTag } }] } }
-      : { match_all: {} },
+    query: scopedQuery(analyticsScopeFilters(org, pipelineTag)),
     aggs: {
       total_tokens: { sum: { field: 'tokens' } },
       latency_pct: LATENCY_PCT,
