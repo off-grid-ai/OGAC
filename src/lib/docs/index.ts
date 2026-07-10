@@ -1,4 +1,4 @@
-// Docs registry — assembles the sidebar from per-section files. Public API is unchanged from the
+// Docs registry - assembles the sidebar from per-section files. Public API is unchanged from the
 // old single-file module (DOC_SECTIONS, DocPage, DocSection, findDocBySlug, allDocSlugs, docIndex),
 // so importers keep working. Each section lives in its own file so pages can be expanded in
 // parallel without collisions.
@@ -43,7 +43,7 @@ export function docIndex(): { slug: string; title: string; description: string; 
   );
 }
 
-// Flat page order (sidebar order) — for prev/next footer navigation.
+// Flat page order (sidebar order) - for prev/next footer navigation.
 export function orderedDocs(): { slug: string; title: string }[] {
   return ALL_PAGES.map((p) => ({ slug: p.slug, title: p.title }));
 }

@@ -1,4 +1,4 @@
-# How-tos — step by step
+# How-tos - step by step
 
 Short, concrete recipes for everyday tasks. Each works in the **UI** and via the **API** (the
 OpenAPI spec at `/docs` is the source of truth and the SDK generator).
@@ -8,12 +8,12 @@ OpenAPI spec at `/docs` is the source of truth and the SDK generator).
 ## Issue a virtual key (token issuance)
 
 **UI:** FinOps → **Issue key** → name, scope (user/project), subject, optional budget → copy the
-`ogk_…` token (shown once). **API:**
+`ogk_...` token (shown once). **API:**
 
 ```bash
 curl -XPOST $URL/api/v1/admin/keys -H 'content-type: application/json' \
   -d '{"name":"Claims team","subjectType":"project","subject":"claims","budgetUsd":500}'
-# → { key: {...}, token: "ogk_…" }   (token returned once)
+# → { key: {...}, token: "ogk_..." }   (token returned once)
 ```
 
 Revoke: toggle off in FinOps, or `PATCH /api/v1/admin/keys/{id} {"enabled":false}`.
@@ -43,7 +43,7 @@ record. **API:**
 
 ```bash
 curl -XPOST $URL/api/v1/admin/brain/ingest -H 'content-type: application/json' \
-  -d '{"kind":"text","title":"Lapse grace period","text":"A policy has a 30-day grace period…"}'
+  -d '{"kind":"text","title":"Lapse grace period","text":"A policy has a 30-day grace period..."}'
 ```
 
 It's embedded + indexed with provenance, then retrievable via the router.
@@ -73,7 +73,7 @@ curl -XPOST $URL/api/v1/admin/grounding/verify -H 'content-type: application/jso
 # → per-claim {supported, score, source}
 ```
 
-No Brain required — point it at your own sources. Swap the grounding model to HHEM/MiniCheck via
+No Brain required - point it at your own sources. Swap the grounding model to HHEM/MiniCheck via
 `OFFGRID_GROUNDING_MODEL`.
 
 ---
@@ -108,7 +108,7 @@ training / vendor / insurance / drill / impact_assessment), title, owner. **API:
 ## Swap a capability to its OSS backend
 
 1. `cd deploy && make <profile>` (e.g. `make guardrails`).
-2. `.env.local`: `OFFGRID_ADAPTER_GUARDRAILS=presidio` + `OFFGRID_PRESIDIO_URL=…`.
+2. `.env.local`: `OFFGRID_ADAPTER_GUARDRAILS=presidio` + `OFFGRID_PRESIDIO_URL=...`.
 3. Restart the console. Confirm in **Admin → Integrations · adapters** (active + healthy).
 
 ---
@@ -134,7 +134,7 @@ Agents call the **gateway** with any OpenAI-compatible SDK; devices use the desk
 
 ---
 
-## Agent QA — run evals, score live traffic, watch for drift
+## Agent QA - run evals, score live traffic, watch for drift
 
 All admin routes accept either an SSO session or `Authorization: Bearer $OFFGRID_ADMIN_TOKEN`.
 Set `BASE=http://127.0.0.1:3000` (or your host) for the examples below.
@@ -146,13 +146,13 @@ curl -sX POST "$BASE/api/v1/admin/evals/run" -H "authorization: Bearer $TOKEN"
 ```
 Switch the evaluator with `OFFGRID_ADAPTER_EVALS=golden|promptfoo|ragas`. `promptfoo` needs the
 `promptfoo` binary on PATH; `ragas` needs the sidecar (`make qa`, `OFFGRID_RAGAS_URL`). Both fall
-back to `golden` if unavailable — so this call always records a run.
+back to `golden` if unavailable - so this call always records a run.
 
 ### Score a live interaction (online eval → Langfuse)
 ```bash
 curl -sX POST "$BASE/api/v1/admin/qa/score" -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"input":"What is the contestability window?","output":"Two years from issue.","sources":["Claims SOP: …within two years of issue."]}'
+  -d '{"input":"What is the contestability window?","output":"Two years from issue.","sources":["Claims SOP: ...within two years of issue."]}'
 # → { "traceId", "verdict": {"quality":0..1,"faithfulness":0..1,"reasoning"}, "judged": bool, "posted": bool }
 ```
 `judged:false` = the gateway judge was unreachable (no fabricated score is written). `posted:false`
@@ -169,11 +169,11 @@ curl -s "$BASE/api/v1/admin/qa/status"  -H "authorization: Bearer $TOKEN"  # off
 ### Schedule the QA sweep (cron / CI gate)
 ```bash
 curl -sX POST "$BASE/api/v1/admin/qa/sweep" -H "authorization: Bearer $TOKEN"
-# 200 + {degraded:false,…}  |  503 + {degraded:true, reasons:[…]}  → emits a qa.sweep span
-# cron example: */30 * * * *  curl -fsX POST … || alert
+# 200 + {degraded:false,...}  |  503 + {degraded:true, reasons:[...]}  → emits a qa.sweep span
+# cron example: */30 * * * *  curl -fsX POST ... || alert
 ```
 
-## Provenance — sign & verify exports and assets
+## Provenance - sign & verify exports and assets
 
 ### Export a report with a signed manifest, then verify
 ```bash
@@ -200,7 +200,7 @@ curl -sX POST "$BASE/api/v1/admin/provenance/sigstore" -H "authorization: Bearer
 Signing needs an OIDC identity token (`OFFGRID_SIGSTORE_IDENTITY_TOKEN`); public-good Fulcio/Rekor by
 default, or self-host via `OFFGRID_FULCIO_URL` / `OFFGRID_REKOR_URL`.
 
-## Sandbox — run agent code safely
+## Sandbox - run agent code safely
 ```bash
 # Enable first: OFFGRID_ADAPTER_SANDBOX=docker + turn on the agent-code-exec flag (Admin → Flags).
 curl -sX POST "$BASE/api/v1/admin/sandbox/run" -H "authorization: Bearer $TOKEN" \
@@ -209,9 +209,9 @@ curl -sX POST "$BASE/api/v1/admin/sandbox/run" -H "authorization: Bearer $TOKEN"
 ```
 Runs `--network none`, memory/CPU/PID-capped, read-only, non-root, with a hard timeout.
 
-## Fleet Control — device inventory
+## Fleet Control - device inventory
 ```bash
-curl -s "$BASE/api/v1/admin/mdm/devices" -H "authorization: Bearer $TOKEN"   # { backend:"native|fleetdm", data:[…] }
+curl -s "$BASE/api/v1/admin/mdm/devices" -H "authorization: Bearer $TOKEN"   # { backend:"native|fleetdm", data:[...] }
 ```
 Point at FleetDM with `OFFGRID_ADAPTER_MDM=fleetdm` + `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`
 (`make mdm`; see RUNBOOKS for the `fleetctl` token steps). Falls back to the registry if unreachable.
