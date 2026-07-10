@@ -21,6 +21,11 @@ import {
   type ParsedClickHouse,
   type TableSummary,
 } from '@/lib/warehouse-model';
+import {
+  ALL_DATABASES,
+  scopeTablesToDatabase,
+  tableInScope,
+} from '@/lib/warehouse-tenancy';
 
 const env = process.env;
 
@@ -36,6 +41,15 @@ function warehouseConfig() {
 
 const QUERY_TIMEOUT_MS = 8000;
 
+// Under a tenant scope, a BARE table name must resolve against THAT tenant's database — not
+// ClickHouse's currentDatabase() (which the SQL builders default a bare name to). Qualify a bare,
+// in-scope name to `<scope>.<name>` so stats/sample read the tenant's own table. A name that's
+// already qualified (its db was checked in-scope by tableInScope) or an unscoped read is unchanged.
+function qualifyForScope(table: string, scope: string | typeof ALL_DATABASES): string {
+  if (scope === ALL_DATABASES) return table;
+  return table.includes('.') ? table : `${scope}.${table}`;
+}
+
 // Per-table stats returned by tableStats(). rows/bytes are the real on-disk figures; freshness is
 // the age of the latest data part.
 export interface TableStats {
@@ -47,12 +61,18 @@ export interface TableStats {
   freshness: Freshness;
 }
 
+// The tenancy scope for a read: the ClickHouse database the caller may see, or ALL_DATABASES (null)
+// for the default / single-tenant org. Resolved by lib/warehouse-scope.ts and passed in by the
+// page/route — the adapter stays pure I/O and only APPLIES the scope (via the pure warehouse-tenancy
+// rules), it never decides it. Defaulting to ALL_DATABASES keeps callers that don't scope unchanged.
+export type WarehouseScope = string | typeof ALL_DATABASES;
+
 export interface WarehousePort {
   meta: AdapterMeta;
   health(): Promise<boolean>;
-  listTables(): Promise<TableSummary[]>;
-  tableStats(table: string): Promise<TableStats | null>;
-  sample(table: string, limit?: number): Promise<ParsedClickHouse | null>;
+  listTables(scope?: WarehouseScope): Promise<TableSummary[]>;
+  tableStats(table: string, scope?: WarehouseScope): Promise<TableStats | null>;
+  sample(table: string, limit?: number, scope?: WarehouseScope): Promise<ParsedClickHouse | null>;
   // Operator-typed READ-ONLY SQL. Returns the parsed rows, or a rejection reason (guard failure /
   // engine error) — never throws.
   query(sql: string): Promise<{ ok: true; result: ParsedClickHouse } | { ok: false; reason: string }>;
@@ -121,21 +141,27 @@ export const clickhouseWarehouse: WarehousePort = {
     }
   },
 
-  async listTables() {
+  async listTables(scope = ALL_DATABASES) {
     try {
       const text = await runSql(buildListTablesSql());
       const now = Date.now();
-      return parseClickHouseJson(text).rows.map((r) => toTableSummary(r, now));
+      const all = parseClickHouseJson(text).rows.map((r) => toTableSummary(r, now));
+      // TENANCY: a tenant sees ONLY the tables in its own database (slug-named); the default /
+      // single-tenant org (ALL_DATABASES) sees everything. Fixes the shared-catalog cross-tenant leak.
+      return scopeTablesToDatabase(all, scope);
     } catch (err) {
       console.warn('[warehouse] listTables failed, degrading to empty:', describeError(err));
       return [];
     }
   },
 
-  async tableStats(table) {
-    if (!isSafeIdentifier(table)) return null;
+  async tableStats(table, scope = ALL_DATABASES) {
+    // TENANCY: deny a cross-database reference (e.g. another tenant's `db.table`) before any I/O.
+    if (!tableInScope(table, scope)) return null;
+    const scoped = qualifyForScope(table, scope);
+    if (!isSafeIdentifier(scoped)) return null;
     try {
-      const text = await runSql(buildTableStatsSql(table));
+      const text = await runSql(buildTableStatsSql(scoped));
       const row = parseClickHouseJson(text).rows[0];
       if (!row) return null;
       return {
@@ -152,10 +178,13 @@ export const clickhouseWarehouse: WarehousePort = {
     }
   },
 
-  async sample(table, limit) {
-    if (!isSafeIdentifier(table)) return null;
+  async sample(table, limit, scope = ALL_DATABASES) {
+    // TENANCY: deny a cross-database reference before any I/O; resolve a bare name to the tenant's db.
+    if (!tableInScope(table, scope)) return null;
+    const scoped = qualifyForScope(table, scope);
+    if (!isSafeIdentifier(scoped)) return null;
     try {
-      const text = await runSql(buildSampleSql(table, clampLimit(limit)));
+      const text = await runSql(buildSampleSql(scoped, clampLimit(limit)));
       return parseClickHouseJson(text);
     } catch (err) {
       console.warn('[warehouse] sample failed:', describeError(err));
