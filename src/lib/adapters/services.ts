@@ -412,3 +412,21 @@ export const jaegerEntry: RegEntry = {
   },
   health: ping(env.OFFGRID_JAEGER_URL, '/'),
 };
+
+// LiteLLM Proxy — the router / load-balancer / budget layer on the model-door path (behind the
+// gateway's GATEWAY_URL seam, OpenAI-compatible, replacing the hand-rolled aggregator). Surfaced in
+// Integrations with live health, exactly like the other observability backends. Its /health/liveliness
+// endpoint answers ok when the proxy is up; unset OFFGRID_LITELLM_URL ⇒ not connected (honest).
+export const litellmEntry: RegEntry = {
+  meta: {
+    id: 'litellm',
+    capability: 'observability',
+    vendor: 'LiteLLM Proxy',
+    license: 'MIT',
+    render: 'headless',
+    embedUrl: env.OFFGRID_LITELLM_URL,
+    description:
+      'Model router / load-balancer / budget layer on the gateway door — health-checked LB + automatic failover across the fleet and cloud, per-key budgets and rate limits, and structured request logging into the traffic index. Surfaced in the gateway Router view. Configure OFFGRID_LITELLM_URL + OFFGRID_LITELLM_MASTER_KEY.',
+  },
+  health: ping(env.OFFGRID_LITELLM_URL, '/health/liveliness'),
+};

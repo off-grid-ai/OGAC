@@ -24,6 +24,7 @@ import {
   SIEM,
   jaegerEntry,
   langfuseEntry,
+  litellmEntry,
   victoriaLogsEntry,
   victoriaMetricsEntry,
 } from './services';
@@ -150,6 +151,7 @@ const ALL: Record<Capability, RegEntry[]> = {
   observability: [
     ...portEntries(OBSERVABILITY),
     langfuseEntry,
+    litellmEntry,
     victoriaMetricsEntry,
     victoriaLogsEntry,
     jaegerEntry,
