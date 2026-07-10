@@ -816,3 +816,24 @@ Individual surfaces PASS vision + full-width + no-OSS-leak: ROI (`/insights/roi`
 
 - **[G-ISO-W2-1] ✅ CLOSED — cross-tenant read+write leak on prompts / golden cases / eval defs / analytics rules+views.** These surfaces queried their tables WITHOUT an `org_id` filter, so every tenant could list/get/edit/delete every other tenant's rows (an 'org'-visibility prompt leaked to ALL tenants; a guessed id let one tenant mutate/delete another's). FIXED: org-scoped `listPrompts/getPrompt/createPrompt/updatePrompt/deletePrompt/incrementUses` (`src/lib/prompts.ts`), `listGoldenCases/getGoldenCase/addGoldenCase/updateGoldenCase/deleteGoldenCase` + `runEval` (`src/lib/evals.ts`), `listEvalDefs/getEvalDef/addEvalDef/updateEvalDef/deleteEvalDef` (`src/lib/eval-defs.ts`), and `listRules/createRule/updateRule/deleteRule/listViews/createView/updateView/deleteView/evaluateRules` (`src/lib/analytics-rules.ts`); threaded from the thin routes via `currentOrgId()`. Migration `deploy/onprem/migrations/wave2-prompts-analytics-evals-isolation.sql`. Evidence: `test/security-wave2-tenant-isolation.integration.test.ts` (5 tests, real Postgres, all PASS) — A cannot list/get/update/delete B's rows; same key/name coexists per org. typecheck + full suite (2990 pass) + coverage:check (≥85% global, exit 0) + prod build all green.
 - **[G-ISO-W2-2] (residual, out of this agent's file-set) `/build/*` + `/workspace/prompts/[id]` server-component pages read golden/eval-def/prompt lists WITHOUT threading orgId.** The DB store functions now ACCEPT an optional `orgId` (and the leak-critical API routes pass it), but a few server components still call `listGoldenCases(appId)` / `listEvalDefs(id)` / `getPrompt(id)` with no org arg (`src/app/(console)/build/evals/page.tsx`, `build/pipelines/[id]/*`, `build/apps/[id]/quality/page.tsx`, `workspace/prompts/[id]/page.tsx`). These are owned by other agents' file-sets. Since those pages filter by app/pipeline id (themselves org-scoped entities) the practical exposure is narrow, but for defense-in-depth they should thread `currentOrgId()` into the list/get calls. FIX: pass the caller org through the page loaders (one-line each, the store already supports it).
+
+---
+
+## GUARDRAILS — LLM Guard live-verify findings (2026-07-10, verified on S1 fleet Docker)
+
+LLM Guard (`laiyer/llm-guard-api:0.3.16`) deployed + screened a live payload through the tunnel:
+`{"is_valid":false,"scanners":{"Anonymize":0.5,"Secrets":1.0},"sanitized_prompt":"... email
+[REDACTED_EMAIL_ADDRESS_RE_1], AWS key ******"}` in 0.55s. Engine VERIFIED. Open items:
+
+- **G-LG-1 (infra, P1):** the FULL ML scanner suite OOM-killed (exit 137) — prompt-injection/
+  toxicity/bias are heavy transformers. Ran only with a trimmed PII+Secrets config + 6g cap. A
+  production deploy of the full suite needs a sized host (or GPU). Compose service should document
+  a minimal-scanner default + a "full suite needs N GB" note.
+- **G-LG-2 (console, P1):** stock Anonymize did NOT catch the Indian PAN (`ABCDE1234F` passed). The
+  console's first-party Presidio `in-pan`/`aadhaar` recognizers are what close this — confirm the
+  LLM Guard scanner config the console generates includes the India recognizers, else BFSI-India PII
+  leaks past the engine's defaults.
+- **G-LG-3 (console, P1):** engine screening is verified; the console ROUTING a governed run through
+  it (`OFFGRID_ADAPTER_GUARDRAILS=llm-guard` → guardrail step → masked in run trace + audit) is
+  code+wired, NOT yet live-verified on the fleet (needs the new console code deployed). Verify
+  end-to-end after the LiteLLM+guard deploy.
