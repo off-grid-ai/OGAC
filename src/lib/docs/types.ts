@@ -1,4 +1,4 @@
-// Docs content types — shared by every section file. A page is markdown; sections group pages in
+// Docs content types - shared by every section file. A page is markdown; sections group pages in
 // the sidebar. Copy follows brand/ (outcomes-first, Off Grid AI voice, no em dashes / AI-slop).
 export interface DocPage {
   slug: string; // path under /docs ('' = home). e.g. 'guides/chat'

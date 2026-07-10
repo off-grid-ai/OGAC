@@ -7,22 +7,22 @@ export const operateSection: DocSection = {
     {
       slug: 'guides/overview',
       title: 'Overview (home)',
-      description: 'The operator’s landing page — health, governance posture, cost, and quick actions.',
+      description: 'The operator\'s landing page - health, governance posture, cost, and quick actions.',
       body: `Overview is where an operator lands. Instead of a flat list of modules, it answers the
-three questions you have every morning — is my AI healthy, is it safe, what is it costing — and puts
+three questions you have every morning - is my AI healthy, is it safe, what is it costing - and puts
 the next action one click away.
 
-![The Overview home — governance posture, traffic, spend, and recent activity](/docs-shots/overview.png)
+![The Overview home - governance posture, traffic, spend, and recent activity](/docs-shots/overview.png)
 
 ## What it shows
 
-- **Governance posture** — the policy engine state, guardrail actions in the window, and the live
+- **Governance posture** - the policy engine state, guardrail actions in the window, and the live
   cloud-egress state. At a glance: are the org's rules in force.
-- **Traffic & health** — request volume, latency p95, and how much of your traffic is served by your
+- **Traffic & health** - request volume, latency p95, and how much of your traffic is served by your
   own models vs. cloud.
-- **Spend** — cost for the window, the share served by your own models (which cost zero to run), and
+- **Spend** - cost for the window, the share served by your own models (which cost zero to run), and
   any virtual key over budget.
-- **Data & recent activity** — connected data sources and the most recent governed runs.
+- **Data & recent activity** - connected data sources and the most recent governed runs.
 
 ## Quick actions
 
@@ -38,15 +38,15 @@ fabricated number.`,
       slug: 'guides/services',
       title: 'Services',
       description: 'The map of everything you run, with live, server-probed health.',
-      body: `Services is the directory of every Off Grid AI surface — the console, the model gateway, the
-product subdomains, and the swappable backends — each with health probed live from the server.
+      body: `Services is the directory of every Off Grid AI surface - the console, the model gateway, the
+product subdomains, and the swappable backends - each with health probed live from the server.
 
 ## What you see
 
-- **Every service in one place** — its subdomain, what it does, and whether it's reachable right now.
-- **Server-probed health** — the reachability check runs from the console host (where the backends
+- **Every service in one place** - its subdomain, what it does, and whether it's reachable right now.
+- **Server-probed health** - the reachability check runs from the console host (where the backends
   bind to loopback), so it reflects what the platform can actually reach, not what your browser can.
-- **One login** — reach any surface from here without a second sign-in.
+- **One login** - reach any surface from here without a second sign-in.
 
 Use it as your first stop when something looks off: a backend showing unreachable tells you where to
 look before you dig into a specific module.`,
@@ -61,34 +61,34 @@ control how the platform is reached.
 
 ## What it covers
 
-- **Subdomain routing** — which public hostname maps to which internal service.
-- **Exposure posture** — services are reachable only through the edge, so there's one controlled
+- **Subdomain routing** - which public hostname maps to which internal service.
+- **Exposure posture** - services are reachable only through the edge, so there's one controlled
   front door rather than many.
-- **Boundary enforcement** — rate limiting and abuse protection are enforced at the edge, before a
+- **Boundary enforcement** - rate limiting and abuse protection are enforced at the edge, before a
   request ever reaches a service.
 
 ## What success looks like
 
 You see each public subdomain mapped to its service, and you know abuse protection runs at the
-boundary — so no request reaches a service without passing the front door first.`,
+boundary - so no request reaches a service without passing the front door first.`,
     },
     {
       slug: 'guides/gateway',
       title: 'AI Gateway & routing',
       description: 'One endpoint for every model, governed by rules you set once.',
-      body: `**What you'll get:** every model call — your own models and frontier cloud models alike —
+      body: `**What you'll get:** every model call - your own models and frontier cloud models alike -
 flows through one gateway, governed by the routing rules your org set once. Set the rules once,
 everyone builds on top of them.
 
-![The AI Gateway — routing rules, per-model cost, and which node served each call](/docs-shots/gateway.png)
+![The AI Gateway - routing rules, per-model cost, and which node served each call](/docs-shots/gateway.png)
 
 ## Routing
 
 For each request, the first matching routing rule (by priority) decides where it runs:
 
-- **local** — a model on your own nodes.
-- **cloud** — a frontier model, and only when cloud egress is ON.
-- **block** — the request is refused.
+- **local** - a model on your own nodes.
+- **cloud** - a frontier model, and only when cloud egress is ON.
+- **block** - the request is refused.
 
 ## The egress leash
 
@@ -106,7 +106,7 @@ whole model estate.
 ## What success looks like
 
 You add a rule, open the routing tester, paste a sample request, and see exactly where it would land
-— local, cloud, or block — before you commit. Every real call then shows which node served it.`,
+ - local, cloud, or block - before you commit. Every real call then shows which node served it.`,
     },
     {
       slug: 'guides/fleet',
@@ -115,15 +115,15 @@ You add a rule, open the routing tester, paste a sample request, and see exactly
       body: `Fleet is how you run the hardware behind the platform. A single source-of-truth table
 holds your topology; everything downstream is derived from it.
 
-![Fleet — nodes, their roles, the model each serves, and enable/disable](/docs-shots/fleet.png)
+![Fleet - nodes, their roles, the model each serves, and enable/disable](/docs-shots/fleet.png)
 
 ## What you manage
 
-- **Nodes** — each gateway node, its role (chat, vision, image, server, spare), the model it serves,
+- **Nodes** - each gateway node, its role (chat, vision, image, server, spare), the model it serves,
   and whether it's enabled.
-- **Models per node** — edit a node's model, context size, or enable/disable it from the console; the
+- **Models per node** - edit a node's model, context size, or enable/disable it from the console; the
   change saves to the database and is pushed to the node.
-- **Routing pool** — the aggregator reads its routing pool from this source of truth, so the console
+- **Routing pool** - the aggregator reads its routing pool from this source of truth, so the console
   is where you decide what the fleet looks like.
 
 Draining a node (disable) takes it out of rotation without removing it, so you can service hardware
@@ -136,16 +136,16 @@ without editing config by hand.`,
       body: `Observability shows what your AI actually did. Every governed run and gateway call emits a
 trace you can read back.
 
-![Observability — traces of every governed run and gateway call, on your own tracing store](/docs-shots/observability.png)
+![Observability - traces of every governed run and gateway call, on your own tracing store](/docs-shots/observability.png)
 
 ## What you see
 
-- **Agent-run traces** — the pipeline steps for each run (policy, guard, retrieve, answer, ground),
+- **Agent-run traces** - the pipeline steps for each run (policy, guard, retrieve, answer, ground),
   with timing.
-- **Recent traces** — a first-party read-back from your tracing store, with name, latency,
+- **Recent traces** - a first-party read-back from your tracing store, with name, latency,
   and cost when available.
 
-Traces are emitted best-effort — a failing trace never breaks a request — and read back from a store
+Traces are emitted best-effort - a failing trace never breaks a request - and read back from a store
 you run, so your telemetry stays yours.`,
     },
     {
@@ -154,21 +154,21 @@ you run, so your telemetry stays yours.`,
       description: 'Volume, tokens, outcomes, and latency from the real traffic log.',
       body: `Analytics summarizes real traffic: request volume, tokens, outcomes (clean, redacted,
 blocked), and latency percentiles (p50, p95). It reads from the audit/traffic index, so every number
-traces to a real event — an unreachable source shows real zeros, never synthetic data.`,
+traces to a real event - an unreachable source shows real zeros, never synthetic data.`,
     },
     {
       slug: 'guides/finops',
       title: 'FinOps',
-      description: 'Cost per model, team, and key — with budgets and the on-prem dividend.',
+      description: 'Cost per model, team, and key - with budgets and the on-prem dividend.',
       body: `FinOps meters usage and cost from the traffic log.
 
-![FinOps — cost by model, team, and key, with budgets and the on-prem dividend](/docs-shots/finops.png)
+![FinOps - cost by model, team, and key, with budgets and the on-prem dividend](/docs-shots/finops.png)
 
 ## What it shows
 
 - **Cost by model, team, and virtual key**, with request and token counts.
-- **Budgets** — per-key monthly limits; a completion checks the budget before it runs.
-- **Your-own-models dividend** — models you run yourself cost zero, so the savings from serving your
+- **Budgets** - per-key monthly limits; a completion checks the budget before it runs.
+- **Your-own-models dividend** - models you run yourself cost zero, so the savings from serving your
   own models are visible next to any cloud spend.
 
 Manage virtual keys and their budgets from the FinOps surface.
@@ -176,12 +176,12 @@ Manage virtual keys and their budgets from the FinOps surface.
 ## What success looks like
 
 You set a monthly limit on a project's key, and once spend passes it the next paid call is refused
-with a clear reason — while free local calls keep running. The cap holds without you watching it.`,
+with a clear reason - while free local calls keep running. The cap holds without you watching it.`,
     },
     {
       slug: 'guides/budgets',
       title: 'Budget enforcement',
-      description: 'A spend limit that actually stops the spend — not just an alert after the fact.',
+      description: 'A spend limit that actually stops the spend - not just an alert after the fact.',
       body: `A budget you can't enforce is a suggestion. Off Grid AI checks the limit **before** a call runs,
 so a team can't quietly blow past its cap and leave you to find out on the invoice.
 
@@ -198,9 +198,9 @@ The governance promise is that spend limits hold by default, not by opt-in, so h
 **on** unless you turn it off. Three switches control it, in order of precedence:
 
 - **A deployment-wide kill-switch** (\`OFFGRID_BUDGET_ENFORCE=false\`) forces a known posture on an
-  instance regardless of database state — useful to guarantee a demo box never blocks.
+  instance regardless of database state - useful to guarantee a demo box never blocks.
 - **A per-org override** (\`budget.enforce:<org>\`), so one tenant can differ from the deployment
-  default — enforce for everyone but hold one team advisory, or the reverse — without flipping the
+  default - enforce for everyone but hold one team advisory, or the reverse - without flipping the
   whole instance. On a shared deployment, one org's choice never changes another's.
 - **A per-deployment feature flag** (\`budget.enforce\`), editable in the console: the global default
   every org falls back to when it has no override of its own.
@@ -210,8 +210,8 @@ recorded so you can alert and reconcile. It never silently changes to "no limits
 
 ## What you set
 
-- **Per-key monthly limits** — set on the [FinOps](/docs/guides/finops) surface, one per project key.
-- **Unattributed or unlimited work runs free** — a call with no key, no limit, or zero cost is always
+- **Per-key monthly limits** - set on the [FinOps](/docs/guides/finops) surface, one per project key.
+- **Unattributed or unlimited work runs free** - a call with no key, no limit, or zero cost is always
   allowed, so enforcement only ever bites where you've drawn a line.
 
 Budgets pair with [Accounting](/docs/guides/accounting): the limit is the guardrail, the chargeback
@@ -224,13 +224,13 @@ report is the reconciliation.`,
       body: `Accounting turns raw usage into the numbers a finance owner needs: cost attributed to the
 team, model, and use-case that spent it, over a period you choose.
 
-![Accounting — chargeback-grade cost by team, model, and use-case](/docs-shots/accounting.png)
+![Accounting - chargeback-grade cost by team, model, and use-case](/docs-shots/accounting.png)
 
 ## What it answers
 
-- **Who spent what** — cost by team and virtual key, so spend has an owner.
-- **On what** — by model and use-case, so you can see which workloads cost the most.
-- **Over which period** — pick a range; every figure is metered from the real traffic log.
+- **Who spent what** - cost by team and virtual key, so spend has an owner.
+- **On what** - by model and use-case, so you can see which workloads cost the most.
+- **Over which period** - pick a range; every figure is metered from the real traffic log.
 
 Where [FinOps](/docs/guides/finops) is the live operational view (budgets, keys, the on-prem
 dividend), Accounting is the period close: the chargeback report you reconcile against.`,
@@ -242,14 +242,14 @@ dividend), Accounting is the period close: the chargeback report you reconcile a
       body: `Reports turn the dashboards into a document you can hand someone. Built-in reports are
 seeded; you can also compose your own templates.
 
-![Reports — signed documents rendered live over your real platform data](/docs-shots/app-reports.png)
+![Reports - signed documents rendered live over your real platform data](/docs-shots/app-reports.png)
 
 ## Manage and run
 
-- **Templates** — built-in reports are ready to run; create, edit, and delete custom templates.
-- **Run live** — a report renders against your current platform data using the same section
+- **Templates** - built-in reports are ready to run; create, edit, and delete custom templates.
+- **Run live** - a report renders against your current platform data using the same section
   renderers as the dashboards, so a report can't drift from what the console shows.
-- **Export** — as Markdown or PDF, carrying a [provenance](/docs/guides/provenance) signature so the
+- **Export** - as Markdown or PDF, carrying a [provenance](/docs/guides/provenance) signature so the
   exported figures are verifiable after the fact.
 
 Custom templates compose the same live sections as the built-ins, so anything you build stays
@@ -263,11 +263,11 @@ grounded in real data.`,
 
 ## How it works
 
-- **Signals** — per-feature distribution shift and quality degradation over a recent window vs. the
+- **Signals** - per-feature distribution shift and quality degradation over a recent window vs. the
   baseline.
-- **Baseline reset** — after a deliberate model or prompt change, reset the baseline so the next
+- **Baseline reset** - after a deliberate model or prompt change, reset the baseline so the next
   window measures against fresh reference.
-- **Alert thresholds** — set bounds on drift score and eval pass-rate; crossing one raises an alert.
+- **Alert thresholds** - set bounds on drift score and eval pass-rate; crossing one raises an alert.
 
 Manage thresholds and the baseline right on the Drift page.`,
     },
@@ -277,12 +277,12 @@ Manage thresholds and the baseline right on the Drift page.`,
       description: 'Gate quality with golden sets and LLM-as-judge scoring.',
       body: `Evals prove the AI still works, with evidence rather than vibes.
 
-![Evals — golden sets and LLM-as-judge scoring that gate quality with evidence](/docs-shots/evals.png)
+![Evals - golden sets and LLM-as-judge scoring that gate quality with evidence](/docs-shots/evals.png)
 
 ## What you run
 
-- **Golden sets** — curated query/expected-answer pairs. Manage them on the Evals page.
-- **Eval runs** — score against the golden set, with pass rates and run history. LLM-as-judge scoring
+- **Golden sets** - curated query/expected-answer pairs. Manage them on the Evals page.
+- **Eval runs** - score against the golden set, with pass rates and run history. LLM-as-judge scoring
   can run on live traffic when enabled.
 
 Use evals as a regression gate: run them after a model swap or prompt change and compare the pass
@@ -298,7 +298,7 @@ index: actor, action, outcome, and source IP for every event.
 ## Keep it signal
 
 - **Filter** by outcome (allowed, denied, blocked, error), URL-driven so views are linkable.
-- **Suppression rules** — mute known-noise events (a scanner IP, a service account, a health-probe
+- **Suppression rules** - mute known-noise events (a scanner IP, a service account, a health-probe
   path). Rules apply to the whole view server-side, so tiles and facets reflect them.
 
 Full-text audit search across the stream is available from the Control page.`,
@@ -306,12 +306,12 @@ Full-text audit search across the stream is available from the Control page.`,
     {
       slug: 'guides/audit',
       title: 'Audit ledger',
-      description: 'Who sent which chats, ran which runs, and changed what — the record a regulator reads.',
+      description: 'Who sent which chats, ran which runs, and changed what - the record a regulator reads.',
       body: `The Audit ledger is the accountability record: who sent which chats, ran which workflows,
 and changed what, when. It reads the same tamper-evident \`offgrid-audit\` index every governed run
 writes to, so it's the artifact you hand a regulator, not a claim.
 
-![The Audit ledger — actor, action, outcome, model, and cost per governed run](/docs-shots/audit.png)
+![The Audit ledger - actor, action, outcome, model, and cost per governed run](/docs-shots/audit.png)
 
 ## What each entry holds
 
@@ -333,18 +333,18 @@ ledger; SIEM is the security-signal stream over the same events, tuned with supp
     {
       slug: 'guides/lineage',
       title: 'Lineage',
-      description: 'Trace an answer back to the sources it came from — source to answer, provable.',
+      description: 'Trace an answer back to the sources it came from - source to answer, provable.',
       body: `Lineage traces where an answer came from: which sources fed a grounded run, all the way
 back to the document. It reads lineage events from your data-lineage store, with a fallback
 reconstruction from the source→answer references recorded on each run.
 
-![Lineage — the source-to-answer graph for a governed run](/docs-shots/lineage.png)
+![Lineage - the source-to-answer graph for a governed run](/docs-shots/lineage.png)
 
 ## What it shows
 
-- **Source-to-answer graph** — for a governed run, the retrieved sources and the answer they
+- **Source-to-answer graph** - for a governed run, the retrieved sources and the answer they
   produced, linked.
-- **Correlated by run id** — a lineage run is keyed to the same run id as the audit ledger and the
+- **Correlated by run id** - a lineage run is keyed to the same run id as the audit ledger and the
   trace, so you can pivot between them.
 
 ## Why it matters
@@ -358,7 +358,7 @@ altered afterward.`,
       title: 'Sandbox',
       description: 'Run agent-authored code in isolation, gated by policy.',
       body: `Sandbox runs code an agent writes, in an ephemeral, network-disabled, resource-capped
-container — so an agent can compute, not just talk, without touching your systems.
+container - so an agent can compute, not just talk, without touching your systems.
 
 ## Double-gated
 
@@ -374,7 +374,7 @@ is disabled.`,
       body: `**What you'll get:** one place for every file the platform touches. Uploaded knowledge,
 generated images, chat attachments, and exported artifacts all live in a single object store you own.
 
-![Storage — one object store for knowledge, generated images, attachments, and exports](/docs-shots/storage.png)
+![Storage - one object store for knowledge, generated images, attachments, and exports](/docs-shots/storage.png)
 
 ## What you can do
 
@@ -382,25 +382,25 @@ generated images, chat attachments, and exported artifacts all live in a single 
 - Upload and share files; a public file gets an internet-reachable URL through the gateway, a private
   one is served only to authorized callers.
 
-There is no other file-storage path — everything the console stores goes through this one layer.`,
+There is no other file-storage path - everything the console stores goes through this one layer.`,
     },
     {
       slug: 'guides/data',
       title: 'Data & connectors',
       description: 'Connect your systems of record and keep the data real.',
-      body: `**What you'll get:** your existing systems, connected into the platform as-is — no need to
+      body: `**What you'll get:** your existing systems, connected into the platform as-is - no need to
 migrate anything. Off Grid AI ships connectors for the common ones (databases, object storage, event
 streams, and REST APIs), so what your org already runs becomes something your AI can use.
 
-![Data — your systems of record connected, synced, and kept to real row counts](/docs-shots/data.png)
+![Data - your systems of record connected, synced, and kept to real row counts](/docs-shots/data.png)
 
 ## Manage connectors
 
 On the **Integrations** page, add a connector (point it at an endpoint, choose an auth scheme), edit
-it, trigger a sync, and see the ingest history — real row and document counts from the live source,
+it, trigger a sync, and see the ingest history - real row and document counts from the live source,
 never fabricated. Delete removes it and its history.
 
-![Connectors — add an endpoint, choose an auth scheme, sync, and read real ingest history](/docs-shots/connectors.png)
+![Connectors - add an endpoint, choose an auth scheme, sync, and read real ingest history](/docs-shots/connectors.png)
 
 ## Real data only
 
@@ -410,24 +410,24 @@ the full list of supported sources in [Integrations](/docs/integrations/catalog)
 
 ## What success looks like
 
-You add a connector, trigger a sync, and see a real row/document count land in the ingest history —
+You add a connector, trigger a sync, and see a real row/document count land in the ingest history -
 pulled from the live source. That connected data is then available to ground your assistants.`,
     },
     {
       slug: 'guides/backups',
       title: 'Backups',
       description: 'Scheduled, restorable backups of the control plane.',
-      body: `Backups protect the control-plane state — the console database (every governed run, policy,
+      body: `Backups protect the control-plane state - the console database (every governed run, policy,
 connector, and audit record) and its configuration. It is the recovery path behind
 [data sovereignty](/docs/concepts/data-sovereignty): your record is only yours if you can restore it.
 
 ## What you can do
 
-- **See status and history** — the last successful backup, its size, and the full history, read from
+- **See status and history** - the last successful backup, its size, and the full history, read from
   a backup manifest so the figures are real, not a claimed schedule.
-- **Run one on demand** — take a backup now, before a risky change, without waiting for the schedule.
-- **Prune** — remove backups past your retention window.
-- **Restore** — bring the control plane back from a prior backup within your recovery target.
+- **Run one on demand** - take a backup now, before a risky change, without waiting for the schedule.
+- **Prune** - remove backups past your retention window.
+- **Restore** - bring the control plane back from a prior backup within your recovery target.
 
 ## Scheduled and restorable
 
@@ -436,7 +436,7 @@ per component. Restore is end-to-end, not display-only: the surface triggers and
 [multi-tenant](/docs/concepts/multi-tenancy) deployment every org's data restores together, since
 isolation is a column and a policy on shared tables, not a separate database per org.
 
-Backups are part of running the platform, not an afterthought — the surface lets you trigger and
+Backups are part of running the platform, not an afterthought - the surface lets you trigger and
 verify them, not just view a schedule.`,
     },
   ],
