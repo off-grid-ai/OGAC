@@ -21,9 +21,9 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
           <Hellobar model={banner} />
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <Topbar user={session?.user} />
-              <main className="flex-1 overflow-y-auto p-6">
+              <main className="flex-1 overflow-y-auto p-4 md:p-6">
                 <PageTransition>{children}</PageTransition>
               </main>
             </div>
