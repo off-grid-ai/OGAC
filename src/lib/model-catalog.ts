@@ -85,16 +85,18 @@ export interface ModelSpec {
 export const MODEL_CATALOG: ModelSpec[] = [
   // ── Fleet-served (SSOT: SERVER_STATE.md / SERVICE_MAP.md) ──────────────────────────────────────
   {
-    // The fleet's routing tag. Underlying HF release is 9B (no sub-9B qwythos exists — SERVER_STATE).
+    // `qwythos-9b` is the fleet's live routing TAG (the DB SSOT `fleet_nodes.model` on g1/g3/g4,
+    // per SERVER_STATE + SERVICE_MAP) — kept verbatim so `mergeFleetServed()` reconciles against the
+    // live tag. The display NAME is the real underlying model: a Qwen-derived 9B chat/vision release.
     id: 'qwythos-9b',
-    name: 'Qwythos 9B',
-    family: 'Qwen', // Qwen-derived fine-tune served on the fleet
+    name: 'Qwen 9B (fleet)',
+    family: 'Qwen', // Qwen-derived release served on the fleet
     contextWindow: null, // community fine-tune; no single published context window → honest null
     modality: 'vision', // fleet runs it text + vision (SERVICE_MAP: "text + vision")
     paramsB: 9,
     license: null,
     servedOnFleet: true,
-    note: 'Fleet chat/vision model (g1). Qwen-derived fine-tune; context window not publicly fixed.',
+    note: 'Fleet chat/vision model (g1). Qwen-derived 9B release; context window not publicly fixed.',
   },
   {
     id: 'gemma-4-e4b',
