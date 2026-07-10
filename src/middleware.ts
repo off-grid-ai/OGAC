@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
 import { isPublicFileGet, isPublicPath, tenantSlugFromHost } from '@/lib/route-access';
+import { isViewerWriteAttempt, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 import {
   checkRateLimit as decideRateLimit,
   resolveRateLimit,
@@ -197,6 +198,15 @@ export default auth(async (req) => {
     const signin = new URL('/signin', req.nextUrl.origin);
     signin.searchParams.set('callbackUrl', pathname + req.nextUrl.search);
     return NextResponse.redirect(signin);
+  }
+  // READ-ONLY VIEWER — the load-bearing, catch-all write block for the public live demo. A viewer
+  // cookie session may VIEW everything but may MUTATE nothing: any mutating method on an /api/* route
+  // is rejected 403 HERE, before the handler runs, so every write route is covered without a per-file
+  // edit (the per-handler `requireWriter` gate is defense-in-depth on top). GET/HEAD/OPTIONS pass, so
+  // a viewer reads every surface. Machine bearer tokens are never a viewer (they short-circuit above).
+  const role = (req.auth.user as { role?: string } | undefined)?.role;
+  if (pathname.startsWith('/api/') && isViewerWriteAttempt(role, req.method)) {
+    return withCors(NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 }), pathname);
   }
   return withCors(pass(), pathname);
 });
