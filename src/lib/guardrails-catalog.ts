@@ -612,21 +612,23 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
 ];
 
 // ─── Engine availability (PURE) ───────────────────────────────────────────────────────────────────
-// Honest per-item availability, given what the operator has actually configured. A presidio-entity is
-// READY only when the Presidio engine is configured (else it degrades to the always-on regex floor,
-// which covers only EMAIL_ADDRESS + PHONE_NUMBER). A guardrails-validator is READY when the
-// Guardrails-AI runtime is configured, else it FALLS BACK to "recorded intent" — the rule is stored
-// and enforced once the runtime is wired. Nothing here does I/O; the caller passes in the two flags.
+// Honest per-item availability, given what the operator has actually configured. LLM Guard is THE
+// authoritative content-guardrail engine, so a PII-entity item (a presidio-entity toggle) is READY
+// when LLM Guard is configured + reachable — LLM Guard's Anonymize scanner detects/masks it, with the
+// India recognizers (PAN/Aadhaar/IFSC/UPI) folded into the scanner config the console generates
+// (llm-guard-config.ts). An llm-guard-scanner item is likewise READY under LLM Guard. A
+// guardrails-validator (a legacy Guardrails-AI second-opinion check) is READY only when that runtime
+// is configured. Nothing here does I/O; the caller passes in the engine flags.
 export interface EngineStatus {
-  /** Presidio analyzer is configured + reachable (from the guardrails view). */
-  presidioReady: boolean;
-  /** Guardrails-AI runtime is configured on-prem. */
+  /** Kept for back-compat with older callers; PII entities are now enforced by LLM Guard's Anonymize. */
+  presidioReady?: boolean;
+  /** Guardrails-AI runtime is configured on-prem (legacy second-opinion validators only). */
   guardrailsAiReady: boolean;
-  /** LLM Guard engine is the active guardrails adapter AND configured + reachable. */
+  /** LLM Guard — the authoritative engine — is the active guardrails adapter AND configured + reachable. */
   llmGuardReady?: boolean;
 }
 
-// Entities the always-on regex floor can catch even when Presidio is down.
+// Entities the deterministic regex floor still catches on the data-movement path (informational).
 export const REGEX_FLOOR_ENTITIES = ['EMAIL_ADDRESS', 'PHONE_NUMBER'] as const;
 
 export type Availability = 'ready' | 'fallback' | 'floor';
@@ -641,33 +643,24 @@ export function itemAvailability(
   item: GuardrailCatalogItem,
   status: EngineStatus,
 ): ItemAvailability {
-  if (item.kind === 'presidio-entity') {
-    if (status.presidioReady) {
-      return { status: 'ready', detail: 'Detected by the Presidio analyzer.' };
-    }
-    if ((REGEX_FLOOR_ENTITIES as readonly string[]).includes(item.entity)) {
+  // PII-entity toggles + LLM Guard scanners are BOTH enforced by the LLM Guard engine now.
+  if (item.kind === 'presidio-entity' || item.kind === 'llm-guard-scanner') {
+    if (status.llmGuardReady) {
       return {
-        status: 'floor',
-        detail: 'Presidio is not configured — the always-on regex floor still catches this one.',
+        status: 'ready',
+        detail:
+          item.kind === 'presidio-entity'
+            ? 'Detected and masked by LLM Guard’s Anonymize scanner (India recognizers folded in).'
+            : 'Enforced by the on-prem LLM Guard engine.',
       };
     }
     return {
       status: 'fallback',
       detail:
-        'Presidio is not configured. The rule is stored and takes effect once Presidio is on.',
+        'LLM Guard is not configured or is unreachable. The rule is stored and enforced once the engine is on.',
     };
   }
-  if (item.kind === 'llm-guard-scanner') {
-    if (status.llmGuardReady) {
-      return { status: 'ready', detail: 'Enforced by the on-prem LLM Guard engine.' };
-    }
-    return {
-      status: 'fallback',
-      detail:
-        'The LLM Guard engine is not the active guardrails adapter (or is unreachable). The rule is stored and enforced once it’s on.',
-    };
-  }
-  // guardrails-validator
+  // guardrails-validator — the legacy Guardrails-AI second-opinion runtime.
   if (status.guardrailsAiReady) {
     return { status: 'ready', detail: 'Enforced by the on-prem Guardrails-AI runtime.' };
   }
