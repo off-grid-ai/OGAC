@@ -60,6 +60,11 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <Icon className="size-4 shrink-0" />
                     {m.label}
+                    {m.comingSoon ? (
+                      <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground/80">
+                        Soon
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}
@@ -80,7 +85,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           API docs &amp; playground
         </a>
         <p className="px-3 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-          On-prem · local-first
+          One control plane · no lock-in
         </p>
       </div>
     </>

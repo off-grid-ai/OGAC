@@ -65,6 +65,8 @@ export interface ModuleDef {
   service: string;
   /** Internal management surface (not a sellable plane; hidden from the public landing). */
   internal?: boolean;
+  /** Nav marks this module "Soon" — the surface is present but part of it is not yet live. */
+  comingSoon?: boolean;
 }
 
 export const MODULES: readonly ModuleDef[] = [
@@ -121,9 +123,11 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'fleet',
     label: 'Fleet',
-    description: 'Devices, enrollment, policy assignment, kill switch.',
+    description:
+      'Device inventory and health across the estate. Live enrollment and device commands are coming soon.',
     route: '/gateway/fleet',
     service: 'fleet-control',
+    comingSoon: true,
   },
   {
     id: 'gateway',

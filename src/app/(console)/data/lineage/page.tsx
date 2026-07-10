@@ -44,15 +44,26 @@ export default async function LineagePage() {
       {/* Lineage store read-back — the server-sourced namespaces / jobs / datasets model. */}
       {!configured ? (
         <Card className="shadow-sm">
-          <CardContent className="py-8 text-center text-xs text-muted-foreground">
-            Lineage store not configured — configure the lineage service to read the server lineage
-            graph.
+          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              Coming soon
+            </Badge>
+            <p className="text-xs text-muted-foreground">
+              The full source to answer lineage graph is coming soon. Every grounded agent run still
+              records its source to answer edges below.
+            </p>
           </CardContent>
         </Card>
       ) : error ? (
         <Card className="shadow-sm">
-          <CardContent className="py-8 text-center text-xs text-destructive">
-            Lineage store unreachable: {error}
+          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              Coming soon
+            </Badge>
+            <p className="text-xs text-muted-foreground">
+              The full source to answer lineage graph is coming soon. Every grounded agent run still
+              records its source to answer edges below.
+            </p>
           </CardContent>
         </Card>
       ) : (

@@ -62,7 +62,7 @@ const GROUPS: FeatureGroup[] = [
     title: 'Your knowledge, grounded and cited',
     tagline: 'Agents answer from your content — not the model’s guesses.',
     features: [
-      { name: 'The Brain (RAG)', value: 'Versioned knowledge base over your own SOPs/playbooks; embedded on-disk, or a dedicated vector store at scale.' },
+      { name: 'Org knowledge base (RAG)', value: 'Versioned knowledge base over your own SOPs and playbooks; embedded on-disk, or a dedicated vector store at scale.' },
       { name: 'Retrieval router', value: 'Detects intent and queries the right source — knowledge base, database, or tool — with provenance on every hit.' },
       { name: 'Grounding & citation checks', value: 'Verifies each claim against its sources, so hallucination is caught before it ships.' },
       { name: 'Response cache', value: 'Exact + semantic caching (in-process or Redis) cuts cost and latency on repeated prompts.' },
@@ -177,7 +177,7 @@ const AGENTIFY: Angle[] = [
   },
   {
     icon: Brain,
-    title: 'One organizational brain every agent shares',
+    title: 'One org knowledge base every agent shares',
     body: 'New agents inherit the same versioned knowledge, tool registry, and policy — so the second agent ships in weeks, not months, reusing everything that already passed production.',
   },
   {

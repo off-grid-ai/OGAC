@@ -94,7 +94,7 @@ const INTELLIGENCE: Item[] = [
   {
     icon: ChartLineUp,
     name: 'Field-force & sales intelligence',
-    body: 'Playbook adherence, winning-pattern detection, and next-best-action — grounded in your own Brain, surfaced per rep and per region.',
+    body: 'Playbook adherence, winning-pattern detection, and next-best-action — grounded in your own knowledge base, surfaced per rep and per region.',
   },
   {
     icon: Sparkle,
@@ -250,7 +250,7 @@ export default function FleetControlPage() {
             {[
               { icon: Desktop, t: 'Device-fleet engine', d: 'Inventory, policy, and compliance — inventory, policy, compliance.' },
               { icon: DeviceMobile, t: 'Off Grid AI node (desktop + mobile)', d: 'The on-device signal — activity, capture, the copilot.' },
-              { icon: Brain, t: 'The Brain', d: 'Your knowledge — what the intelligence is grounded in.' },
+              { icon: Brain, t: 'Org knowledge base', d: 'Your knowledge — what the intelligence is grounded in.' },
               { icon: Broadcast, t: 'The console', d: 'One control plane — governance, audit, kill-switch, insight.' },
             ].map((s, i, arr) => (
               <div key={s.t} className="flex flex-1 items-center gap-3">
