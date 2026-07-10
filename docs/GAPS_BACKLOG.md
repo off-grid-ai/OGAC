@@ -973,3 +973,37 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+---
+
+## E2E vision audit — bharatunion demo (2026-07-11, LIVE, read-only viewer)
+
+Full route crawl of `bharatunion-onprem-console.getoffgridai.co` (Playwright, light+wide full crawl,
+mobile + dark top-routes) audited by vision. Detail + evidence: `docs/E2E_VISION_AUDIT.md`. The
+console is overall PASS (coherent, populated with BFSI seed data, CRUD present). Real defects found:
+
+- **G-E1 (P0/P1, `console`+`infra`)** — **`/overview` PII-GUARDRAILS card renders `LLM-GUARD` /
+  `engine unreachable`.** Two defects in one: (1) forbidden OSS-engine name ("LLM Guard") leaked on
+  the operator home page — relabel to an outcome ("PII & prompt-injection guardrails"); (2) the
+  guardrail engine health reads unreachable on the landing page (fix the deploy/probe, or it reads as
+  platform-down). Also visible on `/governance/guardrails`. Evidence:
+  `.shots/bank-light2/overview.png`, `.shots/bank-light/governance_guardrails.png`.
+- **G-E2 (P1, `console`+`infra`)** — **`qwythos-9b` (forbidden OSS name) surfaces as a user-facing
+  model id** in chat model selector, `/gateway/ai` model catalog ("Qwen 9B (fleet)", live), and
+  `/gateway/fleet/[id]` allowed-models. Confirm intent; if it's an internal codename, relabel to the
+  public model name. Evidence: `.shots/bank-light2/workspace_chat.png`, `bank-light/gateway_ai.png`,
+  `bank-dyn/gateway_fleet_id_.png`.
+- **G-E3 (P2, `console`+`infra`)** — **dark mode not switchable via cookie / `prefers-color-scheme`.**
+  Every `--theme=dark` capture rendered in light. The in-app moon toggle exists, so dark theme likely
+  ships but isn't OS/cookie-driven → unverifiable headlessly and possibly ignores a dark-OS user until
+  they click the toggle. Confirm the theme provider reads OS/cookie. Evidence: `.shots/bank-dark/*`.
+- **G-E4 (P2, `console`)** — **polish:** `/insights/siem` Detail column shows raw `agent:agent_xxxx`
+  ids + Actor uniformly "unknown"; `/insights` eval score empty ("No eval runs yet"); FinOps spend
+  $0.16 / budgets $0.00 (under-seeded); `/gateway/ai` aggregator URL has a double slash `…:8800//v1`.
+- **G-E5 (P2, `console`)** — **`/build/apps` list exposes no crawlable drill-in to `/build/apps/[id]`**
+  (app detail reachable only via Studio cards). Mild list→detail IA gap; confirm the apps index links
+  to real detail routes.
+- **G-E6 (tooling, `console`)** — **harness `brokenState` heuristic over-flags:** the regex
+  (`…|500|…`) matched benign copy on 17/17 flagged routes (all vision-confirmed fine). Tighten to
+  error-boundary text / HTTP status ≥ 500, not body-text tokens, so `ok` is trustworthy. (STEP-1
+  Cloudflare-beacon noise filter already committed.)

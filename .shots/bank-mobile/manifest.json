@@ -1,0 +1,625 @@
+{
+  "base": "https://bharatunion-onprem-console.getoffgridai.co",
+  "theme": "light",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "capturedAt": "2026-07-10T19:56:43.337Z",
+  "total": 50,
+  "ok": 39,
+  "failed": [
+    {
+      "route": "/data/catalog",
+      "url": "/data/catalog",
+      "file": "data_catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/tool-catalog",
+      "url": "/data/tool-catalog",
+      "file": "data_tool-catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/warehouse",
+      "url": "/data/warehouse",
+      "file": "data_warehouse.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance",
+      "url": "/governance",
+      "file": "governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/regulatory",
+      "url": "/governance/regulatory",
+      "file": "governance_regulatory.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/trust",
+      "url": "/governance/trust",
+      "file": "governance_trust.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/build/studio/new/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/connectors/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/etl/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/warehouse/[table]",
+      "url": "/data/warehouse/bharatunion.fact_transaction",
+      "file": "data_warehouse_table_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    }
+  ],
+  "shots": [
+    {
+      "route": "/build/pipelines",
+      "url": "/build/pipelines",
+      "file": "build_pipelines.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/studio",
+      "url": "/build/studio",
+      "file": "build_studio.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/studio/new",
+      "url": "/build/studio/new",
+      "file": "build_studio_new.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data",
+      "url": "/data",
+      "file": "data.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/catalog",
+      "url": "/data/catalog",
+      "file": "data_catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/domains",
+      "url": "/data/domains",
+      "file": "data_domains.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/etl",
+      "url": "/data/etl",
+      "file": "data_etl.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/governance",
+      "url": "/data/governance",
+      "file": "data_governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/integrations",
+      "url": "/data/integrations",
+      "file": "data_integrations.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/lineage",
+      "url": "/data/lineage",
+      "file": "data_lineage.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/pipelines",
+      "url": "/data/pipelines",
+      "file": "data_pipelines.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/query",
+      "url": "/data/query",
+      "file": "data_query.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/retrieval",
+      "url": "/data/retrieval",
+      "file": "data_retrieval.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/tool-catalog",
+      "url": "/data/tool-catalog",
+      "file": "data_tool-catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/warehouse",
+      "url": "/data/warehouse",
+      "file": "data_warehouse.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/gateway/ai",
+      "url": "/gateway/ai",
+      "file": "gateway_ai.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/services",
+      "url": "/gateway/services",
+      "file": "gateway_services.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance",
+      "url": "/governance",
+      "file": "governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/access",
+      "url": "/governance/access",
+      "file": "governance_access.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/exporters",
+      "url": "/governance/exporters",
+      "file": "governance_exporters.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/guardrails",
+      "url": "/governance/guardrails",
+      "file": "governance_guardrails.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/policy",
+      "url": "/governance/policy",
+      "file": "governance_policy.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/provenance",
+      "url": "/governance/provenance",
+      "file": "governance_provenance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/regulatory",
+      "url": "/governance/regulatory",
+      "file": "governance_regulatory.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/secrets",
+      "url": "/governance/secrets",
+      "file": "governance_secrets.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/teams",
+      "url": "/governance/teams",
+      "file": "governance_teams.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/trust",
+      "url": "/governance/trust",
+      "file": "governance_trust.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/analytics",
+      "url": "/insights/analytics",
+      "file": "insights_analytics.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/overview",
+      "url": "/overview",
+      "file": "overview.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat",
+      "url": "/workspace/chat",
+      "file": "workspace_chat.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor",
+      "file": "build_pipelines_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/audit",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/audit",
+      "file": "build_pipelines_id_audit.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/cost",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/cost",
+      "file": "build_pipelines_id_cost.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/drift",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/drift",
+      "file": "build_pipelines_id_drift.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/guardrails",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/guardrails",
+      "file": "build_pipelines_id_guardrails.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/observability",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/observability",
+      "file": "build_pipelines_id_observability.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/policy",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/policy",
+      "file": "build_pipelines_id_policy.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/quality",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/quality",
+      "file": "build_pipelines_id_quality.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/routing",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/routing",
+      "file": "build_pipelines_id_routing.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines/[id]/versions",
+      "url": "/build/pipelines/pl_seed_org_bharat_cross-sell-advisor/versions",
+      "file": "build_pipelines_id_versions.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/studio/new/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/catalog/[id]",
+      "url": "/data/catalog/da_a64c1a4efeec",
+      "file": "data_catalog_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/connectors/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/domains/[id]",
+      "url": "/data/domains/bhdom_accounts",
+      "file": "data_domains_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/etl/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/warehouse/[table]",
+      "url": "/data/warehouse/bharatunion.fact_transaction",
+      "file": "data_warehouse_table_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/gateway/services/[id]",
+      "url": "/gateway/services/console",
+      "file": "gateway_services_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/access/[id]",
+      "url": "/governance/access/df314e49-2ae4-43c0-8aad-cd79efc31b5a",
+      "file": "governance_access_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/teams/[id]",
+      "url": "/governance/teams/team_c96cf4f5ea51",
+      "file": "governance_teams_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    }
+  ]
+}

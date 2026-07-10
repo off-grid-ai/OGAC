@@ -1,0 +1,2113 @@
+{
+  "base": "https://bharatunion-onprem-console.getoffgridai.co",
+  "theme": "light",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "capturedAt": "2026-07-10T19:48:31.154Z",
+  "total": 125,
+  "ok": 48,
+  "failed": [
+    {
+      "route": "/build/apps/runs",
+      "url": "/build/apps/runs",
+      "file": "build_apps_runs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/build/review",
+      "url": "/build/review",
+      "file": "build_review.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/build/tools",
+      "url": "/build/tools",
+      "file": "build_tools.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/catalog",
+      "url": "/data/catalog",
+      "file": "data_catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/tool-catalog",
+      "url": "/data/tool-catalog",
+      "file": "data_tool-catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/warehouse",
+      "url": "/data/warehouse",
+      "file": "data_warehouse.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance",
+      "url": "/governance",
+      "file": "governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/regulatory",
+      "url": "/governance/regulatory",
+      "file": "governance_regulatory.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/trust",
+      "url": "/governance/trust",
+      "file": "governance_trust.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights",
+      "url": "/insights",
+      "file": "insights.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/accounting",
+      "url": "/insights/accounting",
+      "file": "insights_accounting.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/finops",
+      "url": "/insights/finops",
+      "file": "insights_finops.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/roi",
+      "url": "/insights/roi",
+      "file": "insights_roi.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/siem",
+      "url": "/insights/siem",
+      "file": "insights_siem.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/admin",
+      "url": "/operations/admin",
+      "file": "operations_admin.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/api-docs",
+      "url": "/operations/api-docs",
+      "file": "operations_api-docs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/backups",
+      "url": "/operations/backups",
+      "file": "operations_backups.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/config",
+      "url": "/operations/config",
+      "file": "operations_config.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - navigating to \"https://bharatunion-onprem-c",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/operations/messaging",
+      "url": "/operations/messaging",
+      "file": "operations_messaging.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/operations/runs",
+      "url": "/operations/runs",
+      "file": "operations_runs.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/overview",
+      "url": "/overview",
+      "file": "overview.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/provit",
+      "url": "/provit",
+      "file": "provit.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/signin",
+      "url": "/signin",
+      "file": "signin.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/artifacts",
+      "url": "/workspace/artifacts",
+      "file": "workspace_artifacts.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat",
+      "url": "/workspace/chat",
+      "file": "workspace_chat.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/knowledge",
+      "url": "/workspace/knowledge",
+      "file": "workspace_knowledge.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/projects",
+      "url": "/workspace/projects",
+      "file": "workspace_projects.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts",
+      "url": "/workspace/prompts",
+      "file": "workspace_prompts.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts/partials",
+      "url": "/workspace/prompts/partials",
+      "file": "workspace_prompts_partials.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/storage",
+      "url": "/workspace/storage",
+      "file": "workspace_storage.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/app/[slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/architecture/[phase]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/artifacts/[id]/view",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]/runs",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]/runs/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/access",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/controls",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/input",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/quality",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/reports",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/review",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/runs",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/runs/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/schedule",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/runs/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/audit",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/cost",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/drift",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/guardrails",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/observability",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/policy",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/quality",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/routing",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/versions",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/review/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/studio/new/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/catalog/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/connectors/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/domains/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/etl/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/warehouse/[table]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/docs/[...slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/fleet/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/registry/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/services/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/governance/access/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/governance/teams/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/handbook/[slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/insights/evals/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/operations/runs/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/knowledge/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/projects/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/prompts/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    }
+  ],
+  "shots": [
+    {
+      "route": "/",
+      "url": "/",
+      "file": "root.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/agent-runs",
+      "url": "/build/agent-runs",
+      "file": "build_agent-runs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/agents",
+      "url": "/build/agents",
+      "file": "build_agents.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/apps/reports",
+      "url": "/build/apps/reports",
+      "file": "build_apps_reports.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/apps/runs",
+      "url": "/build/apps/runs",
+      "file": "build_apps_runs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/build/evals",
+      "url": "/build/evals",
+      "file": "build_evals.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/evals [create dialog]",
+      "url": "/build/evals",
+      "file": "build_evals__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/build/pipelines",
+      "url": "/build/pipelines",
+      "file": "build_pipelines.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/pipelines [create dialog]",
+      "url": "/build/pipelines",
+      "file": "build_pipelines__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/build/review",
+      "url": "/build/review",
+      "file": "build_review.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/build/sandbox",
+      "url": "/build/sandbox",
+      "file": "build_sandbox.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/studio",
+      "url": "/build/studio",
+      "file": "build_studio.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/studio/new",
+      "url": "/build/studio/new",
+      "file": "build_studio_new.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/build/tools",
+      "url": "/build/tools",
+      "file": "build_tools.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data",
+      "url": "/data",
+      "file": "data.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/catalog",
+      "url": "/data/catalog",
+      "file": "data_catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/domains",
+      "url": "/data/domains",
+      "file": "data_domains.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/domains [create dialog]",
+      "url": "/data/domains",
+      "file": "data_domains__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/data/etl",
+      "url": "/data/etl",
+      "file": "data_etl.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/governance",
+      "url": "/data/governance",
+      "file": "data_governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/integrations",
+      "url": "/data/integrations",
+      "file": "data_integrations.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/lineage",
+      "url": "/data/lineage",
+      "file": "data_lineage.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/pipelines",
+      "url": "/data/pipelines",
+      "file": "data_pipelines.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/query",
+      "url": "/data/query",
+      "file": "data_query.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/retrieval",
+      "url": "/data/retrieval",
+      "file": "data_retrieval.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/data/tool-catalog",
+      "url": "/data/tool-catalog",
+      "file": "data_tool-catalog.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/data/warehouse",
+      "url": "/data/warehouse",
+      "file": "data_warehouse.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/docs",
+      "url": "/docs",
+      "file": "docs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/features",
+      "url": "/features",
+      "file": "features.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/fleet-control",
+      "url": "/fleet-control",
+      "file": "fleet-control.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/ai",
+      "url": "/gateway/ai",
+      "file": "gateway_ai.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/edge",
+      "url": "/gateway/edge",
+      "file": "gateway_edge.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/fleet",
+      "url": "/gateway/fleet",
+      "file": "gateway_fleet.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/registry",
+      "url": "/gateway/registry",
+      "file": "gateway_registry.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/gateway/services",
+      "url": "/gateway/services",
+      "file": "gateway_services.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance",
+      "url": "/governance",
+      "file": "governance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/access",
+      "url": "/governance/access",
+      "file": "governance_access.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/access [create dialog]",
+      "url": "/governance/access",
+      "file": "governance_access__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/governance/exporters",
+      "url": "/governance/exporters",
+      "file": "governance_exporters.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/guardrails",
+      "url": "/governance/guardrails",
+      "file": "governance_guardrails.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/policy",
+      "url": "/governance/policy",
+      "file": "governance_policy.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/provenance",
+      "url": "/governance/provenance",
+      "file": "governance_provenance.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/regulatory",
+      "url": "/governance/regulatory",
+      "file": "governance_regulatory.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/governance/secrets",
+      "url": "/governance/secrets",
+      "file": "governance_secrets.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/secrets [create dialog]",
+      "url": "/governance/secrets",
+      "file": "governance_secrets__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/governance/teams",
+      "url": "/governance/teams",
+      "file": "governance_teams.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/governance/teams [create dialog]",
+      "url": "/governance/teams",
+      "file": "governance_teams__create.png",
+      "status": 200,
+      "title": "state:create",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": "state-change capture"
+    },
+    {
+      "route": "/governance/trust",
+      "url": "/governance/trust",
+      "file": "governance_trust.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/handbook",
+      "url": "/handbook",
+      "file": "handbook.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights",
+      "url": "/insights",
+      "file": "insights.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/accounting",
+      "url": "/insights/accounting",
+      "file": "insights_accounting.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/analytics",
+      "url": "/insights/analytics",
+      "file": "insights_analytics.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/audit",
+      "url": "/insights/audit",
+      "file": "insights_audit.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/copilot",
+      "url": "/insights/copilot",
+      "file": "insights_copilot.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/drift",
+      "url": "/insights/drift",
+      "file": "insights_drift.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/finops",
+      "url": "/insights/finops",
+      "file": "insights_finops.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/platform",
+      "url": "/insights/platform",
+      "file": "insights_platform.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/reports",
+      "url": "/insights/reports",
+      "file": "insights_reports.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/insights/roi",
+      "url": "/insights/roi",
+      "file": "insights_roi.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/insights/siem",
+      "url": "/insights/siem",
+      "file": "insights_siem.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/invite/accept",
+      "url": "/invite/accept",
+      "file": "invite_accept.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/journey",
+      "url": "/journey",
+      "file": "journey.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/operations/admin",
+      "url": "/operations/admin",
+      "file": "operations_admin.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/api-docs",
+      "url": "/operations/api-docs",
+      "file": "operations_api-docs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/backups",
+      "url": "/operations/backups",
+      "file": "operations_backups.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/config",
+      "url": "/operations/config",
+      "file": "operations_config.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - navigating to \"https://bharatunion-onprem-c",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/operations/messaging",
+      "url": "/operations/messaging",
+      "file": "operations_messaging.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/operations/runs",
+      "url": "/operations/runs",
+      "file": "operations_runs.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/overview",
+      "url": "/overview",
+      "file": "overview.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/provit",
+      "url": "/provit",
+      "file": "provit.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/signin",
+      "url": "/signin",
+      "file": "signin.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/artifacts",
+      "url": "/workspace/artifacts",
+      "file": "workspace_artifacts.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat",
+      "url": "/workspace/chat",
+      "file": "workspace_chat.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/knowledge",
+      "url": "/workspace/knowledge",
+      "file": "workspace_knowledge.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/projects",
+      "url": "/workspace/projects",
+      "file": "workspace_projects.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts",
+      "url": "/workspace/prompts",
+      "file": "workspace_prompts.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts/partials",
+      "url": "/workspace/prompts/partials",
+      "file": "workspace_prompts_partials.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/storage",
+      "url": "/workspace/storage",
+      "file": "workspace_storage.png",
+      "status": 0,
+      "title": "",
+      "consoleErrors": [
+        "nav: page.goto: Target page, context or browser has been closed",
+        "shot: page.screenshot: Target page, context or browser has been closed"
+      ],
+      "ok": false,
+      "notes": ""
+    },
+    {
+      "route": "/app/[slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/architecture/[phase]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/artifacts/[id]/view",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]/runs",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/agents/[id]/runs/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/access",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/controls",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/input",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/quality",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/reports",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/review",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/runs",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/runs/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/[id]/schedule",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/apps/runs/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/audit",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/cost",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/drift",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/guardrails",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/observability",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/policy",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/quality",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/routing",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/pipelines/[id]/versions",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/review/[runId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/build/studio/new/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/catalog/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/connectors/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/domains/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/etl/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/data/warehouse/[table]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/docs/[...slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/fleet/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/registry/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/gateway/services/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/governance/access/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/governance/teams/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/handbook/[slug]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/insights/evals/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/operations/runs/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/knowledge/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/projects/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/prompts/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    }
+  ]
+}

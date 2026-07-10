@@ -1,0 +1,265 @@
+{
+  "base": "https://bharatunion-onprem-console.getoffgridai.co",
+  "theme": "light",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "capturedAt": "2026-07-10T19:50:20.304Z",
+  "total": 20,
+  "ok": 15,
+  "failed": [
+    {
+      "route": "/operations/admin",
+      "url": "/operations/admin",
+      "file": "operations_admin.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/api-docs",
+      "url": "/operations/api-docs",
+      "file": "operations_api-docs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/backups",
+      "url": "/operations/backups",
+      "file": "operations_backups.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/projects/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    }
+  ],
+  "shots": [
+    {
+      "route": "/operations/admin",
+      "url": "/operations/admin",
+      "file": "operations_admin.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/api-docs",
+      "url": "/operations/api-docs",
+      "file": "operations_api-docs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/backups",
+      "url": "/operations/backups",
+      "file": "operations_backups.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "broken-state text on page"
+    },
+    {
+      "route": "/operations/config",
+      "url": "/operations/config",
+      "file": "operations_config.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/operations/messaging",
+      "url": "/operations/messaging",
+      "file": "operations_messaging.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/operations/runs",
+      "url": "/operations/runs",
+      "file": "operations_runs.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/overview",
+      "url": "/overview",
+      "file": "overview.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/provit",
+      "url": "/provit",
+      "file": "provit.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/artifacts",
+      "url": "/workspace/artifacts",
+      "file": "workspace_artifacts.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat",
+      "url": "/workspace/chat",
+      "file": "workspace_chat.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/knowledge",
+      "url": "/workspace/knowledge",
+      "file": "workspace_knowledge.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/projects",
+      "url": "/workspace/projects",
+      "file": "workspace_projects.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts",
+      "url": "/workspace/prompts",
+      "file": "workspace_prompts.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/prompts/partials",
+      "url": "/workspace/prompts/partials",
+      "file": "workspace_prompts_partials.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/storage",
+      "url": "/workspace/storage",
+      "file": "workspace_storage.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/operations/runs/[id]",
+      "url": "/operations/runs/agent%3Arun_496b2dcfad7d",
+      "file": "operations_runs_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/chat/[conversationId]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/knowledge/[id]",
+      "url": "/workspace/knowledge/6f71852d-a9d9-43f4-9f88-6592ddb10b00",
+      "file": "workspace_knowledge_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    },
+    {
+      "route": "/workspace/projects/[id]",
+      "url": null,
+      "file": null,
+      "status": 0,
+      "title": "",
+      "consoleErrors": [],
+      "ok": false,
+      "notes": "could not resolve a real id (empty collection?)"
+    },
+    {
+      "route": "/workspace/prompts/[id]",
+      "url": "/workspace/prompts/partials",
+      "file": "workspace_prompts_id_.png",
+      "status": 200,
+      "title": "Off Grid AI Console",
+      "consoleErrors": [],
+      "ok": true,
+      "notes": ""
+    }
+  ]
+}
