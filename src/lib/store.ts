@@ -853,10 +853,15 @@ export async function createConnector(input: {
   return toConnector(row);
 }
 
+// Tenant-scoped: the WHERE pins BOTH id AND orgId, so a guessed/enumerated id from another tenant
+// resolves to no row (returns null) — an admin can only edit connectors in their own org (P1 IDOR
+// fix, mirrors listConnectors(orgId)).
 export async function updateConnector(
   id: string,
   patch: { name?: string; type?: string; endpoint?: string; auth?: string; description?: string },
+  orgId: string = DEFAULT_ORG,
 ): Promise<Connector | null> {
+  const scope = and(eq(connectors.id, id), eq(connectors.orgId, orgId));
   const set: Record<string, unknown> = {};
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.type !== undefined) set.type = patch.type;
@@ -864,21 +869,34 @@ export async function updateConnector(
   if (patch.auth !== undefined) set.auth = patch.auth;
   if (patch.description !== undefined) set.description = patch.description;
   if (Object.keys(set).length === 0) {
-    const [cur] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
+    const [cur] = await db.select().from(connectors).where(scope).limit(1);
     return cur ? toConnector(cur) : null;
   }
-  const [row] = await db.update(connectors).set(set).where(eq(connectors.id, id)).returning();
+  const [row] = await db.update(connectors).set(set).where(scope).returning();
   return row ? toConnector(row) : null;
 }
 
-export async function deleteConnector(id: string): Promise<void> {
+// Tenant-scoped delete: BOTH the ingest_jobs cascade AND the connector row are pinned to orgId, so
+// org A can never delete org B's connector or purge its ingest history via a guessed id (P1 IDOR).
+export async function deleteConnector(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  // Guard first: if the connector isn't in this org, do nothing — no cross-tenant vault purge or
+  // cascade. The scoped deletes below would already no-op, but this also stops removeConnectorSecret
+  // from resolving another org's secretRef.
+  const [own] = await db
+    .select({ id: connectors.id })
+    .from(connectors)
+    .where(and(eq(connectors.id, id), eq(connectors.orgId, orgId)))
+    .limit(1);
+  if (!own) return;
   // Purge the connector's vaulted credential BEFORE deleting the row — removeConnectorSecret resolves
   // the secretRef FROM the row, so the row must still exist. Best-effort (the row delete is what
   // matters); dynamic import avoids pulling the secrets/vault graph into every store consumer.
   const { removeConnectorSecret } = await import('@/lib/connector-secrets');
   await removeConnectorSecret(id).catch(() => undefined);
-  await db.delete(ingestJobs).where(eq(ingestJobs.connectorId, id));
-  await db.delete(connectors).where(eq(connectors.id, id));
+  await db
+    .delete(ingestJobs)
+    .where(and(eq(ingestJobs.connectorId, id), eq(ingestJobs.orgId, orgId)));
+  await db.delete(connectors).where(and(eq(connectors.id, id), eq(connectors.orgId, orgId)));
 }
 
 export async function syncConnector(id: string): Promise<IngestJob | null> {
@@ -957,8 +975,17 @@ export async function createMaskingRule(
   return { id: row.id, kind: row.kind, action: row.action, enabled: row.enabled };
 }
 
-export async function setMaskingRuleEnabled(id: string, enabled: boolean): Promise<void> {
-  await db.update(maskingRules).set({ enabled }).where(eq(maskingRules.id, id));
+// Tenant-scoped: the enable/disable toggle only lands when the rule belongs to orgId, so org A cannot
+// flip org B's masking rule (which would silently unmask B's PII) via a guessed id (P1 IDOR).
+export async function setMaskingRuleEnabled(
+  id: string,
+  enabled: boolean,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await db
+    .update(maskingRules)
+    .set({ enabled })
+    .where(and(eq(maskingRules.id, id), eq(maskingRules.orgId, orgId)));
 }
 
 export async function listDatasets(orgId: string = DEFAULT_ORG): Promise<Dataset[]> {
@@ -1554,12 +1581,19 @@ export async function createApiKey(input: {
   return { key: toApiKey(row), token };
 }
 
-export async function setApiKeyEnabled(id: string, enabled: boolean): Promise<void> {
-  await db.update(apiKeys).set({ enabled }).where(eq(apiKeys.id, id));
+// Tenant-scoped: org A cannot enable/disable org B's API key via a guessed id (disabling B's key is
+// a denial-of-service; enabling a revoked one re-opens access) — P1 IDOR.
+export async function setApiKeyEnabled(
+  id: string,
+  enabled: boolean,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await db.update(apiKeys).set({ enabled }).where(and(eq(apiKeys.id, id), eq(apiKeys.orgId, orgId)));
 }
 
-export async function deleteApiKey(id: string): Promise<void> {
-  await db.delete(apiKeys).where(eq(apiKeys.id, id));
+// Tenant-scoped: org A cannot delete org B's API key via a guessed id (P1 IDOR).
+export async function deleteApiKey(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  await db.delete(apiKeys).where(and(eq(apiKeys.id, id), eq(apiKeys.orgId, orgId)));
 }
 
 // ─── Tool registry (the router's `tool` source) ───────────────────────────────

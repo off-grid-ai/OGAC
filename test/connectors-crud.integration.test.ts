@@ -18,7 +18,7 @@ test('connector CRUD against a real Postgres', { skip: dbUp ? false : SKIP_MESSA
     await import('@/lib/store');
 
   t.after(async () => {
-    for (const c of await listConnectors(ORG)) await deleteConnector(c.id);
+    for (const c of await listConnectors(ORG)) await deleteConnector(c.id, ORG);
   });
 
   // ── CREATE ───────────────────────────────────────────────────────────────────────────────────
@@ -43,11 +43,15 @@ test('connector CRUD against a real Postgres', { skip: dbUp ? false : SKIP_MESSA
   assert.equal(listed[0].id, created.id);
 
   // ── UPDATE ────────────────────────────────────────────────────────────────────────────────────
-  const updated = await updateConnector(created.id, {
-    name: 'Renamed source',
-    auth: 'oauth',
-    description: 'edited',
-  });
+  const updated = await updateConnector(
+    created.id,
+    {
+      name: 'Renamed source',
+      auth: 'oauth',
+      description: 'edited',
+    },
+    ORG,
+  );
   assert.ok(updated, 'update returns the row');
   assert.equal(updated!.name, 'Renamed source');
   assert.equal(updated!.auth, 'oauth');
@@ -56,11 +60,11 @@ test('connector CRUD against a real Postgres', { skip: dbUp ? false : SKIP_MESSA
   assert.equal(updated!.endpoint, 'https://example.invalid/api', 'endpoint untouched');
 
   // Empty patch is a no-op that still returns the current row (not a wipe).
-  const noop = await updateConnector(created.id, {});
+  const noop = await updateConnector(created.id, {}, ORG);
   assert.equal(noop!.name, 'Renamed source', 'empty patch preserves the row');
 
   // Updating an unknown id misses cleanly.
-  assert.equal(await updateConnector('con_nope99', { name: 'x' }), null, 'unknown id → null');
+  assert.equal(await updateConnector('con_nope99', { name: 'x' }, ORG), null, 'unknown id → null');
 
   // ── SYNC (records an ingest job; endpoint is unreachable → status error, records 0) ────────────
   const job = await syncConnector(created.id);
@@ -73,6 +77,6 @@ test('connector CRUD against a real Postgres', { skip: dbUp ? false : SKIP_MESSA
   assert.equal(await syncConnector('con_nope99'), null, 'sync unknown → null');
 
   // ── DELETE (also removes ingest history) ───────────────────────────────────────────────────────
-  await deleteConnector(created.id);
+  await deleteConnector(created.id, ORG);
   assert.equal((await listConnectors(ORG)).length, 0, 'list empty after delete');
 });

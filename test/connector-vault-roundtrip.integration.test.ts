@@ -104,7 +104,7 @@ test('connector credential round-trips through the vault; endpoint stays clean; 
   } = await import('@/lib/connector-secrets');
 
   t.after(async () => {
-    for (const c of await listConnectors(ORG)) await deleteConnector(c.id);
+    for (const c of await listConnectors(ORG)) await deleteConnector(c.id, ORG);
   });
 
   // 1. Create with a credential-FREE endpoint (what the POST route stores after the pure split).
@@ -145,7 +145,7 @@ test('connector credential round-trips through the vault; endpoint stays clean; 
   assert.equal(u.username, 'reader');
 
   // 7. Delete purges the vault secret — no orphan left behind.
-  await deleteConnector(created.id);
+  await deleteConnector(created.id, ORG);
   assert.equal(kv.has(ref!), false, 'the vault secret is removed on connector delete');
   assert.equal(await resolveConnectorSecret(created.id), null);
 });

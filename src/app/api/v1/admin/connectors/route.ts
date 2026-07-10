@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     await persistConnectorSecret(created.id, v.secret);
   } catch (e) {
     const { deleteConnector } = await import('@/lib/store');
-    await deleteConnector(created.id).catch(() => undefined);
+    await deleteConnector(created.id, orgId).catch(() => undefined);
     return NextResponse.json(
       { error: `Could not store the credential securely: ${(e as Error).message}` },
       { status: 502 },
