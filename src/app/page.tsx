@@ -1,60 +1,61 @@
-import {
-  Broadcast,
-  GithubLogo,
-  Path,
-  ScribbleLoop,
-  SealCheck,
-  ShieldCheck,
-  Sparkle,
-} from '@phosphor-icons/react/dist/ssr';
+import { GithubLogo, Path, SealCheck, ShieldCheck, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { FlowDiagram } from '@/app/_landing/flow-diagram';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
+import { ProductTour } from '@/app/_landing/product-tour';
+import { SeeItLive } from '@/app/_landing/see-it-live';
 import { AuroraText } from '@/components/ui/aurora-text';
-import { BentoGrid, BentoTile } from '@/components/ui/bento-grid';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
-import { type CarouselCard, CardsCarousel } from '@/components/ui/cards-carousel';
-import { ContainerScroll } from '@/components/ui/container-scroll';
+import { DecryptText } from '@/components/ui/decrypt-text';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { Spotlight } from '@/components/ui/spotlight';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import type { TourShot } from '@/lib/landing-hero';
 
-// Six real surfaces from the running console - proof, not promise.
-const SURFACES: CarouselCard[] = [
+// Six real surfaces from the running console - proof, not promise. The Studio shot leads (the
+// plain-language authoring moment), then the governed path in order. Ids drive the ?shot= URL.
+const SHOTS: TourShot[] = [
   {
-    src: '/docs-shots/app-review.png',
-    alt: 'The review inbox: a run paused for a person to approve, reject, or edit',
-    label: 'Oversee',
-    caption: 'A run pauses for a person, then finishes on its own.',
+    id: 'studio',
+    src: '/docs-shots/studio.png',
+    alt: 'The Studio: real BFSI apps and agents a business team stands up in plain language, each governed',
+    label: 'Build',
+    caption: 'A business team builds a governed app in plain language. No code.',
   },
   {
+    id: 'route',
+    src: '/docs-shots/gateways-list.png',
+    alt: 'The gateway list: several model-serving gateways, on-prem and cloud, each observed',
+    label: 'Route',
+    caption: 'Many gateways, on your servers or in the cloud. Each one observed.',
+  },
+  {
+    id: 'pipelines',
     src: '/docs-shots/pipeline-overview.png',
     alt: 'A pipeline: model, evals, guardrails, policy, and drift bound to one use case',
-    label: 'Pipelines',
+    label: 'Govern',
     caption: 'Bind the rules to a use case once. Everything inherits them.',
   },
   {
+    id: 'watch',
     src: '/docs-shots/observability.png',
     alt: 'Observability: live eval scores, drift detection, and per-run traces',
     label: 'Watch',
     caption: 'Live scoring on real traffic. Drift caught as it starts.',
   },
   {
-    src: '/docs-shots/gateways-list.png',
-    alt: 'The gateway list: several model-serving gateways, on-prem and cloud, each observed',
-    label: 'Route',
-    caption: 'Many gateways, on your servers or cloud. Each one observed.',
+    id: 'oversee',
+    src: '/docs-shots/app-review.png',
+    alt: 'The review inbox: a run paused for a person to approve, reject, or edit',
+    label: 'Oversee',
+    caption: 'A run pauses for a person, then finishes on its own.',
   },
   {
-    src: '/docs-shots/lineage.png',
-    alt: 'Lineage: the graph of where every answer came from',
-    label: 'Trace',
-    caption: 'Every answer traced to where it came from.',
-  },
-  {
+    id: 'prove',
     src: '/docs-shots/regulatory.png',
     alt: 'Regulatory: controls mapped to ISO 42001, NIST AI RMF, and the EU AI Act',
     label: 'Prove',
@@ -62,20 +63,28 @@ const SURFACES: CarouselCard[] = [
   },
 ];
 
+// The proof strip: CIO/CISO outcomes, each true and defensible - not engineering vanity.
+const PROOF: { value: string; label: string }[] = [
+  { value: '1', label: 'interface for every model, gateway and pipeline' },
+  { value: '0', label: 'engineering tickets: business teams ship governed AI in plain language' },
+  { value: '100%', label: 'of AI traffic logged, traced, reversible. Rules set once, inherited everywhere' },
+  { value: '4', label: 'frameworks on demand: ISO 42001, NIST AI RMF, EU AI Act, DPDP' },
+];
+
 function Nav() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[100rem] items-center justify-between px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
+      <div className="mx-auto flex h-14 max-w-[100rem] items-center justify-between gap-2 px-4 sm:px-6">
+        <div className="flex min-w-0 shrink items-center gap-2 sm:gap-2.5">
           <Image src="/logo.png" alt="Off Grid AI" width={24} height={24} priority />
-          <span className="text-sm font-medium text-foreground">Off Grid AI</span>
+          <span className="truncate text-sm font-medium text-foreground">Off Grid AI</span>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:inline">
             Console
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <ThemeToggle />
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <a
               href="https://github.com/off-grid-ai/console"
               target="_blank"
@@ -104,11 +113,11 @@ export default function LandingPage() {
       <LandingThemeDefault />
       <Nav />
 
-      {/* ── Hero: the thesis, over the sketch that IS the pitch ────────────── */}
+      {/* ── Hero: the thesis + the live invitation, above the fold ─────────── */}
       <section className="relative overflow-hidden border-b border-border">
         <Spotlight />
-        <div className="relative z-10 mx-auto max-w-[100rem] px-6 py-16 sm:py-24">
-          <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr]">
+        <div className="relative z-10 mx-auto max-w-[100rem] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
             <div>
               <BlurFade delay={0.05} inView>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -117,20 +126,25 @@ export default function LandingPage() {
                 </span>
               </BlurFade>
               <BlurFade delay={0.12} inView>
-                <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                <h1 className="mt-6 text-[2rem] font-semibold leading-[1.06] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                   Win your industry.{' '}
                   <AuroraText className="font-semibold">Put AI to work</AuroraText> across the whole
                   company.
                 </h1>
               </BlurFade>
               <BlurFade delay={0.24} inView>
-                <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                  One interface, on your infrastructure, where AI is already safe to run. Set your
-                  rules once. Everyone builds inside them. Nothing to rip out.
+                <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                  One interface where AI is already safe to run. Set your rules once. Everyone builds
+                  inside them.
                 </p>
               </BlurFade>
-              <BlurFade delay={0.36} inView>
-                <div className="mt-9">
+              <BlurFade delay={0.32} inView>
+                <div className="mt-7">
+                  <SeeItLive />
+                </div>
+              </BlurFade>
+              <BlurFade delay={0.4} inView>
+                <div className="mt-4">
                   <CtaButtons githubLabel="View the source" />
                 </div>
               </BlurFade>
@@ -152,123 +166,83 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── The flow: five real stages, wired live ────────────────────────── */}
+      {/* ── The tour: the core value, the whole product live ───────────────── */}
+      <section className="relative border-b border-border bg-card/40">
+        <div className="mx-auto max-w-[100rem] px-4 pb-16 pt-6 sm:px-6 sm:pb-20">
+          <Suspense fallback={null}>
+            <ProductTour shots={SHOTS} />
+          </Suspense>
+        </div>
+      </section>
+
+      {/* ── One governed path: the flow, with the guarantees folded in ─────── */}
       <section className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-6 py-20">
+        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
           <BlurFade inView>
             <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-primary">
               <Path className="size-4" weight="bold" />
               One governed path
             </p>
             <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              From your data to a signed, audited result. One path, end to end.
-            </h2>
-          </BlurFade>
-          <BlurFade delay={0.15} inView>
-            <div className="mt-14 rounded-2xl border border-border bg-card p-6 sm:p-12">
-              <FlowDiagram />
-            </div>
-          </BlurFade>
-        </div>
-      </section>
-
-      {/* ── See it: the product rising into view, then a rail of surfaces ─── */}
-      <section className="relative border-b border-border bg-card/40">
-        <div className="mx-auto max-w-[100rem] px-6 pb-20 pt-8">
-          <ContainerScroll
-            header={
-              <div className="text-center">
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
-                  See it running
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  Anyone builds. In plain language. Governed by default.
-                </h2>
-                <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-                  A person on lending, claims, or finance describes the work. No engineer, no code.
-                </p>
-              </div>
-            }
-          >
-            <Image
-              src="/docs-shots/studio.png"
-              alt="The Studio: real BFSI apps and agents a business team stands up in plain language, each governed"
-              width={1600}
-              height={1000}
-              className="h-auto w-full"
-            />
-          </ContainerScroll>
-
-          <BlurFade inView>
-            <div className="mt-8">
-              <CardsCarousel cards={SURFACES} />
-            </div>
-          </BlurFade>
-        </div>
-      </section>
-
-      {/* ── Safe / set-once: the unlock, as compact tiles ─────────────────── */}
-      <section className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-6 py-20">
-          <BlurFade inView>
-            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-primary">
-              <ShieldCheck className="size-4" weight="bold" />
-              Set once, use everywhere
-            </p>
-            <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Safe is the unlock. It is what lets you move fast without fear.
+              From your data to a{' '}
+              <DecryptText text="signed, audited" className="text-primary" /> result. One path, end
+              to end.
             </h2>
           </BlurFade>
           <BlurFade delay={0.12} inView>
-            <BentoGrid className="mt-10">
-              <BentoTile
-                className="lg:col-span-3"
-                icon={ShieldCheck}
-                title="Guardrails on every call"
-                body="Prompt-injection, PII, toxicity, and policy screened in the pipe. A call that is not allowed off the box does not leave."
-              />
-              <BentoTile
-                className="lg:col-span-3"
-                icon={ScribbleLoop}
-                title="Evals and drift, live"
-                body="Every run scored against a golden set and watched for drift, so you see the moment one regresses."
-              />
-              <BentoTile
-                className="lg:col-span-2"
-                icon={SealCheck}
-                title="Signed provenance"
-                body="Every answer cited and signed to an append-only log."
-              />
-              <BentoTile
-                className="lg:col-span-2"
-                icon={Path}
-                title="Audit and lineage"
-                body="Trace any result to its source. Export it for a regulator."
-              />
-              <BentoTile
-                className="lg:col-span-2"
-                icon={Broadcast}
-                title="One rule set, inherited"
-                body="An admin sets the rules once. Nobody re-implements them."
-              />
-            </BentoGrid>
+            <div className="mt-10 rounded-2xl border border-border bg-card p-5 sm:mt-12 sm:p-12">
+              <FlowDiagram />
+              {/* The five governance guarantees, folded into three compact chips (was a 5-card
+                  Bento). Same point, a fraction of the scroll. */}
+              <ul className="mt-8 grid gap-3 border-t border-border pt-6 sm:mt-10 sm:grid-cols-3">
+                {[
+                  {
+                    icon: ShieldCheck,
+                    title: 'Guarded on every call',
+                    body: 'Prompt-injection, PII and policy screened in the pipe. A blocked call never leaves.',
+                  },
+                  {
+                    icon: Path,
+                    title: 'Scored and traced, live',
+                    body: 'Every run scored against a golden set, watched for drift, traced to its source.',
+                  },
+                  {
+                    icon: SealCheck,
+                    title: 'Signed and set once',
+                    body: 'Every answer cited and signed. An admin sets the rules once; nobody re-implements them.',
+                  },
+                ].map((chip) => (
+                  <li
+                    key={chip.title}
+                    className="flex gap-3 rounded-xl border border-border bg-background/40 p-4"
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
+                      <chip.icon className="size-4" weight="bold" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">
+                        {chip.title}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                        {chip.body}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </BlurFade>
         </div>
       </section>
 
-      {/* ── Proof strip: real numbers only ────────────────────────────────── */}
+      {/* ── Proof strip: CIO/CISO outcomes ─────────────────────────────────── */}
       <section className="relative border-b border-border bg-card/40">
-        <div className="mx-auto grid max-w-[100rem] grid-cols-2 gap-y-10 px-6 py-16 lg:grid-cols-4">
-          {[
-            { value: 1, suffix: '', label: 'Docker bring-up wires the whole stack' },
-            { value: 85, suffix: '%+', label: 'Test coverage, enforced on every push' },
-            { value: 3, suffix: '', label: 'Frameworks mapped: ISO 42001, NIST, EU AI Act' },
-            { value: 0, suffix: '', label: 'Vendors your data is handed to' },
-          ].map((stat, i) => (
+        <div className="mx-auto grid max-w-[100rem] grid-cols-2 gap-x-4 gap-y-10 px-4 py-14 sm:px-6 lg:grid-cols-4">
+          {PROOF.map((stat, i) => (
             <BlurFade key={stat.label} delay={0.08 * i} inView>
-              <div className="px-2 text-center">
+              <div className="px-1 text-center sm:px-2">
                 <div className="font-mono text-4xl font-semibold tracking-tight text-primary sm:text-5xl">
-                  <NumberTicker value={stat.value} suffix={stat.suffix} />
+                  <NumberTicker value={stat.value} />
                 </div>
                 <p className="mx-auto mt-3 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
                   {stat.label}
@@ -279,15 +253,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Close: compliance travels with every run ──────────────────────── */}
+      {/* ── Close: what "without losing out" actually means ────────────────── */}
       <section className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-6 py-20">
-          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
+        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
             <BlurFade inView>
               <figure className="relative overflow-hidden rounded-2xl border border-border bg-[#f4f2ec] p-1.5 shadow-[0_30px_120px_-30px_rgba(5,150,105,0.22)]">
                 <Image
                   src="/diagrams/flow/flow-compliance.png"
-                  alt="Compliance is not a step you bolt on; it travels with every run. Each run is signed, cited, and scored; one that fails a check is stopped; audit-ready evidence exports for a regulator, on infrastructure you own."
+                  alt="Compliance travels with every run: each run is signed, cited and scored; one that fails a check is stopped; audit-ready evidence exports for a regulator."
                   width={1280}
                   height={720}
                   className="h-auto w-full rounded-xl"
@@ -300,13 +274,34 @@ export default function LandingPage() {
                   <SealCheck className="size-4" weight="bold" />
                   Without losing out
                 </p>
-                <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
+                <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
                   Become an intelligent enterprise, without compromising.
                 </h2>
-                <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground">
-                  No rip and replace. No lock-in. No handing your moat to anyone. Open the console
-                  and see it running, or read the source and run it yourself.
-                </p>
+                <ul className="mt-6 grid gap-4">
+                  {[
+                    {
+                      title: 'Complete control',
+                      body: 'Your data, your models, your rules. Cloud or on-prem, the control stays with you.',
+                    },
+                    {
+                      title: 'No vendor lock-in',
+                      body: 'Open source, open standards. Swap a model or a gateway without ripping anything out.',
+                    },
+                    {
+                      title: 'One coherent system',
+                      body: 'Every part speaks to every other part. One platform, not twenty duct-taped tools.',
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="border-l-2 border-primary/50 pl-4">
+                      <span className="block text-sm font-semibold text-foreground">
+                        {item.title}
+                      </span>
+                      <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
+                        {item.body}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </BlurFade>
               <BlurFade delay={0.15} inView>
                 <div className="mt-8">
@@ -319,7 +314,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="bg-background">
-        <div className="mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-2 px-6 py-8 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground sm:flex-row">
+        <div className="mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-2 px-4 py-8 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground sm:flex-row sm:px-6">
           <span>Off Grid AI · AWS for AI · open source</span>
           <span>AGPL-3.0 · set once, use everywhere</span>
         </div>
