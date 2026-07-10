@@ -27,6 +27,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
     tabs: [
       { id: 'observability', label: 'Observability', route: '/insights' },
       { id: 'observability', label: 'Ops Copilot', route: '/insights/copilot' },
+      { id: 'platform-health', label: 'Platform Health', route: '/insights/platform' },
       { id: 'analytics', label: 'Analytics', route: '/insights/analytics' },
       { id: 'drift', label: 'Drift', route: '/insights/drift' },
     ],
@@ -70,34 +71,34 @@ export function InsightsNav() {
     <SubNav>
       <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
         {GROUPS.map((group, gi) => {
-        const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
-        if (tabs.length === 0) return null;
-        return (
-          <div key={group.heading} className="flex items-center gap-1">
-            {gi > 0 ? <span className="mx-1.5 h-4 w-px bg-border" aria-hidden /> : null}
-            <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground/50">
-              {group.heading}
-            </span>
-            {tabs.map((t) => {
-              const active = activeR === t.route;
-              return (
-                <Link
-                  key={t.id}
-                  href={t.route}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 text-sm transition-colors',
-                    active
-                      ? 'bg-primary/10 font-medium text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  {t.label}
-                </Link>
-              );
-            })}
-          </div>
-        );
+          const tabs = group.tabs.filter((t) => isModuleEnabled(t.id));
+          if (tabs.length === 0) return null;
+          return (
+            <div key={group.heading} className="flex items-center gap-1">
+              {gi > 0 ? <span className="mx-1.5 h-4 w-px bg-border" aria-hidden /> : null}
+              <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground/50">
+                {group.heading}
+              </span>
+              {tabs.map((t) => {
+                const active = activeR === t.route;
+                return (
+                  <Link
+                    key={t.id}
+                    href={t.route}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-sm transition-colors',
+                      active
+                        ? 'bg-primary/10 font-medium text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </div>
+          );
         })}
       </nav>
     </SubNav>
