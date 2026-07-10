@@ -37,6 +37,17 @@ paths = [
   '''(^|/)deploy/.*\.sh$''',
   # Test fixtures: hard-coded fake tokens/keys the unit tests assert against.
   '''(^|/)test/.*\.ts$''',
+  # GENERATED / GIT-IGNORED artifacts — never committed, so a "secret" here is a
+  # build-time bundling of an env-var reference (e.g. NEXT_PUBLIC_* baked into a
+  # webpack chunk), not a leak in source. The local `--no-git` scan walks the
+  # whole working tree incl. these dirs; exclude them so a local build doesn't
+  # false-trip the gate. (They are in .gitignore, so history/CI never sees them.)
+  '''(^|/)\.next/''',
+  '''(^|/)coverage/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.turbo/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
 ]
 # Regexes for values that look like secrets but are documented dev defaults.
 regexes = [
