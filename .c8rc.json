@@ -64,6 +64,7 @@
     "src/lib/jaeger.ts",
     "src/lib/superset.ts",
     "src/lib/superset-provision.ts",
+    "src/lib/superset-data.ts",
     "src/lib/opensearch-alerting.ts",
     "src/lib/unleash-client.ts",
     "src/lib/unleash-admin.ts",
