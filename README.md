@@ -60,6 +60,8 @@ finishes on its own.
 
 ![The review inbox: runs paused for a human decision, approve or reject and the run resumes](public/docs-shots/app-review.png)
 
+**[See every feature, screen by screen →](features/README.md)** — the gateway, knowledge, the Studio, agent QA, signed provenance, data, regulatory report packs, and FinOps, each with a screenshot from the live console.
+
 ## Set once, use everywhere
 
 This is the part that changes how an enterprise runs AI.

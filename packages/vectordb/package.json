@@ -1,0 +1,35 @@
+{
+  "name": "@offgrid/vectordb",
+  "version": "0.0.1",
+  "description": "Plug-and-play vector DB / knowledge-base inspection + 2D visualization layer for Off Grid: connect by URL, list/inspect collections, sample points, and PCA-project embeddings to 2D.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@lancedb/lancedb": "*"
+  },
+  "peerDependenciesMeta": {
+    "@lancedb/lancedb": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}

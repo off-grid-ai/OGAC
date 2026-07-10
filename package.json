@@ -39,12 +39,12 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
     "@lancedb/lancedb": "^0.30.0",
-    "@offgrid/analytics": "file:../shared/packages/analytics",
-    "@offgrid/finops": "file:../shared/packages/finops",
-    "@offgrid/gateway": "file:../gateway",
-    "@offgrid/policy": "file:../shared/packages/policy",
-    "@offgrid/speech": "file:../shared/packages/speech",
-    "@offgrid/vectordb": "file:../shared/packages/vectordb",
+    "@offgrid/analytics": "file:packages/analytics",
+    "@offgrid/finops": "file:packages/finops",
+    "@offgrid/gateway": "file:packages/gateway",
+    "@offgrid/policy": "file:packages/policy",
+    "@offgrid/speech": "file:packages/speech",
+    "@offgrid/vectordb": "file:packages/vectordb",
     "@pdf-lib/fontkit": "^1.1.1",
     "@phosphor-icons/react": "^2.1.10",
     "@scalar/nextjs-api-reference": "^0.11.5",
@@ -75,7 +75,8 @@
     "remark-gfm": "^4.0.1",
     "sigstore": "^5.0.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "async-mutex": "^0.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
