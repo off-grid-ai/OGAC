@@ -183,11 +183,15 @@ OSS swap-in, graceful fallback).
 
 ### FleetDM · `:8070` · MIT (Fleet Free) · profile `mdm`
 
-- **What/why:** osquery-based, cross-platform MDM (macOS/Windows/Linux/iOS/Android) — device
-  inventory, policies, GitOps — reached over its REST API. The production swap-in for Fleet Control;
-  our "nodes" map to Fleet "hosts". **Fleet Free is MIT** (free OSS); **Fleet Premium is paid and
-  NOT required.**
-- **When:** real fleet-scale device management. **Configure:** `OFFGRID_ADAPTER_MDM=fleetdm` +
+- **What/why:** osquery-based, cross-platform device fleet (macOS/Windows/Linux/iOS/Android) - device
+  inventory, live queries, software + CVE visibility, policies, GitOps - reached over its REST API.
+  The production swap-in for Fleet Control; our "nodes" map to Fleet "hosts". **Fleet Free is MIT**
+  (free OSS); **Fleet Premium is paid and NOT required.**
+- **Coming soon:** device CONTROL - the MDM commands that act on a device (lock / wipe /
+  config-profile push / settings enforcement / Apple APNs enrollment). In the console these render
+  disabled with a "Coming soon" label rather than firing. Advanced MDM control is Fleet Premium,
+  separately licensed. The inventory/query/policy views above stay live.
+- **When:** real fleet-scale device inventory and posture. **Configure:** `OFFGRID_ADAPTER_MDM=fleetdm` +
   `OFFGRID_FLEET_URL` + `OFFGRID_FLEET_TOKEN`. `make mdm`, then create a token with `fleetctl`
   (see the compose comment). Falls back to the first-party registry if unreachable.
 
