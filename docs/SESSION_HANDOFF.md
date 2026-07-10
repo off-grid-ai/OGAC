@@ -1,3 +1,37 @@
+# Session handoff — 2026-07-10 (session hit limit mid-wave) — READ THIS FIRST
+
+`main` = remote (`ec10e1d`); all merged work pushed. Roadmap: `docs/PRODUCTION_READINESS_ROADMAP.md`.
+
+**Merged+pushed this session:** dependency-cruiser + jscpd (gated local+CI), LLM Guard sole/fail-closed,
+native BI (iframe gone), builder schedule+sinks, SEC-P1 IDOR fixes, release files + SECRET_INVENTORY,
+deploy-reliability (push.sh launchctl restart + stale-root guard), console landing rewrite
+(`src/app/page.tsx` -> AWS-for-AI, em-dashes stripped, privacy-moat framing removed). hygiene SETUP
+mode live in ~/.claude/skills/hygiene.
+
+**IN FLIGHT, backed up to remote, NOT merged (resume = fetch + merge + gate + push):**
+- Viewer role + hellobar (Phase 2.1): `backup/worktree-agent-abba2e71296de1d42` (@112e462, WIP not gated).
+- Two-tenant rich seed + viewer users (2.2/2.3): `backup/worktree-agent-a164bc22e800806d9` (@18f7423).
+- Landing-page repo (separate): `console-landing-page` @db1bc0f pushed (that subdomain is Keycloak-gated;
+  the console ROOT landing is the one fixed on main).
+
+**PENDING (not done):**
+1. DEPLOY main (ec10e1d) to onprem-console so the new landing goes live: fixed `deploy/push.sh` with
+   `SERVER=offgrid-tunnel` (off-LAN -> over the cloudflared alias). Verify one fresh :3000 listener,
+   re-fetch onprem-console.getoffgridai.co/, confirm new hero.
+2. #226 aggressive gate (typed-lint dead-branch + knip + gitleaks + audit-ci + dep-cruiser ratchet +
+   dead-link checker) - AFTER viewer+seed merge (shared src/lib).
+3. Phase 2 finish: seed live DB both tenants, wire hellobar creds, capture live screenshots both
+   tenants -> README, publish demo link.
+
+**DEPLOY GOTCHA (caused a 502 outage today):** console is KeepAlive LaunchAgent `co.getoffgridai.console`;
+restart via `launchctl kickstart -k gui/<uid>/co.getoffgridai.console`, NEVER pkill+nohup. A stale
+ROOT-owned next-server held :3000 serving old code; `sudo -n kill -9` it. push.sh now guards this.
+
+**ON HOLD (do NOT start):** insurer 15 use cases (#207/#216) - founder tests the 2 existing apps + gives
+feedback first, then explicit go. Memory: `feedback-insurer-usecases-on-hold`.
+
+---
+
 # Session handoff — PIPELINES × GATEWAYS architecture (live as of 2026-07-08, overnight autonomous)
 
 Read this first if you're a fresh session continuing the console work. The git log is the source of
