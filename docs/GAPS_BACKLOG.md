@@ -973,3 +973,44 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+---
+
+## Adversarial gateway break-test (2026-07-10, `console`) — G-ADV-GW-*
+
+QA-on-a-bug-hunt pass over the gateway + model-settings subsystem. Full write-up + coverage ledger:
+`docs/adversarial/gateway.md`. Red tests: `test/gateway-adversarial.test.ts` (unit),
+`test/gateway-adversarial.integration.test.ts` (real Postgres). Confirmed breaks are `.skip`'d with
+the RED assertion intact (un-skip after the fix) or, where verifiable vs a live DB, left passing as a
+characterization of the current buggy behavior. HEAD tested: `7ea13b8`.
+
+**Confirmed breaks (RED):**
+- **G-ADV-GW-1 (P1/HIGH) — NaN clock permanently wedges a rate-limit bucket.** `checkRateLimit`
+  (`src/lib/rate-limit.ts:46,56`) has no guard on `now`; a `NaN` writes `resetAt=NaN`, and `now > NaN`
+  is always false → the bucket denies FOREVER with `retryAfterSec=NaN`. Self-DoS, fail-closed. `now`
+  is `Date.now()` today (not attacker-reachable) but the exported pure primitive corrupts shared state
+  on any bad/mocked clock. Fix: clamp/reject non-finite `now` (open a fresh window). RED: G-ADV-GW-1.
+- **G-ADV-GW-3 (P2/MEDIUM) — cloud provider mis-route on a mid-string provider token.**
+  `selectCloudProvider` (`src/lib/cloud-providers.ts:187`) uses `includes(":<prefix>:")` (substring,
+  not anchored) + slices after the LAST colon (`:197`). `my-local-model:openai:v2` → `{provider:openai,
+  model:v2}` — wrong provider + mangled model. Gated by the egress leash so it's routing-correctness,
+  not a residency breach. Fix: anchored-prefix / strict two-segment match. RED: G-ADV-GW-3.
+- **G-ADV-GW-4 (P2/LOW-MED) — PATCH clears a non-compat gateway's baseUrl; unusable row persists.**
+  Verified vs real Postgres. `updateGateway` (`src/lib/gateways.ts:198`) merges `patch.baseUrl ??
+  existing` and `validateGatewayUpdate` (`gateways-policy.ts:262`) turns `''` into a non-nullish
+  `patch.baseUrl=''`; the only emptiness guard (`validateMergedGateway :288`) checks `kind==='compat'`
+  only. A cloud/on-prem gateway can be PATCHed to an empty baseUrl with no error. Fix: treat empty
+  patched baseUrl as no-change/reject, or extend the merged invariant. Test: G-ADV-GW-4.
+
+**Weaknesses / untested crossings (⚠️, not hard breaks — mitigations or by-design):**
+- **G-ADV-GW-5** — per-IP floor trusts client `x-forwarded-for` when `cf-connecting-ip` is absent
+  (`src/middleware.ts:33-39`); off-Cloudflare, rotate XFF ⇒ fresh bucket ⇒ floor bypass. CF mitigates
+  in prod. (Tenant-slug code strips client headers; rate-limit IP does not.)
+- **G-ADV-GW-6** — revocation fails open on a resolver DB error: `internal/rate-limit/route.ts:34-38`
+  returns `{rateLimit:null}` on error ⇒ edge applies the floor ⇒ admits a revoked key at 60/min during
+  a DB hiccup. Aggregator (Keycloak) is the real enforcement; console edge is defence-in-depth.
+- **G-ADV-GW-7** — no DB uniqueness on gateway baseUrl/hostname; silent duplicate rows.
+- **G-ADV-GW-8** — `isGatewayApiKey('ogak_.secret')` true but `parseApiKey` null (gate looser than parser).
+- **G-ADV-GW-9** — `gateway-keys` POST passes `ownerOrg` to Keycloak unvalidated (possible cross-tenant scope).
+- **G-ADV-GW-10** — rate-limit counters are module-level in-memory maps (`src/middleware.ts:23-24`);
+  per-instance, not shared in a scaled/serverless deploy — the floor is effectively N×60/min across N instances.
