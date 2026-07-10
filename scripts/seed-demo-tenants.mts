@@ -41,12 +41,9 @@ import {
   SURAKSHA_PROFILE,
   TOUR_PROFILES,
   type TenantProfile,
-  appId,
   agentRunId,
   appsFor,
   agentsFor,
-  customAgentId,
-  collectionId,
   evalRunId,
   goldenId,
   governanceId,
@@ -59,7 +56,7 @@ import {
   COMPLIANCE_ADOPTION,
 } from '../src/lib/tour-demo-seed.ts';
 import { createGateway, listGatewayRows } from '../src/lib/gateways.ts';
-import { createPipeline, listPipelines, updatePipeline } from '../src/lib/pipelines.ts';
+import { createPipeline, listPipelines } from '../src/lib/pipelines.ts';
 import { planSeedGateways } from '../src/lib/gateways-seed.ts';
 import { planSeedPipelines, SAMPLE_PIPELINES, samplePipelineId } from '../src/lib/pipelines-seed.ts';
 import { createApp, listApps, updateApp } from '../src/lib/apps-store.ts';
@@ -125,12 +122,11 @@ async function seedPipelines(profile: TenantProfile, ownerId: string): Promise<M
 
 // ─── 4. Connectors + data-domains (idempotent by id / label). ──
 async function seedConnectors(profile: TenantProfile, id: TenantIdentity): Promise<void> {
-  const have = new Set((await listConnectors(profile.orgId)).map((c) => c.id));
-  // createConnector mints a random id; to get STABLE ids we insert only if the fixed id is absent,
-  // via the store's create (which stamps orgId) — but we need the fixed id, so use a name guard too.
+  // createConnector mints a random id, so idempotency is by NAME (the operator-visible, stable key —
+  // same convention as seed-data-domains.mts). id.connectors[].id is the local join KEY, not a DB id.
   const haveNames = new Set((await listConnectors(profile.orgId)).map((c) => c.name.trim().toLowerCase()));
   for (const c of id.connectors) {
-    if (have.has(c.id) || haveNames.has(c.name.trim().toLowerCase())) continue;
+    if (haveNames.has(c.name.trim().toLowerCase())) continue;
     await createConnector({ name: c.name, type: c.type, endpoint: c.endpoint, description: c.description, orgId: profile.orgId, custom: true });
   }
   // Domains — bind by connector NAME → real id (createConnector minted random ids).
@@ -230,15 +226,16 @@ async function seedTools(profile: TenantProfile): Promise<void> {
 
 // ─── 9. Custom agents (Studio) — deterministic id, idempotent. ──
 async function seedAgents(profile: TenantProfile): Promise<void> {
-  const have = new Set((await listCustomAgents(profile.orgId)).map((a) => a.id));
+  // Idempotent by NAME (createCustomAgent mints a random id; re-keying a PK is risky and unnecessary —
+  // the agent_runs telemetry references a stable synthetic agentId `app:<key>`, not this row's id).
+  const have = new Set((await listCustomAgents(profile.orgId)).map((a) => a.name.trim().toLowerCase()));
+  let created = 0;
   for (const a of agentsFor(profile)) {
-    const id = customAgentId(profile.orgId, a.key);
-    if (have.has(id)) continue;
-    const created = await createCustomAgent({ name: a.name, role: a.role, description: a.description, systemPrompt: a.systemPrompt }, profile.orgId);
-    // re-key to the deterministic id so agent_runs can reference it stably.
-    await db.execute(sql`UPDATE custom_agents SET id = ${id} WHERE id = ${created.id} AND org_id = ${profile.orgId}`);
+    if (have.has(a.name.trim().toLowerCase())) continue;
+    await createCustomAgent({ name: a.name, role: a.role, description: a.description, systemPrompt: a.systemPrompt }, profile.orgId);
+    created++;
   }
-  log(`agents: ${agentsFor(profile).length} ensured`);
+  log(`agents: ${created} created, ${agentsFor(profile).length - created} present`);
 }
 
 // ─── 10. Studio apps (bound to a governed pipeline) + their APP RUNS. ──
