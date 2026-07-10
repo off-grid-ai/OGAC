@@ -17,7 +17,8 @@ import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { cacheLookup, cacheStore } from '@/lib/cache';
 import { estimateTokens, projectBudget } from '@/lib/chat-governance';
 import { costForTokens } from '@/lib/finops';
-import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
+import { type CheckResult } from '@/lib/checks';
+import { screenGuardrail } from '@/lib/guardrail-seam';
 import { emitRunTrace } from '@/lib/chat-trace';
 import { correlationIds } from '@/lib/correlation';
 import { shipRunAudit } from '@/lib/siem';
@@ -36,7 +37,7 @@ import type { RetrievalHit } from '@/lib/retrieval/types';
 import { listTools } from '@/lib/store';
 import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
 import { auditEnforcement } from '@/lib/pipeline-contract';
-import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
+import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import {
   type AgentTool,
   type LoopStep,
@@ -525,10 +526,14 @@ export async function runAgent(
   mark('plan', agent.name, query, [], Date.now());
 
   // 2. Guardrails (input) — PII + injection on the query. A 'blocked' verdict refuses the run.
+  // Routed through the SHARED fail-CLOSED seam (G-ADV-GOV-3): a screen that THROWS or TIMES OUT is a
+  // BLOCK, never a swallowed error that lets the raw query through. orgId is threaded so the PII deep
+  // config resolves on the worker path (gap #121).
   t = Date.now();
-  const preChecks = await runChecks('pre', { phase: 'pre', input: query, model: ANSWER_MODEL });
-  mark('guard', 'pre', preChecks.map((c) => `${c.name}:${c.verdict}`).join(' '), [], t);
-  if (outcomeFromChecks(preChecks) === 'blocked') {
+  const preScreen = await screenGuardrail('pre', { input: query, model: ANSWER_MODEL, orgId: attribution.org });
+  const preChecks = preScreen.checks;
+  mark('guard', 'pre', preScreen.detail, [], t);
+  if (preScreen.outcome === 'blocked') {
     auditRun('blocked');
     return persist(runId, {
       agentId, query, answer: '', status: 'blocked', steps, citations: [],
@@ -652,28 +657,43 @@ export async function runAgent(
   // outage leaves the query as-is rather than failing the run (the egress leash/local-only
   // guarantees still hold). Additive: with no pipeline / masking not escalated, the query is
   // untouched (legacy behaviour).
+  // FAIL CLOSED (SECURITY #236 fix 2): when masking is MANDATED, a masker that errors must BLOCK the
+  // run — the raw (unmasked) query must NEVER reach the model. The pure maskOrBlock is the ONE
+  // authority: a scan throw ⇒ { block:true }; only a successful scan yields forwardable (redacted)
+  // text. The old `catch { /* query unmasked */ }` was a fail-open PII leak.
   let modelQuery = query;
   const requireMasking = effectivePiiMasking(false, modelVerdict);
   if (requireMasking) {
     t = Date.now();
+    let scanResult: { ok: true; scan: Awaited<ReturnType<ReturnType<typeof getPii>['scan']>> } | { ok: false; error: unknown };
     try {
-      const scan = await getPii().scan(query, attribution.org);
-      const esc = applyPiiEscalation(query, requireMasking, scan);
-      if (esc.masked) {
-        modelQuery = esc.text;
-        mark('mask', scan.engine, `masked ${scan.entities.join(', ')} before model`, [], t);
-        auditEnforcement(
-          enforceCtx,
-          'pipeline.pii.mask',
-          `model:agent:${agentId}`,
-          'redacted',
-          `masked ${scan.entities.join(', ')} (${scan.engine}) before model call`,
-        );
-      } else {
-        mark('mask', scan.engine, 'no PII to mask', [], t);
-      }
-    } catch {
-      mark('mask', 'skip', 'PII scan unavailable — query unmasked', [], t);
+      scanResult = { ok: true, scan: await getPii().scan(query, attribution.org) };
+    } catch (err) {
+      scanResult = { ok: false, error: err };
+    }
+    const decision = maskOrBlock(requireMasking, query, scanResult);
+    if (decision.block) {
+      mark('mask', 'block', decision.reason ?? 'PII masking failed', [], t);
+      auditEnforcement(enforceCtx, 'pipeline.pii.mask', `model:agent:${agentId}`, 'error', decision.reason ?? 'PII masking failed');
+      auditRun('blocked');
+      return persist(runId, {
+        agentId, query, answer: '', status: 'blocked', steps, citations: [],
+        checks: [...preChecks, { name: 'pii-mask', verdict: 'blocked' as const, detail: decision.reason ?? undefined }],
+        provenance: null,
+      }, attribution.org);
+    }
+    modelQuery = decision.text;
+    if (decision.masked && scanResult.ok) {
+      mark('mask', scanResult.scan.engine, `masked ${scanResult.scan.entities.join(', ')} before model`, [], t);
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.pii.mask',
+        `model:agent:${agentId}`,
+        'redacted',
+        `masked ${scanResult.scan.entities.join(', ')} (${scanResult.scan.engine}) before model call`,
+      );
+    } else if (scanResult.ok) {
+      mark('mask', scanResult.scan.engine, 'no PII to mask', [], t);
     }
   }
 
@@ -727,10 +747,21 @@ export async function runAgent(
   }));
   mark('ground', 'grounding', `${grounded.verdicts.filter((v) => v.supported).length}/${grounded.verdicts.length} claims grounded (${grounded.score}%)`, citations.map((c) => c.ref), t);
 
-  // 6. Guardrails (output) — scan the answer before it leaves (recorded, non-blocking).
+  // 6. Guardrails (output) — scan the answer before it leaves. Routed through the SHARED fail-CLOSED
+  // seam (G-ADV-GOV-3) so a throw/timeout records an HONEST 'blocked' verdict, never an empty screen
+  // that reads as "screened, nothing found". A failed outbound screen holds the answer (status
+  // 'blocked'): a broken egress DLP screen must not let unscanned output leave.
   t = Date.now();
-  const postChecks = await runChecks('post', { phase: 'post', output: answer, model: ANSWER_MODEL });
-  mark('guard', 'post', postChecks.map((c) => `${c.name}:${c.verdict}`).join(' '), [], t);
+  const postScreen = await screenGuardrail('post', { output: answer, model: ANSWER_MODEL, orgId: attribution.org });
+  const postChecks = postScreen.checks;
+  mark('guard', 'post', postScreen.detail, [], t);
+  if (postScreen.outcome === 'blocked') {
+    auditRun('blocked');
+    return persist(runId, {
+      agentId, query, answer: '', status: 'blocked', steps, citations,
+      checks: [...preChecks, ...postChecks], provenance: null,
+    }, attribution.org);
+  }
 
   // 7. Provenance — sign the answer (ed25519 by default): tamper-evident, offline-verifiable.
   t = Date.now();
