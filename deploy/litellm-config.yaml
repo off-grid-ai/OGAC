@@ -1,0 +1,108 @@
+# Off Grid AI — LiteLLM Proxy config (SAMPLE, generated).
+#
+# This file is GENERATED from the console's own view of the fleet by src/lib/litellm-config.ts
+# (buildLiteLLMConfig → configToYaml) — the single source of truth. Do NOT hand-edit the model_list:
+# regenerate it from the live pool so it never drifts from scripts/fleet-pool.mjs + cloud-providers.ts:
+#
+#   node --experimental-strip-types --input-type=module -e "\
+#     import { buildLiteLLMConfig, configToYaml } from './src/lib/litellm-config.ts';\
+#     process.stdout.write(configToYaml(buildLiteLLMConfig({ databaseUrlEnvVar: 'OFFGRID_LITELLM_DB_URL' })));"\
+#     > deploy/litellm-config.yaml
+#
+# Secrets are NEVER written here — api_key values are os.environ/… references LiteLLM resolves at
+# runtime from the container env (see the `litellm` service in docker-compose.yml). The fleet nodes
+# need no key. This sample carries the 8 on-prem nodes only; cloud deployments appear when the
+# matching OFFGRID_CLOUD_*_API_KEY is set and the config is regenerated.
+#
+# LiteLLM is OpenAI-compatible, so pointing OFFGRID_GATEWAY_URL at http://litellm:4000 cuts the
+# console over with NO routing-logic change. The hand-rolled aggregator stays available as a fallback.
+model_list:
+  - model_name: onprem/qwythos-9b
+    litellm_params:
+      model: openai/qwythos-9b
+      api_base: "http://192.168.1.57:7878/v1"
+    model_info:
+      id: g1
+      egress: on-prem
+      origin: g1
+      vision: true
+  - model_name: onprem/qwen3.5-9b
+    litellm_params:
+      model: openai/qwen3.5-9b
+      api_base: "http://192.168.1.58:7878/v1"
+    model_info:
+      id: g2
+      egress: on-prem
+      origin: g2
+      vision: true
+  - model_name: onprem/qwythos-9b
+    litellm_params:
+      model: openai/qwythos-9b
+      api_base: "http://192.168.1.32:7878/v1"
+    model_info:
+      id: g3
+      egress: on-prem
+      origin: g3
+      vision: true
+  - model_name: onprem/qwythos-9b
+    litellm_params:
+      model: openai/qwythos-9b
+      api_base: "http://192.168.1.63:7878/v1"
+    model_info:
+      id: g4
+      egress: on-prem
+      origin: g4
+      vision: true
+  - model_name: onprem/qwen3.5-9b
+    litellm_params:
+      model: openai/qwen3.5-9b
+      api_base: "http://192.168.1.65:7878/v1"
+    model_info:
+      id: g5
+      egress: on-prem
+      origin: g5
+      vision: true
+  - model_name: onprem/qwen3.5-9b
+    litellm_params:
+      model: openai/qwen3.5-9b
+      api_base: "http://192.168.1.66:7878/v1"
+    model_info:
+      id: g6
+      egress: on-prem
+      origin: g6
+      vision: true
+  - model_name: onprem/qwythos-9b
+    litellm_params:
+      model: openai/qwythos-9b
+      api_base: "http://192.168.1.62:7878/v1"
+    model_info:
+      id: g7
+      egress: on-prem
+      origin: g7
+      vision: true
+  - model_name: onprem/qwythos-9b
+    litellm_params:
+      model: openai/qwythos-9b
+      api_base: "http://192.168.1.64:7878/v1"
+    model_info:
+      id: g8
+      egress: on-prem
+      origin: g8
+      vision: true
+router_settings:
+  routing_strategy: least-busy
+  num_retries: 2
+  timeout: 600
+  allowed_fails: 3
+  cooldown_time: 30
+  enable_pre_call_checks: true
+litellm_settings:
+  success_callback:
+    - otel
+  failure_callback:
+    - otel
+  drop_params: true
+  turn_off_message_logging: true
+general_settings:
+  master_key: os.environ/OFFGRID_LITELLM_MASTER_KEY
+  database_url: os.environ/OFFGRID_LITELLM_DB_URL
