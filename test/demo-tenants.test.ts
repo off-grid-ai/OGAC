@@ -10,13 +10,13 @@ test('DEMO_TENANTS: bank then insurer, each with a verified https console URL', 
   assert.equal(bank.slug, 'bharatunion');
   assert.equal(bank.industryLabel, 'a bank');
   assert.equal(bank.prompt, 'Are you a bank?');
-  assert.equal(bank.href, `https://bharatunion-${DEMO_HOST_SUFFIX}/`);
+  assert.equal(bank.href, `https://bharatunion-${DEMO_HOST_SUFFIX}/overview`);
 
   assert.equal(insurer.flavour, 'insurer');
   assert.equal(insurer.slug, 'suraksha');
   assert.equal(insurer.industryLabel, 'an insurer');
   assert.equal(insurer.prompt, 'Are you an insurer?');
-  assert.equal(insurer.href, `https://suraksha-${DEMO_HOST_SUFFIX}/`);
+  assert.equal(insurer.href, `https://suraksha-${DEMO_HOST_SUFFIX}/overview`);
 });
 
 test('DEMO_TENANTS: every href passes the domain guard', () => {
