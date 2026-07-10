@@ -66,6 +66,7 @@ export const MODULE_ICONS: Record<ModuleId, LucideIcon> = {
   studio: Graph,
   tools: Wrench,
   observability: Microscope,
+  'platform-health': Pulse,
   analytics: BarChart3,
   roi: TrendUp,
   finops: Coins,
