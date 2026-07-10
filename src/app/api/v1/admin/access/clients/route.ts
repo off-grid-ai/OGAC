@@ -22,7 +22,8 @@ export async function GET(req: Request) {
     const clients = await kc.listClients(search);
     return NextResponse.json({ configured: true, clients });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error('list clients failed:', err);
+    return NextResponse.json({ error: 'service unavailable' }, { status: 500 });
   }
 }
 
@@ -104,10 +105,11 @@ export async function POST(req: Request) {
     // Surface a conflict as 409 with the friendly message (e.g. "a client named X already exists")
     // instead of a generic 500 — the client with that ID is already registered.
     const status = err instanceof KeycloakError ? err.status : 500;
+    if (status !== 409) console.error('create client failed:', err);
     const message =
       status === 409
         ? `A machine client with the ID "${body.clientId}" already exists. Pick a different Client ID, or manage the existing one below.`
-        : (err as Error).message;
+        : 'service unavailable';
     return NextResponse.json({ error: message }, { status });
   }
 }

@@ -12,8 +12,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof body?.enabled !== 'boolean') {
     return NextResponse.json({ error: 'enabled (boolean) required' }, { status: 400 });
   }
-  await setMaskingRuleEnabled(id, body.enabled);
-  auditFromSession(gate, await currentOrgId(), {
+  // Scope the toggle to the caller's org — org A cannot flip org B's masking rule (P1 IDOR fix).
+  const orgId = await currentOrgId();
+  await setMaskingRuleEnabled(id, body.enabled, orgId);
+  auditFromSession(gate, orgId, {
     action: 'masking.change',
     resource: `masking:${id}`,
     outcome: 'ok',

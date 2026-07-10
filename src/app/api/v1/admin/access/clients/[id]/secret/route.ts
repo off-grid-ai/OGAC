@@ -6,6 +6,10 @@ import { keycloakAdmin } from '@/lib/keycloak-admin';
 
 export const dynamic = 'force-dynamic';
 
+// Report ONLY whether a client secret is configured — never the secret value. A client secret is a
+// bearer credential: returning it here made it a repeatable, un-scoped exfiltration endpoint. The
+// cleartext secret is revealed exactly ONCE, at create/rotate time (the POST below). The UI uses this
+// boolean to show "configured / rotate" state. (P1 — cross-tenant/secret-exposure audit.)
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const gate = await requireAdmin(req);
@@ -16,17 +20,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     const secret = await kc.getClientSecret(id);
-    // Reading a live client secret in plaintext is a privileged, repeatable action — audit every
-    // retrieval so there's an accountability trail of who viewed which client's secret when.
-    // (P0 — HARDENING_AUDIT.md; the POST/rotate path already audited, the GET did not.)
-    auditFromSession(gate, await currentOrgId(), {
-      action: 'access.machine.secret.read',
-      resource: `client:${id}`,
-      outcome: 'ok',
-    });
-    return NextResponse.json({ configured: true, secret });
+    return NextResponse.json({ configured: Boolean(secret) });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error(`GET client secret status for ${id} failed:`, err);
+    return NextResponse.json({ error: 'service unavailable' }, { status: 500 });
   }
 }
 
@@ -47,6 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
     return NextResponse.json({ configured: true, secret });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error(`rotate client secret for ${id} failed:`, err);
+    return NextResponse.json({ error: 'service unavailable' }, { status: 500 });
   }
 }
