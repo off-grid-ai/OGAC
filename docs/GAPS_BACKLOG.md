@@ -925,3 +925,28 @@ JSX-scaffolding / import-block matches are excluded — this is the real-DRY-vio
 
 Full clone list (all 256, incl. incidental) is in the generated report: `coverage/jscpd/jscpd-report.html`
 (regenerate with `npm run jscpd:report`) and `coverage/jscpd/jscpd-report.json` (both gitignored).
+
+---
+
+## SECURITY AUDIT (2026-07-10, read-only) — findings
+
+**P0 (.env.production committed) — FALSE ALARM, verified.** The audit agent read `.env.production`
+from the working tree; it is gitignored, absent from HEAD, and never committed (`git log --all --
+.env.production` empty; `git check-ignore` matches). No secret in git. Not a release blocker.
+
+**Confirmed P1s (real — org-scoping gaps Wave1/Wave2 missed), tracked as SEC-P1 (#228):**
+- **G-SEC-1 cross-tenant IDOR — connectors:** `updateConnector(id)` (store.ts:856) + `deleteConnector(id)`
+  (store.ts:874) take no orgId → org A admin can PATCH/DELETE org B's connector via `/api/v1/admin/
+  connectors/[id]`. Fix: add orgId param + `AND eq(connectors.org_id, orgId)`, route passes currentOrgId().
+- **G-SEC-2 cross-tenant IDOR — API keys:** `setApiKeyEnabled(id)` (store.ts:1557), `setKeyRateLimit(id)`
+  + `getKeyRateLimit(id)` (rate-limit-store.ts:58,92) no orgId → cross-org key disable / rate-limit tamper.
+- **G-SEC-3 cross-tenant IDOR — masking rules:** `setMaskingRuleEnabled(id)` (store.ts:960) no orgId →
+  cross-org governance tamper.
+- **G-SEC-4 plaintext secret reveal:** `access/clients/[id]/secret` GET returns the raw Keycloak client
+  secret, repeatable + un-audited. Remove GET (reveal once on create/rotate) or step-up + audit each read.
+- **G-SEC-5 error-detail leak:** `access/clients/[id]/secret` + `app/[slug]/run:96` return
+  `err.message` to the client. Return generic error, log full detail server-side.
+
+**Positives verified:** Drizzle params everywhere (no SQL injection surface); requireAdmin on all
+admin routes; vectordb SSRF allowlist; device-audit token gate; 60/min rate limiter; audit
+canonicalization; list/read ops org-scoped. Posture: solid, with the above P1s to close before public multi-tenant.
