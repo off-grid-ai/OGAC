@@ -244,6 +244,29 @@
   animation: og-aurora linear infinite;
 }
 
+/* Flow-diagram beam pulse: an emerald dash segment slides along a fixed wire. Driven by
+   stroke-dashoffset (compositor-friendly, GPU-composited) so it never restarts when React
+   re-renders the SVG - the previous motion-driven gradient keyframes reset mid-flight on
+   any parent re-render, which read as a stutter. The dash pattern is set inline per-path
+   (`--beam-dash` visible segment, `--beam-len` gap = full path length); we animate the
+   offset from `len + dash` (segment off the start) to `0` (segment off the end). Held at
+   rest under reduced motion by the global block below. */
+@keyframes og-beam-travel {
+  from {
+    stroke-dashoffset: calc((var(--beam-len) + var(--beam-dash)) * 1px);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.og-beam-pulse {
+  animation-name: og-beam-travel;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  will-change: stroke-dashoffset;
+}
+
 /* The landing is deliberately the dark terminal theme regardless of the app's light default.
    Tailwind v4 freezes @theme color tokens at :root (light), so `text-white`, `bg-white/*`,
    `border-white/*`, and the semantic `*-foreground`/`*-background` utilities would resolve to
