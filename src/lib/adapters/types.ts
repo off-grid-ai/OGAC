@@ -115,14 +115,27 @@ export interface PolicyPort {
   evaluate(input: PolicyInput): Promise<PolicyDecision>;
 }
 
-// PII / guardrails — detect (and optionally redact) sensitive spans in text. First-party is a
-// regex scan; Presidio is the production detector. Both answer the same shape so the checks spine
-// is agnostic to which one ran.
+// PII / guardrails — detect (and optionally redact) sensitive spans in text. LLM Guard is THE
+// authoritative content-guardrail engine (PII/DLP, secrets, prompt-injection, toxicity, language);
+// the checks spine reads only this normalized shape, so it is agnostic to the engine internals.
+//
+// Fail-closed semantics (a guardrail must not be bypassable by killing the engine):
+//   • `blocked === true` — the engine was CONFIGURED but could not screen (unreachable / errored).
+//     The run MUST be denied (the checks spine maps this to a 'blocked' verdict). A guardrail that
+//     silently fell open to a weaker floor is a security hole, so this is an explicit hard stop.
+//   • `configured === false` — no engine URL is set. The guardrail step did NOT screen; the UI
+//     surfaces this honestly as "guardrails not configured" (it must never pretend it screened).
+//     A run is NOT blocked in this state — nothing was ever turned on to enforce.
+// Both flags are optional so the shape stays back-compatible; absent ⇒ a normal, screened result.
 export interface PiiResult {
   hits: boolean;
   entities: string[];
   redacted?: string;
   engine: string;
+  /** true ⇒ the engine was configured but unreachable → FAIL CLOSED, the run must be blocked. */
+  blocked?: boolean;
+  /** false ⇒ no engine is configured → the step did not screen (surfaced, never faked as clean). */
+  configured?: boolean;
 }
 
 export interface PiiPort {
