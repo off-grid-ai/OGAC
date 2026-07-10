@@ -45,18 +45,18 @@ function StageNode({
       <div
         ref={nodeRef}
         className={
-          'relative z-10 flex size-16 items-center justify-center rounded-2xl border bg-[#0f0f0f] transition-colors sm:size-[4.5rem] ' +
-          (active ? 'border-[#34D399]/60 text-[#34D399]' : 'border-white/10 text-white/70')
+          'relative z-10 flex size-16 items-center justify-center rounded-2xl border bg-background transition-colors sm:size-[4.5rem] ' +
+          (active ? 'border-primary/60 text-primary' : 'border-border text-muted-foreground')
         }
       >
         <Icon className="size-6 sm:size-7" weight="duotone" />
-        <span className="absolute -right-2 -top-2 rounded-full border border-white/10 bg-[#0a0a0a] px-1.5 py-0.5 font-mono text-[9px] text-white/40">
+        <span className="absolute -right-2 -top-2 rounded-full border border-border bg-card px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
           {stage.n}
         </span>
       </div>
       <div>
-        <p className="text-xs font-semibold text-white sm:text-sm">{stage.label}</p>
-        <p className="mt-0.5 hidden font-mono text-[10px] uppercase tracking-[0.12em] text-white/35 sm:block">
+        <p className="text-xs font-semibold text-foreground sm:text-sm">{stage.label}</p>
+        <p className="mt-0.5 hidden font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground sm:block">
           {stage.note}
         </p>
       </div>
