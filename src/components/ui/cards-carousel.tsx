@@ -223,13 +223,13 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
             <X className="size-4" weight="bold" />
           </button>
         </div>
-        <div className="min-h-0 overflow-auto p-2 sm:p-3">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-2 sm:p-3">
           <Image
             src={card.src}
             alt={card.alt}
             width={1600}
             height={1000}
-            className="h-auto w-full rounded-lg"
+            className="h-auto max-h-[82vh] w-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </div>
