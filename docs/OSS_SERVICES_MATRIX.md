@@ -31,7 +31,7 @@ Where they run: **S1 (127.0.0.1)** — OpenSearch, Qdrant, OPA, OpenBao, Marquez
 | **OpenBao** | Secrets vault (KV) | KV read/write/list + Secrets panel on Control | 🟢 |
 | **Qdrant** | Vector store (Brain) | full client + "reindex Brain→Qdrant"; default is LanceDB | ⚪ |
 | **Superset** | BI / dashboards | guest-token embed on Analytics (needs one-time `superset init`) | 🟡 |
-| **FleetDM** | MDM / device inventory | read-only host list via REST+token | 🟡 |
+| **FleetDM** | osquery device fleet | host inventory, live osquery, software + CVE, policies via REST+token (MDM control coming soon) | 🟡 |
 | **Temporal** | Durable workflows | adapter scaffold only; agent runs stay synchronous | 🔴 |
 
 ---
@@ -123,12 +123,15 @@ Qdrant"** admin action so it's not empty. **Not the default** — activate with
 the embed guard). **Requires a one-time `superset init`** (admin + metadata) to show real data.
 **Not used:** SQL Lab, dataset provisioning. **🟡.**
 
-### FleetDM — MDM / device management
+### FleetDM — osquery device fleet
 **Purpose:** osquery-based cross-platform device inventory, policies, live queries.
-**Exposed:** hosts, teams/policies, live queries, software/vuln inventory, MDM profiles.
-**Console consumes:** **read-only host list** via REST + bearer token on the Fleet page, with
-first-party fallback. **Requires a one-time `fleetctl setup`.**
-**Not used:** policy push, live queries, software inventory, MDM enrollment. **🟡.**
+**Exposed:** hosts, teams/policies, live queries, software/vuln inventory, MDM control commands.
+**Console consumes:** host list, live osquery, software + CVE inventory, and policy CRUD on the
+Fleet page via REST + bearer token, with first-party fallback. **Requires a one-time
+`fleetctl setup`.**
+**Coming soon:** MDM device CONTROL (lock / wipe / config-profile push / settings enforcement /
+APNs enrollment) - rendered in a disabled "coming soon" state today, not fired. Advanced MDM
+control is Fleet Premium, separately licensed. **🟡.**
 
 ### Temporal — durable workflows
 **Purpose:** durable, replayable multi-step agent execution (survives crashes).

@@ -36,7 +36,11 @@ Apache-2.0 / BSD / ISC / MPL-2.0 / PostgreSQL). Nothing copyleft is linked into 
 
 ## Copyleft & paid — kept at arm's length (NOT bundled)
 - **Metabase (AGPL)** — embed-only (a separate, customer-run instance = mere aggregation), never linked.
-- **Fleet Premium** (`ee/`) — paid/source-available. We use **Fleet Free (MIT)** only.
+- **Fleet Premium** (`ee/`) — paid/source-available. We use **Fleet Free (MIT)** only. The Fleet
+  Free core powers what ships today (host inventory, live osquery, software + CVE, policies). Device
+  CONTROL (lock / wipe / config-profile push / settings enforcement) is coming soon, and advanced
+  MDM control leans on Fleet Premium (separately licensed) - so it ships when a self-hostable MIT
+  path is real, never by bundling the paid tier.
 - **E2B cloud** — paid (API key). Not the default; the **Docker sandbox** (free) is. Self-hosted
   Firecracker (Apache-2.0) is the free isolation upgrade.
 - **Sigstore public good** — free + keyless (no API key); self-host Fulcio/Rekor optionally.
