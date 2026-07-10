@@ -216,7 +216,8 @@ export function expandCron(spec: string): CronFields | null {
   const hour = parseField(fields[1], 0, 23);
   const dom = parseField(fields[2], 1, 31);
   const month = parseField(fields[3], 1, 12);
-  const dow = parseField(fields[4], 0, 6, (n) => (n === 7 ? 0 : n)); // allow 7 as Sunday
+  // day-of-week: accept 0..7 (both 0 and 7 mean Sunday, per standard cron) then fold 7→0.
+  const dow = parseField(fields[4], 0, 7, (n) => (n === 7 ? 0 : n));
   if (!minute || !hour || !dom || !month || !dow) return null;
 
   const domAndDowRestricted = fields[2].trim() !== '*' && fields[4].trim() !== '*';
