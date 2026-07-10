@@ -4,6 +4,7 @@ import { CaretDown as ChevronDown, Plus, Warning } from '@phosphor-icons/react/d
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
 import { Button } from '@/components/ui/button';
 import { FormSheet } from '@/components/ui/form-sheet';
 import {
@@ -100,10 +101,12 @@ export function AddConnectorButton() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setPanel('new-connector')}>
-        <Plus className="size-4" />
-        Add connector
-      </Button>
+      <ReadOnlyGuard>
+        <Button size="sm" onClick={() => setPanel('new-connector')}>
+          <Plus className="size-4" />
+          Add connector
+        </Button>
+      </ReadOnlyGuard>
       <FormSheet
         open={open}
         onOpenChange={(o) => !o && setPanel(null)}
