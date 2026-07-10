@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import { type ReactNode, useRef } from 'react';
 
 // A screenshot that tilts back on a 3D plane then rises and flattens as you scroll it
-// into view — a "device coming to rest on the desk" moment. Adapted from Aceternity's
+// into view - a "device coming to rest on the desk" moment. Adapted from Aceternity's
 // ContainerScrollAnimation to the Off Grid frame (charcoal bezel, emerald edge).
 interface ContainerScrollProps {
   header: ReactNode;
