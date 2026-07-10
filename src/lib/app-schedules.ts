@@ -15,6 +15,7 @@
 // edits to the app take effect on the next fire).
 
 import { isValidCron, sanitizeScheduleId } from '@/lib/temporal-schedules';
+import { normalizeScheduleConfig, type ScheduleConfig } from '@/lib/app-schedule';
 import {
   type AppDurableConfig,
   appDurableConfigFromEnv,
@@ -24,6 +25,15 @@ import { durableEnabled } from '@/lib/agent-run-durable';
 
 function appDurableEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return durableEnabled(env) || env.OFFGRID_ADAPTER_APPRUNTIME === 'temporal';
+}
+
+/**
+ * Is the durable runner configured to ACTUALLY fire schedules? Exported so the Schedule tab/API can
+ * tell the operator the honest truth: a valid schedule with the runner off is SAVED but DORMANT (it
+ * fires only once the durable app runtime is enabled) — never a silent "scheduled ✓" that does nothing.
+ */
+export function scheduleRuntimeConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return appDurableEnabled(env);
 }
 
 const NOT_CONFIGURED =
@@ -66,6 +76,29 @@ export function cronFromTrigger(
   return raw.trim();
 }
 
+// ─── scheduleConfigFromTrigger — PURE: the full {cron,timezone,enabled} a trigger carries ─────────
+// Where cronFromTrigger answers just "what cron?", this returns the whole normalized ScheduleConfig
+// (delegating to the pure app-schedule authority) so the I/O bridge can honor the TIMEZONE + the
+// enabled/paused flag — not only the cron. Returns null for a non-schedule trigger or one with no cron
+// set (the "picked schedule but didn't configure it" dead-end → nothing to register).
+export function scheduleConfigFromTrigger(
+  trigger: { kind: string; config?: Record<string, unknown> } | null | undefined,
+): ScheduleConfig | null {
+  if (!trigger || trigger.kind !== 'schedule') return null;
+  const cfg = normalizeScheduleConfig(trigger.config);
+  return cfg.cron ? cfg : null;
+}
+
+// ─── cronWithTimezone — prefix a cron with CRON_TZ so Temporal fires it in the operator's zone ─────
+// PURE. Temporal's cronExpressions accept a "CRON_TZ=<zone> <cron>" prefix. A UTC schedule needs no
+// prefix (UTC is the default). Kept here (not app-schedule.ts) because it's Temporal-spec-shaped I/O
+// syntax, not a general schedule rule.
+export function cronWithTimezone(cron: string, timezone: string): string {
+  const tz = (timezone ?? '').trim();
+  if (!tz || tz.toUpperCase() === 'UTC') return cron.trim();
+  return `CRON_TZ=${tz} ${cron.trim()}`;
+}
+
 // ─── syncAppSchedule — reconcile an app's cron schedule with its current spec (I/O, graceful) ─────
 // The one entry point the publish/update route calls after a write, and delete calls to tear down.
 // Rules:
@@ -82,9 +115,16 @@ export async function syncAppSchedule(
   },
   opts: { caller?: string } = {},
 ): Promise<AppScheduleResult> {
-  const cron = app.published ? cronFromTrigger(app.trigger) : null;
-  if (cron) {
-    return scheduleApp(app.id, cron, { orgId: app.orgId, caller: opts.caller });
+  const cfg = app.published ? scheduleConfigFromTrigger(app.trigger) : null;
+  if (cfg) {
+    // Honor the operator's timezone (CRON_TZ prefix) AND the enabled flag: a disabled schedule is
+    // still REGISTERED but starts PAUSED, so it never fires until the operator re-arms it (rather than
+    // silently vanishing). This makes "saved but paused" an honest, reversible state.
+    return scheduleApp(app.id, cronWithTimezone(cfg.cron, cfg.timezone), {
+      orgId: app.orgId,
+      caller: opts.caller,
+      paused: !cfg.enabled,
+    });
   }
   const res = await unscheduleApp(app.id);
   // A teardown that found nothing to remove is a benign success for the caller's purposes.
