@@ -973,3 +973,26 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## 2026-07-10 — Aggressive quality gate (#226): two report-only ratchets
+
+The #226 gate is live on pre-push + CI with these BLOCKING and GREEN today: typecheck,
+coverage:check (≥85%), depcruise, jscpd (2.04% < 2.5% threshold), knip, security:secrets
+(gitleaks), security:audit (0 HIGH/CRITICAL), docs:links, production build. Two steps run
+**report-only** (surfaced, non-blocking) with a documented ratchet path — logged here so they
+are not forgotten:
+
+- **G-GATE-1 (P2, `console`) — Prettier format drift.** `npm run format:check` reports ~871
+  files that predate `printWidth: 100`. Fix = one reviewable `prettier --write .` pass (large
+  diff, mostly re-wrapping long object literals; touches business-logic files so it must be its
+  own change, reviewed on its own). When clean, drop `continue-on-error` (CI) / `|| true`
+  (pre-push) on the format step to promote it to blocking.
+- **G-GATE-2 (P2, `console`) — typed `no-unnecessary-condition`.** `npm run lint:typed`
+  (`eslint.typed.config.mjs`, type-aware over `src/lib`) reports ~492 findings, but the codebase
+  has essentially NO genuine dead branches: every sampled finding is a correct defensive check the
+  type system is too optimistic about — array/object index access + drizzle `.returning()[0]`
+  (no `noUncheckedIndexedAccess`), `(e as Error).message ?? ''` on cast values, and `unknown`/JSON
+  boundary guards. Making it blocking today would force ~490 misleading suppressions on correct
+  code. Ratchet path: (1) adopt `noUncheckedIndexedAccess` in tsconfig (itself adds ~307 type
+  errors → a separate project), (2) burn down the residual real findings, (3) promote lint:typed
+  to blocking. Until then it is a report-only signal.
