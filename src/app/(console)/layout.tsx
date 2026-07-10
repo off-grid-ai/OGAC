@@ -16,22 +16,22 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
   const banner = readDemoBanner(session?.user?.role);
   return (
     <ViewerModeProvider role={session?.user?.role}>
-    <TooltipProvider>
-      <div className="flex h-screen flex-col bg-background text-foreground">
-        <Hellobar model={banner} />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <Topbar user={session?.user} />
-            <main className="flex-1 overflow-y-auto p-6">
-              <PageTransition>{children}</PageTransition>
-            </main>
+      <TooltipProvider>
+        <div className="flex h-screen flex-col bg-background text-foreground">
+          <Hellobar model={banner} />
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar />
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <Topbar user={session?.user} />
+              <main className="flex-1 overflow-y-auto p-6">
+                <PageTransition>{children}</PageTransition>
+              </main>
+            </div>
           </div>
         </div>
-      </div>
-      <GlobalSearch />
-      <Toaster />
-    </TooltipProvider>
+        <GlobalSearch />
+        <Toaster />
+      </TooltipProvider>
     </ViewerModeProvider>
   );
 }
