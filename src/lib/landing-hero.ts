@@ -1,0 +1,42 @@
+// Pure decision for the landing "product tour": which product shot is showing in the top hero, and
+// which surface a lightbox is opened on. Both are driven from the URL (?shot=<id>) so the tour is
+// deep-linkable and Back-coherent (the nav rule) -  this module turns the raw query value into the
+// resolved shot, with zero IO so it is unit-testable and reused by both the hero and the carousel.
+
+export interface TourShot {
+  /** Stable id used as the ?shot= URL value and the React key. */
+  id: string;
+  src: string;
+  alt: string;
+  label: string;
+  caption: string;
+}
+
+/**
+ * Resolve the shot a given ?shot= value points at. An unknown, empty, or absent value falls back to
+ * the default (index 0) -  the tour always shows a real screenshot, never a blank hero.
+ */
+export function resolveShot(shots: readonly TourShot[], id: string | null | undefined): TourShot {
+  if (shots.length === 0) throw new Error('resolveShot: shots must not be empty');
+  const found = id ? shots.find((s) => s.id === id) : undefined;
+  return found ?? shots[0];
+}
+
+/** The index of the resolved shot -  for marking the active card in the rail. */
+export function activeShotIndex(shots: readonly TourShot[], id: string | null | undefined): number {
+  if (shots.length === 0) return 0;
+  const i = id ? shots.findIndex((s) => s.id === id) : -1;
+  return i >= 0 ? i : 0;
+}
+
+/**
+ * The next URL query value when a card is clicked to promote it to the hero. Clicking the shot that
+ * is ALREADY the hero clears the selection (returns null → back to default) so the interaction
+ * toggles cleanly; any other card returns its id.
+ */
+export function togglePromoted(
+  currentId: string | null | undefined,
+  clickedId: string,
+): string | null {
+  return currentId === clickedId ? null : clickedId;
+}
