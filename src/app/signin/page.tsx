@@ -21,13 +21,14 @@ export const dynamic = 'force-dynamic';
 
 // Where to land after a successful sign-in. The Caddy gate forwards the originally
 // requested URL as `callbackUrl` so a user gated out of console-status returns THERE,
-// not to /fleet. Only same-suite targets are honored (relative path, or an https URL
-// on *.getoffgridai.co) — anything else falls back to /fleet, so the param can't be
-// used as an open redirect.
+// not to /overview. Only same-suite targets are honored (relative path, or an https URL
+// on *.getoffgridai.co) — anything else falls back to /overview, so the param can't be
+// used as an open redirect. Default lands on Overview (Fleet/MDM is coming-soon, not a
+// landing surface for the public demo).
 // eslint-disable-next-line complexity
 function safeCallback(raw: FormDataEntryValue | null): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
-  if (!v) return '/gateway/fleet';
+  if (!v) return '/overview';
   if (v.startsWith('/') && !v.startsWith('//')) return v; // relative, same-origin
   try {
     const u = new URL(v);
@@ -40,7 +41,7 @@ function safeCallback(raw: FormDataEntryValue | null): string {
   } catch {
     /* not a URL — fall through */
   }
-  return '/gateway/fleet';
+  return '/overview';
 }
 
 // Owned login: the console authenticates username/password through the identity seam
