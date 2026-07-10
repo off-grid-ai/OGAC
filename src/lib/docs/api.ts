@@ -11,12 +11,12 @@ export const apiSection: DocSection = {
       body: `Everything the console does is available through one authed API surface, so you can build
 on the platform without touching the UI. There are three families:
 
-![The gateway — one OpenAI-compatible endpoint every model call flows through, on your own nodes](/docs-shots/gateway.png)
+![The gateway - one OpenAI-compatible endpoint every model call flows through, on your own nodes](/docs-shots/gateway.png)
 
-- **Model API** (\`/v1/*\`) — OpenAI-compatible chat, embeddings, and images, served by your gateway.
-- **Console API** (\`/api/v1/*\`) — the platform's own routes (connectors, agents, policy, flags,
+- **Model API** (\`/v1/*\`) - OpenAI-compatible chat, embeddings, and images, served by your gateway.
+- **Console API** (\`/api/v1/*\`) - the platform's own routes (connectors, agents, policy, flags,
   and everything else the console manages).
-- **Service specs** (\`/specs/*\`) — the OpenAPI documents of the underlying services, proxied
+- **Service specs** (\`/specs/*\`) - the OpenAPI documents of the underlying services, proxied
   through one origin.
 
 ## The interactive reference
@@ -51,7 +51,7 @@ Scope a client to only the services it needs, and rotate its secret from the sam
 
 ## Browser sessions
 
-In the console, your SSO session authorizes API calls automatically — no token handling in the
+In the console, your SSO session authorizes API calls automatically - no token handling in the
 browser.
 
 ## CORS
@@ -63,7 +63,7 @@ session surfaces stay protected.`,
     {
       slug: 'api/chat',
       title: 'Chat completions',
-      description: 'OpenAI-compatible chat — point any OpenAI SDK at your gateway.',
+      description: 'OpenAI-compatible chat - point any OpenAI SDK at your gateway.',
       body: `The model endpoint is OpenAI-compatible, so existing OpenAI SDKs work by pointing their
 base URL at your gateway and using your token.
 
@@ -112,13 +112,13 @@ console.log(resp.choices[0].message.content);
 \`\`\`
 
 Which model you can use, and whether a request may reach a cloud model, is governed by your routing
-rules — the gateway picks an enabled node for the model and returns the completion unchanged.`,
+rules - the gateway picks an enabled node for the model and returns the completion unchanged.`,
     },
     {
       slug: 'api/embeddings',
       title: 'Embeddings',
       description: 'Vectorize text on your own hardware.',
-      body: `Embeddings are OpenAI-compatible and served by a model on your own gateway — no embedding
+      body: `Embeddings are OpenAI-compatible and served by a model on your own gateway - no embedding
 service, no text sent out.
 
 \`\`\`bash
@@ -150,12 +150,12 @@ store. The prompt and the image never leave your infrastructure.`,
     {
       slug: 'api/service-specs',
       title: 'Service specs',
-      description: 'Every underlying service’s OpenAPI, through one origin.',
+      description: 'Every underlying service\'s OpenAPI, through one origin.',
       body: `Each integrated service publishes its own OpenAPI document. Off Grid AI proxies them through
 one authed origin so you can browse them together without CORS or LAN issues.
 
 - \`/specs/<service>\` returns that service's OpenAPI JSON. The service token names the underlying
-  capability — e.g. the vector store, tracing store, secrets store, data lineage, dashboards,
+  capability - e.g. the vector store, tracing store, secrets store, data lineage, dashboards,
   feature flags, PII detection, and device management. The full set of available tokens is listed on
   the [API docs & playground](/operations/api-docs) page.
 - The console (\`/openapi.json\`) is the platform's own spec, rendered interactively at
@@ -168,7 +168,7 @@ An unreachable service reports its status rather than failing, so the spec brows
       title: 'SDKs',
       description: 'Use the OpenAI SDKs today; a first-party SDK is on the roadmap.',
       body: `Because the model API is OpenAI-compatible, the official **OpenAI SDKs** (Python, Node,
-and others) work today — point the base URL at your gateway and use a machine-client token, as in
+and others) work today - point the base URL at your gateway and use a machine-client token, as in
 [Chat completions](/docs/api/chat).
 
 For the console API (connectors, agents, policy, and the rest), call the REST routes directly with a
