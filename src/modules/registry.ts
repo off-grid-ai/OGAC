@@ -19,6 +19,7 @@ export type ModuleId =
   | 'studio'
   | 'tools'
   | 'observability'
+  | 'platform-health'
   | 'analytics'
   | 'roi'
   | 'finops'
@@ -183,7 +184,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'studio',
     label: 'Studio',
-    description: 'Build agents & workflows in plain language — wired to your connectors, data, tools, guardrails.',
+    description:
+      'Build agents & workflows in plain language — wired to your connectors, data, tools, guardrails.',
     route: '/build/studio',
     service: 'agents',
   },
@@ -199,10 +201,17 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'observability',
     label: 'Observability',
-    description:
-      'Agent QA: eval scores, online LLM-as-judge scores, drift, and full run traces.',
+    description: 'Agent QA: eval scores, online LLM-as-judge scores, drift, and full run traces.',
     route: '/insights',
     service: 'qa',
+  },
+  {
+    id: 'platform-health',
+    label: 'Platform Health',
+    description:
+      'Live platform metrics, logs, and traces — request/error rate, latency, log search, and distributed traces from the observability stack.',
+    route: '/insights/platform',
+    service: 'observability',
   },
   {
     id: 'analytics',
@@ -267,7 +276,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'integrations',
     label: 'Integrations',
-    description: 'Configure every underlying service (adapters, URLs, secrets, health) from the UI.',
+    description:
+      'Configure every underlying service (adapters, URLs, secrets, health) from the UI.',
     route: '/data/integrations',
     service: 'integrations',
     internal: true,
@@ -284,7 +294,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'data-domains',
     label: 'Data domains',
-    description: 'Declare where data lives (customer→Salesforce, transactions→Postgres) — the rule engine agents route by.',
+    description:
+      'Declare where data lives (customer→Salesforce, transactions→Postgres) — the rule engine agents route by.',
     route: '/data/domains',
     service: 'integrations',
     internal: true,
@@ -343,7 +354,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'storage',
     label: 'Storage',
-    description: 'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
+    description:
+      'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
     route: '/workspace/storage',
     service: 'files',
   },
@@ -367,7 +379,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'agent-runs',
     label: 'Agent Runs',
-    description: 'Durable-execution history — every agent/workflow run, its pipeline timeline, and outcome. Recorded on-prem.',
+    description:
+      'Durable-execution history — every agent/workflow run, its pipeline timeline, and outcome. Recorded on-prem.',
     route: '/build/agent-runs',
     service: 'agents',
     internal: true,
@@ -384,7 +397,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'policy',
     label: 'Policy',
-    description: 'Policy-as-code — the active policy set plus recent allow/deny decisions read back from the engine.',
+    description:
+      'Policy-as-code — the active policy set plus recent allow/deny decisions read back from the engine.',
     route: '/governance/policy',
     service: 'control',
     internal: true,
@@ -392,7 +406,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'evals',
     label: 'Evals',
-    description: 'Golden sets and quality gates — pass-rates and recent eval/red-team runs by suite.',
+    description:
+      'Golden sets and quality gates — pass-rates and recent eval/red-team runs by suite.',
     route: '/build/evals',
     service: 'control',
     internal: true,
@@ -400,7 +415,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'siem',
     label: 'Security Events',
-    description: 'Security/audit event stream from OpenSearch — outcomes, top actors, and blocked/denied activity.',
+    description:
+      'Security/audit event stream from OpenSearch — outcomes, top actors, and blocked/denied activity.',
     route: '/insights/siem',
     service: 'control',
     internal: true,
@@ -425,7 +441,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'backups',
     label: 'Backups',
-    description: 'Backup & DR status — latest dump, age, size, retention window, and off-box replication.',
+    description:
+      'Backup & DR status — latest dump, age, size, retention window, and off-box replication.',
     route: '/operations/backups',
     service: 'console',
     internal: true,
@@ -441,7 +458,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'provenance',
     label: 'Provenance',
-    description: 'Signed provenance (Sigstore) — verify and browse cryptographically signed answers/artifacts.',
+    description:
+      'Signed provenance (Sigstore) — verify and browse cryptographically signed answers/artifacts.',
     route: '/governance/provenance',
     service: 'control',
     internal: true,
@@ -449,7 +467,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'secrets',
     label: 'Secrets',
-    description: 'Secrets management — seal status, mounts, and secret lifecycle. Values never displayed.',
+    description:
+      'Secrets management — seal status, mounts, and secret lifecycle. Values never displayed.',
     route: '/governance/secrets',
     service: 'control',
     internal: true,
@@ -474,7 +493,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'sandbox',
     label: 'Sandbox',
-    description: 'Code-execution sandboxing (E2B/Firecracker) — backend status and recent execution runs.',
+    description:
+      'Code-execution sandboxing (E2B/Firecracker) — backend status and recent execution runs.',
     route: '/build/sandbox',
     service: 'control',
     internal: true,
@@ -482,7 +502,8 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'config',
     label: 'Configuration',
-    description: 'The single place to see and edit every environment setting — gateway, services, auth, adapters — with secrets masked. Applied on restart.',
+    description:
+      'The single place to see and edit every environment setting — gateway, services, auth, adapters — with secrets masked. Applied on restart.',
     route: '/operations/config',
     service: 'console',
     internal: true,

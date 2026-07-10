@@ -96,7 +96,16 @@ export const NAV_GROUPS: NavGroup[] = [
     // One sidebar row → the Insights section landing (Observability), which tabs across analytics,
     // drift, finops, usage & spend, reports, security events, and audit via InsightsNav.
     primary: ['observability'],
-    secondary: ['analytics', 'drift', 'finops', 'accounting', 'reports', 'siem', 'audit'],
+    secondary: [
+      'platform-health',
+      'analytics',
+      'drift',
+      'finops',
+      'accounting',
+      'reports',
+      'siem',
+      'audit',
+    ],
   },
   {
     id: 'operations',
@@ -142,9 +151,9 @@ export function sidebarActiveIdForPath<T extends { id: ModuleId; route: string }
   pathname: string,
   modules: T[],
 ): ModuleId | undefined {
-  const alias = PATH_ALIASES
-    .filter((a) => pathname === a.prefix || pathname.startsWith(`${a.prefix}/`))
-    .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+  const alias = PATH_ALIASES.filter(
+    (a) => pathname === a.prefix || pathname.startsWith(`${a.prefix}/`),
+  ).sort((a, b) => b.prefix.length - a.prefix.length)[0];
   if (alias) return sidebarActiveIdFor(alias.moduleId);
 
   const current = modules
