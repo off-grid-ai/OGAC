@@ -7,7 +7,7 @@ import { resolveShot, togglePromoted, type TourShot } from '@/lib/landing-hero';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { CardsCarousel } from '@/components/ui/cards-carousel';
 import { ContainerScroll } from '@/components/ui/container-scroll';
-import { SeeItLive } from '@/app/_landing/see-it-live';
+import { BookCallDialog } from '@/components/auth/BookCallDialog';
 
 // The centerpiece: the whole real product, live. The top stage shows one product shot; the rail
 // below lets a visitor click any surface to zoom it full-res OR promote it onto the stage. The
@@ -44,11 +44,11 @@ export function ProductTour({ shots }: { shots: TourShot[] }) {
               Take the tour
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              See the whole product. Live, right now.
+              See the whole product.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-              Open a real, fully seeded console and click through every screen yourself. Read-only,
-              nothing to install.
+              A tour of the real console, screen by screen. Book a demo and we will walk you through
+              it on your own data.
             </p>
           </div>
         }
@@ -65,17 +65,17 @@ export function ProductTour({ shots }: { shots: TourShot[] }) {
       </ContainerScroll>
 
       <BlurFade inView>
-        <div className="mx-auto mt-8 max-w-3xl">
-          <SeeItLive />
-        </div>
-      </BlurFade>
-
-      <BlurFade inView>
         <div className="mt-10">
           <p className="mb-4 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Tap a surface to zoom, or send it to the stage above
           </p>
           <CardsCarousel cards={shots} onPromote={promote} promotedId={promotedId} />
+        </div>
+      </BlurFade>
+
+      <BlurFade inView>
+        <div className="mx-auto mt-10 flex max-w-xs justify-center">
+          <BookCallDialog label="Book a demo" variant="default" size="lg" className="w-full" />
         </div>
       </BlurFade>
     </div>
