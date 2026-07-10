@@ -81,10 +81,18 @@ export function AssetFormSheet({
     >
       <div className="space-y-4">
         <Field label="Name">
-          <Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="e.g. Customer master" />
+          <Input
+            value={v.name}
+            onChange={(e) => setV({ ...v, name: e.target.value })}
+            placeholder="e.g. Customer master"
+          />
         </Field>
         <Field label="Source">
-          <Input value={v.source} onChange={(e) => setV({ ...v, source: e.target.value })} placeholder="e.g. Core Bank DB (postgres)" />
+          <Input
+            value={v.source}
+            onChange={(e) => setV({ ...v, source: e.target.value })}
+            placeholder="e.g. Core Bank DB (postgres)"
+          />
         </Field>
         <Field label="Kind">
           <select
@@ -100,9 +108,13 @@ export function AssetFormSheet({
           </select>
         </Field>
         <Field label="Owner (steward email / team)">
-          <Input value={v.owner} onChange={(e) => setV({ ...v, owner: e.target.value })} placeholder="risk-ops@bank.in" />
+          <Input
+            value={v.owner}
+            onChange={(e) => setV({ ...v, owner: e.target.value })}
+            placeholder="risk-ops@bank.in"
+          />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Row count">
             <Input
               type="number"
