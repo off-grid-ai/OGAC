@@ -1,4 +1,4 @@
-# Concepts — what each control is, who owns it, how to set it up, and why
+# Concepts - what each control is, who owns it, how to set it up, and why
 
 The console is dense because it spans five planes. This is the orientation: for **each surface**,
 what it is, **who** configures it, **how** to set it up, and **why** it exists. Pair with the
@@ -14,7 +14,7 @@ inline hints in the UI and the step-by-step recipes in **How-tos**.
 
 ### Policy (`/control` → Policy)
 
-- **What:** the org-wide rule set every enrolled node enforces — cloud-egress switch, guardrails to
+- **What:** the org-wide rule set every enrolled node enforces - cloud-egress switch, guardrails to
   run, and the allowed-model list. Versioned + append-only.
 - **Who:** Security / Platform admin.
 - **How to set up:** toggle **Egress to cloud**; add **Guardrails** (`pii-input`, `injection-scan`,
@@ -25,7 +25,7 @@ inline hints in the UI and the step-by-step recipes in **How-tos**.
 
 ### Model routing (`/control` → Model routing)
 
-- **What:** conditional + smart routing rules — `if <attribute> <op> <value> → local | cloud |
+- **What:** conditional + smart routing rules - `if <attribute> <op> <value> → local | cloud |
 block` (+ model + fallback), evaluated by priority; first match wins.
 - **Who:** Security / Platform admin.
 - **How to set up:** Add rule (e.g. `data_class eq pii → local`, `region eq in → local`,
@@ -33,7 +33,7 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 - **Why:** keeps sensitive/regulated traffic on-device and routes the rest by cost/latency/region.
   A `cloud` decision is leashed to `block` when egress is off.
 
-### RBAC — Users & roles
+### RBAC - Users & roles
 
 - **What:** console users mapped to `admin` / `compliance` / `viewer`.
 - **Who:** Platform admin.
@@ -58,7 +58,7 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 
 ### Brain + ingestion (`/brain`)
 
-- **What:** the knowledge layer — ingest text/file/image/dataset → chunk → embed → index with
+- **What:** the knowledge layer - ingest text/file/image/dataset → chunk → embed → index with
   provenance; retrieve with citations.
 - **Who:** Platform admin / knowledge owner.
 - **How:** Brain → **Ingest** (pick a kind). Images are captioned by the gateway.
@@ -74,7 +74,7 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 
 - **What:** the registry of HTTP/MCP tools the router can invoke (name, endpoint, "when to use").
 - **Who:** Platform admin.
-- **Why:** lets agents act, not just answer — scoped + intent-matched.
+- **Why:** lets agents act, not just answer - scoped + intent-matched.
 
 ### Grounding & evals
 
@@ -108,7 +108,7 @@ block` (+ model + fallback), evaluated by priority; first match wins.
   records), and **regulator response packs** (IRDAI/RBI/SEBI/DPDP/CERT-In).
 - **Who:** Compliance / DPO.
 - **How:** add governance items with owners; generate a regulator pack on demand.
-- **Why:** answer a regulator with live, status-honest evidence — not a slide deck. Note: the
+- **Why:** answer a regulator with live, status-honest evidence - not a slide deck. Note: the
   registry **tracks** the process; humans still execute the committee/training/drills.
 
 ---
@@ -132,13 +132,13 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 
 ## The interaction pipeline
 
-- **What:** one ordered chain every agent run flows through — policy gate → guardrails(in) →
+- **What:** one ordered chain every agent run flows through - policy gate → guardrails(in) →
   retrieve → answer (cached) → ground → guardrails(out) → provenance-sign → audit/lineage/trace,
   plus an async online QA score after the response.
 - **Who:** Platform (automatic). **How:** `src/lib/agentrun.ts`; runs fire it via
   `/admin/agents/runs`. Safety checks on every request; the LLM-judge score runs out-of-band
   (`next/server after()`) so it adds no latency.
-- **Why:** the capabilities below aren't just admin endpoints — they *fire in-path* on real work.
+- **Why:** the capabilities below aren't just admin endpoints - they *fire in-path* on real work.
 
 ## Agent QA (`/handbook/agent-qa`)
 
@@ -150,7 +150,7 @@ block` (+ model + fallback), evaluated by priority; first match wins.
 
 ## Provenance & tamper-evidence
 
-- **What:** signed, offline-verifiable outputs — ed25519 detached manifests on report exports, C2PA
+- **What:** signed, offline-verifiable outputs - ed25519 detached manifests on report exports, C2PA
   Content Credentials on images, Sigstore attestation on artifacts.
 - **Who:** Compliance / Security. **How:** `/admin/provenance/{verify,c2pa,sigstore}`,
   `/admin/reports/[id]/export?manifest=1`. **Why:** prove what was produced, unaltered, with a public key.
