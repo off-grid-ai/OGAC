@@ -45,7 +45,7 @@ variable. Defaults run first-party; these are the production swap-ins:
 - **Audit / security event index** — searchable event store (e.g. OpenSearch).
 - **Dashboards / BI** — analytics dashboards (e.g. Superset).
 - **Feature flags** — runtime capability gating (e.g. Unleash).
-- **Device management** — fleet inventory + posture (e.g. FleetDM).
+- **Device management** — fleet inventory + posture, e.g. FleetDM (device control commands like lock and wipe are coming soon).
 - **Workflow engine** — durable agent workflows (e.g. Temporal).
 - **Object storage** — file/artifact store (e.g. SeaweedFS).
 

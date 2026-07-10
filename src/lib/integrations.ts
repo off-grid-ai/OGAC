@@ -79,7 +79,8 @@ export const INTEGRATIONS: IntegrationLayer[] = [
   },
   {
     layer: 'Fleet Control (MDM)',
-    blurb: 'Manage the devices running AI — provision, policy, audit, kill-switch.',
+    blurb:
+      'See the devices running AI - inventory, live queries, policy posture, audit, and the first-party kill-switch. Device control commands (lock / wipe / config-profile push) are coming soon.',
     tools: ['FleetDM', 'osquery'],
   },
 ];

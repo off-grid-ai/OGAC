@@ -235,7 +235,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'fleetdm',
     label: 'FleetDM',
-    description: 'MDM / device management — osquery-based cross-platform fleet control and posture.',
+    description:
+      'osquery-based device fleet - host inventory, live/scheduled queries, software + CVE visibility, and policy/compliance posture (available today). Device CONTROL (lock / wipe / config-profile push / settings enforcement) is coming soon; advanced MDM control is Fleet Premium, separately licensed.',
     // mdm profile in compose (:8070). On g6 — via the S1 edge-Caddy loopback proxy
     // (8934→offgrid-g6.local:8070). /healthz is unauthenticated and available pre-setup. Env on S1.
     url: process.env.OFFGRID_FLEET_URL ?? 'http://127.0.0.1:8934',

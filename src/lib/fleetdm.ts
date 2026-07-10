@@ -264,6 +264,33 @@ export interface DeviceCommandResult {
   pendingAction?: string;
 }
 
+// ── MDM CONTROL tier availability (coming soon) ─────────────────────────────────
+// Fleet splits into two tiers. The osquery-based CORE works today (agent-enrolled): host
+// inventory, live/scheduled queries, software + CVE visibility, policies/compliance, and `refetch`
+// (re-collect host vitals). What is NOT shipped for public release is fleet CONTROL - the MDM
+// commands that ACT on a device: lock, unlock, wipe (and, later, config-profile push / settings
+// enforcement / Apple APNs enrollment). Those stay gated behind a "coming soon" state so an
+// operator never sees a control that silently no-ops.
+//
+// Advanced MDM (profiles, script execution, richer RBAC over device actions) is Fleet Premium,
+// which is separately licensed - the console stays on the MIT core, so control ships when the
+// self-hostable path is real, not before.
+export const MDM_CONTROL_COMMANDS = ['lock', 'unlock', 'wipe'] as const;
+export type MdmControlCommand = (typeof MDM_CONTROL_COMMANDS)[number];
+
+// A command is CONTROL (acts on the device) vs inventory (`refetch` - just re-collects vitals).
+// One predicate so the UI, the route, and the docs classify commands the same way.
+export function isMdmControlCommand(command: DeviceCommand): command is MdmControlCommand {
+  return (MDM_CONTROL_COMMANDS as readonly string[]).includes(command);
+}
+
+// Whether the MDM CONTROL tier is available in this build. Public release: not yet - coming soon.
+// Kept as a single function so every surface (DeviceActions, routes, docs badges) reads one truth;
+// when the self-hostable control path lands, this flips in one place.
+export function mdmControlAvailable(): boolean {
+  return false;
+}
+
 // The path segment for each command — one place so the adapter can't drift from the endpoint set.
 export function deviceCommandPath(hostId: number, command: DeviceCommand): string {
   return `${FLEET_API}/hosts/${hostId}/${command}`;

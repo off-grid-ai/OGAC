@@ -4,11 +4,14 @@ import {
   deviceCommandBody,
   deviceCommandPath,
   fleetHeaders,
+  isMdmControlCommand,
   mapDeviceCommand,
   mapPolicies,
   mapPolicy,
   mapQueryReport,
   mapSoftware,
+  MDM_CONTROL_COMMANDS,
+  mdmControlAvailable,
   policyBody,
   runCampaignBody,
   saveQueryBody,
@@ -212,4 +215,26 @@ test('mapDeviceCommand echoes unlock_pin and device status when present', () => 
   });
   // null-safe
   assert.equal(mapDeviceCommand(3, 'lock', null).status, 'pending');
+});
+
+// ── MDM control tier (coming soon) ──────────────────────────────────────────────
+test('isMdmControlCommand: lock/unlock/wipe are control, refetch is inventory', () => {
+  // The control tier - each acts on the device.
+  assert.equal(isMdmControlCommand('lock'), true);
+  assert.equal(isMdmControlCommand('unlock'), true);
+  assert.equal(isMdmControlCommand('wipe'), true);
+  // refetch just re-collects host vitals - inventory, not control - so it is NOT gated.
+  assert.equal(isMdmControlCommand('refetch'), false);
+});
+
+test('MDM_CONTROL_COMMANDS is exactly the acting commands and every one is classified as control', () => {
+  assert.deepEqual([...MDM_CONTROL_COMMANDS], ['lock', 'unlock', 'wipe']);
+  for (const cmd of MDM_CONTROL_COMMANDS) {
+    assert.equal(isMdmControlCommand(cmd), true, `${cmd} must be a control command`);
+  }
+});
+
+test('mdmControlAvailable: MDM control is coming soon for public release (gated off)', () => {
+  // The single source of truth every surface reads. Public release: not available yet.
+  assert.equal(mdmControlAvailable(), false);
 });
