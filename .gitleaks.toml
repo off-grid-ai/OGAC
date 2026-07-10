@@ -18,6 +18,16 @@ useDefault = true
 description = "Known intentional non-secrets: dev/demo placeholders, local compose defaults, synthetic demo data, docs."
 # Files/paths that are documentation, lockfiles, fixtures, or local-only dev config.
 paths = [
+  # Build output / caches / deps — ephemeral, gitignored, NEVER source. In
+  # --no-git mode gitleaks would otherwise scan .next/ (Next.js auto-generates
+  # preview-mode + server-actions encryption keys there) and webpack bundles
+  # (icon component names trip the dropbox/linkedin token rules). None are
+  # committed or real. The local script also runs from a clean tree in CI.
+  '''(^|/)\.next/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)coverage/''',
+  '''(^|/)\.turbo/''',
+  '''(^|/)dist/''',
   '''(^|/)package-lock\.json$''',
   '''(^|/)\.env\.example$''',
   '''(^|/)\.env\.local\.example$''',
