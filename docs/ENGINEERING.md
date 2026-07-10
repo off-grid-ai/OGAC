@@ -146,3 +146,45 @@ A task is done when:
 - The API route is authenticated
 - The env var is in `.env.example` with a comment
 - It works against the on-prem fleet, not just localhost
+
+## The mechanical gate (pre-push hook + CI, #226)
+
+Quality here is CODE, not memory. The **same chain runs in `.githooks/pre-push`
+(local) and `.github/workflows/ci.yml` (the always-on backstop)** — each step
+blocks a push/PR:
+
+1. **`typecheck`** — `tsc --noEmit`.
+2. **`coverage:check`** — c8 ≥85% on branches/statements/lines/functions (+
+   conditions via branch coverage) over the unit-testable logic layer
+   (`.c8rc.json` include/exclude). See "Coverage bar" in CLAUDE.md.
+3. **`depcruise`** — dependency-cruiser: fails on any ERROR-level violation —
+   above all an eager-value **circular import** (the Node-22 TDZ prod-build
+   crash class), plus the ports-and-adapters **boundary rules** (pure-lib-no-io,
+   lib-no-app, no-route-to-route, no-src-to-test, lib-no-components,
+   no-lib-to-worker). Type-only cycles + orphans are WARN.
+4. **`jscpd`** — copy/paste detector; fails past the ratcheting DRY threshold
+   (`.jscpd.json`).
+5. **`knip`** — dead files / unused (dev)deps / unlisted deps (`knip.json`).
+   Unused **exports** are advisory (`npm run knip:all`, G-KNIP-1) — knip is
+   false-positive on dynamically-imported / source-read exports, so the gate
+   blocks only on the reliable issue types.
+6. **`lint:dead-code`** — the typed `@typescript-eslint/no-unnecessary-condition`
+   (dead branches) via a type-aware ESLint override, isolated from the pre-existing
+   `next lint` backlog. WARN baseline (G-UNC-*), ratchet toward `error`.
+7. **`security:secrets`** — gitleaks over the working tree (`.gitleaks.toml`).
+   Local script no-ops with a message if the binary is absent; CI runs the
+   gitleaks-action as the real backstop.
+8. **`security:audit`** — audit-ci; fails on any HIGH/CRITICAL npm advisory
+   (`audit-ci.jsonc`). Moderate/low reported, not blocking (G-AUDIT-1).
+9. **`docs:links`** — internal markdown links must resolve; external links are
+   counted, not fetched.
+10. **`build`** — a clean production build (tsc + tests do NOT catch build/route
+    errors).
+
+**Deferred:** `format:check` (prettier) is not yet in the blocking chain — the
+repo predates a committed prettier config, so a repo-wide reformat (its own PR)
+must land first (G-FMT-1). Noisy checks follow **baseline-then-ratchet**: start
+at the real baseline, only tighten, never loosen a gate to excuse a new problem.
+Baselines + burn-down lists live in `docs/GAPS_BACKLOG.md`.
+
+Install the hook once per clone: `npm run hooks:install`.

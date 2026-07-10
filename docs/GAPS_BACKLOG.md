@@ -973,3 +973,39 @@ for `viewer@bharatunion.demo` + `viewer@suraksha.demo`. Password login goes thro
 `authenticatePassword`) — there is no password column in the console DB. The matching Keycloak users
 must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a literal in git). Until
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
+
+## Aggressive quality gate baselines + burn-down (#226, 2026-07-10)
+
+The #226 gate added knip, typed dead-branch lint, gitleaks, audit-ci, a docs
+dead-link check, and three new dependency-cruiser boundary rules — wired into
+both the pre-push hook and CI. Each noisy check ships at an honest
+baseline-then-ratchet posture (like the existing G-CPD jscpd baseline). The
+burn-down items:
+
+- **G-UNC-* (P2, `console`)** — **`@typescript-eslint/no-unnecessary-condition`
+  runs at `warn` (baseline ~760 findings), not `error`.** Almost all findings are
+  two defensive patterns TS over-narrows at runtime boundaries: `x ?? default`
+  and `x?.y` on values typed non-null but sourced from route params / JSON bodies
+  / external responses that CAN be null at runtime (verified genuine-guard cases,
+  e.g. `users.find() ?? users[0]` flagged "always truthy" though `users[0]` is
+  `undefined` on an empty array). No real always-true/false BUG was found in the
+  sample. Burn down by enabling `noUncheckedIndexedAccess` + tightening runtime-
+  boundary types, then per-file removing the now-provably-redundant guards, then
+  ratchet the rule to `error`. Report: `npm run lint:dead-code`.
+- **G-KNIP-1 (P2, `console`)** — **knip reports ~80 unused EXPORTS (advisory,
+  `npm run knip:all`), not gated.** knip proved false-positive on dynamically-
+  imported / source-read exports (e.g. `enforceAppAccess` IS imported by its
+  integration test; `requireWriter`'s source is string-read by a test), so bulk
+  deletion is unsafe without per-symbol verification. The gate blocks on the
+  reliable issue types (files / dependencies / unlisted / binaries), which are
+  clean. Burn down by verifying + removing each genuinely-dead export.
+- **G-AUDIT-1 (P3, `console`)** — **16 moderate npm advisories** (0 high, 0
+  critical), all in the `@temporalio/*` dependency tree (common/proto/workflow/
+  core-bridge/nexus — one upstream advisory chain, no first-party fix). audit-ci
+  blocks only on high/critical; moderate are reported. Clear on a temporalio bump.
+- **G-FMT-1 (P2, `console`)** — **`format:check` is NOT yet in the blocking
+  chain.** The repo predates a committed prettier config, so ~1020 tracked files
+  are not prettier-clean under any single printWidth. Making it green requires a
+  one-off repo-wide `prettier --write` reformat, which per the hygiene standard is
+  its own dedicated PR (not bundled, to avoid colliding with in-flight work). Once
+  that lands, add the `format:check` step back to `.githooks/pre-push` + `ci.yml`.
