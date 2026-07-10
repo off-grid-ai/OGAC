@@ -50,7 +50,7 @@ export function supersetBase(): string | undefined {
 
 // ─── Authenticated session (bearer + CSRF for mutations) ────────────────────
 
-interface Session {
+export interface Session {
   access: string;
   csrf: string;
   cookie: string;
@@ -72,8 +72,9 @@ async function login(): Promise<string> {
 }
 
 // Full session: bearer + a CSRF token (required by Superset on POST/PUT/DELETE) plus the session
-// cookie that the CSRF token is bound to.
-async function authSession(): Promise<Session> {
+// cookie that the CSRF token is bound to. Exported so the native data client (superset-data.ts) can
+// authenticate the same way for read-only chart-data queries — one login path, reused (DRY).
+export async function authSession(): Promise<Session> {
   const access = await login();
   const res = await fetch(`${BASE}/api/v1/security/csrf_token/`, {
     headers: { authorization: `Bearer ${access}` },
@@ -86,7 +87,7 @@ async function authSession(): Promise<Session> {
   return { access, csrf, cookie };
 }
 
-function authHeaders(s: Session, mutate: boolean): Record<string, string> {
+export function authHeaders(s: Session, mutate: boolean): Record<string, string> {
   const h: Record<string, string> = {
     'content-type': 'application/json',
     authorization: `Bearer ${s.access}`,
