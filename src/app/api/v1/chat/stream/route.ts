@@ -42,12 +42,15 @@ import { auditEnforcement } from '@/lib/pipeline-contract';
 import { resolveChatBinding } from '@/lib/pipeline-run-glue';
 import {
   chatRequiresMasking,
+  inboundGuardrailBlocks,
   newChatRunId,
+  outboundGuardrailBlocks,
   runInboundGuardrails,
   runOutboundGuardrails,
   signChatAnswer,
   type ChatRunWorkflowInput,
 } from '@/lib/chat-run';
+import type { CheckResult } from '@/lib/checks';
 import { dispatchChatRun } from '@/lib/chat-run-dispatch';
 import { correlationIds } from '@/lib/correlation';
 
@@ -155,14 +158,20 @@ export async function POST(req: Request) {
     orgId,
   }).catch(() => null);
   const preChecks = inbound?.checks ?? [];
-  if (inbound?.blocked) {
-    // Injection/blocked on the inbound message — a hard refusal, audited (governed run = blocked).
+  // FAIL CLOSED (SECURITY #236): a thrown/timed-out inbound guardrail (inbound === null) is a BLOCK,
+  // never a fall-through to sending the raw user input to the model. The pure authority decides.
+  if (inboundGuardrailBlocks(inbound)) {
+    // Injection/blocked OR a failed screen (inbound === null) — a hard refusal, audited (blocked).
+    const reason =
+      inbound === null
+        ? 'inbound guardrail failed to screen (fail-closed block)'
+        : 'inbound guardrail blocked (injection)';
     auditEnforcement(
       enforceCtx,
       'pipeline.guardrail.block',
       `conversation:${convo.id || 'temporary'}`,
       'blocked',
-      'inbound guardrail blocked (injection)',
+      reason,
     );
     recordAudit({
       actor: actorFrom({ email: userId }),
@@ -174,7 +183,11 @@ export async function POST(req: Request) {
       outcome: 'blocked',
       runId: chatRunId,
     });
-    return deny('request blocked by input guardrail: prompt injection detected');
+    return deny(
+      inbound === null
+        ? 'request blocked by input guardrail: screening unavailable'
+        : 'request blocked by input guardrail: prompt injection detected',
+    );
   }
   // The model-facing copy of the user turn: redacted when the contract required masking + PII hit,
   // else the original text. The user's OWN typed message is still persisted verbatim (below) — the
@@ -291,7 +304,7 @@ export async function POST(req: Request) {
       auditEnforcement(enforceCtx, 'pipeline.data.deny', `data:${ragProjectId}`, 'blocked', v.reason);
     } else {
       try {
-        const r = await retrieve(ragProjectId, String(content));
+        const r = await retrieve(ragProjectId, String(content), 6, { orgId });
         if (r.context) {
           messages.push({ role: 'system', content: r.context });
           citations = r.citations;
@@ -342,7 +355,10 @@ export async function POST(req: Request) {
       try {
         // Access gate — you can only reference a project you can read.
         if (!(await projectAccess(userId, scope.projectId, session?.user?.role ?? 'viewer'))) continue;
-        const r = await retrieve(scope.projectId, String(content), 6, { docId: scope.docId });
+        const r = await retrieve(scope.projectId, String(content), 6, {
+          docId: scope.docId,
+          orgId,
+        });
         if (r.context) {
           messages.push({ role: 'system', content: r.context });
           citations = citations.concat(r.citations);
@@ -672,10 +688,26 @@ export async function POST(req: Request) {
         });
       }
 
-      // ── W2: OUTBOUND guardrail scan on the answer (recorded, non-blocking — mirrors runAgent step 6).
-      const postChecks = full
-        ? await runOutboundGuardrails(full, effectiveModel, orgId).catch(() => [])
+      // ── W2: OUTBOUND guardrail scan on the answer. FAIL CLOSED (SECURITY #236): a screen that
+      // threw/timed out yields null (NOT an empty "clean" list) so outboundGuardrailBlocks() treats
+      // it as a block, and a completed screen with a blocked verdict also blocks. When blocked, tell
+      // the client to withhold/redact the raw output rather than trust an un-cleared answer.
+      const postChecks: CheckResult[] | null = full
+        ? await runOutboundGuardrails(full, effectiveModel, orgId).catch(() => null)
         : [];
+      const outboundBlocked = full ? outboundGuardrailBlocks(postChecks) : false;
+      if (outboundBlocked) {
+        send({ guardrail: { phase: 'post', blocked: true } });
+        auditEnforcement(
+          enforceCtx,
+          'pipeline.guardrail.block',
+          `conversation:${convo.id || 'temporary'}`,
+          'blocked',
+          postChecks === null
+            ? 'outbound guardrail failed to screen (fail-closed block)'
+            : 'outbound guardrail blocked model output',
+        );
+      }
 
       // ── W2: PROVENANCE — sign the answer, bound to the run id (tamper-evident, offline-verifiable).
       const refs = citations.map((c) => c.name);
@@ -703,9 +735,11 @@ export async function POST(req: Request) {
         orgId,
         project: convo.projectId ?? null,
         pipelineId: pipelineBinding.pipelineId,
-        checks: [...preChecks, ...postChecks],
+        // A null postChecks means the outbound screen failed (fail-closed above) — record none rather
+        // than fabricate a clean verdict; the 'blocked' status below is the durable signal.
+        checks: [...preChecks, ...(postChecks ?? [])],
         refs,
-        status: full ? 'done' : 'error',
+        status: outboundBlocked ? 'blocked' : full ? 'done' : 'error',
       };
       const dispatch = await dispatchChatRun(runInput).catch(() => null);
 

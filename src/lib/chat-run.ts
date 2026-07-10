@@ -143,6 +143,32 @@ export async function runInboundGuardrails(
   return { text, checks, blocked, redacted };
 }
 
+/**
+ * PURE fail-CLOSED verdict for the inbound guardrail (SECURITY #236). The guardrail screen is a
+ * SAFETY gate, so ANY failure to reach a verdict — the call threw, timed out, or otherwise returned
+ * no result — MUST be treated as a BLOCK, never a pass. This is the ONE authority the chat route
+ * consults so "a thrown/timed-out guardrail is a block, not a fall-through to the raw user input" is
+ * a single, testable decision (mirrors the agent path's pre-guardrail refusal). `result` is the
+ * InboundGuardrailResult when the screen completed, or null when it threw/timed out.
+ */
+export function inboundGuardrailBlocks(result: InboundGuardrailResult | null): boolean {
+  // null ⇒ the guardrail failed to produce a verdict ⇒ fail closed (block). Otherwise honor its
+  // explicit verdict (an injection/blocked screen is a block; a clean screen passes).
+  return result === null || result.blocked === true;
+}
+
+/**
+ * PURE fail-CLOSED verdict for the OUTBOUND guardrail (SECURITY #236). The output scan is a safety
+ * gate on what LEAVES to the user, so a screen that threw/timed out (checks === null) MUST NOT be
+ * treated as "clean" — it blocks. A completed scan blocks when any of its checks reached a blocked
+ * outcome; a clean, completed scan passes. This lets the route refuse to release raw model output
+ * whenever the guardrail could not clear it.
+ */
+export function outboundGuardrailBlocks(checks: CheckResult[] | null): boolean {
+  if (checks === null) return true; // screen failed to run ⇒ fail closed
+  return outcomeFromChecks(checks) === 'blocked';
+}
+
 /** Run the outbound guardrail scan on the answer (recorded, non-blocking — mirrors runAgent step 6). */
 export async function runOutboundGuardrails(
   answer: string,
