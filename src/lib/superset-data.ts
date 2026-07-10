@@ -20,6 +20,10 @@ import {
   type SupersetChartSpec,
   shapeChart,
 } from './superset-data-shape';
+
+// Re-export the display model so presentation (NativeSupersetPanel) imports its props from this one
+// client module rather than reaching into the pure shaper directly.
+export type { NativeChartData } from './superset-data-shape';
 import { authHeaders, authSession, supersetBase, supersetConfigured } from './superset';
 
 // Injectable fetch so the adapter is testable without a live Superset (mirrors victoria-metrics.ts).
