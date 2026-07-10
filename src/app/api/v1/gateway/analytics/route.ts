@@ -1,5 +1,7 @@
 import { AnalyticsStore, type TrafficRecord } from '@offgrid/analytics';
 import { NextResponse } from 'next/server';
+import { analyticsScopeFilters } from '@/lib/analytics-aggs';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +17,13 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const BUCKET_MS = 60 * 60 * 1000; // hourly
 
 export async function GET() {
+  // TENANT ISOLATION (G-ADV-OBS-ORG): scope the 24h window to the caller's org via an `org` term —
+  // without it a tenant sees combined cross-tenant usage/cost.
+  const orgFilters = analyticsScopeFilters(await currentOrgId());
   const body = {
     size: 5000,
     sort: [{ '@timestamp': 'desc' }],
-    query: { bool: { filter: [{ range: { '@timestamp': { gte: 'now-24h' } } }] } },
+    query: { bool: { filter: [{ range: { '@timestamp': { gte: 'now-24h' } } }, ...orgFilters] } },
   };
 
   try {

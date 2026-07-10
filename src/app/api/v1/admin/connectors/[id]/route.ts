@@ -4,6 +4,7 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { currentOrgId } from '@/lib/tenancy';
 import { deleteConnector, updateConnector } from '@/lib/store';
 import { splitEndpointSecret, persistConnectorSecret } from '@/lib/connector-secrets';
+import { validateConnectorUpdate } from '@/lib/connector-policy';
 
 const AUTHS = ['none', 'api-key', 'oauth'];
 
@@ -24,6 +25,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const rawEndpoint = body.endpoint as string | undefined;
   const { endpoint: cleanEndpoint, secret: peeledSecret } =
     rawEndpoint !== undefined ? splitEndpointSecret(rawEndpoint) : { endpoint: undefined, secret: null };
+
+  // Run the SAME create-grade validation on the edit (DRY): a coming-soon/garbage type and a
+  // non-http / private / metadata endpoint are refused here just as on create — the PATCH path used
+  // to run NONE of this and forward body.type/body.endpoint straight to the store (G-ADV-DATA-2/3).
+  // We validate the SANITIZED endpoint (post-split) so the host guard sees exactly what would be
+  // stored/reached.
+  const gateResult = validateConnectorUpdate({
+    type: body.type,
+    endpoint: cleanEndpoint,
+  });
+  if (!gateResult.ok) {
+    return NextResponse.json({ error: gateResult.errors.join(' ') }, { status: 400 });
+  }
 
   // Scope the mutation to the caller's org — a guessed id from another tenant resolves to no row
   // (→ 404), never a cross-tenant edit (P1 IDOR fix).
