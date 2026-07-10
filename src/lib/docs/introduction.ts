@@ -130,8 +130,8 @@ The guides go capability by capability from here.`,
 
 ## Operate the platform
 
-- **Add or drain a model node.** Register it in [Fleet](/docs/guides/fleet), assign a model, enable
-  it; disable to drain for maintenance.
+- **Add or drain a model node.** Register it on the [AI Gateway](/docs/guides/gateway), assign a
+  model, enable it; disable to drain for maintenance.
 - **Check every service is healthy.** The [Services](/docs/guides/services) directory shows live,
   server-probed health for the console, gateway, and every backend.
 - **Set a team's budget.** Create a virtual key and a monthly limit in [FinOps](/docs/guides/finops);
