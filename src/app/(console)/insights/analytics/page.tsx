@@ -12,12 +12,12 @@ import {
   LatencyChart,
   ModelTokensChart,
 } from '@/components/analytics/AnalyticsCharts';
-import { SupersetEmbed } from '@/components/analytics/SupersetEmbed';
+import { NativeSupersetPanel } from '@/components/analytics/NativeSupersetPanel';
 import { GatewayUsage } from '@/components/gateway/GatewayUsage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
-import { supersetBase } from '@/lib/superset';
+import { safeSupersetDashboard } from '@/lib/superset-data';
 import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
@@ -38,6 +38,7 @@ export default async function AnalyticsPage({
   const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
   const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
   const a = await computeAnalytics(facet ? pipelineTag(facet) : null);
+  const supersetDashboard = await safeSupersetDashboard();
 
   const stats = [
     { label: 'Events (5k window)', value: a.totalEvents.toLocaleString(), icon: Activity },
@@ -153,15 +154,15 @@ export default async function AnalyticsPage({
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-sm">Superset dashboards</CardTitle>
+          <CardTitle className="text-sm">BI dashboards</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Native BI over the governed data. The embed UUID is verified against Superset before a
-            guest token is minted — a missing dashboard shows a provisioning action, never a blank
-            iframe.
+            Native BI over the governed data. Superset runs each chart&apos;s query behind the
+            scenes and the console renders the result — no embedded UI, no blank iframe. Power users
+            can open Superset directly to author new charts.
           </p>
         </CardHeader>
         <CardContent>
-          <SupersetEmbed supersetBase={supersetBase()} />
+          <NativeSupersetPanel dashboard={supersetDashboard} />
         </CardContent>
       </Card>
     </div>
