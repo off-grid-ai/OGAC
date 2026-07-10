@@ -146,3 +146,46 @@ A task is done when:
 - The API route is authenticated
 - The env var is in `.env.example` with a comment
 - It works against the on-prem fleet, not just localhost
+
+---
+
+## The Quality Gate (`#226`) — what runs, where, and why
+
+One chain is enforced in two places: the local **pre-push hook** (`.githooks/pre-push`,
+install once with `npm run hooks:install`) and **CI** (`.github/workflows/ci.yml`) on every
+push/PR. A step is either **BLOCKING** (a non-zero exit fails the push/job) or **REPORT-ONLY**
+(run for visibility, never blocks — a documented, ratcheting baseline).
+
+**BLOCKING gates** (all green on the current tree; a regression fails):
+
+| Gate | Command | What it catches |
+|------|---------|-----------------|
+| Typecheck | `npm run typecheck` | Type errors. |
+| Coverage | `npm run coverage:check` | <85% on statements/branches/functions/lines (`.c8rc.json`). |
+| Dependency-cruiser | `npm run depcruise` | Eager-value import cycles (the Node-22 TDZ prod-build crash) + ports-and-adapters boundary breaks (`.dependency-cruiser.js`). Type-only cycles/orphans are WARN. |
+| jscpd | `npm run jscpd` | Code duplication over the ratcheting threshold (`.jscpd.json`, currently 2.5%; real baseline ~2.04%). |
+| knip | `npm run knip` | Dead **files**, unused/undeclared **dependencies**, missing binaries (`knip.json`). |
+| Secret scan | `npm run security:secrets` | Committed secrets, via gitleaks (`.gitleaks.toml`). Local script **no-ops with a clear message if the `gitleaks` binary is absent**; CI runs `gitleaks/gitleaks-action@v2` as the always-on backstop, so nothing slips through. |
+| Dependency audit | `npm run security:audit` | HIGH/CRITICAL npm advisories via audit-ci (`audit-ci.jsonc`). The 16 current advisories are all MODERATE dev/build-only deps — rationale + ratchet path documented in that file. |
+| Docs links | `npm run docs:links` | Broken **internal** (relative) markdown links (`src/lib/doc-links.ts` pure rules). External links WARN only (network-flaky); repo-absolute `/…` links are treated as in-app routes and ignored. |
+| Build | `npm run build` (CI only) | Route/build errors typecheck + tests miss. |
+
+**REPORT-ONLY** (run, surfaced, never block — promote by removing `|| true` / `continue-on-error`
+once the baseline is burned down):
+
+- **`npm run format:check`** — Prettier. ~870 files predate `printWidth: 100`; the fix is a
+  single reviewable `prettier --write` pass, tracked separately, not a per-change gate.
+- **`npm run lint:typed`** — a **type-aware** ESLint pass (`eslint.typed.config.mjs`) running
+  `@typescript-eslint/no-unnecessary-condition` over `src/lib` with `parserOptions.project`. It is
+  kept separate from `next lint` so the type-aware parser is configured once and the rule isn't
+  dragged through the ~1k pre-existing stylistic findings. It is report-only **because** the repo's
+  `tsconfig` lacks `noUncheckedIndexedAccess`: without it the rule flags correct defensive checks on
+  JSON/index/cast boundaries (e.g. `arr[0] ?? x`, `(e as Error).message ?? ''`) as false positives.
+  Adopting `noUncheckedIndexedAccess` first adds 300+ type errors of its own — a separate project.
+  Once that lands and the genuine findings are burned down, promote this to a blocking gate.
+
+**On knip's scope:** the gate runs `--include files,dependencies,unlisted,binaries` — it deliberately
+excludes unused **exports/types**. In this Next.js + barrel-export codebase those checks are dominated
+by false positives (functions used only via a `store.*` barrel, or from `.tsx` route files knip can't
+fully trace — e.g. `deletePrompt`, `deleteCollection` are live in routes/tests yet reported unused).
+`npm run knip:all` runs the full check for manual review; the gate uses the scoped, signal-only set.

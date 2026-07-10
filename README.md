@@ -180,10 +180,18 @@ npm run db:push                   # create the schema
 npm run dev                       # http://localhost:3000
 npm run build                     # production build
 npm test                          # real tests, against a real database
+npm run hooks:install             # install the pre-push quality gate (once per clone)
 ```
 
 `make -C deploy` lists every stack target (data, secrets, identity, agents, and more) so you can
 bring up only what you need. Full self-hosting and configuration are documented in the app at `/docs`.
+
+**Quality gate.** One chain runs on pre-push (`.githooks/pre-push`) and in CI: typecheck, coverage
+≥85%, dependency-cruiser (no circular imports / boundary breaks), jscpd (duplication), knip (dead
+code / dep drift), gitleaks (secrets), audit-ci (HIGH/CRITICAL advisories), and a broken-doc-link
+check — plus a clean production build. Two steps are report-only until their baseline is burned
+down (Prettier formatting, type-aware `no-unnecessary-condition`). Full description:
+[`docs/ENGINEERING.md`](docs/ENGINEERING.md) § The Quality Gate.
 
 ## When to use it
 
