@@ -8,6 +8,12 @@
 # (conditions are covered via branch coverage). See CLAUDE.md § Engineering
 # standards → "Coverage bar (≥85%, enforced)".
 #
+# It ALSO runs dependency-cruiser (`npm run depcruise`) to block a push on any
+# ERROR-level architecture violation — most importantly an eager-value circular
+# import (the Node-22-only TDZ prod-build crash class). depcruise exits non-zero
+# on errors only; WARN-level findings (type-only cycles, orphans) are advisory
+# and do NOT block. See .dependency-cruiser.js for the ruleset + rationale.
+#
 # INSTALL (one-time, per clone — hooks are not copied by `git clone`):
 #     npm run hooks:install        # == git config core.hooksPath .githooks
 # This points git at the repo-tracked .githooks/ dir so every dev gets the gate.
@@ -30,4 +36,7 @@ npm run --silent typecheck
 echo "pre-push: coverage:check (branches/statements/lines/functions ≥85%)…"
 npm run --silent coverage:check
 
-echo "pre-push: OK — typecheck clean and coverage above the bar."
+echo "pre-push: depcruise (no eager-value circular imports / boundary breaks)…"
+npm run --silent depcruise
+
+echo "pre-push: OK — typecheck clean, coverage above the bar, dependency graph clean."
