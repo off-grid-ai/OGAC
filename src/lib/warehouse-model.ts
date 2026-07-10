@@ -130,6 +130,25 @@ const FORBIDDEN_TOKENS = new Set([
   'INTO', 'REPLACE', 'MERGE', 'MOVE', 'MODIFY', 'EXCHANGE', 'CALL', 'USE',
 ]);
 
+// ── ClickHouse remote/local TABLE FUNCTIONS — the SSRF/exfil/file-read surface (G-ADV-DATA-1) ──
+// A read verb (SELECT) is not enough: ClickHouse lets a SELECT read from a *table function* that
+// reaches OUT of the warehouse — `url()` (server-side HTTP → cloud metadata / internal hosts),
+// `file()` (arbitrary server-side file read), `s3()/mysql()/postgresql()/mongodb()/remote()/…`
+// (SSRF + credential exfil to any host), plus `numbers()/generateRandom()` for unbounded DoS.
+// None of these carry a FORBIDDEN_TOKENS verb, so the verb scan alone lets them through. We reject
+// any of these names appearing in a call position (`name(`), case-insensitively. Plain table reads
+// (`FROM txns`) and legitimate scalar/aggregate functions (count/sum/toString/…) are untouched
+// because they are NOT in this deny-list. Deny-list (not allow-list) because the set of dangerous
+// SOURCES is small, closed, and named by ClickHouse; ordinary SQL functions vastly outnumber them.
+const FORBIDDEN_TABLE_FUNCTIONS = new Set([
+  'URL', 'URLCLUSTER', 'FILE', 'FILECLUSTER',
+  'S3', 'S3CLUSTER', 'GCS', 'HDFS', 'HDFSCLUSTER', 'AZUREBLOBSTORAGE', 'AZUREBLOBSTORAGECLUSTER',
+  'REMOTE', 'REMOTESECURE', 'CLUSTER', 'CLUSTERALLREPLICAS',
+  'MYSQL', 'POSTGRESQL', 'MONGODB', 'SQLITE', 'REDIS', 'JDBC', 'ODBC',
+  'DELTALAKE', 'ICEBERG', 'HUDI', 'INPUT',
+  'NUMBERS', 'NUMBERS_MT', 'GENERATERANDOM', 'ZEROS', 'ZEROS_MT',
+]);
+
 export interface GuardResult {
   ok: boolean;
   reason?: string;
@@ -165,6 +184,18 @@ export function guardReadOnlySql(rawSql: string): GuardResult {
   for (const tok of tokens) {
     if (FORBIDDEN_TOKENS.has(tok)) {
       return { ok: false, reason: `forbidden keyword: ${tok}` };
+    }
+  }
+
+  // Reject any dangerous TABLE FUNCTION in a call position (`name(`). This is the SSRF/exfil/
+  // file-read/DoS surface a read verb alone can't catch (G-ADV-DATA-1): a function-name token
+  // followed by an opening paren (whitespace tolerated) whose name is in the deny-list. Case-
+  // insensitive; `foo . url ( )` can't dodge it because we match the identifier immediately before
+  // the paren. Ordinary functions (count/sum/toString) aren't in the set, so real reads pass.
+  const callRe = /([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+  for (let m = callRe.exec(withoutTrailing); m !== null; m = callRe.exec(withoutTrailing)) {
+    if (FORBIDDEN_TABLE_FUNCTIONS.has(m[1].toUpperCase())) {
+      return { ok: false, reason: `forbidden table function: ${m[1]}` };
     }
   }
 
