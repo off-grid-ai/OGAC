@@ -4,15 +4,18 @@
 // hand-write regex to turn on the protections everyone needs. Bundle the STANDARD guardrails so a
 // non-technical operator ONE-CLICK enables them.
 //
-// Two kinds of standard guardrail ship here:
-//   1. `presidio-entity`  — a PII/PHI entity type that Presidio's analyzer already knows how to
-//      detect out of the box (PERSON, EMAIL_ADDRESS, US_SSN, IBAN_CODE, country packs, …). The
-//      operator just picks WHICH entities to detect — no regex, no config. Presidio ships these
-//      recognizers; enabling one means "detect + mask this entity in this org."
-//   2. `guardrails-validator` — a curated Guardrails-AI Hub validator (toxic-language, detect-PII,
-//      detect-prompt-injection, secrets-present, competitor-check, …). A behavioural check that
-//      runs on-prem via the Guardrails-AI runtime; the console records the org's intent to enforce
-//      it.
+// LLM Guard is THE authoritative content-guardrail engine. Its Anonymize scanner uses Presidio under
+// the hood (so it recognizes the standard PII entities below) AND carries the India recognizers the
+// console folds into the scanner config (llm-guard-config.ts). Three kinds of standard guardrail ship:
+//   1. `presidio-entity`  — a PII/PHI entity type (PERSON, EMAIL_ADDRESS, US_SSN, IBAN_CODE, the IN_*
+//      packs, …). The operator picks WHICH entities to mask — no regex, no config. Enabling one means
+//      "detect + mask this entity", ENFORCED by LLM Guard's Anonymize scanner (the entity name is a
+//      Presidio recognizer LLM Guard runs).
+//   2. `llm-guard-scanner` — a specific LLM Guard scanner class (Anonymize, Secrets, PromptInjection,
+//      Toxicity, Bias, BanTopics, Language, Regex, TokenLimit) enabled directly.
+//   3. `guardrails-validator` — a curated Guardrails-AI Hub validator (a LEGACY second-opinion check
+//      that runs on-prem via the Guardrails-AI runtime; distinct from the authoritative LLM Guard
+//      engine). The console records the org's intent to enforce it.
 //
 // ── HOW ENABLING WRITES THROUGH THE EXISTING PATH (no new storage) ────────────────────────────────
 // Enabling a catalog item does NOT introduce a new store. It writes a row through the EXISTING
@@ -25,9 +28,10 @@
 // path, one audit trail, and the existing GuardrailRules table/UI already manages what we enable.
 //
 // ── AIR-GAP SAFETY ────────────────────────────────────────────────────────────────────────────────
-// Everything here runs ON-PREM. Presidio entities are detected by the local Presidio analyzer.
-// Guardrails-AI validators run in the local Guardrails runtime. Nothing in this catalog reaches the
-// public internet — no item declares network egress, and the payload builder writes only local rows.
+// Everything here runs ON-PREM. PII entities + LLM Guard scanners are enforced by the self-hosted
+// LLM Guard engine (its Anonymize scanner runs Presidio locally). Guardrails-AI validators run in the
+// local Guardrails runtime. Nothing in this catalog reaches the public internet — no item declares
+// network egress, and the payload builder writes only local rows.
 //
 // ── GROUNDED — REAL entities/validators ONLY (do NOT invent) ─────────────────────────────────────
 //   • Presidio predefined recognizers — microsoft.github.io/presidio (Supported entities):
@@ -612,21 +616,23 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
 ];
 
 // ─── Engine availability (PURE) ───────────────────────────────────────────────────────────────────
-// Honest per-item availability, given what the operator has actually configured. A presidio-entity is
-// READY only when the Presidio engine is configured (else it degrades to the always-on regex floor,
-// which covers only EMAIL_ADDRESS + PHONE_NUMBER). A guardrails-validator is READY when the
-// Guardrails-AI runtime is configured, else it FALLS BACK to "recorded intent" — the rule is stored
-// and enforced once the runtime is wired. Nothing here does I/O; the caller passes in the two flags.
+// Honest per-item availability, given what the operator has actually configured. LLM Guard is THE
+// authoritative content-guardrail engine, so a PII-entity item (a presidio-entity toggle) is READY
+// when LLM Guard is configured + reachable — LLM Guard's Anonymize scanner detects/masks it, with the
+// India recognizers (PAN/Aadhaar/IFSC/UPI) folded into the scanner config the console generates
+// (llm-guard-config.ts). An llm-guard-scanner item is likewise READY under LLM Guard. A
+// guardrails-validator (a legacy Guardrails-AI second-opinion check) is READY only when that runtime
+// is configured. Nothing here does I/O; the caller passes in the engine flags.
 export interface EngineStatus {
-  /** Presidio analyzer is configured + reachable (from the guardrails view). */
-  presidioReady: boolean;
-  /** Guardrails-AI runtime is configured on-prem. */
+  /** Kept for back-compat with older callers; PII entities are now enforced by LLM Guard's Anonymize. */
+  presidioReady?: boolean;
+  /** Guardrails-AI runtime is configured on-prem (legacy second-opinion validators only). */
   guardrailsAiReady: boolean;
-  /** LLM Guard engine is the active guardrails adapter AND configured + reachable. */
+  /** LLM Guard — the authoritative engine — is the active guardrails adapter AND configured + reachable. */
   llmGuardReady?: boolean;
 }
 
-// Entities the always-on regex floor can catch even when Presidio is down.
+// Entities the deterministic regex floor still catches on the data-movement path (informational).
 export const REGEX_FLOOR_ENTITIES = ['EMAIL_ADDRESS', 'PHONE_NUMBER'] as const;
 
 export type Availability = 'ready' | 'fallback' | 'floor';
@@ -641,33 +647,24 @@ export function itemAvailability(
   item: GuardrailCatalogItem,
   status: EngineStatus,
 ): ItemAvailability {
-  if (item.kind === 'presidio-entity') {
-    if (status.presidioReady) {
-      return { status: 'ready', detail: 'Detected by the Presidio analyzer.' };
-    }
-    if ((REGEX_FLOOR_ENTITIES as readonly string[]).includes(item.entity)) {
+  // PII-entity toggles + LLM Guard scanners are BOTH enforced by the LLM Guard engine now.
+  if (item.kind === 'presidio-entity' || item.kind === 'llm-guard-scanner') {
+    if (status.llmGuardReady) {
       return {
-        status: 'floor',
-        detail: 'Presidio is not configured — the always-on regex floor still catches this one.',
+        status: 'ready',
+        detail:
+          item.kind === 'presidio-entity'
+            ? 'Detected and masked by LLM Guard’s Anonymize scanner (India recognizers folded in).'
+            : 'Enforced by the on-prem LLM Guard engine.',
       };
     }
     return {
       status: 'fallback',
       detail:
-        'Presidio is not configured. The rule is stored and takes effect once Presidio is on.',
+        'LLM Guard is not configured or is unreachable. The rule is stored and enforced once the engine is on.',
     };
   }
-  if (item.kind === 'llm-guard-scanner') {
-    if (status.llmGuardReady) {
-      return { status: 'ready', detail: 'Enforced by the on-prem LLM Guard engine.' };
-    }
-    return {
-      status: 'fallback',
-      detail:
-        'The LLM Guard engine is not the active guardrails adapter (or is unreachable). The rule is stored and enforced once it’s on.',
-    };
-  }
-  // guardrails-validator
+  // guardrails-validator — the legacy Guardrails-AI second-opinion runtime.
   if (status.guardrailsAiReady) {
     return { status: 'ready', detail: 'Enforced by the on-prem Guardrails-AI runtime.' };
   }

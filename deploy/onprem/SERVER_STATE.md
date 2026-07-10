@@ -205,9 +205,12 @@ cutover is purely config: set `OFFGRID_GATEWAY_URL=http://litellm:4000`.
 - **Env (add to `.env.local` on cutover):** `OFFGRID_LITELLM_URL=http://127.0.0.1:4000`,
   `OFFGRID_LITELLM_MASTER_KEY=<real key>` (rotate off the dev default),
   `OFFGRID_LITELLM_DB_URL` (optional, LiteLLM's own Postgres for budget persistence).
-- **STATUS: code + wired, NOT live-verified.** The aggregator (`scripts/cluster-gateway.mjs`,
-  `co.getoffgridai.aggregator` launchd job on :8800) stays the ACTIVE model door and the fallback
-  until LiteLLM is verified live on the fleet. Compose service `litellm` (profiles `ai`, `all`).
+- **STATUS: code + wired, NOT live-verified.** LiteLLM (:4000) is the gateway; the repo no longer
+  ships a hand-rolled aggregator runner (`scripts/cluster-gateway.mjs` DELETED). The LIVE
+  `co.getoffgridai.aggregator` launchd job on :8800 is still running on S1 and remains the active
+  model door until the fleet owner cuts `OFFGRID_GATEWAY_URL` over to `http://litellm:4000` and
+  verifies LB/failover/budgets/logging end-to-end — then that launchd job is torn down. Compose
+  service `litellm` (profiles `ai`, `all`).
 
 ## Native launchd services (S1)
 

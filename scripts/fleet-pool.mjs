@@ -1,12 +1,12 @@
 // SINGLE SOURCE OF TRUTH for the on-prem fleet node pool (the 8 OpenAI-compatible nodes on :7878).
 //
-// This is plain ESM JS on purpose: it is imported BOTH by the hand-rolled runner
-// (scripts/cluster-gateway.mjs, run by node with no type-strip) AND by the LiteLLM config
-// generator (src/lib/fleet-pool.ts, compiled by Next/tsc with allowJs). Neither may re-declare
-// the pool — DRY: one array, two consumers. Override at runtime with OFFGRID_POOL (JSON).
+// This is plain ESM JS on purpose so it can be imported by the LiteLLM config generator
+// (src/lib/fleet-pool.ts, compiled by Next/tsc with allowJs) without a type-strip step. It is the
+// one place the pool is declared — DRY: one array, its consumers reference it. Override at runtime
+// with OFFGRID_POOL (JSON).
 //
-// Shape: { name, host, port, vision, model } — the same shape @offgrid/gateway's cluster pool and
-// LiteLLM's model_list both key off. `model` is the node's routing tag (the served model id).
+// Shape: { name, host, port, vision, model } — the same shape LiteLLM's model_list keys off.
+// `model` is the node's routing tag (the served model id).
 
 /**
  * @typedef {Object} FleetPoolNode
