@@ -237,6 +237,39 @@ services:
     ports: ['4318:4318', '4317:4317']
     depends_on: [victoriametrics, jaeger]
 
+  # LiteLLM Proxy — the model-door ROUTER. OpenAI-compatible, so it drops in behind the console's
+  # GATEWAY_URL (set OFFGRID_GATEWAY_URL=http://litellm:4000 to cut over) and replaces the hand-rolled
+  # aggregator with health-checked load-balancing, automatic failover/retries, per-key budgets + rate
+  # limits, and structured request logging. It routes across the on-prem fleet nodes (192.168.1.x:7878)
+  # AND the configured cloud providers. The mounted config.yaml is generated from the console's own
+  # view of the fleet — see src/lib/litellm-config.ts (deploy/litellm-config.yaml is the committed
+  # sample; regenerate it from the live pool). The aggregator (scripts/cluster-gateway.mjs) stays
+  # available as a fallback until this is verified live.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    profiles: [ai, all]
+    command: ['--config', '/app/config.yaml', '--port', '4000', '--num_workers', '4']
+    ports: ['4000:4000']
+    volumes: ['./litellm-config.yaml:/app/config.yaml:ro']
+    environment:
+      # Master key gate for the management APIs (/model|/key|/health) the console Router view reads.
+      OFFGRID_LITELLM_MASTER_KEY: ${OFFGRID_LITELLM_MASTER_KEY:-sk-litellm-dev-change-me}
+      # Cloud provider keys resolved at runtime via os.environ/… refs in config.yaml (never committed).
+      OFFGRID_CLOUD_OPENAI_API_KEY: ${OFFGRID_CLOUD_OPENAI_API_KEY:-}
+      OFFGRID_CLOUD_ANTHROPIC_API_KEY: ${OFFGRID_CLOUD_ANTHROPIC_API_KEY:-}
+      OFFGRID_CLOUD_DEEPSEEK_API_KEY: ${OFFGRID_CLOUD_DEEPSEEK_API_KEY:-}
+      OFFGRID_CLOUD_ZHIPU_API_KEY: ${OFFGRID_CLOUD_ZHIPU_API_KEY:-}
+      OFFGRID_CLOUD_COMPAT_API_KEY: ${OFFGRID_CLOUD_COMPAT_API_KEY:-}
+      # Structured request logging → the same offgrid-gateway OpenSearch index the traffic/logs UI
+      # reads (litellm-log-shape.ts maps the callback payload into the TrafficRecord shape).
+      OFFGRID_OPENSEARCH_URL: ${OFFGRID_OPENSEARCH_URL:-http://opensearch:9200}
+      OFFGRID_GATEWAY_INDEX: ${OFFGRID_GATEWAY_INDEX:-offgrid-gateway}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4000/health/liveliness']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   # Distributed-trace backend (app-layer tracing): OTLP in → queryable trace UI on :16686.
   jaeger:
     image: jaegertracing/all-in-one:1.62.0

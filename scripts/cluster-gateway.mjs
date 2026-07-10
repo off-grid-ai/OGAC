@@ -13,6 +13,7 @@
 //   OFFGRID_LANGFUSE_URL, OFFGRID_LANGFUSE_PUBLIC_KEY, OFFGRID_LANGFUSE_SECRET_KEY
 import { createClusterGateway } from '@offgrid/gateway';
 import { policiesFromEnv } from '@offgrid/policy';
+import { FLEET_POOL } from './fleet-pool.mjs';
 
 // Fleet default: ship every call to the on-prem OpenSearch (durable, searchable
 // gateway logs) unless overridden. Without this the observability sink is off and
@@ -25,20 +26,11 @@ if (!process.env.OFFGRID_GATEWAY_API_KEY) {
   console.warn('[cluster-gateway] OFFGRID_GATEWAY_API_KEY not set — the exposed endpoint will reject requests until you set one.');
 }
 
-// The on-prem fleet pool. Override with OFFGRID_POOL (JSON) without editing code.
-const POOL = [
-  { name: 'g1', host: '192.168.1.57', port: 7878, vision: true, model: 'qwythos-9b' },
-  { name: 'g2', host: '192.168.1.58', port: 7878, vision: true, model: 'qwen3.5-9b' },
-  { name: 'g3', host: '192.168.1.32', port: 7878, vision: true, model: 'qwythos-9b' },
-  { name: 'g4', host: '192.168.1.63', port: 7878, vision: true, model: 'qwythos-9b' },
-  { name: 'g5', host: '192.168.1.65', port: 7878, vision: true, model: 'qwen3.5-9b' },
-  { name: 'g6', host: '192.168.1.66', port: 7878, vision: true, model: 'qwen3.5-9b' },
-  { name: 'g7', host: '192.168.1.62', port: 7878, vision: true, model: 'qwythos-9b' },
-  { name: 'g8', host: '192.168.1.64', port: 7878, vision: true, model: 'qwythos-9b' },
-];
+// The on-prem fleet pool is the shared SSOT in scripts/fleet-pool.mjs (also consumed by the LiteLLM
+// config generator — DRY). Override at runtime with OFFGRID_POOL (JSON) without editing code.
 
 createClusterGateway({
-  pool: process.env.OFFGRID_POOL ? JSON.parse(process.env.OFFGRID_POOL) : POOL,
+  pool: process.env.OFFGRID_POOL ? JSON.parse(process.env.OFFGRID_POOL) : FLEET_POOL,
   port: Number(process.env.PORT || 8800),
   hostHint: process.env.HOST_HINT || '127.0.0.1',
   // Policy layer (guardrails / rate limits / budgets / cache) assembled from env.

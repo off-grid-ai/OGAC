@@ -184,6 +184,31 @@ The 15 insurer use cases are built one-at-a-time (founder loop: auto-test end-to
   do `rm -rf .next && next build` (clean) and verify BOTH `.next/server/middleware-manifest.json`
   and `pages-manifest.json` exist before restart.
 
+### LiteLLM Proxy — the AWS-grade router replacing the aggregator on the model-door path (2026-07-10, NOT YET LIVE)
+LiteLLM Proxy (`ghcr.io/berriai/litellm:main-stable`) is being introduced as the professional
+router/LB/failover/budget layer on the model door. It is OpenAI-compatible, so it drops in behind the
+SAME `OFFGRID_GATEWAY_URL` seam the console already uses — **no console routing-logic change**; the
+cutover is purely config: set `OFFGRID_GATEWAY_URL=http://litellm:4000`.
+- **Config is GENERATED, never hand-rolled.** `src/lib/litellm-config.ts` (pure, unit-tested) turns
+  the console's own view of the fleet — the shared pool `scripts/fleet-pool.mjs` (now the SSOT for
+  BOTH the aggregator runner AND LiteLLM, DRY) + the configured cloud providers
+  (`cloud-providers.ts`) — into the `config.yaml`. Committed sample: `deploy/litellm-config.yaml`
+  (regenerate from the live pool; secrets are `os.environ/…` refs, never written).
+- **Logging into the SAME index.** LiteLLM's callback payload maps into the console's `TrafficRecord`
+  via `src/lib/litellm-log-shape.ts` (pure) and lands in the SAME `offgrid-gateway` OpenSearch index
+  the existing Traffic/Logs UI reads — the UI is UNCHANGED.
+- **Read-back adapter + UI.** `src/lib/litellm.ts` (graceful, `configured:false` when
+  `OFFGRID_LITELLM_URL` unset/unreachable — mirrors victoria-metrics.ts) feeds
+  `GET /api/v1/gateway/router` → AI Gateway → **Router** tab (`GatewayRouter`): per-deployment health
+  (fleet + cloud) + per-key budgets. Surfaced in Integrations too (observability `litellm` entry,
+  health = `/health/liveliness`).
+- **Env (add to `.env.local` on cutover):** `OFFGRID_LITELLM_URL=http://127.0.0.1:4000`,
+  `OFFGRID_LITELLM_MASTER_KEY=<real key>` (rotate off the dev default),
+  `OFFGRID_LITELLM_DB_URL` (optional, LiteLLM's own Postgres for budget persistence).
+- **STATUS: code + wired, NOT live-verified.** The aggregator (`scripts/cluster-gateway.mjs`,
+  `co.getoffgridai.aggregator` launchd job on :8800) stays the ACTIVE model door and the fallback
+  until LiteLLM is verified live on the fleet. Compose service `litellm` (profiles `ai`, `all`).
+
 ## Native launchd services (S1)
 
 Long-running native Node processes that are NOT in Docker and NOT pm2 — owned by launchd so they
