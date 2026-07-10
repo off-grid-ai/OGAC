@@ -45,7 +45,7 @@ export function PipelineChip({
         title="No governing pipeline resolved — this consumer runs ungoverned until one is bound or an org-default chat pipeline is set."
       >
         <GitBranch className="size-3" />
-        Ungoverned
+        No pipeline
       </Badge>
     );
   }
