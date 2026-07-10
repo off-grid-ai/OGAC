@@ -189,8 +189,14 @@ export async function redactBatch(
   return { rows: base.rows, report: reportArr, totalRedacted: reportArr.reduce((n, e) => n + e.changed, 0) };
 }
 
-/** Pick the active PII port: Presidio when wired, else the always-on regex floor. */
+/**
+ * The PII detector for the DATA-MOVEMENT redaction path (free-text column `detect`). This is the
+ * deterministic regex floor (email/phone + India PAN/Aadhaar/IFSC/UPI) — NOT the content-guardrail
+ * engine. ETL redaction must be deterministic and never depend on a remote engine's liveness (a
+ * data sync must not fail-closed the way a governed model call does), so it uses the pure floor, not
+ * LLM Guard. Content screening on the model-access path is LLM Guard (the sole guardrail engine).
+ */
 export async function activePiiPort(): Promise<PiiPort> {
-  const { regexPii, presidioPii } = await import('./adapters/pii');
-  return process.env.OFFGRID_PRESIDIO_URL ? presidioPii : regexPii;
+  const { regexPii } = await import('./adapters/pii');
+  return regexPii;
 }

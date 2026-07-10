@@ -99,51 +99,15 @@ export const LINEAGE: RegEntry[] = [
   },
 ];
 
+// Content guardrails: LLM Guard is THE authoritative engine (founder DRY consolidation). It leads
+// the list so it is the DEFAULT the registry picks. The `regex-floor` entry below is NOT a selectable
+// content-guardrail engine — it is the meta for the pure regex detector the DATA-MOVEMENT redaction
+// path reuses (regexPii in adapters/pii.ts); it carries no health probe (no service to reach).
 export const GUARDRAIL_ENTRIES: RegEntry[] = [
   {
-    meta: {
-      id: 'checks',
-      capability: 'guardrails',
-      vendor: 'Off Grid AI checks spine',
-      license: 'first-party',
-      render: 'native',
-      description: 'PII / injection hooks normalized onto the audit record (always on).',
-    },
-  },
-  {
-    meta: {
-      id: 'presidio',
-      capability: 'guardrails',
-      vendor: 'Microsoft Presidio',
-      license: 'MIT',
-      render: 'headless',
-      embedUrl: env.OFFGRID_PRESIDIO_URL,
-      description: 'Production-grade PII detection / anonymization behind the checks port.',
-    },
-    health: ping(env.OFFGRID_PRESIDIO_URL, '/health'),
-  },
-  {
-    // The bring-your-own external guardrail provider seam. Behavior lives in the PiiPort
-    // `httpGuardrailPii` (adapters/guardrail-provider.ts) — selected via
-    // OFFGRID_ADAPTER_GUARDRAILS=http-guardrail; this entry surfaces it in the Integrations UI +
-    // reports live health. A named vendor (Lakera / Aporia / …) slots in via config, not code.
-    meta: {
-      id: 'http-guardrail',
-      capability: 'guardrails',
-      vendor: 'External HTTP guardrail provider',
-      license: 'third-party (bring-your-own)',
-      render: 'headless',
-      embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
-      description:
-        'Plug in a third-party guardrail engine (Lakera / Aporia / Prompt-Security / self-hosted) by config: POSTs text, reads a verdict. Configure OFFGRID_HTTP_GUARDRAIL_URL + _API_KEY. Falls back to the regex floor when unset or unreachable.',
-    },
-    health: ping(env.OFFGRID_HTTP_GUARDRAIL_URL),
-  },
-  {
-    // LLM Guard (Protect AI) — a NAMED, MIT self-hosted scanner suite on the same seam. Behavior
-    // lives in the PiiPort `llmGuardPii` (adapters/guardrail-provider.ts) — selected via
-    // OFFGRID_ADAPTER_GUARDRAILS=llm-guard; this entry surfaces it in the Integrations UI + reports
-    // live health (GET /healthz). Shares OFFGRID_HTTP_GUARDRAIL_URL/_API_KEY with the generic seam.
+    // LLM Guard (Protect AI) — the sole content-guardrail engine, behind the PiiPort `llmGuardPii`
+    // (adapters/guardrail-provider.ts). Configured with OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY =
+    // AUTH_TOKEN). FAIL CLOSED when configured-but-down; surfaced "not configured" when no URL is set.
     meta: {
       id: 'llm-guard',
       capability: 'guardrails',
@@ -152,9 +116,22 @@ export const GUARDRAIL_ENTRIES: RegEntry[] = [
       render: 'headless',
       embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
       description:
-        'Self-hosted LLM Guard scanners — PII/Anonymize, Secrets, Toxicity, Bias, BanTopics, PromptInjection, Language, Regex, TokenLimit — behind the checks port. POSTs to /analyze/prompt, reads {is_valid, scanners, sanitized_prompt}. Configure OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api base) + _API_KEY (AUTH_TOKEN). Falls back to the regex floor when unset or unreachable.',
+        'The authoritative content-guardrail engine — self-hosted LLM Guard scanners (PII/Anonymize with the India recognizers folded in, Secrets, PromptInjection, Toxicity, Bias, BanTopics, Language, Regex, TokenLimit). POSTs the text + the console scanner config to /analyze/prompt. FAIL CLOSED: configured + unreachable blocks the run; not configured is surfaced honestly. Configure OFFGRID_HTTP_GUARDRAIL_URL (the llm-guard-api base) + _API_KEY (AUTH_TOKEN).',
     },
     health: ping(env.OFFGRID_HTTP_GUARDRAIL_URL, '/healthz'),
+  },
+  {
+    // Meta ONLY for the pure regex detector reused by the data-movement redaction path (not a
+    // content-guardrail engine and never picked by the registry). No health probe.
+    meta: {
+      id: 'regex-floor',
+      capability: 'guardrails',
+      vendor: 'Off Grid AI regex floor',
+      license: 'first-party',
+      render: 'native',
+      description:
+        'Deterministic regex PII detector (email/phone + India PAN/Aadhaar/IFSC/UPI) reused by the data-movement redaction path. Not a content-guardrail engine — LLM Guard is the sole engine.',
+    },
   },
 ];
 
