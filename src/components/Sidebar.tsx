@@ -9,7 +9,11 @@ import { cn } from '@/lib/utils';
 import { sidebarActiveIdForPath, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 
-export function Sidebar() {
+// The nav body (logo header + grouped rows + docs footer). Rendered in TWO places — the fixed
+// desktop `<aside>` below and the mobile slide-in drawer (Topbar) — so it lives here ONCE as the
+// single source of truth (DRY). `onNavigate` lets the drawer close itself when a row is tapped;
+// the desktop aside passes nothing.
+export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const modules = getEnabledModules();
   const sections = sidebarSections(modules);
@@ -21,7 +25,7 @@ export function Sidebar() {
   const activeId = sidebarActiveIdForPath(pathname, modules);
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
+    <>
       <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
         <Image src="/logo.png" alt="Off Grid AI" width={28} height={28} priority />
         <div className="leading-tight">
@@ -46,8 +50,9 @@ export function Sidebar() {
                   <Link
                     key={m.id}
                     href={m.route}
+                    onClick={onNavigate}
                     className={cn(
-                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-150 active:scale-[0.98]',
+                      'flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-150 active:scale-[0.98]',
                       active
                         ? 'bg-primary/10 font-medium text-primary'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -68,7 +73,8 @@ export function Sidebar() {
           href="/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2.5 rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={onNavigate}
+          className="flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <BookOpen className="size-4 shrink-0" />
           API docs &amp; playground
@@ -77,6 +83,16 @@ export function Sidebar() {
           On-prem · local-first
         </p>
       </div>
+    </>
+  );
+}
+
+// The fixed desktop sidebar. Hidden below `md` (the mobile shell reaches the SAME nav through the
+// Topbar's slide-in drawer) so desktop (md+) is byte-for-byte unchanged.
+export function Sidebar() {
+  return (
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
+      <SidebarNav />
     </aside>
   );
 }
