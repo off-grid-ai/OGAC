@@ -23,6 +23,7 @@ import {
   audioConfigView as audioConfigViewPkg,
 } from '@offgrid/speech';
 import { toDisplayHost } from './display-host';
+import { stripControlTokens } from './strip-control-tokens';
 
 // Re-export the shared MIME helpers + types verbatim so existing imports of `@/lib/chat-audio`
 // keep working unchanged (behavior-preserving consolidation).
@@ -215,7 +216,10 @@ export function speakButtonLabel(phase: SpeakPhase, backend: SpeakBackend): stri
  * whitespace. Also caps length so a huge answer doesn't blow the TTS request/synth budget.
  */
 export function textForSpeech(markdown: string, maxLen = 4000): string {
-  let t = markdown ?? '';
+  // First strip model control/tool tokens (`<function=…>`, `<think>…</think>`, `<tool_call>…`,
+  // `<|im_start|>`) so TTS never READS engine plumbing or a private chain-of-thought aloud. Same
+  // rule the chat render path uses (single source of truth).
+  let t = stripControlTokens(markdown ?? '');
   t = t.replace(/```[\s\S]*?```/g, ' '); // fenced code blocks
   t = t.replace(/`([^`]+)`/g, '$1'); // inline code
   t = t.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1'); // images/links → their text

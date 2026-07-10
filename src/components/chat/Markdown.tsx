@@ -5,6 +5,7 @@ import { Fragment, type ReactNode, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { parseCitationMarkers } from '@/lib/chat-citations';
+import { stripControlTokens } from '@/lib/strip-control-tokens';
 
 // Recursively pull plain text out of a React node tree (for the code-block copy button).
 function nodeText(node: ReactNode): string {
@@ -100,6 +101,10 @@ export function Markdown({
   sourceCount?: number;
   onCiteClick?: (n: number) => void;
 }) {
+  // Strip inline model control/tool tokens (`<function=…>`, `<think>…</think>`, `<tool_call>…`,
+  // `<|im_start|>`) before rendering so a leaked token never appears as visible text nor a private
+  // chain-of-thought bleeds into the bubble. Same rule TTS uses (single source of truth).
+  const safe = stripControlTokens(children);
   // Only linkify when we actually have somewhere for chips to point.
   const cite = (nodes: ReactNode): ReactNode =>
     sourceCount > 0 && onCiteClick ? linkifyCitations(nodes, sourceCount, onCiteClick) : nodes;
@@ -160,7 +165,7 @@ export function Markdown({
           },
         }}
       >
-        {children}
+        {safe}
       </ReactMarkdown>
     </div>
   );
