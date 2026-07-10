@@ -21,7 +21,11 @@ test('buildDemoBanner: shows for a viewer, hidden for admin/other/absent', () =>
 });
 
 test('buildDemoBanner: passes creds through, trims, nulls blanks', () => {
-  const m = buildDemoBanner({ role: 'viewer', email: '  demo@offgrid.local ', password: ' pw123 ' });
+  const m = buildDemoBanner({
+    role: 'viewer',
+    email: '  demo@offgrid.local ',
+    password: ' pw123 ',
+  });
   assert.equal(m.email, 'demo@offgrid.local');
   assert.equal(m.password, 'pw123');
 
@@ -37,7 +41,11 @@ test('buildDemoBanner: passes creds through, trims, nulls blanks', () => {
 test('buildDemoBanner: the note is the shared read-only copy, brand-clean (no em-dash/!/curly)', () => {
   const m = buildDemoBanner({ role: 'viewer', email: null, password: null });
   assert.equal(m.note, DEMO_READONLY_NOTE);
-  assert.doesNotMatch(m.note, /—|!|[""'']/, 'brand voice: no em-dash, exclamation, or curly quotes');
+  assert.doesNotMatch(
+    m.note,
+    /—|!|[""'']/,
+    'brand voice: no em-dash, exclamation, or curly quotes',
+  );
   assert.match(m.note, /view everything/i);
   assert.match(m.note, /cannot make changes/i);
 });
@@ -47,13 +55,23 @@ test('buildDemoBanner: the note is the shared read-only copy, brand-clean (no em
 test('buildSigninDemoBanner: shows on a demo tenant host regardless of session, hidden off-host', () => {
   assert.equal(buildSigninDemoBanner({ isTenantHost: true, email: 'x', password: 'y' }).show, true);
   // no creds set but on a demo host → still shows (the read-only note)
-  assert.equal(buildSigninDemoBanner({ isTenantHost: true, email: null, password: null }).show, true);
+  assert.equal(
+    buildSigninDemoBanner({ isTenantHost: true, email: null, password: null }).show,
+    true,
+  );
   // not a demo host → never shows, even with creds
-  assert.equal(buildSigninDemoBanner({ isTenantHost: false, email: 'x', password: 'y' }).show, false);
+  assert.equal(
+    buildSigninDemoBanner({ isTenantHost: false, email: 'x', password: 'y' }).show,
+    false,
+  );
 });
 
 test('buildSigninDemoBanner: passes creds through trimmed, nulls blanks, shares the note copy', () => {
-  const m = buildSigninDemoBanner({ isTenantHost: true, email: ' demo@offgrid.local ', password: ' pw ' });
+  const m = buildSigninDemoBanner({
+    isTenantHost: true,
+    email: ' demo@offgrid.local ',
+    password: ' pw ',
+  });
   assert.equal(m.email, 'demo@offgrid.local');
   assert.equal(m.password, 'pw');
   assert.equal(m.note, DEMO_READONLY_NOTE);
@@ -62,7 +80,11 @@ test('buildSigninDemoBanner: passes creds through trimmed, nulls blanks, shares 
   assert.equal(blank.email, null);
   assert.equal(blank.password, null);
 
-  const absent = buildSigninDemoBanner({ isTenantHost: true, email: undefined, password: undefined });
+  const absent = buildSigninDemoBanner({
+    isTenantHost: true,
+    email: undefined,
+    password: undefined,
+  });
   assert.equal(absent.email, null);
   assert.equal(absent.password, null);
 });
