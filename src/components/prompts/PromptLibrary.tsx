@@ -22,6 +22,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingBlock, Spinner } from '@/components/ui/spinner';
 import { PromptStarterLibrary } from '@/components/prompts/PromptStarterLibrary';
+import { CardRail } from '@/components/workspace/CardRail';
 import { usePagination } from '@/lib/use-pagination';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
@@ -265,7 +266,7 @@ export function PromptLibrary() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <CardRail>
               {paged.pageItems.map((p) => (
                 <PromptCard
                   key={p.id}
@@ -275,7 +276,7 @@ export function PromptLibrary() {
                   onDelete={() => remove(p)}
                 />
               ))}
-            </div>
+            </CardRail>
             <Pagination
               state={paged}
               onPageChange={paged.setPage}
@@ -317,7 +318,7 @@ function PromptCard({
 }) {
   const hue = accentHue(p.id || p.title);
   return (
-    <div className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
+    <div className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
         <span
           className="flex size-6 shrink-0 items-center justify-center rounded"

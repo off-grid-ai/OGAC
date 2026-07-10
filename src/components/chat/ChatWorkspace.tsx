@@ -20,6 +20,7 @@ import {
   Globe,
   ImageSquare,
   Lightning,
+  List,
   Paperclip,
   MagnifyingGlass,
   Microphone,
@@ -476,6 +477,10 @@ export function ChatWorkspace({
   // Incognito / temporary chat: transcript lives only in the client, no DB row, excluded from the
   // sidebar, never added to memory. Toggling it starts a fresh ephemeral thread.
   const [temporary, setTemporary] = useState(false);
+  // Mobile-only: the conversation/project rail is an off-canvas drawer (< md). Transient UI panel,
+  // not a navigational "place" — the active conversation/project stays URL-driven — so local state
+  // is correct here. Desktop (md+) always shows the rail inline and ignores this.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   // Audio mode (STT voice input + TTS read-aloud). All browser/network audio I/O + the pure state
@@ -813,6 +818,7 @@ export function ChatWorkspace({
   // effect's job; here we only move the navigational position (and leave incognito if we were in it).
   function openConversation(id: string) {
     setTemporary(false);
+    setSidebarOpen(false);
     navigate({ conversationId: id, projectId: activeProjectId });
   }
 
@@ -820,11 +826,13 @@ export function ChatWorkspace({
   // (null = "All chats"). The URL-driven effect clears the transcript since conversationId is null.
   function selectProject(projectId: string | null) {
     setTemporary(false);
+    setSidebarOpen(false);
     navigate({ conversationId: null, projectId });
   }
 
   async function newChat() {
     setTemporary(false);
+    setSidebarOpen(false);
     const r = await fetch('/api/v1/chat/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -1258,8 +1266,25 @@ export function ChatWorkspace({
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] min-h-0">
-      {/* Rail: projects + conversations */}
-      <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
+      {/* Mobile backdrop — closes the drawer on tap. Only rendered/interactive below md. */}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close chats menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+        />
+      ) : null}
+
+      {/* Rail: projects + conversations. Inline column on md+; off-canvas drawer below md. */}
+      <aside
+        className={cn(
+          'flex h-full w-64 shrink-0 flex-col border-r border-border bg-card',
+          // Mobile: fixed off-canvas drawer, slid in/out by sidebarOpen.
+          'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
         {/* Top: primary action + search */}
         <div className="space-y-2 p-2.5">
           <Button
@@ -1392,12 +1417,21 @@ export function ChatWorkspace({
 
       {/* Thread */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            {temporary ? <Ghost className="size-4 text-primary" /> : <Sparkle className="size-4 text-primary" />}
-            {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            {/* Mobile-only: open the conversation/project drawer. ≥44px tap target. */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open chats menu"
+              className="-ml-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+            >
+              <List className="size-5" />
+            </button>
+            {temporary ? <Ghost className="size-4 shrink-0 text-primary" /> : <Sparkle className="size-4 shrink-0 text-primary" />}
+            <span className="truncate">{temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
                 from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
             <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
@@ -1462,7 +1496,7 @@ export function ChatWorkspace({
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
+                className="max-w-[8rem] rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground sm:max-w-none"
               >
                 {models.length === 0 ? <option value="">no models</option> : null}
                 {models.map((m) => (
