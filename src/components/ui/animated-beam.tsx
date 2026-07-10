@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useEffect, useId, useRef, useState } from 'react';
+import { type RefObject, useEffect, useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // A curved wire between two DOM nodes with an emerald pulse traveling along it.
@@ -30,6 +30,34 @@ interface Geometry {
 
 const EMPTY: Geometry = { w: 0, h: 0, d: '', len: 0 };
 
+// Arc length of the quadratic Bézier P0->(control)->P2, by polyline sampling. Computed from
+// the geometry directly (no dependency on a rendered <path>), so it is correct on the very
+// first measurement - `getTotalLength()` returns 0 on a not-yet-updated path, which would
+// suppress the pulse.
+function quadLength(
+  x1: number,
+  y1: number,
+  cx: number,
+  cy: number,
+  x2: number,
+  y2: number,
+): number {
+  const SEGMENTS = 24;
+  let len = 0;
+  let px = x1;
+  let py = y1;
+  for (let i = 1; i <= SEGMENTS; i++) {
+    const t = i / SEGMENTS;
+    const mt = 1 - t;
+    const x = mt * mt * x1 + 2 * mt * t * cx + t * t * x2;
+    const y = mt * mt * y1 + 2 * mt * t * cy + t * t * y2;
+    len += Math.hypot(x - px, y - py);
+    px = x;
+    py = y;
+  }
+  return len;
+}
+
 export function AnimatedBeam({
   containerRef,
   fromRef,
@@ -40,7 +68,6 @@ export function AnimatedBeam({
   className,
 }: AnimatedBeamProps) {
   const id = useId();
-  const pathRef = useRef<SVGPathElement>(null);
   const [geo, setGeo] = useState<Geometry>(EMPTY);
 
   useEffect(() => {
@@ -59,9 +86,10 @@ export function AnimatedBeam({
       const y1 = a.top - c.top + a.height / 2;
       const x2 = b.left - c.left + b.width / 2;
       const y2 = b.top - c.top + b.height / 2;
+      const cx = (x1 + x2) / 2;
       const midY = (y1 + y2) / 2 - curvature;
-      const d = `M ${x1},${y1} Q ${(x1 + x2) / 2},${midY} ${x2},${y2}`;
-      const len = pathRef.current?.getTotalLength() ?? Math.hypot(x2 - x1, y2 - y1);
+      const d = `M ${x1},${y1} Q ${cx},${midY} ${x2},${y2}`;
+      const len = quadLength(x1, y1, cx, midY, x2, y2);
       setGeo((prev) =>
         prev.w === c.width && prev.h === c.height && prev.d === d
           ? prev
@@ -69,8 +97,7 @@ export function AnimatedBeam({
       );
     };
 
-    // Measure once now, then again on the next frame so the path element exists and
-    // `getTotalLength()` returns a real value for the dash animation.
+    // Measure once now, then again after layout settles (fonts/images can shift the nodes).
     compute();
     const raf = requestAnimationFrame(compute);
 
@@ -103,13 +130,7 @@ export function AnimatedBeam({
       aria-hidden="true"
     >
       {/* Static wire - the resting connection. */}
-      <path
-        ref={pathRef}
-        d={geo.d}
-        stroke="var(--og-border)"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
+      <path d={geo.d} stroke="var(--og-border)" strokeWidth={1.5} strokeLinecap="round" />
       {/* Travelling emerald pulse: a dashed overlay whose offset animates on the compositor. */}
       {geo.len > 0 && (
         <path
