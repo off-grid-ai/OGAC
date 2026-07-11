@@ -1,9 +1,0 @@
-rule | file:line | justification
-
-# S6479 — array index used as a React key. Accept-listed: the mapped items carry NO stable unique
-# id, and the render order IS the item's identity (a fixed, server-computed sequence). Inventing a
-# synthetic key is behavior-neutral at best and risks key collisions at worst — not a mechanical,
-# provably-safe change. Per ROE, index key retained where there is no stable id.
-S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:35 | RunStep has no stable unique id (kind/label/detail/refs/ms); ordered/append-only "governed chain" — index IS the step identity. Fabricated key could change reconciliation.
-S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:62 | CheckResult has no stable unique id (name/verdict/detail/score) and names can repeat; keying on name could collide. Index retained per ROE.
-S6479 | src/app/(console)/data/warehouse/[table]/page.tsx:151 | Raw warehouse query rows have no guaranteed id column; a rendered result set where row order is identity. Index retained per ROE.
