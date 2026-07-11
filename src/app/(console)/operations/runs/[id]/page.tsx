@@ -191,7 +191,7 @@ function Meta({ label, value, mono }: Readonly<{ label: string; value: string; m
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <div className="rounded-md border border-border p-4">
       <p className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">{title}</p>
