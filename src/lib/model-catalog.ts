@@ -346,6 +346,34 @@ export function getModelSpec(id: string, catalog: ModelSpec[] = MODEL_CATALOG): 
   return catalog.find((m) => m.id.toLowerCase() === needle);
 }
 
+// Customer-facing DISPLAY name for a raw model id / routing tag. NEVER surface an internal routing
+// codename (e.g. `qwythos-9b`) or a raw Ollama-style tag (`llama3.1:70b`, `gemma-local`) to a user —
+// they read as broken/internal. Prefer the curated catalog `name`; otherwise prettify the tag
+// (strip a provider/`onprem/` prefix, split on -/_/:, title-case, keep version numbers). Pure, no I/O.
+export function modelLabel(id: string | null | undefined, catalog: ModelSpec[] = MODEL_CATALOG): string {
+  if (!id) return 'Default model';
+  const raw = String(id).trim();
+  const bare = raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw; // drop openai//onprem/ prefix
+  const spec = getModelSpec(bare, catalog) ?? getModelSpec(raw, catalog);
+  if (spec) return spec.name;
+  // Prettify an unknown tag: "llama3.1:70b" -> "Llama 3.1 70B", "gemma-local" -> "Gemma Local".
+  const cleaned = bare
+    .replace(/[:_-]+/g, ' ')
+    .replace(/([a-zA-Z])(\d)/g, '$1 $2') // split letter→digit: llama3.1 -> llama 3.1
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (
+    cleaned
+      .split(' ')
+      .map((w) => {
+        if (/^\d+b$/i.test(w)) return w.toUpperCase(); // 70b -> 70B
+        if (/^\d/.test(w)) return w; // version number like 3.1 stays
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      })
+      .join(' ') || 'Model'
+  );
+}
+
 /** Group a catalog into `family → specs`, preserving MODEL_FAMILIES order and dropping empty groups. */
 export function catalogByFamily(catalog: ModelSpec[] = MODEL_CATALOG): { family: ModelFamily; models: ModelSpec[] }[] {
   return MODEL_FAMILIES.map((family) => ({
