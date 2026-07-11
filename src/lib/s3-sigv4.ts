@@ -63,7 +63,7 @@ function encodePath(path: string): string {
       }
       return encodeURIComponent(decoded).replace(
         /[!'()*]/g,
-        (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase(),
+        (c) => '%' + c.codePointAt(0)!.toString(16).toUpperCase(),
       );
     })
     .join('/');
