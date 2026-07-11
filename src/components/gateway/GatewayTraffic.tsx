@@ -171,6 +171,9 @@ export function CallDetail({ c }: Readonly<{ c: Call }>) {
 // latency, tokens, and status. Hidden entirely when the gateway has no traffic feed.
 export function GatewayTraffic() {
   const [data, setData] = useState<Traffic | null>(null);
+  // Flips true after the first fetch settles (success OR failure) so we never sit on a blank
+  // pane forever when the traffic feed is offline / returns nothing.
+  const [loaded, setLoaded] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -181,7 +184,11 @@ export function GatewayTraffic() {
         const d = (await r.json()) as Traffic;
         if (alive) setData(d);
       } catch {
-        /* keep last snapshot */
+        // Feed unreachable: mark it unavailable rather than keeping a stale/empty snapshot,
+        // so the explicit empty state renders instead of a blank pane.
+        if (alive) setData((prev) => prev ?? { available: false });
+      } finally {
+        if (alive) setLoaded(true);
       }
     };
     tick();
@@ -192,7 +199,20 @@ export function GatewayTraffic() {
     };
   }, []);
 
-  if (!data?.available) return null;
+  if (!data?.available) {
+    return (
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Traffic by gateway</CardTitle>
+        </CardHeader>
+        <CardContent className="py-10 text-center text-xs text-muted-foreground">
+          {!loaded
+            ? 'Loading live traffic…'
+            : 'No live traffic feed. Requests made through the gateway appear here in real time; if this stays empty, the aggregator’s traffic feed is offline or no calls have been routed yet.'}
+        </CardContent>
+      </Card>
+    );
+  }
   const stats = data.stats ?? [];
   const recent = data.recent ?? [];
 
