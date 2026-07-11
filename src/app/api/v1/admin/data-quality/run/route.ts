@@ -26,10 +26,14 @@ export async function POST(req: Request) {
 
   const verdict = await geDataQuality.runCheckpoint(suite, body.rows, body.expectations);
 
+  let outcome: 'ok' | 'fail' | 'error' = 'error';
+  if (verdict.engineReachable) {
+    outcome = verdict.success ? 'ok' : 'fail';
+  }
   auditFromSession(gate, await currentOrgId(), {
     action: 'data-quality.checkpoint',
     resource: `suite:${suite}`,
-    outcome: verdict.engineReachable ? (verdict.success ? 'ok' : 'fail') : 'error',
+    outcome,
   });
 
   return NextResponse.json({ ...verdict, summary: summarize(verdict) });

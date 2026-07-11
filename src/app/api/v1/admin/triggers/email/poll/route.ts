@@ -52,10 +52,14 @@ export async function POST(req: Request) {
 
   const result = await pollEmailTriggers();
 
+  let outcome: 'ok' | 'error' = 'ok';
+  if (result.configured && result.errors.length) {
+    outcome = 'error';
+  }
   auditFromSession(gate, orgId, {
     action: 'trigger.email.poll',
     resource: 'trigger:email',
-    outcome: result.configured ? (result.errors.length ? 'error' : 'ok') : 'ok',
+    outcome,
   });
 
   // 200 with the honest cycle summary. When unconfigured, configured:false + note (not an error — the
