@@ -111,7 +111,7 @@ function sqlStr(v: string | number): string {
 
 // Only allow plain identifiers as column names — defends the generated SQL against injection via a
 // crafted `field`. Anything else drops the condition (safe: narrows nothing).
-const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const IDENT_RE = /^[A-Za-z_]\w*$/;
 
 /**
  * PURE: map a typed MetaFilter onto a LanceDB `.where(...)` SQL predicate. Returns undefined when

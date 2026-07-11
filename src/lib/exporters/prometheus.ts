@@ -31,7 +31,7 @@ export function escapeLabelValue(v: string): string {
 
 // Sanitize a metric/label NAME to the allowed charset [a-zA-Z_][a-zA-Z0-9_]*. Pure.
 export function sanitizeName(name: string): string {
-  const cleaned = name.replace(/[^a-zA-Z0-9_]/g, '_');
+  const cleaned = name.replace(/\W/g, '_');
   return /^[a-zA-Z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
 }
 

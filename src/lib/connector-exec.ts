@@ -94,7 +94,7 @@ export function detectDialect(
 // name into the statement (bound params can't parameterize an identifier), so we allow only safe
 // identifier characters incl. an optional schema qualifier. Rejects anything else → the caller
 // gets null rather than an injection surface.
-const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
+const SAFE_IDENTIFIER = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)?$/;
 function safeIdentifier(name: string): string | null {
   return SAFE_IDENTIFIER.test(name) ? name : null;
 }

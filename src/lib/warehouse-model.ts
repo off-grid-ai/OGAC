@@ -11,7 +11,7 @@
 // optional `database.table` qualifier — and reject everything else (spaces, quotes, backticks,
 // semicolons, parens, comment markers). That closes the interpolation injection surface: there is
 // no character left that could break out of the identifier position.
-const SAFE_IDENTIFIER = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)?$/;
+const SAFE_IDENTIFIER = /^\w+(\.\w+)?$/;
 
 export function isSafeIdentifier(name: string): boolean {
   return typeof name === 'string' && SAFE_IDENTIFIER.test(name);
@@ -192,7 +192,7 @@ export function guardReadOnlySql(rawSql: string): GuardResult {
   // followed by an opening paren (whitespace tolerated) whose name is in the deny-list. Case-
   // insensitive; `foo . url ( )` can't dodge it because we match the identifier immediately before
   // the paren. Ordinary functions (count/sum/toString) aren't in the set, so real reads pass.
-  const callRe = /([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+  const callRe = /([A-Za-z_]\w*)\s*\(/g;
   for (let m = callRe.exec(withoutTrailing); m !== null; m = callRe.exec(withoutTrailing)) {
     if (FORBIDDEN_TABLE_FUNCTIONS.has(m[1].toUpperCase())) {
       return { ok: false, reason: `forbidden table function: ${m[1]}` };

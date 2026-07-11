@@ -16,7 +16,7 @@ export const PHONE = /\b\+?\d[\d ()-]{7,}\d\b/g;
 // PAN — Permanent Account Number: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F). No other
 // 10-char token mixes letters+digits in this exact layout, so the shape alone is highly specific
 // and we don't over-gate on context.
-export const IN_PAN = /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g;
+export const IN_PAN = /\b[A-Z]{5}\d{4}[A-Z]\b/g;
 
 // IFSC — bank branch code: 4 letters (bank), a literal 0 (reserved), then 6 alphanumerics
 // (e.g. HDFC0001234). The mandatory `0` in position 5 makes this shape almost impossible to hit by
@@ -31,7 +31,7 @@ export const IN_IFSC = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
 //      bare 12-digit run standing on its own word boundary. A longer digit run (a 16-digit card,
 //      an 18-digit order id) fails the \b on the trailing side and is left alone.
 // The spaced 4-4-4 form is by itself an extremely strong Aadhaar signal.
-export const IN_AADHAAR = /\b[2-9][0-9]{3}[ -][0-9]{4}[ -][0-9]{4}\b|\b[2-9][0-9]{11}\b/g;
+export const IN_AADHAAR = /\b[2-9]\d{3}[ -]\d{4}[ -]\d{4}\b|\b[2-9]\d{11}\b/g;
 
 // UPI VPA — Virtual Payment Address: `handle@psp` (e.g. ramesh@okhdfc, 98765@paytm). The PSP side
 // is letters-only (2+), which is what separates a VPA from an email: an email's domain has a dotted

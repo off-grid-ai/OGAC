@@ -63,7 +63,7 @@ export type EtlJobDraft = Omit<
 // safe identifiers (same class as warehouse-model.isSafeIdentifier — letters/digits/underscore, no
 // dot: db and table are separate fields here). Source resource is validated by connector-exec's own
 // guard at query time; here we only require it non-empty.
-const SAFE_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SAFE_IDENT = /^[A-Za-z_]\w*$/;
 
 export function isSafeIdent(name: unknown): name is string {
   return typeof name === 'string' && SAFE_IDENT.test(name);

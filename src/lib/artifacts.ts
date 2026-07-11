@@ -71,7 +71,7 @@ function escapeHtml(s: string): string {
 function stripImportsExports(code: string): string {
   return code
     .replace(/^\s*import\s+.*?;?\s*$/gm, '')
-    .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
+    .replace(/export\s+default\s+function\s+(\w+)/g, 'function $1')
     .replace(/export\s+default\s+/g, 'window.exports = window.exports || {}; exports.default = ')
     .replace(/^\s*export\s+(const|let|var|function|class)\s/gm, '$1 ');
 }
