@@ -108,12 +108,13 @@ test('every domain binds to a declared connector (no dangling references)', () =
   for (const d of SURAKSHA_DOMAINS) assert.ok(ids.has(d.connectorId), `${d.label} → ${d.connectorId}`);
 });
 
-test('connectors point at the ISOLATED per-tenant `suraksha` databases (not shared corebank/policyadmin, not coreins)', () => {
+test('connectors are insurer-flavoured: isolated `suraksha` DB, `coreins` role, NO bank `corebank`', () => {
   const pg = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_coreins');
   const my = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_policyadmin');
   assert.ok(pg && pg.endpoint.endsWith('/suraksha'), 'coreins → …/suraksha');
-  assert.ok(pg && pg.endpoint.includes('corebank@'), 'points at the corebank server (auth via vault, not inline)');
-  assert.ok(!pg.endpoint.includes('coreins'), 'no stale coreins DB');
+  // The insurer connector must NOT read bank-flavoured — the connect role is `coreins`, not `corebank`.
+  assert.ok(pg && pg.endpoint.includes('coreins@'), 'connects as the insurer `coreins` role');
+  assert.ok(pg && !pg.endpoint.includes('corebank'), 'no bank-flavoured `corebank` on the insurer');
   assert.ok(my && my.endpoint.endsWith('/suraksha'), 'policyadmin → …/suraksha');
 });
 
