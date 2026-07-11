@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { auth } from '@/auth';
 import { GlobalSearch } from '@/components/GlobalSearch';
@@ -9,11 +10,14 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerModeProvider } from '@/components/ViewerModeProvider';
 import { readDemoBanner } from '@/lib/demo-hellobar';
+import { tenantSlugFromHost } from '@/lib/route-access';
 
 export default async function ConsoleLayout({ children }: Readonly<{ children: ReactNode }>) {
   const session = await auth();
-  // Read-only-demo hellobar: shows only for a viewer session, with the demo creds from env.
-  const banner = readDemoBanner(session?.user?.role);
+  // Read-only-demo hellobar: shows only for a viewer session, with THIS tenant's demo creds
+  // (resolved per host slug — so the insurer shows demo-insurer@, not the bank's demo-bank@).
+  const slug = tenantSlugFromHost((await headers()).get('host'));
+  const banner = readDemoBanner(session?.user?.role, slug);
   return (
     <ViewerModeProvider role={session?.user?.role}>
       <TooltipProvider>

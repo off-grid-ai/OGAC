@@ -210,6 +210,24 @@ test('readDemoBanner: pulls the creds from env for a viewer, hides for a non-vie
 
     const admin = readDemoBanner('admin');
     assert.equal(admin.show, false);
+
+    // Per-tenant: a slug's own override wins over the generic pair, so each tenant's in-app
+    // hellobar shows ITS OWN viewer email (the bug: insurer was showing the generic demo-bank@).
+    const savedSlugEmail = process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL;
+    const savedSlugPw = process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_PASSWORD;
+    try {
+      process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL = 'demo-insurer@getoffgridai.co';
+      process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_PASSWORD = 'view-only-2026';
+      const insurer = readDemoBanner('viewer', 'suraksha');
+      assert.equal(insurer.email, 'demo-insurer@getoffgridai.co', 'per-slug override must win over generic');
+      // no slug → generic fallback still works (single-tenant deploys)
+      assert.equal(readDemoBanner('viewer').email, 'demo@offgrid.local');
+    } finally {
+      if (savedSlugEmail === undefined) delete process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL;
+      else process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL = savedSlugEmail;
+      if (savedSlugPw === undefined) delete process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_PASSWORD;
+      else process.env.OFFGRID_DEMO_VIEWER_SURAKSHA_PASSWORD = savedSlugPw;
+    }
   } finally {
     if (savedEmail === undefined) delete process.env.OFFGRID_DEMO_VIEWER_EMAIL;
     else process.env.OFFGRID_DEMO_VIEWER_EMAIL = savedEmail;
