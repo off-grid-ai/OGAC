@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { modelLabel } from '@/lib/model-catalog';
 
 export type Health = 'up' | 'degraded' | 'down' | 'unknown';
 interface Stat {
@@ -87,7 +88,7 @@ export function CallDetail({ c }: Readonly<{ c: Call }>) {
   return (
     <div className="space-y-2 py-1">
       <div className="flex flex-wrap gap-1.5">
-        <Chip label="served" value={c.modelServed ?? c.model} />
+        <Chip label="served" value={modelLabel(c.modelServed ?? c.model)} />
         <Chip label="tokens" value={`${c.promptTokens ?? '?'} → ${c.completionTokens ?? '?'}`} />
         {c.tps ? <Chip label="tok/s" value={c.tps} /> : null}
         {c.finish ? <Chip label="finish" value={c.finish} /> : null}
@@ -218,7 +219,7 @@ export function GatewayTraffic() {
                 </span>
                 <span className={`font-mono text-[10px] font-medium uppercase ${h.text}`}>{h.label}</span>
               </div>
-              <div className="mt-0.5 text-right font-mono text-[11px] text-muted-foreground">{s.model}</div>
+              <div className="mt-0.5 text-right text-[11px] text-muted-foreground">{modelLabel(s.model)}</div>
               <dl className="mt-2 space-y-0.5 text-xs text-muted-foreground">
                 <div className="flex justify-between">
                   <dt>requests</dt>
@@ -297,7 +298,7 @@ export function GatewayTraffic() {
                             {c.gateway}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{c.model}</TableCell>
+                        <TableCell className="text-xs">{modelLabel(c.model)}</TableCell>
                         <TableCell className="text-xs">{c.kind}</TableCell>
                         <TableCell
                           className={`font-mono text-xs ${
