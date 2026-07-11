@@ -31,8 +31,9 @@ function metaOf(id: string) {
 
 async function firstPartyDecision(input: PolicyInput) {
   const { allow, matched } = await evaluateAbac(input);
+  const decision = allow ? 'allowed' : 'denied';
   const reason = matched.length
-    ? `${matched.length} rule(s) matched; ${allow ? 'allowed' : 'denied'} (deny-overrides)`
+    ? `${matched.length} rule(s) matched; ${decision} (deny-overrides)`
     : 'no rule matched; default deny';
   return { allow, reason, engine: 'abac' };
 }

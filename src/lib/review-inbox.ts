@@ -295,9 +295,10 @@ export function guardrailNotesFrom(trace: ReviewAgentTrace | null): string[] {
   for (const c of trace.checks) {
     if (c.name === 'grounding') continue; // surfaced separately as faithfulness
     if (c.name === 'pii') {
+      const detailSuffix = c.detail ? ` (${c.detail})` : '';
       notes.push(
         c.verdict === 'redacted'
-          ? `Sensitive data was detected and masked before the model saw it${c.detail ? ` (${c.detail})` : ''}.`
+          ? `Sensitive data was detected and masked before the model saw it${detailSuffix}.`
           : 'No sensitive personal data was exposed.',
       );
     } else if (c.name === 'guardrail-rules' || c.name === 'injection') {

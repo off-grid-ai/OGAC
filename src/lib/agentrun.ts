@@ -445,9 +445,11 @@ async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
   }
   const t = Date.now();
   const result = await getSandbox().run('python', tool.endpoint || 'print("ok")');
+  const okLabel = result.ok ? 'ok' : 'fail';
+  const timeoutLabel = result.timedOut ? ' (timeout)' : '';
   const detail = result.refused
     ? result.refused
-    : `${result.engine}: exit ${result.exitCode} ${result.ok ? 'ok' : 'fail'}${result.timedOut ? ' (timeout)' : ''}`;
+    : `${result.engine}: exit ${result.exitCode} ${okLabel}${timeoutLabel}`;
   mark('sandbox', result.engine, detail, [ref], t);
 }
 
