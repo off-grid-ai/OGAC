@@ -345,6 +345,11 @@ function ShareDialog({ file, onClose }: Readonly<{ file: FileMeta | null; onClos
     }
   }, [file, ttl]);
 
+  // Share-link button label: minting, regenerating an existing link, or creating the first one.
+  let shareLinkLabel: string;
+  if (loading) shareLinkLabel = 'Generating…';
+  else shareLinkLabel = link ? 'Regenerate' : 'Create link';
+
   return (
     <FormSheet
       open={!!file}
@@ -355,7 +360,7 @@ function ShareDialog({ file, onClose }: Readonly<{ file: FileMeta | null; onClos
       footer={
         <Button onClick={() => void mint()} disabled={loading} className="w-full gap-1.5">
           {loading ? <Spinner /> : null}
-          {loading ? 'Generating…' : link ? 'Regenerate' : 'Create link'}
+          {shareLinkLabel}
         </Button>
       }
     >

@@ -179,8 +179,11 @@ export function MessagingManager() {
     }
   }
 
-  const statusVariant = (s: string) =>
-    s === 'verified' ? 'default' : s === 'failed' ? 'destructive' : 'secondary';
+  const statusVariant = (s: string) => {
+    if (s === 'verified') return 'default';
+    if (s === 'failed') return 'destructive';
+    return 'secondary';
+  };
 
   return (
     <div className="w-full space-y-6">
