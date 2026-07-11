@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getMdm } from '@/lib/adapters/registry';
+import { modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getDevice, listAudit, listDevices, pullPolicyForDevice } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -105,7 +106,7 @@ function ActivityCard({ audit }: Readonly<{ audit: Audit }>) {
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {e.ts.slice(0, 16).replace('T', ' ')}
                   </TableCell>
-                  <TableCell className="text-foreground">{e.model}</TableCell>
+                  <TableCell className="text-foreground">{modelLabel(e.model)}</TableCell>
                   <TableCell className="text-muted-foreground">{e.tokens}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {e.leftDevice ? 'left device' : 'on-device'}
