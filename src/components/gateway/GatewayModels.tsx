@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ModelBrowser, useModelCatalog } from '@/components/gateway/ModelPicker';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,13 @@ export function GatewayModels() {
   const { models, loading, error } = useModelCatalog();
   const [detail, setDetail] = useState<ModelSpec | null>(null);
   const liveCount = models.filter((m) => m.servedOnFleet).length;
+
+  // Pre-select the first model once the catalog loads so the spec pane shows real content
+  // instead of an empty "Select a model…" placeholder. Only auto-selects while nothing is
+  // chosen — a user's pick is never overridden.
+  useEffect(() => {
+    if (!detail && models.length > 0) setDetail(models[0]);
+  }, [models, detail]);
 
   return (
     <Card className="shadow-sm">
