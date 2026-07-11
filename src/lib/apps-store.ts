@@ -16,6 +16,7 @@ import {
   type FormField,
   validateAppSpec,
 } from '@/lib/app-model';
+import { hideDemoTestArtifact } from '@/lib/demo-test-artifacts';
 
 const DEFAULT_ORG = 'default';
 
@@ -185,7 +186,10 @@ export async function listApps(orgId: string): Promise<AppSpec[]> {
     .from(apps)
     .where(eq(apps.orgId, orgId || DEFAULT_ORG))
     .orderBy(desc(apps.createdAt));
-  return rows.map(toAppSpec);
+  // On customer-facing demo tenants, hide QA `[autotest]` apps (see demo-test-artifacts.ts).
+  return rows
+    .map(toAppSpec)
+    .filter((a) => !hideDemoTestArtifact(orgId, { title: a.title, ownerId: a.ownerId }));
 }
 
 // ─── listAppsByPipeline — apps/agents BOUND to a pipeline (Overview "Consumers") ─
@@ -198,7 +202,9 @@ export async function listAppsByPipeline(pipelineId: string, orgId: string): Pro
     .from(apps)
     .where(and(eq(apps.orgId, orgId || DEFAULT_ORG), eq(apps.pipelineId, pipelineId)))
     .orderBy(desc(apps.createdAt));
-  return rows.map(toAppSpec);
+  return rows
+    .map(toAppSpec)
+    .filter((a) => !hideDemoTestArtifact(orgId, { title: a.title, ownerId: a.ownerId }));
 }
 
 // ─── updateApp — patch, org-scoped, re-validated ────────────────────────────────

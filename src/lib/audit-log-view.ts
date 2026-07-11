@@ -1,5 +1,6 @@
-// PURE audit-log display-model normalizer + filter contract — zero imports, zero I/O, fully
-// unit-testable. This is the accountability surface's view-model: it turns the loosely-shaped
+// PURE audit-log display-model normalizer + filter contract — zero I/O, fully unit-testable. Its
+// only import is another PURE same-layer helper (demo-test-artifacts) so the one rule for "is this
+// the QA autotest actor?" lives in exactly one place (DRY) rather than being re-spelled here. This is the accountability surface's view-model: it turns the loosely-shaped
 // `offgrid-audit` OpenSearch docs (read back through `searchAudit` in src/lib/siem.ts) into one
 // clean row model answering "who did what, to what, on which project, with what model/tokens/cost,
 // and how it turned out."
@@ -11,6 +12,7 @@
 //      action, resource?, model?, tokens:{prompt,completion,total}, costUsd?, outcome, runId?, ip? }.
 // The normalizer reads either defensively (first-non-empty across candidate keys) so a mixed index
 // renders coherently and no producer's rows go blank.
+import { isAutotestActor } from '@/lib/demo-test-artifacts';
 //
 // The network read + the server-side filter push-down live in `searchAudit` (owned by the
 // foundation agent). This file NEVER fetches. It also carries the FILTER + EXPORT contract so the
@@ -108,6 +110,8 @@ export interface AuditFilters {
   to?: string; // ISO / date-time upper bound (inclusive)
   page?: number; // 1-based
   size?: number; // page size
+  /** Drop QA autotest-actor rows (set on customer-facing demo tenants — see demo-test-artifacts). */
+  hideAutotest?: boolean;
 }
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -255,6 +259,7 @@ export function filterAuditRows(rows: AuditRow[], f: AuditFilters): AuditRow[] {
   const fromMs = f.from ? Date.parse(f.from) : Number.NaN;
   const toMs = f.to ? Date.parse(f.to) : Number.NaN;
   return rows.filter((r) => {
+    if (f.hideAutotest && isAutotestActor(r.actor)) return false;
     if (!eq(r.actor, f.actor)) return false;
     if (!eq(r.action, f.action)) return false;
     if (!eq(r.project, f.project)) return false;
