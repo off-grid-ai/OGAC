@@ -73,7 +73,9 @@ export function accountingQueryClause(
   const range = {
     range: { '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) } },
   };
-  return { bool: { filter: [range, ...scopeFilters] } };
+  // No org/pipeline scope → keep the bare range clause (backward-compatible single-tenant shape).
+  // With scope filters, AND them alongside the range under a bool.filter.
+  return scopeFilters.length ? { bool: { filter: [range, ...scopeFilters] } } : range;
 }
 
 /**
