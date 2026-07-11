@@ -273,25 +273,32 @@ export function TeamsDepartments() {
 
   const load = useCallback(async () => {
     setError(null);
-    const res = await fetch('/api/v1/admin/teams');
-    if (!res.ok) {
-      setError('Failed to load teams');
+    try {
+      const res = await fetch('/api/v1/admin/teams');
+      if (!res.ok) {
+        setError('Failed to load teams');
+        setTeams([]);
+        return;
+      }
+      const body = (await res.json()) as { data?: TeamRow[] };
+      const list = body.data ?? [];
+      setTeams(list);
+      // Fetch each team's members in parallel so the org chart is fully expanded.
+      const entries = await Promise.all(
+        list.map(async (t): Promise<[string, MemberRow[]]> => {
+          const mRes = await fetch(`/api/v1/admin/teams/${t.id}/members`);
+          if (!mRes.ok) return [t.id, []];
+          const mBody = (await mRes.json()) as { data?: MemberRow[] };
+          return [t.id, mBody.data ?? []];
+        }),
+      );
+      setMembersByTeam(Object.fromEntries(entries));
+    } catch {
+      // A thrown fetch/json (API unreachable) must still resolve the loading state — otherwise
+      // teams stays null and the panel sits on "Loading the org chart…" forever.
+      setError('Failed to reach the teams API');
       setTeams([]);
-      return;
     }
-    const body = (await res.json()) as { data?: TeamRow[] };
-    const list = body.data ?? [];
-    setTeams(list);
-    // Fetch each team's members in parallel so the org chart is fully expanded.
-    const entries = await Promise.all(
-      list.map(async (t): Promise<[string, MemberRow[]]> => {
-        const mRes = await fetch(`/api/v1/admin/teams/${t.id}/members`);
-        if (!mRes.ok) return [t.id, []];
-        const mBody = (await mRes.json()) as { data?: MemberRow[] };
-        return [t.id, mBody.data ?? []];
-      }),
-    );
-    setMembersByTeam(Object.fromEntries(entries));
   }, []);
 
   useEffect(() => {
