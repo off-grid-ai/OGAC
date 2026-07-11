@@ -119,7 +119,8 @@ export interface StarterQuery {
   sql: string;
 }
 
-export const STARTER_QUERIES: StarterQuery[] = [
+// ── BANK starters (org_bharat) — the union-bank book: transactions, loans/NPA, KYC, branches. ──
+const BANK_STARTER_QUERIES: StarterQuery[] = [
   {
     id: 'flagged-by-channel',
     title: 'Flagged transactions by channel',
@@ -168,6 +169,71 @@ export const STARTER_QUERIES: StarterQuery[] = [
       'LIMIT 25',
   },
 ];
+
+// ── INSURER starters (org_suraksha) — the life-insurer book: policies, premiums/persistency,
+// claims, KYC. Same `bfsi` warehouse schema convention as the bank box (the on-prem ClickHouse
+// schema name is fleet-wide), but every table + concept is insurance, so nothing bank-flavoured
+// (transactions/NPA-loans/branches) leaks onto the insurer tenant. ──
+const INSURER_STARTER_QUERIES: StarterQuery[] = [
+  {
+    id: 'policies-by-status',
+    title: 'Policies by status',
+    description: 'In-force book by policy status — in-force, lapsed, matured, surrendered — with sum assured.',
+    sql:
+      'SELECT status, count() AS policies, sum(sum_assured) AS sum_assured\n' +
+      'FROM bfsi.fact_policy\n' +
+      'GROUP BY status\n' +
+      'ORDER BY policies DESC',
+  },
+  {
+    id: 'persistency-by-band',
+    title: 'Premium persistency by band',
+    description: 'Persistency (share of premiums still being paid) by persistency band — the retention health check.',
+    sql:
+      'SELECT persistency_band AS band,\n' +
+      '       count() AS policies,\n' +
+      "       countIf(is_paid = 1) AS paid,\n" +
+      "       round(100.0 * countIf(is_paid = 1) / count(), 1) AS persistency_pct\n" +
+      'FROM bfsi.fact_premium\n' +
+      'GROUP BY band\n' +
+      'ORDER BY persistency_pct DESC',
+  },
+  {
+    id: 'claims-by-type',
+    title: 'Claims by type',
+    description: 'Claim register by claim type (death/maturity/surrender) with count and settled amount.',
+    sql:
+      'SELECT claim_type AS type,\n' +
+      '       count() AS claims,\n' +
+      "       countIf(status = 'settled') AS settled,\n" +
+      "       sum(if(status = 'settled', settled_amount, 0)) AS settled_amount\n" +
+      'FROM bfsi.fact_claim\n' +
+      'GROUP BY type\n' +
+      'ORDER BY claims DESC',
+  },
+  {
+    id: 'kyc-events-by-day',
+    title: 'KYC events over the last 30 days',
+    description: 'Daily volume of KYC verification events — a freshness + activity check on the pipeline.',
+    sql:
+      'SELECT toDate(event_time) AS day, count() AS events\n' +
+      'FROM bfsi.fact_kyc_event\n' +
+      'GROUP BY day\n' +
+      'ORDER BY day DESC\n' +
+      'LIMIT 30',
+  },
+];
+
+/** Starter queries for a tenant — bank vs insurer. Keeps bank concepts off the insurer tenant. */
+export function starterQueriesFor(flavour: 'bank' | 'insurer'): StarterQuery[] {
+  return flavour === 'bank' ? BANK_STARTER_QUERIES : INSURER_STARTER_QUERIES;
+}
+
+/**
+ * @deprecated Prefer {@link starterQueriesFor} — this bank-flavoured default is retained only for
+ * callers that cannot resolve a tenant flavour. New code MUST branch by tenant.
+ */
+export const STARTER_QUERIES: StarterQuery[] = BANK_STARTER_QUERIES;
 
 // ─── Query result columns (derive from either meta or the first row) ───────────
 // The /warehouse/query response carries `columns:[{name,type}]`. When (defensively) absent, derive

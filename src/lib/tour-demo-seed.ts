@@ -76,6 +76,17 @@ export const SURAKSHA_PROFILE: TenantProfile = {
 
 export const TOUR_PROFILES: readonly TenantProfile[] = [BHARAT_PROFILE, SURAKSHA_PROFILE];
 
+/**
+ * Resolve a tenant's demo profile from its org id. PURE — the single place that maps an org id to
+ * its bank/insurer flavour, so any surface that must vary its (non-DB-backed) copy/examples per
+ * tenant reads the flavour here instead of hard-coding one industry. Unknown orgs default to the
+ * bank profile (the canonical BFSI flavour), never the insurer, so a non-demo tenant is never
+ * shown insurer-only examples.
+ */
+export function profileForOrg(orgId: string | null | undefined): TenantProfile {
+  return TOUR_PROFILES.find((p) => p.orgId === orgId) ?? BHARAT_PROFILE;
+}
+
 // ─── Apps + agents (Studio) — governed use cases, each bound to a pipeline by NAME ────────────────
 // A step is a minimal AppSpec step. `domain` on connector-query steps is a LABEL (resolves at run
 // time via the label-matching resolver — the honesty seam in data-domains-demo-seed).
