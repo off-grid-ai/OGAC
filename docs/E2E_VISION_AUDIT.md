@@ -154,3 +154,30 @@ BROKEN (app-level): 1 (the overview LLM-GUARD card).
   HTTP-status ≥ 500 from the response, not body text) so `ok` is trustworthy.
 - **Stability:** the first full light crawl's browser died at ~65 routes (exit 144) — long fullPage
   crawls should restart the context every N routes or run in smaller batches.
+
+---
+
+## 2026-07-12 — #240 fixes verified live + definitive both-tenant pass (in progress)
+
+Post-fix clean-state pass on both tenants (`suraksha` insurer + `bharatunion` bank).
+
+**Closed + verified live this session:**
+- **In-app demo hellobar showed the wrong tenant's login** (insurer showed the bank's
+  `demo-bank@`). Root cause was NOT seed/env — the shared `(console)` layout keyed the banner off
+  `headers().get('host')`, which is host-ambiguous on a post-login **client RSC navigation** (correct
+  on hard reload, wrong on client-nav). Fixed by resolving the tenant from the signed-in **org**
+  (`currentTenantSlug()` → pure `slugForOrg()`), host as fallback. Verified 4/4 both tenants via the
+  exact failing path. See memory `feedback-rsc-nav-host-ambiguous`.
+- **Duplicate knowledge collection per tenant** ("Insurance Policies & SOPs" / "BFSI Policies &
+  SOPs" — the seed ran twice, each copy with its own 3 docs). Deleted the newer copy + its docs +
+  chunks on the live DB in a transaction (kept the 18:14 originals); 0 dupes remain; Knowledge UI
+  now shows exactly one card per tenant. Code already prevents new dupes.
+
+**Still open (NOT this repo — private fleet-orchestration seed scripts):**
+- Bank-flavored FinOps data on the insurer tenant (`@bank.example` owners, "Personal Loan
+  Underwriting Assist", "corebank → warehouse" pipeline) — needs a private-repo seed edit + reseed,
+  and the `coreins` DB role. Flagged for the fleet-repo session.
+
+**Definitive vision pass:** capturing all 72 static + 48 dynamic-template routes (+ tab states) for
+both tenants (dark theme) into `scratchpad/vision-{insurer,bank}`, then per-screen vision review.
+Findings appended below as batches land.
