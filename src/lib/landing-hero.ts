@@ -42,6 +42,19 @@ export function togglePromoted(
 }
 
 /**
+ * The next index when stepping a lightbox/carousel by keyboard arrow or on-screen prev/next.
+ * CLAMPED at both ends (no wrap): stepping past the last stays on the last, before the first stays
+ * on the first — so the on-screen arrows can be disabled at the bounds and the ←/→ keys never jump
+ * the viewer off the ends. Pure (length + index + direction in, index out) so the navigation rule is
+ * unit-testable without the DOM. An empty set returns 0.
+ */
+export function stepIndex(count: number, current: number, dir: 1 | -1): number {
+  if (count <= 0) return 0;
+  const clamped = Math.max(0, Math.min(current, count - 1));
+  return Math.max(0, Math.min(clamped + dir, count - 1));
+}
+
+/**
  * The focus-trap decision for a lightbox / modal on a Tab keypress: given the ordered focusable
  * elements and which one currently holds focus, return the element focus should WRAP to (and thus
  * the default should be prevented), or null to let the browser move focus normally. Kept pure (no

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   activeShotIndex,
   nextFocusTarget,
+  stepIndex,
   resolveShot,
   togglePromoted,
   type TourShot,
@@ -68,4 +69,27 @@ test('nextFocusTarget: an empty focusable set never intercepts', () => {
 test('nextFocusTarget: a single focusable element wraps to itself both ways', () => {
   assert.equal(nextFocusTarget(1, 0, false), 'first');
   assert.equal(nextFocusTarget(1, 0, true), 'last');
+});
+
+// ── stepIndex — clamped lightbox/carousel navigation (arrow keys + on-screen prev/next) ──────────────
+test('stepIndex: steps forward and backward within bounds', () => {
+  assert.equal(stepIndex(5, 0, 1), 1);
+  assert.equal(stepIndex(5, 2, 1), 3);
+  assert.equal(stepIndex(5, 3, -1), 2);
+});
+
+test('stepIndex: clamps at both ends (no wrap)', () => {
+  assert.equal(stepIndex(5, 4, 1), 4, 'past last stays on last');
+  assert.equal(stepIndex(5, 0, -1), 0, 'before first stays on first');
+});
+
+test('stepIndex: single-item set never moves', () => {
+  assert.equal(stepIndex(1, 0, 1), 0);
+  assert.equal(stepIndex(1, 0, -1), 0);
+});
+
+test('stepIndex: empty set and out-of-range current are safe', () => {
+  assert.equal(stepIndex(0, 0, 1), 0);
+  assert.equal(stepIndex(3, 99, 1), 2, 'out-of-range current is clamped first');
+  assert.equal(stepIndex(3, -5, -1), 0);
 });

@@ -1,15 +1,17 @@
 'use client';
 
-import { ArrowsOut, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nextFocusTarget } from '@/lib/landing-hero';
+import { nextFocusTarget, stepIndex } from '@/lib/landing-hero';
 import { cn } from '@/lib/utils';
 
-// A horizontal, scroll-snapping rail of real product surfaces. Tap any card to open it FULL-SCREEN
-// in a focus-trapped lightbox (closed by esc / backdrop / the button). Native scroll-snap keeps it
-// keyboard/touch accessible; framed to the Off Grid charcoal/emerald system, both themes via tokens.
+// The product-tour surfaces. The RAIL below the hero is a filmstrip SELECTOR: tapping a card
+// promotes that surface to the big hero viewer (onSelect) and the page scrolls up to it - it no
+// longer opens the lightbox directly. The hero is the single viewer; clicking the hero opens the
+// full-screen Lightbox, which itself steps through every surface with the arrow keys / on-screen
+// arrows. Framed to the Off Grid charcoal/emerald system, both themes via tokens.
 export interface CarouselCard {
   id: string;
   src: string;
@@ -20,13 +22,14 @@ export interface CarouselCard {
 
 interface CardsCarouselProps {
   cards: CarouselCard[];
+  activeIndex: number;
+  onSelect: (index: number) => void;
 }
 
-export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
+export function CardsCarousel({ cards, activeIndex, onSelect }: Readonly<CardsCarouselProps>) {
   const railRef = useRef<HTMLUListElement>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
-  const [zoomed, setZoomed] = useState<CarouselCard | null>(null);
 
   const onScroll = useCallback(() => {
     const el = railRef.current;
@@ -48,16 +51,24 @@ export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
         onScroll={onScroll}
         className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {cards.map((card) => (
+        {cards.map((card, i) => (
           <li
             key={card.id}
             className="group relative w-[82%] shrink-0 snap-start sm:w-[52%] lg:w-[38%] xl:w-[30%]"
           >
-            <figure className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/40">
+            <figure
+              className={cn(
+                'overflow-hidden rounded-xl border bg-card transition-colors',
+                i === activeIndex
+                  ? 'border-primary ring-1 ring-primary/40'
+                  : 'border-border hover:border-primary/40',
+              )}
+            >
               <button
                 type="button"
-                onClick={() => setZoomed(card)}
-                aria-label={`Open ${card.label} full screen`}
+                onClick={() => onSelect(i)}
+                aria-label={`Show ${card.label} in the viewer`}
+                aria-current={i === activeIndex ? 'true' : undefined}
                 className="relative block aspect-[16/10] w-full overflow-hidden border-b border-border/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Image
@@ -67,9 +78,6 @@ export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
                   sizes="(max-width: 640px) 82vw, (max-width: 1280px) 40vw, 30vw"
                   className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
                 />
-                <span className="pointer-events-none absolute right-2 top-2 flex size-7 items-center justify-center rounded-md border border-border bg-background/80 text-foreground opacity-0 backdrop-blur transition-opacity duration-200 group-hover:opacity-100">
-                  <ArrowsOut className="size-4" weight="bold" />
-                </span>
               </button>
               <figcaption className="p-4">
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
@@ -87,7 +95,7 @@ export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
           type="button"
           onClick={() => scrollBy(-1)}
           disabled={atStart}
-          aria-label="Previous surfaces"
+          aria-label="Scroll surfaces left"
           className={cn(
             'flex size-11 items-center justify-center rounded-full border border-border text-foreground/80 transition',
             'hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
@@ -100,7 +108,7 @@ export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
           type="button"
           onClick={() => scrollBy(1)}
           disabled={atEnd}
-          aria-label="Next surfaces"
+          aria-label="Scroll surfaces right"
           className={cn(
             'flex size-11 items-center justify-center rounded-full border border-border text-foreground/80 transition',
             'hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
@@ -110,21 +118,30 @@ export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
           <CaretRight className="size-4" weight="bold" />
         </button>
         <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          Tap to zoom
+          Tap a surface to show it above
         </span>
       </div>
-
-      {zoomed && <Lightbox card={zoomed} onClose={() => setZoomed(null)} />}
     </div>
   );
 }
 
-// A focus-trapped, backdrop/esc-closable FULL-SCREEN view of one surface. Rendered plainly (no
-// entrance animation that could leave it invisible); the image fills the viewport, object-contain.
-// Focus is trapped inside so keyboard users cannot tab out behind it.
-function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }) {
+// A focus-trapped, backdrop/esc-closable FULL-SCREEN viewer that steps through ALL surfaces:
+// ArrowRight/ArrowLeft (and the on-screen prev/next arrows) move to the neighbouring surface,
+// CLAMPED at the ends (stepIndex). The active index is lifted to the parent (onIndex) so the hero
+// underneath stays in sync. Focus is trapped inside so keyboard users cannot tab out behind it.
+interface LightboxProps {
+  cards: CarouselCard[];
+  index: number;
+  onIndex: (index: number) => void;
+  onClose: () => void;
+}
+
+export function Lightbox({ cards, index, onIndex, onClose }: Readonly<LightboxProps>) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const card = cards[index];
+  const atStart = index <= 0;
+  const atEnd = index >= cards.length - 1;
 
   // Lock body scroll for the life of the overlay ONLY - a mount/unmount effect with no deps.
   useEffect(() => {
@@ -142,6 +159,11 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
         onClose();
         return;
       }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onIndex(stepIndex(cards.length, index, e.key === 'ArrowRight' ? 1 : -1));
+        return;
+      }
       if (e.key !== 'Tab') return;
       const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
         'button, a[href], [tabindex]:not([tabindex="-1"])',
@@ -155,12 +177,10 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onIndex, cards.length, index]);
 
   // Portal to <body> so `fixed inset-0` resolves against the VIEWPORT, not a transformed ancestor.
-  // The carousel sits inside a motion/BlurFade wrapper whose `transform` would otherwise make this
-  // fixed overlay position relative to that box (trapping it mid-page instead of full-screen).
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !card) return null;
   return createPortal(
     <div
       ref={panelRef}
@@ -179,22 +199,36 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
           </span>
           <span className="ml-3 hidden text-sm text-muted-foreground sm:inline">{card.caption}</span>
         </span>
-        <button
-          ref={closeRef}
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border text-foreground/80 transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <X className="size-4" weight="bold" />
-        </button>
+        <span className="flex items-center gap-3">
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+            {index + 1} / {cards.length}
+          </span>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border text-foreground/80 transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <X className="size-4" weight="bold" />
+          </button>
+        </span>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close full screen"
-        className="flex min-h-0 flex-1 cursor-zoom-out items-center justify-center overflow-auto p-3 sm:p-6"
-      >
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-3 sm:p-6">
+        {/* Prev / next arrows overlaid on the image, clamped at the ends. */}
+        <button
+          type="button"
+          onClick={() => onIndex(stepIndex(cards.length, index, -1))}
+          disabled={atStart}
+          aria-label="Previous surface"
+          className={cn(
+            'absolute left-3 top-1/2 z-10 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/80 text-foreground/80 backdrop-blur transition sm:left-6',
+            'hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
+            'disabled:cursor-not-allowed disabled:opacity-25',
+          )}
+        >
+          <CaretLeft className="size-5" weight="bold" />
+        </button>
         <Image
           src={card.src}
           alt={card.alt}
@@ -203,7 +237,20 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
           priority
           className="h-auto max-h-[86vh] w-auto max-w-full rounded-lg border border-border object-contain shadow-2xl"
         />
-      </button>
+        <button
+          type="button"
+          onClick={() => onIndex(stepIndex(cards.length, index, 1))}
+          disabled={atEnd}
+          aria-label="Next surface"
+          className={cn(
+            'absolute right-3 top-1/2 z-10 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/80 text-foreground/80 backdrop-blur transition sm:right-6',
+            'hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
+            'disabled:cursor-not-allowed disabled:opacity-25',
+          )}
+        >
+          <CaretRight className="size-5" weight="bold" />
+        </button>
+      </div>
     </div>,
     document.body,
   );
