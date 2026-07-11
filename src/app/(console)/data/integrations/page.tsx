@@ -168,22 +168,22 @@ export default async function IntegrationsPage() {
                       else if (j.status === 'failed')
                         jobStatusCls = 'bg-destructive/10 text-destructive';
                       return (
-                      <TableRow key={j.id}>
-                        <TableCell className="font-medium text-foreground">
-                          {j.connectorName}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className={jobStatusCls}>
-                            {j.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {j.records.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {relTime(j.startedAt)}
-                        </TableCell>
-                      </TableRow>
+                        <TableRow key={j.id}>
+                          <TableCell className="font-medium text-foreground">
+                            {j.connectorName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className={jobStatusCls}>
+                              {j.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                            {j.records.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">
+                            {relTime(j.startedAt)}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
                   </TableBody>
