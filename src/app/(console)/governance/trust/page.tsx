@@ -269,7 +269,7 @@ export default async function TrustCenterPage() {
   );
 }
 
-function PostureCard({ item }: { item: PostureItem }) {
+function PostureCard({ item }: Readonly<{ item: PostureItem }>) {
   const briefs = controlBriefs(item.evidenceFor);
   const inProgress = item.status === 'in-progress';
   return (

@@ -22,9 +22,9 @@ export const dynamic = 'force-dynamic';
 // it shows what actually happens — not just the regex demo. URL-driven (?q=...), no client state.
 export default async function GuardrailsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ q?: string }>;
-}) {
+}>) {
   await requireModuleForUser('guardrails');
   const { q } = await searchParams;
   const probe = typeof q === 'string' ? q : '';

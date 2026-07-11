@@ -72,7 +72,7 @@ type Trace = Awaited<ReturnType<typeof listAgentRuns>>[number];
 type Eval = Awaited<ReturnType<typeof listEvalRuns>>[number];
 
 // Offline eval-run history — each row drills into per-case pass/fail detail.
-function EvalRunsCard({ evals }: { evals: Eval[] }) {
+function EvalRunsCard({ evals }: Readonly<{ evals: Eval[] }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -123,7 +123,7 @@ function EvalRunsCard({ evals }: { evals: Eval[] }) {
 }
 
 // Recent governed-pipeline runs — checks + provenance per interaction.
-function RunTracesTable({ runs }: { runs: Trace[] }) {
+function RunTracesTable({ runs }: Readonly<{ runs: Trace[] }>) {
   if (!runs.length) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
@@ -190,9 +190,9 @@ function RunTracesTable({ runs }: { runs: Trace[] }) {
 
 export default async function ObservabilityPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   await requireModuleForUser('observability');
   const org = await currentOrgId();
   const sp = await searchParams;
