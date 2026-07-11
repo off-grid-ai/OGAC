@@ -17,7 +17,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const runId = new URL(req.url).searchParams.get('runId');
   if (!runId) return NextResponse.json({ error: 'runId query param is required' }, { status: 400 });
   const run = await getEtlRun(runId, orgId);
-  if (!run || run.jobId !== id) return NextResponse.json({ error: 'run not found' }, { status: 404 });
+  if (run?.jobId !== id) return NextResponse.json({ error: 'run not found' }, { status: 404 });
 
   const logs = await getRunLogs(run);
   return NextResponse.json({ object: 'list', data: logs });

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const body = await req.json().catch(() => null);
   const subject = body?.subject as string | undefined;
-  if (!subject || !subject.trim()) {
+  if (!subject?.trim()) {
     return NextResponse.json({ error: 'subject (email/id) required' }, { status: 400 });
   }
 
