@@ -39,7 +39,7 @@ async function modelPlan(prompt: string, catalog: Catalog, ids: Set<string>): Pr
     if (r.ok) {
       const data = await r.json();
       const text: string = data?.choices?.[0]?.message?.content ?? '';
-      const m = text.match(/\{[\s\S]*\}/);
+      const m = /\{[\s\S]*\}/.exec(text);
       if (m) {
         const wf = JSON.parse(m[0]) as Workflow;
         const nodeIds = (wf.nodeIds ?? []).filter((id) => ids.has(id));

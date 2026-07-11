@@ -5,11 +5,11 @@ import { finalizeKeyCreation } from '@/lib/rate-limit-store';
 import { createApiKey, listApiKeys } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const TYPES = ['user', 'project'];
+const TYPES = new Set(['user', 'project']);
 
 function valid(b: Record<string, unknown> | null): boolean {
   if (!b) return false;
-  return Boolean(b.name) && Boolean(b.subject) && TYPES.includes(b.subjectType as string);
+  return Boolean(b.name) && Boolean(b.subject) && TYPES.has(b.subjectType as string);
 }
 
 // A per-key rate limit (requests/minute). null = no per-key limit (falls back to org/global).
