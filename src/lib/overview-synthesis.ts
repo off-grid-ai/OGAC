@@ -146,9 +146,9 @@ function pct(share: number): string {
 }
 
 function parseTs(ts: string): number {
-  if (!ts) return NaN;
+  if (!ts) return Number.NaN;
   const t = Date.parse(ts);
-  return Number.isNaN(t) ? NaN : t;
+  return Number.isNaN(t) ? Number.NaN : t;
 }
 
 /** Within the trailing window, OR undated (kept so a producer that drops timestamps still surfaces). */

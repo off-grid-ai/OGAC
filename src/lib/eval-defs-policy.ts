@@ -47,7 +47,7 @@ function trimStr(v: unknown): string {
 }
 
 function num01(v: unknown): number | null {
-  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN;
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : Number.NaN;
   if (!Number.isFinite(n) || n < 0 || n > 1) return null;
   return n;
 }

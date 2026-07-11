@@ -95,14 +95,14 @@ export function normalizeWorkflowStatus(name: string | undefined): WorkflowExecu
 /** Convert a Date/string/number/bigint timestamp to an ISO string, or undefined. */
 function toIso(v: Date | string | number | null | undefined): string | undefined {
   if (v == null) return undefined;
-  if (v instanceof Date) return isNaN(v.getTime()) ? undefined : v.toISOString();
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString();
   if (typeof v === 'number') {
     const d = new Date(v);
-    return isNaN(d.getTime()) ? undefined : d.toISOString();
+    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
   // string — accept ISO directly, else try to parse.
   const d = new Date(v);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 function toNum(v: number | bigint | null | undefined): number | undefined {

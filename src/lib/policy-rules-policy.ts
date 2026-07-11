@@ -47,7 +47,7 @@ function isOperator(v: unknown): v is PolicyOperator {
 // Coerce a priority into an integer in [0, 10000]; non-numeric / out-of-range → null (the validator
 // turns that into a message). Accepts number or numeric string.
 function coercePriority(v: unknown): number | null {
-  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : Number.NaN;
   if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
   if (n < 0 || n > 10000) return null;
   return n;

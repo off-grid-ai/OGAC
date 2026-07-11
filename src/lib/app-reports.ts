@@ -159,7 +159,7 @@ export function runCost(run: AppRunView): { tokens: number; usd: number } {
 // reports its own count (not an inflated rate). Only dated runs count in both numerator + span.
 export function computeThroughputPerDay(runs: Pick<AppRunView, 'startedAt'>[]): number {
   const times = runs
-    .map((r) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN))
+    .map((r) => (r.startedAt ? new Date(r.startedAt).getTime() : Number.NaN))
     .filter((t) => Number.isFinite(t)) as number[];
   if (times.length === 0) return 0;
   const min = Math.min(...times);
