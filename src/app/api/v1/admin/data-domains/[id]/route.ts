@@ -14,36 +14,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(domain);
 }
 
-// eslint-disable-next-line complexity
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireAdmin(req);
-  if (gate instanceof NextResponse) return gate;
-  const { id } = await params;
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+interface DomainPatch {
+  label?: string;
+  connectorId?: string;
+  resource?: string;
+  aliases?: string[];
+  opHints?: Record<string, unknown> | null;
+}
 
-  // Field-level validation on the fields actually present (partial update). Empty required fields
-  // are rejected rather than clearing a live binding.
-  const patch: {
-    label?: string;
-    connectorId?: string;
-    resource?: string;
-    aliases?: string[];
-    opHints?: Record<string, unknown> | null;
-  } = {};
+// Pure: validate + build the partial-update patch from the request body. Field-level validation on
+// the fields actually present; empty required fields are rejected (rather than clearing a live
+// binding) via an error result the handler surfaces as a 400 — behavior-identical to the previous
+// inline validation.
+function buildDomainPatch(
+  body: Record<string, unknown>,
+): { ok: true; patch: DomainPatch } | { ok: false; error: string } {
+  const patch: DomainPatch = {};
   if (body.label !== undefined) {
     const label = String(body.label).trim();
-    if (!label) return NextResponse.json({ error: 'label cannot be empty' }, { status: 400 });
+    if (!label) return { ok: false, error: 'label cannot be empty' };
     patch.label = label;
   }
   if (body.connectorId !== undefined) {
     const c = String(body.connectorId).trim();
-    if (!c) return NextResponse.json({ error: 'connectorId cannot be empty' }, { status: 400 });
+    if (!c) return { ok: false, error: 'connectorId cannot be empty' };
     patch.connectorId = c;
   }
   if (body.resource !== undefined) {
     const r = String(body.resource).trim();
-    if (!r) return NextResponse.json({ error: 'resource cannot be empty' }, { status: 400 });
+    if (!r) return { ok: false, error: 'resource cannot be empty' };
     patch.resource = r;
   }
   if (body.aliases !== undefined) {
@@ -59,6 +58,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ? (body.opHints as Record<string, unknown>)
         : null;
   }
+  return { ok: true, patch };
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+  const { id } = await params;
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+
+  const built = buildDomainPatch(body);
+  if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
+  const patch = built.patch;
 
   const orgId = await currentOrgId();
   const updated = await updateDomain(id, patch, orgId);
