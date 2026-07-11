@@ -1,0 +1,6 @@
+S3358 | src/app/(console)/operations/runs/[id]/page.tsx:147 | Nested ternary is the JSX render branch (agent vs chat vs null); extracting to a const would require lifting a large JSX subtree — low value, readability-neutral. Behavior-preserving accept.
+S6479 | src/app/(console)/operations/runs/[id]/page.tsx:82 | agent.steps have no stable unique id; index key is correct here (append-only ordered timeline). Fabricating a key risks changing reconciliation.
+S6479 | src/app/(console)/operations/runs/[id]/page.tsx:105 | s.refs are bare strings with no stable id; index key appropriate.
+S6479 | src/app/(console)/operations/runs/[id]/page.tsx:125 | agent.checks have no stable unique id; index key appropriate.
+S3776 | src/app/(console)/operations/runs/[id]/page.tsx:19 | Page render CC driven by conditional JSX sections; splitting would fragment a cohesive server component with no behavior change and real regression risk in an async data page.
+S3776 | src/app/(console)/operations/runs/[id]/page.tsx:159 | Resolved by lookup-map refactor (was ternary cascade); leaving remaining CC as-is — no further behavior-safe reduction.

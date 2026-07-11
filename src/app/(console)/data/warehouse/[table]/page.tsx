@@ -34,9 +34,9 @@ export const dynamic = 'force-dynamic';
 // directly (server component). Deep-linkable: /data/warehouse/[table].
 export default async function WarehouseTableDetailPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ table: string }>;
-}) {
+}>) {
   await requireModuleForUser('data');
   const { table: raw } = await params;
   const name = decodeURIComponent(raw);

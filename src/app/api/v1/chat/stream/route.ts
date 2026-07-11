@@ -213,8 +213,9 @@ export async function POST(req: Request) {
   }
 
   // Temporary chats carry their own history from the client (never touch the DB).
+  const clientHistory = Array.isArray(history) ? history : [];
   const prior: { role: string; content: string }[] = temporary
-    ? (Array.isArray(history) ? history : []).map((h: { role: string; content: string }) => ({
+    ? clientHistory.map((h: { role: string; content: string }) => ({
         role: h.role,
         content: h.content,
       }))
@@ -283,7 +284,7 @@ export async function POST(req: Request) {
   const activeSkillId = turnSkillId ?? convo.skillId;
   if (activeSkillId) {
     const skill = await getSkill(orgId, activeSkillId);
-    if (skill && skill.enabled) {
+    if (skill?.enabled) {
       if (skill.systemPrompt.trim()) messages.push({ role: 'system', content: skill.systemPrompt });
       skillModel = skill.model ?? '';
       if (!ragProjectId && skill.projectId) ragProjectId = skill.projectId;
@@ -431,12 +432,13 @@ export async function POST(req: Request) {
   if (!budget.ok) {
     // Record the denial in the audit ledger (canonical event: action=budget.deny, outcome=blocked)
     // so "we can prove spend limits are enforced" holds — the block is attributable + auditable.
+    const projectResource = ragProjectId ? `project:${ragProjectId}` : undefined;
     recordAudit({
       actor: actorFrom({ email: userId }),
       org: DEFAULT_ORG,
       project: ragProjectId ?? undefined,
       action: 'budget.deny',
-      resource: budget.keyId ? `key:${budget.keyId}` : ragProjectId ? `project:${ragProjectId}` : undefined,
+      resource: budget.keyId ? `key:${budget.keyId}` : projectResource,
       model: effectiveModel || undefined,
       costUsd: incomingCost,
       outcome: 'blocked',
@@ -527,12 +529,12 @@ export async function POST(req: Request) {
   }
 
   // A blocked route is a hard stop — nothing runs, and the block is audited (leash proof).
-  if (plan && plan.kind === 'block') {
+  if (plan?.kind === 'block') {
     recordAudit(egressBlockedAuditEvent(egressCtx, plan));
     return deny(`request blocked by routing policy: ${plan.reason}`);
   }
   // Cloud unavailable → we fell back to local; record it so the honest degradation is provable.
-  if (plan && plan.kind === 'local' && plan.cloudUnavailable) {
+  if (plan?.kind === 'local' && plan.cloudUnavailable) {
     recordAudit(egressBlockedAuditEvent(egressCtx, plan));
   }
 
@@ -561,9 +563,8 @@ export async function POST(req: Request) {
         egressAuditEvent(egressCtx, plan, { promptTokens: 0, completionTokens: 0 }, 'error'),
       );
     }
-    const detail = upstream
-      ? `${routedToCloud ? 'cloud provider' : 'gateway'} ${upstream.status}`
-      : `${routedToCloud ? 'cloud provider' : 'gateway'} unreachable`;
+    const upstreamLabel = routedToCloud ? 'cloud provider' : 'gateway';
+    const detail = upstream ? `${upstreamLabel} ${upstream.status}` : `${upstreamLabel} unreachable`;
     return new Response(`data: ${JSON.stringify({ error: detail })}\n\n`, {
       status: 200,
       headers: { 'content-type': 'text/event-stream' },
@@ -723,6 +724,7 @@ export async function POST(req: Request) {
       // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable. The
       // token stream above already reached the client; this records the run (guardrail verdicts +
       // lineage + attributed audit) durably + replayably, and hands back the workflow/run id.
+      const completionStatus = full ? 'done' : 'error';
       const runInput: ChatRunWorkflowInput = {
         runId: chatRunId,
         conversationId: convo.id,
@@ -737,7 +739,7 @@ export async function POST(req: Request) {
         // than fabricate a clean verdict; the 'blocked' status below is the durable signal.
         checks: [...preChecks, ...(postChecks ?? [])],
         refs,
-        status: outboundBlocked ? 'blocked' : full ? 'done' : 'error',
+        status: outboundBlocked ? 'blocked' : completionStatus,
       };
       const dispatch = await dispatchChatRun(runInput).catch(() => null);
 

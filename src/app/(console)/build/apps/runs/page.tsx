@@ -15,9 +15,9 @@ export const dynamic = 'force-dynamic';
 // URL-driven (?appId=) so it is deep-linkable and Back-coherent.
 export default async function AppRunsListPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ appId?: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
   const { appId } = await searchParams;

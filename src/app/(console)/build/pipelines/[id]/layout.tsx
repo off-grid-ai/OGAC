@@ -14,10 +14,10 @@ export const dynamic = 'force-dynamic';
 export default async function PipelineShellLayout({
   children,
   params,
-}: {
+}: Readonly<{
   children: ReactNode;
   params: Promise<{ id: string }>;
-}) {
+}>) {
   await requireModuleForUser('pipelines');
   const { id } = await params;
   const pipeline = await getPipeline(id, await currentOrgId());

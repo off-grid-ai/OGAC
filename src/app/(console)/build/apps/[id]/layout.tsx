@@ -17,10 +17,10 @@ export const dynamic = 'force-dynamic';
 export default async function AppShellLayout({
   children,
   params,
-}: {
+}: Readonly<{
   children: ReactNode;
   params: Promise<{ id: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();
