@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
-import { createCustomRole, getCustomRoleByName } from '@/lib/store';
 import { validateModules } from '@/lib/roles';
+import { createCustomRole, getCustomRoleByName } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

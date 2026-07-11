@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { KeycloakError } from '@/lib/keycloak-admin';
+import { requireAdmin } from '@/lib/authz';
 import { keycloakConfigured, revokeGatewayKey } from '@/lib/gateway-api-keys';
+import { KeycloakError } from '@/lib/keycloak-admin';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

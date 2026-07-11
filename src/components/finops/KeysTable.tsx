@@ -1,8 +1,8 @@
 'use client';
 
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
-import { KeyToggle } from '@/components/finops/KeyToggle';
 import { KeyRateLimit } from '@/components/finops/KeyRateLimit';
+import { KeyToggle } from '@/components/finops/KeyToggle';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/Pagination';
 import { Progress } from '@/components/ui/progress';

@@ -15,9 +15,9 @@
 //
 // SOLID: config + payload shaping are PURE (trigger-dispatch.ts, unit-tested); this is the thin I/O.
 
-import { getAppBySlug } from '@/lib/apps-store';
-import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
+import { newAppRunId } from '@/lib/app-run';
+import { getAppBySlug } from '@/lib/apps-store';
 import {
   buildTriggerInput,
   whatsappConfigFromEnv,

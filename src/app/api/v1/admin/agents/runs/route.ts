@@ -1,13 +1,13 @@
 import { after, NextResponse } from 'next/server';
-import { listAgentRuns, scoreRun } from '@/lib/agentrun';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
-import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { requireAdmin } from '@/lib/authz';
-import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
-import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
-import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
+import { listAgentRuns, scoreRun } from '@/lib/agentrun';
 import { callerFromSession } from '@/lib/app-access-caller';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
+import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
+import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
 export async function GET(req: Request) {

@@ -20,9 +20,9 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 import type { DriftStatus } from '@/lib/adapters/types';
+import type { RollbackResult } from '@/lib/pipeline-release';
 import type { ReleaseGateDecision } from '@/lib/release-gate';
 import type { RollbackReason } from '@/lib/rollback-policy';
-import type { RollbackResult } from '@/lib/pipeline-release';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // The pure verdict: does the observed quality signal warrant an automatic rollback, and why?

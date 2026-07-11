@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
 import { formatAliases } from '@/lib/data-domains-ui';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 

@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { isModuleEnabled } from '@/lib/modules';
+import { effectiveBaseRole, resolveEffectivePermissions } from '@/lib/role-permissions';
 import { type ModuleId } from '@/modules/registry';
 // Role→permission resolution lives in a leaf module (no auth/navigation imports) so DB-backed libs
 // can depend on it without dragging in Next's request surface. Re-exported here so every existing
 // `@/lib/module-access` importer of these is unchanged.
-import { effectiveBaseRole, resolveEffectivePermissions } from '@/lib/role-permissions';
 export { effectiveBaseRole, resolveEffectivePermissions };
 
 // Server-only, user-aware permission resolution. Kept out of lib/roles (which is client-safe and

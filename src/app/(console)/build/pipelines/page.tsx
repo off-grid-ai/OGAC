@@ -1,6 +1,6 @@
 import { PipelinesManager, type PipelineCardData } from '@/components/pipelines/PipelinesManager';
-import { listPipelines } from '@/lib/pipelines';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { CapabilityBinding } from '@/lib/adapters/registry';
 import {
   ADAPTER_CATEGORIES,
   ALL_CATEGORY_ID,
@@ -13,6 +12,7 @@ import {
   filterByCategory,
   normalizeCategory,
 } from '@/lib/adapters/categories';
+import type { CapabilityBinding } from '@/lib/adapters/registry';
 import { cn } from '@/lib/utils';
 
 const RENDER: Record<string, string> = {

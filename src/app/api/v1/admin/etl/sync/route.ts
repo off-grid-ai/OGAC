@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Trigger an ETL sync for an Airbyte connection. POST { connectionId } → the job that was started.
 // Audited like the connectors sync route. 404 when Airbyte is unreachable / rejected the trigger.

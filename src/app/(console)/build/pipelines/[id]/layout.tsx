@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { PipelineDetailNav } from '@/components/pipelines/PipelineDetailNav';
-import { getPipeline } from '@/lib/pipelines';
 import { requireModuleForUser } from '@/lib/module-access';
+import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

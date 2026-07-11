@@ -4,9 +4,9 @@
 // stay in the pure modules (routing-policy.ts, cloud-routing.ts, cloud-providers.ts), which are the
 // tested chokepoints. This file only wires them to the DB + env.
 
-import { decideRouting } from './routing-policy';
-import { planCloudRoute, type CloudPlan } from './cloud-routing';
 import { configuredCloudProviders } from './cloud-client';
+import { planCloudRoute, type CloudPlan } from './cloud-routing';
+import { decideRouting } from './routing-policy';
 import { getOrgPolicy, listRoutingRules } from './store';
 
 /**

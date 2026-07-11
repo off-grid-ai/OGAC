@@ -1,5 +1,5 @@
-import { requireModuleForUser } from '@/lib/module-access';
 import { QueryConsole } from '@/components/data/QueryConsole';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 

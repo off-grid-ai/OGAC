@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
+import { submitAppRun } from '@/lib/adapters/apprun';
+import { newAppRunId } from '@/lib/app-run';
+import { getAppBySlug } from '@/lib/apps-store';
 import { requireUser } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
-import { getAppBySlug } from '@/lib/apps-store';
-import { newAppRunId } from '@/lib/app-run';
-import { submitAppRun } from '@/lib/adapters/apprun';
 import { buildTriggerInput } from '@/lib/trigger-dispatch';
 
 export const dynamic = 'force-dynamic';

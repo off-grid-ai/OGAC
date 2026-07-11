@@ -1,9 +1,9 @@
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { EMBED_DIM, type InferencePort } from './types';
 
 // Inference adapters. The default is the Off Grid AI Gateway (OpenAI-compatible, on-device);
 // if it is unreachable embeddings fall back to a deterministic local hash so the Brain still
 // works offline. Any OpenAI-compatible endpoint can be bound here without touching callers.
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const EMBED_MODEL = process.env.OFFGRID_EMBED_MODEL ?? 'all-MiniLM-L6-v2';
 
 function deterministicEmbed(text: string): number[] {

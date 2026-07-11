@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { AppInputForm } from '@/components/build/AppInputForm';
 import { NeedsDataSourceBanner } from '@/components/build/NeedsDataSourceBanner';
-import { getApp } from '@/lib/apps-store';
+import { Badge } from '@/components/ui/badge';
 import { isSimpleAgent, unboundConnectorSteps, type AppStep } from '@/lib/app-model';
+import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 

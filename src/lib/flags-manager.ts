@@ -7,6 +7,8 @@
 // `src/lib/adapters/flags.ts` + `src/lib/store.ts` — this facade is only the write/read management
 // surface behind the admin routes.
 
+import { deleteFlag, listFlags, setFlag } from '@/lib/store';
+import type { FlagDetail, VariantInput, VariantPayload } from '@/lib/unleash-admin';
 import {
   archiveUnleashFlag,
   createUnleashFlag,
@@ -19,8 +21,6 @@ import {
   unleashManageable,
   updateUnleashDescription,
 } from '@/lib/unleash-client';
-import type { FlagDetail, VariantInput, VariantPayload } from '@/lib/unleash-admin';
-import { deleteFlag, listFlags, setFlag } from '@/lib/store';
 
 export type FlagBackend = 'unleash' | 'native';
 

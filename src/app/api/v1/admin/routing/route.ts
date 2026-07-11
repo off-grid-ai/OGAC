@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import { createRoutingRule, listRoutingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 

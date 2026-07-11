@@ -16,9 +16,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/Pagination';
 import { buildSrcDoc, isLiveKind } from '@/lib/artifacts';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { usePagination } from '@/lib/use-pagination';
 import { accentHue, relativeTime } from '@/lib/workspace-grid';
-import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 interface ArtifactRow {
   id: string;

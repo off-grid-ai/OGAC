@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { createConnector, listConnectors } from '@/lib/store';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import {
   validateConnectorCreate,
   persistConnectorSecret,
   type ConnectorCreateInput,
 } from '@/lib/connector-secrets';
+import { createConnector, listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);

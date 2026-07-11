@@ -1,11 +1,8 @@
 import { ChartBar, DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import { notFound } from 'next/navigation';
-import { StatBand } from '@/components/insights/StatBand';
 import { AppRoiCard } from '@/components/build/AppRoiCard';
 import { StatusBadge } from '@/components/build/AppRunStatus';
-import { resolveRoiSettings } from '@/lib/roi';
-import { computeAppRoiRow } from '@/lib/roi-reader';
-import { getAppRoiOverride, getOrgRoiDefault } from '@/lib/roi-settings-store';
+import { StatBand } from '@/components/insights/StatBand';
 import {
   bucketByDay,
   buildReportStats,
@@ -16,6 +13,9 @@ import { progress } from '@/lib/app-runs-view';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
+import { resolveRoiSettings } from '@/lib/roi';
+import { computeAppRoiRow } from '@/lib/roi-reader';
+import { getAppRoiOverride, getOrgRoiDefault } from '@/lib/roi-settings-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

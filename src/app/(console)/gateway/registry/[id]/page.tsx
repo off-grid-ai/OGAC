@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import { GatewayDetail } from '@/components/gateways/GatewayDetail';
 import { getGatewayWithHealth } from '@/lib/gateways';
 import { MODEL_CATALOG, getModelSpec, type ModelSpec } from '@/lib/model-catalog';
-import { listPipelinesByGateway } from '@/lib/pipelines';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelinesByGateway } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

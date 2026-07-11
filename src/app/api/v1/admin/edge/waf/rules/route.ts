@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { getEdgeIntent, saveEdgeIntent } from '@/lib/store';
 import { upsertRule, validateRule } from '@/lib/edge-intent';
+import { getEdgeIntent, saveEdgeIntent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

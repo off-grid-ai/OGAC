@@ -18,13 +18,13 @@
 // ladder (app-sharing-policy.ts) verbatim — DRY, no second role vocabulary.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { RBAC_ROLES, isRbacRole, type RbacRole } from '@/lib/roles';
 import {
   type AppShareRole,
   isAppShareRole,
   normalizeShareRole,
   normalizeUserId,
 } from '@/lib/app-sharing-policy';
+import { RBAC_ROLES, isRbacRole, type RbacRole } from '@/lib/roles';
 
 // ─── the org-role a person is invited AT ────────────────────────────────────────────────────────────
 // Deliberately the console RBAC roles (roles.ts) — an invite hands the person their console role, which

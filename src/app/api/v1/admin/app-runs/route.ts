@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
-import { listAppRunsView } from '@/lib/app-runs-view-reader';
 
 export const dynamic = 'force-dynamic';
 

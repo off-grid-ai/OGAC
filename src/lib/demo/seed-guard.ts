@@ -2,9 +2,9 @@
 // runner (scripts/seed-demo-tenants.mts). Isolated here so the load-bearing SAFETY rule (never write
 // to `default`/`wednesdaysol`) and the bank/insurer identity mapping are tested WITHOUT running the
 // I/O runner (which connects to the DB + process.exit on import).
-import { type TenantProfile } from '@/lib/tour-demo-seed';
 import { SEED_CONNECTORS, SEED_DOMAINS } from '@/lib/data-domains-demo-seed';
 import { SURAKSHA_CONNECTORS, SURAKSHA_DOMAINS } from '@/lib/suraksha-tenant-seed';
+import { type TenantProfile } from '@/lib/tour-demo-seed';
 
 /** The ONLY orgs the demo seed is ever allowed to write to. */
 export const ALLOWED_ORGS: ReadonlySet<string> = new Set(['org_bharat', 'org_suraksha']);

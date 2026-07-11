@@ -1,4 +1,3 @@
-import { type AuditEvent } from '@/lib/store';
 import {
   analyticsScopeFilters,
   buildAggsQuery,
@@ -7,6 +6,7 @@ import {
   scopedQuery,
 } from '@/lib/analytics-aggs';
 import { type Analytics } from '@/lib/analytics-types';
+import { type AuditEvent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Analytics now reads REAL gateway traffic from OpenSearch (index offgrid-gateway — the same

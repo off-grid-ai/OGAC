@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { verifyRunProvenance } from '@/lib/provenance-ops';
+import { currentOrgId } from '@/lib/tenancy';
 
 // On-demand VERIFY for a single agent-run's signed provenance. Re-checks the stored signature
 // against the active signing key and returns an HONEST verdict (verified / tampered / key-mismatch /

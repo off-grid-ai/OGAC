@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { renderAppRunReport } from '@/lib/adapters/sinks/report';
+import { getAppRunView } from '@/lib/app-runs-view-reader';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

@@ -11,9 +11,9 @@
 // The download ROUTE (api/v1/admin/app-runs/[id]/report) is the operator-facing entry: admin-gated,
 // reads the run, calls this, and streams the PDF/Markdown with the provenance headers.
 
+import { type RunSummary, singleRunSummary } from '@/lib/app-reports';
 import type { AppRunView } from '@/lib/app-runs-view';
 import { statusLabel } from '@/lib/app-runs-view';
-import { type RunSummary, singleRunSummary } from '@/lib/app-reports';
 import { markdownToPdf } from '@/lib/pdf';
 import { type ProvenanceManifest, buildManifest } from '@/lib/provenance';
 

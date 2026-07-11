@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
-import { deleteApiKey, setApiKeyEnabled } from '@/lib/store';
 import { getKeyRateLimit, setKeyRateLimit } from '@/lib/rate-limit-store';
+import { deleteApiKey, setApiKeyEnabled } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Read a single key's configured per-minute rate limit (null = unset → org/global default applies).
 // Scoped to the caller's org — a cross-tenant id reads back null, never org B's limit (P1 IDOR fix).

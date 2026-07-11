@@ -1,5 +1,5 @@
-import { Badge } from '@/components/ui/badge';
 import { ConnectorRowActions } from '@/components/integrations/ConnectorRowActions';
+import { Badge } from '@/components/ui/badge';
 
 // Presentational card for one connector in the directory grid. The row-level "…" actions
 // (sync / edit / delete) are unchanged — the same URL-driven ConnectorRowActions used by the

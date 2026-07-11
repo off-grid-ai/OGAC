@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { deriveDataPlaneHealth, DATA_PLANE_ENGINES } from '@/lib/dataplane-ui';
 import { getServices } from '@/lib/services-directory';
 import { probeEntry } from '@/lib/status';
-import { deriveDataPlaneHealth, DATA_PLANE_ENGINES } from '@/lib/dataplane-ui';
 
 // Compact data-plane engine-health band (server component). Probes only the four data-plane
 // services through the shared probe, then renders their up/down in PRODUCT language (Pipelines /

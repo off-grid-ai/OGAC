@@ -4,12 +4,12 @@ import { notFound } from 'next/navigation';
 import { EtlBuilder } from '@/components/data/etl/EtlBuilder';
 import { EtlJobActions } from '@/components/data/EtlJobActions';
 import { Badge } from '@/components/ui/badge';
-import { defaultDag, type EtlDagSpec, type EtlJobSpec } from '@/lib/etl-job';
 import type { RedactionAction } from '@/lib/data-redaction';
-import type { EtlJobStatus } from '@/lib/etl-model';
+import { defaultDag, type EtlDagSpec, type EtlJobSpec } from '@/lib/etl-job';
 import { getEtlJob, listEtlRuns } from '@/lib/etl-jobs-store';
-import { listConnectors } from '@/lib/store';
+import type { EtlJobStatus } from '@/lib/etl-model';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

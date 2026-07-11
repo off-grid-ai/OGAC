@@ -13,10 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { requireModuleForUser } from '@/lib/module-access';
-import { PLATFORM_CHARTS, safePlatformMetrics } from '@/lib/victoria-metrics';
-import { safeSearchLogs } from '@/lib/victoria-logs';
 import { safeJaegerOverview } from '@/lib/jaeger';
+import { requireModuleForUser } from '@/lib/module-access';
+import { safeSearchLogs } from '@/lib/victoria-logs';
+import { PLATFORM_CHARTS, safePlatformMetrics } from '@/lib/victoria-metrics';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { deleteEtlJob, getEtlJob, listEtlRuns, updateEtlJob } from '@/lib/etl-jobs-store';
+import { requireAdmin } from '@/lib/authz';
 import type { EtlJobDraft } from '@/lib/etl-job';
+import { deleteEtlJob, getEtlJob, listEtlRuns, updateEtlJob } from '@/lib/etl-jobs-store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // A single ETL job — GET (spec + recent runs), PATCH (edit), DELETE. Admin-gated, org-scoped.
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {

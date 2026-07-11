@@ -1,14 +1,14 @@
 import { randomUUID } from 'crypto';
 import { getLineage } from '@/lib/adapters/registry';
 import { addDocument, type BrainDoc } from '@/lib/brain';
-import { listDatasets } from '@/lib/store';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import type { DocAcl } from '@/lib/retrieval/acl';
+import { listDatasets } from '@/lib/store';
 
 // The Brain's ingestion layer: turn a source (text, file, image, database) into an indexed,
 // provenance-tagged document. Files/text are stored directly; images are captioned via the
 // gateway (multimodal) then indexed; a database row becomes a textual record. Everything funnels
 // through addDocument() so chunking/embedding/storage stays in one place.
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 const VISION_MODEL = process.env.OFFGRID_VISION_MODEL ?? 'gemma-local';
 
 // Record source→document lineage through the lineage port (no-op by default, Marquez when

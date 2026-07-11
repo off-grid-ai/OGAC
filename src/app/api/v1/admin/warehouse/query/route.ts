@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

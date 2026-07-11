@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { toggleMessage } from '@/lib/toast-messages';
 import { Switch } from '@/components/ui/switch';
+import { toggleMessage } from '@/lib/toast-messages';
 
 export function FlagToggle({ flagKey, enabled }: { flagKey: string; enabled: boolean }) {
   const router = useRouter();

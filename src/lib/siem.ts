@@ -3,9 +3,9 @@
 // Shipping is fire-and-forget and best-effort — a SIEM outage never blocks or fails an audited
 // request. Read-back (searchAudit) powers the console's Audit view: full-text + filtered search
 // over the shipped stream, well beyond the 25-row Postgres slice on the Control page.
-import { correlationIds } from '@/lib/correlation';
-import { type AuditEvent, type AuditEventInput, buildAuditEvent } from '@/lib/audit-event';
 import { randomUUID } from 'crypto';
+import { type AuditEvent, type AuditEventInput, buildAuditEvent } from '@/lib/audit-event';
+import { correlationIds } from '@/lib/correlation';
 
 const OPENSEARCH_URL = process.env.OFFGRID_OPENSEARCH_URL;
 const INDEX = process.env.OFFGRID_OPENSEARCH_INDEX ?? 'offgrid-audit';

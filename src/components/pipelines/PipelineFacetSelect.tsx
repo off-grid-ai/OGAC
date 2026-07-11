@@ -8,9 +8,9 @@
 // query string, so the view is deep-linkable + Back-coherent), rendered as a labelled <select> that
 // matches the audit filter bar. "All pipelines" clears the facet.
 
+import { GitBranch } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
-import { GitBranch } from '@phosphor-icons/react/dist/ssr';
 
 export interface PipelineFacetOption {
   id: string;

@@ -1,10 +1,10 @@
 import { after, NextResponse } from 'next/server';
-import { getAgentRun, scoreRun } from '@/lib/agentrun';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { getAgentRun, scoreRun } from '@/lib/agentrun';
 import { actorFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { runIdFromWorkflowId } from '@/lib/temporal-visibility';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

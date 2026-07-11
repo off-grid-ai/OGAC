@@ -3,7 +3,6 @@ import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
-import { currentOrgId } from '@/lib/tenancy';
 import {
   audienceMapperConfig,
   audienceMapperName,
@@ -16,6 +15,7 @@ import {
   type SecretAction,
   type ServiceClientResult,
 } from '@/lib/service-clients';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

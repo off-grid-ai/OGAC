@@ -5,7 +5,6 @@
 // (src/lib/adapters/services.ts, pii.ts): health() returns false and list/stats return []/null when
 // the box is unreachable — never throws an uncaught error into a route handler.
 
-import type { AdapterMeta } from './types';
 import {
   buildListTablesSql,
   buildSampleSql,
@@ -26,6 +25,7 @@ import {
   scopeTablesToDatabase,
   tableInScope,
 } from '@/lib/warehouse-tenancy';
+import type { AdapterMeta } from './types';
 
 const env = process.env;
 

@@ -14,8 +14,9 @@
 // behavior UNCHANGED — byte-identical requests to today, so nothing breaks pre-deploy. All S3 calls go
 // through the one `s3Fetch` seam so signing is applied uniformly (or not at all).
 
-import { getServiceCredential } from './service-credentials';
+import { orgFilePrefix, isKeyInOrg } from './files-tenancy';
 import { presignS3Url, signS3Request } from './s3-sigv4';
+import { getServiceCredential } from './service-credentials';
 import {
   buildLifecycleXml,
   buildPublicReadPolicy,
@@ -23,7 +24,6 @@ import {
   parseLifecycleXml,
   type LifecycleRule,
 } from './storage-lifecycle';
-import { orgFilePrefix, isKeyInOrg } from './files-tenancy';
 
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 const BUCKET = process.env.OFFGRID_SEAWEEDFS_BUCKET || 'media';

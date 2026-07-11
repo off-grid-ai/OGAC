@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
 import { AgentFormPanel } from '@/components/agents/AgentFormPanel';
 import { AgentRunner } from '@/components/agents/AgentRunner';
+import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';

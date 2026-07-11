@@ -19,9 +19,9 @@
 // a PII request never even produces a `cloud` decision. Egress being a governed switch is likewise
 // enforced in decideRouting. This module is the last, independent gate before the network.
 
-import type { RoutingDecision } from './routing-policy';
 import type { CloudProviderConfig, CloudSelection } from './cloud-providers';
 import { selectCloudProvider } from './cloud-providers';
+import type { RoutingDecision } from './routing-policy';
 
 /** What the request path should do after the governance gate. */
 export type CloudPlanKind =

@@ -8,7 +8,6 @@
 // they land, we over-fetch a window with the server-supported filters and apply the rest in the
 // pure `filterAuditRows`, then paginate in-memory. When searchAudit gains native support the pure
 // post-filter is an idempotent no-op — no double-filtering, no code change here required.
-import { searchAudit } from '@/lib/siem';
 import {
   auditFacets,
   DEFAULT_PAGE_SIZE,
@@ -19,6 +18,7 @@ import {
   type AuditRow,
   type AuditView,
 } from '@/lib/audit-log-view';
+import { searchAudit } from '@/lib/siem';
 
 export interface AuditPage {
   rows: AuditRow[]; // this page, post-filtered

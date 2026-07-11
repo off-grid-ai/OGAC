@@ -1,13 +1,13 @@
 import { TerminalWindow as TerminalSquare } from '@phosphor-icons/react/dist/ssr';
-import Image from 'next/image';
 import { headers } from 'next/headers';
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import { devLoginEnabled, googleEnabled, microsoftEnabled, passwordEnabled } from '@/auth.config';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
-import { WriteToUsDialog } from '@/components/auth/WriteToUsDialog';
 import { PasswordField } from '@/components/auth/PasswordField';
+import { WriteToUsDialog } from '@/components/auth/WriteToUsDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

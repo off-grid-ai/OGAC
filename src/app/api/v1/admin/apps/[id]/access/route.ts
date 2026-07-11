@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { getApp } from '@/lib/apps-store';
-import { validateAppAccessPolicyInput } from '@/lib/app-access-policy';
 import {
   deleteAppAccessPolicy,
   resolveAppAccessPolicy,
   setAppAccessPolicy,
 } from '@/lib/app-access';
+import { validateAppAccessPolicyInput } from '@/lib/app-access-policy';
+import { getApp } from '@/lib/apps-store';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

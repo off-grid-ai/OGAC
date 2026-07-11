@@ -12,7 +12,6 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { ensureAppAccessSchema, resolveAppAccessPolicy } from '@/lib/app-access';
 import {
   type AppAccessCaller,
@@ -30,6 +29,7 @@ import {
   removeGrant,
 } from '@/lib/app-sharing-policy';
 import { listAllMemberships } from '@/lib/teams';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ─── self-migrate: the additive `grants` column on app_access_policies ──────────────────────────────
 // The table itself is owned by app-access.ts (ensureAppAccessSchema). We ADD our column idempotently

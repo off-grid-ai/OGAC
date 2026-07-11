@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import { fleetModelTags } from '@/lib/model-catalog';
 import { sanitizeGuardrails, sanitizeModels } from '@/lib/policy-catalog';
-import { currentOrgId } from '@/lib/tenancy';
 import { type PolicyBundle, getOrgPolicy, pushPolicy } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 type PolicyPatch = Partial<Omit<PolicyBundle, 'version' | 'updatedAt'>>;
 

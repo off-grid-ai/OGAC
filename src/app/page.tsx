@@ -7,13 +7,13 @@ import { FlowDiagram } from '@/app/_landing/flow-diagram';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
 import { DecryptText } from '@/components/ui/decrypt-text';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { Spotlight } from '@/components/ui/spotlight';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import type { TourShot } from '@/lib/landing-hero';
 
 // Six real surfaces from the running console - proof, not promise. The Studio shot leads (the

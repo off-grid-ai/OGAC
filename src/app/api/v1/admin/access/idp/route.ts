@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
 import { KeycloakError } from '@/lib/keycloak-admin';
 import { buildOidcIdpRep, forbiddenGrantMessage, normalizeIdps, type KcRawIdp } from '@/lib/keycloak-realm';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
+import { requireAdmin } from '@/lib/authz';
 import { MODEL_CATALOG, fleetModelTags, mergeFleetServed } from '@/lib/model-catalog';
 
 export const dynamic = 'force-dynamic';

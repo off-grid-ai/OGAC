@@ -7,9 +7,9 @@
 // server-side and passed in.
 
 import { Pagination } from '@/components/ui/Pagination';
-import { usePagination } from '@/lib/use-pagination';
 import { toDisplayHost } from '@/lib/display-host';
 import type { SiemEvent, SiemOutcome } from '@/lib/siem-view';
+import { usePagination } from '@/lib/use-pagination';
 
 export function SiemEventsTable({ events }: { events: SiemEvent[] }) {
   const { pageItems, ...state } = usePagination(events, { key: 'ev', defaultPageSize: 25 });

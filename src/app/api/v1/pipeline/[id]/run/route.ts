@@ -1,17 +1,17 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
-import { recordAudit } from '@/lib/store';
-import { actorFrom } from '@/lib/audit-event';
 import { ipFromRequest } from '@/lib/audit-actor';
-import { getPipeline } from '@/lib/pipelines';
-import { deriveEgress } from '@/lib/pipelines-policy';
-import { verifyPipelineKey } from '@/lib/pipeline-api-keys';
+import { actorFrom } from '@/lib/audit-event';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { verifyPipelineKey } from '@/lib/pipeline-api-keys';
 import { resolveContract } from '@/lib/pipeline-contract';
-import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 import { enforceModelCall } from '@/lib/pipeline-enforcement';
 import { executePipelineRun } from '@/lib/pipeline-execute';
 import { defaultExecuteDeps } from '@/lib/pipeline-execute-wiring';
+import { isConsumable } from '@/lib/pipeline-lifecycle-model';
+import { getPipeline } from '@/lib/pipelines';
+import { deriveEgress } from '@/lib/pipelines-policy';
+import { recordAudit } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 

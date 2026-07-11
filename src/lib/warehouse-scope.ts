@@ -9,9 +9,9 @@
 // their own org, so this can never widen a viewer's scope) and map it to that org's slug. The
 // default / single-tenant org (no matching tenant row) → ALL_DATABASES (unscoped, backwards-compat).
 
+import { listTenants } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { listTenants } from '@/lib/store';
 import { warehouseDatabaseForSlug, type ALL_DATABASES } from '@/lib/warehouse-tenancy';
 
 /**

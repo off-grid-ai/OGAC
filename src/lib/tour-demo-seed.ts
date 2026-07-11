@@ -25,8 +25,8 @@
 // console-DB surfaces; the telemetry docs are a data-plane step (documented in the emitter + report).
 // Drift + regulatory coverage DERIVE from console-DB rows we DO seed here (eval_runs + adoption).
 
-import { egressClassFor, type GatewayKind } from '@/lib/gateways-policy';
 import type { AppStep, AppEdge, OutputStep } from '@/lib/app-model';
+import { egressClassFor, type GatewayKind } from '@/lib/gateways-policy';
 
 // ─── Deterministic id helper (FNV-1a → 12 hex, matches seed-bharat-catalog.mjs) ───────────────────
 /** Stable 12-hex digest of a key. Deterministic (no randomUUID) ⇒ the seed is idempotent. */

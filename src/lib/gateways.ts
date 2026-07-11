@@ -17,9 +17,8 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { gateways } from '@/db/schema';
 import type { Gateway as GatewayRowDb } from '@/db/schema';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { cloudProviderStatuses } from '@/lib/cloud-providers';
-import { randomGatewaySuffix, tenantGatewayHost } from '@/lib/tenant-domain';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import {
   type EgressClass,
   type GatewayHealthSignal,
@@ -32,6 +31,7 @@ import {
   mergeGatewayHealth,
   validateMergedGateway,
 } from '@/lib/gateways-policy';
+import { randomGatewaySuffix, tenantGatewayHost } from '@/lib/tenant-domain';
 
 const DEFAULT_ORG = 'default';
 

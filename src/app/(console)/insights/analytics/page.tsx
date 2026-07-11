@@ -14,15 +14,15 @@ import {
 } from '@/components/analytics/AnalyticsCharts';
 import { NativeSupersetPanel } from '@/components/analytics/NativeSupersetPanel';
 import { GatewayUsage } from '@/components/gateway/GatewayUsage';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import { computeAnalytics } from '@/lib/analytics';
 import { requireModuleForUser } from '@/lib/module-access';
-import { safeSupersetDashboard } from '@/lib/superset-data';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
+import { safeSupersetDashboard } from '@/lib/superset-data';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

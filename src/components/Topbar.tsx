@@ -7,8 +7,8 @@ import { SidebarNav } from '@/components/Sidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/UserMenu';
-import { getEnabledModules } from '@/lib/modules';
 import { drawerReducer } from '@/lib/mobile-nav';
+import { getEnabledModules } from '@/lib/modules';
 
 interface SessionUser {
   name?: string | null;

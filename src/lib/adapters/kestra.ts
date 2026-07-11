@@ -17,8 +17,8 @@
 // The OSS default tenant is `main` (override via OFFGRID_KESTRA_TENANT). Optional basic auth via
 // OFFGRID_KESTRA_USER/OFFGRID_KESTRA_PASSWORD (Kestra OSS Basic Auth) — omitted when unset.
 
-import type { AdapterMeta } from './types';
 import { KESTRA_NAMESPACE as KESTRA_NS } from '../etl-kestra-compile';
+import type { AdapterMeta } from './types';
 
 const env = process.env;
 

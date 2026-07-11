@@ -13,8 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { ProvenanceRow } from '@/lib/provenance-view';
 import type { VerificationStatus } from '@/lib/provenance-verify';
+import type { ProvenanceRow } from '@/lib/provenance-view';
 
 // Per-row verification status, either from the server-rendered read (verified/unverified) or from a
 // live Verify action (the richer 4-way verdict). '' = never explicitly verified this session.

@@ -2,9 +2,9 @@ import { GlobeHemisphereWest, ShieldCheck } from '@phosphor-icons/react/dist/ssr
 import { Suspense } from 'react';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { ToolToggle } from '@/components/brain/ToolToggle';
+import { McpInstallButton } from '@/components/tool-catalog/McpInstallButton';
 import { CatalogControls } from '@/components/tools/CatalogControls';
 import { EditToolButton } from '@/components/tools/EditToolButton';
-import { McpInstallButton } from '@/components/tool-catalog/McpInstallButton';
 import { RegisterToolButton } from '@/components/tools/RegisterToolButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,8 +25,8 @@ import {
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
 import { allowlistReferencesTokens, normalizeRefToken } from '@/lib/pipelines-policy';
-import { currentOrgId } from '@/lib/tenancy';
 import { listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { primitiveCatalog } from '@/lib/tool-primitives';
 import { filterCatalog, normalizeToolsTab } from '@/lib/tools-view';
 import { ToolsNav } from './ToolsNav';

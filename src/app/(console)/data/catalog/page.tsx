@@ -4,12 +4,12 @@ import { AddAssetButton } from '@/components/data-catalog/AddAssetButton';
 import { SeedCatalogButton } from '@/components/data-catalog/SeedCatalogButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import {
   assetPosture,
   listAssets,
   listAllClassifications,
 } from '@/lib/data-catalog-store';
+import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import { evaluateFreshness } from '@/lib/data-freshness';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';

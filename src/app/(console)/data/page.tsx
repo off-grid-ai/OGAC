@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { DataPlaneHealthBand } from '@/components/data/DataPlaneHealthBand';
 import { AddConnectorButton } from '@/components/data/AddConnectorButton';
 import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
+import { DataPlaneHealthBand } from '@/components/data/DataPlaneHealthBand';
 import { ErasureForm } from '@/components/data/ErasureForm';
 import { MaskingRuleToggle } from '@/components/data/MaskingRuleToggle';
 import { PiiScanner } from '@/components/data/PiiScanner';
@@ -21,9 +21,9 @@ import {
 import { listDocuments } from '@/lib/brain';
 import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
 import { listConnectors, listDatasets, listIngestJobs, listMaskingRules } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

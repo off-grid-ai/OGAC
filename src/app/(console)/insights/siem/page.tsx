@@ -1,19 +1,19 @@
-import Link from 'next/link';
 import { ShieldWarning } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { StatBand } from '@/components/insights/StatBand';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { AlertingManager } from '@/components/siem/AlertingManager';
 import { SiemEventsTable } from '@/components/siem/SiemEventsTable';
 import { SuppressionManager } from '@/components/siem/SuppressionManager';
 import { buildSiemStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
-import { applySuppressions } from '@/lib/siem-suppress-policy';
+import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listSuppressions } from '@/lib/siem-suppress';
+import { applySuppressions } from '@/lib/siem-suppress-policy';
 import { filterByOutcome, readSiemView } from '@/lib/siem-view';
 import { currentOrgId } from '@/lib/tenancy';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
-import { pipelineTag } from '@/lib/pipeline-api-key-format';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
-import { listPipelines } from '@/lib/pipelines';
 
 export const dynamic = 'force-dynamic';
 

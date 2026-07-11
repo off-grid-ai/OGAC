@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { deleteConnector, updateConnector } from '@/lib/store';
-import { splitEndpointSecret, persistConnectorSecret } from '@/lib/connector-secrets';
+import { requireAdmin } from '@/lib/authz';
 import { validateConnectorUpdate } from '@/lib/connector-policy';
+import { splitEndpointSecret, persistConnectorSecret } from '@/lib/connector-secrets';
+import { deleteConnector, updateConnector } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 const AUTHS = ['none', 'api-key', 'oauth'];
 

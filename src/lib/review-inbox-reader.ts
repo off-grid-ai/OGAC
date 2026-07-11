@@ -8,9 +8,10 @@
 // Disjoint from the WRITE path: approvals/rejections still flow through the existing review route
 // (/api/v1/admin/apps/runs/[id]/review) → signalAppRun. This reader is READ-only.
 
-import { getApp } from '@/lib/apps-store';
 import { resolveAppAccessPolicy } from '@/lib/app-access';
 import { type AppAccessCaller } from '@/lib/app-access-policy';
+import { getAppRunView, listAppRunsView } from '@/lib/app-runs-view-reader';
+import { getApp } from '@/lib/apps-store';
 import {
   type ReviewAppLike,
   type ReviewInboxItem,
@@ -19,7 +20,6 @@ import {
   childRunIdForReview,
   scopeInbox,
 } from '@/lib/review-inbox';
-import { getAppRunView, listAppRunsView } from '@/lib/app-runs-view-reader';
 import { getReviewTrace } from '@/lib/review-trace-reader';
 
 // resolveReviewApp — the app + its effective access policy, shaped for the pure logic. null when the

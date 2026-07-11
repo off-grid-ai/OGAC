@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { getConnector } from '@/lib/connector-detail';
 import { listResources } from '@/lib/connector-exec';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Resource browse. Lists the tables/objects on a connector (information_schema for SQL, the base
 // URL's top-level collection keys for REST) so a user picks a resource to bind instead of hand-typing

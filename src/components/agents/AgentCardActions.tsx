@@ -4,7 +4,6 @@ import { PencilSimple, Play, Power, Trash } from '@phosphor-icons/react/dist/ssr
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 interface RunStep {
   kind: string;

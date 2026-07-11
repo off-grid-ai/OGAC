@@ -9,6 +9,7 @@
 //      Supports pause / resume / stop, and only ONE message speaks at a time.
 // Everything is on-prem / in-browser — no cloud API is ever contacted.
 
+import { type SpeechModel, defaultVoice } from '@offgrid/speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AudioConfigView,
@@ -25,7 +26,6 @@ import {
   speakButtonLabel,
   textForSpeech,
 } from '@/lib/chat-audio';
-import { type SpeechModel, defaultVoice } from '@offgrid/speech';
 
 /** The speech-model catalog + defaults the audio-config route ships alongside availability. */
 interface AudioModelCatalog {

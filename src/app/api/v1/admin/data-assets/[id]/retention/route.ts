@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { RETENTION_ACTIONS } from '@/lib/data-retention';
 import { deleteRetention, getAsset, getRetention, setRetention } from '@/lib/data-catalog-store';
+import { RETENTION_ACTIONS } from '@/lib/data-retention';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
 import { RunsMonitor } from '@/components/operations/RunsMonitor';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
-import { listAllRuns } from '@/lib/runs-monitor-reader';
 import { filterRuns, paginate, parseKind, parseStatus, summarizeRuns } from '@/lib/runs-monitor';
+import { listAllRuns } from '@/lib/runs-monitor-reader';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

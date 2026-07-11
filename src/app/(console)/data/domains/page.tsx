@@ -3,11 +3,11 @@ import { DomainCard } from '@/components/data-domains/DomainCard';
 import { SuggestStartersButton } from '@/components/data-domains/SuggestStartersButton';
 import { TestResolveBox } from '@/components/data-domains/TestResolveBox';
 import { Card, CardContent } from '@/components/ui/card';
-import { listDomains } from '@/lib/data-domains-store';
 import { proposeStarterDomains } from '@/lib/data-domains-seed';
+import { listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
 import { listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

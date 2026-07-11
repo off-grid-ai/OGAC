@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { revokeKey } from '@/lib/pipeline-api-keys';
+import { requireAdmin } from '@/lib/authz';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import { revokeKey } from '@/lib/pipeline-api-keys';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

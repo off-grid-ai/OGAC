@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import {
   AppWindow,
   CaretDown,
@@ -15,13 +14,14 @@ import {
   Trash,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
-import type { AppStep, AppStepKind, OutputStep } from '@/lib/app-model';
-import { describeStepBinding, type BindingNames } from '@/lib/app-builder';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { describeStepBinding, type BindingNames } from '@/lib/app-builder';
+import type { AppStep, AppStepKind, OutputStep } from '@/lib/app-model';
 
 // ─── Tool catalog shape (mirrors GET /api/v1/admin/tool-catalog) ──────────────────────────────────
 interface AppToolEntry { id: string; ref: string; name: string; description: string; cyclic: boolean }

@@ -2,17 +2,17 @@ import { randomUUID } from 'crypto';
 import { searchDocuments } from '@/lib/brain';
 import type { EvalDef } from '@/lib/eval-defs';
 import {
-  heuristicScore,
-  rollupMetrics,
-  scoreMetric,
-  type MetricScore,
-} from '@/lib/eval-metrics';
-import {
   buildGEvalPrompt,
   gEvalUnavailable,
   parseGEvalScore,
   type GEvalResult,
 } from '@/lib/eval-geval';
+import {
+  heuristicScore,
+  rollupMetrics,
+  scoreMetric,
+  type MetricScore,
+} from '@/lib/eval-metrics';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';

@@ -1,7 +1,7 @@
-import { PDFDocument, type PDFFont } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import fontkit from '@pdf-lib/fontkit';
+import { PDFDocument, type PDFFont } from 'pdf-lib';
 
 // Minimal, dependency-light Markdown→PDF for report exports (pure JS, no headless browser, no fees).
 // It is not a full Markdown renderer — it lays the report text out as monospaced lines with simple

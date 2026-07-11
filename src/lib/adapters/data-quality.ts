@@ -1,4 +1,3 @@
-import type { AdapterMeta } from './types';
 import {
   buildCheckpoint,
   failureVerdict,
@@ -8,6 +7,7 @@ import {
   type RawCheckpointResult,
   type Row,
 } from '../data-quality-model';
+import type { AdapterMeta } from './types';
 
 // ─── Data-quality adapter (Great Expectations sidecar) ──────────────────────────────────────────
 //

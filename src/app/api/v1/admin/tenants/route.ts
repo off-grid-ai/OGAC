@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { createTenant, listTenants } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);

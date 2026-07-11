@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { getDevice, updateDeviceRole } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

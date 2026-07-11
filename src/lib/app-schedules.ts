@@ -14,14 +14,14 @@
 // loadAppSpec activity at fire time (the schedule stores only the appId, not a spec snapshot, so
 // edits to the app take effect on the next fire).
 
-import { isValidCron, sanitizeScheduleId } from '@/lib/temporal-schedules';
-import { normalizeScheduleConfig, type ScheduleConfig } from '@/lib/app-schedule';
+import { durableEnabled } from '@/lib/agent-run-durable';
 import {
   type AppDurableConfig,
   appDurableConfigFromEnv,
   type AppRunWorkflowInput,
 } from '@/lib/app-run-durable';
-import { durableEnabled } from '@/lib/agent-run-durable';
+import { normalizeScheduleConfig, type ScheduleConfig } from '@/lib/app-schedule';
+import { isValidCron, sanitizeScheduleId } from '@/lib/temporal-schedules';
 
 function appDurableEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return durableEnabled(env) || env.OFFGRID_ADAPTER_APPRUNTIME === 'temporal';

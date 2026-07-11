@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
 import { actorFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
 import { requireUser } from '@/lib/authz';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

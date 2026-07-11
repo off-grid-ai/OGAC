@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { assetPosture, listAssets, listErasureRequests, recordErasureRequest } from '@/lib/data-catalog-store';
-import { planErasure, propagateErasure, summarizeErasure, type StepResult } from '@/lib/erasure';
-import { executeErasureStep } from '@/lib/erasure-execute';
+import { toClassification, listClassifications } from '@/lib/data-catalog-store';
 import { deriveAssetPosture } from '@/lib/data-classification';
 import { resolveRtbfScope, type RtbfAsset } from '@/lib/data-rtbf';
-import { toClassification, listClassifications } from '@/lib/data-catalog-store';
+import { planErasure, propagateErasure, summarizeErasure, type StepResult } from '@/lib/erasure';
+import { executeErasureStep } from '@/lib/erasure-execute';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

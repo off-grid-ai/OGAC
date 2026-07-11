@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { listPipelineVersions } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

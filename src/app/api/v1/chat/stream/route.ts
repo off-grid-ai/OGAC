@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { actorFrom } from '@/lib/audit-event';
 import {
   addMessage,
   branchUserMessage,
@@ -16,7 +17,7 @@ import {
   renameConversation,
 } from '@/lib/chat';
 import { attachmentBlock } from '@/lib/chat-attach';
-import { parseRefsPayload, referencedMemoryBlock } from '@/lib/chat-mentions';
+import { citationInstruction, sourceNames } from '@/lib/chat-citations';
 import {
   estimateTokens,
   isDenied,
@@ -24,22 +25,7 @@ import {
   writeChatAudit,
 } from '@/lib/chat-governance';
 import { extractMemory } from '@/lib/chat-memory';
-import { resolveTools } from '@/lib/chat-tools';
-import { emitChatTrace } from '@/lib/chat-trace';
-import { actorFrom } from '@/lib/audit-event';
-import { costForTokens } from '@/lib/finops';
-import { resolveCloudPlan } from '@/lib/cloud-route-plan';
-import { forwardToCloud } from '@/lib/cloud-client';
-import { egressAuditEvent, egressBlockedAuditEvent } from '@/lib/cloud-egress-audit';
-import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
-import { type Citation, retrieve } from '@/lib/rag';
-import { citationInstruction, sourceNames } from '@/lib/chat-citations';
-import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
-import { currentOrgId } from '@/lib/tenancy';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
-import { auditEnforcement } from '@/lib/pipeline-contract';
-import { resolveChatBinding } from '@/lib/pipeline-run-glue';
+import { parseRefsPayload, referencedMemoryBlock } from '@/lib/chat-mentions';
 import {
   chatRequiresMasking,
   inboundGuardrailBlocks,
@@ -50,9 +36,23 @@ import {
   signChatAnswer,
   type ChatRunWorkflowInput,
 } from '@/lib/chat-run';
-import type { CheckResult } from '@/lib/checks';
 import { dispatchChatRun } from '@/lib/chat-run-dispatch';
+import { resolveTools } from '@/lib/chat-tools';
+import { emitChatTrace } from '@/lib/chat-trace';
+import type { CheckResult } from '@/lib/checks';
+import { forwardToCloud } from '@/lib/cloud-client';
+import { egressAuditEvent, egressBlockedAuditEvent } from '@/lib/cloud-egress-audit';
+import { resolveCloudPlan } from '@/lib/cloud-route-plan';
 import { correlationIds } from '@/lib/correlation';
+import { costForTokens } from '@/lib/finops';
+import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
+import { auditEnforcement } from '@/lib/pipeline-contract';
+import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
+import { resolveChatBinding } from '@/lib/pipeline-run-glue';
+import { type Citation, retrieve } from '@/lib/rag';
+import { getOrgSystemPrompt, recordAudit } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;

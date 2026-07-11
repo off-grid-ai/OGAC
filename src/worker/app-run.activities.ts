@@ -10,11 +10,11 @@
 // relative specifiers work without depending on an @/-alias resolver in that runtime (mirrors
 // agent-run.activities.ts).
 
+import type { AppSpec, AppStep } from '../lib/app-model';
 import { runApp as _unusedRunApp, executeStep, defaultDeps } from '../lib/app-run';
 import type { StepResult, AppRunContext, AppRunDeps } from '../lib/app-run';
-import type { AppRunState } from '../lib/app-run-plan';
 import type { AppRunWorkflowInput } from '../lib/app-run-durable';
-import type { AppSpec, AppStep } from '../lib/app-model';
+import type { AppRunState } from '../lib/app-run-plan';
 import type { PipelineContract } from '../lib/pipeline-enforcement';
 
 // Silence the unused re-export import (kept so the module and app-run.ts stay coupled at the type

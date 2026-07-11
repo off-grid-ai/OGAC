@@ -4,17 +4,8 @@ import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -32,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toggleMessage } from '@/lib/toast-messages';
 
 // Guardrails masking-rules management surface. Full CRUD over console-owned PII/masking rules:
 // add (entity name or regex → redact|mask|hash|allow|block|flag|log), edit, delete-with-confirmation,

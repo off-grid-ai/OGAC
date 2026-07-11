@@ -17,6 +17,7 @@
 //   OFFGRID_QUEUE_ENABLED=1 | OFFGRID_ADAPTER_APPRUNTIME=temporal — opt into durable dispatch
 //   OFFGRID_TEMPORAL_ADDRESS (host:7233), OFFGRID_TEMPORAL_NAMESPACE, OFFGRID_APP_TASK_QUEUE
 
+import { durableEnabled } from '@/lib/agent-run-durable';
 import type { AppSpec } from '@/lib/app-model';
 import type { AppRunContext, AppRunOutcome } from '@/lib/app-run';
 import {
@@ -27,7 +28,6 @@ import {
   type AppRunWorkflowResult,
   shouldRunDurably,
 } from '@/lib/app-run-durable';
-import { durableEnabled } from '@/lib/agent-run-durable';
 
 const NOT_CONFIGURED =
   'Durable app runtime not enabled — set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_APPRUNTIME=temporal.';

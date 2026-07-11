@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
-import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 import {
   filterTables,
   formatBytes,
@@ -18,6 +17,7 @@ import {
   type WarehouseTable,
 } from '@/lib/dataplane-ui';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 
 export const dynamic = 'force-dynamic';
 

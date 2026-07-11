@@ -14,11 +14,11 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { keycloakAdmin, type KcRole } from '@/lib/keycloak-admin';
 import { sendViaResend } from '@/lib/adapters/sinks/email-resend';
 import type { EmailMessage } from '@/lib/adapters/sinks/email-smtp';
 import { grantAppAccess } from '@/lib/app-sharing';
+import { keycloakAdmin, type KcRole } from '@/lib/keycloak-admin';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type InviteAppGrant,
   type InviteOrgRole,

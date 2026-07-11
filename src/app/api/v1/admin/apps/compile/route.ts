@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { compileAppSpec } from '@/lib/app-compile';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
-import { compileAppSpec } from '@/lib/app-compile';
 
 export const dynamic = 'force-dynamic';
 

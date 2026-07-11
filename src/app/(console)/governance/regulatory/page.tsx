@@ -18,13 +18,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { frameworkOverview, statusMap } from '@/lib/compliance-adoption';
-import { buildCrossMap, CATALOG } from '@/lib/compliance-catalog';
 import { computeCompliance } from '@/lib/compliance';
 import { buildComplianceActivity } from '@/lib/compliance-activity';
+import { frameworkOverview, statusMap } from '@/lib/compliance-adoption';
+import { buildCrossMap, CATALOG } from '@/lib/compliance-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
 import { listGovernance, readComplianceActivity } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

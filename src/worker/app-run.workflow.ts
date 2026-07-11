@@ -36,10 +36,9 @@ import {
   setHandler,
   condition,
 } from '@temporalio/workflow';
-import type * as activities from './app-run.activities';
-import type { AppRunWorkflowInput, AppRunWorkflowResult } from '../lib/app-run-durable';
+import type { AppSpec, AppStep } from '../lib/app-model';
 import type { StepResult } from '../lib/app-run';
-import type { PipelineContract } from '../lib/pipeline-enforcement';
+import type { AppRunWorkflowInput, AppRunWorkflowResult } from '../lib/app-run-durable';
 import {
   initState,
   applyStepResult,
@@ -48,7 +47,8 @@ import {
   type AppRunState,
   type StepResultInput,
 } from '../lib/app-run-plan';
-import type { AppSpec, AppStep } from '../lib/app-model';
+import type { PipelineContract } from '../lib/pipeline-enforcement';
+import type * as activities from './app-run.activities';
 
 // ─── The resume signal payload (HITL decision from the console) ──────────────────────────────────
 export interface ResumeStepDecision {

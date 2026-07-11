@@ -3,10 +3,10 @@ import { desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { provitRepos } from '@/db/schema';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentPrincipal, provitAbacAllows, visibilityFilter } from '@/lib/provit-access';
 import { getShowcase, provitBaseUrl, provitConfigured, provitHealth } from '@/lib/provit';
-import { TokenPanel } from './TokenPanel';
+import { currentPrincipal, provitAbacAllows, visibilityFilter } from '@/lib/provit-access';
 import { IntelligencePanel } from './IntelligencePanel';
+import { TokenPanel } from './TokenPanel';
 import { UploadPanel } from './UploadPanel';
 
 export const dynamic = 'force-dynamic';

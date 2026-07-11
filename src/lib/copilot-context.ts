@@ -11,11 +11,11 @@
 // The route (copilot-gateway.ts + the API handler) gathers the context via the existing reader libs
 // and passes it in; this module owns the shape + the prompt.
 
+import type { AnomalyScan } from './anomaly';
 import type { AuditRow } from './audit-log-view';
-import type { FinOps } from './finops';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
-import type { AnomalyScan } from './anomaly';
+import type { FinOps } from './finops';
 
 /** One numbered, citable fact drawn from a real spine record. */
 export interface Citation {

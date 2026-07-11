@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
 import { readSecretsView } from '@/lib/secrets-view';
+import { currentOrgId } from '@/lib/tenancy';
 
 // OpenBao secrets management. Stores connector/tool credentials and virtual-key secrets in
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only

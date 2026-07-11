@@ -1,8 +1,8 @@
 import { Sparkle } from '@phosphor-icons/react/dist/ssr';
 import { CopilotConsole } from '@/components/copilot/CopilotConsole';
-import { requireModuleForUser } from '@/lib/module-access';
-import { computeFinOps } from '@/lib/finops';
 import { deriveAnomalies } from '@/lib/copilot-gather';
+import { computeFinOps } from '@/lib/finops';
+import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 

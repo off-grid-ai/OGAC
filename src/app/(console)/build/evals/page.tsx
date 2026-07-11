@@ -1,5 +1,7 @@
 import { CheckCircle, Flask, XCircle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
+import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -11,8 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
-import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { evalEngineLabel } from '@/lib/eval-engine-label';
 import { listGoldenCases } from '@/lib/evals';
 import { readEvalsView } from '@/lib/evals-view';

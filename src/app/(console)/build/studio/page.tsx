@@ -1,15 +1,15 @@
 import { Plus, Robot, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { AppsList } from '@/components/build/AppsList';
 import { AgentsGrid, type AgentCardModel } from '@/components/agents/AgentsGrid';
 import { CreateAgentButton } from '@/components/agents/CreateAgentButton';
+import { AppsList } from '@/components/build/AppsList';
+import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { agentActivity, listManagedAgents } from '@/lib/agents';
 import { listApps } from '@/lib/apps-store';
-import { resolveConsumerChips } from '@/lib/pipeline-chip';
-import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { requireModuleForUser } from '@/lib/module-access';
+import { resolveConsumerChips } from '@/lib/pipeline-chip';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';

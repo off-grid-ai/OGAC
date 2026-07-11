@@ -8,13 +8,13 @@ import {
   Vault,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatRail } from '@/components/ui/StatRail';
 import { DynamicDbPanel } from '@/components/secrets/DynamicDbPanel';
 import { LeasesPanel } from '@/components/secrets/LeasesPanel';
 import { SealControl } from '@/components/secrets/SealControl';
 import { SecretsManagerNav } from '@/components/secrets/SecretsManagerNav';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatRail } from '@/components/ui/StatRail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { readSecretsView } from '@/lib/secrets-view';
 

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { getPipeline } from '@/lib/pipelines';
-import { listKeys, mintKey } from '@/lib/pipeline-api-keys';
+import { requireAdmin } from '@/lib/authz';
 import { pipelineTag, validateKeyName } from '@/lib/pipeline-api-key-format';
+import { listKeys, mintKey } from '@/lib/pipeline-api-keys';
+import { getPipeline } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

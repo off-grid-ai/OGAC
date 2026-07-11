@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { getApp } from '@/lib/apps-store';
-import { isAppShareRole, normalizeUserId } from '@/lib/app-sharing-policy';
 import { listAppGrants, grantAppAccess, revokeAppAccess } from '@/lib/app-sharing';
+import { isAppShareRole, normalizeUserId } from '@/lib/app-sharing-policy';
+import { getApp } from '@/lib/apps-store';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

@@ -16,16 +16,16 @@
 //
 // Keeping this out of pipelines.ts avoids pulling the eval runner + team store into the low-level
 // store (SOLID / no cycles), mirroring pipeline-release.ts.
-import { recordAudit } from '@/lib/store';
 import { actorFrom, type AuditAction } from '@/lib/audit-event';
-import { getPipeline, updatePipeline, type PipelineView } from '@/lib/pipelines';
-import { publishWithGate, type PublishGateResult } from '@/lib/pipeline-release';
 import {
   type LifecycleAction,
   type LifecycleRole,
   canTransition,
   transitionTarget,
 } from '@/lib/pipeline-lifecycle-model';
+import { publishWithGate, type PublishGateResult } from '@/lib/pipeline-release';
+import { getPipeline, updatePipeline, type PipelineView } from '@/lib/pipelines';
+import { recordAudit } from '@/lib/store';
 import { listMembershipsForUser } from '@/lib/teams';
 import { type ActorContext, resolveLifecycleRole } from '@/lib/teams-policy';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';

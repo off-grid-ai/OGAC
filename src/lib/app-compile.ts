@@ -34,8 +34,8 @@ import {
   validateAppSpec,
 } from '@/lib/app-model';
 import { type DataDomain, resolveDomain } from '@/lib/data-domains';
-import { getOrgContext } from '@/lib/org-context';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { getOrgContext } from '@/lib/org-context';
 
 // ─── Result contract ───────────────────────────────────────────────────────────────────────────
 export interface CompileResult {

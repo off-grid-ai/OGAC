@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { gatherCopilotContext } from '@/lib/copilot-gather';
 import { answerCopilot } from '@/lib/copilot-gateway';
+import { gatherCopilotContext } from '@/lib/copilot-gather';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,10 +1,10 @@
-import { NextResponse, type NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { requireAdmin } from '@/lib/authz';
+import { NextResponse, type NextRequest } from 'next/server';
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { requireAdmin } from '@/lib/authz';
 import { activeModelConfig, validateFleetNode, type FleetNode } from '@/lib/fleet';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 

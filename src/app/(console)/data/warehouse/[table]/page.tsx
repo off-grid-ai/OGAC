@@ -14,7 +14,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { clickhouseWarehouse } from '@/lib/adapters/warehouse';
-import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 import {
   bareTableName,
   deriveResultColumns,
@@ -25,6 +24,7 @@ import {
 } from '@/lib/dataplane-ui';
 import { requireModuleForUser } from '@/lib/module-access';
 import { isSafeIdentifier } from '@/lib/warehouse-model';
+import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
 
 export const dynamic = 'force-dynamic';
 

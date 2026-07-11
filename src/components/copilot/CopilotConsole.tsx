@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { useCallback } from 'react';
 import { AskPanel } from '@/components/copilot/AskPanel';
 import { SuggestControlsTool } from '@/components/copilot/SuggestControlsTool';
 import { SuggestExpectationsTool } from '@/components/copilot/SuggestExpectationsTool';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 // The Ops Copilot surface. Full-width: the ask/answer column fills the page, an anomalies-at-a-glance
 // rail sits beside it on wide screens, and the self-service tools (suggest guardrails+evals, generate

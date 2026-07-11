@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
-import { SubNav } from '@/components/nav/SubNav';
 
 // Scoped secondary-nav for the Insights family — observability, analytics, drift, finops, reports,
 // and security events are one operator job ("is my AI healthy, safe, and what's it costing?").

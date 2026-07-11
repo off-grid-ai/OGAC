@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { synthesizeSpeech } from '@/lib/chat-audio-server';
 import { textForSpeech } from '@/lib/chat-audio';
+import { synthesizeSpeech } from '@/lib/chat-audio-server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;

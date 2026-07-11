@@ -9,8 +9,8 @@
 //     facts) rather than fabricate an answer.
 // The pure request-shaping (`buildChatBody`) is exported + unit-testable without a live gateway.
 
-import { gatewayFetch } from './gateway';
 import { buildCopilotPrompt, type CopilotContext, type CopilotPrompt, type Citation } from './copilot-context';
+import { gatewayFetch } from './gateway';
 
 export interface CopilotAnswer {
   answer: string;

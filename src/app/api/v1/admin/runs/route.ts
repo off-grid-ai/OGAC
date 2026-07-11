@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
-import { listAllRuns } from '@/lib/runs-monitor-reader';
 import {
   filterRuns,
   paginate,
@@ -9,6 +7,8 @@ import {
   parseStatus,
   summarizeRuns,
 } from '@/lib/runs-monitor';
+import { listAllRuns } from '@/lib/runs-monitor-reader';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

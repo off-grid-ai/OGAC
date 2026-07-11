@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { rollbackToLastGood } from '@/lib/pipeline-release';
 import type { RollbackReason } from '@/lib/rollback-policy';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

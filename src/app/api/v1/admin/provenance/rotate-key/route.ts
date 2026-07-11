@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { rotateSigningKey } from '@/lib/provenance-ops';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Rotate the provenance SIGNING KEY. The console cannot durably rewrite a server-managed env var /
 // KMS from a web request, so this generates a fresh ed25519 keypair for the operator to install and

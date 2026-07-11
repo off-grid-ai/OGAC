@@ -2,7 +2,6 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { boolean, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 import { db } from '@/db';
 import { computeAnalytics } from '@/lib/analytics';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type Metric,
   type RuleInput,
@@ -10,6 +9,7 @@ import {
   evaluateRule,
   metricValue,
 } from '@/lib/analytics-rules-policy';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ANALYTICS MANAGEMENT LAYER — the DB/OpenSearch ADAPTER over the pure policy in
 // analytics-rules-policy.ts. Owns two console-owned entities layered on top of the read-only

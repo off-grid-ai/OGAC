@@ -4,7 +4,6 @@ import { Plus, SlidersHorizontal, Trash } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toggleMessage } from '@/lib/toast-messages';
 import { FlagDetailPanel } from './FlagDetailPanel';
 
 interface Flag {

@@ -1,6 +1,6 @@
+import { type RunsView, summarizeRuns } from '@/lib/agent-runs';
 import { listAgentRuns } from '@/lib/agentrun';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { type RunsView, summarizeRuns } from '@/lib/agent-runs';
 
 // Thin adapter over the existing agentrun store: pull recent runs and normalize them through the
 // pure `summarizeRuns` rule. This is the only I/O seam for the read-back surface.

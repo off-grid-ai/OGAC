@@ -5,8 +5,8 @@ import { DomainDetailPanel } from '@/components/data-domains/DomainDetailPanel';
 import { getDomain, listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelinesByDomain } from '@/lib/pipelines';
-import { currentOrgId } from '@/lib/tenancy';
 import { listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
