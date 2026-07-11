@@ -147,7 +147,8 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   assert.equal(byLabel.get('Policy engine')!.value, 'OPA');
   assert.equal(byLabel.get('Policy engine')!.tone, 'good');
 
-  assert.equal(byLabel.get('PII guardrails')!.value, 'PRESIDIO');
+  // Outcome-based value (never the engine/product name); reachable+configured => ACTIVE/good.
+  assert.equal(byLabel.get('PII guardrails')!.value, 'ACTIVE');
   assert.equal(byLabel.get('PII guardrails')!.tone, 'good');
 
   assert.equal(byLabel.get('Cloud egress')!.value, '12%');
@@ -223,14 +224,28 @@ test('degrades gracefully when whole modules are unavailable (null snapshots)', 
   assert.equal(home.blocking.total, 0);
 });
 
-test('unreachable policy / unconfigured guardrails tone bad', () => {
+test('unreachable policy / configured-but-offline guardrails tone bad', () => {
   const input = fullInput();
   input.policy = { engine: 'opa', reachable: false };
-  input.guardrails = { engine: 'presidio', reachable: false, configured: true };
+  input.guardrails = { engine: 'llm-guard', reachable: false, configured: true };
   const { posture } = synthesizeOperatorHome(input);
   const byLabel = new Map(posture.map((t) => [t.label, t]));
   assert.equal(byLabel.get('Policy engine')!.tone, 'bad');
-  assert.equal(byLabel.get('PII guardrails')!.tone, 'bad');
+  const g = byLabel.get('PII guardrails')!;
+  assert.equal(g.tone, 'bad');
+  assert.equal(g.value, 'OFFLINE');
+  // NEVER surface the engine/product name on the tile.
+  assert.ok(!/llm.?guard|presidio|regex/i.test(g.value), `guardrail value leaked engine name: ${g.value}`);
+});
+
+test('guardrails not configured => calm NOT SET (muted), no engine name (the demo state)', () => {
+  const input = fullInput();
+  input.guardrails = { engine: 'llm-guard', reachable: false, configured: false };
+  const { posture } = synthesizeOperatorHome(input);
+  const g = new Map(posture.map((t) => [t.label, t])).get('PII guardrails')!;
+  assert.equal(g.value, 'NOT SET');
+  assert.equal(g.tone, 'muted');
+  assert.ok(!/llm.?guard|presidio/i.test(g.value + ' ' + g.hint), 'no engine name in value/hint');
 });
 
 test('undated audit blocking events are kept (a producer that drops timestamps still surfaces)', () => {
