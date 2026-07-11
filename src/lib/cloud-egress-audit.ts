@@ -8,8 +8,7 @@
 //   • gateway.egress.blocked — a cloud route was NOT taken (blocked, or cloud unavailable → fell back),
 //                       recorded so the leash / honest-degradation is provable after the fact.
 
-import type { AuditEventInput } from './audit-event';
-import type { Actor } from './audit-event';
+import type { Actor, AuditEventInput } from './audit-event';
 import type { CloudPlan } from './cloud-routing';
 
 export interface EgressAuditContext {

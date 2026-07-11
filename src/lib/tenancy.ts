@@ -4,12 +4,13 @@ import { cache } from 'react';
 import { auth } from '@/auth';
 import { requireUser } from '@/lib/authz';
 import { getTenantBySlug } from '@/lib/store';
-import { DEFAULT_ORG, bindTenantOrg, resolveOrg } from '@/lib/tenancy-policy';
+import { bindTenantOrg, resolveOrg } from '@/lib/tenancy-policy';
 
 // Multi-tenancy spine (Phase 3). Every tenant-scoped row carries an `org_id`. The pure
 // resolution RULE lives in tenancy-policy.ts (zero imports → unit-testable, no mocks); these
 // are the impure ADAPTERS that feed the session / verified-claims into it.
-export { DEFAULT_ORG, bindTenantOrg, resolveOrg };
+export { DEFAULT_ORG } from '@/lib/tenancy-policy';
+export { bindTenantOrg, resolveOrg };
 
 // Resolve the tenant org from the host, if this request is on a tenant subdomain
 // (<slug>-onprem-console.*). The slug arrives as x-offgrid-tenant-slug, set by middleware from the

@@ -42,11 +42,10 @@ import { auditEnforcement } from '@/lib/pipeline-contract';
 import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
 import { scoreInteraction } from '@/lib/qa/scoring';
 import { shipRunAudit } from '@/lib/siem';
-import { recordAudit } from '@/lib/store';
+import { listTools, recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { route } from '@/lib/retrieval/router';
 import type { RetrievalHit } from '@/lib/retrieval/types';
-import { listTools } from '@/lib/store';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the

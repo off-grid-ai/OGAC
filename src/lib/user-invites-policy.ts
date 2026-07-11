@@ -18,12 +18,7 @@
 // ladder (app-sharing-policy.ts) verbatim — DRY, no second role vocabulary.
 
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  type AppShareRole,
-  isAppShareRole,
-  normalizeShareRole,
-  normalizeUserId,
-} from '@/lib/app-sharing-policy';
+import { type AppShareRole, isAppShareRole, normalizeShareRole } from '@/lib/app-sharing-policy';
 import { RBAC_ROLES, isRbacRole, type RbacRole } from '@/lib/roles';
 
 // ─── the org-role a person is invited AT ────────────────────────────────────────────────────────────
@@ -289,4 +284,4 @@ export function keycloakRealmRoleForOrgRole(role: InviteOrgRole): string {
 }
 
 /** Re-export for the store so callers have one import surface. */
-export { normalizeUserId };
+export { normalizeUserId } from '@/lib/app-sharing-policy';

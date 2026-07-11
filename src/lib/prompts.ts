@@ -3,10 +3,11 @@ import { db } from '@/db';
 import { promptLibrary } from '@/db/schema';
 // Pure {{variable}} template helpers live in a client-safe module (no DB import) so client components
 // can use them without bundling `pg`. Re-exported here for existing server callers.
-import { extractVariables, renderPromptTemplate } from '@/lib/prompt-template';
+import { extractVariables } from '@/lib/prompt-template';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
-export { extractVariables, renderPromptTemplate };
+export { renderPromptTemplate } from '@/lib/prompt-template';
+export { extractVariables };
 
 // Prompt library server logic — a personal/org library of reusable prompt texts. Adjacent to but
 // distinct from skills (which are assistants). Tables are created idempotently on first use, copying
