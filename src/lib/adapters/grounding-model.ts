@@ -83,11 +83,11 @@ export function parseModelVerdicts(raw: string): RawModelVerdict[] {
   } catch {
     return [];
   }
-  const arr = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray((parsed as { verdicts?: unknown })?.verdicts)
-      ? (parsed as { verdicts: unknown[] }).verdicts
-      : null;
+  let arr: unknown[] | null = null;
+  if (Array.isArray(parsed)) arr = parsed;
+  else if (Array.isArray((parsed as { verdicts?: unknown })?.verdicts)) {
+    arr = (parsed as { verdicts: unknown[] }).verdicts;
+  }
   if (!arr) return [];
   return arr.filter((v): v is RawModelVerdict => typeof v === 'object' && v !== null);
 }

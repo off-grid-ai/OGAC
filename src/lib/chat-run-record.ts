@@ -55,12 +55,10 @@ export async function recordChatRunGovernance(
   // provable. The outcome folds the guardrail verdicts (blocked/redacted/ok) with the run status.
   try {
     const guardOutcome = outcomeFromChecks(input.checks);
-    const outcome =
-      input.status === 'blocked'
-        ? 'blocked'
-        : guardOutcome === 'redacted'
-          ? 'redacted'
-          : outcomeFromStatus(input.status);
+    let outcome: ReturnType<typeof outcomeFromStatus> | 'blocked' | 'redacted';
+    if (input.status === 'blocked') outcome = 'blocked';
+    else if (guardOutcome === 'redacted') outcome = 'redacted';
+    else outcome = outcomeFromStatus(input.status);
     recordAudit({
       actor: actorFrom({ email: input.userId }),
       org: orgId,

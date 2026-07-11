@@ -275,12 +275,9 @@ export async function listEvalRuns(
   pipelineId?: string | null,
 ): Promise<EvalRun[]> {
   await ensureEvalsSchema();
-  const pipelineWhere =
-    pipelineId === undefined
-      ? sql``
-      : pipelineId === null
-        ? sql` AND pipeline_id IS NULL`
-        : sql` AND pipeline_id = ${pipelineId}`;
+  let pipelineWhere = sql``;
+  if (pipelineId === null) pipelineWhere = sql` AND pipeline_id IS NULL`;
+  else if (pipelineId !== undefined) pipelineWhere = sql` AND pipeline_id = ${pipelineId}`;
   const { rows } = await db.execute<EvalRunRow>(
     sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
         FROM eval_runs WHERE org_id = ${orgId}${pipelineWhere} ORDER BY started_at DESC LIMIT ${limit};`,

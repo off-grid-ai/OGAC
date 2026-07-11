@@ -202,6 +202,12 @@ interface RagasSample {
 }
 
 // Generate an answer for one query, grounded in the retrieved contexts, through the gateway.
+function ragasScore(faithfulness: number | undefined, passed: number, total: number): number {
+  if (faithfulness !== undefined) return Math.round(faithfulness * 100);
+  if (total) return Math.round((passed / total) * 100);
+  return 0;
+}
+
 async function generateAnswer(question: string, contexts: string[]): Promise<string> {
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
@@ -257,12 +263,7 @@ async function runRagas(): Promise<EvalRunResult> {
   return {
     id: `ragas_${Date.now().toString(36)}`,
     engine: 'ragas',
-    score:
-      faithfulness !== undefined
-        ? Math.round(faithfulness * 100)
-        : total
-          ? Math.round((passed / total) * 100)
-          : 0,
+    score: ragasScore(faithfulness, passed, total),
     total,
     passed,
     startedAt: iso(),
