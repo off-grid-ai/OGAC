@@ -367,9 +367,10 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'provit',
     label: 'Provit',
     description:
-      'Visual QA — catch visual regressions and review UI changes. Runs on-prem at its own subdomain, surfaced here with live status and its showcase.',
+      'Visual QA — catch visual regressions and review UI changes before they ship. Coming soon.',
     route: '/provit',
     service: 'provit',
+    comingSoon: true,
   },
   {
     id: 'api-docs',
