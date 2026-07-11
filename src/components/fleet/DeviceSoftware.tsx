@@ -15,7 +15,7 @@ import type { SoftwareInventory } from '@/lib/fleetdm';
 
 // Per-device software inventory + known CVEs, pulled from FleetDM on mount. Only rendered when the
 // active MDM supports it (the parent gates on supportsFleet).
-export function DeviceSoftware({ hostId }: { hostId: string }) {
+export function DeviceSoftware({ hostId }: Readonly<{ hostId: string }>) {
   const [inv, setInv] = useState<SoftwareInventory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

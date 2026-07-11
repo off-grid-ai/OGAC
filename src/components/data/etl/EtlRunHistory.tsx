@@ -39,7 +39,7 @@ function whenLabel(iso?: string): string {
 // Run history for an ETL job. Live-polls the runs endpoint while any run is 'running' (the server
 // refreshes orchestrated executions from the engine). Each run expands to its engine logs, fetched
 // on demand. Honest: a failed run shows its message; unreachable-engine logs come back empty.
-export function EtlRunHistory({ jobId, initialRuns }: { jobId: string; initialRuns: EtlRunView[] }) {
+export function EtlRunHistory({ jobId, initialRuns }: Readonly<{ jobId: string; initialRuns: EtlRunView[] }>) {
   const [runs, setRuns] = useState<EtlRunView[]>(initialRuns);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [logs, setLogs] = useState<Record<string, LogLine[]>>({});
@@ -160,7 +160,7 @@ export function EtlRunHistory({ jobId, initialRuns }: { jobId: string; initialRu
   );
 }
 
-function LogView({ lines, orchestrated }: { lines?: LogLine[]; orchestrated: boolean }) {
+function LogView({ lines, orchestrated }: Readonly<{ lines?: LogLine[]; orchestrated: boolean }>) {
   if (lines === undefined) return <p className="py-2 text-xs text-muted-foreground">Loading logs…</p>;
   if (lines.length === 0) {
     return (

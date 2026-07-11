@@ -76,7 +76,7 @@ function egressBadge(egressClass: string | undefined) {
   return null;
 }
 
-function PipelineCard({ p, onDelete }: { p: PipelineCardData; onDelete: (p: PipelineCardData) => void }) {
+function PipelineCard({ p, onDelete }: Readonly<{ p: PipelineCardData; onDelete: (p: PipelineCardData) => void }>) {
   return (
     <Card className="flex flex-col shadow-sm transition-colors hover:border-primary/40">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -140,11 +140,11 @@ function AddPipelineSheet({
   open,
   onOpenChange,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
-}) {
+}>) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [gatewayId, setGatewayId] = useState('');
@@ -275,7 +275,7 @@ function AddPipelineSheet({
 // The Pipelines library surface — full-width grid of pipeline cards + a URL-driven New sheet
 // (?panel=new-pipeline so Back closes it and it's deep-linkable). Each card → the pipeline detail
 // page. Templates and org pipelines are shown together; the card marks templates.
-export function PipelinesManager({ pipelines }: { pipelines: PipelineCardData[] }) {
+export function PipelinesManager({ pipelines }: Readonly<{ pipelines: PipelineCardData[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

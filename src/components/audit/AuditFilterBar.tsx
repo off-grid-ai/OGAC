@@ -17,7 +17,7 @@ interface Props {
 
 const OUTCOME_OPTIONS: AuditOutcome[] = ['ok', 'blocked', 'redacted', 'denied', 'error', 'unknown'];
 
-export function AuditFilterBar({ actors, actions, projects, outcomes }: Props) {
+export function AuditFilterBar({ actors, actions, projects, outcomes }: Readonly<Props>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -116,12 +116,12 @@ function SelectFilter({
   value,
   options,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
-}) {
+}>) {
   // Keep the current value selectable even if it isn't in the (page-derived) facet list.
   const opts = value && !options.includes(value) ? [value, ...options] : options;
   return (

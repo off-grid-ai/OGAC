@@ -47,11 +47,11 @@ const STATUS_VARIANT: Record<Invite['status'], 'default' | 'secondary' | 'destru
 };
 
 // ─── Invite form (FormSheet) ────────────────────────────────────────────────────────────────────────
-function InviteForm({ open, onOpenChange, onDone }: {
+function InviteForm({ open, onOpenChange, onDone }: Readonly<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onDone: () => void;
-}) {
+}>) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string>('viewer');
   const [appId, setAppId] = useState('');

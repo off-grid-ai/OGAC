@@ -53,12 +53,12 @@ export function ComplianceCatalog({
   overview,
   statuses,
   crossMap,
-}: {
+}: Readonly<{
   catalog: CatalogFramework[];
   overview: FrameworkView[];
   statuses: Record<string, ControlTrackStatus>;
   crossMap: CrossMapEntry[];
-}) {
+}>) {
   const router = useRouter();
   const params = useSearchParams();
   const active = (params.get('fw') as FrameworkId) || catalog[0]?.id;
@@ -227,14 +227,14 @@ function ControlRow({
   satisfies,
   busy,
   onSetStatus,
-}: {
+}: Readonly<{
   control: CatalogControl;
   status: ControlTrackStatus | undefined;
   tracked: boolean;
   satisfies: CrossMapEntry['satisfies'];
   busy: boolean;
   onSetStatus: (s: ControlTrackStatus) => void;
-}) {
+}>) {
   const meta = STATUS_META[status ?? 'new'];
   const StatusIcon = meta.Icon;
   return (

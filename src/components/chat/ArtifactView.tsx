@@ -36,7 +36,7 @@ export function ArtifactView({
   title,
   conversationId,
   onSaved,
-}: {
+}: Readonly<{
   artifact: Artifact;
   onClose: () => void;
   // Persist context: `title` + `conversationId` key the EXISTING save route to the same logical
@@ -45,7 +45,7 @@ export function ArtifactView({
   title?: string;
   conversationId?: string | null;
   onSaved?: (id: string) => void;
-}) {
+}>) {
   // Live kinds render in the sandboxed iframe: html/svg inline, react (Babel+UMD) and mermaid via
   // CDN libs loaded inside the frame. The AI bridge (window.offgrid.complete) is enabled so
   // generated apps can call the local model through the console proxy.

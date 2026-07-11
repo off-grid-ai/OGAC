@@ -17,11 +17,11 @@ export function TableQualityCheck({
   table,
   columns,
   sampleRows,
-}: {
+}: Readonly<{
   table: string;
   columns: string[];
   sampleRows: Record<string, unknown>[];
-}) {
+}>) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(columns));
   const [verdict, setVerdict] = useState<CheckpointVerdict | null>(null);
   const [summary, setSummary] = useState<string>('');

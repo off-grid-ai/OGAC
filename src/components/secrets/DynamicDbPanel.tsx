@@ -12,7 +12,7 @@ import { type DynamicDbCreds, formatTtl } from '@/lib/secrets-ops';
 // generates on-demand, short-lived creds for a role. The minted username/password ARE shown once —
 // that is the point of a dynamic secret — with the lease + TTL so the operator knows when it expires.
 // If the engine isn't provisioned, the panel says so (stubbed path, per task scope note).
-export function DynamicDbPanel({ sealed }: { sealed: boolean }) {
+export function DynamicDbPanel({ sealed }: Readonly<{ sealed: boolean }>) {
   const [roles, setRoles] = useState<string[]>([]);
   const [mount, setMount] = useState('database');
   const [loading, setLoading] = useState(true);
@@ -132,11 +132,11 @@ function CredField({
   label,
   value,
   onCopy,
-}: {
+}: Readonly<{
   label: string;
   value: string | null;
   onCopy: (text: string) => void;
-}) {
+}>) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-20 text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>

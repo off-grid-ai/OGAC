@@ -29,11 +29,11 @@ export function PipelineChip({
   pipeline,
   className,
   size = 'sm',
-}: {
+}: Readonly<{
   pipeline: PipelineChipData | null | undefined;
   className?: string;
   size?: 'sm' | 'xs';
-}) {
+}>) {
   const text = size === 'xs' ? 'text-[11px]' : 'text-xs';
 
   // Ungoverned: nothing bound AND no org default resolved. Honest — not a pipeline link.

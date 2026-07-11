@@ -37,14 +37,14 @@ export function PipelineDriftPanel({
   pipelineName,
   hasHistory,
   evalCount,
-}: {
+}: Readonly<{
   pipelineId: string;
   pipelineName: string;
   /** True when this pipeline has enough eval-run history to compute drift honestly. */
   hasHistory: boolean;
   /** How many evals are attached (drives the "run an eval first" guidance). */
   evalCount: number;
-}) {
+}>) {
   const recommended = DRIFT_CATALOG.filter((i) => i.recommended);
   const [itemId, setItemId] = useState<string>(recommended[0]?.id ?? DRIFT_CATALOG[0]?.id ?? 'psi');
   const [threshold, setThreshold] = useState<number>(DEFAULT_DRIFT_SHARE_THRESHOLD);

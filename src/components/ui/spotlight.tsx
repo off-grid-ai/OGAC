@@ -9,7 +9,7 @@ interface SpotlightProps {
   className?: string;
 }
 
-export function Spotlight({ className }: SpotlightProps) {
+export function Spotlight({ className }: Readonly<SpotlightProps>) {
   return (
     <motion.div
       aria-hidden="true"

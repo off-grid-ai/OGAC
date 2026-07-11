@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 //
 // Motion is defined entirely in CSS (`og-page-enter` in globals.css), which is disabled
 // under `prefers-reduced-motion: reduce`, so this honors the opt-out with no JS branch.
-export function PageTransition({ children }: { children: ReactNode }) {
+export function PageTransition({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   // h-full so the wrapper is transparent to the layout height chain — full-height pages
   // (Chat, etc.) rely on h-full resolving against <main>; without it the wrapper collapses

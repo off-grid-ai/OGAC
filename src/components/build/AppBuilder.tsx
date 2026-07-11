@@ -122,7 +122,7 @@ export function AppBuilder({
   connectors = [],
   pipelines = [],
   initialApp,
-}: {
+}: Readonly<{
   summary: OrgContextSummary;
   domains: { id: string; label: string }[];
   agents: { id: string; name: string }[];
@@ -131,7 +131,7 @@ export function AppBuilder({
   pipelines?: { id: string; name: string }[];
   /** When present, the builder EDITS a saved app: it opens in refine, and Save PATCHes it. */
   initialApp?: AppSpec;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -459,14 +459,14 @@ function GuidedRefine({
   highlightStep,
   handlersFor,
   onSpec,
-}: {
+}: Readonly<{
   spec: AppSpec;
   names: BindingNames;
   pipelines: { id: string; name: string }[];
   highlightStep: string | null;
   handlersFor: (id: string) => StepEditorHandlers;
   onSpec: (fn: (s: AppSpec | null) => AppSpec | null) => void;
-}) {
+}>) {
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
       {/* Steps take the wide column */}
@@ -628,12 +628,12 @@ function DescribePhase({
   setDescription,
   compiling,
   onCompile,
-}: {
+}: Readonly<{
   description: string;
   setDescription: (v: string) => void;
   compiling: boolean;
   onCompile: () => void;
-}) {
+}>) {
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <div className="space-y-4 xl:col-span-2">
@@ -709,7 +709,7 @@ function DescribePhase({
 //     here: you can still save and run — the app just won't read that source until you add it, which
 //     you can do right here or from the app's screens anytime. This is what lets a first-time,
 //     non-technical user finish and save their app without setting up connectors first.
-function FixItPanel({ items, onAct }: { items: FixIt[]; onAct: (f: FixIt) => void }) {
+function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixIt) => void }>) {
   const blockers = items.filter((i) => i.severity === 'blocker');
   const advisories = items.filter((i) => i.severity === 'advisory');
   // Optional items that still carry a one-click remedy (e.g. wire-data-source) get an action button;
@@ -763,11 +763,11 @@ function FixItRow({
   item,
   onAct,
   tone,
-}: {
+}: Readonly<{
   item: FixIt;
   onAct: (f: FixIt) => void;
   tone: 'blocker' | 'optional';
-}) {
+}>) {
   const cta =
     item.action === 'wire-data-source'
       ? 'Wire a data source'
@@ -796,7 +796,7 @@ function FixItRow({
   );
 }
 
-function HowThisWorks({ text }: { text: string }) {
+function HowThisWorks({ text }: Readonly<{ text: string }>) {
   return (
     <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
       <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
@@ -805,7 +805,7 @@ function HowThisWorks({ text }: { text: string }) {
   );
 }
 
-function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+function ViewToggle({ view, onChange }: Readonly<{ view: View; onChange: (v: View) => void }>) {
   return (
     <div className="inline-flex items-center gap-0.5 rounded-md border border-border p-0.5">
       <button
@@ -843,12 +843,12 @@ function SelectRow({
   label,
   hint,
   onClick,
-}: {
+}: Readonly<{
   active: boolean;
   label: string;
   hint: string;
   onClick: () => void;
-}) {
+}>) {
   return (
     <button
       type="button"

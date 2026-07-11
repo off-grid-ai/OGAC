@@ -51,7 +51,7 @@ function formatBytes(b: number): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function FileIcon({ mime, className }: { mime: string; className?: string }) {
+function FileIcon({ mime, className }: Readonly<{ mime: string; className?: string }>) {
   if (mime.startsWith('image/')) return <FileImage className={className} />;
   if (mime.startsWith('video/')) return <FileVideo className={className} />;
   if (mime.startsWith('audio/')) return <FileAudio className={className} />;
@@ -66,12 +66,12 @@ function FileCard({
   onDelete,
   onToggleVisibility,
   onShare,
-}: {
+}: Readonly<{
   file: FileMeta;
   onDelete: (id: string) => void;
   onToggleVisibility: (id: string, current: 'public' | 'private') => void;
   onShare: (file: FileMeta) => void;
-}) {
+}>) {
   const isImage = file.mime.startsWith('image/');
   const isVideo = file.mime.startsWith('video/');
   const [failed, setFailed] = useState(false);
@@ -183,7 +183,7 @@ function FileCard({
 }
 
 // Drag-and-drop upload zone
-function UploadZone({ onUploaded }: { onUploaded: () => void }) {
+function UploadZone({ onUploaded }: Readonly<{ onUploaded: () => void }>) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -288,7 +288,7 @@ function applyFilter(files: FileMeta[], filter: Filter): FileMeta[] {
 
 // First-level navigation: a compact folder tile (icon + name + file count) — no preview, so it
 // stays a fixed small size. Clicking opens the folder to reveal its files. Top level = folders only.
-function FolderCard({ name, files, onOpen }: { name: string; files: FileMeta[]; onOpen: () => void }) {
+function FolderCard({ name, files, onOpen }: Readonly<{ name: string; files: FileMeta[]; onOpen: () => void }>) {
   const label = name.split('/').pop() || name;
   return (
     <Card className="cursor-pointer shadow-sm transition-shadow hover:shadow-md" onClick={onOpen}>
@@ -314,7 +314,7 @@ const TTL_CHOICES: { label: string; seconds: number }[] = [
   { label: '7 days', seconds: 604800 },
 ];
 
-function ShareDialog({ file, onClose }: { file: FileMeta | null; onClose: () => void }) {
+function ShareDialog({ file, onClose }: Readonly<{ file: FileMeta | null; onClose: () => void }>) {
   const [ttl, setTtl] = useState(3600);
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState<{ url: string; signed: boolean; expiresAt: string | null } | null>(null);
@@ -422,7 +422,7 @@ interface BucketState {
   policy: { supported: boolean; access: 'public' | 'private'; note?: string };
 }
 
-function BucketPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+function BucketPanel({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const [state, setState] = useState<BucketState | null>(null);
   const [rules, setRules] = useState<LifecycleRuleUI[]>([]);
   const [access, setAccess] = useState<'public' | 'private'>('private');

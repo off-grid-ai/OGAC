@@ -34,11 +34,11 @@ export function RegoModulesManager({
   modules,
   reachable,
   reason,
-}: {
+}: Readonly<{
   modules: RegoModule[];
   reachable: boolean;
   reason?: string;
-}) {
+}>) {
   const router = useRouter();
   const params = useSearchParams();
   const selected = params.get('module'); // null | 'new' | '<id>'
@@ -130,7 +130,7 @@ export function RegoModulesManager({
   );
 }
 
-function DeleteButton({ id }: { id: string }) {
+function DeleteButton({ id }: Readonly<{ id: string }>) {
   const router = useRouter();
   const params = useSearchParams();
   const [confirm, setConfirm] = useState(false);
@@ -182,11 +182,11 @@ function ModulePanel({
   module,
   isNew,
   onClose,
-}: {
+}: Readonly<{
   module: RegoModule | undefined;
   isNew: boolean;
   onClose: () => void;
-}) {
+}>) {
   const router = useRouter();
   const [id, setId] = useState(module?.id ?? '');
   const [rego, setRego] = useState(module?.rego ?? (isNew ? STARTER_REGO : ''));

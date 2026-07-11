@@ -9,7 +9,7 @@ interface Heading {
 }
 
 // On-page table of contents (right rail). Anchors to the heading ids DocsMarkdown renders.
-export function DocToc({ headings }: { headings: Heading[] }) {
+export function DocToc({ headings }: Readonly<{ headings: Heading[] }>) {
   if (headings.length < 2) return null;
   return (
     <aside className="hidden w-48 shrink-0 xl:block">

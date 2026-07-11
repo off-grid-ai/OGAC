@@ -5,7 +5,7 @@ import type { LineageGraph } from '@/lib/marquez';
 
 // Marquez-sourced lineage graph. Renders the server's job→dataset graph read back from Marquez's
 // REST API — the ground-truth OpenLineage view, distinct from the audit-reconstructed edges below.
-export function MarquezGraph({ graph }: { graph: LineageGraph }) {
+export function MarquezGraph({ graph }: Readonly<{ graph: LineageGraph }>) {
   if (!graph.configured) {
     return (
       <Card className="shadow-sm">

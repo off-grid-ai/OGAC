@@ -24,10 +24,10 @@ const LEVEL_TONE: Record<string, string> = {
 export function ClassificationManager({
   assetId,
   initial,
-}: {
+}: Readonly<{
   assetId: string;
   initial: DataClassificationRow[];
-}) {
+}>) {
   const router = useRouter();
   const [column, setColumn] = useState('');
   const [level, setLevel] = useState('internal');

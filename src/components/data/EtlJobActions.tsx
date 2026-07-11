@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 // Run-now + delete for one ETL job. "Run now" fires the governed direct-copy synchronously and
 // reports the outcome (rows moved, values redacted) inline; on any terminal state it refreshes so
 // the run history + last-run badge update. Delete confirms first (destructive). Real actions.
-export function EtlJobActions({ jobId }: { jobId: string }) {
+export function EtlJobActions({ jobId }: Readonly<{ jobId: string }>) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [deleting, setDeleting] = useState(false);

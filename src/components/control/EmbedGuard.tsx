@@ -19,11 +19,11 @@ export function EmbedGuard({
   url,
   title,
   height = 640,
-}: {
+}: Readonly<{
   url?: string;
   title: string;
   height?: number;
-}) {
+}>) {
   const [probe, setProbe] = useState<Probe | null>(null);
   const [checked, setChecked] = useState(false);
 

@@ -57,7 +57,7 @@ function when(iso?: string): string {
 }
 
 // Emerald/amber/red status dot vocabulary, matching the console's run-status palette.
-function StatusPill({ status, temporalStatus }: { status: string; temporalStatus: string }) {
+function StatusPill({ status, temporalStatus }: Readonly<{ status: string; temporalStatus: string }>) {
   const tone =
     status === 'running' || status === 'queued'
       ? 'text-primary border-primary/40'
@@ -284,7 +284,7 @@ export function DurableExecutionsPanel() {
   );
 }
 
-function ExecutionDetail({ workflowId, onBack }: { workflowId: string; onBack: () => void }) {
+function ExecutionDetail({ workflowId, onBack }: Readonly<{ workflowId: string; onBack: () => void }>) {
   const [detail, setDetail] = useState<WorkflowDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -379,7 +379,7 @@ function ExecutionDetail({ workflowId, onBack }: { workflowId: string; onBack: (
   );
 }
 
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Field({ label, value, mono }: Readonly<{ label: string; value: string; mono?: boolean }>) {
   return (
     <div className="rounded-md border border-border p-2">
       <div className="text-muted-foreground">{label}</div>

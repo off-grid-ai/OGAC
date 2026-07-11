@@ -34,12 +34,12 @@ export function ProjectDialog({
   open,
   onOpenChange,
   onSaved,
-}: {
+}: Readonly<{
   project: Project | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onSaved: () => void;
-}) {
+}>) {
   const [name, setName] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -236,7 +236,7 @@ export function ProjectDialog({
   );
 }
 
-function DialogFooterRow({ onCancel, onSave }: { onCancel: () => void; onSave: () => void }) {
+function DialogFooterRow({ onCancel, onSave }: Readonly<{ onCancel: () => void; onSave: () => void }>) {
   return (
     <div className="flex justify-end gap-2 pt-2">
       <Button variant="outline" size="sm" onClick={onCancel}>

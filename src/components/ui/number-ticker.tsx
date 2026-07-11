@@ -23,7 +23,7 @@ export function NumberTicker({
   className,
   suffix = '',
   prefix = '',
-}: NumberTickerProps) {
+}: Readonly<NumberTickerProps>) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduce = useReducedMotion();
 

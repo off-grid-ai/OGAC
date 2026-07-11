@@ -63,7 +63,7 @@ const components: Components = {
   strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
 };
 
-export function Markdown({ children }: { children: string }) {
+export function Markdown({ children }: Readonly<{ children: string }>) {
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
       {children}

@@ -11,7 +11,7 @@ const OPTIONS: { value: string; label: string }[] = [
 ];
 
 // Admin-editable per-tool action policy. PATCHes the tool and enforces it in chat-tools execution.
-export function ToolPolicySelect({ toolId, policy }: { toolId: string; policy: string }) {
+export function ToolPolicySelect({ toolId, policy }: Readonly<{ toolId: string; policy: string }>) {
   const router = useRouter();
   const [value, setValue] = useState(policy);
   const [busy, setBusy] = useState(false);

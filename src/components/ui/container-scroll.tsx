@@ -18,7 +18,7 @@ interface ContainerScrollProps {
   children: ReactNode;
 }
 
-export function ContainerScroll({ header, children }: ContainerScrollProps) {
+export function ContainerScroll({ header, children }: Readonly<ContainerScrollProps>) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 // URL-driven search box for the warehouse catalog. Per the nav rule, the filter position lives in
 // the URL (`?q=`) — deep-linkable + Back-coherent — not local-only state. Debounced so typing pushes
 // one history entry per pause, not per keystroke (replace, so Back doesn't step per character).
-export function WarehouseSearch({ initial = '' }: { initial?: string }) {
+export function WarehouseSearch({ initial = '' }: Readonly<{ initial?: string }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

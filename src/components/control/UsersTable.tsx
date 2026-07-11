@@ -22,7 +22,7 @@ import {
 import { RBAC_ROLES } from '@/lib/roles';
 import type { ConsoleUser } from '@/lib/store';
 
-export function UsersTable({ users }: { users: ConsoleUser[] }) {
+export function UsersTable({ users }: Readonly<{ users: ConsoleUser[] }>) {
   const router = useRouter();
 
   async function setRole(id: string, role: string) {

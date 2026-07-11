@@ -24,7 +24,7 @@ import { buildInstallPayload, isInstallable, type McpServer } from '@/lib/mcp-ca
 // runs); the pure buildInstallPayload turns entry + endpoint into the EXACT tool-create body, POSTed
 // to the EXISTING /api/v1/admin/tools route (type=mcp). No new tool storage — the added tool shows
 // up in the builder's ToolPicker "Registered tools" group automatically.
-export function McpInstallButton({ server }: { server: McpServer }) {
+export function McpInstallButton({ server }: Readonly<{ server: McpServer }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

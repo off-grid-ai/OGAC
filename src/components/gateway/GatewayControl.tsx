@@ -41,11 +41,11 @@ function NodeCard({
   node,
   support,
   onDone,
-}: {
+}: Readonly<{
   node: Node;
   support: Support;
   onDone: () => Promise<void>;
-}) {
+}>) {
   const h = HEALTH_META[node.health ?? 'unknown'];
   const [selected, setSelected] = useState(node.activeModel);
   const [pending, setPending] = useState<NodeAction | null>(null);

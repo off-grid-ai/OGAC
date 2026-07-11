@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 
 // Secrets store panel. Stores connector/tool credentials + virtual-key secrets in the secrets store
 // (KV v2) via /api/v1/admin/secrets. Values are write-only from the UI — GET returns key names only.
-export function SecretsPanel({ configured, initialKeys }: { configured: boolean; initialKeys: string[] }) {
+export function SecretsPanel({ configured, initialKeys }: Readonly<{ configured: boolean; initialKeys: string[] }>) {
   const [keys, setKeys] = useState<string[]>(initialKeys);
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');

@@ -22,7 +22,7 @@ interface KeyView {
 
 // ─── Reveal-once banner ─────────────────────────────────────────────────────────
 
-function NewKeyBanner({ name, apiKey, onDismiss }: { name: string; apiKey: string; onDismiss: () => void }) {
+function NewKeyBanner({ name, apiKey, onDismiss }: Readonly<{ name: string; apiKey: string; onDismiss: () => void }>) {
   const [copied, setCopied] = useState(false);
   const copy = () =>
     void navigator.clipboard.writeText(apiKey).then(() => {
@@ -59,10 +59,10 @@ function NewKeyBanner({ name, apiKey, onDismiss }: { name: string; apiKey: strin
 function CreateKeyForm({
   onDone,
   onCancel,
-}: {
+}: Readonly<{
   onDone: (name: string, apiKey: string) => void;
   onCancel: () => void;
-}) {
+}>) {
   const [name, setName] = useState('');
   const [owner, setOwner] = useState('');
   const [saving, setSaving] = useState(false);

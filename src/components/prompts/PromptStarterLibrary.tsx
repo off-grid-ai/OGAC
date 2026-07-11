@@ -18,7 +18,7 @@ import { preview } from '@/lib/workspace-grid';
 // Starter library panel for the Prompts module. A curated, searchable, grouped set of common
 // reusable prompts. "Add to my prompts" writes through the EXISTING create path
 // (POST /api/v1/prompts) — no new storage — then calls onAdded so the parent reloads its grid.
-export function PromptStarterLibrary({ onAdded }: { onAdded: () => void }) {
+export function PromptStarterLibrary({ onAdded }: Readonly<{ onAdded: () => void }>) {
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState<string | null>(null);
 
@@ -101,11 +101,11 @@ function StarterCard({
   starter,
   busy,
   onAdd,
-}: {
+}: Readonly<{
   starter: PromptStarter;
   busy: boolean;
   onAdd: () => void;
-}) {
+}>) {
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">

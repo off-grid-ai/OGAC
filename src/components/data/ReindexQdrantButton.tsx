@@ -12,11 +12,11 @@ export function ReindexQdrantButton({
   collection,
   qdrantCount,
   sourceDocs,
-}: {
+}: Readonly<{
   collection: string;
   qdrantCount: number | null;
   sourceDocs: number;
-}) {
+}>) {
   const [count, setCount] = useState(qdrantCount);
   const [busy, setBusy] = useState(false);
 

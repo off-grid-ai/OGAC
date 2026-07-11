@@ -11,7 +11,7 @@ import { toDisplayHost } from '@/lib/display-host';
 import type { SiemEvent, SiemOutcome } from '@/lib/siem-view';
 import { usePagination } from '@/lib/use-pagination';
 
-export function SiemEventsTable({ events }: { events: SiemEvent[] }) {
+export function SiemEventsTable({ events }: Readonly<{ events: SiemEvent[] }>) {
   const { pageItems, ...state } = usePagination(events, { key: 'ev', defaultPageSize: 25 });
 
   if (events.length === 0) {
@@ -60,7 +60,7 @@ export function SiemEventsTable({ events }: { events: SiemEvent[] }) {
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: SiemOutcome }) {
+function OutcomeBadge({ outcome }: Readonly<{ outcome: SiemOutcome }>) {
   const danger = outcome === 'denied' || outcome === 'blocked' || outcome === 'error';
   return (
     <span

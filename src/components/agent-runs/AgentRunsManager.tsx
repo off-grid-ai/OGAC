@@ -40,11 +40,11 @@ export function AgentRunsManager({
   runs,
   statusCounts,
   totalRuns,
-}: {
+}: Readonly<{
   runs: RunSummaryRow[];
   statusCounts: RunsSummary['statusCounts'];
   totalRuns: number;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -127,11 +127,11 @@ function RunRow({
   run,
   onOpen,
   onChanged,
-}: {
+}: Readonly<{
   run: RunSummaryRow;
   onOpen: () => void;
   onChanged: () => void;
-}) {
+}>) {
   const [busy, setBusy] = useState(false);
   const actions = actionsFor(run.status);
 
@@ -230,7 +230,7 @@ async function runAction(
   return { ok: false, message: body.error ?? `Action failed (${res.status})` };
 }
 
-function RunDetail({ id, onBack, onChanged }: { id: string; onBack: () => void; onChanged: () => void }) {
+function RunDetail({ id, onBack, onChanged }: Readonly<{ id: string; onBack: () => void; onChanged: () => void }>) {
   const [run, setRun] = useState<RunTrace | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);

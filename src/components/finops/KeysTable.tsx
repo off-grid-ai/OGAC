@@ -22,7 +22,7 @@ const usd = (n: number) => `$${n.toFixed(2)}`;
 // The virtual-key roster can grow large (one row per issued key). Paginate the server-computed
 // rows client-side — the page stays a thin server component, this client leaf owns the slice +
 // control. URL-namespaced by `keys` so it deep-links and Back-button steps through pages.
-export function KeysTable({ rows }: { rows: KeySpend[] }) {
+export function KeysTable({ rows }: Readonly<{ rows: KeySpend[] }>) {
   const paged = usePagination(rows, { key: 'keys', defaultPageSize: 25 });
 
   return (

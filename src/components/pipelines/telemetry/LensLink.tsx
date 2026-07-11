@@ -10,11 +10,11 @@ export function LensLink({
   pipelineName,
   surface,
   href,
-}: {
+}: Readonly<{
   pipelineName: string;
   surface: string;
   href: string;
-}) {
+}>) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
       <span>

@@ -45,10 +45,10 @@ function fmtFire(iso: string): string {
 export function AppScheduleEditor({
   appId,
   initialView,
-}: {
+}: Readonly<{
   appId: string;
   initialView: ScheduleView;
-}) {
+}>) {
   const router = useRouter();
   const [cron, setCron] = React.useState(initialView.config.cron);
   const [timezone, setTimezone] = React.useState(initialView.config.timezone);

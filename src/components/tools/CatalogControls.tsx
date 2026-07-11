@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 // Both the query and the category live in the URL (?q= / ?cat=) so a filtered view is deep-linkable
 // and Back-coherent, and the server page filters from those params (SSR). This component only writes
 // the params; it holds no filtering logic of its own (that's the pure filterCatalog in tools-view).
-export function CatalogControls({ categories }: { categories: string[] }) {
+export function CatalogControls({ categories }: Readonly<{ categories: string[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

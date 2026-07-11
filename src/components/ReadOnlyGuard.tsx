@@ -17,10 +17,10 @@ export const READ_ONLY_TOOLTIP = 'Read-only demo. Sign in with a full account to
 export function ReadOnlyGuard({
   children,
   className,
-}: {
+}: Readonly<{
   children: ReactNode;
   className?: string;
-}): ReactNode {
+}>): ReactNode {
   const viewer = useIsViewer();
   if (!viewer) return children;
 

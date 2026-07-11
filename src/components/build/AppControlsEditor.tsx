@@ -36,11 +36,11 @@ export function AppControlsEditor({
   appId,
   initialControls,
   usage,
-}: {
+}: Readonly<{
   appId: string;
   initialControls: BlastRadiusControls;
   usage: BlastRadiusUsage;
-}) {
+}>) {
   const [enabled, setEnabled] = React.useState(initialControls.enabled);
   const [shadowDefault, setShadowDefault] = React.useState(initialControls.shadowDefault ?? false);
   const [maxRunsPerDay, setMaxRunsPerDay] = React.useState(numOrEmpty(initialControls.maxRunsPerDay));

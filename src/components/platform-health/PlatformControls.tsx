@@ -27,7 +27,7 @@ function useSetParam() {
   );
 }
 
-export function TabSwitcher({ active }: { active: string }) {
+export function TabSwitcher({ active }: Readonly<{ active: string }>) {
   const setParam = useSetParam();
   return (
     <div className="flex gap-1 border-b border-border">
@@ -52,7 +52,7 @@ export function TabSwitcher({ active }: { active: string }) {
 
 // LogsQL search box — commits the query to ?logsq on Enter / submit. defaultValue (not value) keeps
 // this an uncontrolled input driven by the URL, so typing doesn't round-trip every keystroke.
-export function LogsSearchBox({ query }: { query: string }) {
+export function LogsSearchBox({ query }: Readonly<{ query: string }>) {
   const setParam = useSetParam();
   const submit = (raw: string) =>
     setParam((p) => {
@@ -90,10 +90,10 @@ export function LogsSearchBox({ query }: { query: string }) {
 export function ServiceSelect({
   services,
   selected,
-}: {
+}: Readonly<{
   services: string[];
   selected: string | null;
-}) {
+}>) {
   const setParam = useSetParam();
   return (
     <label className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -24,11 +24,11 @@ export function AppReview({
   run,
   pending,
   onResolved,
-}: {
+}: Readonly<{
   run: AppRunView;
   pending: AppRunStepRow;
   onResolved?: () => void;
-}) {
+}>) {
   const prior = priorContextForReview(run.steps);
   const [editing, setEditing] = useState(false);
   const [output, setOutput] = useState(pending.outcome ?? '');

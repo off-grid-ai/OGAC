@@ -14,10 +14,10 @@ const ViewerContext = createContext<boolean>(false);
 export function ViewerModeProvider({
   role,
   children,
-}: {
+}: Readonly<{
   role: string | null | undefined;
   children: ReactNode;
-}) {
+}>) {
   return <ViewerContext.Provider value={isViewer(role)}>{children}</ViewerContext.Provider>;
 }
 

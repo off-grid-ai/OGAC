@@ -52,7 +52,7 @@ const CHECK_CLASS: Record<string, string> = {
 // result inline: the answer, the pipeline steps it ran (policy → guard → retrieve → answer → ground
 // → sign), guardrail verdicts, and source citations. This is the console's "run it and watch it be
 // governed" surface — the whole platform thesis in one box.
-export function AgentRunner({ agentId }: { agentId: string }) {
+export function AgentRunner({ agentId }: Readonly<{ agentId: string }>) {
   const router = useRouter();
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);

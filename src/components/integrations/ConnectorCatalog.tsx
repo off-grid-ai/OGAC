@@ -243,12 +243,12 @@ function AddFromCatalogSheet({
   open,
   onClose,
   onAdded,
-}: {
+}: Readonly<{
   type: ConnectorType;
   open: boolean;
   onClose: () => void;
   onAdded: () => void;
-}) {
+}>) {
   const [name, setName] = useState('');
   const [endpoint, setEndpoint] = useState('');
   const [busy, setBusy] = useState(false);

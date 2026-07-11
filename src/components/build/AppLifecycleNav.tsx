@@ -18,12 +18,12 @@ export function AppLifecycleNav({
   appId,
   title,
   pipeline,
-}: {
+}: Readonly<{
   appId: string;
   title: string;
   /** The resolved "Runs on: <pipeline>" chip for this app (own binding, else org default). */
   pipeline?: PipelineChipData | null;
-}) {
+}>) {
   const pathname = usePathname();
   const tabs = lifecycleTabs(appId);
   const active = activeTabForPath(pathname, appId) ?? 'build';

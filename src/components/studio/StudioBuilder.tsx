@@ -58,11 +58,11 @@ export function StudioBuilder({
   tools,
   collections,
   allowedModels,
-}: {
+}: Readonly<{
   tools: Skill[];
   collections: DataCollection[];
   allowedModels: string[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -641,7 +641,7 @@ export function StudioBuilder({
   );
 }
 
-function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+function SummaryRow({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>
@@ -650,7 +650,7 @@ function SummaryRow({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-function ReviewRow({ label, children }: { label: string; children: React.ReactNode }) {
+function ReviewRow({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="grid grid-cols-[7rem_1fr] gap-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>

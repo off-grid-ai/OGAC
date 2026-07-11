@@ -72,7 +72,7 @@ interface Traffic {
 
 const time = (ts: number) => new Date(ts).toLocaleTimeString();
 
-function Chip({ label, value }: { label: string; value: string | number }) {
+function Chip({ label, value }: Readonly<{ label: string; value: string | number }>) {
   return (
     <span className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
       {label} <span className="font-mono text-foreground">{value}</span>
@@ -82,7 +82,7 @@ function Chip({ label, value }: { label: string; value: string | number }) {
 
 // The expanded detail for one gateway call: metadata + tool calls + prompt/completion + reasoning.
 // eslint-disable-next-line complexity
-export function CallDetail({ c }: { c: Call }) {
+export function CallDetail({ c }: Readonly<{ c: Call }>) {
   const p = c.params ?? {};
   return (
     <div className="space-y-2 py-1">

@@ -37,7 +37,7 @@ interface PromptView {
 // Prompt detail — the full template + a live fill-and-copy preview over its {{variables}}, metadata,
 // and the prompt's actions. Editing deep-links back to the library's edit panel (?panel=<id>) so the
 // single edit form stays DRY (no duplicated editor). Delete confirms, then returns to the library.
-export function PromptDetail({ prompt, isOwner }: { prompt: PromptView; isOwner: boolean }) {
+export function PromptDetail({ prompt, isOwner }: Readonly<{ prompt: PromptView; isOwner: boolean }>) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>({});
   // The prompt's version is its updatedAt (single living version — each edit bumps it). Runs are
@@ -255,7 +255,7 @@ export function PromptDetail({ prompt, isOwner }: { prompt: PromptView; isOwner:
   );
 }
 
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+function Detail({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>

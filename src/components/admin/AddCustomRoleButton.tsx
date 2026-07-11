@@ -22,7 +22,7 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 te
 
 // Define a custom role on top of the built-in RBAC: a name, a built-in role it inherits, and the
 // set of module ids it may access (capabilities). Persists to custom_roles.
-export function AddCustomRoleButton({ modules }: { modules: { id: string; label: string }[] }) {
+export function AddCustomRoleButton({ modules }: Readonly<{ modules: { id: string; label: string }[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   const open = params.get('panel') === 'new-role';
