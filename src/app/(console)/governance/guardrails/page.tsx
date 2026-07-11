@@ -60,9 +60,9 @@ export default async function GuardrailsPage({
         <div>
           <h1 className="text-lg font-semibold text-foreground">Guardrails</h1>
           <p className="text-sm text-muted-foreground">
-            Input/output PII policy — the active detection engine, its reachability, and the entity
-            types it surfaces. Detection degrades to the always-on regex floor if the detector is
-            down.
+            Input/output PII policy — the active detector, its reachability, and the entity types it
+            surfaces. Detection falls back to the always-on baseline pattern protection if the
+            detector is down.
           </p>
         </div>
       </div>

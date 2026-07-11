@@ -449,8 +449,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
     entity: 'DETECT_PII',
     hubId: 'guardrails/detect_pii',
     defaultEnabled: false,
-    description:
-      'A second-opinion PII check that runs in the Guardrails runtime, alongside Presidio detection.',
+    description: 'A second-opinion PII check that runs on-prem, alongside the primary detector.',
   },
 
   // ── Output Quality (Guardrails-AI validators) ─────────────────────────────────────────────────────
@@ -654,14 +653,14 @@ export function itemAvailability(
         status: 'ready',
         detail:
           item.kind === 'presidio-entity'
-            ? 'Detected and masked by LLM Guard’s Anonymize scanner (India recognizers folded in).'
-            : 'Enforced by the on-prem LLM Guard engine.',
+            ? 'Detected and masked in-line, with India recognizers folded in.'
+            : 'Enforced on-prem, in-line on every request.',
       };
     }
     return {
       status: 'fallback',
       detail:
-        'LLM Guard is not configured or is unreachable. The rule is stored and enforced once the engine is on.',
+        'The content scanner is not configured or is unreachable. The rule is stored and enforced once it is on.',
     };
   }
   // guardrails-validator — the legacy Guardrails-AI second-opinion runtime.
@@ -761,14 +760,11 @@ export function buildEnablePayload(
   action: EnableAction = 'redact',
 ): EnableRulePayload {
   const act = isEnableAction(action) ? action : 'redact';
-  let engineLabel = 'Guardrails-AI';
-  if (item.engine === 'presidio') engineLabel = 'Presidio';
-  else if (item.engine === 'llm-guard') engineLabel = 'LLM Guard';
   return {
     matcher: 'entity',
     pattern: item.entity,
     action: act,
-    label: `${item.name} (${engineLabel} — from catalog)`,
+    label: `${item.name} (from catalog)`,
     enabled: true,
   };
 }

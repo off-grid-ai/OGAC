@@ -134,11 +134,13 @@ test('filterCatalog respects category + kind, does not mutate input', () => {
 });
 
 // ─── Availability (honest engine gating — LLM Guard is THE engine) ─────────────────────────────────
-test('PII entity: ready when LLM Guard is the active engine (enforced by Anonymize)', () => {
+test('PII entity: ready when the content scanner is the active engine (enforced in-line)', () => {
   const item = getGuardrailItem('person')!;
   const avail = itemAvailability(item, { guardrailsAiReady: false, llmGuardReady: true });
   assert.equal(avail.status, 'ready');
-  assert.match(avail.detail, /LLM Guard/);
+  assert.match(avail.detail, /masked in-line/i);
+  // Customer-facing detail must NEVER surface the engine/product name.
+  assert.ok(!/llm.?guard|presidio/i.test(avail.detail), `detail leaked engine name: ${avail.detail}`);
 });
 
 test('PII entity: fallback (stored intent) when LLM Guard is not configured', () => {
@@ -202,11 +204,12 @@ test('llm-guard scanner: ready when the LLM Guard engine is active, fallback oth
   );
 });
 
-test('buildEnablePayload labels an LLM Guard scanner with the LLM Guard engine', () => {
+test('buildEnablePayload labels a content-scanner rule from the catalog (no engine name)', () => {
   const p = buildEnablePayload(getGuardrailItem('llm-guard-toxicity')!);
   assert.equal(p.matcher, 'entity');
   assert.equal(p.pattern, 'LLM_GUARD_TOXICITY');
-  assert.match(p.label, /LLM Guard/);
+  assert.match(p.label, /from catalog/);
+  assert.ok(!/llm.?guard|presidio|guardrails-ai/i.test(p.label), `label leaked engine name: ${p.label}`);
   assert.equal(p.enabled, true);
 });
 
@@ -217,14 +220,16 @@ test('buildEnablePayload produces a valid entity-matcher rule body', () => {
   assert.equal(p.pattern, 'US_SSN');
   assert.equal(p.action, 'redact'); // default
   assert.equal(p.enabled, true);
-  assert.match(p.label, /Presidio/);
+  assert.match(p.label, /from catalog/);
+  assert.ok(!/presidio/i.test(p.label), `label leaked engine name: ${p.label}`);
 });
 
-test('buildEnablePayload honours a chosen action and labels the engine', () => {
+test('buildEnablePayload honours a chosen action and labels from the catalog', () => {
   const p = buildEnablePayload(getGuardrailItem('toxic-language')!, 'mask');
   assert.equal(p.pattern, 'TOXIC_LANGUAGE');
   assert.equal(p.action, 'mask');
-  assert.match(p.label, /Guardrails-AI/);
+  assert.match(p.label, /from catalog/);
+  assert.ok(!/guardrails-ai/i.test(p.label), `label leaked engine name: ${p.label}`);
 });
 
 test('buildEnablePayload falls back to redact on a bad action, never throws', () => {
