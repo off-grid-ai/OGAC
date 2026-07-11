@@ -15,7 +15,7 @@ Next.js 15 app. The AI gateway runs separately (the LiteLLM proxy at `<control-p
 ## Systems of record — READ THESE (don't keep infra knowledge in your head)
 
 > **On-prem / fleet deployment orchestration now lives in the PRIVATE repo
-> [`off-grid-ai/fleet-orchestration`](https://github.com/off-grid-ai/fleet-orchestration)**, not
+> [`off-grid-ai/onprem-fleet-orchestration`](https://github.com/off-grid-ai/onprem-fleet-orchestration)**, not
 > in this (public-bound) repo. The specific-deployment systems of record — `SERVER_STATE.md`,
 > `SERVICE_MAP.md`, `DEPLOY.md`, the Cloudflare tunnel config, `dns-records.sh`, seed SQL, and the
 > deploy scripts (`push.sh`/`fleet.sh`/`prod.sh`/`verify-integration.sh`) — were moved there. Clone
