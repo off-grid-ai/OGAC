@@ -266,7 +266,10 @@ export function checkRequestPolicy(
   const p = checkRequestParams(paramsPolicy, params);
   const mr = checkModelRules(modelRules, model);
   const allow = p.allow && mr.allow;
-  const reason = !p.allow ? p.reason : !mr.allow ? mr.reason : `${p.reason}; ${mr.reason}`;
+  let reason: string;
+  if (!p.allow) reason = p.reason;
+  else if (!mr.allow) reason = mr.reason;
+  else reason = `${p.reason}; ${mr.reason}`;
   return { allow, params: p, modelRules: mr, reason };
 }
 

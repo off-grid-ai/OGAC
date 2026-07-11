@@ -77,7 +77,11 @@ export function summarizeRuns(records: RunRecord[]): RunsView {
       };
     })
     // Newest-first. String compare is correct for ISO-8601 timestamps.
-    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0));
+    .sort((a, b) => {
+      if (a.startedAt < b.startedAt) return 1;
+      if (a.startedAt > b.startedAt) return -1;
+      return 0;
+    });
 
   const statusCounts: Record<string, number> = {};
   const rollupByKind = new Map<string, StepRollup>();

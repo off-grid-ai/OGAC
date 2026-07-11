@@ -190,7 +190,9 @@ export function enforceModelCall(
     const egressRank = levelRank(egress as PermissionLevel);
     const ceilingRank = levelRank(ceiling);
     if (ceilingRank >= 0 && egressRank > ceilingRank) {
-      egress = ceiling === 'cloud' ? 'cloud' : ceiling === 'local' ? 'local' : 'block';
+      if (ceiling === 'cloud') egress = 'cloud';
+      else if (ceiling === 'local') egress = 'local';
+      else egress = 'block';
     }
   }
 

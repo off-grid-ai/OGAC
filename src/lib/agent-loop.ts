@@ -265,8 +265,9 @@ export function parseAgentAction(raw: string): AgentAction | null {
   }
 
   // tool: { action: "tool", tool|ref: "prim:web_search", args: {...} }
-  const ref =
-    typeof o.tool === 'string' ? o.tool : typeof o.ref === 'string' ? o.ref : undefined;
+  let ref: string | undefined;
+  if (typeof o.tool === 'string') ref = o.tool;
+  else if (typeof o.ref === 'string') ref = o.ref;
   if ((act === 'tool' || ref) && ref) {
     const args =
       o.args && typeof o.args === 'object' && !Array.isArray(o.args)

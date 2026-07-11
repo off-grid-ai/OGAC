@@ -22,7 +22,7 @@ export function formatBytes(bytes: number | null | undefined): string {
   const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
   const val = n / Math.pow(1024, i);
   // Whole-number bytes show no decimal; larger units show up to one.
-  const digits = i === 0 ? 0 : val >= 100 ? 0 : 1;
+  const digits = i === 0 || val >= 100 ? 0 : 1;
   return `${val.toFixed(digits)} ${units[i]}`;
 }
 

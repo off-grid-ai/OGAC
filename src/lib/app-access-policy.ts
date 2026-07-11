@@ -269,7 +269,9 @@ export function evaluateAppAccess(
     if (!auth.allow) return auth;
   }
 
-  const via = isAdmin ? 'admin' : isOwner ? 'owner' : 'policy';
+  let via: 'admin' | 'owner' | 'policy' = 'policy';
+  if (isAdmin) via = 'admin';
+  else if (isOwner) via = 'owner';
   return { allow: true, reason: `${action} permitted (${via})` };
 }
 
@@ -301,7 +303,10 @@ function sanitizePredicates(raw: unknown, errors: string[], where: string): Abac
   for (const p of raw) {
     const o = (p ?? {}) as Record<string, unknown>;
     const attribute = typeof o.attribute === 'string' ? o.attribute.trim() : '';
-    const value = typeof o.value === 'string' ? o.value : o.value === undefined ? '' : String(o.value);
+    let value: string;
+    if (typeof o.value === 'string') value = o.value;
+    else if (o.value === undefined) value = '';
+    else value = String(o.value);
     const operator = o.operator;
     if (!attribute) {
       errors.push(`${where}.attributes: each predicate needs an attribute`);

@@ -205,7 +205,11 @@ export function shapeCostSummary(rows: LangfuseDailyMetric[]): LangfuseCostSumma
   let totalTraces = 0;
 
   // Oldest → newest so the series reads left-to-right in time.
-  const sorted = [...rows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const sorted = [...rows].sort((a, b) => {
+    if (a.date < b.date) return -1;
+    if (a.date > b.date) return 1;
+    return 0;
+  });
   for (const row of sorted) {
     const usage = row.usage ?? [];
     let dayTokens = 0;
@@ -257,7 +261,11 @@ export function shapeScoreTrends(scores: LangfuseScore[]): ScoreTrendSeries[] {
   }
   return [...byName.entries()]
     .map(([name, pts]) => {
-      const points = pts.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+      const points = pts.sort((a, b) => {
+    if (a.ts < b.ts) return -1;
+    if (a.ts > b.ts) return 1;
+    return 0;
+  });
       const sum = points.reduce((acc, p) => acc + p.value, 0);
       return {
         name,
@@ -385,9 +393,11 @@ export function shapePrompts(rows: LangfusePromptMeta[]): PromptRow[] {
         updatedAt: (r.lastUpdatedAt ?? '').trim(),
       };
     })
-    .sort((a, b) =>
-      a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.name.localeCompare(b.name),
-    );
+    .sort((a, b) => {
+      if (a.updatedAt < b.updatedAt) return 1;
+      if (a.updatedAt > b.updatedAt) return -1;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 // GET /api/public/datasets — dataset definitions (each groups items = input/expected pairs).
@@ -415,9 +425,11 @@ export function shapeDatasets(rows: LangfuseDataset[]): DatasetRow[] {
       createdAt: (r.createdAt ?? '').trim(),
       updatedAt: (r.updatedAt ?? '').trim(),
     }))
-    .sort((a, b) =>
-      a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.name.localeCompare(b.name),
-    );
+    .sort((a, b) => {
+      if (a.createdAt < b.createdAt) return 1;
+      if (a.createdAt > b.createdAt) return -1;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 // GET /api/public/sessions — sessions group related traces (a multi-turn conversation / run chain).
@@ -443,9 +455,11 @@ export function shapeSessions(rows: LangfuseSession[]): SessionRow[] {
       createdAt: (r.createdAt ?? '').trim(),
       traces: r.countTraces ?? r.traceCount ?? 0,
     }))
-    .sort((a, b) =>
-      a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id.localeCompare(b.id),
-    );
+    .sort((a, b) => {
+      if (a.createdAt < b.createdAt) return 1;
+      if (a.createdAt > b.createdAt) return -1;
+      return a.id.localeCompare(b.id);
+    });
 }
 
 // Thin fetchers.
