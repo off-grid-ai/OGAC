@@ -24,12 +24,12 @@ export function PipelineFacetSelect({
   /** Extra params to DROP when the facet changes (e.g. reset `page`/`cursor` pagination). */
   resetParams = ['page', 'cursor'],
   className,
-}: {
+}: Readonly<{
   pipelines: PipelineFacetOption[];
   param?: string;
   resetParams?: string[];
   className?: string;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

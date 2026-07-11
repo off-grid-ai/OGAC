@@ -20,7 +20,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { slugifyTenant, TENANT_BASE_DOMAIN, tenantHost } from '@/lib/tenant-domain';
 import { cn } from '@/lib/utils';
 
-export function AddTenantButton({ modules }: { modules: { id: string; label: string }[] }) {
+export function AddTenantButton({ modules }: Readonly<{ modules: { id: string; label: string }[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   // Open INSTANTLY from local state, then sync the URL in the background. Gating the panel purely on

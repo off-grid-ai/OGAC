@@ -17,11 +17,11 @@ export function TableQualityCheck({
   table,
   columns,
   sampleRows,
-}: {
+}: Readonly<{
   table: string;
   columns: string[];
   sampleRows: Record<string, unknown>[];
-}) {
+}>) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(columns));
   const [verdict, setVerdict] = useState<CheckpointVerdict | null>(null);
   const [summary, setSummary] = useState<string>('');
@@ -115,7 +115,7 @@ export function TableQualityCheck({
               )}
               <span className="text-sm font-medium text-foreground">{summary || 'Check complete'}</span>
             </div>
-            {verdict.results.filter((r) => !r.success).length > 0 ? (
+            {verdict.results.some((r) => !r.success) ? (
               <ul className="space-y-1 text-xs text-muted-foreground">
                 {verdict.results
                   .filter((r) => !r.success)

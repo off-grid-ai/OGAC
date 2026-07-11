@@ -17,7 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,12 +88,12 @@ function GatewayCard({
   onEdit,
   onToggle,
   onDelete,
-}: {
+}: Readonly<{
   gw: GatewayView;
   onEdit: (gw: GatewayView) => void;
   onToggle: (gw: GatewayView, enabled: boolean) => void;
   onDelete: (gw: GatewayView) => void;
-}) {
+}>) {
   return (
     <Card className="flex flex-col shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -179,13 +179,13 @@ export function GatewayFormSheet({
   onOpenChange,
   onSaved,
   gateway,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   /** null ⇒ create; a view ⇒ edit that gateway. */
   gateway: GatewayView | null;
-}) {
+}>) {
   const isEdit = gateway !== null;
   const [name, setName] = useState('');
   const [kind, setKind] = useState<GatewayKind>('on-prem');
@@ -322,7 +322,7 @@ export function GatewayFormSheet({
 // (?panel=new-gateway to add, ?panel=edit-gateway&id=… to edit — so Back closes it and it's
 // deep-linkable). Health is honest: the server merged live probes, so an unconfigured OpenAI shows
 // "not configured", never a fake green.
-export function GatewaysManager({ gateways }: { gateways: GatewayView[] }) {
+export function GatewaysManager({ gateways }: Readonly<{ gateways: GatewayView[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

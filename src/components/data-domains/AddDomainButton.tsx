@@ -9,7 +9,7 @@ import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 // Declare a new data-domain rule. The create panel's open/closed state lives in the URL
 // (?panel=new-domain) so Back closes it and it's deep-linkable — never local useState.
-export function AddDomainButton({ connectors }: { connectors: ConnectorOption[] }) {
+export function AddDomainButton({ connectors }: Readonly<{ connectors: ConnectorOption[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

@@ -44,7 +44,7 @@ const VERDICT_COLOR: Record<string, string> = {
 };
 
 // The recorded trace of a run — proof the governed pipeline fired end-to-end.
-function RunTrace({ run }: { run: Run }) {
+function RunTrace({ run }: Readonly<{ run: Run }>) {
   return (
     <div className="space-y-3 border-t border-border pt-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -115,11 +115,11 @@ export function AgentCardActions({
   agentId,
   custom,
   enabled = true,
-}: {
+}: Readonly<{
   agentId: string;
   custom?: boolean;
   enabled?: boolean;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

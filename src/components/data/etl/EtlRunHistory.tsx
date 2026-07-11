@@ -30,6 +30,13 @@ interface LogLine {
   taskId?: string;
 }
 
+function formatLogLine(l: LogLine): string {
+  const ts = l.ts ? `${l.ts.slice(11, 19)} ` : '';
+  const level = l.level ? `[${l.level}] ` : '';
+  const task = l.taskId ? `${l.taskId}: ` : '';
+  return `${ts}${level}${task}${l.message}`;
+}
+
 function whenLabel(iso?: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -39,7 +46,7 @@ function whenLabel(iso?: string): string {
 // Run history for an ETL job. Live-polls the runs endpoint while any run is 'running' (the server
 // refreshes orchestrated executions from the engine). Each run expands to its engine logs, fetched
 // on demand. Honest: a failed run shows its message; unreachable-engine logs come back empty.
-export function EtlRunHistory({ jobId, initialRuns }: { jobId: string; initialRuns: EtlRunView[] }) {
+export function EtlRunHistory({ jobId, initialRuns }: Readonly<{ jobId: string; initialRuns: EtlRunView[] }>) {
   const [runs, setRuns] = useState<EtlRunView[]>(initialRuns);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [logs, setLogs] = useState<Record<string, LogLine[]>>({});
@@ -160,7 +167,7 @@ export function EtlRunHistory({ jobId, initialRuns }: { jobId: string; initialRu
   );
 }
 
-function LogView({ lines, orchestrated }: { lines?: LogLine[]; orchestrated: boolean }) {
+function LogView({ lines, orchestrated }: Readonly<{ lines?: LogLine[]; orchestrated: boolean }>) {
   if (lines === undefined) return <p className="py-2 text-xs text-muted-foreground">Loading logs…</p>;
   if (lines.length === 0) {
     return (
@@ -173,9 +180,7 @@ function LogView({ lines, orchestrated }: { lines?: LogLine[]; orchestrated: boo
   }
   return (
     <pre className="max-h-64 overflow-auto rounded bg-black/90 p-3 font-mono text-[11px] leading-relaxed text-emerald-300">
-      {lines
-        .map((l) => `${l.ts ? `${l.ts.slice(11, 19)} ` : ''}${l.level ? `[${l.level}] ` : ''}${l.taskId ? `${l.taskId}: ` : ''}${l.message}`)
-        .join('\n')}
+      {lines.map(formatLogLine).join('\n')}
     </pre>
   );
 }

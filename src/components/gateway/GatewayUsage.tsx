@@ -47,7 +47,7 @@ interface Usage {
 
 const num = (n: number) => n.toLocaleString();
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="rounded-md border border-border px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -58,7 +58,7 @@ function Kpi({ label, value }: { label: string; value: string }) {
 
 // Inline-SVG throughput bars from the hourly timeseries — no chart libs. Height scales to the
 // busiest bucket; errors tint a bar amber.
-function Throughput({ series }: { series: TimeBucket[] }) {
+function Throughput({ series }: Readonly<{ series: TimeBucket[] }>) {
   if (!series.length) {
     return <div className="py-6 text-center text-xs text-muted-foreground">No throughput yet.</div>;
   }

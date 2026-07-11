@@ -68,7 +68,7 @@ function fmt(ms?: number): string {
 
 // A degraded-call banner: Keycloak 403 (missing realm-management grant) or an unreachable service.
 // Mirrors the honest messaging used by the Sessions / Federation panels — never a 500 dead-end.
-function DegradeBanner({ message }: { message: string }) {
+function DegradeBanner({ message }: Readonly<{ message: string }>) {
   return (
     <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-xs text-destructive">
       <span className="font-medium">Identity provider error:</span> {message}
@@ -83,12 +83,12 @@ function RolesCard({
   assigned,
   allRoles,
   onChanged,
-}: {
+}: Readonly<{
   userId: string;
   assigned: string[];
   allRoles: KcRole[];
   onChanged: () => void;
-}) {
+}>) {
   const [checked, setChecked] = useState<Set<string>>(new Set(assigned));
   const [saving, setSaving] = useState(false);
 
@@ -191,7 +191,7 @@ function RolesCard({
 
 // ─── Password card ─────────────────────────────────────────────────────────────
 
-function PasswordCard({ userId }: { userId: string }) {
+function PasswordCard({ userId }: Readonly<{ userId: string }>) {
   const [newPassword, setNewPassword] = useState('');
   const [tempPw, setTempPw] = useState(true);
   const [showPw, setShowPw] = useState(false);
@@ -270,7 +270,7 @@ function PasswordCard({ userId }: { userId: string }) {
 
 // ─── MFA card ──────────────────────────────────────────────────────────────────
 
-function MfaCard({ userId }: { userId: string }) {
+function MfaCard({ userId }: Readonly<{ userId: string }>) {
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [requiredActions, setRequiredActions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -445,7 +445,7 @@ function MfaCard({ userId }: { userId: string }) {
 
 // ─── Sessions card (scoped to this user) ────────────────────────────────────────
 
-function SessionsCard({ userId, label }: { userId: string; label: string }) {
+function SessionsCard({ userId, label }: Readonly<{ userId: string; label: string }>) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -597,7 +597,7 @@ function SessionsCard({ userId, label }: { userId: string; label: string }) {
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
 
-export function UserDetailPanel({ userId }: { userId: string }) {
+export function UserDetailPanel({ userId }: Readonly<{ userId: string }>) {
   const [user, setUser] = useState<KcUser | null>(null);
   const [allRoles, setAllRoles] = useState<KcRole[]>([]);
   const [loading, setLoading] = useState(true);

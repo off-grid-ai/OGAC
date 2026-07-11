@@ -37,14 +37,14 @@ export function PromptPlayground({
   promptId,
   version,
   onRun,
-}: {
+}: Readonly<{
   content: string;
   /** When set, runs are tagged (promptId + version) so they appear in the prompt's observability. */
   promptId?: string;
   version?: string;
   /** Fired after a run completes (any outcome) so the detail page can refresh its metrics. */
   onRun?: () => void;
-}) {
+}>) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});

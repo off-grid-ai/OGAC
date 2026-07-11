@@ -19,10 +19,10 @@ import {
 export function WorkspacePipelineBinding({
   initial,
   pipelines,
-}: {
+}: Readonly<{
   initial: { defaultChatPipelineId: string | null; allowlist: string[] };
   pipelines: WorkspacePipelineOption[];
-}) {
+}>) {
   const options = useMemo(() => buildPipelineOptions(pipelines), [pipelines]);
   const knownIds = useMemo(() => options.map((o) => o.id), [options]);
 

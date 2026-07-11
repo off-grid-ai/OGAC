@@ -13,7 +13,7 @@ import { defaultDag } from '@/lib/etl-job';
 // Create a new ETL job with just a name, then open its visual builder (list→detail). The job starts
 // as a two-node source→destination DAG the operator configures on the detail page — so the create
 // step is a quick modal (allowed for a create form), and the real authoring happens in the builder.
-export function NewEtlJobButton({ hasConnectors }: { hasConnectors: boolean }) {
+export function NewEtlJobButton({ hasConnectors }: Readonly<{ hasConnectors: boolean }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');

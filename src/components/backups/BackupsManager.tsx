@@ -135,7 +135,7 @@ function useRestoreParam() {
   return { name, open, close };
 }
 
-export function BackupsManager({ initial }: { initial: BackupsPayload }) {
+export function BackupsManager({ initial }: Readonly<{ initial: BackupsPayload }>) {
   const [data, setData] = useState<BackupsPayload>(initial);
   const [busy, setBusy] = useState<null | 'run' | 'prune' | 'delete'>(null);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
@@ -520,7 +520,7 @@ export function BackupsManager({ initial }: { initial: BackupsPayload }) {
               <p className="py-4 text-center text-xs text-destructive">
                 {restore.error ?? 'Could not inspect this backup.'}
               </p>
-            ) : restore && restore.plan.length === 0 ? (
+            ) : restore?.plan.length === 0 ? (
               <p className="py-4 text-center text-xs text-muted-foreground">
                 No dump files found in this backup.
               </p>
@@ -622,12 +622,12 @@ function SummaryTile({
   label,
   value,
   sub,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   label: string;
   value: string;
   sub: string;
-}) {
+}>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="space-y-1 py-4">

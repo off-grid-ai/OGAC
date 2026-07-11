@@ -25,7 +25,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { CardRail } from '@/components/workspace/CardRail';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { usePagination } from '@/lib/use-pagination';
-import { cn } from '@/lib/utils';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
 
 interface Prompt {
@@ -310,12 +309,12 @@ function PromptCard({
   onUse,
   onEdit,
   onDelete,
-}: {
+}: Readonly<{
   p: Prompt;
   onUse: () => void;
   onEdit: () => void;
   onDelete: () => void;
-}) {
+}>) {
   const hue = accentHue(p.id || p.title);
   return (
     <div className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
@@ -389,13 +388,13 @@ function PromptEditPanel({
   onChange,
   onSave,
   onCancel,
-}: {
+}: Readonly<{
   draft: Draft;
   saving: boolean;
   onChange: (d: Draft) => void;
   onSave: () => void;
   onCancel: () => void;
-}) {
+}>) {
   return (
     <aside className="sticky top-0 hidden h-[calc(100vh-7rem)] w-96 shrink-0 flex-col overflow-y-auto rounded-lg border border-border bg-card shadow-sm lg:flex">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -469,11 +468,11 @@ function CommonPromptsPanel({
   common,
   available,
   onSave,
-}: {
+}: Readonly<{
   common: CommonPrompt[] | null;
   available: boolean;
   onSave: (c: CommonPrompt) => void;
-}) {
+}>) {
   return (
     <div className="space-y-3 border-t border-border pt-6">
       <div className="flex items-center gap-2">

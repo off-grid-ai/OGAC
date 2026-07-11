@@ -22,7 +22,7 @@ interface Row {
   score: number;
 }
 
-export function PresidioThresholds({ thresholds }: { thresholds: Thresholds }) {
+export function PresidioThresholds({ thresholds }: Readonly<{ thresholds: Thresholds }>) {
   const router = useRouter();
   const [global, setGlobal] = useState(thresholds.global);
   const [rows, setRows] = useState<Row[]>(

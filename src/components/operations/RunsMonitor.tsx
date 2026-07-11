@@ -80,7 +80,7 @@ function statusToneClasses(status: RunStatus): string {
   }
 }
 
-function StatusIcon({ status }: { status: RunStatus }) {
+function StatusIcon({ status }: Readonly<{ status: RunStatus }>) {
   const cls = 'size-3.5';
   if (status === 'succeeded') return <CheckCircle className={cls} weight="fill" />;
   if (status === 'failed') return <XCircle className={cls} weight="fill" />;
@@ -90,7 +90,7 @@ function StatusIcon({ status }: { status: RunStatus }) {
   return <Clock className={cls} />;
 }
 
-function StatusBadge({ status }: { status: RunStatus }) {
+function StatusBadge({ status }: Readonly<{ status: RunStatus }>) {
   return (
     <Badge variant="secondary" className={`${statusToneClasses(status)} gap-1`}>
       <StatusIcon status={status} />
@@ -105,7 +105,7 @@ const KIND_BADGE: Record<RunKind, string> = {
   chat: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
 };
 
-export function RunsMonitor({ initial }: { initial: RunsResponse }) {
+export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -334,21 +334,18 @@ function Stat({
   label,
   value,
   tone,
-}: {
+}: Readonly<{
   label: string;
   value: number;
   tone?: 'active' | 'warn' | 'success' | 'error';
-}) {
-  const toneCls =
-    tone === 'active'
-      ? 'text-sky-600 dark:text-sky-400'
-      : tone === 'warn'
-        ? 'text-amber-600 dark:text-amber-500'
-        : tone === 'success'
-          ? 'text-primary'
-          : tone === 'error'
-            ? 'text-destructive'
-            : 'text-foreground';
+}>) {
+  const toneClsMap = {
+    active: 'text-sky-600 dark:text-sky-400',
+    warn: 'text-amber-600 dark:text-amber-500',
+    success: 'text-primary',
+    error: 'text-destructive',
+  } as const;
+  const toneCls = (tone && toneClsMap[tone]) || 'text-foreground';
   return (
     <div className="rounded-md border border-border p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
@@ -361,11 +358,11 @@ function FilterChip({
   active,
   onClick,
   children,
-}: {
+}: Readonly<{
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <button
       type="button"

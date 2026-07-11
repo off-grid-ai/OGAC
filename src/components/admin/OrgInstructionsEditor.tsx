@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 // Org-wide system prompt editor. Persists the single org instruction injected as the
 // highest-precedence system block into every chat (before per-user custom instructions).
-export function OrgInstructionsEditor({ initial }: { initial: string }) {
+export function OrgInstructionsEditor({ initial }: Readonly<{ initial: string }>) {
   const [value, setValue] = useState(initial);
   const [busy, setBusy] = useState(false);
 

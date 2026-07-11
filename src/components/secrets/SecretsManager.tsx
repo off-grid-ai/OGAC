@@ -41,12 +41,12 @@ export function SecretsManager({
   sealed,
   addOpen,
   onToggleAdd,
-}: {
+}: Readonly<{
   configured: boolean;
   sealed: boolean;
   addOpen: boolean;
   onToggleAdd: (open: boolean) => void;
-}) {
+}>) {
   const [keys, setKeys] = useState<SecretKeyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState('');
@@ -277,14 +277,14 @@ function SecretRow({
   expanded,
   onToggle,
   onRemove,
-}: {
+}: Readonly<{
   row: SecretKeyRow;
   sealed: boolean;
   busy: boolean;
   expanded: boolean;
   onToggle: () => void;
   onRemove: () => void;
-}) {
+}>) {
   if (row.folder) {
     return (
       <TableRow>
@@ -354,7 +354,7 @@ function SecretRow({
 }
 
 // eslint-disable-next-line complexity
-function VersionPanel({ keyPath, sealed }: { keyPath: string; sealed: boolean }) {
+function VersionPanel({ keyPath, sealed }: Readonly<{ keyPath: string; sealed: boolean }>) {
   const [data, setData] = useState<SecretVersionsView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -553,12 +553,12 @@ function VersionRow({
   disabled,
   onUndelete,
   onDestroy,
-}: {
+}: Readonly<{
   v: SecretVersionsView['versions'][number];
   disabled: boolean;
   onUndelete: () => void;
   onDestroy: () => void;
-}) {
+}>) {
   return (
     <tr className="border-b border-border/50 last:border-0">
       <td className="py-1 pr-4 font-mono">

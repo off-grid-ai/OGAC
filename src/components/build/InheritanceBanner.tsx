@@ -8,7 +8,7 @@ import type { OrgContextSummary } from '@/lib/org-context';
 // zero secrets) so a builder can see, at a glance, everything a new app inherits from its org:
 // connectors, tools, data domains, guardrails, and the active policy version. Founder's ask: the
 // builder should feel generous and governed — this is what proves it.
-export function InheritanceBanner({ summary }: { summary: OrgContextSummary }) {
+export function InheritanceBanner({ summary }: Readonly<{ summary: OrgContextSummary }>) {
   const chips: { icon: React.ReactNode; label: string; title?: string }[] = [
     {
       icon: <TreeStructure className="size-3.5" />,

@@ -23,11 +23,11 @@ const VIS_LABEL: Record<string, string> = {
 export function AppsList({
   apps,
   chips,
-}: {
+}: Readonly<{
   apps: AppSpec[];
   /** The resolved "Runs on: <pipeline>" chip per app id (page resolves them in one batch). */
   chips?: Record<string, PipelineChipData>;
-}) {
+}>) {
   if (apps.length === 0) {
     return (
       <Card className="shadow-sm">

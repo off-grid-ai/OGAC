@@ -19,7 +19,13 @@ import { Label } from '@/components/ui/label';
 // Per-key request rate limit editor, rendered inline in the keys roster. Reads the key's current
 // limit lazily when opened (GET /api/v1/admin/keys/[id]) and saves via PATCH { rateLimit }. A blank
 // value clears the per-key limit → the key falls back to the workspace / global default.
-export function KeyRateLimit({ id, label }: { id: string; label?: string }) {
+function summarizeLimit(current: number | null | undefined): string {
+  if (current === undefined) return 'set limit';
+  if (current === null) return 'default';
+  return `${current}/min`;
+}
+
+export function KeyRateLimit({ id, label }: Readonly<{ id: string; label?: string }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
@@ -55,10 +61,11 @@ export function KeyRateLimit({ id, label }: { id: string; label?: string }) {
         body: JSON.stringify({ rateLimit }),
       });
       if (!res.ok) throw new Error('failed');
+      const forLabel = label ? ` for ${label}` : '';
       toast.success(
         rateLimit === null
-          ? `Rate limit cleared${label ? ` for ${label}` : ''}`
-          : `Rate limit set to ${rateLimit}/min${label ? ` for ${label}` : ''}`,
+          ? `Rate limit cleared${forLabel}`
+          : `Rate limit set to ${rateLimit}/min${forLabel}`,
       );
       setOpen(false);
       router.refresh();
@@ -69,8 +76,7 @@ export function KeyRateLimit({ id, label }: { id: string; label?: string }) {
     }
   }
 
-  const summary =
-    current === undefined ? 'set limit' : current === null ? 'default' : `${current}/min`;
+  const summary = summarizeLimit(current);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

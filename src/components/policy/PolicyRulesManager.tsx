@@ -68,7 +68,7 @@ const EMPTY: FormState = {
   priority: '100',
 };
 
-export function PolicyRulesManager({ rules }: { rules: PolicyRule[] }) {
+export function PolicyRulesManager({ rules }: Readonly<{ rules: PolicyRule[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   const editing = params.get('rule'); // null | 'new' | '<id>'
@@ -162,7 +162,7 @@ export function PolicyRulesManager({ rules }: { rules: PolicyRule[] }) {
   );
 }
 
-function PushButton({ count }: { count: number }) {
+function PushButton({ count }: Readonly<{ count: number }>) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   async function push() {
@@ -187,7 +187,7 @@ function PushButton({ count }: { count: number }) {
   );
 }
 
-function EnableToggle({ id, enabled }: { id: string; enabled: boolean }) {
+function EnableToggle({ id, enabled }: Readonly<{ id: string; enabled: boolean }>) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);
@@ -212,7 +212,7 @@ function EnableToggle({ id, enabled }: { id: string; enabled: boolean }) {
   return <Switch checked={on} disabled={busy} onCheckedChange={toggle} />;
 }
 
-function DeleteButton({ id, name }: { id: string; name: string }) {
+function DeleteButton({ id, name }: Readonly<{ id: string; name: string }>) {
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -260,11 +260,11 @@ function RuleDialog({
   open,
   rule,
   onClose,
-}: {
+}: Readonly<{
   open: boolean;
   rule: PolicyRule | undefined;
   onClose: () => void;
-}) {
+}>) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const initial: FormState = rule

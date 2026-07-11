@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 // URL-driven date-range picker + export links for the DPO activity report. State lives in the URL
 // (?from&to), so the range is deep-linkable/shareable and Back is coherent — no local navigational
 // state. The server page re-reads searchParams and re-aggregates from the real ledger.
-export function ActivityRangeControls({ from, to }: { from: string; to: string }) {
+export function ActivityRangeControls({ from, to }: Readonly<{ from: string; to: string }>) {
   const router = useRouter();
   const params = useSearchParams();
 

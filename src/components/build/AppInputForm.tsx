@@ -29,7 +29,7 @@ type RunStep = {
 };
 type RunOutcome = { runId: string; status: string; steps: RunStep[]; outcome: string };
 
-export function AppInputForm({ app }: { app: AppSpec }) {
+export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
   const fields: FormField[] = app.inputForm && app.inputForm.length > 0 ? app.inputForm : FALLBACK_FIELDS;
   const [values, setValues] = useState<Record<string, string>>({});
   const [running, setRunning] = useState(false);
@@ -115,7 +115,7 @@ export function AppInputForm({ app }: { app: AppSpec }) {
 
 // The per-step trace + outcome. A seam for the live-status screen (Phase 3/4): today it renders the
 // completed run's steps; a streaming version will render the same shape as it fills.
-function RunTrace({ outcome }: { outcome: RunOutcome }) {
+function RunTrace({ outcome }: Readonly<{ outcome: RunOutcome }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex-row items-center justify-between pb-3">
@@ -155,7 +155,7 @@ function RunTrace({ outcome }: { outcome: RunOutcome }) {
   );
 }
 
-function StatusBadge({ status, small }: { status: string; small?: boolean }) {
+function StatusBadge({ status, small }: Readonly<{ status: string; small?: boolean }>) {
   const ok = status === 'done';
   const err = status === 'error';
   const cls = err

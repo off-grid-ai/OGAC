@@ -159,13 +159,13 @@ export function EtlBuilder({
   initialDag,
   connectors,
   initialRuns,
-}: {
+}: Readonly<{
   jobId: string;
   jobName: string;
   initialDag: EtlDagSpec;
   connectors: { id: string; name: string; type: string }[];
   initialRuns: EtlRunView[];
-}) {
+}>) {
   const [spec, setSpec] = useState<EtlDagSpec>(initialDag);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -413,10 +413,10 @@ export function EtlBuilder({
 function TriggerControls({
   spec,
   onChange,
-}: {
+}: Readonly<{
   spec: EtlDagSpec;
   onChange: (trigger: EtlDagSpec['trigger'], cron?: string) => void;
-}) {
+}>) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <select
@@ -446,13 +446,13 @@ function NodeConfigPanel({
   onLabel,
   onConfig,
   onRemove,
-}: {
+}: Readonly<{
   node: EtlNode;
   connectors: { id: string; name: string; type: string }[];
   onLabel: (label: string) => void;
   onConfig: (patch: Partial<EtlNodeConfig>) => void;
   onRemove?: () => void;
-}) {
+}>) {
   const c = node.config;
   const cols = (v: string): string[] => v.split(',').map((s) => s.trim()).filter(Boolean);
   return (
@@ -627,7 +627,7 @@ function NodeConfigPanel({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <Label className="text-xs">{label}</Label>

@@ -18,7 +18,7 @@ function headingText(children: React.ReactNode): string {
 
 // A fenced code block with a copy button (docs are terminal/mono; the copy affordance is the key
 // finesse for API samples).
-function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
+function CodeBlock({ children, className }: Readonly<{ children: React.ReactNode; className?: string }>) {
   const [copied, setCopied] = useState(false);
   const text = headingText(children);
   // rehype-highlight adds `hljs language-*` to the <code> className; keep it so the highlight.js
@@ -51,7 +51,7 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
 // Markdown renderer for docs pages — brand-styled headings, links, code, lists, tables. Internal
 // /docs links use next/link for client nav; external links open in a new tab. Headings get slug ids
 // so the on-page table of contents can anchor to them.
-export function DocsMarkdown({ body }: { body: string }) {
+export function DocsMarkdown({ body }: Readonly<{ body: string }>) {
   return (
     <div className="max-w-none space-y-4 text-sm leading-relaxed text-foreground">
       <ReactMarkdown

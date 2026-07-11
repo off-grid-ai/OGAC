@@ -37,7 +37,7 @@ interface MemoryRow {
 }
 
 // eslint-disable-next-line complexity
-export function ProjectDetail({ projectId }: { projectId: string }) {
+export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   const [name, setName] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);

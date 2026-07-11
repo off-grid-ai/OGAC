@@ -34,7 +34,7 @@ const METRICS = ['drift_score', 'eval_pass_rate'] as const;
 const OPS = ['gt', 'gte', 'lt', 'lte'] as const;
 const OP_TEXT: Record<string, string> = { gt: '>', gte: '≥', lt: '<', lte: '≤' };
 
-function AddRuleForm({ onDone }: { onDone: () => void }) {
+function AddRuleForm({ onDone }: Readonly<{ onDone: () => void }>) {
   const [metric, setMetric] = useState<(typeof METRICS)[number]>('drift_score');
   const [op, setOp] = useState<(typeof OPS)[number]>('gt');
   const [value, setValue] = useState('');

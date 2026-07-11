@@ -14,12 +14,12 @@ import Link from 'next/link';
 export function NeedsDataSourceBanner({
   appId,
   count,
-}: {
+}: Readonly<{
   /** The saved app's id — links to its Build tab, where the source is wired. */
   appId: string;
   /** How many steps still need a source (for the count in the copy). */
   count: number;
-}) {
+}>) {
   const plural = count === 1 ? 'step' : 'steps';
   return (
     <div className="flex flex-col gap-3 rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">

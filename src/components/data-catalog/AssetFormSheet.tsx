@@ -31,7 +31,7 @@ export function AssetFormSheet({
   method,
   initial,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   title: string;
@@ -40,7 +40,7 @@ export function AssetFormSheet({
   method: 'POST' | 'PATCH';
   initial: AssetFormValues;
   onSaved: () => void;
-}) {
+}>) {
   const [v, setV] = useState<AssetFormValues>(initial);
   const [busy, setBusy] = useState(false);
 
@@ -145,7 +145,7 @@ export function AssetFormSheet({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>

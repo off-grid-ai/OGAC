@@ -80,7 +80,7 @@ export function AppStepEditor({
   names,
   handlers,
   appId,
-}: {
+}: Readonly<{
   step: AppStep;
   index: number;
   total: number;
@@ -88,7 +88,7 @@ export function AppStepEditor({
   handlers: StepEditorHandlers;
   /** The id of the app being edited — so the tool picker can flag apps-as-tools that would cycle. */
   appId?: string;
-}) {
+}>) {
   const meta = KIND_META[step.kind];
   const binding = describeStepBinding(step, names);
   const unbound =
@@ -206,12 +206,12 @@ function AgentBinding({
   names,
   handlers,
   appId,
-}: {
+}: Readonly<{
   step: Extract<AppStep, { kind: 'agent' }>;
   names: BindingNames;
   handlers: StepEditorHandlers;
   appId?: string;
-}) {
+}>) {
   const agents = names.agents ?? [];
   return (
     <div className="space-y-3">
@@ -269,11 +269,11 @@ function ConnectorBinding({
   step,
   names,
   handlers,
-}: {
+}: Readonly<{
   step: Extract<AppStep, { kind: 'connector-query' }>;
   names: BindingNames;
   handlers: StepEditorHandlers;
-}) {
+}>) {
   const domains = names.domains ?? [];
   return (
     <div className="space-y-1.5">
@@ -312,11 +312,11 @@ function ToolPicker({
   selected,
   onChange,
   appId,
-}: {
+}: Readonly<{
   selected: string[];
   onChange: (refs: string[]) => void;
   appId?: string;
-}) {
+}>) {
   const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -437,12 +437,12 @@ function ToolGroup({
   title,
   hint,
   children,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   title: string;
   hint: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
@@ -462,14 +462,14 @@ function ToolRow({
   disabled,
   badge,
   onToggle,
-}: {
+}: Readonly<{
   name: string;
   description: string;
   checked: boolean;
   disabled?: boolean;
   badge?: React.ReactNode;
   onToggle: () => void;
-}) {
+}>) {
   return (
     <label
       className={
@@ -497,6 +497,6 @@ function ToolRow({
   );
 }
 
-function EmptyRow({ text }: { text: string }) {
+function EmptyRow({ text }: Readonly<{ text: string }>) {
   return <p className="px-1.5 text-[11px] text-muted-foreground">{text}</p>;
 }

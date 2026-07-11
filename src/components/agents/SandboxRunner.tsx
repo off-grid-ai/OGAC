@@ -22,7 +22,7 @@ interface Result {
   error?: string;
 }
 
-function SandboxOutput({ result }: { result: Result }) {
+function SandboxOutput({ result }: Readonly<{ result: Result }>) {
   const refusal = result.refused ?? result.error;
   if (refusal) {
     return (

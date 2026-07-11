@@ -31,7 +31,7 @@ const TRIGGER: Record<string, string> = {
   'on-demand': 'bg-muted text-muted-foreground',
 };
 
-function AgentCard({ a }: { a: AgentCardModel }) {
+function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
   const hue = accentHue(a.id || a.name);
   const disabled = a.custom && a.enabled === false;
   return (
@@ -116,10 +116,10 @@ function AgentCard({ a }: { a: AgentCardModel }) {
 export function AgentsGrid({
   agents,
   tools,
-}: {
+}: Readonly<{
   agents: AgentCardModel[];
   tools: ToolOption[];
-}) {
+}>) {
   const editable: EditableAgent[] = agents
     .filter((a) => a.custom)
     .map((a) => ({

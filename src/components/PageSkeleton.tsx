@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 // group can dial the column/row counts to its real layout without copy-pasting markup.
 
 /** Page title + subtitle + optional right-aligned action button placeholder. */
-export function SkeletonPageHeader({ action = true }: { action?: boolean }) {
+export function SkeletonPageHeader({ action = true }: Readonly<{ action?: boolean }>) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="space-y-2.5">
@@ -25,7 +25,7 @@ export function SkeletonPageHeader({ action = true }: { action?: boolean }) {
 }
 
 /** A horizontal band of stat tiles — mirrors the `grid grid-cols-2 lg:grid-cols-4` stat rows. */
-export function SkeletonStatBand({ count = 4 }: { count?: number }) {
+export function SkeletonStatBand({ count = 4 }: Readonly<{ count?: number }>) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
@@ -42,10 +42,10 @@ export function SkeletonStatBand({ count = 4 }: { count?: number }) {
 export function SkeletonCardGrid({
   count = 6,
   className,
-}: {
+}: Readonly<{
   count?: number;
   className?: string;
-}) {
+}>) {
   return (
     <div
       className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', className)}
@@ -72,7 +72,7 @@ export function SkeletonCardGrid({
 }
 
 /** A full-width table placeholder — mirrors list surfaces rendered as rows. */
-export function SkeletonTable({ rows = 8, cols = 5 }: { rows?: number; cols?: number }) {
+export function SkeletonTable({ rows = 8, cols = 5 }: Readonly<{ rows?: number; cols?: number }>) {
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex items-center gap-4 border-b bg-muted/40 px-4 py-3">
@@ -128,11 +128,11 @@ export function PageSkeleton({
   stats = 4,
   cards = 8,
   action = true,
-}: {
+}: Readonly<{
   stats?: number;
   cards?: number;
   action?: boolean;
-}) {
+}>) {
   return (
     <div className="w-full space-y-6" aria-busy="true" aria-live="polite">
       <SkeletonPageHeader action={action} />

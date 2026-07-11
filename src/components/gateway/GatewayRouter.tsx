@@ -112,9 +112,12 @@ export function GatewayRouter() {
           <span className="font-medium text-foreground">
             Router is {data.live ? 'live' : 'unreachable'}.
           </span>{' '}
-          {data.live
-            ? 'It load-balances across the deployments below with automatic failover + retries; per-key budgets and rate limits are enforced.'
-            : `The console is wired to the router but it isn't answering${data.error ? ` (${data.error})` : ''}. Traffic falls back to the built-in aggregator.`}
+          {(() => {
+            const errSuffix = data.error ? ` (${data.error})` : '';
+            return data.live
+              ? 'It load-balances across the deployments below with automatic failover + retries; per-key budgets and rate limits are enforced.'
+              : `The console is wired to the router but it isn't answering${errSuffix}. Traffic falls back to the built-in aggregator.`;
+          })()}
         </div>
       </div>
 

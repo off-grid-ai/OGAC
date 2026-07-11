@@ -15,7 +15,7 @@ const TONE_CLASS: Record<StatTile['tone'], string> = {
   bad: 'text-destructive',
 };
 
-export function StatBand({ stats }: { stats: StatTile[] }) {
+export function StatBand({ stats }: Readonly<{ stats: StatTile[] }>) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {stats.map((s) => (

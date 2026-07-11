@@ -66,7 +66,7 @@ export function FormSheet({
   size = 'md',
   className,
   showCloseButton = true,
-}: FormSheetProps) {
+}: Readonly<FormSheetProps>) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent

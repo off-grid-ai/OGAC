@@ -75,7 +75,7 @@ interface Draft {
 
 const EMPTY: Draft = { matcher: 'entity', pattern: '', action: 'redact', label: '' };
 
-export function GuardrailRules({ rules }: { rules: Rule[] }) {
+export function GuardrailRules({ rules }: Readonly<{ rules: Rule[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   // Which panel is open lives in the URL: ?panel=new-mask (create) or ?panel=edit-mask&id=<id>.
@@ -226,7 +226,7 @@ export function GuardrailRules({ rules }: { rules: Rule[] }) {
                     id="rule-pattern"
                     value={draft.pattern}
                     placeholder={
-                      draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : '\\bACME-\\d+\\b'
+                      draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : String.raw`\bACME-\d+\b`
                     }
                     onChange={(e) => setDraft((d) => ({ ...d, pattern: e.target.value }))}
                   />

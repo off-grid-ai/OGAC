@@ -8,7 +8,7 @@ interface Turn { role: 'user' | 'assistant'; text: string; governed?: boolean }
 
 // The runnable surface of a deployed Studio app. Sends input to the public run endpoint
 // (which executes through the governed pipeline) and shows the conversation.
-export function DeployedApp({ slug }: { slug: string }) {
+export function DeployedApp({ slug }: Readonly<{ slug: string }>) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);

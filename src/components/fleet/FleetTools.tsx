@@ -35,10 +35,10 @@ type TabValue = (typeof TABS)[number];
 export function FleetTools({
   hosts,
   supported,
-}: {
+}: Readonly<{
   hosts: FleetHostOption[];
   supported: boolean;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -85,7 +85,7 @@ export function FleetTools({
 }
 
 // ── Live query ──────────────────────────────────────────────────────────────────
-function LiveQueryPanel({ hosts }: { hosts: FleetHostOption[] }) {
+function LiveQueryPanel({ hosts }: Readonly<{ hosts: FleetHostOption[] }>) {
   const [sql, setSql] = useState('SELECT name, version FROM os_version;');
   const [selected, setSelected] = useState<Set<string>>(new Set(hosts.map((h) => h.id)));
   const [running, setRunning] = useState(false);

@@ -32,14 +32,14 @@ export function DomainDetailPanel({
   connectors,
   allDomains,
   referencedByPipelines = [],
-}: {
+}: Readonly<{
   domain: DataDomain & { connectorName: string };
   connectorName: string;
   connectors: ConnectorOption[];
   allDomains: DataDomain[];
   /** Pipelines whose data ceiling (dataAllowlist) allowlists THIS domain — the reverse edge. */
   referencedByPipelines?: { id: string; name: string; status: string }[];
-}) {
+}>) {
   const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { toggleMessage } from '@/lib/toast-messages';
 
-export function FlagToggle({ flagKey, enabled }: { flagKey: string; enabled: boolean }) {
+export function FlagToggle({ flagKey, enabled }: Readonly<{ flagKey: string; enabled: boolean }>) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);

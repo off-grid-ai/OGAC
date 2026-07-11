@@ -42,10 +42,10 @@ export interface DomainLite {
 export function DomainCard({
   domain,
   connectors,
-}: {
+}: Readonly<{
   domain: DomainLite;
   connectors: ConnectorOption[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

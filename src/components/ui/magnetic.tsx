@@ -14,7 +14,7 @@ interface MagneticProps {
   strength?: number;
 }
 
-export function Magnetic({ children, className, strength = 0.3 }: MagneticProps) {
+export function Magnetic({ children, className, strength = 0.3 }: Readonly<MagneticProps>) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduce = useReducedMotion();
   const x = useMotionValue(0);

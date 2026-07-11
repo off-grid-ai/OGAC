@@ -67,7 +67,7 @@ interface RunResult {
 // Full CRUD for saved eval definitions + RUN with per-metric results. The parent passes a `reloadKey`
 // bump (incremented after a template is applied) to trigger a reload. URL-panel state is kept simple
 // here (local edit/delete dialogs) since the catalog owns the primary add flow.
-export function EvalDefsManager({ reloadKey }: { reloadKey: number }) {
+export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) {
   const router = useRouter();
   const [defs, setDefs] = useState<EvalDef[]>([]);
   const [loading, setLoading] = useState(true);

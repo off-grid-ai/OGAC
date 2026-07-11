@@ -84,7 +84,7 @@ const CATEGORY_ORDER = [
 // The HEADLINE surface: a browsable catalog of prebuilt evaluators. "Apply" turns a template into a
 // saved eval definition in one click (name pre-filled). Availability is shown honestly — whether
 // the check runs for real or via a degraded first-party fallback.
-export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
+export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => void }>) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<Template | null>(null);

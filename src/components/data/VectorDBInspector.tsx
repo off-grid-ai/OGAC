@@ -50,7 +50,7 @@ function normalize(points: ScatterPoint[]): Array<ScatterPoint & { cx: number; c
 // PCA scatter plot of sampled embeddings (inline SVG, no chart libs). Everything routes through
 // the server /api/v1/vectordb endpoint so credentials never touch the browser bundle.
 // eslint-disable-next-line complexity
-export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
+export function VectorDBInspector({ urlHint }: Readonly<{ urlHint?: string }>) {
   const [kind, setKind] = useState<'qdrant' | 'lancedb'>('qdrant');
   const [url, setUrl] = useState(toDisplayHost(urlHint) || QDRANT_DISPLAY_DEFAULT);
   const [apiKey, setApiKey] = useState('');

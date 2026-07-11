@@ -49,11 +49,11 @@ export function PromptObservabilityPanel({
   promptId,
   currentVersion,
   refreshKey = 0,
-}: {
+}: Readonly<{
   promptId: string;
   currentVersion?: string;
   refreshKey?: number;
-}) {
+}>) {
   const [data, setData] = useState<Observability | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -200,11 +200,11 @@ function Stat({
   label,
   value,
   tone,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   tone?: 'warn';
-}) {
+}>) {
   return (
     <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>

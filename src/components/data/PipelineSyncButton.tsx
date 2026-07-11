@@ -12,10 +12,10 @@ import { Button } from '@/components/ui/button';
 export function PipelineSyncButton({
   connectionId,
   name,
-}: {
+}: Readonly<{
   connectionId: string;
   name: string;
-}) {
+}>) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
 

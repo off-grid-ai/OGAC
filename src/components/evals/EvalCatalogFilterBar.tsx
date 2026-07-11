@@ -49,7 +49,7 @@ export function EvalCatalogFilterBar({
   onCategory,
   onSort,
   onClear,
-}: Props) {
+}: Readonly<Props>) {
   return (
     <div className="space-y-3 rounded-md border border-border bg-muted/10 p-3">
       {/* Search + sort + count, one band on wide screens. */}

@@ -16,7 +16,7 @@ interface SessionUser {
   role?: string;
 }
 
-export function Topbar({ user }: { user?: SessionUser }) {
+export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   const pathname = usePathname();
   const mod = getEnabledModules().find((m) => pathname.startsWith(m.route));
 

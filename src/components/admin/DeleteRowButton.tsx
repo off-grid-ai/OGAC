@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
-export function DeleteRowButton({ url, label }: { url: string; label: string }) {
+export function DeleteRowButton({ url, label }: Readonly<{ url: string; label: string }>) {
   const router = useRouter();
 
   async function del() {
