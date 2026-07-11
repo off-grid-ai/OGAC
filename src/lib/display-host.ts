@@ -23,22 +23,28 @@ const G6_LOOPBACK_PORT_MAX = 8939;
 // Loopback identities — from the console's vantage these ARE S1 (see header).
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '::1', '[::1]']);
 
-// Raw fleet IPs → mDNS host. Anything on the LAN that could surface in the UI is mapped so a
-// raw IP never leaks. S1 and g6 are the primary targets; the gateway inference nodes (g1–g8)
-// carry their own IPs in the aggregator's `gateways[].host`, so map those too.
-const IP_TO_HOST: Record<string, string> = {
-  '127.0.0.1': S1_HOST, // S1 — control plane + S1-local backends
-  '192.168.1.66': G6_HOST, // g6 — aux tier (server #2)
-  // Gateway inference nodes (SERVICE_MAP § node → model). Displayed in Gateway node cards.
-  '192.168.1.57': 'offgrid-g1.local',
-  '192.168.1.58': 'offgrid-g2.local',
-  '192.168.1.32': 'offgrid-g3.local',
-  '192.168.1.63': 'offgrid-g4.local',
-  '192.168.1.65': 'offgrid-g5.local',
-  '192.168.1.62': 'offgrid-g7.local',
-  '192.168.1.64': 'offgrid-g8.local',
-  '192.168.1.60': 'offgrid-s2.local', // retired, but map defensively so no IP leaks
-};
+// Raw fleet IPs → mDNS host, so a raw LAN IP never surfaces in the UI. The concrete map is
+// DEPLOYMENT-SPECIFIC topology (which LAN IP is which node), so it lives in the environment
+// (`OFFGRID_FLEET_HOST_MAP`, a JSON object of `{ "<ip>": "<host>.local" }` set in .env.local on
+// the box) — not hardcoded in this public source. When unset, the map is empty and the
+// `isPrivateIPv4` fallback below still rewrites ANY private IP to S1_HOST, so no raw IP ever
+// leaks regardless. Read lazily (memoized) so the value is picked up after env is configured.
+export function parseFleetHostMap(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const o: unknown = JSON.parse(raw);
+    if (o && typeof o === 'object' && !Array.isArray(o)) return o as Record<string, string>;
+  } catch {
+    /* malformed — fall back to empty (fallback still prevents leaks) */
+  }
+  return {};
+}
+
+let _ipToHost: Record<string, string> | null = null;
+function ipToHost(): Record<string, string> {
+  if (_ipToHost === null) _ipToHost = parseFleetHostMap(process.env.OFFGRID_FLEET_HOST_MAP);
+  return _ipToHost;
+}
 
 // A bare host token counts as "internal" (and thus rewritable) if it is a loopback identity,
 // a known fleet IP, or any RFC-1918 / link-local private IPv4. Public hostnames (e.g.
@@ -62,7 +68,8 @@ function mapHostname(host: string, port: string): string | null {
     if (p >= G6_LOOPBACK_PORT_MIN && p <= G6_LOOPBACK_PORT_MAX) return G6_HOST;
     return S1_HOST;
   }
-  if (IP_TO_HOST[host]) return IP_TO_HOST[host];
+  const mapped = ipToHost()[host];
+  if (mapped) return mapped;
   if (isPrivateIPv4(host)) return S1_HOST; // unknown private IP — never leak it
   return null; // public / already-mDNS / anything else: leave unchanged
 }

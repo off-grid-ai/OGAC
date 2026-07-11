@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { toConnectHost, toDisplayHost, toDisplayHostname } from '@/lib/display-host';
+// Fleet IP→host topology is seeded once in test/support/register-alias.mjs (OFFGRID_FLEET_HOST_MAP),
+// loaded via --import before this module — so the g1..g8 mapping assertions below exercise the real
+// env-driven path. Production ships no LAN IPs in source; the box sets the env.
+import { toConnectHost, toDisplayHost, toDisplayHostname, parseFleetHostMap } from '@/lib/display-host';
 
 test('loopback host maps to S1', () => {
   assert.equal(toDisplayHost('http://127.0.0.1:6333'), 'http://offgrid-s1.local:6333/');
@@ -144,4 +147,12 @@ test('no raw loopback / IP survives for any known internal URL', () => {
     assert.doesNotMatch(out, /127\.0\.0\.1|localhost|192\.168\.|10\.\d|172\.(1[6-9]|2\d|3[01])\./, `leaked in ${u} -> ${out}`);
     assert.match(out, /offgrid-(s1|g6)\.local/);
   }
+});
+
+test('parseFleetHostMap: empty / malformed / non-object input all yield an empty map (fallback still guards leaks)', () => {
+  assert.deepEqual(parseFleetHostMap(undefined), {});
+  assert.deepEqual(parseFleetHostMap(''), {});
+  assert.deepEqual(parseFleetHostMap('not json'), {});
+  assert.deepEqual(parseFleetHostMap('[1,2,3]'), {}); // array is not a host map
+  assert.deepEqual(parseFleetHostMap('{"10.0.0.9":"node.local"}'), { '10.0.0.9': 'node.local' });
 });
