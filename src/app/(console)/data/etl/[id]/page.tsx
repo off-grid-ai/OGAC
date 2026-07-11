@@ -27,7 +27,7 @@ const JOB_TONE: Record<EtlJobStatus, string> = {
 // below. The job's DAG is the source of truth the pipeline compiles from; older jobs without a DAG
 // are back-filled from their flat fields so they open in the builder too. This is the "place" the
 // list drills into (list→detail IA), never a modal.
-export default async function EtlJobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EtlJobDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('data');
   const { id } = await params;
   const orgId = await currentOrgId();

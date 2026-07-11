@@ -28,7 +28,7 @@ const STATUS: Record<string, string> = {
   failed: 'bg-destructive/10 text-destructive',
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>
@@ -41,7 +41,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // dialect, the data-domains routing to it, and its sync history. Reached by clicking a connector
 // on the Data page (URL-driven, deep-linkable). All actions (sync/edit/delete) live on the row's
 // action menu, reused here so the operator can run + maintain the connector from its own page.
-export default async function ConnectorDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ConnectorDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('data');
   const { id } = await params;
   const org = await currentOrgId();

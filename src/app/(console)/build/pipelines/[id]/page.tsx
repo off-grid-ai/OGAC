@@ -30,7 +30,7 @@ async function countOf<T>(p: Promise<T[]>): Promise<number> {
 // product surface. Reads the pipeline + its real peripheral facts (evals/golden attach counts, org
 // rule counts, version history) so the dashboard is honest, never fabricated. Per-pipeline attach
 // counts key on the pipeline id; org rule counts are the inherited defaults.
-export default async function PipelineOverviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineOverviewPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);

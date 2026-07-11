@@ -223,7 +223,7 @@ export default async function AppReportsPage({
   );
 }
 
-function Row({ label, value }: { label: string; value: number | string }) {
+function Row({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <div className="flex items-center justify-between">
       <dt className="capitalize text-muted-foreground">{label}</dt>

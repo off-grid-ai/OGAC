@@ -108,11 +108,9 @@ export async function POST(req: Request) {
   const mentionRefs = parseRefsPayload(refs);
   // Temporary conversations have no persisted row; synthesize a light stand-in so the rest of the
   // pipeline (system prompt, budget, tools) works unchanged. projectId/skillId stay null.
-  const convo = temporary
-    ? { id: '', userId, projectId: null, skillId: null }
-    : conversationId
-      ? await getConversation(userId, orgId, conversationId)
-      : null;
+  const loadPersistedConvo = async () =>
+    conversationId ? await getConversation(userId, orgId, conversationId) : null;
+  const convo = temporary ? { id: '', userId, projectId: null, skillId: null } : await loadPersistedConvo();
   if (!convo) return new Response('conversation not found', { status: 404 });
 
   // PA-16b — resolve the bound-pipeline CONTRACT this chat run enforces (data allowlist + egress

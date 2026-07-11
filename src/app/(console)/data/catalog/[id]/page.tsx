@@ -37,7 +37,7 @@ const FRESH_TONE: Record<string, string> = {
 // Data catalog DETAIL (M4) — the deep, deep-linkable view behind one dataset: its facts, its derived
 // governance posture, and full CRUD over its classification + retention. All actions live here so an
 // operator can run + maintain the dataset from its own page.
-export default async function DataAssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DataAssetDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('catalog');
   const { id } = await params;
   const org = await currentOrgId();
@@ -125,7 +125,7 @@ export default async function DataAssetDetailPage({ params }: { params: Promise<
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</div>

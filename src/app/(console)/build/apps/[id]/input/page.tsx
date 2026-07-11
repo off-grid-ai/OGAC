@@ -35,7 +35,7 @@ function describeStep(step: AppStep): string {
 // FULL-WIDTH (non-negotiable console rule): the form keeps a readable measure on the left, while a
 // plain-language "what happens when you run this" rail fills the right on lg+, so a wide screen
 // carries useful context instead of an empty gutter (gap G-WIDTH-1).
-export default async function AppInputTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppInputTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const app = await getApp(id, await currentOrgId());

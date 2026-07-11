@@ -10,7 +10,7 @@ type Status = { running: boolean; phase: string; message: string; error: string 
 // Provit's INTELLIGENCE ENGINE, surfaced through the console: map a public repo (Provit reads the
 // code + tests and synthesizes a feature map), watch the live job, and chat with the test copilot
 // grounded in a mapped repo. Everything flows through /api/v1/provit/intelligence(/chat).
-export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
+export function IntelligencePanel({ baseUrl }: Readonly<{ baseUrl: string }>) {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [status, setStatus] = useState<Status>(null);
   const [repoUrl, setRepoUrl] = useState('');
@@ -119,7 +119,7 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
 
 // The test copilot for one mapped repo — Provit answers on the console's gateway, grounded in that
 // repo's feature/batch context. A collapsible ask box per repo (kept simple: one question → reply).
-function Copilot({ repo }: { repo: string }) {
+function Copilot({ repo }: Readonly<{ repo: string }>) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);

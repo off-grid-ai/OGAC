@@ -123,7 +123,7 @@ export default async function AgentsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2">

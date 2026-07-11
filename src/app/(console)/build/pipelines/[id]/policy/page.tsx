@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // locked→tighten-only rule and decorates every control with its source. The operator edits the
 // overlay here (tighten a control) → persists via updatePipeline (versions the pipeline). Scoped to
 // THIS pipeline — the org store is where the baseline lives, never here.
-export default async function PipelinePolicyPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelinePolicyPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();

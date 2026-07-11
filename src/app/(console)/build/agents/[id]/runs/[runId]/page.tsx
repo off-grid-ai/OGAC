@@ -21,7 +21,7 @@ function verdictColor(v: string): string {
   return 'bg-amber-500/10 text-amber-600';
 }
 
-function StepsCard({ run }: { run: AgentRun }) {
+function StepsCard({ run }: Readonly<{ run: AgentRun }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -50,7 +50,7 @@ function StepsCard({ run }: { run: AgentRun }) {
   );
 }
 
-function ChecksCard({ run }: { run: AgentRun }) {
+function ChecksCard({ run }: Readonly<{ run: AgentRun }>) {
   if (!run.checks.length) return null;
   return (
     <Card className="shadow-sm">
@@ -75,7 +75,7 @@ function ChecksCard({ run }: { run: AgentRun }) {
   );
 }
 
-function CitationsCard({ run }: { run: AgentRun }) {
+function CitationsCard({ run }: Readonly<{ run: AgentRun }>) {
   if (!run.citations.length) return null;
   return (
     <Card className="shadow-sm">
@@ -102,7 +102,7 @@ function CitationsCard({ run }: { run: AgentRun }) {
   );
 }
 
-function ProvenanceCard({ run }: { run: AgentRun }) {
+function ProvenanceCard({ run }: Readonly<{ run: AgentRun }>) {
   if (!run.provenance) return null;
   const p = run.provenance;
   return (
