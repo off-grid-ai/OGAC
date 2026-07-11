@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { ipFromRequest } from '@/lib/audit-actor';
 import { actorFrom } from '@/lib/audit-event';

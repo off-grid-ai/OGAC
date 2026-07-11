@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   if (!session?.user?.email) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const isAdmin = session.user.role === 'admin';
   const body = await req.json().catch(() => ({}));
-  const visibility = isAdmin ? (body.visibility === 'private' ? 'private' : 'org') : 'private';
+  const adminVisibility = body.visibility === 'private' ? 'private' : 'org';
+  const visibility = isAdmin ? adminVisibility : 'private';
   const cap = body.capabilities ?? {};
   // Can't bind an assistant to a project the creator can't access.
   if (body.projectId) {
