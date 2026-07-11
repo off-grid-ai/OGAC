@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { LensLink } from '@/components/pipelines/telemetry/LensLink';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -58,6 +59,51 @@ export default async function PipelineObservabilityPage({
     return hay.includes(tag) || hay.includes(id);
   });
 
+  let tracesBody: ReactNode;
+  if (!traceResult.configured) {
+    tracesBody = (
+      <p className="text-sm text-muted-foreground">
+        Tracing isn&apos;t configured on this deployment, so there are no traces to show yet.
+      </p>
+    );
+  } else if (traces.length === 0) {
+    tracesBody = (
+      <p className="text-sm text-muted-foreground">
+        No traces tagged to this pipeline in the recent window. Runs invoked through this pipeline
+        appear here once traces carry its tag.
+      </p>
+    );
+  } else {
+    tracesBody = (
+      <div className="overflow-x-auto rounded-md border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Trace</TableHead>
+              <TableHead className="text-right">Latency (ms)</TableHead>
+              <TableHead className="text-right">Spans</TableHead>
+              <TableHead>When</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {traces.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">{t.name ?? t.id}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {t.latency != null ? Math.round(t.latency) : '—'}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{t.observations ?? '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {t.timestamp ? new Date(t.timestamp).toLocaleString() : '—'}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-4">
       <LensLink pipelineName={p.name} surface="Observability" href="/insights" />
@@ -76,47 +122,7 @@ export default async function PipelineObservabilityPage({
             Traces naming <code className="text-xs">{tag}</code> from the recent window.
           </p>
         </CardHeader>
-        <CardContent>
-          {!traceResult.configured ? (
-            <p className="text-sm text-muted-foreground">
-              Tracing isn&apos;t configured on this deployment, so there are no traces to show yet.
-            </p>
-          ) : traces.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No traces tagged to this pipeline in the recent window. Runs invoked through this
-              pipeline appear here once traces carry its tag.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Trace</TableHead>
-                    <TableHead className="text-right">Latency (ms)</TableHead>
-                    <TableHead className="text-right">Spans</TableHead>
-                    <TableHead>When</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {traces.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium">{t.name ?? t.id}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {t.latency != null ? Math.round(t.latency) : '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {t.observations ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {t.timestamp ? new Date(t.timestamp).toLocaleString() : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+        <CardContent>{tracesBody}</CardContent>
       </Card>
     </div>
   );
