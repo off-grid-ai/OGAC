@@ -358,7 +358,7 @@ export async function generateReport(
   if (id in REGULATORS) return regulatorPack(id);
   // Fall through to operator-authored custom templates stored in the DB.
   const custom = await getReportTemplate(id);
-  if (custom && custom.kind === 'custom') return generateCustomReport(custom);
+  if (custom?.kind === 'custom') return generateCustomReport(custom);
   return null;
 }
 

@@ -120,7 +120,7 @@ export function validateJobDraft(draft: Partial<EtlJobDraft> | null | undefined)
   }
   const mappings = Array.isArray(draft.mappings) ? draft.mappings : [];
   for (const [i, m] of mappings.entries()) {
-    if (!m || !m.source || !String(m.source).trim()) {
+    if (!m?.source || !String(m.source).trim()) {
       errors.push(`Mapping ${i + 1}: a source column is required.`);
       continue;
     }

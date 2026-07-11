@@ -16,8 +16,8 @@ const SUPERUSER_ROLES = ['admin'];
 function aclPayload(acl?: DocAcl): Record<string, unknown> {
   const p: Record<string, unknown> = {};
   if (acl?.owner) p[ACL_FIELDS.owner] = acl.owner;
-  if (acl?.allowed_roles && acl.allowed_roles.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
-  if (acl?.allowed_subjects && acl.allowed_subjects.length)
+  if (acl?.allowed_roles?.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
+  if (acl?.allowed_subjects?.length)
     p[ACL_FIELDS.allowedSubjects] = acl.allowed_subjects;
   if (acl?.data_class) p[ACL_FIELDS.dataClass] = acl.data_class;
   return p;

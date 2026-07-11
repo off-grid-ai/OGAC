@@ -325,7 +325,7 @@ export function finalizeSpec(
   // yields a valid (output-only) spec.
   const steps = [...assembled.steps];
   const last = steps[steps.length - 1];
-  if (!last || last.kind !== 'output') {
+  if (last?.kind !== 'output') {
     const usedIds = new Set(steps.map((s) => s.id));
     let outId = `s${steps.length + 1}`;
     while (usedIds.has(outId)) outId += 'x';

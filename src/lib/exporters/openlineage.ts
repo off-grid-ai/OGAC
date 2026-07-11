@@ -37,7 +37,7 @@ export function openLineageUrl(endpoint: string): string {
 
 // Build ONE OpenLineage RunEvent. Same shape the internal adapter emits — spec-compliant. Pure.
 export function buildRunEvent(rec: LineageExportRecord): Record<string, unknown> {
-  const namespace = (rec.namespace && rec.namespace.trim()) || DEFAULT_NAMESPACE;
+  const namespace = (rec.namespace?.trim()) || DEFAULT_NAMESPACE;
   const eventTime =
     rec.eventTime && !Number.isNaN(Date.parse(rec.eventTime))
       ? new Date(rec.eventTime).toISOString()

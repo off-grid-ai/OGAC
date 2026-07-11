@@ -176,7 +176,7 @@ interface OsHit {
 function buildQuery(p: AuditSearchParams): Record<string, unknown> {
   const must: Record<string, unknown>[] = [];
   const filter: Record<string, unknown>[] = [];
-  if (p.q && p.q.trim()) {
+  if (p.q?.trim()) {
     must.push({
       multi_match: {
         query: p.q.trim(),

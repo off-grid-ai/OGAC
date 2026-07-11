@@ -57,7 +57,7 @@ export async function eraseSubjectLakeObjects(subjectKey: string): Promise<LakeE
     for (const f of files) {
       // listFiles derives owner as '' (cheap listing), so HEAD each to read the real owner metadata.
       const meta = await getFileMeta(f.id);
-      if (!meta || !meta.owner || !ownerMatches(meta.owner, subjectKey)) continue;
+      if (!meta?.owner || !ownerMatches(meta.owner, subjectKey)) continue;
       const ok = await deleteFile(f.id, '', true); // admin delete — DSAR bypasses per-owner guard
       if (ok) removed += 1;
       else anyFailed = true;

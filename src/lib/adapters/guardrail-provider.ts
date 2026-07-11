@@ -217,7 +217,7 @@ async function loadScannerConfig(orgId?: string): Promise<LlmGuardScannerConfig>
   try {
     const { listRecognizers } = await import('../presidio-recognizers');
     const resolvedOrg =
-      orgId && orgId.trim()
+      orgId?.trim()
         ? orgId.trim()
         : await (await import('../tenancy')).currentOrgId();
     const recs = await listRecognizers(resolvedOrg);

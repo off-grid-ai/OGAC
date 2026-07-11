@@ -169,7 +169,7 @@ export function resolveDomain(phrase: string, domains: DataDomain[]): DataDomain
   // Exact matches (tier 1/2) are trusted outright.
   if (topTier === 1 || topTier === 2) {
     const second = ranked[1];
-    if (second && second.score === top.score) {
+    if (second?.score === top.score) {
       const secondTier = scoreDomain(normQuery, queryTokens, second.domain).tier;
       if (secondTier === topTier) return null; // two exact matches on the same phrase ⇒ ambiguous
     }

@@ -31,7 +31,7 @@ export function thinkingState(
   content: string | null | undefined,
   streaming: boolean,
 ): ThinkingState {
-  const hasReasoning = Boolean(reasoning && reasoning.trim());
+  const hasReasoning = Boolean(reasoning?.trim());
   if (!hasReasoning) return { phase: 'hidden', hasReasoning: false, defaultOpen: false };
   const answerStarted = Boolean(content && content.length > 0);
   // Still thinking: answer not begun and generation ongoing → keep it open and live.

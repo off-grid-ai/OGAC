@@ -279,7 +279,7 @@ export function connectorSecretKey(id: string): string {
 // api key is applied as a header at fetch time by connector-exec, so REST returns the endpoint as-is.
 export function spliceCredential(type: string, endpoint: string, secret: string): string {
   const def = connectorTypeDef(type);
-  if (!def || def.family !== 'sql') return endpoint;
+  if (def?.family !== 'sql') return endpoint;
   try {
     const u = new URL(endpoint);
     if (u.password) return endpoint; // already has creds — don't override

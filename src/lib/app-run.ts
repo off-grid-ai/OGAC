@@ -354,7 +354,7 @@ export function defaultDeps(): AppRunDeps {
 export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): string {
   const label = step.label || step.id;
   const contextBlocks = priorResults
-    .filter((r) => r.output && r.output.trim())
+    .filter((r) => r.output?.trim())
     .map((r) => `- [${r.kind}] ${r.output!.trim()}`);
   if (contextBlocks.length === 0) return label;
   return `CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}\n\nTASK: ${label}`;
@@ -884,7 +884,7 @@ function finalize(state: AppRunState, results: StepResult[]): AppRunOutcome {
 function aggregateOutcome(results: StepResult[]): string {
   for (let i = results.length - 1; i >= 0; i--) {
     const o = results[i].output;
-    if (o && o.trim()) return o;
+    if (o?.trim()) return o;
   }
   return '';
 }

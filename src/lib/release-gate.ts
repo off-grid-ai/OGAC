@@ -94,7 +94,7 @@ export function evaluateReleaseGate(
 
   for (const def of evalDefs) {
     const r = byId.get(def.id);
-    if (!r || !r.scored) {
+    if (!r?.scored) {
       unscored.push({ evalId: def.id, name: def.name });
       continue;
     }

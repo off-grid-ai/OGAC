@@ -227,7 +227,7 @@ export interface ParsedClickHouse {
 
 export function parseClickHouseJson(text: string): ParsedClickHouse {
   const empty: ParsedClickHouse = { columns: [], rows: [], count: 0 };
-  if (!text || !text.trim()) return empty;
+  if (!text?.trim()) return empty;
   let obj: unknown;
   try {
     obj = JSON.parse(text);
