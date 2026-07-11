@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { deleteTool, setToolEnabled, setToolPolicy, updateTool, type ToolPolicy } from '@/lib/store';
 
-const POLICIES = ['allow', 'approval', 'blocked'];
+const POLICIES = new Set(['allow', 'approval', 'blocked']);
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
@@ -11,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const b = (await req.json().catch(() => null)) as
     | { enabled?: unknown; policy?: unknown; name?: unknown; endpoint?: unknown; description?: unknown }
     | null;
-  if (b && typeof b.policy === 'string' && POLICIES.includes(b.policy)) {
+  if (b && typeof b.policy === 'string' && POLICIES.has(b.policy)) {
     await setToolPolicy(id, b.policy as ToolPolicy);
     return NextResponse.json({ ok: true });
   }

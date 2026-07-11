@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/authz';
 import { createCustomRole, listCustomRoles } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const BASE_ROLES = ['viewer', 'operator', 'admin'];
+const BASE_ROLES = new Set(['viewer', 'operator', 'admin']);
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
   const basedOn = (b?.basedOn as string | undefined) ?? 'viewer';
-  if (!BASE_ROLES.includes(basedOn)) {
+  if (!BASE_ROLES.has(basedOn)) {
     return NextResponse.json({ error: 'basedOn must be viewer | operator | admin' }, { status: 400 });
   }
   const caps = Array.isArray(b?.capabilities) ? (b!.capabilities as string[]) : [];

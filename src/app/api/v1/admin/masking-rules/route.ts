@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/authz';
 import { createMaskingRule, listMaskingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const ACTIONS = ['mask', 'tokenize', 'block'];
+const ACTIONS = new Set(['mask', 'tokenize', 'block']);
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const kind = body?.kind as string | undefined;
   const action = body?.action as string | undefined;
-  if (!kind || !action || !ACTIONS.includes(action)) {
+  if (!kind || !action || !ACTIONS.has(action)) {
     return NextResponse.json(
       { error: 'kind and action (mask|tokenize|block) required' },
       { status: 400 },

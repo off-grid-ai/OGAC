@@ -3,11 +3,11 @@ import { requireAdmin } from '@/lib/authz';
 import { createTool, listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const TYPES = ['http', 'mcp'];
+const TYPES = new Set(['http', 'mcp']);
 
 function valid(b: Record<string, unknown> | null): boolean {
   if (!b) return false;
-  return typeof b.name === 'string' && Boolean(b.name) && TYPES.includes(b.type as string);
+  return typeof b.name === 'string' && Boolean(b.name) && TYPES.has(b.type as string);
 }
 
 export async function GET(req: Request) {

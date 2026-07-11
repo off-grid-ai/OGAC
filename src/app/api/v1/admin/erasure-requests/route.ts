@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { assetPosture, listAssets, listErasureRequests, recordErasureRequest } from '@/lib/data-catalog-store';
+import { listAssets, listErasureRequests, recordErasureRequest } from '@/lib/data-catalog-store';
 import { toClassification, listClassifications } from '@/lib/data-catalog-store';
 import { deriveAssetPosture } from '@/lib/data-classification';
 import { resolveRtbfScope, type RtbfAsset } from '@/lib/data-rtbf';

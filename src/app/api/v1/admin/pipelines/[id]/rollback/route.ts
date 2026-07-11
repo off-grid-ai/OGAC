@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // Honest: when there is no prior published version, returns 409 with the reason and leaves the
 // pipeline untouched — it never fabricates a rollback. The restore, its frozen `autorollback`
 // snapshot, and the `pipeline.autorollback` audit are all handled by rollbackToLastGood.
-const REASONS: readonly RollbackReason[] = ['eval-gate-fail', 'drift-breach', 'manual'];
+const REASONS = new Set<RollbackReason>(['eval-gate-fail', 'drift-breach', 'manual']);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const by = gate.user.email ?? 'service@offgrid.local';
 
   const body = (await req.json().catch(() => ({}))) as { reason?: string; detail?: string };
-  const reason: RollbackReason = REASONS.includes(body.reason as RollbackReason)
+  const reason: RollbackReason = REASONS.has(body.reason as RollbackReason)
     ? (body.reason as RollbackReason)
     : 'manual';
 
