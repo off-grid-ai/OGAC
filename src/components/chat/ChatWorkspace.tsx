@@ -1279,20 +1279,25 @@ export function ChatWorkspace({
   }
 
   // Header title: temporary chats read "Temporary chat", else the active project's name, else "Chat".
-  const headerTitle = temporary ? 'Temporary chat' : (activeProject ? activeProject.name : 'Chat');
+  let headerTitle: string;
+  if (temporary) headerTitle = 'Temporary chat';
+  else if (activeProject) headerTitle = activeProject.name;
+  else headerTitle = 'Chat';
   // Empty-state heading + subtext mirror the same temporary/project/default precedence.
-  const emptyStateHeading = temporary
-    ? 'Temporary chat'
-    : (activeProject ? activeProject.name : 'Your own private AI');
-  const emptyStateSubtext = temporary
-    ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
-    : (activeProject
-        ? 'Chats here use this project’s instructions and knowledge.'
-        : 'Answered on-prem by the Off Grid AI gateways. Ask anything.');
+  let emptyStateHeading: string;
+  if (temporary) emptyStateHeading = 'Temporary chat';
+  else if (activeProject) emptyStateHeading = activeProject.name;
+  else emptyStateHeading = 'Your own private AI';
+  let emptyStateSubtext: string;
+  if (temporary)
+    emptyStateSubtext = 'This chat won’t be saved, won’t appear in your history, and won’t update memory.';
+  else if (activeProject) emptyStateSubtext = 'Chats here use this project’s instructions and knowledge.';
+  else emptyStateSubtext = 'Answered on-prem by the Off Grid AI gateways. Ask anything.';
   // Mic button tint: recording (destructive, pulsing) → transcribing (primary, pulsing) → idle.
-  const micButtonTint = audio.recording
-    ? 'animate-pulse text-destructive'
-    : (audio.recordPhase === 'transcribing' ? 'animate-pulse text-primary' : 'text-muted-foreground');
+  let micButtonTint: string;
+  if (audio.recording) micButtonTint = 'animate-pulse text-destructive';
+  else if (audio.recordPhase === 'transcribing') micButtonTint = 'animate-pulse text-primary';
+  else micButtonTint = 'text-muted-foreground';
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] min-h-0">
