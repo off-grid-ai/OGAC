@@ -1,27 +1,9 @@
 rule | file:line | justification
 
-# S6479 — array index in React keys. Accept-listed: the mapped items carry NO stable unique id,
-# and the render order is the item's identity (a fixed, server-computed sequence). Inventing a
-# synthetic key would be behavior-neutral at best and risk key collisions at worst — not a
-# mechanical, provably-safe change.
+# S6479 — array index used as a React key. Accept-listed: the mapped items carry NO stable unique
+# id, and the render order IS the item's identity (a fixed, server-computed sequence). Inventing a
+# synthetic key is behavior-neutral at best and risks key collisions at worst — not a mechanical,
+# provably-safe change. Per ROE, index key retained where there is no stable id.
 S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:35 | RunStep has no stable unique id (kind/label/detail/refs/ms); ordered/append-only "governed chain" — index IS the step identity. Fabricated key could change reconciliation.
 S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:62 | CheckResult has no stable unique id (name/verdict/detail/score) and names can repeat; keying on name could collide. Index retained per ROE.
-S6479 | src/app/(console)/data/warehouse/[table]/page.tsx:151 | Raw warehouse query rows have no guaranteed id column; a rendered result set where row order is identity.
-
-# S3358 — nested ternary. Accept-listed WHERE the "nested ternary" is a JSX conditional-render
-# chain (cond ? <JSX> : cond2 ? <JSX> : <JSX>). These are structural conditional rendering in the
-# component tree; extracting them into statements would restructure the JSX (not behavior-preserving
-# in the mechanical sense and a real readability regression). Value-ternaries (className strings,
-# tone maps) WERE flattened — see commits. Only the JSX-render chains are accepted.
-S3358 | src/app/(console)/build/pipelines/[id]/audit/page.tsx:67 | JSX conditional-render chain (!configured ? … : rows.length===0 ? … : table).
-S3358 | src/app/(console)/build/pipelines/[id]/observability/page.tsx:84 | JSX conditional-render chain (!configured ? … : traces.length===0 ? … : list).
-S3358 | src/app/(console)/data/domains/page.tsx:70 | JSX conditional-render chain (loading/empty/list states).
-S3358 | src/app/(console)/data/lineage/page.tsx:57 | JSX conditional-render chain (!configured ? … : error ? … : graph).
-S3358 | src/app/(console)/data/warehouse/page.tsx:87 | JSX conditional-render chain (health/empty/list states).
-S3358 | src/app/(console)/data/warehouse/page.tsx:94 | JSX conditional-render chain (empty warehouse / no-match / table states).
-
-# S3776 — cognitive complexity. Accept-listed: complexity is 16 (1 over the 15 threshold) and is
-# dominated by nested JSX conditional rendering in an async server-component page — a known
-# SonarCloud over-count for React. Reducing it requires extracting JSX subtrees into child
-# components, which is a structural refactor, not a mechanical behavior-preserving edit.
-S3776 | src/app/(console)/data/lineage/page.tsx:19 | 16→15; JSX-conditional-heavy async page; extraction is a real refactor, out of scope for a behavior-preserving mechanical pass.
+S6479 | src/app/(console)/data/warehouse/[table]/page.tsx:151 | Raw warehouse query rows have no guaranteed id column; a rendered result set where row order is identity. Index retained per ROE.
