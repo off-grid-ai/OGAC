@@ -94,7 +94,7 @@ export const REPORTS: ReportDef[] = [
 // flags binding vs advisory/draft, because most AI-specific instruments are NOT yet binding —
 // enforceable obligations map to in-force generic directions (IT/cyber/outsourcing/localization)
 // + the final DPDP Rules 2025 + CERT-In. `artifacts` = the evidence a compliance team keeps ready.
-interface RegulatorSpec {
+export interface RegulatorSpec {
   name: string;
   status: string;
   frameworks: string[];
@@ -102,7 +102,7 @@ interface RegulatorSpec {
   artifacts: string[];
 }
 
-const REGULATORS: Record<string, RegulatorSpec> = {
+export const REGULATORS: Record<string, RegulatorSpec> = {
   irdai: {
     name: 'IRDAI — insurers',
     status:
