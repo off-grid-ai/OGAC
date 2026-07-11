@@ -248,7 +248,8 @@ function allDocs() {
 async function extractText(bytes) {
   // pdfjs-dist legacy build runs in Node with no worker/canvas.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const loadingTask = pdfjs.getDocument({ data: bytes, useSystemFonts: true, disableWorker: true });
+  // pass a copy — pdfjs detaches the ArrayBuffer it is handed.
+  const loadingTask = pdfjs.getDocument({ data: bytes.slice(), useSystemFonts: true, disableWorker: true });
   const pdf = await loadingTask.promise;
   let text = '';
   for (let p = 1; p <= pdf.numPages; p++) {
