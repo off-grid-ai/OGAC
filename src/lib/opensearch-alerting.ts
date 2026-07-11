@@ -35,7 +35,7 @@ export function alertingConfigured(): boolean {
 async function osFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${osUrl()}${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'content-type': 'application/json', ...init?.headers },
     cache: 'no-store',
     signal: AbortSignal.timeout(6000),
   });
