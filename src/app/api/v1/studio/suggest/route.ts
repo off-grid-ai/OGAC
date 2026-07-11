@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     if (r.ok) {
       const data = await r.json();
       const text: string = data?.choices?.[0]?.message?.content ?? '';
-      const m = text.match(/\{[\s\S]*\}/);
+      const m = /\{[\s\S]*\}/.exec(text);
       if (m) {
         const parsed = JSON.parse(m[0]) as { title?: string; toolIds?: string[]; grounded?: boolean };
         const validIds = new Set(tools.map((t) => t.id));

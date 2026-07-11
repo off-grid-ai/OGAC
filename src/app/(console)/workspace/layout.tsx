@@ -6,7 +6,7 @@ import { WorkspaceNav } from '@/components/workspace/WorkspaceNav';
 // WorkspaceNav top-tabs so the everyday-create plane reads as one experience, and it's how
 // Artifacts (hidden from the sidebar) stays reachable. Chat itself is a full-bleed surface and
 // carries its own link back to this nav, so it deliberately lives outside this group.
-export default function WorkspaceLayout({ children }: { children: ReactNode }) {
+export default function WorkspaceLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="space-y-6">
       <WorkspaceNav />

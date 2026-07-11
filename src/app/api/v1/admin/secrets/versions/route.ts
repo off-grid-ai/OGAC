@@ -20,7 +20,11 @@ export const dynamic = 'force-dynamic';
 function parseVersions(v: unknown): number[] {
   if (!Array.isArray(v)) return [];
   return v
-    .map((n) => (typeof n === 'number' ? Math.floor(n) : typeof n === 'string' ? Number.parseInt(n, 10) : Number.NaN))
+    .map((n) => {
+      if (typeof n === 'number') return Math.floor(n);
+      if (typeof n === 'string') return Number.parseInt(n, 10);
+      return Number.NaN;
+    })
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 

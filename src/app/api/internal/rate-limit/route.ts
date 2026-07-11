@@ -29,7 +29,8 @@ export async function GET(req: Request) {
       getOrgDefaultRateLimit(),
     ]);
     // A disabled key is pinned to 0 → the edge denies every request for it (retry-after = window).
-    const rateLimit = key ? (key.enabled ? key.rateLimit : 0) : null;
+    let rateLimit: number | null = null;
+    if (key) rateLimit = key.enabled ? key.rateLimit : 0;
     return NextResponse.json({ rateLimit, orgDefault });
   } catch {
     // On any DB error, tell the edge "nothing configured" → it applies the global floor. Never 500

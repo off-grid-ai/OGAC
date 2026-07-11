@@ -60,9 +60,9 @@ function backendLabel(id: string): string {
 
 export default async function SandboxPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ status?: string }>;
-}) {
+}>) {
   await requireModuleForUser('sandbox');
   const { status: statusParam } = await searchParams;
   const filter: 'all' | ExecStatus = isExecStatus(statusParam) ? statusParam : 'all';

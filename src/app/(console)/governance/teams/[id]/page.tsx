@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 // Team detail (M2) — the full entity + its actions: edit/delete, member CRUD, and the pipelines
 // assigned to it. Deep-linkable route (/governance/teams/<id>). 404 for an unknown/cross-org id.
-export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TeamDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('teams');
   const { id } = await params;
   const orgId = await currentOrgId();

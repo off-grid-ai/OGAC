@@ -20,10 +20,10 @@ interface RotateResult {
 export function RotateKeyControl({
   algorithm,
   currentPublicKey,
-}: {
+}: Readonly<{
   algorithm: string;
   currentPublicKey: string | null;
-}) {
+}>) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RotateResult | null>(null);
 

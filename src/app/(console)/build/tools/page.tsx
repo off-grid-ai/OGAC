@@ -49,9 +49,9 @@ const TOOL_TYPE: Record<string, string> = {
 
 export default async function ToolsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ tab?: string; q?: string; cat?: string }>;
-}) {
+}>) {
   await requireModuleForUser('tools');
   const { tab: rawTab, q = '', cat } = await searchParams;
   const tab = normalizeToolsTab(rawTab);
@@ -96,10 +96,10 @@ export default async function ToolsPage({
 function RegisteredTab({
   tools,
   usedByCount,
-}: {
+}: Readonly<{
   tools: Awaited<ReturnType<typeof listTools>>;
   usedByCount: Record<string, number>;
-}) {
+}>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -187,11 +187,11 @@ function CatalogTab({
   tools,
   query,
   category,
-}: {
+}: Readonly<{
   tools: Awaited<ReturnType<typeof listTools>>;
   query: string;
   category: string | null;
-}) {
+}>) {
   const filtered = filterCatalog(MCP_SERVERS, query, category);
   const groups = mcpCatalogByCategory(filtered);
   const internetCount = internetReachingServers().length;

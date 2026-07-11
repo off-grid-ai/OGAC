@@ -24,7 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
   denied: 'bg-destructive/10 text-destructive',
 };
 
-export default async function AgentRunsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AgentRunsPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();

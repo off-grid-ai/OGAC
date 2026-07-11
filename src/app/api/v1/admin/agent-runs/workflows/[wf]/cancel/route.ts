@@ -35,6 +35,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ wf: str
     });
     return NextResponse.json({ ok: true, workflowId: res.workflowId, mode, by: gate.user.email });
   }
-  const status = res.reason === 'not_found' ? 404 : res.reason === 'not_configured' ? 409 : 502;
+  let status = 502;
+  if (res.reason === 'not_found') {
+    status = 404;
+  } else if (res.reason === 'not_configured') {
+    status = 409;
+  }
   return NextResponse.json({ error: res.error }, { status });
 }

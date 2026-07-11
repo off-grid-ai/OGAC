@@ -42,11 +42,12 @@ export async function GET(req: Request) {
     statuses.map(async (s) => {
       // Only probe configured providers — an unconfigured one has no meaningful endpoint to reach.
       const health = s.configured ? await probe(s.baseUrl) : { reachable: false, status: 0 };
+      const configuredHealth = health.reachable ? 'up' : 'down';
       return {
         ...s,
         // A configured provider that answers = 'up'; configured but no answer = 'down';
         // not configured = 'unconfigured' (not an outage — it was never wired).
-        health: !s.configured ? 'unconfigured' : health.reachable ? 'up' : 'down',
+        health: !s.configured ? 'unconfigured' : configuredHealth,
         probeStatus: health.status,
         // Genuinely usable ONLY when configured AND reachable AND org egress is ON.
         available: s.configured && health.reachable && policy.egressAllowed === true,

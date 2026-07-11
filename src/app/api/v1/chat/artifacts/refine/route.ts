@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const j = await r.json();
     let text: string = j?.choices?.[0]?.message?.content ?? '';
     // Strip a leading/trailing markdown fence if the model added one.
-    const fence = text.match(/^\s*```[a-z]*\n([\s\S]*?)\n```\s*$/i);
+    const fence = /^\s*```[a-z]*\n([\s\S]*?)\n```\s*$/i.exec(text);
     if (fence) text = fence[1];
     return NextResponse.json({ code: text.trim() });
   } catch {

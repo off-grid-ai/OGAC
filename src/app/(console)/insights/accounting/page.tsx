@@ -36,11 +36,11 @@ function Stat({
   label,
   value,
   icon: Icon,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
-}) {
+}>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -60,9 +60,9 @@ function Stat({
 // computeAccounting(); ADDITIVE to Analytics/FinOps, which are untouched.
 export default async function AccountingPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ range?: string; pipeline?: string }>;
-}) {
+}>) {
   await requireModuleForUser('accounting');
   const { range: rawRange, pipeline: rawPipeline } = await searchParams;
   const range: RangePreset = rawRange && isRangePreset(rawRange) ? rawRange : 'all';
@@ -71,6 +71,7 @@ export default async function AccountingPage({
   const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
   const a = await computeAccounting(range, facet ? pipelineTag(facet) : null);
   const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facetParam = facet ? `&pipeline=${facet}` : '';
 
   return (
     <div className="space-y-6">
@@ -92,7 +93,7 @@ export default async function AccountingPage({
             {RANGES.map((r) => (
               <Link
                 key={r.key}
-                href={`/insights/accounting?range=${r.key}${facet ? `&pipeline=${facet}` : ''}`}
+                href={`/insights/accounting?range=${r.key}${facetParam}`}
                 className={`rounded-md border px-2 py-1 ${range === r.key ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
               >
                 {r.label}

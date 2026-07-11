@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getAgentRuntime } from '@/lib/adapters/agentruntime';
 import { requireAdmin } from '@/lib/authz';

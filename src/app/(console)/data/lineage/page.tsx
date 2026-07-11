@@ -5,6 +5,7 @@ import {
   Stack,
   TreeStructure,
 } from '@phosphor-icons/react/dist/ssr';
+import type { ReactNode } from 'react';
 import { DatasetDetailPanel } from '@/components/lineage/DatasetDetailPanel';
 import { LineageCurate } from '@/components/lineage/LineageCurate';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,122 @@ export default async function LineagePage() {
   const withSources = runs.filter((r) => r.citations.length > 0);
   const { configured, data, error } = lineage;
 
+  // The lineage-store read-back card. When the store isn't configured or errored, both render the
+  // same "coming soon" placeholder (identical branches collapsed into one).
+  let lineageStoreCard: ReactNode;
+  if (!configured || error) {
+    lineageStoreCard = (
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+          <Badge variant="secondary" className="bg-primary/10 text-primary">
+            Coming soon
+          </Badge>
+          <p className="text-xs text-muted-foreground">
+            The full source to answer lineage graph is coming soon. Every grounded agent run still
+            records its source to answer edges below.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  } else {
+    let jobsBody: ReactNode;
+    if (!data.jobs.length && !data.datasets.length) {
+      jobsBody = (
+        <p className="py-4 text-center text-xs text-muted-foreground">
+          No lineage in namespace {data.namespace ?? '—'} yet. Run a grounded agent to emit lineage
+          events.
+        </p>
+      );
+    } else {
+      jobsBody = data.jobs.map((j) => (
+        <div
+          key={j.name}
+          className="grid grid-cols-1 items-center gap-2 lg:grid-cols-[1fr_auto_1fr]"
+        >
+          <div className="space-y-1">
+            {j.inputs.length ? (
+              j.inputs.map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1"
+                >
+                  <Database className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-xs text-foreground">{i}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                no inputs
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
+            <Badge variant="outline" className="gap-1">
+              <TreeStructure className="size-3" />
+              {j.name}
+            </Badge>
+            <Badge variant="secondary" className="text-[10px]">
+              {j.lastRunState}
+            </Badge>
+            <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
+          </div>
+          <div className="space-y-1">
+            {j.outputs.length ? (
+              j.outputs.map((o) => (
+                <div
+                  key={o}
+                  className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1"
+                >
+                  <Database className="size-3.5 shrink-0 text-primary" />
+                  <span className="truncate text-xs text-foreground">{o}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                no outputs
+              </span>
+            )}
+          </div>
+        </div>
+      ));
+    }
+    lineageStoreCard = (
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Data lineage</CardTitle>
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              {data.namespace ?? '—'}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {data.counts.namespaces} namespace(s) · {data.counts.jobs} job(s) ·{' '}
+            {data.counts.datasets} dataset(s) · {data.counts.edges} edge(s)
+            {data.lastRun ? ` · last run ${data.lastRun}` : ''} — read back from the lineage store.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {jobsBody}
+          {data.namespaces.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+              <Stack className="size-3.5 text-muted-foreground" />
+              {data.namespaces.map((n) => (
+                <Badge
+                  key={n}
+                  variant={n === data.namespace ? 'secondary' : 'outline'}
+                  className="text-[10px]"
+                >
+                  {n}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -42,122 +159,7 @@ export default async function LineagePage() {
       </div>
 
       {/* Lineage store read-back — the server-sourced namespaces / jobs / datasets model. */}
-      {!configured ? (
-        <Card className="shadow-sm">
-          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              Coming soon
-            </Badge>
-            <p className="text-xs text-muted-foreground">
-              The full source to answer lineage graph is coming soon. Every grounded agent run still
-              records its source to answer edges below.
-            </p>
-          </CardContent>
-        </Card>
-      ) : error ? (
-        <Card className="shadow-sm">
-          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              Coming soon
-            </Badge>
-            <p className="text-xs text-muted-foreground">
-              The full source to answer lineage graph is coming soon. Every grounded agent run still
-              records its source to answer edges below.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">Data lineage</CardTitle>
-              <Badge variant="secondary" className="bg-primary/10 text-primary">
-                {data.namespace ?? '—'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {data.counts.namespaces} namespace(s) · {data.counts.jobs} job(s) ·{' '}
-              {data.counts.datasets} dataset(s) · {data.counts.edges} edge(s)
-              {data.lastRun ? ` · last run ${data.lastRun}` : ''} — read back from the lineage store.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!data.jobs.length && !data.datasets.length ? (
-              <p className="py-4 text-center text-xs text-muted-foreground">
-                No lineage in namespace {data.namespace ?? '—'} yet. Run a grounded agent to emit
-                lineage events.
-              </p>
-            ) : (
-              data.jobs.map((j) => (
-                <div
-                  key={j.name}
-                  className="grid grid-cols-1 items-center gap-2 lg:grid-cols-[1fr_auto_1fr]"
-                >
-                  <div className="space-y-1">
-                    {j.inputs.length ? (
-                      j.inputs.map((i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1"
-                        >
-                          <Database className="size-3.5 shrink-0 text-muted-foreground" />
-                          <span className="truncate text-xs text-foreground">{i}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
-                        no inputs
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-                    <Badge variant="outline" className="gap-1">
-                      <TreeStructure className="size-3" />
-                      {j.name}
-                    </Badge>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {j.lastRunState}
-                    </Badge>
-                    <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-                  </div>
-                  <div className="space-y-1">
-                    {j.outputs.length ? (
-                      j.outputs.map((o) => (
-                        <div
-                          key={o}
-                          className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1"
-                        >
-                          <Database className="size-3.5 shrink-0 text-primary" />
-                          <span className="truncate text-xs text-foreground">{o}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
-                        no outputs
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            {data.namespaces.length > 1 ? (
-              <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-                <Stack className="size-3.5 text-muted-foreground" />
-                {data.namespaces.map((n) => (
-                  <Badge
-                    key={n}
-                    variant={n === data.namespace ? 'secondary' : 'outline'}
-                    className="text-[10px]"
-                  >
-                    {n}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
+      {lineageStoreCard}
 
       {configured && !error ? (
         <>

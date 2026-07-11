@@ -4,14 +4,14 @@ import { requireAdmin } from '@/lib/authz';
 import { createAbacRule, listAbacRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const OPS = ['eq', 'neq', 'in'];
-const EFFECTS = ['allow', 'deny'];
+const OPS = new Set(['eq', 'neq', 'in']);
+const EFFECTS = new Set(['allow', 'deny']);
 
 function validRule(b: Record<string, unknown> | null): boolean {
   if (!b) return false;
   const { attribute, value, operator, effect } = b;
-  const opOk = typeof operator === 'string' && OPS.includes(operator);
-  const efOk = typeof effect === 'string' && EFFECTS.includes(effect);
+  const opOk = typeof operator === 'string' && OPS.has(operator);
+  const efOk = typeof effect === 'string' && EFFECTS.has(effect);
   return Boolean(attribute) && Boolean(value) && opOk && efOk;
 }
 

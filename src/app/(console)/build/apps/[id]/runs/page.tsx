@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // ─── Per-app RUNS tab (Builder Epic #116, screen 3) ───────────────────────────────────────────────
 // This app's run history — newest first, scoped to the app id. Pick a run to watch it live (screen 3)
 // or open a paused one to decide on it (screen 4). Links stay within the app shell (/apps/<id>/runs/…).
-export default async function AppRunsTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppRunsTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

@@ -15,7 +15,7 @@ const ICONS: Record<string, ComponentType<{ className?: string; weight?: 'bold' 
   insurer: ShieldCheck,
 };
 
-export function SeeItLive({ className }: { className?: string }) {
+export function SeeItLive({ className }: Readonly<{ className?: string }>) {
   return (
     <div className={cn('grid gap-3 sm:grid-cols-2', className)}>
       {DEMO_TENANTS.map((tenant) => {

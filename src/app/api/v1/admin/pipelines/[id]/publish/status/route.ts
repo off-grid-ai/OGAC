@@ -22,7 +22,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   if (jobId) {
     const job = await getPublishJob(jobId, orgId);
-    if (!job || job.pipelineId !== id) {
+    if (job?.pipelineId !== id) {
       return NextResponse.json({ error: 'unknown job' }, { status: 404 });
     }
     return NextResponse.json(job);

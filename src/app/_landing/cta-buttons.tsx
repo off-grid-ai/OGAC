@@ -8,7 +8,7 @@ import { Magnetic } from '@/components/ui/magnetic';
 // The primary + secondary call to action, reused at the hero and the close so the two stay in
 // lockstep (one place to change the copy or the destinations). The primary is magnetic (hover
 // intent); both keep >=44px tap targets and read correctly in both themes via semantic tokens.
-export function CtaButtons({ githubLabel = 'GitHub' }: { githubLabel?: string }) {
+export function CtaButtons({ githubLabel = 'GitHub' }: Readonly<{ githubLabel?: string }>) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Magnetic strength={0.25}>

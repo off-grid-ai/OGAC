@@ -4,13 +4,13 @@ import { requireAdmin } from '@/lib/authz';
 import { createRoutingRule, listRoutingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const OPS = ['eq', 'neq', 'in'];
-const ACTIONS = ['local', 'cloud', 'block'];
+const OPS = new Set(['eq', 'neq', 'in']);
+const ACTIONS = new Set(['local', 'cloud', 'block']);
 
 function valid(b: Record<string, unknown> | null): boolean {
   if (!b) return false;
-  const opOk = typeof b.operator === 'string' && OPS.includes(b.operator);
-  const actOk = typeof b.action === 'string' && ACTIONS.includes(b.action);
+  const opOk = typeof b.operator === 'string' && OPS.has(b.operator);
+  const actOk = typeof b.action === 'string' && ACTIONS.has(b.action);
   return Boolean(b.name) && Boolean(b.attribute) && Boolean(b.value) && opOk && actOk;
 }
 

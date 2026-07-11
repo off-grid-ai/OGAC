@@ -50,10 +50,18 @@ function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 // Probe only the core on-prem services on the home — fast and legible. The full directory lives on
 // the Services module.
-const HOME_SERVICE_IDS = ['gateway', 'langfuse', 'presidio', 'keycloak', 'openbao', 'qdrant', 'opa'];
+const HOME_SERVICE_IDS = new Set([
+  'gateway',
+  'langfuse',
+  'presidio',
+  'keycloak',
+  'openbao',
+  'qdrant',
+  'opa',
+]);
 
 async function probeHomeServices() {
-  const entries = getServices().filter((s) => HOME_SERVICE_IDS.includes(s.id));
+  const entries = getServices().filter((s) => HOME_SERVICE_IDS.has(s.id));
   return Promise.all(
     entries.map(async (s) => {
       const h: RawProbe = await safe(

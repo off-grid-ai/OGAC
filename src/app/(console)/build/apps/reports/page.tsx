@@ -24,9 +24,9 @@ export const dynamic = 'force-dynamic';
 // route (Phase 4B sink). Value-forward: the stat band + charts lead; the table is the drill-down.
 export default async function AppReportsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ appId?: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
   const { appId } = await searchParams;
@@ -223,7 +223,7 @@ export default async function AppReportsPage({
   );
 }
 
-function Row({ label, value }: { label: string; value: number | string }) {
+function Row({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <div className="flex items-center justify-between">
       <dt className="capitalize text-muted-foreground">{label}</dt>

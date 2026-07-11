@@ -10,7 +10,7 @@ import type { DemoBannerModel } from '@/lib/demo-hellobar';
 // creds render only when configured in env, otherwise just the read-only note (never crashes).
 // Off Grid tokens only; brand voice (no em-dash/exclamation/curly quotes).
 
-function CopyChip({ label, value }: { label: string; value: string }) {
+function CopyChip({ label, value }: Readonly<{ label: string; value: string }>) {
   const [copied, setCopied] = useState(false);
   const copy = (): void => {
     void navigator.clipboard
@@ -43,7 +43,7 @@ function CopyChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function SigninDemoBanner({ model }: { model: DemoBannerModel }) {
+export function SigninDemoBanner({ model }: Readonly<{ model: DemoBannerModel }>) {
   if (!model.show) return null;
   const hasCreds = Boolean(model.email || model.password);
 

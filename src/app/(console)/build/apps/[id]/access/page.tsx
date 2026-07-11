@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 //   • SHARING — Google-Doc-style per-user grants over existing Keycloak users, plus the owner's
 //     upward management chain which auto-inherits (AppShareManager → /api/v1/admin/apps/[id]/shares).
 // Effective access is the UNION of the two, resolved in the enforcement seam (enforceAppAccessWithSharing).
-export default async function AppAccessTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppAccessTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

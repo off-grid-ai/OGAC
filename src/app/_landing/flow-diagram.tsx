@@ -40,11 +40,11 @@ function StageNode({
   stage,
   nodeRef,
   active,
-}: {
+}: Readonly<{
   stage: Stage;
   nodeRef: RefObject<HTMLDivElement | null>;
   active?: boolean;
-}) {
+}>) {
   const Icon = stage.icon;
   return (
     <div className="flex flex-col items-center gap-3 text-center">

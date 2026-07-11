@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 // Outcomes over time for THIS app: totals, completions vs failures, HITL approvals/rejections,
 // exceptions, throughput, cost/tokens. Reuses the pure rollup (app-reports.ts) over the app's runs.
 // Each run offers a signed PDF report download (Phase 4B sink).
-export default async function AppReportsTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppReportsTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -187,7 +187,7 @@ export default async function AppReportsTab({ params }: { params: Promise<{ id: 
   );
 }
 
-function Metric({ value, label, tone }: { value: number; label: string; tone: string }) {
+function Metric({ value, label, tone }: Readonly<{ value: number; label: string; tone: string }>) {
   return (
     <div>
       <div className={`text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
@@ -196,7 +196,7 @@ function Metric({ value, label, tone }: { value: number; label: string; tone: st
   );
 }
 
-function Row({ label, value }: { label: string; value: number | string }) {
+function Row({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <div className="flex items-center justify-between">
       <dt className="capitalize text-muted-foreground">{label}</dt>

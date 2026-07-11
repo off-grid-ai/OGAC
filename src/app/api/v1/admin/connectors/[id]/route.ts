@@ -6,7 +6,7 @@ import { splitEndpointSecret, persistConnectorSecret } from '@/lib/connector-sec
 import { deleteConnector, updateConnector } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-const AUTHS = ['none', 'api-key', 'oauth'];
+const AUTHS = new Set(['none', 'api-key', 'oauth']);
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
@@ -14,7 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
-  if (body.auth !== undefined && !AUTHS.includes(body.auth as string)) {
+  if (body.auth !== undefined && !AUTHS.has(body.auth as string)) {
     return NextResponse.json({ error: 'auth must be none | api-key | oauth' }, { status: 400 });
   }
 

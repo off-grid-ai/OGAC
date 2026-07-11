@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 // The Versions tab — the real, immutable version history. Every publish and edit froze a snapshot;
 // this is the audit trail of what the pipeline's governance contract was at each version.
-export default async function PipelineVersionsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineVersionsPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);

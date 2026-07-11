@@ -29,9 +29,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ pipeline?: string }>;
-}) {
+}>) {
   await requireModuleForUser('analytics');
   const { pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();

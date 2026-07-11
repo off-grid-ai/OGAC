@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 // connector · resource), a cross-link into the bound connector, edit/delete, and a scoped
 // test-resolve that runs the pure resolver across all domains so the operator can confirm this rule
 // wins the phrases they expect. Reached by clicking a domain card on the Data domains page.
-export default async function DataDomainDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DataDomainDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('data-domains');
   const { id } = await params;
   const org = await currentOrgId();

@@ -2,6 +2,7 @@ import { AddDomainButton } from '@/components/data-domains/AddDomainButton';
 import { DomainCard } from '@/components/data-domains/DomainCard';
 import { SuggestStartersButton } from '@/components/data-domains/SuggestStartersButton';
 import { TestResolveBox } from '@/components/data-domains/TestResolveBox';
+import type { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { proposeStarterDomains } from '@/lib/data-domains-seed';
 import { listDomains } from '@/lib/data-domains-store';
@@ -27,6 +28,50 @@ export default async function DataDomainsPage() {
     connectorOptions,
     domains.map((d) => d.label),
   );
+
+  let domainsBody: ReactNode;
+  if (connectors.length === 0) {
+    domainsBody = (
+      <Card className="shadow-sm">
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No connectors yet. Add a connector under Integrations first — a data domain must bind to
+            a real connector.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  } else if (domains.length === 0) {
+    domainsBody = (
+      <Card className="shadow-sm">
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No data domains declared yet. Add a rule, or use <b>Suggest starter rules</b> to seed
+            the common ones from your connectors.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  } else {
+    domainsBody = (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {domains.map((d) => (
+          <DomainCard
+            key={d.id}
+            domain={{
+              id: d.id,
+              label: d.label,
+              aliases: d.aliases,
+              connectorId: d.connectorId,
+              connectorName: connectorName(d.connectorId),
+              resource: d.resource,
+            }}
+            connectors={connectorOptions}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -58,42 +103,7 @@ export default async function DataDomainsPage() {
         connectorName={Object.fromEntries(connectors.map((c) => [c.id, c.name]))}
       />
 
-      {connectors.length === 0 ? (
-        <Card className="shadow-sm">
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No connectors yet. Add a connector under Integrations first — a data domain must bind
-              to a real connector.
-            </p>
-          </CardContent>
-        </Card>
-      ) : domains.length === 0 ? (
-        <Card className="shadow-sm">
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No data domains declared yet. Add a rule, or use{' '}
-              <b>Suggest starter rules</b> to seed the common ones from your connectors.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {domains.map((d) => (
-            <DomainCard
-              key={d.id}
-              domain={{
-                id: d.id,
-                label: d.label,
-                aliases: d.aliases,
-                connectorId: d.connectorId,
-                connectorName: connectorName(d.connectorId),
-                resource: d.resource,
-              }}
-              connectors={connectorOptions}
-            />
-          ))}
-        </div>
-      )}
+      {domainsBody}
     </div>
   );
 }

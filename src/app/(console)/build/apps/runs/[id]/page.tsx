@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // Server-renders the current app_runs row (the initial live snapshot) and hands it to AppRunStatus,
 // which polls for updates while the run is open and inlines the REVIEW surface when a human step
 // pauses it. Deep-linkable: /apps/runs/<id> is the run's address (nav lives in the URL).
-export default async function AppRunPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppRunPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

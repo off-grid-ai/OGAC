@@ -119,7 +119,7 @@ const GOVERNANCE: Item[] = [
   { icon: Gauge, name: 'Agent QA across the fleet', body: 'Evals, drift, and online scoring keep the on-device intelligence reliable as it scales.' },
 ];
 
-function Cards({ items, cols }: { items: Item[]; cols: string }) {
+function Cards({ items, cols }: Readonly<{ items: Item[]; cols: string }>) {
   return (
     <div className={`mt-10 grid grid-cols-1 gap-5 ${cols}`}>
       {items.map((it) => (

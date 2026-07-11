@@ -30,7 +30,7 @@ const OUTCOME: Record<string, string> = {
 type Policy = Awaited<ReturnType<typeof pullPolicyForDevice>>;
 type Audit = Awaited<ReturnType<typeof listAudit>>;
 
-function PolicyCard({ policy }: { policy: Policy }) {
+function PolicyCard({ policy }: Readonly<{ policy: Policy }>) {
   const egress = Boolean(policy?.egressAllowed);
   const guardrails = policy?.guardrails ?? [];
   const models = policy?.allowedModels ?? [];
@@ -78,7 +78,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
   );
 }
 
-function ActivityCard({ audit }: { audit: Audit }) {
+function ActivityCard({ audit }: Readonly<{ audit: Audit }>) {
   return (
     <Card className="shadow-sm lg:col-span-2">
       <CardHeader>
@@ -127,7 +127,7 @@ function ActivityCard({ audit }: { audit: Audit }) {
   );
 }
 
-export default async function DeviceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DeviceDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('fleet');
   const { id } = await params;
   const org = await currentOrgId();

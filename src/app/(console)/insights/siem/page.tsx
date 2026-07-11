@@ -22,15 +22,16 @@ export const dynamic = 'force-dynamic';
 // linkable and history-aware. Best-effort: an unreachable index degrades to zeros + an error note.
 export default async function SiemPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ outcome?: string; pipeline?: string }>;
-}) {
+}>) {
   await requireModuleForUser('siem');
   const { outcome, pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();
   const pipelines = await listPipelines(orgId).catch(() => []);
   const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
   const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facetParam = facet ? `&pipeline=${encodeURIComponent(facet)}` : '';
   const [{ configured, data: raw, error }, suppressions] = await Promise.all([
     readSiemView(500, facet ? pipelineTag(facet) : null),
     listSuppressions(orgId).catch(() => []),
@@ -96,7 +97,7 @@ export default async function SiemPage({
         {data.byOutcome.map((o) => (
           <Link
             key={o.outcome}
-            href={`/insights/siem?outcome=${encodeURIComponent(o.outcome)}${facet ? `&pipeline=${encodeURIComponent(facet)}` : ''}`}
+            href={`/insights/siem?outcome=${encodeURIComponent(o.outcome)}${facetParam}`}
             className={`rounded-md border px-2 py-1 ${active === o.outcome ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
           >
             {o.outcome} ({o.count})

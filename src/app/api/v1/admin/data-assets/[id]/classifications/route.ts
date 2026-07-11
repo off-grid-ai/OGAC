@@ -48,9 +48,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const column = body?.column ? String(body.column).trim() : null;
 
   const row = await setClassification(id, { level, piiTags, column }, org);
+  const columnSuffix = column ? `#${column}` : '';
   auditFromSession(gate, org, {
     action: 'data-classification.set',
-    resource: `data-asset:${id}${column ? `#${column}` : ''}`,
+    resource: `data-asset:${id}${columnSuffix}`,
     outcome: 'ok',
   });
   return NextResponse.json(row, { status: 201 });

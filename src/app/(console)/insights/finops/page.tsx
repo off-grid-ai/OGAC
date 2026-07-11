@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 const usd = (n: number) => `$${n.toFixed(2)}`;
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2">
@@ -39,9 +39,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default async function FinOpsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ pipeline?: string }>;
-}) {
+}>) {
   await requireModuleForUser('finops');
   const { pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();

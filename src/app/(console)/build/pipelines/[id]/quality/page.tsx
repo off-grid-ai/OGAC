@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 //
 // M1 close-the-loop: this tab now also shows the RELEASE GATE (publish-through-evals) + ROLLBACK
 // history (last-good restores), and labels feedback-derived golden cases (source='feedback').
-export default async function PipelineQualityPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineQualityPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);

@@ -26,9 +26,9 @@ export const dynamic = 'force-dynamic';
 // (?suite=<engine>), so filtering is a plain link/back-stack navigation, never client state.
 export default async function EvalsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ suite?: string }>;
-}) {
+}>) {
   await requireModuleForUser('evals');
   const { suite } = await searchParams;
   const org = await currentOrgId();
