@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { provitRepos, provitRuns } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
 import { effectiveBaseRole } from '@/lib/module-access';
-import { abacAllows, pushVisibility, type ProvitAbacRule } from '@/lib/provit-policy';
+import { abacAllows, type ProvitAbacRule } from '@/lib/provit-policy';
 import { verifyToken } from '@/lib/provit-token';
 import { listAbacRules } from '@/lib/store';
 import { currentOrgId, DEFAULT_ORG } from '@/lib/tenancy';

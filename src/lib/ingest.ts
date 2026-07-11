@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { getLineage } from '@/lib/adapters/registry';
 import { addDocument, type BrainDoc } from '@/lib/brain';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';

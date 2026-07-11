@@ -4,7 +4,7 @@
 // (CREATE TABLE IF NOT EXISTS + ALTER ADD COLUMN IF NOT EXISTS) so it works on a DB that hasn't run
 // the migration yet (deploy is rsync-only, no migration step over SSH) — same pattern as pipelines.ts.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { publishJobs } from '@/db/schema';

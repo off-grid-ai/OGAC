@@ -11,7 +11,7 @@
 //
 // The governance correctness (validation, effectiveGovernance, canReachData, snapshotOf) lives in the
 // PURE pipelines-policy.ts; this file only persists + reads facts.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { pipelines, pipelineVersions } from '@/db/schema';

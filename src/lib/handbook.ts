@@ -1,5 +1,5 @@
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 // The hosted handbook — the prose docs (integration / operations / running) served in-app at
 // /handbook, alongside the API reference at /docs. Source of truth is the markdown in docs/,

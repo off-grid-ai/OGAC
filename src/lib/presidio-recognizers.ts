@@ -434,7 +434,7 @@ export async function createRecognizer(
   await ensureRecognizersSchema();
   const { db } = await import('@/db');
   const { sql } = await import('drizzle-orm');
-  const { randomUUID } = await import('crypto');
+  const { randomUUID } = await import('node:crypto');
   const id = `rec_${randomUUID().slice(0, 8)}`;
   const res = await db.execute(sql`
     INSERT INTO presidio_recognizers (id, org_id, kind, entity, name, regex, context, deny_list, score, enabled)

@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { getCache, getInference } from '@/lib/adapters/registry';
 
 // Response cache — the gateway-level cost/latency win (Portkey/Bifrost-style). Two layers:

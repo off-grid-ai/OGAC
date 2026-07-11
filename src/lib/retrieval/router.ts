@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { getLineage } from '@/lib/adapters/registry';
 import { SOURCES } from './sources';
 import type {

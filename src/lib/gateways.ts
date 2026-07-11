@@ -12,7 +12,7 @@
 // The correctness (kind→egressClass, available = enabled+configured+reachable, status) lives in the
 // PURE gateways-policy.ts; this file only gathers the facts and calls `mergeGatewayHealth`. It can
 // therefore NEVER fake availability — an unconfigured or unreachable gateway is reported honestly.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { gateways } from '@/db/schema';

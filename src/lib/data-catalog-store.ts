@@ -9,7 +9,7 @@
 // CREATE TABLE IF NOT EXISTS (mirrors ensureAppsSchema / ensurePipelinesSchema). Column names MUST
 // match schema.ts exactly.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {

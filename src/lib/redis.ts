@@ -1,4 +1,4 @@
-import { createConnection, type Socket } from 'net';
+import { createConnection, type Socket } from 'node:net';
 
 // Minimal RESP (Redis serialization protocol) client — just the GET / SET / PING we need for the
 // caching port, with zero external dependency. A single lazily-opened connection with a FIFO queue

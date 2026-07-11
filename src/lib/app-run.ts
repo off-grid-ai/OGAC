@@ -25,7 +25,7 @@
 //   executeStep(spec, step, priorResults, ctx) → StepResult   (run ONE runnable step)
 //   runApp(spec, input, ctx)                    → AppRunOutcome (run the whole spec inline)
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { AppSpec, AppStep } from '@/lib/app-model';
 import {
   type RunMode,
