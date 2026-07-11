@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { studioTemplates } from '@/db/schema';
 import { requireUser } from '@/lib/authz';
+import { randomToken } from '@/lib/rand';
 import type { Workflow } from '@/lib/studio';
+import { slugFromTitle } from '@/lib/studio-template';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,11 +26,10 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const body = await req.json() as { title?: string; summary?: string; prompt?: string; workflow?: Workflow; visibility?: string; deploy?: boolean };
   if (!body.title || !body.workflow) return NextResponse.json({ error: 'title and workflow required' }, { status: 400 });
-  const id = `st_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  // Deploy (S2): publish as a shareable app at /app/<slug>. Slug from title + short suffix.
-  const slug = body.deploy
-    ? `${(body.title ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'app'}-${Math.random().toString(36).slice(2, 6)}`
-    : null;
+  const id = `st_${Date.now()}_${randomToken(6)}`;
+  // Deploy (S2): publish as a shareable app at /app/<slug>. Slug from title + short suffix — reuse
+  // the shared, tested slugFromTitle so the slug rule lives in one place (DRY).
+  const slug = body.deploy ? slugFromTitle(body.title ?? 'app') : null;
   await db.insert(studioTemplates).values({
     id,
     ownerId: gate.user.email ?? '',
