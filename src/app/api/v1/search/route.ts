@@ -145,7 +145,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     id: r.id,
     title: r.name,
     subtitle: r.kind,
-    href: '/storage',
+    href: '/workspace/storage',
   }));
 
   const results: SearchResult[] = [

@@ -30,6 +30,15 @@ interface NodesResponse {
   support: Support;
 }
 
+// Nothing is backed when the control plane is unreachable — used as the fallback response so the
+// UI can render an explicit "unavailable" state (never a perpetual spinner) without null-guarding.
+const UNAVAILABLE_SUPPORT: Support = {
+  model: { backed: false, needs: '' },
+  restart: { backed: false, needs: '' },
+  enable: { backed: false, needs: '' },
+  disable: { backed: false, needs: '' },
+};
+
 const selectCls =
   'h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30';
 
@@ -193,13 +202,19 @@ function NodeCard({
 // /api/v1/gateway/nodes/[name], which proxies the aggregator's POST /nodes/:name.
 export function GatewayControl() {
   const [data, setData] = useState<NodesResponse | null>(null);
+  // Settled after the first fetch resolves (success OR failure) so a thrown/unreachable feed
+  // shows an explicit "unavailable" state instead of a perpetual "Loading nodes…" spinner.
+  const [loaded, setLoaded] = useState(false);
 
   const refetch = async () => {
     try {
       const r = await fetch('/api/v1/gateway/nodes', { cache: 'no-store' });
       setData((await r.json()) as NodesResponse);
     } catch {
-      /* keep last snapshot */
+      // Feed unreachable: treat as an unavailable control plane rather than keeping null forever.
+      setData((prev) => prev ?? { nodes: [], available: false, support: UNAVAILABLE_SUPPORT });
+    } finally {
+      setLoaded(true);
     }
   };
 
@@ -240,7 +255,7 @@ export function GatewayControl() {
           </div>
         ) : (
           <div className="py-8 text-center text-xs text-muted-foreground">
-            {data ? 'No nodes discovered in the pool.' : 'Loading nodes…'}
+            {loaded ? 'No nodes discovered in the pool.' : 'Loading nodes…'}
           </div>
         )}
       </CardContent>
