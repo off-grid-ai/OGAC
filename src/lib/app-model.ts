@@ -124,7 +124,7 @@ export interface ValidationResult {
 }
 
 const TRIGGER_KINDS: TriggerKind[] = ['on-demand', 'webhook', 'email', 'whatsapp', 'schedule'];
-const STEP_KINDS: AppStepKind[] = ['agent', 'connector-query', 'guardrail', 'human', 'output'];
+const STEP_KINDS = new Set<AppStepKind>(['agent', 'connector-query', 'guardrail', 'human', 'output']);
 
 export function validateAppSpec(spec: AppSpec): ValidationResult {
   const errors: string[] = [];
@@ -149,7 +149,7 @@ export function validateAppSpec(spec: AppSpec): ValidationResult {
     }
     if (ids.has(step.id)) errors.push(`duplicate step id: ${step.id}`);
     ids.add(step.id);
-    if (!STEP_KINDS.includes(step.kind)) {
+    if (!STEP_KINDS.has(step.kind)) {
       errors.push(`step ${step.id}: unknown kind '${step.kind}'`);
     }
     validateStepShape(step, errors);

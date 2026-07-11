@@ -1671,10 +1671,10 @@ export async function updateTool(
   await db.update(tools).set(set).where(eq(tools.id, id));
 }
 
-const TOOL_POLICIES: ToolPolicy[] = ['allow', 'approval', 'blocked'];
+const TOOL_POLICIES = new Set<ToolPolicy>(['allow', 'approval', 'blocked']);
 export async function setToolPolicy(id: string, policy: ToolPolicy): Promise<void> {
   await ensureOrgSchema();
-  if (!TOOL_POLICIES.includes(policy)) return;
+  if (!TOOL_POLICIES.has(policy)) return;
   await db.update(tools).set({ policy }).where(eq(tools.id, id));
 }
 
