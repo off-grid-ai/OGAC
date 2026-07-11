@@ -25,8 +25,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toDisplayHost } from '@/lib/display-host';
 import type { GatewayView } from '@/lib/gateways-policy';
-import { mergeFleetServed, type ModelSpec } from '@/lib/model-catalog';
+import { mergeFleetServed, modelLabel, type ModelSpec } from '@/lib/model-catalog';
 
 const KIND_LABEL: Record<string, string> = {
   'on-prem': 'On-prem cluster',
@@ -167,10 +168,10 @@ function NodePool() {
                   <TableRow key={n.name}>
                     <TableCell>
                       <div className="text-xs text-foreground">{n.name}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">{n.host}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground">{toDisplayHost(n.host)}</div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {n.model || '—'}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {n.model ? modelLabel(n.model) : '—'}
                       {n.vision ? <span className="ml-1 text-[10px]">(vision)</span> : null}
                     </TableCell>
                     <TableCell>
@@ -419,7 +420,11 @@ export function GatewayDetail({
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Base URL</div>
               <div className="mt-1 break-all font-mono text-xs text-foreground">
-                {gateway.baseUrl || (isOnPrem ? 'aggregator (fleet-configured)' : 'provider default')}
+                {gateway.baseUrl
+                  ? toDisplayHost(gateway.baseUrl)
+                  : isOnPrem
+                    ? 'aggregator (fleet-configured)'
+                    : 'provider default'}
               </div>
             </div>
             <div>

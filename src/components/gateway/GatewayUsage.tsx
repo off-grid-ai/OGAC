@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { modelLabel } from '@/lib/model-catalog';
 
 interface Totals {
   requests: number;
@@ -176,7 +177,7 @@ export function GatewayUsage() {
             {byModel.length ? (
               byModel.map((m) => (
                 <TableRow key={m.model}>
-                  <TableCell className="font-mono text-xs text-foreground">{m.model}</TableCell>
+                  <TableCell className="text-xs text-foreground">{modelLabel(m.model)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{num(m.requests)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{num(m.tokens)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">

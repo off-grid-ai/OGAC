@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { modelLabel } from '@/lib/model-catalog';
 import { usePagination } from '@/lib/use-pagination';
 
 interface Hit {
@@ -140,7 +141,7 @@ export function AuditSearch({ configured }: Readonly<{ configured: boolean }>) {
                   {h.ts?.slice(0, 19).replace('T', ' ')}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{h.deviceId}</TableCell>
-                <TableCell className="font-medium text-foreground">{h.model}</TableCell>
+                <TableCell className="font-medium text-foreground">{modelLabel(h.model)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{h.tokens}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className={OUTCOME_VARIANT[h.outcome] ?? ''}>
