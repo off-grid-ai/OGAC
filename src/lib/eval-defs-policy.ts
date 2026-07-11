@@ -32,22 +32,24 @@ export type EvalDefValidation =
   | { ok: true; value: EvalDefDraft }
   | { ok: false; error: string };
 
-const ENGINES: readonly EvalEngine[] = [
+const ENGINES = new Set<EvalEngine>([
   'ragas',
   'evidently',
   'guardrails',
   'presidio',
   'deepeval',
   'heuristic',
-];
-const DIRECTIONS: readonly MetricDirection[] = ['higher-better', 'lower-better'];
+]);
+const DIRECTIONS = new Set<MetricDirection>(['higher-better', 'lower-better']);
 
 function trimStr(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
 function num01(v: unknown): number | null {
-  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : Number.NaN;
+  let n = Number.NaN;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && v.trim()) n = Number(v);
   if (!Number.isFinite(n) || n < 0 || n > 1) return null;
   return n;
 }
@@ -68,13 +70,13 @@ export function validateEvalDef(input: EvalDefInput | null | undefined): EvalDef
   if (!metric) return { ok: false, error: 'metric is required' };
 
   const engineRaw = trimStr(src.engine).toLowerCase() || tpl?.engine || '';
-  if (!ENGINES.includes(engineRaw as EvalEngine)) {
+  if (!ENGINES.has(engineRaw as EvalEngine)) {
     return { ok: false, error: `invalid engine: ${engineRaw || '(none)'}` };
   }
   const engine = engineRaw as EvalEngine;
 
   const dirRaw = trimStr(src.direction) || tpl?.direction || '';
-  if (!DIRECTIONS.includes(dirRaw as MetricDirection)) {
+  if (!DIRECTIONS.has(dirRaw as MetricDirection)) {
     return { ok: false, error: `invalid direction: ${dirRaw || '(none)'}` };
   }
   const direction = dirRaw as MetricDirection;

@@ -120,7 +120,7 @@ export function deriveTitle(goal: string): string {
   return t.length > 48 ? `${t.slice(0, 45)}…` : t;
 }
 
-const VISIBILITIES: Visibility[] = ['private', 'org', 'public'];
+const VISIBILITIES = new Set<Visibility>(['private', 'org', 'public']);
 
 export function validateBuilderInput(
   input: Partial<BuilderInput> | null | undefined,
@@ -131,7 +131,7 @@ export function validateBuilderInput(
     return { ok: false, error: 'Describe what the assistant should do (at least a sentence).' };
   }
   if (goal.length > 4000) return { ok: false, error: 'Description is too long (max 4000 chars).' };
-  const visibility = VISIBILITIES.includes(input.visibility as Visibility)
+  const visibility = VISIBILITIES.has(input.visibility as Visibility)
     ? (input.visibility as Visibility)
     : 'private';
   const toolIds = uniqueStrings(input.toolIds);

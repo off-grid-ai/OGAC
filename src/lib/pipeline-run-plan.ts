@@ -91,17 +91,14 @@ export function buildRunPlan(
  * route treats an empty prompt as a 400 — never a fabricated call).
  */
 export function extractPrompt(body: Record<string, unknown>): string {
-  const direct =
-    typeof body.input === 'string'
-      ? body.input
-      : typeof body.prompt === 'string'
-        ? body.prompt
-        : '';
+  let direct = '';
+  if (typeof body.input === 'string') direct = body.input;
+  else if (typeof body.prompt === 'string') direct = body.prompt;
   if (direct.trim()) return direct.trim();
   const messages = Array.isArray(body.messages) ? body.messages : [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i] as { role?: unknown; content?: unknown };
-    if (m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()) {
+    if (m?.role === 'user' && typeof m.content === 'string' && m.content.trim()) {
       return m.content.trim();
     }
   }

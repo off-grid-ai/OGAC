@@ -56,7 +56,7 @@ export interface MonitorSummary {
   primaryTerm: number | null;
 }
 
-const OPS: ThresholdOp[] = ['gt', 'gte', 'lt', 'lte'];
+const OPS = new Set<ThresholdOp>(['gt', 'gte', 'lt', 'lte']);
 
 function clampInt(v: unknown, min: number, max: number, dflt: number): number {
   const n = Math.floor(Number(v));
@@ -83,7 +83,7 @@ export function normalizeMonitorSpec(input: {
   const name = str(input.name).slice(0, 255);
   const index = str(input.index).slice(0, 255);
   if (!name || !index) return null;
-  const op = OPS.includes(input.op as ThresholdOp) ? (input.op as ThresholdOp) : 'gt';
+  const op = OPS.has(input.op as ThresholdOp) ? (input.op as ThresholdOp) : 'gt';
   return {
     name,
     index,
@@ -162,7 +162,7 @@ export function parseCondition(source: unknown): {
   threshold: number | null;
 } {
   const s = typeof source === 'string' ? source : '';
-  const m = s.match(/(>=|<=|>|<)\s*(\d+)/);
+  const m = /(>=|<=|>|<)\s*(\d+)/.exec(s);
   if (!m) return { op: null, threshold: null };
   const opMap: Record<string, ThresholdOp> = { '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte' };
   return { op: opMap[m[1]] ?? null, threshold: Number(m[2]) };
@@ -316,11 +316,11 @@ export interface IsmPolicySummary {
 }
 
 function daysFromAge(v: unknown): number | null {
-  const m = typeof v === 'string' ? v.match(/^(\d+)\s*d$/) : null;
+  const m = typeof v === 'string' ? /^(\d+)\s*d$/.exec(v) : null;
   return m ? Number(m[1]) : null;
 }
 function gbFromSize(v: unknown): number | null {
-  const m = typeof v === 'string' ? v.match(/^(\d+)\s*gb$/i) : null;
+  const m = typeof v === 'string' ? /^(\d+)\s*gb$/i.exec(v) : null;
   return m ? Number(m[1]) : null;
 }
 

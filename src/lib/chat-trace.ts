@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { correlationIds } from '@/lib/correlation';
 import { pipelineTagOrNull } from '@/lib/pipeline-api-key-format';
 

@@ -98,7 +98,7 @@ export function parseOpaCompileErrors(raw: unknown): RegoCompileError[] {
   if (raw === null || typeof raw !== 'object') return [];
   const body = raw as Record<string, unknown>;
   const nested = Array.isArray(body.errors) ? body.errors : null;
-  if (nested && nested.length) {
+  if (nested?.length) {
     return nested.map((e) => flattenError(e)).filter((e): e is RegoCompileError => e !== null);
   }
   // No nested list — surface the top-level code/message as a single diagnostic.

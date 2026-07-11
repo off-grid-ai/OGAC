@@ -124,12 +124,12 @@ export interface ValidationResult {
 }
 
 const TRIGGER_KINDS: TriggerKind[] = ['on-demand', 'webhook', 'email', 'whatsapp', 'schedule'];
-const STEP_KINDS: AppStepKind[] = ['agent', 'connector-query', 'guardrail', 'human', 'output'];
+const STEP_KINDS = new Set<AppStepKind>(['agent', 'connector-query', 'guardrail', 'human', 'output']);
 
 export function validateAppSpec(spec: AppSpec): ValidationResult {
   const errors: string[] = [];
 
-  if (!spec.title || !spec.title.trim()) errors.push('title is required');
+  if (!spec.title?.trim()) errors.push('title is required');
   if (!spec.trigger || !TRIGGER_KINDS.includes(spec.trigger.kind)) {
     errors.push(`trigger.kind must be one of: ${TRIGGER_KINDS.join(', ')}`);
   }
@@ -143,13 +143,13 @@ export function validateAppSpec(spec: AppSpec): ValidationResult {
   // Unique step ids + per-kind shape.
   const ids = new Set<string>();
   for (const step of steps) {
-    if (!step.id || !step.id.trim()) {
+    if (!step.id?.trim()) {
       errors.push('every step must have a non-empty id');
       continue;
     }
     if (ids.has(step.id)) errors.push(`duplicate step id: ${step.id}`);
     ids.add(step.id);
-    if (!STEP_KINDS.includes(step.kind)) {
+    if (!STEP_KINDS.has(step.kind)) {
       errors.push(`step ${step.id}: unknown kind '${step.kind}'`);
     }
     validateStepShape(step, errors);
@@ -215,7 +215,7 @@ function validateStepShape(step: AppStep, errors: string[]): void {
       }
       break;
     case 'connector-query':
-      if (!step.domain || !step.domain.trim()) {
+      if (!step.domain?.trim()) {
         errors.push(`connector-query step ${step.id}: needs a domain binding`);
       }
       break;
@@ -311,7 +311,7 @@ export function workflowToAppSpec(template: LegacyTemplate): AppSpec {
         agentId,
       });
     }
-  } else if (template.prompt && template.prompt.trim()) {
+  } else if (template.prompt?.trim()) {
     // No agent node named, but the template carries a prompt → one inline-agent step.
     steps.push({
       id: 'agent:inline',

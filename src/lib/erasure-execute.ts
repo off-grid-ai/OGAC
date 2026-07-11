@@ -16,9 +16,11 @@ import { buildErasureWhere, type PlanStep, type StepResult } from '@/lib/erasure
 // subject value + org are always bound parameters (no interpolation → no injection).
 export function bindErasureClause(clause: string, subject: string, org: string): SQL {
   const parts = clause.split(/(%SUBJECT%|%ORG%)/);
-  const frags: SQL[] = parts.map((p) =>
-    p === '%SUBJECT%' ? sql`${subject}` : p === '%ORG%' ? sql`${org}` : sql.raw(p),
-  );
+  const frags: SQL[] = parts.map((p) => {
+    if (p === '%SUBJECT%') return sql`${subject}`;
+    if (p === '%ORG%') return sql`${org}`;
+    return sql.raw(p);
+  });
   return sql.join(frags, sql``);
 }
 

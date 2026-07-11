@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
@@ -438,16 +438,18 @@ type Mark = (kind: string, label: string, detail: string, refs: string[], start:
 // the no-exec default refuses) and record a 'sandbox' step. Tool.endpoint holds the script.
 async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
   const tool = (await listTools()).find((t) => `tool:${t.id}` === ref);
-  if (!tool || tool.type !== 'sandbox') return;
+  if (tool?.type !== 'sandbox') return;
   if (!(await getFlags().isEnabled('agent-code-exec', false))) {
     mark('sandbox', 'gated', 'agent-code-exec flag off — execution skipped', [ref], Date.now());
     return;
   }
   const t = Date.now();
   const result = await getSandbox().run('python', tool.endpoint || 'print("ok")');
+  const okLabel = result.ok ? 'ok' : 'fail';
+  const timeoutLabel = result.timedOut ? ' (timeout)' : '';
   const detail = result.refused
     ? result.refused
-    : `${result.engine}: exit ${result.exitCode} ${result.ok ? 'ok' : 'fail'}${result.timedOut ? ' (timeout)' : ''}`;
+    : `${result.engine}: exit ${result.exitCode} ${okLabel}${timeoutLabel}`;
   mark('sandbox', result.engine, detail, [ref], t);
 }
 

@@ -245,12 +245,10 @@ const POSTURE_SPECS: PostureSpec[] = [
     detail:
       'Connector, tool, and gateway credentials are stored in a dedicated secrets vault and are write-only from the console — key names are listed, values never read back.',
     evidenceFor: ['iso-a7-data-governance'],
-    status: (i) =>
-      i.secretsVault && i.secretsVaultPersistent
-        ? 'implemented'
-        : i.secretsVault
-          ? 'in-progress'
-          : 'planned',
+    status: (i) => {
+      if (i.secretsVault && i.secretsVaultPersistent) return 'implemented';
+      return i.secretsVault ? 'in-progress' : 'planned';
+    },
   },
 
   // -- 3. AI governance / model risk --------------------------------------------
@@ -306,12 +304,10 @@ const POSTURE_SPECS: PostureSpec[] = [
     detail:
       'Every governed action is recorded to an append-only audit trail — who did what, what was blocked or redacted, and what it cost — so every AI action is observable and reversible.',
     evidenceFor: ['eu-art-12-logging', 'nist-manage-4-1', 'iso-a6-lifecycle'],
-    status: (i) =>
-      i.auditImmutable && i.siemStreaming
-        ? 'implemented'
-        : i.auditImmutable
-          ? 'in-progress'
-          : 'planned',
+    status: (i) => {
+      if (i.auditImmutable && i.siemStreaming) return 'implemented';
+      return i.auditImmutable ? 'in-progress' : 'planned';
+    },
   },
   {
     id: 'ai-model-risk-lifecycle',

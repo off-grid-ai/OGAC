@@ -186,7 +186,11 @@ export function buildComplianceActivity(
   }
 
   // Newest-first for the blocked-event evidence list.
-  blockedEvents.sort((a, b) => (a.ts && b.ts ? b.ts.localeCompare(a.ts) : a.ts ? -1 : b.ts ? 1 : 0));
+  blockedEvents.sort((a, b) => {
+    if (a.ts && b.ts) return b.ts.localeCompare(a.ts);
+    if (a.ts) return -1;
+    return b.ts ? 1 : 0;
+  });
 
   const runs = Math.max(0, Math.trunc(coverage.runs));
   const signed = Math.min(Math.max(0, Math.trunc(coverage.signed)), runs);

@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { getSigning } from '@/lib/adapters/registry';
 
 // Detached provenance for exported files (reports, etc.). C2PA targets media; a report is text/PDF,

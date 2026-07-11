@@ -25,12 +25,12 @@ export interface ValidationResult {
   error?: string;
 }
 
-const KINDS: SuppressionKind[] = ['actor', 'ip', 'action'];
+const KINDS = new Set<SuppressionKind>(['actor', 'ip', 'action']);
 
 export function validateSuppression(input: Partial<SuppressionInput> | null | undefined): ValidationResult {
   if (!input) return { ok: false, error: 'missing body' };
   const kind = input.kind;
-  if (!kind || !KINDS.includes(kind)) {
+  if (!kind || !KINDS.has(kind)) {
     return { ok: false, error: 'kind must be actor | ip | action' };
   }
   const pattern = (input.pattern ?? '').trim();

@@ -162,6 +162,16 @@ const WINDOW_HOURS = 24;
 
 // ── The synthesizer ─────────────────────────────────────────────────────────────────────────────
 
+function guardrailTone(live: boolean, engine: string): HomeTile['tone'] {
+  if (live) return 'good';
+  return engine === 'regex' ? 'muted' : 'bad';
+}
+function localShareTone(localShare: number): HomeTile['tone'] {
+  if (localShare >= 90) return 'good';
+  if (localShare > 0) return 'muted';
+  return 'warn';
+}
+
 export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
   const {
     analytics,
@@ -260,7 +270,9 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
   const up = services.filter((s) => s.status === 'up').length;
   const total = services.length;
   const down = total - up;
-  const healthTone: 'good' | 'warn' | 'bad' = down === 0 ? 'good' : down >= total ? 'bad' : 'warn';
+  let healthTone: 'good' | 'warn' | 'bad' = 'warn';
+  if (down === 0) healthTone = 'good';
+  else if (down >= total) healthTone = 'bad';
   const health: OperatorHome['health'] = {
     up,
     total,

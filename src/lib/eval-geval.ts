@@ -82,13 +82,13 @@ export function parseGEvalScore(text: string): GEvalResult {
   if (!t) return { score: 0, raw: null, rationale: '', parsed: false };
 
   let raw: number | null = null;
-  const labeled = t.match(/SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i);
+  const labeled = /SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i.exec(t);
   if (labeled) {
     raw = Number(labeled[1]);
   } else {
     // Fallback: the last standalone 1..5 integer anywhere in the text.
     const nums = t.match(/\b([1-5])\b/g);
-    if (nums && nums.length > 0) raw = Number(nums[nums.length - 1]);
+    if (nums && nums.length > 0) raw = Number(nums.at(-1));
   }
 
   if (raw === null || !Number.isFinite(raw)) {

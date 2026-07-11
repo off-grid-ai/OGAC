@@ -67,7 +67,7 @@ export function parseActions(schemaText: string): ActionTool[] {
 // assistant in another org resolves to null → no tools, so its Actions can't be enumerated cross-tenant.
 export async function skillActionTools(orgId: string, skillId: string): Promise<ActionTool[]> {
   const skill = await getSkill(orgId, skillId);
-  if (!skill || !skill.capabilities?.tools) return [];
+  if (!skill?.capabilities?.tools) return [];
   return parseActions(skill.actionsSchema ?? '');
 }
 

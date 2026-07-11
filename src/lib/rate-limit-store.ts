@@ -8,7 +8,7 @@
 //   - resolve a presented Bearer/x-api-key secret → its key row + configured limit (the cleartext
 //     secret is never stored; only its sha-256 fingerprint).
 
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -95,7 +95,9 @@ function firstRow(res: unknown): Record<string, unknown> | undefined {
 }
 
 function toLimit(v: unknown): number | null {
-  return typeof v === 'number' ? v : v == null ? null : Number(v);
+  if (typeof v === 'number') return v;
+  if (v == null) return null;
+  return Number(v);
 }
 
 /**

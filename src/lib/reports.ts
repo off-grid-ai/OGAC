@@ -318,7 +318,8 @@ async function evalReport(orgId?: string): Promise<string> {
   l.push('', '## Cases');
   for (const c of cases) {
     const r = latest?.results?.find((x) => x.query === c.query);
-    const verdict = r ? (r.pass ? `PASS · ${r.top}` : `FAIL · ${r.top}`) : '—';
+    let verdict = '—';
+    if (r) verdict = r.pass ? `PASS · ${r.top}` : `FAIL · ${r.top}`;
     l.push(`- **${c.query}** → expected ${c.expected} — ${verdict}`);
   }
   return l.join('\n');
@@ -358,7 +359,7 @@ export async function generateReport(
   if (id in REGULATORS) return regulatorPack(id);
   // Fall through to operator-authored custom templates stored in the DB.
   const custom = await getReportTemplate(id);
-  if (custom && custom.kind === 'custom') return generateCustomReport(custom);
+  if (custom?.kind === 'custom') return generateCustomReport(custom);
   return null;
 }
 

@@ -11,7 +11,7 @@
 //
 // The governance correctness (validation, effectiveGovernance, canReachData, snapshotOf) lives in the
 // PURE pipelines-policy.ts; this file only persists + reads facts.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { pipelines, pipelineVersions } from '@/db/schema';
@@ -103,7 +103,9 @@ export async function ensurePipelinesSchema(): Promise<void> {
 
 // ─── row → pure-shape mapping ──────────────────────────────────────────────────────────────────────
 function iso(v: string | Date | null | undefined): string | null {
-  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  return null;
 }
 
 export interface PipelineView extends PipelineShape {

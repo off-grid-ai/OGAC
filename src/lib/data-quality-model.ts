@@ -136,6 +136,12 @@ export function buildCheckpoint(rows: unknown, expectations: unknown): Checkpoin
 }
 
 // A readable label for an expectation, used in the per-result detail line.
+function dqDetail(note: string | undefined, unsupported: boolean, uc: number): string {
+  if (note) return note;
+  if (unsupported) return 'expectation not supported by the running engine';
+  return `${uc} unexpected value${uc === 1 ? '' : 's'}`;
+}
+
 function label(type: string, column?: string): string {
   return column ? `${type} [${column}]` : type;
 }
@@ -165,11 +171,7 @@ export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdi
       column,
       success: false,
       unexpectedCount: uc,
-      detail: f.note
-        ? f.note
-        : unsupported
-          ? 'expectation not supported by the running engine'
-          : `${uc} unexpected value${uc === 1 ? '' : 's'}`,
+      detail: dqDetail(f.note, unsupported, uc),
     };
   });
 

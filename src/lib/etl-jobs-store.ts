@@ -12,8 +12,7 @@
 // shape → land in ClickHouse (etl-job SQL builders). Redaction + the run record give governance +
 // lineage. If/when Airbyte connection-creation is wired, compileToAirbyteConfig is the ready mapper.
 
-import { randomUUID } from 'crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { db } from '@/db';
 import { kestraOrchestration } from '@/lib/adapters/kestra';
 import { execConnectorQuery } from '@/lib/connector-exec';

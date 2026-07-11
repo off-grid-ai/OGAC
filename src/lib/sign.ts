@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 // First-party provenance signing: an HMAC-SHA256 over the canonical (answer + citations) with a
 // server key, so an exported answer is tamper-evident and offline-verifiable. C2PA Content

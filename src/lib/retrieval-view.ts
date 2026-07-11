@@ -214,12 +214,9 @@ export function buildCreatePayload(input: CreateCollectionInput): BuildCreateRes
     return { name: null, payload: null, error: 'name must be 1–255 chars of letters, digits, . _ or -' };
   }
   const sizeRaw = input.vectorSize;
-  const size =
-    typeof sizeRaw === 'number'
-      ? sizeRaw
-      : typeof sizeRaw === 'string' && sizeRaw.trim() !== ''
-        ? Number(sizeRaw)
-        : Number.NaN;
+  let size = Number.NaN;
+  if (typeof sizeRaw === 'number') size = sizeRaw;
+  else if (typeof sizeRaw === 'string' && sizeRaw.trim() !== '') size = Number(sizeRaw);
   if (!Number.isInteger(size) || size < 1 || size > 65536) {
     return { name, payload: null, error: 'vectorSize must be an integer between 1 and 65536' };
   }

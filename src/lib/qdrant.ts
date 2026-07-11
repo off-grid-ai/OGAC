@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
 import { ACL_FIELDS, aclFromPayload, filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
@@ -16,8 +16,8 @@ const SUPERUSER_ROLES = ['admin'];
 function aclPayload(acl?: DocAcl): Record<string, unknown> {
   const p: Record<string, unknown> = {};
   if (acl?.owner) p[ACL_FIELDS.owner] = acl.owner;
-  if (acl?.allowed_roles && acl.allowed_roles.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
-  if (acl?.allowed_subjects && acl.allowed_subjects.length)
+  if (acl?.allowed_roles?.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
+  if (acl?.allowed_subjects?.length)
     p[ACL_FIELDS.allowedSubjects] = acl.allowed_subjects;
   if (acl?.data_class) p[ACL_FIELDS.dataClass] = acl.data_class;
   return p;
@@ -240,7 +240,7 @@ export async function qdrantSearch(
   const baseFilter = buildQdrantFilter(opts.filter);
   const filter =
     baseFilter || aclShould
-      ? { ...(baseFilter ?? {}), ...(aclShould ? { should: aclShould } : {}) }
+      ? { ...baseFilter, ...(aclShould ? { should: aclShould } : {}) }
       : undefined;
   // When an ACL applies, over-fetch so the post-filter still yields up to k allowed hits.
   const fetchK = opts.asker ? Math.max(k * 4, 20) : k;
@@ -264,7 +264,7 @@ export async function qdrantSearch(
   await ensureTextIndex();
   const should = keywordShould(query);
   const prefetchFilter = (extra?: Record<string, unknown>) =>
-    filter || extra ? { filter: { ...(filter ?? {}), ...(extra ?? {}) } } : {};
+    filter || extra ? { filter: { ...filter, ...extra } } : {};
 
   const body = {
     prefetch: [

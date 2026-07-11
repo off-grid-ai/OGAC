@@ -426,7 +426,7 @@ export function resolveHealth(entry: ServiceEntry, raw?: RawProbe): ServiceHealt
   }
 
   if (mode === 'optional') {
-    if (raw && raw.status === 'up') {
+    if (raw?.status === 'up') {
       return { id: entry.id, status: 'up', httpStatus: raw.httpStatus, ms: raw.ms };
     }
     const fallback = entry.fallbackLabel ?? 'fallback';

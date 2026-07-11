@@ -82,7 +82,7 @@ export function summarizeJob(raw: unknown): EtlJob {
   // jobs/get nests under { job: {...}, attempts: [...] }; jobs/list items are the same wrapper.
   const jobObj = (isObj(wrapper.job) ? wrapper.job : wrapper) as Record<string, unknown>;
   const attempts = Array.isArray(wrapper.attempts) ? (wrapper.attempts as unknown[]) : [];
-  const last = attempts.length ? (attempts[attempts.length - 1] as Record<string, unknown>) : undefined;
+  const last = attempts.length ? (attempts.at(-1) as Record<string, unknown>) : undefined;
 
   // Job-level status wins; fall back to the latest attempt's status.
   const rawStatus = jobObj.status ?? last?.status;
@@ -128,7 +128,9 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 function str(v: unknown): string {
-  return typeof v === 'string' ? v : v == null ? '' : String(v);
+  if (typeof v === 'string') return v;
+  if (v == null) return '';
+  return String(v);
 }
 function optStr(v: unknown): string | undefined {
   const s = str(v);

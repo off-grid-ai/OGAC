@@ -9,7 +9,7 @@
 // up by its opaque token (the token is the lookup key, the HMAC is the actual auth).
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { isWebhookTargetKind, type WebhookTargetKind } from '@/lib/webhook-trigger-policy';

@@ -255,18 +255,16 @@ export function parseAgentAction(raw: string): AgentAction | null {
 
   // finish: { action: "finish", answer: "..." } (also accept { finish: "..." } / a bare answer).
   if (act === 'finish' || typeof o.answer === 'string' || typeof o.finish === 'string') {
-    const answer =
-      typeof o.answer === 'string'
-        ? o.answer
-        : typeof o.finish === 'string'
-          ? o.finish
-          : '';
+    let answer = '';
+    if (typeof o.answer === 'string') answer = o.answer;
+    else if (typeof o.finish === 'string') answer = o.finish;
     if (answer.trim()) return { kind: 'finish', answer: answer.trim(), thought };
   }
 
   // tool: { action: "tool", tool|ref: "prim:web_search", args: {...} }
-  const ref =
-    typeof o.tool === 'string' ? o.tool : typeof o.ref === 'string' ? o.ref : undefined;
+  let ref: string | undefined;
+  if (typeof o.tool === 'string') ref = o.tool;
+  else if (typeof o.ref === 'string') ref = o.ref;
   if ((act === 'tool' || ref) && ref) {
     const args =
       o.args && typeof o.args === 'object' && !Array.isArray(o.args)
@@ -314,7 +312,7 @@ export function buildPlannerPrompt(input: PlanInput): string {
         .map(
           (t) =>
             `  - ${t.ref} (${t.name}): ${t.description}${
-              t.paramKeys && t.paramKeys.length ? ` [args: ${t.paramKeys.join(', ')}]` : ''
+              t.paramKeys?.length ? ` [args: ${t.paramKeys.join(', ')}]` : ''
             }`,
         )
         .join('\n')

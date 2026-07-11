@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import type { EvalDefDraft } from '@/lib/eval-defs-policy';
@@ -160,12 +160,10 @@ function evalDefWhere(filter: EvalDefFilter) {
 // org-wide library (unattached); `{orgId}` scopes to a tenant; omitting all returns ALL (internal).
 export async function listEvalDefs(arg?: string | null | EvalDefFilter): Promise<EvalDef[]> {
   await ensureEvalDefsSchema();
-  const filter: EvalDefFilter =
-    arg === undefined
-      ? {}
-      : arg === null || typeof arg === 'string'
-        ? { appId: arg }
-        : arg;
+  let filter: EvalDefFilter = {};
+  if (arg === undefined) filter = {};
+  else if (arg === null || typeof arg === 'string') filter = { appId: arg };
+  else filter = arg;
   const { rows } = await db.execute<Row>(
     sql`SELECT ${EVAL_DEF_COLS} FROM eval_definitions ${evalDefWhere(filter)} ORDER BY created_at DESC;`,
   );

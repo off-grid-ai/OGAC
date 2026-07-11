@@ -77,6 +77,12 @@ export interface SecretVersionRow {
   state: 'active' | 'deleted' | 'destroyed';
 }
 
+function versionState(destroyed: boolean, deleted: boolean): SecretVersionRow['state'] {
+  if (destroyed) return 'destroyed';
+  if (deleted) return 'deleted';
+  return 'active';
+}
+
 export interface SecretVersionsView {
   currentVersion: number | null;
   oldestVersion: number | null;
@@ -129,7 +135,7 @@ export function buildSecretVersionsView(raw: RawKeyMetadata | null): SecretVersi
         deletionTime,
         destroyed,
         current: current !== null && version === current,
-        state: destroyed ? 'destroyed' : deleted ? 'deleted' : 'active',
+        state: versionState(destroyed, deleted),
       } satisfies SecretVersionRow;
     })
     .filter((r): r is SecretVersionRow => r !== null)

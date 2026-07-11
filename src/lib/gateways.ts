@@ -12,7 +12,7 @@
 // The correctness (kind→egressClass, available = enabled+configured+reachable, status) lives in the
 // PURE gateways-policy.ts; this file only gathers the facts and calls `mergeGatewayHealth`. It can
 // therefore NEVER fake availability — an unconfigured or unreachable gateway is reported honestly.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { gateways } from '@/db/schema';
@@ -278,6 +278,12 @@ export async function deleteGateway(id: string, orgId: string = DEFAULT_ORG): Pr
 
 /** On-prem cluster health from the aggregator's GET /nodes: configured = any nodes listed;
  *  reachable = any node up/degraded. Never throws — an unreachable aggregator ⇒ down. */
+function rollupNodeStatus(up: number, total: number): GatewayHealthSignal['status'] {
+  if (up === 0) return 'down';
+  if (up < total) return 'degraded';
+  return 'up';
+}
+
 async function onPremSignal(): Promise<GatewayHealthSignal> {
   try {
     const r = await fetch(`${GATEWAY_URL}/nodes`, {
@@ -293,7 +299,7 @@ async function onPremSignal(): Promise<GatewayHealthSignal> {
     return {
       configured: true,
       reachable: up > 0,
-      status: up === 0 ? 'down' : up < nodes.length ? 'degraded' : 'up',
+      status: rollupNodeStatus(up, nodes.length),
       detail: `${up} of ${nodes.length} nodes up`,
     };
   } catch {
@@ -323,7 +329,7 @@ async function cloudSignal(kind: string): Promise<GatewayHealthSignal> {
   // reaches here (handled by onPremSignal); any non-first-class kind falls back to the generic compat.
   const providerId = gatewayKindToProviderId(kind) ?? 'compat';
   const s = statuses.find((p) => p.id === providerId);
-  if (!s || !s.configured) {
+  if (!s?.configured) {
     return { configured: false, reachable: false, status: 'unconfigured', detail: 'not configured' };
   }
   const reachable = await probeCloud(s.baseUrl);

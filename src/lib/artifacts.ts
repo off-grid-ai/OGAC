@@ -80,9 +80,9 @@ function stripImportsExports(code: string): string {
 // heading, or a kind-based fallback. Keeps the library readable without asking the user.
 // eslint-disable-next-line complexity
 export function artifactTitle(a: Artifact): string {
-  const title = a.code.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+  const title = /<title[^>]*>([^<]+)<\/title>/i.exec(a.code)?.[1]?.trim();
   if (title) return title.slice(0, 80);
-  const heading = a.code.match(/^\s*(?:\/\/|#|<!--)?\s*#{0,3}\s*([A-Za-z][^\n]{2,60})/)?.[1]?.trim();
+  const heading = /^\s*(?:\/\/|#|<!--)?\s*#{0,3}\s*([A-Za-z][^\n]{2,60})/.exec(a.code)?.[1]?.trim();
   if (heading && /[a-z]/i.test(heading)) return heading.slice(0, 80);
   const label = a.kind === 'code' ? (a.language ?? 'code') : a.kind;
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} artifact`;
@@ -147,7 +147,7 @@ export function parseArtifact(content: string): Artifact | null {
   if (reactBlocks.length) return { kind: 'react', code: reactBlocks.join('\n\n') };
 
   // 2. Single html / svg / mermaid fenced block.
-  const m = content.match(/```(html|svg|mermaid)\s*\n([\s\S]*?)```/i);
+  const m = /```(html|svg|mermaid)\s*\n([\s\S]*?)```/i.exec(content);
   if (m) return { kind: m[1].toLowerCase() as ArtifactKind, code: m[2].trim() };
 
   // 3. Plain js/ts blocks that look like React.
@@ -159,11 +159,11 @@ export function parseArtifact(content: string): Artifact | null {
   }
 
   // 4. Bare <svg>…</svg> with no fence.
-  const svg = content.match(/<svg[\s\S]*<\/svg>/i);
+  const svg = /<svg[\s\S]*<\/svg>/i.exec(content);
   if (svg) return { kind: 'svg', code: svg[0] };
 
   // 5. Runnable code: a python or node/js block (that isn't React) → executable via the sandbox.
-  const py = content.match(/```(?:python|py)\s*\n([\s\S]*?)```/i);
+  const py = /```(?:python|py)\s*\n([\s\S]*?)```/i.exec(content);
   if (py) return { kind: 'code', code: py[1].trim(), language: 'python' };
   if (jsBlocks.length) return { kind: 'code', code: jsBlocks.join('\n\n'), language: 'node' };
 
