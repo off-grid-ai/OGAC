@@ -91,10 +91,11 @@ export function LeasesPanel({ sealed }: { sealed: boolean }) {
           }}
         >
           <div className="flex-1 space-y-1">
-            <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <label htmlFor="leases-prefix" className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Lease prefix (e.g. database/creds/app-ro)
             </label>
             <Input
+              id="leases-prefix"
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}
               placeholder="empty = root"
