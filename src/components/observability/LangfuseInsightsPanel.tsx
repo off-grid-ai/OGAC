@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { LangfuseCostSummary, ScoreTrendSeries } from '@/lib/langfuse';
+import { modelLabel } from '@/lib/model-catalog';
 
 // Distinct colors so multiple score series read apart. Emerald leads (brand accent).
 const SERIES_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#a3a3a3'];
@@ -218,7 +219,7 @@ export function LangfuseInsightsPanel({
                 <TableBody>
                   {cost.byModel.map((m) => (
                     <TableRow key={m.model}>
-                      <TableCell className="font-mono text-xs text-foreground">{m.model}</TableCell>
+                      <TableCell className="text-xs text-foreground">{modelLabel(m.model)}</TableCell>
                       <TableCell className="text-right text-foreground">{fmtUsd(m.cost)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {fmtNum(m.tokens)}
