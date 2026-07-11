@@ -1402,7 +1402,7 @@ export function ChatWorkspace({
           </button>
         </div>
 
-        <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
+        <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
           {visibleConversations.map((c) => (
             <div
               key={c.id}
@@ -1459,8 +1459,9 @@ export function ChatWorkspace({
         </div>
       </aside>
 
-      {/* Thread */}
-      <section className="flex min-w-0 flex-1 flex-col">
+      {/* Thread — min-h-0 so the flex-1 message list can shrink and scroll internally, pinning the
+          composer to the bottom instead of letting it float mid-page with dead space below. */}
+      <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {/* Mobile-only: open the conversation/project drawer. ≥44px tap target. */}
@@ -1554,7 +1555,7 @@ export function ChatWorkspace({
           </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
           <div className={cn('space-y-5 px-4 py-6', messages.length === 0 && !temporary && !activeStarters.length ? 'mx-auto max-w-5xl' : 'mx-auto max-w-3xl')}>
             {messages.length === 0 ? (
               <div className="pt-16 text-center text-sm text-muted-foreground">
@@ -1983,13 +1984,13 @@ export function ChatWorkspace({
                 onKeyUp={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
                 onClick={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
                 onKeyDown={onComposerKey}
-                rows={1}
+                rows={2}
                 placeholder={
                   activeModel?.image
                     ? 'Describe an image to generate…'
                     : 'Message the model…  (/ for skills, @ to reference memory or knowledge)'
                 }
-                className="max-h-40 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none"
+                className="max-h-40 min-h-[2.75rem] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm outline-none"
               />
               {streaming ? (
                 <Button size="icon" variant="outline" onClick={stop} title="Stop">
