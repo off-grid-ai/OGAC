@@ -13,6 +13,27 @@ interface SuggestBody {
   tools?: { id: string; name: string }[];
 }
 
+interface Suggestion {
+  title: string;
+  toolIds: string[];
+  grounded: boolean | null;
+}
+
+const EMPTY_SUGGESTION: Suggestion = { title: '', toolIds: [], grounded: null };
+
+// Pure: extract + validate the model's JSON reply into a Suggestion. Returns the empty suggestion
+// when no JSON object is present or parsing fails (behavior-identical to the previous inline path).
+function shapeSuggestion(text: string, validIds: Set<string>): Suggestion {
+  const m = /\{[\s\S]*\}/.exec(text);
+  if (!m) return EMPTY_SUGGESTION;
+  const parsed = JSON.parse(m[0]) as { title?: string; toolIds?: string[]; grounded?: boolean };
+  return {
+    title: typeof parsed.title === 'string' ? parsed.title.trim().slice(0, 48) : '',
+    toolIds: Array.isArray(parsed.toolIds) ? parsed.toolIds.filter((id) => validIds.has(id)) : [],
+    grounded: typeof parsed.grounded === 'boolean' ? parsed.grounded : null,
+  };
+}
+
 export async function POST(req: Request) {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
@@ -21,7 +42,7 @@ export async function POST(req: Request) {
   const goal = (body?.goal ?? '').trim();
   const tools = Array.isArray(body?.tools) ? body!.tools.filter((t) => t?.id && t?.name) : [];
   if (goal.length < 10) {
-    return NextResponse.json({ title: '', toolIds: [], grounded: null });
+    return NextResponse.json(EMPTY_SUGGESTION);
   }
 
   const toolList = tools.map((t) => `${t.id} — ${t.name}`).join('\n') || '(none available)';
@@ -51,19 +72,11 @@ export async function POST(req: Request) {
     if (r.ok) {
       const data = await r.json();
       const text: string = data?.choices?.[0]?.message?.content ?? '';
-      const m = /\{[\s\S]*\}/.exec(text);
-      if (m) {
-        const parsed = JSON.parse(m[0]) as { title?: string; toolIds?: string[]; grounded?: boolean };
-        const validIds = new Set(tools.map((t) => t.id));
-        return NextResponse.json({
-          title: typeof parsed.title === 'string' ? parsed.title.trim().slice(0, 48) : '',
-          toolIds: Array.isArray(parsed.toolIds) ? parsed.toolIds.filter((id) => validIds.has(id)) : [],
-          grounded: typeof parsed.grounded === 'boolean' ? parsed.grounded : null,
-        });
-      }
+      const validIds = new Set(tools.map((t) => t.id));
+      return NextResponse.json(shapeSuggestion(text, validIds));
     }
   } catch {
     /* gateway unavailable — fall through to empty suggestion */
   }
-  return NextResponse.json({ title: '', toolIds: [], grounded: null });
+  return NextResponse.json(EMPTY_SUGGESTION);
 }
