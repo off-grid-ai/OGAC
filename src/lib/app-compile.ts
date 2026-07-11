@@ -324,7 +324,7 @@ export function finalizeSpec(
   // not — so centralize the guarantee here. Also guarantees ≥1 step so an empty description still
   // yields a valid (output-only) spec.
   const steps = [...assembled.steps];
-  const last = steps[steps.length - 1];
+  const last = steps.at(-1);
   if (last?.kind !== 'output') {
     const usedIds = new Set(steps.map((s) => s.id));
     let outId = `s${steps.length + 1}`;

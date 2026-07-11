@@ -262,7 +262,7 @@ export function shapeScoreTrends(scores: LangfuseScore[]): ScoreTrendSeries[] {
       return {
         name,
         count: points.length,
-        latest: points.length ? points[points.length - 1].value : null,
+        latest: points.length ? points.at(-1)!.value : null,
         average: points.length ? round(sum / points.length) : null,
         points,
       };

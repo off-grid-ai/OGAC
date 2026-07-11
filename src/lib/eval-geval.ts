@@ -88,7 +88,7 @@ export function parseGEvalScore(text: string): GEvalResult {
   } else {
     // Fallback: the last standalone 1..5 integer anywhere in the text.
     const nums = t.match(/\b([1-5])\b/g);
-    if (nums && nums.length > 0) raw = Number(nums[nums.length - 1]);
+    if (nums && nums.length > 0) raw = Number(nums.at(-1));
   }
 
   if (raw === null || !Number.isFinite(raw)) {
