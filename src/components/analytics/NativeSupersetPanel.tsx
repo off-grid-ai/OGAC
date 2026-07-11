@@ -101,8 +101,8 @@ export function NativeSupersetPanel({ dashboard }: Readonly<{ dashboard: NativeS
   if (!dashboard.configured) {
     return (
       <p data-testid="superset-not-configured" className="text-xs text-muted-foreground">
-        BI engine not configured — set OFFGRID_SUPERSET_URL and credentials to surface native
-        dashboards here.
+        BI engine isn&apos;t connected yet — connect it in Settings to surface native dashboards
+        here.
       </p>
     );
   }

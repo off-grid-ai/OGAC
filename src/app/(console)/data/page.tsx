@@ -208,8 +208,8 @@ export default async function DataPage() {
         <CardHeader>
           <CardTitle className="text-sm">Vector index (Qdrant)</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Push the Brain&apos;s documents into Qdrant so switching the retrieval backend
-            (OFFGRID_ADAPTER_RETRIEVAL=qdrant) lands on a populated store, not an empty one.
+            Push the Brain&apos;s documents into Qdrant so switching the retrieval backend to Qdrant
+            lands on a populated store, not an empty one.
           </p>
         </CardHeader>
         <CardContent>

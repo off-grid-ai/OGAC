@@ -78,8 +78,8 @@ export function AuditSearch({ configured }: Readonly<{ configured: boolean }>) {
   if (!configured) {
     return (
       <p className="text-xs text-muted-foreground">
-        OpenSearch not configured — set OFFGRID_OPENSEARCH_URL to enable full-text SIEM search over
-        the shipped audit stream.
+        OpenSearch isn&apos;t connected yet — connect it in Settings to enable full-text SIEM search
+        over the shipped audit stream.
       </p>
     );
   }

@@ -58,11 +58,8 @@ export function FleetTools({
           <CardTitle className="text-sm">Fleet tools</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Live osquery, software/CVE inventory, and FleetDM policies require a FleetDM backend. Set{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">OFFGRID_ADAPTER_MDM=fleetdm</code>{' '}
-          and <code className="rounded bg-muted px-1 py-0.5 text-xs">OFFGRID_FLEET_URL</code> /{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">OFFGRID_FLEET_TOKEN</code> to enable
-          them. The native device registry has no osquery agent.
+          Live osquery, software/CVE inventory, and FleetDM policies require a FleetDM backend.
+          Connect one in Settings to enable them. The native device registry has no osquery agent.
         </CardContent>
       </Card>
     );

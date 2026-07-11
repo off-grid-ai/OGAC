@@ -183,7 +183,7 @@ export function DurableExecutionsPanel() {
           <p className="font-medium text-foreground">Durable runtime not enabled</p>
           <p className="mt-1 text-muted-foreground">
             {view.note ??
-              'Set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_AGENTRUNTIME=temporal to run agents as durable jobs. Runs still execute synchronously in-process without it.'}
+              'Enable the durable runtime in Settings to run agents as durable jobs. Runs still execute synchronously in-process without it.'}
           </p>
         </div>
       ) : !view.reachable ? (
