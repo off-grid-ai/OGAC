@@ -81,19 +81,14 @@ export function DeployedApp({ slug }: { slug: string }) {
       {/* Webhook trigger — this app is callable programmatically (S3, sync trigger) */}
       <details className="mt-2 text-[11px] text-muted-foreground">
         <summary className="cursor-pointer hover:text-foreground">Call this app via API (webhook)</summary>
-        <pre
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           aria-label="Copy the curl command to call this app"
-          className="mt-1 cursor-copy overflow-x-auto rounded border border-border bg-muted/40 p-2 font-mono"
+          className="mt-1 block w-full cursor-copy text-left"
           onClick={copyCurl}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              copyCurl();
-            }
-          }}
-        >{`curl -X POST /api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`}</pre>
+        >
+          <pre className="overflow-x-auto rounded border border-border bg-muted/40 p-2 font-mono">{`curl -X POST /api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`}</pre>
+        </button>
       </details>
     </div>
   );

@@ -469,9 +469,17 @@ export function MachineClientsList() {
                       <span
                         role="button"
                         tabIndex={0}
+                        aria-label="Delete client"
                         className="shrink-0 text-muted-foreground hover:text-destructive"
                         title="Delete client"
                         onClick={(e) => { e.stopPropagation(); void deleteClient(c); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void deleteClient(c);
+                          }
+                        }}
                       >
                         <Trash className="size-3.5" />
                       </span>
