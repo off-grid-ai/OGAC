@@ -138,7 +138,7 @@ function isoList(xs: (Date | string | number)[] | undefined): string[] {
   const out: string[] = [];
   for (const x of xs) {
     const d = x instanceof Date ? x : new Date(x);
-    if (!isNaN(d.getTime())) out.push(d.toISOString());
+    if (!Number.isNaN(d.getTime())) out.push(d.toISOString());
   }
   return out;
 }

@@ -56,7 +56,7 @@ function scrapeTextOperators(s: string): string {
         const map: Record<string, string> = { n: '\n', r: '\r', t: '\t', b: '', f: '', '(': '(', ')': ')', '\\': '\\' };
         return map[c] ?? c;
       })
-      .replace(/\\[0-7]{1,3}/g, (o) => String.fromCharCode(parseInt(o.slice(1), 8)));
+      .replace(/\\[0-7]{1,3}/g, (o) => String.fromCharCode(Number.parseInt(o.slice(1), 8)));
     if (lit) pieces.push(lit);
   }
   return pieces.join(' ');

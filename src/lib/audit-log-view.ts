@@ -252,15 +252,15 @@ export function normalizeAudit(
 // naive substring re-filter would drop fuzzy/relevance hits the server correctly returned.
 export function filterAuditRows(rows: AuditRow[], f: AuditFilters): AuditRow[] {
   const eq = (a: string, b?: string) => !b || a.toLowerCase() === b.toLowerCase();
-  const fromMs = f.from ? Date.parse(f.from) : NaN;
-  const toMs = f.to ? Date.parse(f.to) : NaN;
+  const fromMs = f.from ? Date.parse(f.from) : Number.NaN;
+  const toMs = f.to ? Date.parse(f.to) : Number.NaN;
   return rows.filter((r) => {
     if (!eq(r.actor, f.actor)) return false;
     if (!eq(r.action, f.action)) return false;
     if (!eq(r.project, f.project)) return false;
     if (!eq(r.outcome, f.outcome)) return false;
     if (Number.isFinite(fromMs) || Number.isFinite(toMs)) {
-      const t = r.ts ? Date.parse(r.ts) : NaN;
+      const t = r.ts ? Date.parse(r.ts) : Number.NaN;
       if (!Number.isFinite(t)) return false;
       if (Number.isFinite(fromMs) && t < fromMs) return false;
       if (Number.isFinite(toMs) && t > toMs) return false;

@@ -100,7 +100,7 @@ export function parseStringList(v: unknown, cap = 100): string[] {
 
 // A score in [0,1]; falls back to a sensible default when absent/out-of-range.
 export function clampScore(v: unknown, fallback = 0.6): number {
-  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : Number.NaN;
   if (!Number.isFinite(n)) return fallback;
   if (n < 0) return 0;
   if (n > 1) return 1;

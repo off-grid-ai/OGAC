@@ -30,7 +30,7 @@ const NUMERIC = /-?\d[\d,]*(\.\d+)?/;
 export function parseFormattedNumber(input: string): NumberFormat {
   const match = NUMERIC.exec(input);
   if (!match) {
-    return { prefix: input, suffix: '', value: NaN, decimals: 0, grouped: false };
+    return { prefix: input, suffix: '', value: Number.NaN, decimals: 0, grouped: false };
   }
   const raw = match[0];
   const start = match.index;
