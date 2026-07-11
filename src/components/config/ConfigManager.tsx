@@ -40,13 +40,13 @@ function Field({
   revealed,
   onChange,
   onReveal,
-}: {
+}: Readonly<{
   entry: ConfigEntry;
   pending: string | undefined;
   revealed: string | undefined;
   onChange: (key: string, value: string | undefined) => void;
   onReveal: (key: string) => void;
-}) {
+}>) {
   const dirty = pending !== undefined;
 
   if (entry.type === 'boolean') {

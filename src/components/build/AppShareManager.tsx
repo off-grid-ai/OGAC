@@ -46,11 +46,11 @@ export function AppShareManager({
   appId,
   ownerId,
   initialGrants,
-}: {
+}: Readonly<{
   appId: string;
   ownerId: string;
   initialGrants: AppGrant[];
-}) {
+}>) {
   const [grants, setGrants] = React.useState<AppGrant[]>(initialGrants);
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState<KcUserLite[]>([]);

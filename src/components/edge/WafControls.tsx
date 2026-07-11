@@ -19,10 +19,10 @@ import { panelHref, withPanelParams } from '@/lib/url-panel';
 // (parsed from the Caddyfile) matches. Admin-gated write routes under /api/v1/admin/edge/waf.
 //
 // The edit panel's open state lives in the URL (?panel=waf-rule[&rule=<id>]) per the nav rule.
-export function WafControls({ liveWafEnabled, liveRuleNames }: {
+export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
   liveWafEnabled: boolean;
   liveRuleNames: string[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

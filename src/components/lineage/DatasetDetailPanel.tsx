@@ -25,7 +25,7 @@ interface Envelope {
 // the URL is deep-linkable. Fetches the dataset's schema fields, tags, and OpenLineage facets from
 // Marquez (GET /api/v1/admin/lineage/dataset) and lets the operator tag/untag it in place. Best-
 // effort: a Marquez read error is shown as a note, never thrown.
-export function DatasetDetailPanel({ namespace }: Props) {
+export function DatasetDetailPanel({ namespace }: Readonly<Props>) {
   const router = useRouter();
   const params = useSearchParams();
   const dataset = params.get('dataset');
@@ -221,7 +221,7 @@ export function DatasetDetailPanel({ namespace }: Props) {
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -230,7 +230,7 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <div className="space-y-1.5 border-t border-border pt-3">
       <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{title}</Label>

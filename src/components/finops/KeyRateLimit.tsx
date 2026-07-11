@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 // Per-key request rate limit editor, rendered inline in the keys roster. Reads the key's current
 // limit lazily when opened (GET /api/v1/admin/keys/[id]) and saves via PATCH { rateLimit }. A blank
 // value clears the per-key limit → the key falls back to the workspace / global default.
-export function KeyRateLimit({ id, label }: { id: string; label?: string }) {
+export function KeyRateLimit({ id, label }: Readonly<{ id: string; label?: string }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');

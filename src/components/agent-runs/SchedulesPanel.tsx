@@ -190,7 +190,7 @@ export function SchedulesPanel() {
   );
 }
 
-function CreateScheduleForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
+function CreateScheduleForm({ onCancel, onCreated }: Readonly<{ onCancel: () => void; onCreated: () => void }>) {
   const [scheduleId, setScheduleId] = useState('');
   const [agentId, setAgentId] = useState('');
   const [query, setQuery] = useState('');
@@ -285,7 +285,7 @@ function CreateScheduleForm({ onCancel, onCreated }: { onCancel: () => void; onC
 const inputCls =
   'w-full rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus:border-primary';
 
-function Labeled({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Labeled({ label, hint, children }: Readonly<{ label: string; hint?: string; children: React.ReactNode }>) {
   return (
     <label className="block space-y-1">
       <span className="text-xs text-muted-foreground">

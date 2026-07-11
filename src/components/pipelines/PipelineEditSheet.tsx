@@ -41,7 +41,7 @@ const VISIBILITIES = [
 // it + it's deep-linkable), prefilled from the current values, and it PATCHes
 // /api/v1/admin/pipelines/[id] which bumps the version + freezes a snapshot. Reachable from both the
 // Overview and the Gateway & Routing tab — one editor, no drift (DRY).
-export function PipelineEditSheet({ data }: { data: PipelineEditData }) {
+export function PipelineEditSheet({ data }: Readonly<{ data: PipelineEditData }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

@@ -14,10 +14,10 @@ import { resolveDomain, resolveDomainRanked, type DataDomain } from '@/lib/data-
 export function TestResolveBox({
   domains,
   connectorName,
-}: {
+}: Readonly<{
   domains: DataDomain[];
   connectorName: Record<string, string>;
-}) {
+}>) {
   const [phrase, setPhrase] = useState('');
 
   const { winner, ranked } = useMemo(() => {

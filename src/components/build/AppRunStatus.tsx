@@ -55,7 +55,7 @@ function toneClasses(tone: StatusTone): string {
   }
 }
 
-function StatusIcon({ status }: { status: string }) {
+function StatusIcon({ status }: Readonly<{ status: string }>) {
   const tone = statusTone(status);
   const cls = 'size-3.5';
   if (tone === 'success') return <CheckCircle className={cls} weight="fill" />;
@@ -65,7 +65,7 @@ function StatusIcon({ status }: { status: string }) {
   return <Clock className={cls} />;
 }
 
-export function StatusBadge({ status, small }: { status: string; small?: boolean }) {
+export function StatusBadge({ status, small }: Readonly<{ status: string; small?: boolean }>) {
   return (
     <Badge
       variant="secondary"
@@ -77,7 +77,7 @@ export function StatusBadge({ status, small }: { status: string; small?: boolean
   );
 }
 
-export function AppRunStatus({ initial }: { initial: AppRunView }) {
+export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
   const [run, setRun] = useState<AppRunView>(initial);
   const [polling, setPolling] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -174,7 +174,7 @@ export function AppRunStatus({ initial }: { initial: AppRunView }) {
   );
 }
 
-function StepRow({ step, index }: { step: AppRunStepRow; index: number }) {
+function StepRow({ step, index }: Readonly<{ step: AppRunStepRow; index: number }>) {
   return (
     <li className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2">
       <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">

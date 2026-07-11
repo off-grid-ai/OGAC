@@ -65,13 +65,13 @@ function ReassignOwnerSheet({
   pipelineId,
   currentOwner,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   pipelineId: string;
   currentOwner: string;
   onSaved: () => void;
-}) {
+}>) {
   const [newOwnerId, setNewOwnerId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,14 +132,14 @@ function AssignTeamSheet({
   currentTeamId,
   teamOptions,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   pipelineId: string;
   currentTeamId: string | null;
   teamOptions: { id: string; name: string }[];
   onSaved: () => void;
-}) {
+}>) {
   const [teamId, setTeamId] = useState(currentTeamId ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +198,7 @@ function AssignTeamSheet({
 // legal next actions for THIS user's role (server-resolved), and ownership (owner + team) with
 // reassign/assign. Lifecycle actions POST to the lifecycle route; `approve` runs through M1's release
 // gate (a 422 surfaces WHY + points to Quality). Sheets are URL-driven so Back closes them.
-export function PipelineLifecycle({ data }: { data: PipelineLifecycleData }) {
+export function PipelineLifecycle({ data }: Readonly<{ data: PipelineLifecycleData }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

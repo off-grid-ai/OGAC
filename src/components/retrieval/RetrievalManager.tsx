@@ -43,7 +43,7 @@ interface Props {
   initialError: string | null;
 }
 
-export function RetrievalManager({ initialView, initialError }: Props) {
+export function RetrievalManager({ initialView, initialError }: Readonly<Props>) {
   const router = useRouter();
   const params = useSearchParams();
   const [view, setView] = useState(initialView);

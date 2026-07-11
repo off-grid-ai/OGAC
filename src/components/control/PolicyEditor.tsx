@@ -38,7 +38,7 @@ function ConstrainedPicker({
   selected,
   onChange,
   isKnown,
-}: {
+}: Readonly<{
   label: string;
   hint: string;
   /** Shown when the known-option set is empty (e.g. no fleet models loaded). */
@@ -47,7 +47,7 @@ function ConstrainedPicker({
   selected: string[];
   onChange: (next: string[]) => void;
   isKnown: (v: string) => boolean;
-}) {
+}>) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -185,13 +185,13 @@ export function PolicyEditor({
   initial,
   modelOptions,
   fleetModelTags,
-}: {
+}: Readonly<{
   initial: PolicyBundle;
   /** Pickable models: MODEL_CATALOG ∪ live fleet-served, from the server (policy-catalog). */
   modelOptions: ModelOption[];
   /** Live fleet routing tags — the union side of the known-model guard. */
   fleetModelTags: string[];
-}) {
+}>) {
   const router = useRouter();
   const [egress, setEgress] = useState(initial.egressAllowed);
   // Keep only values that are actually enforceable — a legacy policy may hold stale garbage; we

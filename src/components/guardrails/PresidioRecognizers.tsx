@@ -62,7 +62,7 @@ const EMPTY: Draft = {
   score: 0.6,
 };
 
-export function PresidioRecognizers({ recognizers }: { recognizers: Recognizer[] }) {
+export function PresidioRecognizers({ recognizers }: Readonly<{ recognizers: Recognizer[] }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Recognizer | null>(null);

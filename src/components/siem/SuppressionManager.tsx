@@ -36,7 +36,7 @@ const KIND_HINT: Record<string, string> = {
 // Suppression rules for the SIEM feed — mute known-noise events so the security stream stays
 // signal. Add/delete drive real POST/DELETE routes; the page re-reads and re-applies them
 // server-side (router.refresh) so tiles and facets reflect the change immediately.
-export function SuppressionManager({ rules }: { rules: Rule[] }) {
+export function SuppressionManager({ rules }: Readonly<{ rules: Rule[] }>) {
   const router = useRouter();
   const [kind, setKind] = useState<(typeof KINDS)[number]>('actor');
   const [pattern, setPattern] = useState('');

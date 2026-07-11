@@ -19,14 +19,14 @@ export function PipelineActions({
   status,
   name,
   showTransitions = true,
-}: {
+}: Readonly<{
   pipelineId: string;
   status: string;
   name: string;
   /** When false, render ONLY the Edit button — the M2 Lifecycle band owns the status transitions
    *  (used on the Overview, where the PipelineLifecycle control is the source of truth). */
   showTransitions?: boolean;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

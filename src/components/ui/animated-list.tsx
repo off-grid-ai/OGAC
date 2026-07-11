@@ -20,7 +20,7 @@ interface AnimatedListProps {
  * per-item so the whole list respects the OS preference). Presentation only — the caller owns the
  * data and ordering.
  */
-export function AnimatedList({ children, className, step }: AnimatedListProps) {
+export function AnimatedList({ children, className, step }: Readonly<AnimatedListProps>) {
   const prefersReduced = useReducedMotion();
   const items = useMemo(() => Children.toArray(children), [children]);
 

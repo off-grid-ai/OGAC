@@ -33,11 +33,11 @@ export function ServiceDetail({
   service,
   control,
   logsHref,
-}: {
+}: Readonly<{
   service: ServiceEntry;
   control: ServiceControl;
   logsHref: string | null;
-}) {
+}>) {
   const [health, setHealth] = useState<ServiceHealth | null>(null);
   const [history, setHistory] = useState<Sample[]>([]);
   const [probing, setProbing] = useState(false);

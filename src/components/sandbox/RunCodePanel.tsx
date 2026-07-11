@@ -35,11 +35,11 @@ export function RunCodePanel({
   execEnabled,
   execCapable,
   backend,
-}: {
+}: Readonly<{
   execEnabled: boolean;
   execCapable: boolean;
   backend: string;
-}) {
+}>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Language selection is a navigational position → drive it from the URL, not local state.

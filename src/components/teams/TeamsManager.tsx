@@ -24,7 +24,7 @@ export interface TeamCardData {
   memberCount: number;
 }
 
-function TeamCard({ t, onDelete }: { t: TeamCardData; onDelete: (t: TeamCardData) => void }) {
+function TeamCard({ t, onDelete }: Readonly<{ t: TeamCardData; onDelete: (t: TeamCardData) => void }>) {
   return (
     <Card className="flex flex-col shadow-sm transition-colors hover:border-primary/40">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -72,7 +72,7 @@ export function AddTeamSheet({
   onSaved,
   departments = [],
   defaultDepartment = '',
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
@@ -80,7 +80,7 @@ export function AddTeamSheet({
   departments?: string[];
   /** Pre-fill the department (e.g. when creating from within a department group). */
   defaultDepartment?: string;
-}) {
+}>) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState(defaultDepartment);
@@ -168,7 +168,7 @@ export function AddTeamSheet({
 
 // The Teams library surface — full-width grid of team cards + a URL-driven New sheet
 // (?panel=new-team so Back closes it and it's deep-linkable). Each card → the team detail page.
-export function TeamsManager({ teams }: { teams: TeamCardData[] }) {
+export function TeamsManager({ teams }: Readonly<{ teams: TeamCardData[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

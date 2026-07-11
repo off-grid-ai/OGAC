@@ -154,7 +154,7 @@ export function StudioCanvas({
   agents = [],
   initialSpec,
   onSpecChange,
-}: {
+}: Readonly<{
   domains?: { id: string; label: string }[];
   agents?: { id: string; name: string }[];
   /** CONTROLLED MODE (Builder Epic #115): when the parent (AppBuilder) owns the spec and only wants
@@ -163,7 +163,7 @@ export function StudioCanvas({
    *  AppSpec. The canvas's own describe/save/publish/run chrome is hidden (the parent owns it). */
   initialSpec?: AppSpec | null;
   onSpecChange?: (spec: AppSpec) => void;
-}) {
+}>) {
   const controlled = onSpecChange !== undefined;
   // The AppSpec is the single source of truth. In controlled mode we seed from initialSpec.
   const [spec, setSpec] = useState<AppSpec | null>(initialSpec ?? null);

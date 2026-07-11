@@ -31,14 +31,14 @@ function Metric({
   sub,
   tone,
   estimate,
-}: {
+}: Readonly<{
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   sub: string;
   tone?: 'good' | 'bad' | 'default';
   estimate?: boolean;
-}) {
+}>) {
   const toneClass =
     tone === 'good' ? 'text-primary' : tone === 'bad' ? 'text-destructive' : 'text-foreground';
   return (
@@ -64,7 +64,7 @@ function Metric({
   );
 }
 
-export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Props) {
+export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly<Props>) {
   const [roi, setRoi] = useState<AppRoi>(initial);
   const [override, setOverride] = useState(hasOverride);
   const [mins, setMins] = useState(String(initial.minutesSavedPerRun));

@@ -18,7 +18,7 @@ import type { DataAsset } from '@/db/schema';
 
 // Edit + delete actions for one data-asset. Edit reuses the shared form sheet (PATCH); delete is
 // guarded by a confirmation dialog and navigates back to the catalog on success.
-export function AssetActions({ asset }: { asset: DataAsset }) {
+export function AssetActions({ asset }: Readonly<{ asset: DataAsset }>) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);

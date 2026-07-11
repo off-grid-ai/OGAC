@@ -37,7 +37,7 @@ export function Pagination<T = unknown>({
   itemLabel = 'items',
   siblings = 1,
   className,
-}: PaginationProps<T>) {
+}: Readonly<PaginationProps<T>>) {
   const { page, pageCount, total, pageSize, from, to, hasPrev, hasNext } = state;
   const range = pageRange(page, pageCount, siblings);
   const showSizeSelector = onPageSizeChange && pageSizeOptions.length > 0;

@@ -13,7 +13,7 @@ import { activeTabForPath, pipelineTabs } from '@/lib/pipeline-detail';
 // Gateway & Routing · Policy · Guardrails · Quality · Drift · Observability · Audit · Cost · API ·
 // Versions), each a real deep-linkable route scoped to the pipeline id. Tab selection is URL-driven
 // (activeTabForPath, the pure resolver in pipeline-detail.ts) so Back walks the tabs — never useState.
-export function PipelineDetailNav({ pipelineId, name }: { pipelineId: string; name: string }) {
+export function PipelineDetailNav({ pipelineId, name }: Readonly<{ pipelineId: string; name: string }>) {
   const pathname = usePathname();
   const tabs = pipelineTabs(pipelineId);
   const active = activeTabForPath(pathname, pipelineId) ?? 'overview';

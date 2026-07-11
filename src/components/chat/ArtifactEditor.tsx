@@ -14,7 +14,7 @@ interface ArtifactEditorProps {
   onCancel?: () => void;
 }
 
-export function ArtifactEditor({ value, onChange, onSave, onCancel }: ArtifactEditorProps) {
+export function ArtifactEditor({ value, onChange, onSave, onCancel }: Readonly<ArtifactEditorProps>) {
   return (
     <textarea
       value={value}

@@ -31,7 +31,7 @@ const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; la
   optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
 };
 
-function HealthDot({ h }: { h: ServiceHealth | undefined }) {
+function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
   if (!h) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -52,7 +52,7 @@ function HealthDot({ h }: { h: ServiceHealth | undefined }) {
   );
 }
 
-function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }) {
+function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | undefined }>) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
@@ -83,7 +83,7 @@ function ServiceCard({ s, h }: { s: ServiceEntry; h: ServiceHealth | undefined }
   );
 }
 
-export function ServicesDirectory({ services }: { services: ServiceEntry[] }) {
+export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntry[] }>) {
   const [health, setHealth] = useState<Record<string, ServiceHealth>>({});
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
 

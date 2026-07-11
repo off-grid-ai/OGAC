@@ -107,13 +107,13 @@ function SectionCard({
   href,
   linkLabel,
   children,
-}: {
+}: Readonly<{
   title: string;
   icon: React.ReactNode;
   href?: string;
   linkLabel?: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <Card className="flex flex-col shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -135,7 +135,7 @@ function SectionCard({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -147,7 +147,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // The comprehensive Overview — the heart-of-the-product surface. Full-width, real dashboard: identity
 // + lifecycle actions, binding, routing/egress leash, governance, quality, data ceiling, consumers,
 // and recent versions — each linking into the tab that owns it. Honest empty states throughout.
-export function PipelineOverview({ pipeline: p }: { pipeline: PipelineOverviewData }) {
+export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineOverviewData }>) {
   const href = (tab: Parameters<typeof pipelineTabHref>[1]) => pipelineTabHref(p.id, tab);
 
   return (

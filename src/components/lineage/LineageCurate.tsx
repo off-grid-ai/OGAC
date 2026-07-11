@@ -28,7 +28,7 @@ interface Props {
 // Clicking a dataset opens the dataset detail panel (`?dataset=<name>`, a navigational place —
 // Back closes it, the URL is shareable) where its schema/facets/tags are shown and it can be
 // tagged/untagged. Delete is shown but disabled with its reason.
-export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: Props) {
+export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: Readonly<Props>) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -114,7 +114,7 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: P
   );
 }
 
-function CreateNamespaceForm({ onDone }: { onDone: () => void }) {
+function CreateNamespaceForm({ onDone }: Readonly<{ onDone: () => void }>) {
   const [name, setName] = useState('');
   const [owner, setOwner] = useState('');
   const [busy, setBusy] = useState(false);
@@ -174,7 +174,7 @@ function CreateNamespaceForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function DeclareTagForm({ onDone }: { onDone: () => void }) {
+function DeclareTagForm({ onDone }: Readonly<{ onDone: () => void }>) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false);
@@ -238,11 +238,11 @@ function TagJobForm({
   jobs,
   namespace,
   onDone,
-}: {
+}: Readonly<{
   jobs: string[];
   namespace: string | null;
   onDone: () => void;
-}) {
+}>) {
   const [job, setJob] = useState('');
   const [tag, setTag] = useState('');
   const [busy, setBusy] = useState(false);

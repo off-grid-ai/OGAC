@@ -19,7 +19,7 @@ import { formatTtl, type LeaseDetail, type LeaseRow } from '@/lib/secrets-ops';
 
 // Lease inventory. Leases are opaque handles + TTLs (operational metadata, not secret material).
 // List under a prefix, look up TTL/expiry, and revoke (destructive) a lease. Confirmed on revoke.
-export function LeasesPanel({ sealed }: { sealed: boolean }) {
+export function LeasesPanel({ sealed }: Readonly<{ sealed: boolean }>) {
   const [prefix, setPrefix] = useState('');
   const [leases, setLeases] = useState<LeaseRow[]>([]);
   const [details, setDetails] = useState<Record<string, LeaseDetail>>({});

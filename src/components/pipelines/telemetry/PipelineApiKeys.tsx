@@ -41,7 +41,7 @@ function fmt(ts: string | null): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
-export function PipelineApiKeys({ pipelineId, keys }: { pipelineId: string; keys: KeyRow[] }) {
+export function PipelineApiKeys({ pipelineId, keys }: Readonly<{ pipelineId: string; keys: KeyRow[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   const open = params.get('panel') === 'mint';

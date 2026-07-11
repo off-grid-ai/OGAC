@@ -55,11 +55,11 @@ function ModelRow({
   m,
   selected,
   onPick,
-}: {
+}: Readonly<{
   m: ModelSpec;
   selected: boolean;
   onPick: (m: ModelSpec) => void;
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -103,13 +103,13 @@ export function ModelBrowser({
   error,
   selectedId,
   onPick,
-}: {
+}: Readonly<{
   models: ModelSpec[];
   loading: boolean;
   error: boolean;
   selectedId?: string;
   onPick: (m: ModelSpec) => void;
-}) {
+}>) {
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<Modality | 'all'>('all');
   const [fleetOnly, setFleetOnly] = useState(false);

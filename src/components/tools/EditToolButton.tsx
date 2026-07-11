@@ -26,12 +26,12 @@ export function EditToolButton({
   name: initialName,
   endpoint: initialEndpoint,
   description: initialDescription,
-}: {
+}: Readonly<{
   id: string;
   name: string;
   endpoint: string;
   description: string;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

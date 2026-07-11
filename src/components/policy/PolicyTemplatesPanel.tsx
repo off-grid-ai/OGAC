@@ -104,11 +104,11 @@ function TemplateCard({
   template,
   busy,
   onApply,
-}: {
+}: Readonly<{
   template: PolicyTemplate;
   busy: boolean;
   onApply: () => void;
-}) {
+}>) {
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">

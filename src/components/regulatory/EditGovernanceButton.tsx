@@ -33,13 +33,13 @@ export function EditGovernanceButton({
   owner: initialOwner,
   status: initialStatus,
   reviewedAt: initialReviewed,
-}: {
+}: Readonly<{
   id: string;
   title: string;
   owner: string;
   status: string;
   reviewedAt: string;
-}) {
+}>) {
   const router = useRouter();
   const params = useSearchParams();
   const open = params.get('panel') === `edit-${id}`;

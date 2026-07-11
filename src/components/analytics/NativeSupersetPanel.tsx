@@ -33,7 +33,7 @@ const TOOLTIP = {
   },
 };
 
-function EmptyChart({ note }: { note: string }) {
+function EmptyChart({ note }: Readonly<{ note: string }>) {
   return (
     <div
       data-testid="native-chart-empty"
@@ -45,7 +45,7 @@ function EmptyChart({ note }: { note: string }) {
   );
 }
 
-function NativeChartCard({ chart }: { chart: NativeChartData }) {
+function NativeChartCard({ chart }: Readonly<{ chart: NativeChartData }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2">
@@ -97,7 +97,7 @@ function NativeChartCard({ chart }: { chart: NativeChartData }) {
   );
 }
 
-export function NativeSupersetPanel({ dashboard }: { dashboard: NativeSupersetDashboard }) {
+export function NativeSupersetPanel({ dashboard }: Readonly<{ dashboard: NativeSupersetDashboard }>) {
   if (!dashboard.configured) {
     return (
       <p data-testid="superset-not-configured" className="text-xs text-muted-foreground">

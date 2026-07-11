@@ -35,7 +35,7 @@ export interface RoutingEditorData {
 
 // The Gateway & Routing tab — the FUNCTIONAL editor for the pipeline's binding + egress leash + hard
 // data ceiling. PATCHes /api/v1/admin/pipelines/[id] which bumps the version + writes a snapshot.
-export function PipelineRoutingEditor({ data }: { data: RoutingEditorData }) {
+export function PipelineRoutingEditor({ data }: Readonly<{ data: RoutingEditorData }>) {
   const router = useRouter();
   const [gatewayId, setGatewayId] = useState(data.gatewayId ?? '');
   const [defaultModel, setDefaultModel] = useState(data.defaultModel ?? '');

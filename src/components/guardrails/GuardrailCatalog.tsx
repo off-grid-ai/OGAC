@@ -68,12 +68,12 @@ export function GuardrailCatalog({
   engineStatus,
   enabledRules,
   pipelines,
-}: {
+}: Readonly<{
   engineStatus: EngineStatus;
   enabledRules: EnabledRuleRef[];
   /** Pipelines the operator can scope an enable to, with their current guardrail overlays. */
   pipelines: PipelineScopeRef[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

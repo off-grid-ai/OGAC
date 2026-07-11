@@ -7,11 +7,11 @@ export function TabPlaceholder({
   title,
   pipelineName,
   children,
-}: {
+}: Readonly<{
   title: string;
   pipelineName: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="w-full">
       <Card className="shadow-sm">

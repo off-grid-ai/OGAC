@@ -35,7 +35,7 @@ interface Report {
 const usd = (n: number) => `$${n.toFixed(4)}`;
 
 // Inline-SVG daily-spend bars — no chart libs. Height scales to the costliest day.
-function SpendBars({ daily }: { daily: DailySpend[] }) {
+function SpendBars({ daily }: Readonly<{ daily: DailySpend[] }>) {
   if (!daily.length) {
     return <div className="py-6 text-center text-xs text-muted-foreground">No spend yet.</div>;
   }

@@ -403,12 +403,12 @@ function MonitorEditor({
   busy,
   onClose,
   onSave,
-}: {
+}: Readonly<{
   form: MonitorForm | null;
   busy: boolean;
   onClose: () => void;
   onSave: (f: MonitorForm) => void;
-}) {
+}>) {
   const [draft, setDraft] = useState<MonitorForm>(BLANK_MONITOR);
   useEffect(() => {
     if (form) setDraft(form);

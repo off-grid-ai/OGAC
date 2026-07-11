@@ -49,7 +49,7 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function TextPanel({ ingest, busy }: { ingest: Ingest; busy: boolean }) {
+function TextPanel({ ingest, busy }: Readonly<{ ingest: Ingest; busy: boolean }>) {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   return (
@@ -69,7 +69,7 @@ function TextPanel({ ingest, busy }: { ingest: Ingest; busy: boolean }) {
   );
 }
 
-function FilePanel({ ingest, busy }: { ingest: Ingest; busy: boolean }) {
+function FilePanel({ ingest, busy }: Readonly<{ ingest: Ingest; busy: boolean }>) {
   const [name, setName] = useState('');
   const [text, setText] = useState('');
   async function pick(file: File | undefined) {
@@ -102,7 +102,7 @@ function FilePanel({ ingest, busy }: { ingest: Ingest; busy: boolean }) {
   );
 }
 
-function ImagePanel({ ingest, busy }: { ingest: Ingest; busy: boolean }) {
+function ImagePanel({ ingest, busy }: Readonly<{ ingest: Ingest; busy: boolean }>) {
   const [title, setTitle] = useState('');
   const [dataUrl, setDataUrl] = useState('');
   async function pick(file: File | undefined) {
@@ -130,11 +130,11 @@ function DatabasePanel({
   ingest,
   busy,
   datasets,
-}: {
+}: Readonly<{
   ingest: Ingest;
   busy: boolean;
   datasets: Dataset[];
-}) {
+}>) {
   if (datasets.length === 0) {
     return <p className="text-sm text-muted-foreground">No datasets in the data plane.</p>;
   }
@@ -172,7 +172,7 @@ const MENU: { kind: IngestKind; label: string; icon: typeof TextT }[] = [
 
 const KINDS: IngestKind[] = ['text', 'file', 'image', 'database'];
 
-export function IngestMenu({ datasets }: { datasets: Dataset[] }) {
+export function IngestMenu({ datasets }: Readonly<{ datasets: Dataset[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);

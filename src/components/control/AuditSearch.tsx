@@ -44,7 +44,7 @@ const OUTCOME_VARIANT: Record<string, string> = {
 // SIEM read-back UI: full-text + filtered search over the shipped audit index in OpenSearch. Unlike
 // the 25-row Postgres audit slice below, this queries the whole stream.
 // eslint-disable-next-line complexity
-export function AuditSearch({ configured }: { configured: boolean }) {
+export function AuditSearch({ configured }: Readonly<{ configured: boolean }>) {
   const [q, setQ] = useState('');
   const [outcome, setOutcome] = useState('');
   const [result, setResult] = useState<Result | null>(null);

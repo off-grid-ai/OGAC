@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 
-export function MaskingRuleToggle({ id, initial }: { id: string; initial: boolean }) {
+export function MaskingRuleToggle({ id, initial }: Readonly<{ id: string; initial: boolean }>) {
   const router = useRouter();
   const [on, setOn] = useState(initial);
 

@@ -81,7 +81,7 @@ export function SkillsDialog({
   models,
   onPick,
   userEmail = '',
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   role: string;
@@ -89,7 +89,7 @@ export function SkillsDialog({
   models: ModelLite[];
   onPick: (skillId: string, starters: string[]) => void;
   userEmail?: string;
-}) {
+}>) {
   const isAdmin = role === 'admin';
   const [skills, setSkills] = useState<Skill[]>([]);
   const [editing, setEditing] = useState<Skill | null>(null);

@@ -21,13 +21,13 @@ export function ShareDialog({
   projectId,
   visibility,
   onVisibilityChange,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   projectId: string;
   visibility: string;
   onVisibilityChange: (v: string) => void;
-}) {
+}>) {
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState('');
   const [canEdit, setCanEdit] = useState(false);

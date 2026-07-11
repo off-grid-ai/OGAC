@@ -13,7 +13,7 @@ import { MODULE_ICONS } from '@/modules/icons';
 // desktop `<aside>` below and the mobile slide-in drawer (Topbar) — so it lives here ONCE as the
 // single source of truth (DRY). `onNavigate` lets the drawer close itself when a row is tapped;
 // the desktop aside passes nothing.
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>) {
   const pathname = usePathname();
   const modules = getEnabledModules();
   const sections = sidebarSections(modules);

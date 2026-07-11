@@ -21,11 +21,11 @@ export function CollectionDocuments({
   collectionId,
   documents,
   isAdmin,
-}: {
+}: Readonly<{
   collectionId: string;
   documents: Doc[];
   isAdmin: boolean;
-}) {
+}>) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

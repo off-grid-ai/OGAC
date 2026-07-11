@@ -36,7 +36,7 @@ const AUTH_LABEL: Record<AuthLevel, string> = {
   admin: 'admin',
 };
 
-function TryIt({ endpoint }: { endpoint: ApiEndpoint }) {
+function TryIt({ endpoint }: Readonly<{ endpoint: ApiEndpoint }>) {
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [status, setStatus] = useState<number | null>(null);
   const [body, setBody] = useState<string>('');
@@ -82,7 +82,7 @@ function TryIt({ endpoint }: { endpoint: ApiEndpoint }) {
   );
 }
 
-function EndpointRow({ endpoint }: { endpoint: ApiEndpoint }) {
+function EndpointRow({ endpoint }: Readonly<{ endpoint: ApiEndpoint }>) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">

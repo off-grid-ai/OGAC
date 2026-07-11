@@ -18,13 +18,13 @@ export function ReassignPolicyButton({
   name,
   currentRole,
   knownRoles = [],
-}: {
+}: Readonly<{
   deviceId: string;
   name: string;
   currentRole: string;
   /** Distinct roles already in the fleet, offered as quick-picks. */
   knownRoles?: string[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

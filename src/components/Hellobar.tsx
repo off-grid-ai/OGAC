@@ -12,7 +12,7 @@ import type { DemoBannerModel } from '@/lib/demo-hellobar';
 
 const DISMISS_KEY = 'og-hellobar-dismissed';
 
-export function Hellobar({ model }: { model: DemoBannerModel }) {
+export function Hellobar({ model }: Readonly<{ model: DemoBannerModel }>) {
   // Start dismissed=false; a mount effect reads sessionStorage so SSR and the first client paint
   // agree (no hydration flash), then hides it if this session already dismissed it.
   const [dismissed, setDismissed] = useState(false);

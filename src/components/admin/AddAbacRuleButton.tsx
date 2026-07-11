@@ -30,11 +30,11 @@ function Picker({
   value,
   options,
   onPick,
-}: {
+}: Readonly<{
   value: string;
   options: string[];
   onPick: (v: string) => void;
-}) {
+}>) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

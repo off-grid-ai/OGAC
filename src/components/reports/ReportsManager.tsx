@@ -63,7 +63,7 @@ const EMPTY_DRAFT: Draft = {
   schedule: 'none',
 };
 
-export function ReportsManager({ initial }: { initial: Template[] }) {
+export function ReportsManager({ initial }: Readonly<{ initial: Template[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>(initial);
@@ -266,7 +266,7 @@ export function ReportsManager({ initial }: { initial: Template[] }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <div className="space-y-3">
       <h2 className="font-mono text-sm font-semibold text-muted-foreground">{title}</h2>
@@ -281,13 +281,13 @@ function Grid({
   running,
   onEdit,
   onDelete,
-}: {
+}: Readonly<{
   templates: Template[];
   onRun: (t: Template) => void;
   running: string | null;
   onEdit: (id: string) => void;
   onDelete: (t: Template) => void;
-}) {
+}>) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {templates.map((t) => (
@@ -374,14 +374,14 @@ function TemplateForm({
   onChange,
   onSave,
   onCancel,
-}: {
+}: Readonly<{
   draft: Draft;
   saving: boolean;
   builtin: boolean;
   onChange: (d: Draft) => void;
   onSave: () => void;
   onCancel: () => void;
-}) {
+}>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="space-y-4 p-4">

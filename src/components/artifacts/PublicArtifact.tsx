@@ -10,10 +10,10 @@ import { buildSrcDoc, isLiveKind } from '@/lib/artifacts';
 export function PublicArtifact({
   artifact,
   url,
-}: {
+}: Readonly<{
   artifact: { id: string; kind: string; code: string; language: string | null; title: string };
   url: string;
-}) {
+}>) {
   const [showEmbed, setShowEmbed] = useState(false);
   const live = isLiveKind(artifact.kind);
   const embed = `<iframe src="${url}" style="width:100%;height:600px;border:0" sandbox="allow-scripts"></iframe>`;

@@ -153,11 +153,11 @@ function ProjectCard({
   p,
   badge,
   onDelete,
-}: {
+}: Readonly<{
   p: ProjectRow;
   badge?: string;
   onDelete?: () => void;
-}) {
+}>) {
   const hue = accentHue(p.id || p.name);
   const instr = preview(p.systemPrompt || p.description, 130);
   return (
@@ -226,11 +226,11 @@ function EmptyState({
   icon,
   title,
   body,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   title: string;
   body: string;
-}) {
+}>) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
       {icon}

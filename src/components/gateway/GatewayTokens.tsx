@@ -35,7 +35,7 @@ interface TokenRow {
   lastSeen: string;
 }
 
-function ProviderBadge({ inferred }: { inferred: InferredToken }) {
+function ProviderBadge({ inferred }: Readonly<{ inferred: InferredToken }>) {
   if (!inferred.provider) return <span className="text-muted-foreground text-xs">{inferred.tokenType ?? 'opaque'}</span>;
   return (
     <span className="inline-flex items-center gap-1">
@@ -45,7 +45,7 @@ function ProviderBadge({ inferred }: { inferred: InferredToken }) {
   );
 }
 
-function IpList({ ips }: { ips: Record<string, number> }) {
+function IpList({ ips }: Readonly<{ ips: Record<string, number> }>) {
   const entries = Object.entries(ips).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return <span className="text-muted-foreground text-xs">—</span>;
   return (
@@ -60,7 +60,7 @@ function IpList({ ips }: { ips: Record<string, number> }) {
   );
 }
 
-function RoutingOverrides({ overrides }: { overrides: RoutingOverride[] }) {
+function RoutingOverrides({ overrides }: Readonly<{ overrides: RoutingOverride[] }>) {
   if (!overrides.length) return <span className="text-muted-foreground text-xs">none</span>;
   return (
     <div className="space-y-1">
@@ -76,7 +76,7 @@ function RoutingOverrides({ overrides }: { overrides: RoutingOverride[] }) {
   );
 }
 
-function JwtDetail({ jwt }: { jwt: InferredToken['jwt'] }) {
+function JwtDetail({ jwt }: Readonly<{ jwt: InferredToken['jwt'] }>) {
   if (!jwt) return null;
   const { payload } = jwt;
   const fields = ['sub', 'iss', 'aud', 'exp', 'iat', 'email', 'scope'].filter((k) => payload[k] !== undefined);

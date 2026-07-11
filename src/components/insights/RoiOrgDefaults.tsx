@@ -13,9 +13,9 @@ import { formatInr } from '@/lib/roi';
 // sets its own override. PUTs to /api/v1/admin/roi. Estimates, clearly labelled.
 export function RoiOrgDefaults({
   initial,
-}: {
+}: Readonly<{
   initial: { minutesSavedPerRun: number; loadedCostPerHour: number };
-}) {
+}>) {
   const [mins, setMins] = useState(String(initial.minutesSavedPerRun));
   const [rate, setRate] = useState(String(initial.loadedCostPerHour));
   const [saving, setSaving] = useState(false);

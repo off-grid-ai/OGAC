@@ -47,12 +47,12 @@ export function AppAccessEditor({
   ownerId,
   initialPolicy,
   isDefault,
-}: {
+}: Readonly<{
   appId: string;
   ownerId: string;
   initialPolicy: AppAccessPolicy;
   isDefault: boolean;
-}) {
+}>) {
   const [forms, setForms] = React.useState<Record<AppAction, ActionForm>>(() => {
     const out = {} as Record<AppAction, ActionForm>;
     for (const a of APP_ACTIONS) {

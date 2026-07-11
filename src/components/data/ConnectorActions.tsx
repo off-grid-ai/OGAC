@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function ConnectorActions({ id, name }: { id: string; name: string }) {
+export function ConnectorActions({ id, name }: Readonly<{ id: string; name: string }>) {
   const router = useRouter();
   const [testing, setTesting] = useState(false);
 

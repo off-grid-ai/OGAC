@@ -19,7 +19,7 @@ interface SessionUser {
   role?: string;
 }
 
-export function UserMenu({ user }: { user?: SessionUser }) {
+export function UserMenu({ user }: Readonly<{ user?: SessionUser }>) {
   const { name, email, role } = user ?? {};
   const label = name ?? email ?? 'User';
   const initials = label.slice(0, 2).toUpperCase();

@@ -61,7 +61,7 @@ export function GovernancePanel({
   overlay,
   view,
   library,
-}: GovernancePanelProps) {
+}: Readonly<GovernancePanelProps>) {
   const router = useRouter();
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -169,13 +169,13 @@ function ControlRow({
   onToggle,
   onLevel,
   onRevert,
-}: {
+}: Readonly<{
   control: EffectiveControlView;
   saving: boolean;
   onToggle: (bool: boolean) => void;
   onLevel: (level: PermissionLevel) => void;
   onRevert: () => void;
-}) {
+}>) {
   const c = control;
   return (
     <div className="rounded-md border border-border bg-background p-3.5">

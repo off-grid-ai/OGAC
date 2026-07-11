@@ -75,7 +75,7 @@ interface Draft {
 
 const EMPTY: Draft = { matcher: 'entity', pattern: '', action: 'redact', label: '' };
 
-export function GuardrailRules({ rules }: { rules: Rule[] }) {
+export function GuardrailRules({ rules }: Readonly<{ rules: Rule[] }>) {
   const router = useRouter();
   const params = useSearchParams();
   // Which panel is open lives in the URL: ?panel=new-mask (create) or ?panel=edit-mask&id=<id>.

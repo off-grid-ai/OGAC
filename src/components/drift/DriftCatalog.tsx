@@ -62,7 +62,7 @@ interface RunResult {
   note: string | null;
 }
 
-export function DriftCatalog({ engineStatus }: { engineStatus: DriftEngineStatus }) {
+export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEngineStatus }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
