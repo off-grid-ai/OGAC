@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { computeAccounting } from '@/lib/accounting';
+import { modelLabel } from '@/lib/model-catalog';
 import { pipelineCostSlice, pipelineTag } from '@/lib/pipeline-api-key-format';
 import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
@@ -84,7 +85,7 @@ export default async function PipelineCostPage({ params }: Readonly<{ params: Pr
                 <TableBody>
                   {slice.byModel.map((m) => (
                     <TableRow key={m.model}>
-                      <TableCell className="font-medium">{m.model}</TableCell>
+                      <TableCell className="font-medium">{modelLabel(m.model)}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {m.requests.toLocaleString()}
                       </TableCell>
