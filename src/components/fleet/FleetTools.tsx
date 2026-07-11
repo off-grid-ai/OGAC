@@ -124,6 +124,10 @@ function LiveQueryPanel({ hosts }: Readonly<{ hosts: FleetHostOption[] }>) {
     ? Array.from(new Set(result.rows.flatMap((r) => Object.keys(r.columns))))
     : [];
 
+  // Run-button label: mid-run, else the target host count.
+  const hostPlural = selected.size === 1 ? '' : 's';
+  const runButtonLabel = running ? 'Running…' : `Run on ${selected.size} host${hostPlural}`;
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="shadow-sm lg:col-span-2">
@@ -143,7 +147,7 @@ function LiveQueryPanel({ hosts }: Readonly<{ hosts: FleetHostOption[] }>) {
           />
           <Button onClick={run} disabled={running || selected.size === 0} size="sm">
             <Play className="size-4" />
-            {running ? 'Running…' : `Run on ${selected.size} host${selected.size === 1 ? '' : 's'}`}
+            {runButtonLabel}
           </Button>
           {result ? (
             <div className="space-y-2">
@@ -303,6 +307,13 @@ function PoliciesPanel() {
     }
   }
 
+  // Save-button label: mid-save, updating an existing policy, or creating a new one.
+  // (Only rendered inside the `form ?` block below, so form is non-null there; the
+  // optional chain keeps this hoist type-safe without changing the rendered label.)
+  let policySaveLabel: string;
+  if (saving) policySaveLabel = 'Saving…';
+  else policySaveLabel = form?.id != null ? 'Update policy' : 'Create policy';
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="shadow-sm lg:col-span-2">
@@ -431,7 +442,7 @@ function PoliciesPanel() {
               />
             </div>
             <Button onClick={save} disabled={saving} className="w-full">
-              {saving ? 'Saving…' : form.id != null ? 'Update policy' : 'Create policy'}
+              {policySaveLabel}
             </Button>
           </CardContent>
         </Card>

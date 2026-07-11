@@ -88,7 +88,12 @@ function mergeTrendData(trends: ScoreTrendSeries[]): {
 }
 
 function fmtUsd(n: number): string {
-  return `$${n.toFixed(n >= 100 ? 0 : n >= 1 ? 2 : 4)}`;
+  // More decimals for smaller amounts: ≥$100 whole, ≥$1 cents, else 4 dp for sub-dollar costs.
+  let decimals: number;
+  if (n >= 100) decimals = 0;
+  else if (n >= 1) decimals = 2;
+  else decimals = 4;
+  return `$${n.toFixed(decimals)}`;
 }
 function fmtNum(n: number): string {
   return n.toLocaleString('en-US');

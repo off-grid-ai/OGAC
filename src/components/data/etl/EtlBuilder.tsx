@@ -303,6 +303,12 @@ export function EtlBuilder({
     }
   }
 
+  // Save-button label: mid-save, unsaved changes to save, or already saved.
+  let saveLabel: string;
+  if (saving) saveLabel = 'Saving…';
+  else if (dirty) saveLabel = 'Save';
+  else saveLabel = 'Saved';
+
   return (
     <div className="w-full space-y-4">
       {/* Action bar */}
@@ -320,7 +326,7 @@ export function EtlBuilder({
           )}
           <Button variant="outline" size="sm" onClick={save} disabled={saving}>
             <FloppyDisk className="mr-1 size-4" />
-            {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+            {saveLabel}
           </Button>
           <Button size="sm" onClick={runNow} disabled={running || !validation.ok}>
             <Play className="mr-1 size-4" />

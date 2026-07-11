@@ -84,6 +84,8 @@ function NodeCard({
   const modelBacked = support.model.backed;
   const restartBacked = support.restart.backed;
   const toggleBacked = node.enabled ? support.disable.backed : support.enable.backed;
+  const togglePending = pending === 'enable' || pending === 'disable';
+  const toggleLabel = node.enabled ? 'Disable' : 'Enable';
 
   return (
     <div className="flex flex-col rounded-md border border-border px-3 py-2.5">
@@ -179,7 +181,7 @@ function NodeCard({
             }
           }}
         >
-          {pending === 'enable' || pending === 'disable' ? '…' : node.enabled ? 'Disable' : 'Enable'}
+          {togglePending ? '…' : toggleLabel}
         </Button>
       </div>
     </div>

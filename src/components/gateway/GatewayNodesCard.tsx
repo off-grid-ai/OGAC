@@ -68,6 +68,12 @@ export function GatewayNodesCard({ initial }: Readonly<{ initial: Node[] }>) {
         {nodes.map((g) => {
           const isUp = g.health === 'up';
           const degraded = g.health === 'degraded';
+          let dotCls = 'bg-red-500';
+          if (isUp) dotCls = 'bg-emerald-500';
+          else if (degraded) dotCls = 'bg-amber-500';
+          let textCls = 'text-red-500';
+          if (isUp) textCls = 'text-primary';
+          else if (degraded) textCls = 'text-amber-600';
           return (
             <div key={g.name} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
               <div className="min-w-0">
@@ -78,8 +84,8 @@ export function GatewayNodesCard({ initial }: Readonly<{ initial: Node[] }>) {
                 <p className="truncate font-mono text-[11px] text-muted-foreground">{g.model} · {toDisplayHost(g.host)}</p>
               </div>
               <span className="flex shrink-0 items-center gap-1 text-xs">
-                <span className={`size-2 rounded-full ${isUp ? 'bg-emerald-500' : degraded ? 'bg-amber-500' : 'bg-red-500'}`} />
-                <span className={isUp ? 'text-primary' : degraded ? 'text-amber-600' : 'text-red-500'}>{g.health ?? 'unknown'}</span>
+                <span className={`size-2 rounded-full ${dotCls}`} />
+                <span className={textCls}>{g.health ?? 'unknown'}</span>
               </span>
             </div>
           );

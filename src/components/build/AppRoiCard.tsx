@@ -24,6 +24,13 @@ interface Props {
   hasOverride: boolean;
 }
 
+// Headline-number text colour by tone: good → primary, bad → destructive, else default foreground.
+function toneTextClass(tone?: 'good' | 'bad' | 'default'): string {
+  if (tone === 'good') return 'text-primary';
+  if (tone === 'bad') return 'text-destructive';
+  return 'text-foreground';
+}
+
 function Metric({
   icon: Icon,
   label,
@@ -39,8 +46,7 @@ function Metric({
   tone?: 'good' | 'bad' | 'default';
   estimate?: boolean;
 }>) {
-  const toneClass =
-    tone === 'good' ? 'text-primary' : tone === 'bad' ? 'text-destructive' : 'text-foreground';
+  const toneClass = toneTextClass(tone);
   return (
     <div className="rounded-md border border-border p-4">
       <div className="flex items-center justify-between">
@@ -71,6 +77,12 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
   const [rate, setRate] = useState(String(initial.loadedCostPerHour));
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  // Where the current estimate comes from — own override, inherited org default, or built-in default.
+  let estimateSourceHint: string;
+  if (override) estimateSourceHint = 'This app has its own estimate. ';
+  else if (orgDefault) estimateSourceHint = 'Inheriting the org default. Set an override below. ';
+  else estimateSourceHint = 'Using the built-in default. Set an override below. ';
 
   async function save(clear: boolean) {
     setSaving(true);
@@ -181,11 +193,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
         {editing ? (
           <div className="space-y-3 rounded-md border border-border p-4">
             <p className="text-xs text-muted-foreground">
-              {override
-                ? 'This app has its own estimate. '
-                : orgDefault
-                  ? 'Inheriting the org default. Set an override below. '
-                  : 'Using the built-in default. Set an override below. '}
+              {estimateSourceHint}
               These are <span className="font-medium text-amber-600">estimates</span> — set them from
               how long the task took your team by hand.
             </p>

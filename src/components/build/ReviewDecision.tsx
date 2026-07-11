@@ -21,6 +21,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { type ReviewDetail } from '@/lib/review-inbox';
 
+// Pick one of three values by the run's decided outcome — approved / rejected / undecided.
+// A tiny pure selector so the outcome→tone/label mappings read as flat lookups, not nested ternaries.
+function byOutcome<T>(approved: boolean, rejected: boolean, whenApproved: T, whenRejected: T, otherwise: T): T {
+  if (approved) return whenApproved;
+  if (rejected) return whenRejected;
+  return otherwise;
+}
+
+// Faithfulness meter fill colour by score band: ≥80 good, ≥50 caution, else poor.
+function faithfulnessBarClass(pct: number): string {
+  if (pct >= 80) return 'bg-primary';
+  if (pct >= 50) return 'bg-amber-500';
+  return 'bg-destructive';
+}
+
 // ─── ReviewDecision (HITL — screen 4 detail) — the reviewer's plain-language decision surface ─────
 //
 // A non-technical BFSI reviewer reads this and understands, in seconds: WHAT they are approving (the
@@ -96,37 +111,44 @@ export function ReviewDecision({
   // decision already resumed + completed the run (gap G-HITL-3). Prefer the just-made decision
   // (`resolved`), else infer from the persisted terminal status when we land on an already-resolved
   // run: done → approved/completed, cancelled/error → rejected/halted.
-  const outcome: 'approve' | 'reject' | null =
-    resolved ??
-    (reviewable
-      ? null
-      : runStatus === 'done'
-        ? 'approve'
-        : runStatus === 'cancelled' || runStatus === 'error'
-          ? 'reject'
-          : null);
+  // Infer the outcome when we land on an already-resolved run: done → approve, cancelled/error → reject.
+  function inferredOutcome(): 'approve' | 'reject' | null {
+    if (reviewable) return null;
+    if (runStatus === 'done') return 'approve';
+    if (runStatus === 'cancelled' || runStatus === 'error') return 'reject';
+    return null;
+  }
+  const outcome: 'approve' | 'reject' | null = resolved ?? inferredOutcome();
   const decidedApproved = outcome === 'approve';
   const decidedRejected = outcome === 'reject';
-  const headerTone = decidedApproved
-    ? 'border-primary/40 bg-primary/[0.05]'
-    : decidedRejected
-      ? 'border-destructive/40 bg-destructive/[0.05]'
-      : 'border-amber-500/40 bg-amber-500/[0.05]';
-  const eyebrowTone = decidedApproved
-    ? 'text-primary'
-    : decidedRejected
-      ? 'text-destructive'
-      : 'text-amber-600 dark:text-amber-500';
-  const eyebrowLabel = decidedApproved
-    ? 'approved · the run has continued'
-    : decidedRejected
-      ? 'rejected · the run was halted'
-      : 'needs your decision';
-  const amountTone = decidedApproved
-    ? 'text-primary'
-    : decidedRejected
-      ? 'text-destructive'
-      : 'text-amber-700 dark:text-amber-400';
+  const headerTone = byOutcome(
+    decidedApproved,
+    decidedRejected,
+    'border-primary/40 bg-primary/[0.05]',
+    'border-destructive/40 bg-destructive/[0.05]',
+    'border-amber-500/40 bg-amber-500/[0.05]',
+  );
+  const eyebrowTone = byOutcome(
+    decidedApproved,
+    decidedRejected,
+    'text-primary',
+    'text-destructive',
+    'text-amber-600 dark:text-amber-500',
+  );
+  const eyebrowLabel = byOutcome(
+    decidedApproved,
+    decidedRejected,
+    'approved · the run has continued',
+    'rejected · the run was halted',
+    'needs your decision',
+  );
+  const amountTone = byOutcome(
+    decidedApproved,
+    decidedRejected,
+    'text-primary',
+    'text-destructive',
+    'text-amber-700 dark:text-amber-400',
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
@@ -252,13 +274,7 @@ export function ReviewDecision({
               {detail.faithfulnessPct !== null ? (
                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full rounded-full ${
-                      detail.faithfulnessPct >= 80
-                        ? 'bg-primary'
-                        : detail.faithfulnessPct >= 50
-                          ? 'bg-amber-500'
-                          : 'bg-destructive'
-                    }`}
+                    className={`h-full rounded-full ${faithfulnessBarClass(detail.faithfulnessPct)}`}
                     style={{ width: `${Math.max(3, detail.faithfulnessPct)}%` }}
                   />
                 </div>

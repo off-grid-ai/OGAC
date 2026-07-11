@@ -147,6 +147,18 @@ function Field({ label, children }: Readonly<{ label: string; children: React.Re
 // The comprehensive Overview — the heart-of-the-product surface. Full-width, real dashboard: identity
 // + lifecycle actions, binding, routing/egress leash, governance, quality, data ceiling, consumers,
 // and recent versions — each linking into the tab that owns it. Honest empty states throughout.
+// A pipeline's egress posture in one plain-language line for the Overview.
+function egressSummary(gateway: PipelineOverviewData['gateway']): string {
+  if (!gateway) return '—';
+  return gateway.egressClass === 'on-prem' ? 'Data stays on-prem' : 'Data may leave to cloud';
+}
+
+// "N override(s)" when a pipeline tightens org defaults, else "inherits org defaults".
+function overrideSummary(count: number): string {
+  if (count > 0) return `${count} override${count === 1 ? '' : 's'}`;
+  return 'inherits org defaults';
+}
+
 export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineOverviewData }>) {
   const href = (tab: Parameters<typeof pipelineTabHref>[1]) => pipelineTabHref(p.id, tab);
 
@@ -190,13 +202,7 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
                 <span className="text-muted-foreground">Org default gateway</span>
               )}
             </Field>
-            <Field label="Egress">
-              {p.gateway
-                ? p.gateway.egressClass === 'on-prem'
-                  ? 'Data stays on-prem'
-                  : 'Data may leave to cloud'
-                : '—'}
-            </Field>
+            <Field label="Egress">{egressSummary(p.gateway)}</Field>
             <Field label="Default model">
               <span className="font-mono text-xs">{p.defaultModel || 'gateway default'}</span>
             </Field>
@@ -269,11 +275,7 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           linkLabel="Policy tab"
         >
           <div className="divide-y">
-            <Field label="This pipeline">
-              {p.governance.policyOverlayKeys > 0
-                ? `${p.governance.policyOverlayKeys} override${p.governance.policyOverlayKeys === 1 ? '' : 's'}`
-                : 'inherits org defaults'}
-            </Field>
+            <Field label="This pipeline">{overrideSummary(p.governance.policyOverlayKeys)}</Field>
             <Field label="Org policy rules">{p.governance.orgPolicyRules}</Field>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -289,11 +291,7 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           linkLabel="Guardrails tab"
         >
           <div className="divide-y">
-            <Field label="This pipeline">
-              {p.governance.guardrailOverlayKeys > 0
-                ? `${p.governance.guardrailOverlayKeys} override${p.governance.guardrailOverlayKeys === 1 ? '' : 's'}`
-                : 'inherits org defaults'}
-            </Field>
+            <Field label="This pipeline">{overrideSummary(p.governance.guardrailOverlayKeys)}</Field>
             <Field label="Org guardrail rules">{p.governance.orgGuardrailRules}</Field>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">

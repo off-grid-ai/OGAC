@@ -114,12 +114,11 @@ export function GatewayProviders() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {providers.map((p) => {
-          const dot =
-            p.health === 'up'
-              ? 'bg-emerald-500'
-              : p.health === 'down'
-                ? 'bg-red-500'
-                : 'bg-muted-foreground/40';
+          let dot = 'bg-muted-foreground/40';
+          if (p.health === 'up') dot = 'bg-emerald-500';
+          else if (p.health === 'down') dot = 'bg-red-500';
+          let unavailableLabel = 'not configured';
+          if (p.configured) unavailableLabel = p.health === 'down' ? 'unreachable' : 'leashed';
           return (
             <Card key={p.id} className="shadow-sm">
               <CardHeader className="pb-2">
@@ -135,7 +134,7 @@ export function GatewayProviders() {
                   ) : (
                     <Badge variant="secondary" className="text-muted-foreground">
                       <XCircle className="size-3" />
-                      {p.configured ? (p.health === 'down' ? 'unreachable' : 'leashed') : 'not configured'}
+                      {unavailableLabel}
                     </Badge>
                   )}
                 </CardTitle>

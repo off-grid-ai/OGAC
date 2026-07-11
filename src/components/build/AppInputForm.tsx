@@ -91,7 +91,7 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
                 </select>
               ) : (
                 <Input
-                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                  type={htmlInputType(f.type)}
                   value={values[f.key] ?? ''}
                   onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={f.type === 'file' ? 'File reference / path' : undefined}
@@ -155,14 +155,24 @@ function RunTrace({ outcome }: Readonly<{ outcome: RunOutcome }>) {
   );
 }
 
+// Map a form-field type to the HTML <input type>: number/date pass through, everything else is text.
+function htmlInputType(type: FormField['type']): 'number' | 'date' | 'text' {
+  if (type === 'number') return 'number';
+  if (type === 'date') return 'date';
+  return 'text';
+}
+
+// Status pill colour: error → destructive, done → primary, otherwise (running/pending) → amber.
+function statusBadgeClass(ok: boolean, err: boolean): string {
+  if (err) return 'bg-destructive/10 text-destructive';
+  if (ok) return 'bg-primary/10 text-primary';
+  return 'bg-amber-500/10 text-amber-600 dark:text-amber-500';
+}
+
 function StatusBadge({ status, small }: Readonly<{ status: string; small?: boolean }>) {
   const ok = status === 'done';
   const err = status === 'error';
-  const cls = err
-    ? 'bg-destructive/10 text-destructive'
-    : ok
-      ? 'bg-primary/10 text-primary'
-      : 'bg-amber-500/10 text-amber-600 dark:text-amber-500';
+  const cls = statusBadgeClass(ok, err);
   return (
     <Badge variant="secondary" className={`${cls} ${small ? 'text-[10px]' : ''} gap-1`}>
       {ok ? <CheckCircle className="size-3" /> : err ? <Warning className="size-3" /> : null}

@@ -85,6 +85,11 @@ export function RunCodePanel({
     }
   }
 
+  // Run-button label: mid-run, gated off (sandbox unavailable), or ready to run.
+  let runButtonLabel: string;
+  if (busy) runButtonLabel = 'Running…';
+  else runButtonLabel = gated ? 'Run (disabled)' : 'Run';
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -143,7 +148,7 @@ export function RunCodePanel({
             variant={gated ? 'secondary' : 'default'}
           >
             <Play className="size-4" />
-            {busy ? 'Running…' : gated ? 'Run (disabled)' : 'Run'}
+            {runButtonLabel}
           </Button>
           <span className="text-xs text-muted-foreground">
             {language} · network disabled · 30s cap
