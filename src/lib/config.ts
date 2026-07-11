@@ -108,7 +108,11 @@ export async function setConfig(
   await Promise.all(
     entries.map(([key, value], i) => {
       const def = known.get(key)!;
-      const redact = (v: string | undefined) => (v === undefined ? null : def.secret ? (v ? '••••' : '') : v);
+      const redact = (v: string | undefined) => {
+        if (v === undefined) return null;
+        if (def.secret) return v ? '••••' : '';
+        return v;
+      };
       return db.insert(configAudit).values({
         id: `cfg_${now.getTime()}_${i}_${randomToken(4)}`,
         key,
