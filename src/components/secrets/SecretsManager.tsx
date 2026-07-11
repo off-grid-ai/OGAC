@@ -181,10 +181,11 @@ export function SecretsManager({
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <label htmlFor="secrets-new-key" className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Key path
                 </label>
                 <Input
+                  id="secrets-new-key"
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
                   placeholder="e.g. connector.slack.token"
@@ -192,10 +193,11 @@ export function SecretsManager({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <label htmlFor="secrets-new-value" className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Value (write-only)
                 </label>
                 <Input
+                  id="secrets-new-value"
                   type="password"
                   autoComplete="new-password"
                   value={newValue}
@@ -469,10 +471,11 @@ function VersionPanel({ keyPath, sealed }: { keyPath: string; sealed: boolean })
             void rotate();
           }}
         >
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <label htmlFor="secrets-rotate-value" className="text-[10px] uppercase tracking-wide text-muted-foreground">
             New value (write-only)
           </label>
           <Input
+            id="secrets-rotate-value"
             type="password"
             autoComplete="new-password"
             value={rotateValue}

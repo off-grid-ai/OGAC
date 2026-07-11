@@ -76,8 +76,9 @@ export function SecretsPanel({ configured, initialKeys }: { configured: boolean;
         }}
       >
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">Key</label>
+          <label htmlFor="control-secret-key" className="text-[10px] uppercase tracking-wide text-muted-foreground">Key</label>
           <Input
+            id="control-secret-key"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="e.g. connector.slack.token"
@@ -85,8 +86,9 @@ export function SecretsPanel({ configured, initialKeys }: { configured: boolean;
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">Value</label>
+          <label htmlFor="control-secret-value" className="text-[10px] uppercase tracking-wide text-muted-foreground">Value</label>
           <Input
+            id="control-secret-value"
             type="password"
             value={value}
             onChange={(e) => setValue(e.target.value)}

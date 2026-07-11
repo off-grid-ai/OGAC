@@ -17,6 +17,7 @@
 
 import { connect as netConnect, type Socket } from 'node:net';
 import { connect as tlsConnect } from 'node:tls';
+import { randomToken } from '@/lib/rand';
 
 // ─── config ───────────────────────────────────────────────────────────────────────────────────────
 export interface SmtpConfig {
@@ -140,7 +141,7 @@ export function buildMimeMessage(
     headers.push('Content-Transfer-Encoding: 8bit');
     return `${headers.join('\r\n')}\r\n\r\n${dotStuff(msg.text)}`;
   }
-  const boundary = opts.boundary ?? `=_offgrid_${Math.random().toString(36).slice(2)}`;
+  const boundary = opts.boundary ?? `=_offgrid_${randomToken(12)}`;
   headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
   const parts: string[] = [];
   parts.push(

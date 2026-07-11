@@ -1,6 +1,7 @@
-// Client-safe tenant subdomain helpers — PURE, zero imports (no db/server code), so both the browser
+// Client-safe tenant subdomain helpers — PURE (no db/server code), so both the browser
 // (AddTenantButton, admin table) and the server (store, middleware) can use them. Each tenant gets
 // its own subdomain: <slug>.onprem-console.getoffgridai.co.
+import { randomToken } from '@/lib/rand';
 
 // The apex zone + the console host suffix. Each tenant gets a FIRST-LEVEL host
 // "<slug>-onprem-console.getoffgridai.co" — first-level so the zone's universal *.getoffgridai.co
@@ -44,8 +45,5 @@ export function tenantGatewayHost(slug: string, randomSuffix: string): string {
 // Generate the 5-char random suffix for a tenant gateway host (lowercase alphanumerics). Impure
 // (randomness) — kept separate from tenantGatewayHost so the host builder stays testable.
 export function randomGatewaySuffix(): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let s = '';
-  for (let i = 0; i < 5; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return s;
+  return randomToken(5, 'abcdefghijklmnopqrstuvwxyz0123456789');
 }
