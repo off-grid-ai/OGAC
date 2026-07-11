@@ -1,0 +1,2 @@
+S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:35 | RunStep has no stable unique id (fields: kind/label/detail/refs/ms); the array is ordered/append-only. A fabricated key could change React reconciliation — index key retained per ROE.
+S6479 | src/app/(console)/build/agents/[id]/runs/[runId]/page.tsx:62 | CheckResult has no stable unique id (fields: name/verdict/detail/score) and names can repeat; index key retained per ROE (no stable id to key by).
