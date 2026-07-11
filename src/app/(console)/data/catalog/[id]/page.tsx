@@ -77,7 +77,7 @@ export default async function DataAssetDetailPage({ params }: Readonly<{ params:
             <Badge className={FRESH_TONE[freshness.state]}>{freshness.state}</Badge>
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            {asset.source || '—'} · {asset.kind} · {asset.rowCount.toLocaleString('en-IN')} rows
+            {asset.source || '—'} · {asset.kind} · {asset.rowCount.toLocaleString('en-US')} rows
           </p>
         </div>
         <AssetActions asset={asset} />

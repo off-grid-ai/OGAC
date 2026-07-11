@@ -58,7 +58,7 @@ export interface ReviewInboxItem {
   runId: string;
   appId: string;
   appTitle: string;
-  /** The plain-language decision line, e.g. "Approve ₹5,00,000 reimbursement". */
+  /** The plain-language decision line, e.g. "Approve $500,000 reimbursement". */
   question: string;
   /** The money/subject at a glance (already formatted), or null when there is none. */
   amountLabel: string | null;
@@ -103,17 +103,17 @@ export interface ReviewDetail {
   approveBlockedReason: string | null;
 }
 
-// ─── amount / threshold formatting (INR — the demo tenant is Indian BFSI) ─────────────────────────
-// The Indian grouping (₹5,00,000) is the reviewer's native format; a plain Intl 'en-IN' currency
-// formatter produces exactly that. Non-numeric / absent ⇒ null (no amount to show).
-export function formatInr(value: unknown): string | null {
+// ─── amount / threshold formatting (USD) ──────────────────────────────────────────────────────────
+// A plain Intl 'en-US' currency formatter produces "$500,000". Non-numeric / absent ⇒ null (no amount
+// to show). One place, reused by the decision line, the at-a-glance label, and the input rows.
+export function formatUsd(value: unknown): string | null {
   let n = Number.NaN;
   if (typeof value === 'number') n = value;
   else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
   if (!Number.isFinite(n)) return null;
-  return new Intl.NumberFormat('en-IN', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     maximumFractionDigits: 0,
   }).format(n);
 }
@@ -168,7 +168,7 @@ function readAmount(input: Record<string, unknown>): { key: string; value: unkno
 // reads as a sentence, never "Approve undefined".
 export function decisionQuestion(app: ReviewAppLike, input: Record<string, unknown>): string {
   const amount = readAmount(input);
-  const amountLabel = amount ? formatInr(amount.value) : null;
+  const amountLabel = amount ? formatUsd(amount.value) : null;
   const requester = readStr(input, REQUESTER_KEYS);
   const subject = readStr(input, SUBJECT_KEYS);
   const noun = subject ?? app.title;
@@ -180,7 +180,7 @@ export function decisionQuestion(app: ReviewAppLike, input: Record<string, unkno
 // ─── amountLabelFor — the money at a glance (or null) ─────────────────────────────────────────────
 export function amountLabelFor(input: Record<string, unknown>): string | null {
   const amount = readAmount(input);
-  return amount ? formatInr(amount.value) : null;
+  return amount ? formatUsd(amount.value) : null;
 }
 
 // ─── requestedByFor — who requested the run, best-effort ──────────────────────────────────────────
@@ -326,7 +326,7 @@ export function recommendationFrom(run: AppRunView): string {
 
 // ─── policyContextFrom — what rule routed this to a human, in plain language (PURE) ───────────────
 // Built from the app's approval authority (the threshold that trips a human) + the run's amount. So a
-// reviewer sees "This ₹5,00,000 is above the ₹1,00,000 auto-approve limit" instead of an opaque
+// reviewer sees "This $500,000 is above the $100,000 auto-approve limit" instead of an opaque
 // "awaiting_human". Falls back to a generic sentence when no threshold is set.
 export function policyContextFrom(app: ReviewAppLike, input: Record<string, unknown>): string {
   const approval = app.policy.approval;
@@ -334,8 +334,8 @@ export function policyContextFrom(app: ReviewAppLike, input: Record<string, unkn
     'This step is configured to require a person to sign off before the run continues.';
   if (approval?.thresholdAttribute && approval.maxThreshold !== undefined) {
     const raw = input[approval.thresholdAttribute];
-    const amountLabel = formatInr(raw);
-    const limitLabel = formatInr(approval.maxThreshold);
+    const amountLabel = formatUsd(raw);
+    const limitLabel = formatUsd(approval.maxThreshold);
     if (amountLabel && limitLabel) {
       return `This ${approval.thresholdAttribute} of ${amountLabel} is above the ${limitLabel} auto-approval limit, so it needs a manager's decision.`;
     }
@@ -347,7 +347,7 @@ export function policyContextFrom(app: ReviewAppLike, input: Record<string, unkn
 }
 
 // ─── inputPairs — the run input as readable key/value rows (PURE) ─────────────────────────────────
-// Turns the input object into labelled rows (amount fields formatted as INR) so the reviewer reads
+// Turns the input object into labelled rows (amount fields formatted as USD) so the reviewer reads
 // the request, not raw JSON. Nested objects/arrays are JSON-stringified compactly as a last resort.
 export function inputPairs(input: Record<string, unknown>): { key: string; value: string }[] {
   const pairs: { key: string; value: string }[] = [];
@@ -355,7 +355,7 @@ export function inputPairs(input: Record<string, unknown>): { key: string; value
     if (raw === undefined || raw === null) continue;
     let value: string;
     if (AMOUNT_KEYS.has(key)) {
-      value = formatInr(raw) ?? String(raw);
+      value = formatUsd(raw) ?? String(raw);
     } else if (typeof raw === 'object') {
       value = JSON.stringify(raw);
     } else {

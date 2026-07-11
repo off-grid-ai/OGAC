@@ -9,8 +9,8 @@
 //     uses, resolved via teams.ts) so ROI rolls up the way the org-chart does;
 //   • the two ESTIMATES  ← resolveRoiSettings(app override → org default → hard default).
 //
-// AI cost from the run trace is priced in USD (the gateway's native unit); ROI is stated in ₹, so we
-// convert once here with a single, documented rate constant. The pure calc stays currency-agnostic.
+// AI cost from the run trace is priced in USD (the gateway's native unit) and ROI is stated in USD,
+// so the cost passes straight through — no currency conversion. The pure calc stays currency-agnostic.
 
 import { computeReportMetrics } from '@/lib/app-reports';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
@@ -31,16 +31,12 @@ import { listMembershipsForUser, getTeam } from '@/lib/teams';
 
 const DEFAULT_ORG = 'default';
 
-// Single documented USD→₹ conversion for AI cost (the gateway prices in USD). Rounded, indicative —
-// the ROI card labels AI cost as ACTUAL spend converted at this rate, not a live FX quote.
-export const USD_TO_INR = 83;
-
 // ─── per-app: real run count + real AI cost, from the run trace ───────────────────────────────────
 // Reuses computeReportMetrics (the same rollup the Reports tab shows) so run counts + cost never
 // drift between ROI and Reports. `completed` is the honest "runs that produced value" numerator.
 export interface AppRunFacts {
   runsCompleted: number;
-  actualAiCostInr: number;
+  actualAiCostUsd: number;
 }
 
 export async function appRunFacts(
@@ -52,7 +48,7 @@ export async function appRunFacts(
   const m = computeReportMetrics(runs);
   return {
     runsCompleted: m.completed,
-    actualAiCostInr: Math.round(m.totalCostUsd * USD_TO_INR * 100) / 100,
+    actualAiCostUsd: Math.round(m.totalCostUsd * 100) / 100,
   };
 }
 
@@ -92,7 +88,7 @@ export async function computeAppRoiRow(
     appTitle: app.title,
     department,
     runsCompleted: facts.runsCompleted,
-    actualAiCost: facts.actualAiCostInr,
+    actualAiCost: facts.actualAiCostUsd,
     settings,
   });
 }
@@ -123,7 +119,7 @@ export async function computeOrgRoiRollup(orgId: string = DEFAULT_ORG): Promise<
         appTitle: app.title,
         department,
         runsCompleted: facts.runsCompleted,
-        actualAiCost: facts.actualAiCostInr,
+        actualAiCost: facts.actualAiCostUsd,
         settings,
       }),
     );

@@ -8,7 +8,7 @@ import {
   computeAppRoi,
   computeRoi,
   formatHours,
-  formatInr,
+  formatUsd,
   resolveRoiSettings,
   rollupRoi,
   validateRoiSettingsInput,
@@ -19,7 +19,7 @@ import {
 // The bar cases: normal, zero-runs, missing/negative estimate, rollup-sum equals the parts.
 
 // ─── computeRoi — normal ─────────────────────────────────────────────────────────────────────────
-test('computeRoi: normal — 100 runs × 15 min @ ₹1500/hr minus ₹500 cost', () => {
+test('computeRoi: normal — 100 runs × 15 min @ $1500/hr minus $500 cost', () => {
   const r = computeRoi({
     runsCompleted: 100,
     minutesSavedPerRun: 15,
@@ -172,9 +172,9 @@ function appRoi(overrides: Partial<AppRoi> & { appId: string; department: string
 
 test('rollupRoi: department + org totals equal the sum of app rows', () => {
   const apps = [
-    appRoi({ appId: 'a1', department: 'Actuarial', runsCompleted: 10, actualAiCost: 100 }), // 10h → ₹10000, net 9900
-    appRoi({ appId: 'a2', department: 'Actuarial', runsCompleted: 5, actualAiCost: 50 }), // 5h → ₹5000, net 4950
-    appRoi({ appId: 'a3', department: 'Underwriting', runsCompleted: 2, actualAiCost: 0 }), // 2h → ₹2000, net 2000
+    appRoi({ appId: 'a1', department: 'Actuarial', runsCompleted: 10, actualAiCost: 100 }), // 10h → $10000, net 9900
+    appRoi({ appId: 'a2', department: 'Actuarial', runsCompleted: 5, actualAiCost: 50 }), // 5h → $5000, net 4950
+    appRoi({ appId: 'a3', department: 'Underwriting', runsCompleted: 2, actualAiCost: 0 }), // 2h → $2000, net 2000
     appRoi({ appId: 'a4', department: UNASSIGNED_ROI_DEPARTMENT, runsCompleted: 0, actualAiCost: 0 }),
   ];
   const r = rollupRoi(apps);
@@ -224,11 +224,13 @@ test('rollupRoi: single named department, no Unassigned present', () => {
 });
 
 // ─── formatting helpers ────────────────────────────────────────────────────────────────────────────
-test('formatInr: Indian grouping, ₹ prefix, negative sign', () => {
-  assert.equal(formatInr(123456), '₹1,23,456');
-  assert.equal(formatInr(0), '₹0');
-  assert.equal(formatInr(-4400), '−₹4,400');
-  assert.equal(formatInr(NaN), '₹0');
+test('formatUsd: en-US grouping, $ prefix, negative sign', () => {
+  assert.equal(formatUsd(123456), '$123,456');
+  assert.equal(formatUsd(1234), '$1,234');
+  assert.equal(formatUsd(0), '$0');
+  assert.equal(formatUsd(-4400), '−$4,400');
+  assert.equal(formatUsd(-1234), '−$1,234');
+  assert.equal(formatUsd(NaN), '$0');
 });
 
 test('formatHours: one decimal + hrs suffix', () => {

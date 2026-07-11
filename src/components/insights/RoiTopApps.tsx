@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { type AppRoi, formatHours, formatInr } from '@/lib/roi';
+import { type AppRoi, formatHours, formatUsd } from '@/lib/roi';
 import { usePagination } from '@/lib/use-pagination';
 
 // ─── Top apps by value — paginated, URL-driven, drills into each app's Reports (ROI card) ─────────
@@ -40,23 +40,23 @@ export function RoiTopApps({ apps }: Readonly<{ apps: AppRoi[] }>) {
                   <TableCell className="font-medium text-foreground">{a.appTitle}</TableCell>
                   <TableCell className="text-muted-foreground">{a.department}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {a.runsCompleted.toLocaleString('en-IN')}
+                    {a.runsCompleted.toLocaleString('en-US')}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {formatHours(a.hoursSaved)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-foreground">
-                    {formatInr(a.grossValue)}
+                    {formatUsd(a.grossValue)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {formatInr(a.actualAiCost)}
+                    {formatUsd(a.actualAiCost)}
                   </TableCell>
                   <TableCell
                     className={`text-right font-medium tabular-nums ${
                       a.netValue >= 0 ? 'text-primary' : 'text-destructive'
                     }`}
                   >
-                    {formatInr(a.netValue)}
+                    {formatUsd(a.netValue)}
                   </TableCell>
                   <TableCell>
                     <Link
