@@ -82,7 +82,7 @@ export function parseGEvalScore(text: string): GEvalResult {
   if (!t) return { score: 0, raw: null, rationale: '', parsed: false };
 
   let raw: number | null = null;
-  const labeled = t.match(/SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i);
+  const labeled = /SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i.exec(t);
   if (labeled) {
     raw = Number(labeled[1]);
   } else {

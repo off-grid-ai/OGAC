@@ -72,12 +72,12 @@ export function parseLifecycleXml(xml: string): LifecycleRule[] {
   const out: LifecycleRule[] = [];
   for (const m of xml.matchAll(/<Rule>([\s\S]*?)<\/Rule>/g)) {
     const block = m[1];
-    const days = Number(block.match(/<Days>\s*(\d+)\s*<\/Days>/)?.[1]);
+    const days = Number(/<Days>\s*(\d+)\s*<\/Days>/.exec(block)?.[1]);
     if (!Number.isFinite(days) || days < 1) continue; // only expiry-by-days rules are represented
-    const id = block.match(/<ID>([\s\S]*?)<\/ID>/)?.[1]?.trim() ?? '';
+    const id = /<ID>([\s\S]*?)<\/ID>/.exec(block)?.[1]?.trim() ?? '';
     // Prefix can be nested under Filter (v2) or a bare <Prefix> (v1).
-    const prefix = block.match(/<Prefix>([\s\S]*?)<\/Prefix>/)?.[1] ?? '';
-    const status = block.match(/<Status>([\s\S]*?)<\/Status>/)?.[1]?.trim() ?? 'Enabled';
+    const prefix = /<Prefix>([\s\S]*?)<\/Prefix>/.exec(block)?.[1] ?? '';
+    const status = /<Status>([\s\S]*?)<\/Status>/.exec(block)?.[1]?.trim() ?? 'Enabled';
     out.push({ id: id || `expire-${prefix || 'all'}-${days}d`, prefix, expireDays: days, enabled: status !== 'Disabled' });
   }
   return out;

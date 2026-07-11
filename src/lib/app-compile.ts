@@ -356,7 +356,7 @@ export function finalizeSpec(
 function segment(description: string): string[] {
   let d = (description ?? '').trim();
   // Drop a leading "title — rest" / "title: rest" prefix (the em-dash / colon title form).
-  const dash = d.match(/^[^—:\n]{3,60}?\s*[—:-]\s+(.*)$/s);
+  const dash = /^[^—:\n]{3,60}?\s*[—:-]\s+(.*)$/s.exec(d);
   if (dash && /\b(read|check|approve|reject|then|decide|verify|send|notify|review)\b/i.test(dash[1])) {
     d = dash[1].trim();
   }
@@ -431,7 +431,7 @@ function titleCase(s: string): string {
 function deriveTitle(description: string): string {
   const d = (description ?? '').trim();
   if (!d) return 'Untitled app';
-  const dash = d.match(/^([^—:\n]{3,60}?)\s*[—:-]\s+/);
+  const dash = /^([^—:\n]{3,60}?)\s*[—:-]\s+/.exec(d);
   if (dash) return titleCase(dash[1].trim());
   const words = d.split(/\s+/).slice(0, 6).join(' ');
   return titleCase(words) || 'Untitled app';
@@ -506,7 +506,7 @@ async function gatewayDecompose(description: string, domains: DataDomain[]): Pro
     if (!r.ok) return null;
     const data = await r.json();
     const text: string = data?.choices?.[0]?.message?.content ?? '';
-    const m = text.match(/\{[\s\S]*\}/);
+    const m = /\{[\s\S]*\}/.exec(text);
     if (!m) return null;
     const parsed = JSON.parse(m[0]) as ModelPlan;
     if (!Array.isArray(parsed.steps)) return null;
