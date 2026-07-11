@@ -115,6 +115,22 @@ interface ModelInfo {
   image?: boolean; // image-generation model (sd-server) — the composer generates instead of chats
 }
 
+// Capability suffix shown after a model id in the picker (image-gen wins over vision). Pure.
+function modelSuffix(m: ModelInfo): string {
+  if (m.image) return ' (image)';
+  if (m.vision) return ' (vision)';
+  return '';
+}
+
+// Map a failed stream response's HTTP status to a human reason (used when the body carries no
+// explicit `error`). Pure over the status code.
+function streamErrorReason(status: number): string {
+  if (status === 401 || status === 403) return 'Not authorized for this model.';
+  if (status === 429) return 'Rate limited — try again shortly.';
+  if (status >= 500) return `Gateway error (${status}).`;
+  return `Request failed (${status}).`;
+}
+
 function ArtifactChip({ content, onOpen }: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
   const art = parseArtifact(content);
   if (!art) return null;
@@ -980,11 +996,7 @@ export function ChatWorkspace({
       });
       if (!r.ok || !r.body) {
         const detail = await r.json().catch(() => null) as { error?: string } | null;
-        const reason = detail?.error
-          ?? (r.status === 401 || r.status === 403 ? 'Not authorized for this model.'
-            : r.status === 429 ? 'Rate limited — try again shortly.'
-            : r.status >= 500 ? `Gateway error (${r.status}).`
-            : `Request failed (${r.status}).`);
+        const reason = detail?.error ?? streamErrorReason(r.status);
         throw new Error(reason);
       }
       const reader = r.body.getReader();
@@ -1266,6 +1278,22 @@ export function ChatWorkspace({
     if (activeId) await reloadActive(activeId);
   }
 
+  // Header title: temporary chats read "Temporary chat", else the active project's name, else "Chat".
+  const headerTitle = temporary ? 'Temporary chat' : (activeProject ? activeProject.name : 'Chat');
+  // Empty-state heading + subtext mirror the same temporary/project/default precedence.
+  const emptyStateHeading = temporary
+    ? 'Temporary chat'
+    : (activeProject ? activeProject.name : 'Your own private AI');
+  const emptyStateSubtext = temporary
+    ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
+    : (activeProject
+        ? 'Chats here use this project’s instructions and knowledge.'
+        : 'Answered on-prem by the Off Grid AI gateways. Ask anything.');
+  // Mic button tint: recording (destructive, pulsing) → transcribing (primary, pulsing) → idle.
+  const micButtonTint = audio.recording
+    ? 'animate-pulse text-destructive'
+    : (audio.recordPhase === 'transcribing' ? 'animate-pulse text-primary' : 'text-muted-foreground');
+
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] min-h-0">
       {/* Mobile backdrop — closes the drawer on tap. Only rendered/interactive below md. */}
@@ -1439,7 +1467,7 @@ export function ChatWorkspace({
               <List className="size-5" />
             </button>
             {temporary ? <Ghost className="size-4 shrink-0 text-primary" /> : <Sparkle className="size-4 shrink-0 text-primary" />}
-            <span className="truncate">{temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Chat'}</span>
+            <span className="truncate">{headerTitle}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
@@ -1512,7 +1540,7 @@ export function ChatWorkspace({
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.id}
-                    {m.image ? ' (image)' : m.vision ? ' (vision)' : ''}
+                    {modelSuffix(m)}
                   </option>
                 ))}
               </select>
@@ -1525,14 +1553,10 @@ export function ChatWorkspace({
             {messages.length === 0 ? (
               <div className="pt-16 text-center text-sm text-muted-foreground">
                 <p className="text-base text-foreground">
-                  {temporary ? 'Temporary chat' : activeProject ? activeProject.name : 'Your own private AI'}
+                  {emptyStateHeading}
                 </p>
                 <p className="mt-1">
-                  {temporary
-                    ? 'This chat won’t be saved, won’t appear in your history, and won’t update memory.'
-                    : activeProject
-                      ? 'Chats here use this project’s instructions and knowledge.'
-                      : 'Answered on-prem by the Off Grid AI gateways. Ask anything.'}
+                  {emptyStateSubtext}
                 </p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
@@ -1882,11 +1906,7 @@ export function ChatWorkspace({
                 disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
                 className={cn(
                   'p-1.5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40',
-                  audio.recording
-                    ? 'animate-pulse text-destructive'
-                    : audio.recordPhase === 'transcribing'
-                      ? 'animate-pulse text-primary'
-                      : 'text-muted-foreground',
+                  micButtonTint,
                 )}
                 title={audio.micLabel}
               >
