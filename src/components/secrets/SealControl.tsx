@@ -124,10 +124,11 @@ export function SealControl({
                 write-only and never stored by the console.
               </span>
             </div>
-            <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <label htmlFor="seal-unseal-key" className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Unseal key share
             </label>
             <Input
+              id="seal-unseal-key"
               type="password"
               autoComplete="off"
               value={unsealKey}

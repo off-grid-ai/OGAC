@@ -91,8 +91,9 @@ export function SuggestControlsTool() {
             rows={4}
           />
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Data allowlist (comma-separated)</label>
+            <label htmlFor="suggest-controls-allowlist" className="text-xs text-muted-foreground">Data allowlist (comma-separated)</label>
             <Input
+              id="suggest-controls-allowlist"
               value={allowlist}
               onChange={(e) => setAllowlist(e.target.value)}
               placeholder="support_tickets, customer_profiles"

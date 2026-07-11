@@ -103,8 +103,8 @@ export function SuggestExpectationsTool() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Table name</label>
-            <Input value={table} onChange={(e) => setTable(e.target.value)} placeholder="customers" />
+            <label htmlFor="suggest-expectations-table" className="text-xs text-muted-foreground">Table name</label>
+            <Input id="suggest-expectations-table" value={table} onChange={(e) => setTable(e.target.value)} placeholder="customers" />
           </div>
           <Textarea
             value={schemaText}

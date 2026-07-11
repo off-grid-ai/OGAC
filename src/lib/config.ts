@@ -8,6 +8,7 @@ import {
   configDisplayValue,
   type ConfigKeyDef,
 } from '@/lib/config-registry';
+import { randomToken } from '@/lib/rand';
 
 // The env file the app loads at boot — edits here take effect on restart. Override
 // with OFFGRID_ENV_FILE for non-default deployments.
@@ -107,7 +108,7 @@ export async function setConfig(
       const def = known.get(key)!;
       const redact = (v: string | undefined) => (v === undefined ? null : def.secret ? (v ? '••••' : '') : v);
       return db.insert(configAudit).values({
-        id: `cfg_${now.getTime()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        id: `cfg_${now.getTime()}_${i}_${randomToken(4)}`,
         key,
         actor,
         oldValue: redact(before[key]),

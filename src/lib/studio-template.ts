@@ -2,10 +2,12 @@
 // and shaping an untrusted edit body into a validated DB patch. Shared by the templates routes so
 // slug/visibility logic lives in one tested place. No DB, no React. See test/studio-template.test.ts.
 
+import { randomToken } from '@/lib/rand';
+
 export type Visibility = 'private' | 'org' | 'public';
 
 /** A URL-safe slug from a title plus a short random suffix, so /app/<slug> is stable & unique. */
-export function slugFromTitle(title: string, suffix = Math.random().toString(36).slice(2, 6)): string {
+export function slugFromTitle(title: string, suffix = randomToken(4)): string {
   const base =
     (title || 'app')
       .toLowerCase()

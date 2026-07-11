@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { configAudit } from '@/db/schema';
 import { requireAdmin } from '@/lib/authz';
 import { revealConfig } from '@/lib/config';
+import { randomToken } from '@/lib/rand';
 import { isViewer, redactSecretForViewer } from '@/lib/viewer-policy';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   const viewer = isViewer(gate.user.role);
   const shown = redactSecretForViewer(value, viewer);
   await db.insert(configAudit).values({
-    id: `cfg_reveal_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `cfg_reveal_${Date.now()}_${randomToken(4)}`,
     key,
     actor: gate.user.email ?? 'admin',
     oldValue: null,
