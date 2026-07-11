@@ -308,7 +308,9 @@ export function buildInsertSql(
     const obj: Record<string, string | null> = {};
     for (const c of cols) {
       const v = row[c];
-      obj[c] = v == null ? null : typeof v === 'string' ? v : JSON.stringify(v);
+      if (v == null) obj[c] = null;
+      else if (typeof v === 'string') obj[c] = v;
+      else obj[c] = JSON.stringify(v);
     }
     return JSON.stringify(obj);
   });

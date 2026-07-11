@@ -84,7 +84,9 @@ export function regexError(pattern: string): string | null {
 // (what a textarea/CSV field yields). Trims, drops blanks, dedupes, caps length so a malformed body
 // can't balloon the payload.
 export function parseStringList(v: unknown, cap = 100): string[] {
-  const raw = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[\n,]/) : [];
+  let raw: string[] = [];
+  if (Array.isArray(v)) raw = v;
+  else if (typeof v === 'string') raw = v.split(/[\n,]/);
   const out: string[] = [];
   const seen = new Set<string>();
   for (const item of raw) {
@@ -100,7 +102,9 @@ export function parseStringList(v: unknown, cap = 100): string[] {
 
 // A score in [0,1]; falls back to a sensible default when absent/out-of-range.
 export function clampScore(v: unknown, fallback = 0.6): number {
-  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : Number.NaN;
+  let n = Number.NaN;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string') n = Number(v);
   if (!Number.isFinite(n)) return fallback;
   if (n < 0) return 0;
   if (n > 1) return 1;
