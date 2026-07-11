@@ -56,6 +56,11 @@ async function readAppRuns(orgId: string): Promise<AppRunSource[]> {
 }
 
 /** Best-effort actor for an app run — the input's owner/actor field if present, else system. */
+function isoOrNull(v: unknown): string | null {
+  if (v instanceof Date) return v.toISOString();
+  return v ? String(v) : null;
+}
+
 function appRunActor(input: Record<string, unknown> | undefined): string {
   if (!input) return '';
   for (const k of ['actor', 'user', 'userId', 'requestedBy', 'owner', 'email']) {
@@ -105,7 +110,7 @@ async function readChatRuns(orgId: string): Promise<ChatRunSource[]> {
       runId: String(r.run_id),
       conversation: conversationLabel(r.resource),
       outcome: r.outcome == null ? '' : String(r.outcome),
-      ts: r.ts instanceof Date ? r.ts.toISOString() : r.ts ? String(r.ts) : null,
+      ts: isoOrNull(r.ts),
       actor:
         (r.actor_label == null ? '' : String(r.actor_label)) ||
         (r.actor_id == null ? '' : String(r.actor_id)),

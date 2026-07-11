@@ -28,8 +28,11 @@ export function parseLogLine(line: string): LogRow | null {
   }
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return null;
   const rec = obj as Record<string, unknown>;
-  const str = (v: unknown): string =>
-    v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v);
+  const str = (v: unknown): string => {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    return JSON.stringify(v);
+  };
   const fields: Record<string, string> = {};
   for (const [k, v] of Object.entries(rec)) {
     if (k.startsWith('_')) continue;
