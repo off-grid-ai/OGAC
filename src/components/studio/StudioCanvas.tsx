@@ -149,6 +149,20 @@ const EXAMPLES = [
   'Answer employee questions about our HR policies and always cite the policy document you used.',
 ];
 
+// Run-status badge tint: done → primary, awaiting a human → amber, otherwise (error/other) → destructive.
+function runStatusBadgeClass(runStatus: string): string {
+  if (runStatus === 'done') return 'bg-primary/10 text-primary';
+  if (runStatus === 'awaiting_human') return 'bg-amber-500/10 text-amber-600';
+  return 'bg-destructive/10 text-destructive';
+}
+
+// Per-step status text tint in the run trace: error → destructive, awaiting a human → amber, else default.
+function stepStatusTextClass(status: string): string {
+  if (status === 'error') return 'font-mono text-destructive';
+  if (status === 'awaiting_human') return 'font-mono text-amber-600';
+  return 'font-mono text-foreground';
+}
+
 export function StudioCanvas({
   domains = [],
   agents = [],
@@ -674,16 +688,7 @@ export function StudioCanvas({
                 <p className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
                   Result
                   {runStatus ? (
-                    <Badge
-                      variant="secondary"
-                      className={
-                        runStatus === 'done'
-                          ? 'bg-primary/10 text-primary'
-                          : runStatus === 'awaiting_human'
-                            ? 'bg-amber-500/10 text-amber-600'
-                            : 'bg-destructive/10 text-destructive'
-                      }
-                    >
+                    <Badge variant="secondary" className={runStatusBadgeClass(runStatus)}>
                       {runStatus}
                     </Badge>
                   ) : null}
@@ -694,17 +699,7 @@ export function StudioCanvas({
                 <ol className="space-y-0.5 border-l border-border pl-2">
                   {runSteps.map((s, i) => (
                     <li key={i} className="text-[10px] text-muted-foreground">
-                      <span
-                        className={
-                          s.status === 'error'
-                            ? 'font-mono text-destructive'
-                            : s.status === 'awaiting_human'
-                              ? 'font-mono text-amber-600'
-                              : 'font-mono text-foreground'
-                        }
-                      >
-                        {s.kind}
-                      </span>
+                      <span className={stepStatusTextClass(s.status)}>{s.kind}</span>
                       {s.detail ? ` — ${s.detail}` : ''}
                     </li>
                   ))}
