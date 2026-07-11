@@ -6,6 +6,7 @@ import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { FlowDiagram } from '@/app/_landing/flow-diagram';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
+import { SeeItLive } from '@/app/_landing/see-it-live';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
@@ -149,6 +150,14 @@ export default function LandingPage() {
               <BlurFade delay={0.4} inView>
                 <div className="mt-4">
                   <CtaButtons githubLabel="View the source" />
+                </div>
+              </BlurFade>
+              <BlurFade delay={0.48} inView>
+                <div className="mt-8">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Explore a live, seeded console
+                  </p>
+                  <SeeItLive className="mt-3 max-w-xl" />
                 </div>
               </BlurFade>
             </div>
