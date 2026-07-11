@@ -5,6 +5,7 @@ import {
   SURAKSHA_PROFILE,
   TOUR_PROFILES,
   profileForOrg,
+  adminOwnerEmail,
   BANK_APPS,
   INSURER_APPS,
   BANK_AGENTS,
@@ -60,6 +61,23 @@ test('profileForOrg maps org id → flavour, defaulting unknown/empty to the ban
   assert.equal(profileForOrg('org_unknown'), BHARAT_PROFILE);
   assert.equal(profileForOrg(null), BHARAT_PROFILE);
   assert.equal(profileForOrg(undefined), BHARAT_PROFILE);
+});
+
+test('adminOwnerEmail is a per-tenant ADMIN identity, never the read-only viewer', () => {
+  assert.equal(adminOwnerEmail(BHARAT_PROFILE), 'admin@bharatunion.example');
+  assert.equal(adminOwnerEmail(SURAKSHA_PROFILE), 'admin@suraksha.example');
+  // Curated collections must NOT be attributed to the demo viewer.
+  assert.notEqual(adminOwnerEmail(SURAKSHA_PROFILE), SURAKSHA_PROFILE.viewerEmail);
+});
+
+test('exactly one knowledge collection is defined per tenant (no in-code duplicate)', () => {
+  for (const p of TOUR_PROFILES) {
+    const colls = knowledgeFor(p);
+    assert.equal(colls.length, 1, `${p.orgId} declares one collection`);
+    // Deterministic ids must be distinct per (org,key) so the seed is idempotent.
+    const ids = colls.map((c) => collectionId(p.orgId, c.key));
+    assert.equal(new Set(ids).size, ids.length);
+  }
 });
 
 test('YRT is the insurer product label — no stray OYRT anywhere in the seed', () => {

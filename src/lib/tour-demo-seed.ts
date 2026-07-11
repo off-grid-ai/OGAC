@@ -87,6 +87,16 @@ export function profileForOrg(orgId: string | null | undefined): TenantProfile {
   return TOUR_PROFILES.find((p) => p.orgId === orgId) ?? BHARAT_PROFILE;
 }
 
+/**
+ * The admin identity that OWNS curated/seeded org-level entities (e.g. the knowledge collections),
+ * per tenant. PURE. Deliberately NOT the read-only demo viewer: curated collections are authored by
+ * an administrator, so "created by" must read as an admin (`admin@<slug>.example`), matching the
+ * `<function>@<slug>.example` convention used across the demo data.
+ */
+export function adminOwnerEmail(profile: TenantProfile): string {
+  return `admin@${profile.slug}.example`;
+}
+
 // ─── Apps + agents (Studio) — governed use cases, each bound to a pipeline by NAME ────────────────
 // A step is a minimal AppSpec step. `domain` on connector-query steps is a LABEL (resolves at run
 // time via the label-matching resolver — the honesty seam in data-domains-demo-seed).

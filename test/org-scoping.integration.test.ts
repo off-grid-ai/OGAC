@@ -143,6 +143,26 @@ describe('T2 org-scoping — cross-tenant isolation (integration)', { skip }, ()
     assert.ok(await ok_.getCollection(bId, ORG_B), 'cross-org collection delete denied');
   });
 
+  // ── createCollection is idempotent when given a STABLE id (the seed path) ─────────────────────────
+  // Regression guard for the duplicated "Insurance Policies & SOPs" bug: seeding the same collection
+  // twice with the same deterministic id must create exactly ONE row (ON CONFLICT DO NOTHING), and
+  // must NOT clobber the original's created_by.
+  test('createCollection with a fixed id is idempotent (no duplicate on re-run)', async () => {
+    const stableId = `kc_stable_${Date.now()}`;
+    const first = await ok_.createCollection('admin@suraksha.example', { id: stableId, name: 'Insurance Policies & SOPs' }, ORG_A);
+    const second = await ok_.createCollection('someone-else@x', { id: stableId, name: 'Insurance Policies & SOPs (dup attempt)' }, ORG_A);
+    cleanup.push(async () => {
+      await ok_.deleteCollection(stableId, ORG_A);
+    });
+    assert.equal(first, stableId);
+    assert.equal(second, stableId, 'a re-run returns the same id, not a new one');
+    const listA = await ok_.listCollections('admin', ORG_A);
+    const matches = listA.filter((c) => c.id === stableId);
+    assert.equal(matches.length, 1, 'exactly one collection row — no duplicate');
+    assert.equal(matches[0].name, 'Insurance Policies & SOPs', 'original row untouched (ON CONFLICT DO NOTHING)');
+    assert.equal(matches[0].createdBy, 'admin@suraksha.example', 'original created_by preserved');
+  });
+
   // ── eval_runs ───────────────────────────────────────────────────────────────────────────────────
   test('eval runs list/get are org-isolated', async () => {
     const idA = `evtest_a_${Date.now()}`;
