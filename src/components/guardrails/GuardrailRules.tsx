@@ -226,7 +226,7 @@ export function GuardrailRules({ rules }: Readonly<{ rules: Rule[] }>) {
                     id="rule-pattern"
                     value={draft.pattern}
                     placeholder={
-                      draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : '\\bACME-\\d+\\b'
+                      draft.matcher === 'entity' ? 'US_SSN, CREDIT_CARD…' : String.raw`\bACME-\d+\b`
                     }
                     onChange={(e) => setDraft((d) => ({ ...d, pattern: e.target.value }))}
                   />

@@ -25,7 +25,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { CardRail } from '@/components/workspace/CardRail';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { usePagination } from '@/lib/use-pagination';
-import { cn } from '@/lib/utils';
 import { accentHue, preview, relativeTime } from '@/lib/workspace-grid';
 
 interface Prompt {

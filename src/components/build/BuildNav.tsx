@@ -67,7 +67,7 @@ const GROUPS: { heading: string; tabs: Tab[] }[] = [
 // the global-list segments `runs` / `reports`). On these paths AppLifecycleNav owns the band, so the
 // global Build band suppresses itself.
 function isAppShellPath(pathname: string): boolean {
-  const m = pathname.match(/^\/build\/apps\/([^/]+)/);
+  const m = /^\/build\/apps\/([^/]+)/.exec(pathname);
   if (!m) return false;
   const seg = m[1];
   return seg !== 'runs' && seg !== 'reports';

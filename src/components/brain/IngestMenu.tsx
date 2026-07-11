@@ -170,7 +170,7 @@ const MENU: { kind: IngestKind; label: string; icon: typeof TextT }[] = [
   { kind: 'database', label: 'From dataset', icon: Database },
 ];
 
-const KINDS: IngestKind[] = ['text', 'file', 'image', 'database'];
+const KINDS = new Set<IngestKind>(['text', 'file', 'image', 'database']);
 
 export function IngestMenu({ datasets }: Readonly<{ datasets: Dataset[] }>) {
   const router = useRouter();
@@ -179,7 +179,7 @@ export function IngestMenu({ datasets }: Readonly<{ datasets: Dataset[] }>) {
 
   // Which ingest form is open lives in the URL (?panel=ingest&kind=<kind>) — Back closes it.
   const raw = params.get('panel') === 'ingest' ? params.get('kind') : null;
-  const kind: IngestKind | null = raw && KINDS.includes(raw as IngestKind) ? (raw as IngestKind) : null;
+  const kind: IngestKind | null = raw && KINDS.has(raw as IngestKind) ? (raw as IngestKind) : null;
 
   const setKind = useCallback(
     (next: IngestKind | null) => {

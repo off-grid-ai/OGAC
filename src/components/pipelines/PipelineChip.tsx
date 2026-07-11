@@ -37,7 +37,7 @@ export function PipelineChip({
   const text = size === 'xs' ? 'text-[11px]' : 'text-xs';
 
   // Ungoverned: nothing bound AND no org default resolved. Honest — not a pipeline link.
-  if (!pipeline || !pipeline.id) {
+  if (!pipeline?.id) {
     return (
       <Badge
         variant="outline"

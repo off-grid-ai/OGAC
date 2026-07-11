@@ -54,7 +54,7 @@ export function DeviceSoftware({ hostId }: Readonly<{ hostId: string }>) {
           <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
         ) : error ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{error}</p>
-        ) : inv && inv.software.length ? (
+        ) : inv?.software.length ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

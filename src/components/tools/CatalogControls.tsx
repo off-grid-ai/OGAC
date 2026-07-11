@@ -20,7 +20,7 @@ export function CatalogControls({ categories }: Readonly<{ categories: string[] 
   const setParam = useCallback(
     (key: string, value: string | null) => {
       const sp = new URLSearchParams(params.toString());
-      if (value && value.length) sp.set(key, value);
+      if (value?.length) sp.set(key, value);
       else sp.delete(key);
       // Keep us on the catalog tab.
       sp.set('tab', 'catalog');
