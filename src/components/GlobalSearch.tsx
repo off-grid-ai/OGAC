@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  BookOpenText,
   ChatCircleDots,
   File,
   Lightning,

@@ -165,7 +165,7 @@ export function AuditSearch({ configured }: Readonly<{ configured: boolean }>) {
         />
       ) : null}
 
-      {result && result.hits.length === 0 && !result.error ? (
+      {result?.hits.length === 0 && !result.error ? (
         <p className="py-4 text-center text-xs text-muted-foreground">No matches.</p>
       ) : null}
     </div>

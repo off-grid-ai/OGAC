@@ -324,7 +324,7 @@ function ExecutionDetail({ workflowId, onBack }: Readonly<{ workflowId: string; 
 
       {loading ? (
         <LoadingBlock label="Loading job…" />
-      ) : !detail || !detail.found ? (
+      ) : !detail?.found ? (
         <p className="text-sm text-muted-foreground">{detail?.note ?? 'Job not found.'}</p>
       ) : (
         <>

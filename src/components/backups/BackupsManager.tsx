@@ -520,7 +520,7 @@ export function BackupsManager({ initial }: Readonly<{ initial: BackupsPayload }
               <p className="py-4 text-center text-xs text-destructive">
                 {restore.error ?? 'Could not inspect this backup.'}
               </p>
-            ) : restore && restore.plan.length === 0 ? (
+            ) : restore?.plan.length === 0 ? (
               <p className="py-4 text-center text-xs text-muted-foreground">
                 No dump files found in this backup.
               </p>

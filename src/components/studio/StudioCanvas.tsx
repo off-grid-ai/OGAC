@@ -587,7 +587,7 @@ export function StudioCanvas({
                           return r.spec;
                         }
                         const next = addStep(s, k.kind);
-                        newId = next.steps[next.steps.length - 1].id;
+                        newId = next.steps.at(-1)!.id;
                         return next;
                       });
                       markDirty();
