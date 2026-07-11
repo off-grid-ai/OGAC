@@ -2,6 +2,7 @@
 
 import { ArrowsOut, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import Image from 'next/image';
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { nextFocusTarget } from '@/lib/landing-hero';
 import { cn } from '@/lib/utils';
@@ -156,7 +157,11 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  // Portal to <body> so `fixed inset-0` resolves against the VIEWPORT, not a transformed ancestor.
+  // The carousel sits inside a motion/BlurFade wrapper whose `transform` would otherwise make this
+  // fixed overlay position relative to that box (trapping it mid-page instead of full-screen).
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
       ref={panelRef}
       role="dialog"
@@ -199,6 +204,7 @@ function Lightbox({ card, onClose }: { card: CarouselCard; onClose: () => void }
           className="h-auto max-h-[86vh] w-auto max-w-full rounded-lg border border-border object-contain shadow-2xl"
         />
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }
