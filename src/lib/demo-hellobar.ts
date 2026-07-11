@@ -49,11 +49,19 @@ export function buildDemoBanner(input: DemoBannerInput): DemoBannerModel {
  * The impure reader: resolve the hellobar model for a session role from process env. Thin — reads
  * the two env vars and delegates the decision to the pure builder.
  */
-export function readDemoBanner(role: string | null | undefined): DemoBannerModel {
+export function readDemoBanner(
+  role: string | null | undefined,
+  slug?: string | null | undefined,
+): DemoBannerModel {
+  // Resolve creds for THIS tenant (per-slug override → generic fallback) via the same resolver the
+  // signin banner uses, so each tenant's in-app hellobar shows ITS OWN viewer login. (Previously this
+  // read only the generic OFFGRID_DEMO_VIEWER_EMAIL, so every tenant showed whichever the generic pair
+  // was set to — e.g. the bank's demo-bank@ on the insurer.)
+  const creds = resolveDemoCreds(slug, process.env);
   return buildDemoBanner({
     role,
-    email: process.env.OFFGRID_DEMO_VIEWER_EMAIL,
-    password: process.env.OFFGRID_DEMO_VIEWER_PASSWORD,
+    email: creds?.email ?? process.env.OFFGRID_DEMO_VIEWER_EMAIL,
+    password: creds?.password ?? process.env.OFFGRID_DEMO_VIEWER_PASSWORD,
   });
 }
 
