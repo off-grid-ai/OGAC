@@ -136,7 +136,7 @@ export function PromptLibrary() {
   // URL-namespaced by `prompts` so it deep-links alongside the ?panel edit param.
   const paged = usePagination(prompts, { key: 'prompts', defaultPageSize: 12 });
 
-  async function usePrompt(p: Prompt) {
+  async function applyPrompt(p: Prompt) {
     await navigator.clipboard.writeText(p.content);
     toast.success('Copied — paste it into any chat');
     await fetch(`/api/v1/prompts/${p.id}`, {
@@ -271,7 +271,7 @@ export function PromptLibrary() {
                 <PromptCard
                   key={p.id}
                   p={p}
-                  onUse={() => usePrompt(p)}
+                  onUse={() => applyPrompt(p)}
                   onEdit={() => openPanel(p.id)}
                   onDelete={() => remove(p)}
                 />
