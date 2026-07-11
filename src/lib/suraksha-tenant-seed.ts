@@ -166,7 +166,7 @@ export const SURAKSHA_DOMAINS: DomainSpec[] = [
     aliases: ['quote request', 'pricing quote request', 'rfq', 'group pricing request', 'quote requests'],
     connectorId: SUR_COREINS,
     resource: 'pricing_rfq',
-    useCase: '#2 Actuarial OYRT pricing',
+    useCase: '#2 Actuarial YRT pricing',
     opHints: { limit: 20 },
   },
   {
@@ -174,7 +174,7 @@ export const SURAKSHA_DOMAINS: DomainSpec[] = [
     aliases: ['rate card', 'pricing checklist', 'premium rates', 'pricing model rates'],
     connectorId: SUR_COREINS,
     resource: 'pricing_rate_card',
-    useCase: '#2 Actuarial OYRT pricing',
+    useCase: '#2 Actuarial YRT pricing',
     opHints: { limit: 40 },
   },
   {

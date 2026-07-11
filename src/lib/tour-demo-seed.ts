@@ -217,12 +217,12 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     key: 'policy-underwriting',
     title: 'Policy Underwriting Assist',
     summary:
-      'Life-policy underwriting — read the proposal & rate card, assess sum-assured vs income and medical risk, recommend standard/loaded/decline per the OYRT rate card. Amounts in ₹.',
+      'Life-policy underwriting — read the proposal & rate card, assess sum-assured vs income and medical risk, recommend standard/loaded/decline per the YRT rate card. Amounts in ₹.',
     pipelineName: 'Loan Underwriting',
     steps: [
       q('Read the proposal', 'policies'),
-      q('Pull the OYRT rate card', 'pricing rate card'),
-      ag('Assess underwriting decision', 'Assess sum-assured vs declared income and medical risk against the OYRT rate card. Recommend standard, loaded (with the loading %), or decline, with the reason. Amounts in ₹.'),
+      q('Pull the YRT rate card', 'pricing rate card'),
+      ag('Assess underwriting decision', 'Assess sum-assured vs declared income and medical risk against the YRT rate card. Recommend standard, loaded (with the loading %), or decline, with the reason. Amounts in ₹.'),
       hu('Underwriter decision'),
       out('Underwriting recommendation'),
     ],
@@ -364,7 +364,7 @@ export const BANK_AGENTS: readonly CustomAgentSeed[] = [
 
 export const INSURER_AGENTS: readonly CustomAgentSeed[] = [
   { key: 'claims-assessor', name: 'Claims Assessor', role: 'Claims', description: 'Assesses death claims against policy in-force date and premium history.', systemPrompt: 'You assess death claims for early-claim and non-disclosure risk against the policy and premium history. Amounts in ₹.' },
-  { key: 'underwriter', name: 'Underwriter', role: 'Underwriting', description: 'Assesses life proposals against the OYRT rate card.', systemPrompt: 'You underwrite life proposals against the OYRT rate card: standard, loaded (with %), or decline, with reason. Amounts in ₹.' },
+  { key: 'underwriter', name: 'Underwriter', role: 'Underwriting', description: 'Assesses life proposals against the YRT rate card.', systemPrompt: 'You underwrite life proposals against the YRT rate card: standard, loaded (with %), or decline, with reason. Amounts in ₹.' },
   { key: 'persistency-advisor', name: 'Persistency Advisor', role: 'Retention', description: 'Flags lapse-risk policies and recommends retention actions.', systemPrompt: 'You flag policies near grace-period end and recommend retention actions. Aggregate only; mask PII. Amounts in ₹.' },
   { key: 'grievance-officer', name: 'Grievance Officer', role: 'Service', description: 'Classifies grievances by IRDAI category and drafts resolutions.', systemPrompt: 'You classify grievances by IRDAI category and draft compliant, empathetic resolutions. Route for approval; never auto-send.' },
 ];
@@ -474,7 +474,7 @@ const INSURER_KNOWLEDGE: readonly KnowledgeCollectionSeed[] = [
     name: 'Insurance Policies & SOPs',
     description: 'IRDAI-aligned underwriting, claims and grievance standard operating procedures.',
     docs: [
-      { key: 'underwriting', name: 'Life Underwriting OYRT Rate Card Guide', text: 'One-Year Renewable Term rates by age band and sum-assured. Loadings for smoker/medical risk. Sum-assured vs declared income multiple caps by age.' },
+      { key: 'underwriting', name: 'Life Underwriting YRT Rate Card Guide', text: 'Yearly Renewable Term (YRT) rates by age band and sum-assured. Loadings for smoker/medical risk. Sum-assured vs declared income multiple caps by age.' },
       { key: 'claims', name: 'Death-Claim Assessment SOP', text: 'Early-claim (within 3 years of risk-commencement) requires investigation. Cross-check premium history for lapse. Non-disclosure of material facts is a repudiation ground. Settle genuine claims within IRDAI timelines.' },
       { key: 'grievance', name: 'Grievance Redressal Policy (IRDAI)', text: 'Classify grievances by IRDAI category. Acknowledge within 3 days, resolve within 15. Escalate unresolved to the GRO, then the Insurance Ombudsman.' },
     ],
@@ -501,7 +501,7 @@ const BANK_TEAMS: readonly TeamSeed[] = [
 
 const INSURER_TEAMS: readonly TeamSeed[] = [
   { key: 'claims', name: 'Claims', department: 'Operations', description: 'Owns FNOL, death-claim assessment and settlement.' },
-  { key: 'underwriting', name: 'Underwriting', department: 'Risk', description: 'Owns policy underwriting and the OYRT rate card.' },
+  { key: 'underwriting', name: 'Underwriting', department: 'Risk', description: 'Owns policy underwriting and the YRT rate card.' },
   { key: 'service', name: 'Policyholder Service', department: 'Service', description: 'Owns grievance redressal and renewals.' },
 ];
 
