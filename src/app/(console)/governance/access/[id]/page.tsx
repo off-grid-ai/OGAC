@@ -1,5 +1,6 @@
 import { ArrowLeft, Key } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { UserActivityPanel } from '@/components/access/UserActivityPanel';
 import { UserDetailPanel } from '@/components/access/UserDetailPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +34,7 @@ export default async function UserDetailPage({
   const subtab: SubTab = rawTab === 'activity' ? 'activity' : 'identity';
   const configured = keycloakAdmin() !== null;
 
-  let identityPanel: React.ReactNode;
+  let identityPanel: ReactNode;
   if (configured) {
     identityPanel = <UserDetailPanel userId={id} />;
   } else {
