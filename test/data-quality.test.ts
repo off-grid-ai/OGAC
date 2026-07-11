@@ -269,7 +269,7 @@ test('adapter drives a real sidecar: correct verdict per expectation type', asyn
     assert.equal(health.healthy, true);
     assert.equal(health.engine, 'native');
 
-    // Indian-BFSI-shaped rows: PAN (nullable), amount (INR), status set, id (unique key).
+    // Indian-BFSI-shaped rows: PAN (nullable), amount (USD), status set, id (unique key).
     const rows: Row[] = [
       { pan: 'ABCDE1234F', amount: 50000, status: 'ACTIVE', id: 1 },
       { pan: '', amount: -100, status: 'CLOSED', id: 2 },

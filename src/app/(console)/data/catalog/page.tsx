@@ -103,7 +103,7 @@ export default async function DataCatalogPage() {
         />
         <StatCard
           label="Total rows"
-          value={assets.reduce((n, a) => n + a.rowCount, 0).toLocaleString('en-IN')}
+          value={assets.reduce((n, a) => n + a.rowCount, 0).toLocaleString('en-US')}
         />
       </div>
 
@@ -143,7 +143,7 @@ export default async function DataCatalogPage() {
                     <Badge className={FRESH_TONE[freshness.state]}>{freshness.state}</Badge>
                   </div>
                   <div className="flex items-center justify-between text-muted-foreground">
-                    <span>{asset.rowCount.toLocaleString('en-IN')} rows</span>
+                    <span>{asset.rowCount.toLocaleString('en-US')} rows</span>
                     <span>{asset.owner || 'unowned'}</span>
                   </div>
                 </CardContent>

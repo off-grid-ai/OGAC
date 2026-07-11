@@ -232,7 +232,7 @@ export default async function DataGovernancePage() {
                         </TableCell>
                         <TableCell>{r.erasedRows}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {new Date(r.createdAt).toLocaleString('en-IN')}
+                          {new Date(r.createdAt).toLocaleString('en-US')}
                         </TableCell>
                       </TableRow>
                     ))}
