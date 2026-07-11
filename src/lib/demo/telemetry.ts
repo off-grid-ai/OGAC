@@ -131,8 +131,9 @@ export function buildRunMetric(
 
   // Guardrail verdict: a small share blocked, a larger share redacted, the rest clean.
   const r = rng.next();
-  const guardrailVerdict: RunMetric['guardrailVerdict'] =
-    r < fp.blockShare ? 'blocked' : r < fp.blockShare + fp.redactShare ? 'redacted' : 'pass';
+  let guardrailVerdict: RunMetric['guardrailVerdict'] = 'pass';
+  if (r < fp.blockShare) guardrailVerdict = 'blocked';
+  else if (r < fp.blockShare + fp.redactShare) guardrailVerdict = 'redacted';
   const outcome: RunMetric['outcome'] = guardrailVerdict === 'blocked' ? 'blocked' : 'ok';
   const evalScore = rng.int(fp.evalScore[0], fp.evalScore[1]);
 

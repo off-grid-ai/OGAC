@@ -318,7 +318,8 @@ async function evalReport(orgId?: string): Promise<string> {
   l.push('', '## Cases');
   for (const c of cases) {
     const r = latest?.results?.find((x) => x.query === c.query);
-    const verdict = r ? (r.pass ? `PASS · ${r.top}` : `FAIL · ${r.top}`) : '—';
+    let verdict = '—';
+    if (r) verdict = r.pass ? `PASS · ${r.top}` : `FAIL · ${r.top}`;
     l.push(`- **${c.query}** → expected ${c.expected} — ${verdict}`);
   }
   return l.join('\n');

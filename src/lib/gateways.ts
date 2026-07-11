@@ -278,6 +278,12 @@ export async function deleteGateway(id: string, orgId: string = DEFAULT_ORG): Pr
 
 /** On-prem cluster health from the aggregator's GET /nodes: configured = any nodes listed;
  *  reachable = any node up/degraded. Never throws — an unreachable aggregator ⇒ down. */
+function rollupNodeStatus(up: number, total: number): GatewayHealthSignal['status'] {
+  if (up === 0) return 'down';
+  if (up < total) return 'degraded';
+  return 'up';
+}
+
 async function onPremSignal(): Promise<GatewayHealthSignal> {
   try {
     const r = await fetch(`${GATEWAY_URL}/nodes`, {
@@ -293,7 +299,7 @@ async function onPremSignal(): Promise<GatewayHealthSignal> {
     return {
       configured: true,
       reachable: up > 0,
-      status: up === 0 ? 'down' : up < nodes.length ? 'degraded' : 'up',
+      status: rollupNodeStatus(up, nodes.length),
       detail: `${up} of ${nodes.length} nodes up`,
     };
   } catch {

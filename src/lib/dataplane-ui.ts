@@ -247,8 +247,10 @@ export function deriveDataPlaneHealth(
         : state === 'down'
           ? 'bg-destructive/10 text-destructive'
           : 'bg-muted text-muted-foreground';
-    const stateLabel =
-      state === 'up' ? 'Online' : state === 'down' ? 'Offline' : state === 'optional' ? 'Optional' : 'Unknown';
+    let stateLabel = 'Unknown';
+    if (state === 'up') stateLabel = 'Online';
+    else if (state === 'down') stateLabel = 'Offline';
+    else if (state === 'optional') stateLabel = 'Optional';
     return { serviceId: e.serviceId, label: e.label, blurb: e.blurb, up, state, tone, stateLabel };
   });
 }
