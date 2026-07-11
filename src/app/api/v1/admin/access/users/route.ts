@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { keycloakAdmin, type KcRole } from '@/lib/keycloak-admin';
+import { listUsers } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { orgMemberEmailSet, scopeKeycloakUsersToOrg } from '@/lib/user-scope';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +23,17 @@ export async function GET(req: Request) {
 
   try {
     const users = await kc.listUsers(search, first, max);
-    return NextResponse.json({ configured: true, users });
+    // TENANT ISOLATION (SURFACE-1): Keycloak is a REALM-WIDE store, so its user list mixes every
+    // tenant + internal staff. Org membership is owned by the console DB (users.org_id) — the same
+    // source sign-in/currentOrgId trust — so intersect the realm list with THIS org's members. On
+    // the default/single-tenant org the realm IS the tenant, so we don't intersect (unchanged).
+    const org = await currentOrgId();
+    const scoped = org !== DEFAULT_ORG;
+    const orgEmails = scoped ? orgMemberEmailSet(await listUsers(org)) : new Set<string>();
+    return NextResponse.json({
+      configured: true,
+      users: scopeKeycloakUsersToOrg(users, orgEmails, scoped),
+    });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
