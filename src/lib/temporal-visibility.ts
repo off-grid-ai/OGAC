@@ -176,9 +176,12 @@ export function shapeExecution(raw: RawWorkflowExecutionInfo): WorkflowExecution
 }
 
 /** Build the full executions view from a list of raw records. Pure — no cluster, no db. */
+type ExecutionsViewOpts = { configured: boolean; reachable: boolean; note?: string };
+const DEFAULT_EXECUTIONS_OPTS: ExecutionsViewOpts = { configured: false, reachable: false };
+
 export function buildExecutionsView(
   raws: RawWorkflowExecutionInfo[],
-  opts: { configured: boolean; reachable: boolean; note?: string } = { configured: false, reachable: false },
+  opts: ExecutionsViewOpts = DEFAULT_EXECUTIONS_OPTS,
 ): WorkflowExecutionsView {
   const executions = raws.map(shapeExecution);
   const statusCounts: Record<string, number> = {};

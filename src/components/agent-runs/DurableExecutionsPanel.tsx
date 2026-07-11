@@ -49,6 +49,9 @@ interface WorkflowDetail {
 // Poll cadence while at least one execution is still open, so "what's running now" stays live-ish.
 const LIVE_POLL_MS = 5000;
 
+// Default for load()'s opts — hoisted so it isn't reallocated per call / flagged as an inline default.
+const DEFAULT_LOAD_OPTS: { spinner?: boolean } = { spinner: true };
+
 function when(iso?: string): string {
   return iso ? new Date(iso).toLocaleString() : '—';
 }
@@ -102,7 +105,7 @@ export function DurableExecutionsPanel() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async (opts: { spinner?: boolean } = { spinner: true }) => {
+  const load = useCallback(async (opts: { spinner?: boolean } = DEFAULT_LOAD_OPTS) => {
     if (opts.spinner) setLoading(true);
     const r = await fetch('/api/v1/admin/agent-runs/workflows');
     setView(r.ok ? await r.json() : null);
