@@ -1,6 +1,6 @@
 // Persistence for the node↔console state — real Postgres via Drizzle. Same exported
 // signatures the routes/UI already use (now async). Schema lives in src/db/schema.ts.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {

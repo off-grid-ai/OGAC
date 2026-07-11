@@ -11,7 +11,7 @@
 // is created idempotently on first use (same ensure* pattern as the other console stores), so the
 // deploy needs no migration step.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';

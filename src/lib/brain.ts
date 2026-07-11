@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import * as lancedb from '@lancedb/lancedb';
 import { qdrantAdd, qdrantDelete, qdrantList, qdrantSearch } from '@/lib/qdrant';
 import { filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';

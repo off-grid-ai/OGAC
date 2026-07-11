@@ -3,7 +3,7 @@
 // exporters. This module: CRUD (org-scoped), an idempotent self-migrate, secret resolution through
 // the existing secrets adapter, and honest last-status writes.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { exportTargets } from '@/db/schema';

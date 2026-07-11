@@ -16,7 +16,7 @@
 // SOLID: the run route stays a thin orchestrator — it calls these seams. The pure rules live here
 // (and in checks.ts / pipeline-enforcement.ts); the I/O lives behind the adapter registry.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { getLineage, getPii, getSigning } from '@/lib/adapters/registry';
 import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { correlationIds } from '@/lib/correlation';

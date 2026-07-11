@@ -10,7 +10,7 @@
 // credential scope and the signature, so we pin `us-east-1` / `s3`. Payloads are signed with a real
 // SHA-256 body hash (UNSIGNED-PAYLOAD is avoided so no extra header contract is imposed on SeaweedFS).
 
-import { createHash, createHmac } from 'crypto';
+import { createHash, createHmac } from 'node:crypto';
 
 const REGION = 'us-east-1';
 const SERVICE = 's3';

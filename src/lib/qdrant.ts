@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
 import { ACL_FIELDS, aclFromPayload, filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';

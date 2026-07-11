@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 
 // OpenTelemetry emission seam. When OFFGRID_OTLP_URL is set (e.g. the OTel Collector from
 // deploy/docker-compose.yml), spans are exported as real OTLP/HTTP JSON — one wire, any backend

@@ -9,7 +9,7 @@
 //     deploys over SSH before the SQL migration lands. Column names MUST match schema.ts exactly.
 //
 // The validation + RBAC correctness lives in the PURE teams-policy.ts; this file only persists + reads.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { teams, teamMembers } from '@/db/schema';

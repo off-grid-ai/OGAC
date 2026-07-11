@@ -7,7 +7,7 @@
 // emitters (siem.shipAudit, chat-trace/scoring → Langfuse, lineage adapter, signing) all resolve
 // their per-plane id THROUGH this helper, so correlation is derived in exactly one place.
 
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 
 export interface CorrelationIds {
   // The audit-plane id: OpenSearch `offgrid-audit` doc `_id` (and the `runId` field on the doc). The
