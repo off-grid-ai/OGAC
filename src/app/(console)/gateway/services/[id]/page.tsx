@@ -17,12 +17,8 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
   const control = serviceControl(service);
   // Where an operator jumps to see this service's logs/telemetry. OpenSearch/Langfuse power the
   // SIEM + observability views; everything else points at the SIEM search.
-  const logsHref =
-    service.id === 'langfuse'
-      ? '/observability'
-      : service.id === 'opensearch'
-        ? '/siem'
-        : '/siem';
+  // Langfuse powers the observability view; OpenSearch and everything else point at SIEM search.
+  const logsHref = service.id === 'langfuse' ? '/observability' : '/siem';
 
   return <ServiceDetail service={service} control={control} logsHref={logsHref} />;
 }

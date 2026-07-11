@@ -116,7 +116,7 @@ const OUTCOME_ORDER: SiemOutcome[] = ['denied', 'blocked', 'error', 'allowed', '
 export function normalizeSiem(input: RawSiemResponse | RawSiemHit[] | null | undefined): SiemView {
   const hits: RawSiemHit[] = Array.isArray(input) ? input : (input?.hits?.hits ?? []);
 
-  const events = hits.map(toEvent);
+  const events = hits.map((h, i) => toEvent(h, i));
   // Newest-first; events without a timestamp sort to the end.
   events.sort((a, b) => {
     if (a.ts && b.ts) return b.ts.localeCompare(a.ts);

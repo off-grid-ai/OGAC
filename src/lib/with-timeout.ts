@@ -76,8 +76,11 @@ export function safeWithTimeout<T>(
 ): Promise<T> {
   let promise: Promise<T>;
   try {
-    promise = fn();
+    // Handle an async rejection here too (identical to withTimeout's own reject→fallback path, but
+    // makes the promise produced in this try explicitly guarded — a lone floating promise otherwise).
+    promise = fn().catch(() => fallback);
   } catch {
+    // Synchronous throw while producing the promise degrades to the fallback.
     return Promise.resolve(fallback);
   }
   return withTimeout(promise, ms, fallback, options);

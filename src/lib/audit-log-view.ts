@@ -225,7 +225,7 @@ export function normalizeAudit(
   input: AuditSearchLike | RawAuditHit[] | null | undefined,
 ): AuditView {
   const hits: RawAuditHit[] = Array.isArray(input) ? input : (input?.hits ?? []);
-  const rows = hits.map(toRow);
+  const rows = hits.map((h, i) => toRow(h, i));
   // Newest-first; rows without a timestamp sort to the end. (The server already sorts desc; this
   // keeps the guarantee even when a producer omitted ts.)
   rows.sort((a, b) => {
