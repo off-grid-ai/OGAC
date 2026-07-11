@@ -143,7 +143,9 @@ export function resolveDomainRanked(phrase: string, domains: DataDomain[]): Rank
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (a.tier !== b.tier) return a.tier - b.tier;
-    return a.domain.id < b.domain.id ? -1 : a.domain.id > b.domain.id ? 1 : 0;
+    if (a.domain.id < b.domain.id) return -1;
+    if (a.domain.id > b.domain.id) return 1;
+    return 0;
   });
 
   return scored.map(({ domain, score }) => ({ domain, score }));

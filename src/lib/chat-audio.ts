@@ -128,7 +128,9 @@ export function mergeTranscript(existing: string, transcript: string): string {
 export function normalizeLevel(raw: number, max = 128): number {
   if (!Number.isFinite(raw) || raw <= 0 || max <= 0) return 0;
   const v = raw / max;
-  return v < 0 ? 0 : v > 1 ? 1 : v;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

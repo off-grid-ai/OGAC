@@ -46,7 +46,9 @@ export async function ensureExportTargetsSchema(): Promise<void> {
 
 // ─── view ───────────────────────────────────────────────────────────────────────────────────────
 function iso(v: Date | string | null | undefined): string | null {
-  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  return null;
 }
 
 export interface ExportTargetView {

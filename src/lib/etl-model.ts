@@ -128,7 +128,9 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 function str(v: unknown): string {
-  return typeof v === 'string' ? v : v == null ? '' : String(v);
+  if (typeof v === 'string') return v;
+  if (v == null) return '';
+  return String(v);
 }
 function optStr(v: unknown): string | undefined {
   const s = str(v);

@@ -67,7 +67,9 @@ export async function ensureTeamsSchema(): Promise<void> {
 
 // ─── views ────────────────────────────────────────────────────────────────────────────────────────
 function iso(v: string | Date | null | undefined): string | null {
-  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  return null;
 }
 
 export interface TeamMemberView {

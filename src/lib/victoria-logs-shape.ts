@@ -53,7 +53,11 @@ export function parseLogsResponse(body: string | null | undefined): LogRow[] {
     if (row) rows.push(row);
   }
   // Newest first when times are comparable ISO strings; stable otherwise.
-  return rows.sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
+  return rows.sort((a, b) => {
+    if (a.time < b.time) return 1;
+    if (a.time > b.time) return -1;
+    return 0;
+  });
 }
 
 export interface LogsResult {

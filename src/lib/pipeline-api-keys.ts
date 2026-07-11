@@ -70,7 +70,9 @@ export async function ensurePipelineApiKeysSchema(): Promise<void> {
 
 // ─── row → view (never leaks the hash) ─────────────────────────────────────────────────────────────
 function iso(v: Date | string | null | undefined): string | null {
-  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  return null;
 }
 
 function toView(r: PipelineApiKey): PipelineKeyView {

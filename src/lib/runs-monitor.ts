@@ -240,7 +240,9 @@ export function sortRuns(rows: RunRow[]): RunRow[] {
     const ta = a.startedAt ? Date.parse(a.startedAt) : -Infinity;
     const tb = b.startedAt ? Date.parse(b.startedAt) : -Infinity;
     if (tb !== ta) return tb - ta;
-    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    if (a.key < b.key) return -1;
+    if (a.key > b.key) return 1;
+    return 0;
   });
 }
 
