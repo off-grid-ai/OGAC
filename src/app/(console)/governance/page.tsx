@@ -19,7 +19,7 @@ import {
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
-import { fleetModelTags } from '@/lib/model-catalog';
+import { fleetModelTags, modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { modelOptions } from '@/lib/policy-catalog';
 import { siemConfigured } from '@/lib/siem';
@@ -266,7 +266,7 @@ export default async function ControlPage() {
                 <TableRow key={e.id}>
                   <TableCell className="text-muted-foreground">{e.ts.slice(11, 19)}</TableCell>
                   <TableCell className="text-muted-foreground">{e.deviceId}</TableCell>
-                  <TableCell className="font-medium text-foreground">{e.model}</TableCell>
+                  <TableCell className="font-medium text-foreground">{modelLabel(e.model)}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{e.tokens}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {e.leftDevice ? 'yes' : 'no'}

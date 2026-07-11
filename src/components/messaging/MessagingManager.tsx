@@ -332,7 +332,7 @@ export function MessagingManager() {
           <p className="text-sm text-muted-foreground">
             {inbound?.configured
               ? inbound.setup
-              : 'Inbound is disabled. Set OFFGRID_INBOUND_EMAIL_DOMAIN on the server, then create addresses here.'}
+              : 'Inbound is disabled. Configure an inbound email domain in Settings, then create addresses here.'}
           </p>
           {inbound && inbound.data.length > 0 && (
             <div className="overflow-x-auto">

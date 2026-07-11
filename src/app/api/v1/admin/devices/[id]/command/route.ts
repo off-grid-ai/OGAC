@@ -76,7 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ backend: mdm.meta.id, command, queued: cmd }, { status: 202 });
   }
   return NextResponse.json(
-    { error: `${command} requires a FleetDM backend (set OFFGRID_ADAPTER_MDM=fleetdm)` },
+    { error: `${command} requires a FleetDM backend — connect one in Settings.` },
     { status: 501 },
   );
 }

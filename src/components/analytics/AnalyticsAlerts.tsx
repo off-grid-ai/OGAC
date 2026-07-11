@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { modelLabel } from '@/lib/model-catalog';
 
 const METRICS = ['p50', 'p95', 'totalEvents', 'totalTokens', 'egressRate', 'blockedRate'] as const;
 const COMPARATORS = ['gt', 'gte', 'lt', 'lte'] as const;
@@ -504,7 +505,7 @@ export function AnalyticsAlerts() {
                       ? 'border-primary text-primary'
                       : 'border-input text-muted-foreground'
                   }`}
-                  title={`range ${v.range}, model ${v.model || 'all'}, outcome ${v.outcome || 'all'}`}
+                  title={`range ${v.range}, model ${v.model ? modelLabel(v.model) : 'all'}, outcome ${v.outcome || 'all'}`}
                 >
                   {v.name}
                 </button>

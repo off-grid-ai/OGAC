@@ -10,6 +10,7 @@ import {
   type Modality,
   catalogByFamily,
   filterCatalog,
+  modelLabel,
 } from '@/lib/model-catalog';
 
 // Shared client hook: fetch the model-spec catalog reconciled against the LIVE fleet SSOT
@@ -71,7 +72,7 @@ function ModelRow({
       }`}
     >
       <div className="flex w-full items-center justify-between gap-2">
-        <span className="font-mono text-xs text-foreground">{m.id}</span>
+        <span className="text-xs font-medium text-foreground">{modelLabel(m.id)}</span>
         <div className="flex shrink-0 items-center gap-1">
           {m.servedOnFleet ? (
             <Badge variant="secondary" className="bg-primary/10 font-mono text-[10px] text-primary">
@@ -84,7 +85,7 @@ function ModelRow({
         </div>
       </div>
       <div className="flex w-full items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{m.name}</span>
+        <span>{m.family}</span>
         <span className="font-mono">
           {ctxLabel(m.contextWindow)}
           {m.paramsB != null ? ` · ${m.paramsB}B` : ''}

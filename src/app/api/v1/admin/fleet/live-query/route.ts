@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const mdm = getMdm();
   if (!mdm.supportsFleet || !mdm.liveQuery) {
     return NextResponse.json(
-      { error: 'live query requires a FleetDM backend (set OFFGRID_ADAPTER_MDM=fleetdm)' },
+      { error: 'Live query requires a FleetDM backend — connect one in Settings.' },
       { status: 501 },
     );
   }

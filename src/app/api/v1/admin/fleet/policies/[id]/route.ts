@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 function unsupported() {
   return NextResponse.json(
-    { error: 'FleetDM policies require a FleetDM backend (set OFFGRID_ADAPTER_MDM=fleetdm)' },
+    { error: 'FleetDM policies require a FleetDM backend — connect one in Settings.' },
     { status: 501 },
   );
 }

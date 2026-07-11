@@ -130,9 +130,8 @@ export function GatewayTokens() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Client credentials (bearer JWTs) observed in gateway traffic — read-only monitoring of who is
-          calling in. To issue new keys for your own clients, use the <span className="font-medium text-foreground">API keys</span> tab,
-          which mints <span className="font-mono">ogak_</span> keys.
+          Client credentials (bearer tokens) observed in gateway traffic — read-only monitoring of who is
+          calling in. To issue new keys for your own clients, use the <span className="font-medium text-foreground">API keys</span> tab.
         </p>
       </CardHeader>
       <CardContent className="p-0">
