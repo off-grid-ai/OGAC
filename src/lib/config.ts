@@ -50,7 +50,9 @@ export async function getConfigEntries(): Promise<ConfigEntry[]> {
     const fromFile = fileMap[def.key];
     const fromProc = process.env[def.key];
     const raw = fromFile ?? fromProc ?? '';
-    const source: ConfigEntry['source'] = fromFile !== undefined ? 'env-file' : fromProc !== undefined ? 'process' : 'default';
+    let source: ConfigEntry['source'] = 'default';
+    if (fromFile !== undefined) source = 'env-file';
+    else if (fromProc !== undefined) source = 'process';
     const isSet = raw !== '';
     // Never leak secret values. For non-secret host-bearing values, render the mDNS form so a
     // raw 127.0.0.1 / IP never reaches the client (founder directive). configDisplayValue is a
@@ -106,7 +108,11 @@ export async function setConfig(
   await Promise.all(
     entries.map(([key, value], i) => {
       const def = known.get(key)!;
-      const redact = (v: string | undefined) => (v === undefined ? null : def.secret ? (v ? '••••' : '') : v);
+      const redact = (v: string | undefined) => {
+        if (v === undefined) return null;
+        if (def.secret) return v ? '••••' : '';
+        return v;
+      };
       return db.insert(configAudit).values({
         id: `cfg_${now.getTime()}_${i}_${randomToken(4)}`,
         key,

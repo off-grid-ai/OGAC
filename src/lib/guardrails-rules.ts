@@ -179,7 +179,7 @@ export async function createGuardrailRule(
   await ensureGuardrailRulesSchema();
   const { db } = await import('@/db');
   const { sql } = await import('drizzle-orm');
-  const { randomUUID } = await import('crypto');
+  const { randomUUID } = await import('node:crypto');
   const id = `grr_${randomUUID().slice(0, 8)}`;
   const res = await db.execute(sql`
     INSERT INTO guardrails_rules (id, org_id, matcher, pattern, action, label, enabled)

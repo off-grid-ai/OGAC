@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { searchDocuments } from '@/lib/brain';
 import type { EvalDef } from '@/lib/eval-defs';
 import {
@@ -103,7 +103,7 @@ async function ragasMetrics(
         model: EVAL_MODEL,
         gateway: `${GATEWAY_URL}/v1`,
         dataset,
-        ...(metrics && metrics.length ? { metrics } : {}),
+        ...(metrics?.length ? { metrics } : {}),
       }),
       signal: AbortSignal.timeout(600_000),
     });
@@ -238,7 +238,7 @@ export async function runEvalDef(
   // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
   const ragas = usesRagas(def) ? await ragasMetrics(samples, [def.metric]) : null;
   const computedBy: EvalEngine | 'heuristic' =
-    ragas && ragas[def.metric] !== undefined ? 'ragas' : 'heuristic';
+    ragas?.[def.metric] !== undefined ? 'ragas' : 'heuristic';
 
   if (computedBy === 'ragas' && ragas) {
     // Ragas returns dataset-level aggregate per metric — score the whole run once against it.

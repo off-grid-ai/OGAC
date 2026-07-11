@@ -120,7 +120,7 @@ export function validateJobDraft(draft: Partial<EtlJobDraft> | null | undefined)
   }
   const mappings = Array.isArray(draft.mappings) ? draft.mappings : [];
   for (const [i, m] of mappings.entries()) {
-    if (!m || !m.source || !String(m.source).trim()) {
+    if (!m?.source || !String(m.source).trim()) {
       errors.push(`Mapping ${i + 1}: a source column is required.`);
       continue;
     }
@@ -308,7 +308,9 @@ export function buildInsertSql(
     const obj: Record<string, string | null> = {};
     for (const c of cols) {
       const v = row[c];
-      obj[c] = v == null ? null : typeof v === 'string' ? v : JSON.stringify(v);
+      if (v == null) obj[c] = null;
+      else if (typeof v === 'string') obj[c] = v;
+      else obj[c] = JSON.stringify(v);
     }
     return JSON.stringify(obj);
   });

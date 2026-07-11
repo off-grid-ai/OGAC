@@ -230,7 +230,7 @@ export function baseUrlFromHeaders(
   envOrigin?: string,
 ): string {
   const host = get('x-forwarded-host') ?? get('host');
-  if (host && host.trim()) {
+  if (host?.trim()) {
     const proto = (get('x-forwarded-proto') ?? '').trim() || (host.includes('localhost') ? 'http' : 'https');
     return `${proto}://${host.trim()}`;
   }

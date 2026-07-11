@@ -59,7 +59,7 @@ async function api(path: string, init: RequestInit = {}): Promise<Response> {
       authorization: ADMIN_TOKEN,
       'content-type': 'application/json',
       accept: 'application/json',
-      ...(init.headers ?? {}),
+      ...init.headers,
     },
     signal: AbortSignal.timeout(5000),
   });

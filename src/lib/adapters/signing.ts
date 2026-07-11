@@ -5,7 +5,7 @@ import {
   type KeyObject,
   sign as cryptoSign,
   verify as cryptoVerify,
-} from 'crypto';
+} from 'node:crypto';
 import { sign as hmacSign, verify as hmacVerify } from '@/lib/sign';
 import { PROVENANCE } from './services';
 import type { SigningPort } from './types';

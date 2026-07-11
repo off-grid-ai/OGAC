@@ -107,12 +107,9 @@ export interface ReviewDetail {
 // The Indian grouping (₹5,00,000) is the reviewer's native format; a plain Intl 'en-IN' currency
 // formatter produces exactly that. Non-numeric / absent ⇒ null (no amount to show).
 export function formatInr(value: unknown): string | null {
-  const n =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string' && value.trim() !== ''
-        ? Number(value)
-        : Number.NaN;
+  let n = Number.NaN;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
   if (!Number.isFinite(n)) return null;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -123,7 +120,7 @@ export function formatInr(value: unknown): string | null {
 
 // The keys we treat as "the amount" for the at-a-glance line + the decision question, in priority
 // order. This mirrors the approval-authority thresholdAttribute vocabulary (amount/quote/value).
-const AMOUNT_KEYS = ['amount', 'quote', 'value', 'sum', 'total', 'premium'];
+const AMOUNT_KEYS = new Set(['amount', 'quote', 'value', 'sum', 'total', 'premium']);
 
 // The keys we treat as "who requested this", in priority order.
 const REQUESTER_KEYS = [
@@ -295,9 +292,10 @@ export function guardrailNotesFrom(trace: ReviewAgentTrace | null): string[] {
   for (const c of trace.checks) {
     if (c.name === 'grounding') continue; // surfaced separately as faithfulness
     if (c.name === 'pii') {
+      const detailSuffix = c.detail ? ` (${c.detail})` : '';
       notes.push(
         c.verdict === 'redacted'
-          ? `Sensitive data was detected and masked before the model saw it${c.detail ? ` (${c.detail})` : ''}.`
+          ? `Sensitive data was detected and masked before the model saw it${detailSuffix}.`
           : 'No sensitive personal data was exposed.',
       );
     } else if (c.name === 'guardrail-rules' || c.name === 'injection') {
@@ -318,10 +316,10 @@ export function guardrailNotesFrom(trace: ReviewAgentTrace | null): string[] {
 // (what it produced), falling back to the last upstream step's output, then the run outcome.
 export function recommendationFrom(run: AppRunView): string {
   const pending = awaitingStep(run.steps);
-  if (pending?.outcome && pending.outcome.trim()) return pending.outcome.trim();
+  if (pending?.outcome?.trim()) return pending.outcome.trim();
   const prior = priorContextForReview(run.steps);
   for (let i = prior.length - 1; i >= 0; i--) {
-    if (prior[i].outcome && prior[i].outcome!.trim()) return prior[i].outcome!.trim();
+    if (prior[i].outcome?.trim()) return prior[i].outcome!.trim();
   }
   return run.outcome?.trim() || 'The app produced no draft output at this step.';
 }
@@ -356,7 +354,7 @@ export function inputPairs(input: Record<string, unknown>): { key: string; value
   for (const [key, raw] of Object.entries(input ?? {})) {
     if (raw === undefined || raw === null) continue;
     let value: string;
-    if (AMOUNT_KEYS.includes(key)) {
+    if (AMOUNT_KEYS.has(key)) {
       value = formatInr(raw) ?? String(raw);
     } else if (typeof raw === 'object') {
       value = JSON.stringify(raw);

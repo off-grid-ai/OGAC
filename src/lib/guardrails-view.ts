@@ -120,6 +120,14 @@ function engineOf(adapterId: string): GuardrailsEngine {
 }
 
 // A remote engine reaches a backing service (can be unreachable + needs a configured URL).
+// Presidio enumerates predefined entity types; other remotes expose none (don't overclaim); the
+// always-on regex floor surfaces the two it can catch.
+function entityTypesFor(engine: GuardrailsEngine, remote: boolean): readonly string[] {
+  if (engine === 'presidio') return PRESIDIO_ENTITY_TYPES;
+  if (remote) return [];
+  return REGEX_ENTITY_TYPES;
+}
+
 function isRemoteEngine(engine: GuardrailsEngine): boolean {
   return (REMOTE_ENGINES as readonly string[]).includes(engine);
 }
@@ -173,13 +181,7 @@ export function buildGuardrailsView(
     // Presidio enumerates its predefined entity types; the scanner-based remotes (LLM Guard / the
     // generic seam) don't expose a fixed entity list, so we surface none rather than overclaim; the
     // regex floor surfaces the two it can catch.
-    entityTypes: [
-      ...(engine === 'presidio'
-        ? PRESIDIO_ENTITY_TYPES
-        : remote
-          ? []
-          : REGEX_ENTITY_TYPES),
-    ],
+    entityTypes: [...entityTypesFor(engine, remote)],
     demo: normalizeDemo(demo, demoInput),
   };
 }

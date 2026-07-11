@@ -22,7 +22,7 @@ export function formatBytes(bytes: number | null | undefined): string {
   const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
   const val = n / Math.pow(1024, i);
   // Whole-number bytes show no decimal; larger units show up to one.
-  const digits = i === 0 ? 0 : val >= 100 ? 0 : 1;
+  const digits = i === 0 || val >= 100 ? 0 : 1;
   return `${val.toFixed(digits)} ${units[i]}`;
 }
 
@@ -67,7 +67,7 @@ export function tableHref(t: Pick<WarehouseTable, 'name'>): string {
 export function groupTablesByDatabase(tables: WarehouseTable[]): TableGroup[] {
   const byDb = new Map<string, WarehouseTable[]>();
   for (const t of tables ?? []) {
-    const db = t.database && t.database.trim() ? t.database : 'default';
+    const db = t.database?.trim() ? t.database : 'default';
     const arr = byDb.get(db) ?? [];
     arr.push(t);
     byDb.set(db, arr);
@@ -193,7 +193,7 @@ export function formatCell(v: unknown): string {
 // column is non-null (the universal, always-supported expectation). Operators can trim the set in
 // the panel. Pure: takes the column list, returns the expectation objects + a stable suite name.
 export function defaultExpectationsForColumns(columns: { name: string }[] | undefined): Expectation[] {
-  return (columns ?? []).filter((c) => c && c.name).map((c) => expectNotNull(c.name));
+  return (columns ?? []).filter((c) => c?.name).map((c) => expectNotNull(c.name));
 }
 
 export function suiteNameForTable(table: string): string {
@@ -241,14 +241,13 @@ export function deriveDataPlaneHealth(
     else if (status === 'optional') state = 'optional';
     else if (status === 'down') state = 'down';
     else state = 'unknown';
-    const tone =
-      state === 'up'
-        ? 'bg-primary/10 text-primary'
-        : state === 'down'
-          ? 'bg-destructive/10 text-destructive'
-          : 'bg-muted text-muted-foreground';
-    const stateLabel =
-      state === 'up' ? 'Online' : state === 'down' ? 'Offline' : state === 'optional' ? 'Optional' : 'Unknown';
+    let tone = 'bg-muted text-muted-foreground';
+    if (state === 'up') tone = 'bg-primary/10 text-primary';
+    else if (state === 'down') tone = 'bg-destructive/10 text-destructive';
+    let stateLabel = 'Unknown';
+    if (state === 'up') stateLabel = 'Online';
+    else if (state === 'down') stateLabel = 'Offline';
+    else if (state === 'optional') stateLabel = 'Optional';
     return { serviceId: e.serviceId, label: e.label, blurb: e.blurb, up, state, tone, stateLabel };
   });
 }

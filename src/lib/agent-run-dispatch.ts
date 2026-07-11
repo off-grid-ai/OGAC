@@ -16,7 +16,7 @@
 //                run is executing in the worker and will appear once it persists (poll GET /runs).
 //   - run === null with mode 'sync'/'durable' means unknown agent (404).
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { DurableRunHandle } from '@/lib/adapters/agentruntime';
 import type { RunContext } from '@/lib/agent-run-context';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';

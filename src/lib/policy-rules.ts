@@ -6,7 +6,6 @@ import {
   type PolicyRule,
   type PolicyRuleInput,
   toOpaDocument,
-  validatePolicyRulePatch,
 } from '@/lib/policy-rules-policy';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 

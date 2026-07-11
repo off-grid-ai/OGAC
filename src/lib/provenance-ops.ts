@@ -3,7 +3,7 @@
 // to the PURE classifier/planner in `provenance-verify.ts`. The verdict logic lives there so it's
 // unit-testable without a DB or a key; this file only wires real I/O to it.
 
-import { generateKeyPairSync } from 'crypto';
+import { generateKeyPairSync } from 'node:crypto';
 import { getSigning } from '@/lib/adapters/registry';
 import {
   classifyVerification,

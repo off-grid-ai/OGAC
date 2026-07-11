@@ -36,7 +36,7 @@ function toRowSteps(steps: StepState[]): AppRunRow['steps'] {
 function aggregateOutcome(steps: StepState[]): string {
   for (let i = steps.length - 1; i >= 0; i--) {
     const o = steps[i].output;
-    if (o && o.trim()) return o;
+    if (o?.trim()) return o;
   }
   return '';
 }

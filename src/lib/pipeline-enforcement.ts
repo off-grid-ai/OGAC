@@ -190,7 +190,9 @@ export function enforceModelCall(
     const egressRank = levelRank(egress as PermissionLevel);
     const ceilingRank = levelRank(ceiling);
     if (ceilingRank >= 0 && egressRank > ceilingRank) {
-      egress = ceiling === 'cloud' ? 'cloud' : ceiling === 'local' ? 'local' : 'block';
+      if (ceiling === 'cloud') egress = 'cloud';
+      else if (ceiling === 'local') egress = 'local';
+      else egress = 'block';
     }
   }
 
@@ -200,11 +202,10 @@ export function enforceModelCall(
   const blockPromptInjection = boolOn(guardrail, 'blockPromptInjection');
   const requirePurpose = boolOn(policy, 'requirePurpose');
 
-  const reason = !allow
-    ? `egress leash blocked this call for data-class "${dataClass}" (${decision.reason})`
-    : forceLocal
-      ? `data-class "${dataClass}" leashed to LOCAL (on-prem only)`
-      : `egress "${egress}" permitted for data-class "${dataClass}"`;
+  let reason: string;
+  if (!allow) reason = `egress leash blocked this call for data-class "${dataClass}" (${decision.reason})`;
+  else if (forceLocal) reason = `data-class "${dataClass}" leashed to LOCAL (on-prem only)`;
+  else reason = `egress "${egress}" permitted for data-class "${dataClass}"`;
 
   return {
     allow,

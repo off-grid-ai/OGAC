@@ -1,5 +1,5 @@
-import { execFile } from 'child_process';
-import { existsSync } from 'fs';
+import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import type { SandboxLanguage, SandboxPort, SandboxResult } from './types';
 
 // Sandbox engines for agent-authored code execution.

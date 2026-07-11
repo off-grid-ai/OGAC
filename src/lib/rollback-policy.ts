@@ -65,12 +65,9 @@ export function rollbackNote(
   toVersion: number,
   detail?: string,
 ): string {
-  const why =
-    reason === 'eval-gate-fail'
-      ? 'eval gate failed'
-      : reason === 'drift-breach'
-        ? 'drift breach detected'
-        : 'manual rollback';
+  let why = 'manual rollback';
+  if (reason === 'eval-gate-fail') why = 'eval gate failed';
+  else if (reason === 'drift-breach') why = 'drift breach detected';
   const base = `Auto-rollback (${why}): v${fromVersion} → restored v${toVersion}`;
   return detail ? `${base} — ${detail}` : base;
 }

@@ -10,7 +10,7 @@
 // credential scope and the signature, so we pin `us-east-1` / `s3`. Payloads are signed with a real
 // SHA-256 body hash (UNSIGNED-PAYLOAD is avoided so no extra header contract is imposed on SeaweedFS).
 
-import { createHash, createHmac } from 'crypto';
+import { createHash, createHmac } from 'node:crypto';
 
 const REGION = 'us-east-1';
 const SERVICE = 's3';
@@ -73,7 +73,11 @@ function encodePath(path: string): string {
 function canonicalQuery(search: URLSearchParams): string {
   const pairs: [string, string][] = [];
   for (const [k, v] of search) pairs.push([k, v]);
-  pairs.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : 1));
+  pairs.sort((a, b) => {
+    if (a[0] < b[0]) return -1;
+    if (a[0] > b[0]) return 1;
+    return a[1] < b[1] ? -1 : 1;
+  });
   return pairs
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&');

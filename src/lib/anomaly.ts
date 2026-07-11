@@ -101,6 +101,12 @@ function mad(xs: number[], med: number): number {
  * baseline used. When the window has no spread (constant series) any exact match is deviation 0 and
  * any change is treated as maximal (±Infinity) so a jump off a flat line is still caught.
  */
+// Deviation off a flat (zero-spread) baseline: exact match is 0, any change is maximal (±Infinity).
+function flatDeviation(value: number, baseline: number): number {
+  if (value === baseline) return 0;
+  return value > baseline ? Infinity : -Infinity;
+}
+
 function deviate(
   value: number,
   window: number[],
@@ -110,14 +116,14 @@ function deviate(
     const med = median(window);
     const spread = mad(window, med);
     if (spread === 0) {
-      return { deviation: value === med ? 0 : value > med ? Infinity : -Infinity, baseline: med };
+      return { deviation: flatDeviation(value, med), baseline: med };
     }
     return { deviation: (value - med) / spread, baseline: med };
   }
   const mu = mean(window);
   const sd = stddev(window, mu);
   if (sd === 0) {
-    return { deviation: value === mu ? 0 : value > mu ? Infinity : -Infinity, baseline: mu };
+    return { deviation: flatDeviation(value, mu), baseline: mu };
   }
   return { deviation: (value - mu) / sd, baseline: mu };
 }

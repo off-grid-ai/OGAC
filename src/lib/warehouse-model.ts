@@ -172,7 +172,7 @@ export function guardReadOnlySql(rawSql: string): GuardResult {
   }
 
   // Leading keyword must be a read verb.
-  const leaderMatch = withoutTrailing.match(/^([A-Za-z]+)/);
+  const leaderMatch = /^([A-Za-z]+)/.exec(withoutTrailing);
   const leader = (leaderMatch?.[1] ?? '').toUpperCase();
   if (!READ_LEADERS.has(leader)) {
     return { ok: false, reason: `only read queries are allowed (got "${leader || '?'}")` };
@@ -227,7 +227,7 @@ export interface ParsedClickHouse {
 
 export function parseClickHouseJson(text: string): ParsedClickHouse {
   const empty: ParsedClickHouse = { columns: [], rows: [], count: 0 };
-  if (!text || !text.trim()) return empty;
+  if (!text?.trim()) return empty;
   let obj: unknown;
   try {
     obj = JSON.parse(text);

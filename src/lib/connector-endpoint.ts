@@ -117,7 +117,7 @@ function isPrivateIpv6(host: string): boolean {
     return true; // fe80::/10 link-local
   }
   if (host.startsWith('fc') || host.startsWith('fd')) return true; // fc00::/7 unique-local
-  const mapped = host.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
   if (mapped) {
     const oct = ipv4Octets(mapped[1]);
     return oct ? isPrivateIpv4(oct) : true;

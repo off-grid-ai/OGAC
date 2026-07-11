@@ -154,7 +154,7 @@ async function baoJson(
 ): Promise<Record<string, unknown> | null> {
   const res = await fetch(`${baseUrl()}${path}`, {
     ...init,
-    headers: { ...baoHeaders(), ...(init?.headers ?? {}) },
+    headers: { ...baoHeaders(), ...init?.headers },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok && res.status !== 404) throw new Error(`OpenBao ${res.status}`);

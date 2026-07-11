@@ -57,12 +57,13 @@ function isCondition(c: unknown): c is MetaCondition {
  */
 export function normalizeFilter(input: unknown): MetaFilter | null {
   if (input == null) return null;
-  const rawMust = Array.isArray(input)
-    ? // Accept a bare array of conditions for ergonomics.
-      (input as unknown[])
-    : Array.isArray((input as Record<string, unknown>).must)
-      ? ((input as Record<string, unknown>).must as unknown[])
-      : null;
+  let rawMust: unknown[] | null = null;
+  if (Array.isArray(input)) {
+    // Accept a bare array of conditions for ergonomics.
+    rawMust = input as unknown[];
+  } else if (Array.isArray((input as Record<string, unknown>).must)) {
+    rawMust = (input as Record<string, unknown>).must as unknown[];
+  }
   if (!rawMust) return null;
   const must = rawMust.filter(isCondition);
   return must.length > 0 ? { must } : null;

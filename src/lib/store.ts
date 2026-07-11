@@ -1,6 +1,6 @@
 // Persistence for the node↔console state — real Postgres via Drizzle. Same exported
 // signatures the routes/UI already use (now async). Schema lives in src/db/schema.ts.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
@@ -232,6 +232,11 @@ type DeviceRow = typeof devices.$inferSelect;
 type PolicyRow = typeof policies.$inferSelect;
 type AuditRow = typeof auditEvents.$inferSelect;
 type CommandRow = typeof commands.$inferSelect;
+
+function isoOrUndef(v: unknown): string | undefined {
+  if (v instanceof Date) return v.toISOString();
+  return v ? String(v) : undefined;
+}
 
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : String(value);
@@ -613,7 +618,7 @@ export async function readComplianceActivity(
       (res as unknown as { rows?: Record<string, unknown>[] }).rows ??
       (res as unknown as Record<string, unknown>[]);
     rows = (list as Record<string, unknown>[]).map((r) => ({
-      ts: r.ts instanceof Date ? r.ts.toISOString() : r.ts ? String(r.ts) : undefined,
+      ts: isoOrUndef(r.ts),
       actorType: r.actor_type == null ? undefined : String(r.actor_type),
       actorId: r.actor_id == null ? undefined : String(r.actor_id),
       actorLabel: r.actor_label == null ? undefined : String(r.actor_label),
@@ -1671,10 +1676,10 @@ export async function updateTool(
   await db.update(tools).set(set).where(eq(tools.id, id));
 }
 
-const TOOL_POLICIES: ToolPolicy[] = ['allow', 'approval', 'blocked'];
+const TOOL_POLICIES = new Set<ToolPolicy>(['allow', 'approval', 'blocked']);
 export async function setToolPolicy(id: string, policy: ToolPolicy): Promise<void> {
   await ensureOrgSchema();
-  if (!TOOL_POLICIES.includes(policy)) return;
+  if (!TOOL_POLICIES.has(policy)) return;
   await db.update(tools).set({ policy }).where(eq(tools.id, id));
 }
 

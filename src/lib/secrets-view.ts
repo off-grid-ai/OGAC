@@ -157,7 +157,7 @@ function baoEnv(): { url: string | null; token: string; mount: string } {
   const raw = process.env.OFFGRID_OPENBAO_URL ?? process.env.OFFGRID_BAO_URL ?? '';
   const token = process.env.OFFGRID_OPENBAO_TOKEN ?? 'offgrid-dev-token';
   const mount = process.env.OFFGRID_OPENBAO_MOUNT ?? 'secret';
-  return { url: raw && raw.trim() ? raw.trim() : null, token, mount };
+  return { url: raw?.trim() ? raw.trim() : null, token, mount };
 }
 
 async function getJson(

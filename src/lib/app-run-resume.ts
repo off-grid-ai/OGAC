@@ -139,7 +139,7 @@ export async function resumeAppRun(
 function aggregateOutcome(results: StepResult[]): string {
   for (let i = results.length - 1; i >= 0; i--) {
     const o = results[i].output;
-    if (o && o.trim()) return o;
+    if (o?.trim()) return o;
   }
   return '';
 }

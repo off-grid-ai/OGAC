@@ -146,7 +146,7 @@ export function isRunnable(t: {
   if (!t.enabled) return false;
   const cat = catalogFor(t.kind);
   if (!cat) return false;
-  if (cat.endpointRequired && !(t.endpoint && t.endpoint.trim())) return false;
-  if (cat.secretRequired && !(t.secretRef && t.secretRef.trim())) return false;
+  if (cat.endpointRequired && !(t.endpoint?.trim())) return false;
+  if (cat.secretRequired && !(t.secretRef?.trim())) return false;
   return true;
 }

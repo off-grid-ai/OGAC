@@ -69,7 +69,7 @@ export function appScheduleId(appId: string): string {
 export function cronFromTrigger(
   trigger: { kind: string; config?: Record<string, unknown> } | null | undefined,
 ): string | null {
-  if (!trigger || trigger.kind !== 'schedule') return null;
+  if (trigger?.kind !== 'schedule') return null;
   const c = trigger.config ?? {};
   const raw = c.cron ?? c.schedule ?? c.expression;
   if (typeof raw !== 'string' || !raw.trim()) return null;
@@ -84,7 +84,7 @@ export function cronFromTrigger(
 export function scheduleConfigFromTrigger(
   trigger: { kind: string; config?: Record<string, unknown> } | null | undefined,
 ): ScheduleConfig | null {
-  if (!trigger || trigger.kind !== 'schedule') return null;
+  if (trigger?.kind !== 'schedule') return null;
   const cfg = normalizeScheduleConfig(trigger.config);
   return cfg.cron ? cfg : null;
 }

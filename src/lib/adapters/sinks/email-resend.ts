@@ -121,7 +121,7 @@ export function buildResendPayload(
     subject: sanitizeHeader(msg.subject),
     text: msg.text ?? '',
   };
-  if (opts.replyTo && opts.replyTo.trim()) payload.reply_to = sanitizeHeader(opts.replyTo);
+  if (opts.replyTo?.trim()) payload.reply_to = sanitizeHeader(opts.replyTo);
   if (opts.html) payload.html = textToHtml(msg.text ?? '');
   const tags = shapeTags(opts.tags);
   if (tags.length > 0) payload.tags = tags;
@@ -218,7 +218,7 @@ export async function sendViaResend(
       reason: 'Resend sink not configured — no API key (vault resend_api_key or RESEND_API_KEY env).',
     };
   }
-  if (!msg.to || !msg.to.trim()) {
+  if (!msg.to?.trim()) {
     return { ok: false, configured: true, reason: 'no recipient — the email sink needs a `to` address' };
   }
   const payload = buildResendPayload(cfg.config!.from, msg, opts);

@@ -400,10 +400,10 @@ export function buildDriftRunConfig(input: BuildDriftRunInput): DriftRunConfig {
   const columnMethods: Record<string, string> = {};
   for (const ov of input.columnOverrides ?? []) {
     const m = getDriftItem(ov.methodId);
-    if (m && m.kind === 'method' && ov.column) columnMethods[ov.column] = m.evidentlyName;
+    if (m?.kind === 'method' && ov.column) columnMethods[ov.column] = m.evidentlyName;
   }
-  const preset = item && item.kind === 'preset' ? item.evidentlyName : null;
-  const method = item && item.kind === 'method' ? item.evidentlyName : null;
+  const preset = item?.kind === 'preset' ? item.evidentlyName : null;
+  const method = item?.kind === 'method' ? item.evidentlyName : null;
   return {
     preset,
     method,

@@ -140,7 +140,7 @@ export const prometheusExporter: Exporter<MetricSample> = {
   // test(): if an endpoint is configured we treat it as OTLP push and probe it with an empty
   // payload; if not, it's scrape mode — always "ready" (Prometheus pulls, nothing to reach out to).
   async test(target: ResolvedTarget, fetchImpl: FetchLike): Promise<ProbeResult> {
-    if (!target.endpoint || !target.endpoint.trim()) {
+    if (!target.endpoint?.trim()) {
       return {
         ok: true,
         detail: 'Scrape mode: metrics served at /metrics for Prometheus to pull.',
@@ -170,7 +170,7 @@ export const prometheusExporter: Exporter<MetricSample> = {
     records: MetricSample[],
     fetchImpl: FetchLike,
   ): Promise<ExportResult> {
-    if (!target.endpoint || !target.endpoint.trim()) {
+    if (!target.endpoint?.trim()) {
       return { ok: true, count: records.length, detail: 'Scrape mode: served at /metrics (no push).' };
     }
     if (records.length === 0) return { ok: true, count: 0, detail: 'Nothing to export.' };

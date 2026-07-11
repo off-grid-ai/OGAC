@@ -3,7 +3,7 @@
 // Shipping is fire-and-forget and best-effort — a SIEM outage never blocks or fails an audited
 // request. Read-back (searchAudit) powers the console's Audit view: full-text + filtered search
 // over the shipped stream, well beyond the 25-row Postgres slice on the Control page.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { type AuditEvent, type AuditEventInput, buildAuditEvent } from '@/lib/audit-event';
 import { correlationIds } from '@/lib/correlation';
 
@@ -176,7 +176,7 @@ interface OsHit {
 function buildQuery(p: AuditSearchParams): Record<string, unknown> {
   const must: Record<string, unknown>[] = [];
   const filter: Record<string, unknown>[] = [];
-  if (p.q && p.q.trim()) {
+  if (p.q?.trim()) {
     must.push({
       multi_match: {
         query: p.q.trim(),

@@ -5,7 +5,7 @@
 // data-domains.ts; this file is the thin persistence seam that feeds it real rows.
 //
 // SOLID: no matching logic here — just read/write and map rows → the pure `DataDomain` view.
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { dataDomains } from '@/db/schema';

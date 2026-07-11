@@ -69,7 +69,7 @@ export function buildReportMarkdown(run: AppRunView, summary: RunSummary): strin
       lines.push(`- Status: ${statusLabel(step.status)}`);
       if (step.outcome) lines.push(`- Outcome: ${step.outcome}`);
       if (step.detail) lines.push(`- Detail: ${step.detail}`);
-      if (step.refs && step.refs.length) lines.push(`- Sources: ${step.refs.join(', ')}`);
+      if (step.refs?.length) lines.push(`- Sources: ${step.refs.join(', ')}`);
       if (step.childRunId) lines.push(`- Child run: ${step.childRunId}`);
       lines.push('');
     }

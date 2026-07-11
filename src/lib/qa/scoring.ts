@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 // Online evals — score real production interactions on the LLM-as-judge pattern and push the
 // scores to Langfuse, where they trend over time (a falling score IS the degradation signal).

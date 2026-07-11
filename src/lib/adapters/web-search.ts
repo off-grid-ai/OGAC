@@ -86,7 +86,9 @@ export function normalizeSearchResults(data: unknown, limit: number): WebSearchR
 }
 
 function str(v: unknown): string {
-  return typeof v === 'string' ? v.trim() : v == null ? '' : String(v);
+  if (typeof v === 'string') return v.trim();
+  if (v == null) return '';
+  return String(v);
 }
 
 // ─── searchWeb — the reach (I/O) ──────────────────────────────────────────────────────────────────

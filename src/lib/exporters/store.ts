@@ -3,7 +3,7 @@
 // exporters. This module: CRUD (org-scoped), an idempotent self-migrate, secret resolution through
 // the existing secrets adapter, and honest last-status writes.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { exportTargets } from '@/db/schema';
@@ -46,7 +46,9 @@ export async function ensureExportTargetsSchema(): Promise<void> {
 
 // ─── view ───────────────────────────────────────────────────────────────────────────────────────
 function iso(v: Date | string | null | undefined): string | null {
-  return v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'string') return v;
+  return null;
 }
 
 export interface ExportTargetView {

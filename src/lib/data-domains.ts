@@ -143,7 +143,9 @@ export function resolveDomainRanked(phrase: string, domains: DataDomain[]): Rank
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (a.tier !== b.tier) return a.tier - b.tier;
-    return a.domain.id < b.domain.id ? -1 : a.domain.id > b.domain.id ? 1 : 0;
+    if (a.domain.id < b.domain.id) return -1;
+    if (a.domain.id > b.domain.id) return 1;
+    return 0;
   });
 
   return scored.map(({ domain, score }) => ({ domain, score }));
@@ -169,7 +171,7 @@ export function resolveDomain(phrase: string, domains: DataDomain[]): DataDomain
   // Exact matches (tier 1/2) are trusted outright.
   if (topTier === 1 || topTier === 2) {
     const second = ranked[1];
-    if (second && second.score === top.score) {
+    if (second?.score === top.score) {
       const secondTier = scoreDomain(normQuery, queryTokens, second.domain).tier;
       if (secondTier === topTier) return null; // two exact matches on the same phrase ⇒ ambiguous
     }

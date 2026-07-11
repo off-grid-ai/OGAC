@@ -136,11 +136,9 @@ function looksLikeRunId(candidate: string): boolean {
 }
 
 export function runIdFromWorkflowId(workflowId: string): string | undefined {
-  const prefix = workflowId.startsWith('agentrun-')
-    ? 'agentrun-'
-    : workflowId.startsWith('apprun-')
-      ? 'apprun-'
-      : undefined;
+  let prefix: string | undefined;
+  if (workflowId.startsWith('agentrun-')) prefix = 'agentrun-';
+  else if (workflowId.startsWith('apprun-')) prefix = 'apprun-';
   if (!prefix) return undefined;
   const rest = workflowId.slice(prefix.length); // <agent-or-app>-<runId>
   // Scan each '-' boundary; the runId is the FIRST suffix that matches a known runId shape. The

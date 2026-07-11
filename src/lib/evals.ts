@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { goldenCases } from '@/db/schema';
@@ -157,8 +157,10 @@ function goldenWhere(filter: GoldenFilter) {
 // `{orgId}` scopes to a tenant; omitting all returns ALL (the internal global view).
 export async function listGoldenCases(arg?: string | null | GoldenFilter): Promise<GoldenCase[]> {
   await ensureEvalsSchema();
-  const filter: GoldenFilter =
-    arg === undefined ? {} : arg === null || typeof arg === 'string' ? { appId: arg } : arg;
+  let filter: GoldenFilter = {};
+  if (arg === undefined) filter = {};
+  else if (arg === null || typeof arg === 'string') filter = { appId: arg };
+  else filter = arg;
   const { rows } = await db.execute<GoldenRow>(
     sql`SELECT ${GOLDEN_COLS} FROM golden_cases ${goldenWhere(filter)} ORDER BY created_at DESC;`,
   );
@@ -273,12 +275,9 @@ export async function listEvalRuns(
   pipelineId?: string | null,
 ): Promise<EvalRun[]> {
   await ensureEvalsSchema();
-  const pipelineWhere =
-    pipelineId === undefined
-      ? sql``
-      : pipelineId === null
-        ? sql` AND pipeline_id IS NULL`
-        : sql` AND pipeline_id = ${pipelineId}`;
+  let pipelineWhere = sql``;
+  if (pipelineId === null) pipelineWhere = sql` AND pipeline_id IS NULL`;
+  else if (pipelineId !== undefined) pipelineWhere = sql` AND pipeline_id = ${pipelineId}`;
   const { rows } = await db.execute<EvalRunRow>(
     sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
         FROM eval_runs WHERE org_id = ${orgId}${pipelineWhere} ORDER BY started_at DESC LIMIT ${limit};`,

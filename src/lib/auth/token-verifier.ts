@@ -59,9 +59,9 @@ function roleFrom(claims: Record<string, unknown>): Principal['role'] {
   const realm = (claims['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
   const resource = Object.values((claims['resource_access'] as Record<string, { roles?: string[] }> | undefined) ?? {})
     .flatMap((r) => r.roles ?? []);
-  const all = [...realm, ...resource, typeof claims['role'] === 'string' ? (claims['role'] as string) : ''];
-  if (all.includes('admin')) return 'admin';
-  if (all.includes('editor')) return 'editor';
+  const all = new Set([...realm, ...resource, typeof claims['role'] === 'string' ? (claims['role'] as string) : '']);
+  if (all.has('admin')) return 'admin';
+  if (all.has('editor')) return 'editor';
   // A scoped/custom role (e.g. a service token limited to specific modules) — pass its
   // name through so module-access resolves it to the granted module set. Prefer an
   // explicit svc-* scope role, else the first non-default realm role.

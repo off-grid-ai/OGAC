@@ -4,7 +4,7 @@
 // every read/write to an org (like connectors/templates in store.ts), and returns typed AppSpec.
 // It never re-implements a rule that belongs in app-model.ts.
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { apps, type App } from '@/db/schema';

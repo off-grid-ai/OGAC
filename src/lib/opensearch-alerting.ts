@@ -35,7 +35,7 @@ export function alertingConfigured(): boolean {
 async function osFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${osUrl()}${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'content-type': 'application/json', ...init?.headers },
     cache: 'no-store',
     signal: AbortSignal.timeout(6000),
   });
@@ -236,7 +236,7 @@ export async function setIsmPolicy(spec: IsmPolicySpec): Promise<IsmWriteResult>
       return { configured, supported: false, policy: null, note: current.note };
     }
     let path = `/_plugins/_ism/policies/${encodeURIComponent(spec.policyId)}`;
-    if (current.policy && current.policy.seqNo != null && current.policy.primaryTerm != null) {
+    if (current.policy?.seqNo != null && current.policy?.primaryTerm != null) {
       path += `?if_seq_no=${current.policy.seqNo}&if_primary_term=${current.policy.primaryTerm}`;
     }
     const res = await osFetch(path, {
