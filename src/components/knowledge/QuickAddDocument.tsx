@@ -93,8 +93,7 @@ export function QuickAddDocument({
               To review or remove documents,{' '}
               <a href={`/workspace/knowledge/${collectionId}`} className="underline">
                 open the collection
-              </a>
-              .
+              </a>.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>

@@ -324,8 +324,8 @@ export function PipelinesManager({ pipelines }: { pipelines: PipelineCardData[] 
       {pipelines.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No pipelines yet. Create one, or seed the sample BFSI templates with
-            <span className="font-mono"> POST /api/v1/admin/pipelines/seed</span>.
+            No pipelines yet. Create one, or seed the sample BFSI templates with{' '}
+            <span className="font-mono">POST /api/v1/admin/pipelines/seed</span>.
           </CardContent>
         </Card>
       ) : (

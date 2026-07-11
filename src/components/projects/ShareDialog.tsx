@@ -110,7 +110,7 @@ export function ShareDialog({
                 checked={canEdit}
                 onChange={(e) => setCanEdit(e.target.checked)}
               />
-              Can edit (otherwise view only)
+              <span>Can edit (otherwise view only)</span>
             </label>
           </div>
 

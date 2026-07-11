@@ -97,7 +97,7 @@ export function ServiceSelect({
   const setParam = useSetParam();
   return (
     <label className="flex items-center gap-2 text-xs text-muted-foreground">
-      Service
+      <span>Service</span>
       <select
         value={selected ?? ''}
         onChange={(e) => setParam((p) => p.set('svc', e.target.value))}

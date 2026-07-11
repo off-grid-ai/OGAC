@@ -220,8 +220,7 @@ export function StudioBuilder({
                       className="text-primary hover:underline"
                     >
                       {created.url}
-                    </a>
-                    .
+                    </a>.
                   </>
                 ) : null}
               </p>

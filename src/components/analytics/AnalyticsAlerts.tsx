@@ -188,7 +188,7 @@ function RuleDialog({
               checked={draft.enabled}
               onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
             />
-            Enabled
+            <span>Enabled</span>
           </label>
         </SheetBody>
         <SheetFooter>

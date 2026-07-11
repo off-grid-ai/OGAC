@@ -77,7 +77,7 @@ export function EvalCatalogFilterBar({
 
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            Sort
+            <span>Sort</span>
             <select
               value={sortKey}
               onChange={(e) => onSort(e.target.value)}

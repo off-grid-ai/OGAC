@@ -172,8 +172,8 @@ export function PipelineRoutingEditor({ data }: { data: RoutingEditorData }) {
               <span>Allow cloud egress</span>
             </label>
             <p className="text-xs text-muted-foreground">
-              When off, any routing rule that would send data to a cloud model is leashed to
-              <span className="font-medium"> block</span> — data never leaves the box.
+              When off, any routing rule that would send data to a cloud model is leashed to{' '}
+              <span className="font-medium">block</span> — data never leaves the box.
             </p>
           </CardContent>
         </Card>
