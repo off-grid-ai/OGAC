@@ -71,6 +71,7 @@ import {
   selectionToPath,
 } from '@/lib/chat-nav';
 import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
+import { modelLabel } from '@/lib/model-catalog';
 import { thinkingLabel, thinkingState } from '@/lib/chat-thinking';
 import { toDisplayHost } from '@/lib/display-host';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
@@ -1544,7 +1545,7 @@ export function ChatWorkspace({
                 {models.length === 0 ? <option value="">no models</option> : null}
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.id}
+                    {modelLabel(m.id)}
                     {modelSuffix(m)}
                   </option>
                 ))}
@@ -1599,7 +1600,7 @@ export function ChatWorkspace({
                             </span>
                           </div>
                           <div className="mt-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                            <span className="truncate">{c.model}</span>
+                            <span className="truncate">{modelLabel(c.model)}</span>
                             {c.updatedAt ? <span>· {relativeTime(c.updatedAt)}</span> : null}
                           </div>
                         </button>
