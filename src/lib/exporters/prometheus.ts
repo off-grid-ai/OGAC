@@ -26,7 +26,7 @@ export interface MetricSample {
 // ── Prometheus text-exposition format (pure) ────────────────────────────────────────────────────
 // Escape a label VALUE per the exposition format (backslash, double-quote, newline). Pure.
 export function escapeLabelValue(v: string): string {
-  return v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+  return v.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n');
 }
 
 // Sanitize a metric/label NAME to the allowed charset [a-zA-Z_][a-zA-Z0-9_]*. Pure.
@@ -62,7 +62,7 @@ export function renderPromText(samples: MetricSample[]): string {
   for (const name of order) {
     const group = byName.get(name)!;
     const first = group[0];
-    lines.push(`# HELP ${name} ${first.help.replace(/\n/g, ' ')}`);
+    lines.push(`# HELP ${name} ${first.help.replaceAll('\n', ' ')}`);
     lines.push(`# TYPE ${name} ${first.type}`);
     for (const s of group) {
       if (!Number.isFinite(s.value)) continue;

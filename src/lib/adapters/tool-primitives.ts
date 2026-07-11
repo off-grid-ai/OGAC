@@ -228,7 +228,7 @@ function stripHtml(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
+    .replaceAll('&nbsp;', ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

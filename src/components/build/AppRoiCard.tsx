@@ -106,8 +106,8 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Props) {
         <div>
           <CardTitle className="text-sm">Return on investment</CardTitle>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            What this automation is worth this period: real runs and actual AI cost, against an
-            <span className="font-medium text-amber-600"> estimate</span> of the manual time each run
+            What this automation is worth this period: real runs and actual AI cost, against an{' '}
+            <span className="font-medium text-amber-600">estimate</span> of the manual time each run
             replaces. Estimates are yours to set — they are clearly labelled and never presented as
             measured facts.
           </p>

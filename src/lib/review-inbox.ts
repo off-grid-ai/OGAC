@@ -112,7 +112,7 @@ export function formatInr(value: unknown): string | null {
       ? value
       : typeof value === 'string' && value.trim() !== ''
         ? Number(value)
-        : NaN;
+        : Number.NaN;
   if (!Number.isFinite(n)) return null;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

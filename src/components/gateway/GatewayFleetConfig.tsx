@@ -105,7 +105,16 @@ function EditDialog({
         type={opts?.type ?? 'text'}
         placeholder={opts?.placeholder}
         value={form[k] === null ? '' : String(form[k])}
-        onChange={(e) => set(k, (opts?.type === 'number' ? e.target.value : e.target.value) as never)}
+        onChange={(e) =>
+          set(
+            k,
+            (opts?.type === 'number'
+              ? e.target.value === ''
+                ? null
+                : Number(e.target.value)
+              : e.target.value) as never,
+          )
+        }
       />
     </div>
   );

@@ -76,8 +76,8 @@ BEGIN
     EXECUTE 'ALTER TABLE public.${table} FORCE ROW LEVEL SECURITY';
     EXECUTE 'DROP POLICY IF EXISTS ${policyName} ON public.${table}';
     EXECUTE 'CREATE POLICY ${policyName} ON public.${table} FOR ALL TO ${APP_ROLE} ' ||
-            'USING (${predicate.replace(/'/g, "''")}) ' ||
-            'WITH CHECK (${predicate.replace(/'/g, "''")})';
+            'USING (${predicate.replaceAll("'", "''")}) ' ||
+            'WITH CHECK (${predicate.replaceAll("'", "''")})';
     EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON public.${table} TO ${APP_ROLE}';
   ELSE
     RAISE NOTICE 'skip %: absent or has no org_id column', '${table}';

@@ -139,7 +139,7 @@ export function CallDetail({ c }: { c: Call }) {
       {(c.requestHeaders || c.responseHeaders) ? (
         <details className="text-[11px] text-muted-foreground">
           <summary className="cursor-pointer font-medium text-foreground">
-            Raw headers
+            <span>Raw headers</span>
             <span className="ml-1.5 rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">raw mode</span>
           </summary>
           <div className="mt-1 grid gap-2 md:grid-cols-2">

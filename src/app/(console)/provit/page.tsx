@@ -18,7 +18,7 @@ export default async function ProvitPage() {
         </div>
         <div>
           <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            Provit
+            <span>Provit</span>
             <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
               Coming soon
             </span>
@@ -52,8 +52,7 @@ export default async function ProvitPage() {
           Landing here in a future release. Want early access? Reach us at{' '}
           <a href="mailto:mac@getoffgridai.co" className="text-primary hover:underline">
             mac@getoffgridai.co
-          </a>
-          .
+          </a>.
         </p>
       </div>
     </div>

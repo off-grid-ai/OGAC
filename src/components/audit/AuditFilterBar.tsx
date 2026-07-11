@@ -40,7 +40,7 @@ export function AuditFilterBar({ actors, actions, projects, outcomes }: Props) {
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {/* Free-text search */}
       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        Search
+        <span>Search</span>
         <input
           type="search"
           defaultValue={val('q')}
@@ -80,7 +80,7 @@ export function AuditFilterBar({ actors, actions, projects, outcomes }: Props) {
 
       {/* Time range */}
       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        From
+        <span>From</span>
         <input
           type="datetime-local"
           defaultValue={toLocalInput(val('from'))}
@@ -89,7 +89,7 @@ export function AuditFilterBar({ actors, actions, projects, outcomes }: Props) {
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        To
+        <span>To</span>
         <input
           type="datetime-local"
           defaultValue={toLocalInput(val('to'))}

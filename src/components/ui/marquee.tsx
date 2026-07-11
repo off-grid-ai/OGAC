@@ -54,7 +54,7 @@ export function Marquee({
         className,
       )}
     >
-      {Array(repeat)
+      {new Array(repeat)
         .fill(0)
         .map((_, i) => (
           <div

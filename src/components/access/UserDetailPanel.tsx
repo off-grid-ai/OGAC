@@ -251,7 +251,7 @@ function PasswordCard({ userId }: { userId: string }) {
               onChange={(e) => setTempPw(e.target.checked)}
               className="accent-primary"
             />
-            Temporary
+            <span>Temporary</span>
           </label>
           <Button size="sm" className="gap-1.5" onClick={reset} disabled={saving}>
             {saving ? (

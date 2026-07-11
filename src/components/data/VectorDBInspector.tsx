@@ -130,7 +130,7 @@ export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
         {/* Connect form */}
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            kind
+            <span>kind</span>
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as 'qdrant' | 'lancedb')}
@@ -141,7 +141,7 @@ export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
             </select>
           </label>
           <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            url
+            <span>url</span>
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -150,7 +150,7 @@ export function VectorDBInspector({ urlHint }: { urlHint?: string }) {
             />
           </label>
           <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            api key
+            <span>api key</span>
             <input
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}

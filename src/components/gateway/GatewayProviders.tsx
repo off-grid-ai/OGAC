@@ -106,8 +106,8 @@ export function GatewayProviders() {
             routes fall back to local (honest degradation) — the console never fabricates a cloud
             answer. Set <code className="font-mono">OFFGRID_CLOUD_OPENAI_API_KEY</code>,{' '}
             <code className="font-mono">OFFGRID_CLOUD_ANTHROPIC_API_KEY</code>, or{' '}
-            <code className="font-mono">OFFGRID_CLOUD_COMPAT_BASE_URL</code>+
-            <code className="font-mono">_API_KEY</code> to wire one.
+            <code className="font-mono">OFFGRID_CLOUD_COMPAT_BASE_URL</code>+<code className="font-mono">_API_KEY</code>{' '}
+            to wire one.
           </div>
         </div>
       )}

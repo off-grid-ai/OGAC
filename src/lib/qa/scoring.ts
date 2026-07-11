@@ -123,7 +123,7 @@ async function postToLangfuse(i: Interaction, traceId: string, v: JudgeVerdict):
 // judge is unreachable it returns judged:false (and skips the Langfuse write so a fabricated 0
 // score never pollutes the trace); if Langfuse is down it returns posted:false.
 export async function scoreInteraction(i: Interaction): Promise<ScoreResult> {
-  const traceId = i.traceId ?? randomUUID().replace(/-/g, '');
+  const traceId = i.traceId ?? randomUUID().replaceAll('-', '');
   let verdict: JudgeVerdict;
   try {
     verdict = await judge(i);

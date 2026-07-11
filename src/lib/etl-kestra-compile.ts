@@ -56,7 +56,7 @@ function scalar(v: string | number | boolean | null): string {
   if (v === null) return 'null';
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (v.includes('\n')) return ''; // handled by caller as a block scalar
-  return needsQuote(v) ? `'${v.replace(/'/g, "''")}'` : v;
+  return needsQuote(v) ? `'${v.replaceAll("'", "''")}'` : v;
 }
 
 function emit(node: Yaml, indent: number): string[] {

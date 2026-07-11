@@ -257,11 +257,11 @@ function CreateScheduleForm({ onCancel, onCreated }: { onCancel: () => void; onC
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={requireReview} onChange={(e) => setRequireReview(e.target.checked)} />
-          Require review
+          <span>Require review</span>
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} />
-          Start paused
+          <span>Start paused</span>
         </label>
       </div>
       <div className="flex gap-2">

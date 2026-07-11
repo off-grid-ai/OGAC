@@ -37,7 +37,7 @@ export const hmacSigning: SigningPort = {
 // Load an ed25519 private key from PEM in env (production), else generate a process-stable pair so
 // dev works out of the box. The public half is derived from the private key either way.
 function loadKeys(): { privateKey: KeyObject; publicKey: KeyObject } {
-  const pem = env.OFFGRID_ED25519_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const pem = env.OFFGRID_ED25519_PRIVATE_KEY?.replaceAll('\\n', '\n');
   if (pem) {
     const privateKey = createPrivateKey(pem);
     return { privateKey, publicKey: createPublicKey(privateKey) };

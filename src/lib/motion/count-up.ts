@@ -30,14 +30,14 @@ const NUMERIC = /-?\d[\d,]*(\.\d+)?/;
 export function parseFormattedNumber(input: string): NumberFormat {
   const match = NUMERIC.exec(input);
   if (!match) {
-    return { prefix: input, suffix: '', value: NaN, decimals: 0, grouped: false };
+    return { prefix: input, suffix: '', value: Number.NaN, decimals: 0, grouped: false };
   }
   const raw = match[0];
   const start = match.index;
   const prefix = input.slice(0, start);
   const suffix = input.slice(start + raw.length);
   const grouped = raw.includes(',');
-  const plain = raw.replace(/,/g, '');
+  const plain = raw.replaceAll(',', '');
   const dot = plain.indexOf('.');
   const decimals = dot === -1 ? 0 : plain.length - dot - 1;
   const value = Number(plain);

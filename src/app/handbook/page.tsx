@@ -11,8 +11,7 @@ export default function HandbookIndex() {
         How the Off Grid AI Console is built, integrated, and operated. The API reference lives at{' '}
         <a href="/docs" className="text-primary underline underline-offset-2">
           /docs
-        </a>
-        .
+        </a>.
       </p>
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {HANDBOOK.map((d) => (

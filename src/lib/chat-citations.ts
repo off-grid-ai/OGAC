@@ -78,7 +78,7 @@ export function parseCitationMarkers(text: string, sourceCount: number): Segment
     const nums = m[0]
       .replace(/[[\]\s]/g, '')
       .split(',')
-      .map((x) => parseInt(x, 10))
+      .map((x) => Number.parseInt(x, 10))
       .filter((n) => Number.isFinite(n));
     for (const n of nums) {
       segments.push({ type: 'cite', n, valid: n >= 1 && n <= sourceCount });

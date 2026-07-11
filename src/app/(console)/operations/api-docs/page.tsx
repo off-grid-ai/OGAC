@@ -34,8 +34,7 @@ export default async function ApiDocsPage() {
               className="text-primary underline-offset-4 hover:underline"
             >
               /docs
-            </a>
-            .
+            </a>.
           </p>
         </div>
       </div>
