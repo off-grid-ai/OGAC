@@ -40,6 +40,12 @@ const OUTCOME_VARIANT: Record<string, string> = {
   blocked: 'bg-destructive/10 text-destructive',
 };
 
+const ROUTE_ACTION_VARIANT: Record<string, string> = {
+  cloud: 'bg-blue-500/10 text-blue-600',
+  block: 'bg-destructive/10 text-destructive',
+};
+const ROUTE_ACTION_VARIANT_DEFAULT = 'bg-primary/10 text-primary';
+
 const CHECK_VARIANT: Record<string, string> = {
   pass: 'text-muted-foreground',
   warn: 'bg-amber-500/10 text-amber-600',
@@ -181,13 +187,7 @@ export default async function ControlPage() {
                   <TableCell>
                     <Badge
                       variant="secondary"
-                      className={
-                        r.action === 'cloud'
-                          ? 'bg-blue-500/10 text-blue-600'
-                          : r.action === 'block'
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-primary/10 text-primary'
-                      }
+                      className={ROUTE_ACTION_VARIANT[r.action] ?? ROUTE_ACTION_VARIANT_DEFAULT}
                     >
                       {r.action}
                     </Badge>

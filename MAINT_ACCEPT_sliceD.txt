@@ -6,3 +6,9 @@ S3776 | src/app/(console)/operations/runs/[id]/page.tsx:19 | Page render CC driv
 S6551 | src/app/signin/page.tsx:67 | formData.get('username') is FormDataEntryValue|null; already String()-wrapped (no-op for the text input). Narrowing to typeof==='string' would change the File-value edge, so it's not strictly behavior-preserving. Accept.
 S6551 | src/app/signin/page.tsx:68 | Same as :67 for password — already String()-wrapped text input.
 S6551 | src/app/signin/page.tsx:69 | Same as :67 for callbackUrl — already String()-wrapped text input.
+S6479 | src/app/(console)/insights/evals/[id]/page.tsx:96 | Eval cases have no stable unique id; c.query can repeat across cases. Ordered result set — index is the row identity. Accept per RoE.
+S6479 | src/app/(console)/insights/page.tsx:160 | Guardrail checks have no stable unique id (c.name can repeat); ordered badge list. Index appropriate. Accept per RoE.
+S6479 | src/app/_landing/flow-diagram.tsx:100 | Beams map over a positional refs array (refs.slice(0,-1)); index IS the connector identity. No stable id exists. Accept per RoE.
+S3776 | src/app/(console)/governance/guardrails/page.tsx:23 | Page-level CC 21 driven by conditional JSX sections + data fetching; a behavior-safe reduction needs component/logic extraction beyond a mechanical change. Accept per RoE (props marked readonly).
+S3776 | src/app/(console)/governance/secrets/page.tsx:27 | CC reduced by extracting the status-banner chain + seal-status/tone/valueClass out of render; any residual CC over 15 is inherent page composition — no further behavior-safe mechanical reduction. Accept.
+

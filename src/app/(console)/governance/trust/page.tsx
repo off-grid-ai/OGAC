@@ -272,17 +272,17 @@ export default async function TrustCenterPage() {
 function PostureCard({ item }: Readonly<{ item: PostureItem }>) {
   const briefs = controlBriefs(item.evidenceFor);
   const inProgress = item.status === 'in-progress';
+  let statusIcon = <Circle className="size-4 shrink-0 text-muted-foreground" />;
+  if (inProgress) {
+    statusIcon = <Warning className="size-4 shrink-0 text-amber-600" />;
+  } else if (item.status === 'implemented') {
+    statusIcon = <CheckCircle className="size-4 shrink-0 text-primary" weight="fill" />;
+  }
   return (
     <div className="flex h-full flex-col rounded-lg border border-border/60 p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-medium text-foreground">{item.title}</div>
-        {inProgress ? (
-          <Warning className="size-4 shrink-0 text-amber-600" />
-        ) : item.status === 'implemented' ? (
-          <CheckCircle className="size-4 shrink-0 text-primary" weight="fill" />
-        ) : (
-          <Circle className="size-4 shrink-0 text-muted-foreground" />
-        )}
+        {statusIcon}
       </div>
       <p className="mt-1 flex-1 text-xs text-muted-foreground">{item.detail}</p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
