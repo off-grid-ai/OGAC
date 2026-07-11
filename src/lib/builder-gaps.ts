@@ -59,7 +59,7 @@ export function analyzeGaps(gaps: string[]): FixIt[] {
   gaps.forEach((raw, i) => {
     const g = (raw ?? '').trim();
     if (!g) return;
-    const m = g.match(NO_SOURCE_RE);
+    const m = NO_SOURCE_RE.exec(g);
     if (m) {
       const phrase = m[1].trim();
       out.push({

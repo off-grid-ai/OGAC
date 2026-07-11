@@ -162,7 +162,7 @@ export function parseCondition(source: unknown): {
   threshold: number | null;
 } {
   const s = typeof source === 'string' ? source : '';
-  const m = s.match(/(>=|<=|>|<)\s*(\d+)/);
+  const m = /(>=|<=|>|<)\s*(\d+)/.exec(s);
   if (!m) return { op: null, threshold: null };
   const opMap: Record<string, ThresholdOp> = { '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte' };
   return { op: opMap[m[1]] ?? null, threshold: Number(m[2]) };
@@ -316,11 +316,11 @@ export interface IsmPolicySummary {
 }
 
 function daysFromAge(v: unknown): number | null {
-  const m = typeof v === 'string' ? v.match(/^(\d+)\s*d$/) : null;
+  const m = typeof v === 'string' ? /^(\d+)\s*d$/.exec(v) : null;
   return m ? Number(m[1]) : null;
 }
 function gbFromSize(v: unknown): number | null {
-  const m = typeof v === 'string' ? v.match(/^(\d+)\s*gb$/i) : null;
+  const m = typeof v === 'string' ? /^(\d+)\s*gb$/i.exec(v) : null;
   return m ? Number(m[1]) : null;
 }
 

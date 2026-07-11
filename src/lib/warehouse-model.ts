@@ -172,7 +172,7 @@ export function guardReadOnlySql(rawSql: string): GuardResult {
   }
 
   // Leading keyword must be a read verb.
-  const leaderMatch = withoutTrailing.match(/^([A-Za-z]+)/);
+  const leaderMatch = /^([A-Za-z]+)/.exec(withoutTrailing);
   const leader = (leaderMatch?.[1] ?? '').toUpperCase();
   if (!READ_LEADERS.has(leader)) {
     return { ok: false, reason: `only read queries are allowed (got "${leader || '?'}")` };

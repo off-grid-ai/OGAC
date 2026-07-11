@@ -190,13 +190,13 @@ export async function listFiles(_owner: string, opts?: { orgId?: string | null }
   const out: FileMeta[] = [];
   for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
     const block = m[1];
-    const key = block.match(/<Key>([\s\S]*?)<\/Key>/)?.[1];
+    const key = /<Key>([\s\S]*?)<\/Key>/.exec(block)?.[1];
     if (!key) continue;
     // Belt-and-braces: the prefix query already scopes this, but re-apply the pure org rule so a
     // stray out-of-prefix key can never leak into a tenant's list.
     if (!isKeyInOrg(key, orgId)) continue;
-    const size = Number(block.match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0);
-    const lm = block.match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1];
+    const size = Number(/<Size>(\d+)<\/Size>/.exec(block)?.[1] ?? 0);
+    const lm = /<LastModified>([\s\S]*?)<\/LastModified>/.exec(block)?.[1];
     const name = (key.split('/').pop() ?? key).replace(/^[0-9a-f-]{36}-/, '');
     out.push({
       id: key,

@@ -59,8 +59,8 @@ async function parsePolicy(): Promise<EdgePolicy> {
   let text = '';
   try { text = await readFile(CADDYFILE, 'utf8'); } catch { /* no file */ }
   // The limit is passed to the (edge) snippet at the call site: `import edge <zone> <events>`.
-  const imp = text.match(/import\s+edge\s+(\S+)\s+(\d+)/);
-  const window = text.match(/window\s+(\S+)/);
+  const imp = /import\s+edge\s+(\S+)\s+(\d+)/.exec(text);
+  const window = /window\s+(\S+)/.exec(text);
   const wafRules = [...text.matchAll(/msg:'([^']+)'/g)].map((m) => m[1]);
   const hosts = [...text.matchAll(/https?:\/\/([a-z0-9.-]+\.getoffgridai\.co)/g)].map((m) => m[1]);
   return {
