@@ -18,7 +18,7 @@ import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EvalRunPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EvalRunPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('observability');
   const { id } = await params;
   const run = await getEvalRun(id, await currentOrgId());

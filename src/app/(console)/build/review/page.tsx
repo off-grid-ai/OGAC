@@ -135,12 +135,9 @@ function Stat({
   value: string;
   tone: 'warn' | 'success' | 'neutral';
 }>) {
-  const toneCls =
-    tone === 'warn'
-      ? 'text-amber-600 dark:text-amber-500'
-      : tone === 'success'
-        ? 'text-primary'
-        : 'text-foreground';
+  let toneCls = 'text-foreground';
+  if (tone === 'warn') toneCls = 'text-amber-600 dark:text-amber-500';
+  else if (tone === 'success') toneCls = 'text-primary';
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>

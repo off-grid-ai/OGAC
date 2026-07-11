@@ -13,7 +13,7 @@ export function generateStaticParams() {
     .map((slug) => ({ slug: slug.split('/') }));
 }
 
-export default async function DocPage({ params }: { params: Promise<{ slug: string[] }> }) {
+export default async function DocPage({ params }: Readonly<{ params: Promise<{ slug: string[] }> }>) {
   const { slug } = await params;
   const key = slug.join('/');
   const page = findDocBySlug(key);

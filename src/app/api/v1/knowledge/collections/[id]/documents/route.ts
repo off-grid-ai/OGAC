@@ -55,9 +55,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const mime = f.type || 'application/octet-stream';
       name = f.name || name;
       // Client may pre-extract text (PDF/docx); for text/* fall back to the raw bytes.
+      const textFallback = mime.startsWith('text/') ? bytes.toString('utf8') : '';
       content = typeof formContent === 'string' && formContent.trim()
         ? formContent
-        : mime.startsWith('text/') ? bytes.toString('utf8') : '';
+        : textFallback;
       const saved = await saveFile({ name, mime, bytes, visibility: 'public', owner: session.user.email });
       file = { url: publicUrlFor(saved.id), mime };
     } else if (typeof formContent === 'string') {

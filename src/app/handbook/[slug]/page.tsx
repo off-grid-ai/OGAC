@@ -4,7 +4,7 @@ import { findDoc, readDoc } from '@/lib/handbook';
 
 export const dynamic = 'force-dynamic';
 
-export default async function HandbookDocPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function HandbookDocPage({ params }: Readonly<{ params: Promise<{ slug: string }> }>) {
   const { slug } = await params;
   const doc = findDoc(slug);
   if (!doc) notFound();

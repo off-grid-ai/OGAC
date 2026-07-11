@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // `apps` table (the ONE build artifact — see lib/app-model.ts); the SAME table the run endpoint
 // (POST /api/v1/app/<slug>/run → getAppBySlug) resolves, so page + run stay on one source of truth.
 // A slug that isn't a PUBLISHED app 404s (unpublished apps are never served publicly).
-export default async function DeployedAppPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function DeployedAppPage({ params }: Readonly<{ params: Promise<{ slug: string }> }>) {
   const { slug } = await params;
   const app = await getAppBySlug(slug);
   const resolved = resolveDeployedApp(app);
