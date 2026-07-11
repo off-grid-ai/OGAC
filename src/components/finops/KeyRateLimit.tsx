@@ -55,10 +55,11 @@ export function KeyRateLimit({ id, label }: Readonly<{ id: string; label?: strin
         body: JSON.stringify({ rateLimit }),
       });
       if (!res.ok) throw new Error('failed');
+      const forLabel = label ? ` for ${label}` : '';
       toast.success(
         rateLimit === null
-          ? `Rate limit cleared${label ? ` for ${label}` : ''}`
-          : `Rate limit set to ${rateLimit}/min${label ? ` for ${label}` : ''}`,
+          ? `Rate limit cleared${forLabel}`
+          : `Rate limit set to ${rateLimit}/min${forLabel}`,
       );
       setOpen(false);
       router.refresh();

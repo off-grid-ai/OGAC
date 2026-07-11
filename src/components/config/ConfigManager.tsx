@@ -143,6 +143,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
   };
 
   const dirtyKeys = Object.keys(pending);
+  const dirtyCount = dirtyKeys.length ? ` (${dirtyKeys.length})` : '';
 
   const save = async () => {
     if (!dirtyKeys.length) return;
@@ -213,7 +214,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
         )}
         <Button size="sm" className="h-8 gap-1.5" disabled={!dirtyKeys.length || saving} onClick={save}>
           <FloppyDisk className="size-3.5" />
-          {saving ? 'Saving…' : `Save${dirtyKeys.length ? ` (${dirtyKeys.length})` : ''}`}
+          {saving ? 'Saving…' : `Save${dirtyCount}`}
         </Button>
       </div>
 

@@ -60,7 +60,7 @@ function Waterfall({ traceId }: Readonly<{ traceId: string }>) {
             <div
               className="absolute h-3 rounded bg-primary/60"
               style={{ left: `${s.offsetPct}%`, width: `${s.widthPct}%` }}
-              title={`${s.type}${s.model ? ` · ${s.model}` : ''}`}
+              title={s.model ? `${s.type} · ${s.model}` : s.type}
             />
           </div>
           <span className="w-16 shrink-0 text-right font-mono text-muted-foreground">

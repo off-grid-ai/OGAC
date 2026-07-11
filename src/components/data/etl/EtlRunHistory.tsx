@@ -30,6 +30,13 @@ interface LogLine {
   taskId?: string;
 }
 
+function formatLogLine(l: LogLine): string {
+  const ts = l.ts ? `${l.ts.slice(11, 19)} ` : '';
+  const level = l.level ? `[${l.level}] ` : '';
+  const task = l.taskId ? `${l.taskId}: ` : '';
+  return `${ts}${level}${task}${l.message}`;
+}
+
 function whenLabel(iso?: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -173,9 +180,7 @@ function LogView({ lines, orchestrated }: Readonly<{ lines?: LogLine[]; orchestr
   }
   return (
     <pre className="max-h-64 overflow-auto rounded bg-black/90 p-3 font-mono text-[11px] leading-relaxed text-emerald-300">
-      {lines
-        .map((l) => `${l.ts ? `${l.ts.slice(11, 19)} ` : ''}${l.level ? `[${l.level}] ` : ''}${l.taskId ? `${l.taskId}: ` : ''}${l.message}`)
-        .join('\n')}
+      {lines.map(formatLogLine).join('\n')}
     </pre>
   );
 }
