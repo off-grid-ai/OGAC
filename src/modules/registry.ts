@@ -228,7 +228,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'roi',
     label: 'ROI',
     description:
-      'Hours and ₹ saved per app and per department — the value each automation returns against its actual AI cost, for renewals and budget justification.',
+      'Hours and $ saved per app and per department — the value each automation returns against its actual AI cost, for renewals and budget justification.',
     route: '/insights/roi',
     service: 'analytics',
   },

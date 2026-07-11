@@ -44,8 +44,8 @@ test('formatBytes scales into KB/MB/GB with sensible precision', () => {
 });
 
 // ─── formatRows ───────────────────────────────────────────────────────────────
-test('formatRows uses Indian grouping and guards bad input', () => {
-  assert.equal(formatRows(600000), '6,00,000');
+test('formatRows uses en-US grouping and guards bad input', () => {
+  assert.equal(formatRows(600000), '600,000');
   assert.equal(formatRows(-1), '0');
   assert.equal(formatRows(NaN), '0');
 });

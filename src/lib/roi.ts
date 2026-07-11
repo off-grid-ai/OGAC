@@ -1,11 +1,11 @@
 // ─── ROI calc (SURFACED ROI) — PURE, zero-IO ─────────────────────────────────────────────────────
 //
 // The renewal + internal-budget-justification lever. It answers, per app and per department:
-// "this automation saved X hours / ₹Y this period, at Z actual AI cost → net ₹N."
+// "this automation saved X hours / $Y this period, at Z actual AI cost → net $N."
 //
 // The model is deliberately SIMPLE and HONEST — no faked precision:
 //   hoursSaved = runsCompleted × (minutesSavedPerRun / 60)          ← an ESTIMATE
-//   grossValue = hoursSaved × loadedCostPerHour                     ← an ESTIMATE (₹)
+//   grossValue = hoursSaved × loadedCostPerHour                     ← an ESTIMATE ($)
 //   netValue   = grossValue − actualAiCost                          ← est. value MINUS actual cost
 //
 // `runsCompleted` and `actualAiCost` are REAL (run counts from app_runs; cost from the gateway/FinOps
@@ -19,8 +19,8 @@
 // ─── defaults (sensible, editable, clearly an estimate in the UI) ────────────────────────────────
 /** Default minutes saved per completed run when the creator hasn't set an estimate. Conservative. */
 export const DEFAULT_MINUTES_SAVED_PER_RUN = 15;
-/** Default fully-loaded cost per staff hour, in ₹ (INR) — a sensible BFSI knowledge-worker rate. */
-export const DEFAULT_LOADED_COST_PER_HOUR = 1500;
+/** Default fully-loaded cost per staff hour, in $ (USD) — a sensible knowledge-worker rate. */
+export const DEFAULT_LOADED_COST_PER_HOUR = 75;
 
 // ─── input / output shapes ───────────────────────────────────────────────────────────────────────
 export interface RoiInput {
@@ -28,9 +28,9 @@ export interface RoiInput {
   runsCompleted: number;
   /** ESTIMATE: minutes of manual work each completed run replaces. */
   minutesSavedPerRun: number;
-  /** ESTIMATE: fully-loaded cost of one staff hour, in ₹. */
+  /** ESTIMATE: fully-loaded cost of one staff hour, in $. */
   loadedCostPerHour: number;
-  /** REAL: the actual AI/gateway cost attributed to this app's runs this period, in ₹. */
+  /** REAL: the actual AI/gateway cost attributed to this app's runs this period, in $. */
   actualAiCost: number;
 }
 
@@ -39,11 +39,11 @@ export interface RoiResult {
   runsCompleted: number;
   /** ESTIMATE: total hours of manual work saved. */
   hoursSaved: number;
-  /** ESTIMATE: gross value of the time saved, in ₹ (hoursSaved × loadedCostPerHour). */
+  /** ESTIMATE: gross value of the time saved, in $ (hoursSaved × loadedCostPerHour). */
   grossValue: number;
-  /** REAL: actual AI cost, in ₹ (echoed back, sanitised). */
+  /** REAL: actual AI cost, in $ (echoed back, sanitised). */
   actualAiCost: number;
-  /** est. gross value − actual AI cost, in ₹. Can be negative (cost outran estimated value). */
+  /** est. gross value − actual AI cost, in $. Can be negative (cost outran estimated value). */
   netValue: number;
   /** grossValue / actualAiCost — the "×" multiple; null when there is no cost (avoid ÷0). */
   roiMultiple: number | null;
@@ -253,7 +253,7 @@ function sum(xs: number[]): number {
 
 // ─── validateRoiSettingsInput — parse a create/update body into a clean override (pure) ───────────
 // Both estimates are OPTIONAL (a null/omitted field means "clear ⇒ inherit"). When present, a value
-// must be a finite number > 0 (minutes) / ≥ 0 (rate is > 0 too — a ₹0/hr rate is meaningless). Bounds
+// must be a finite number > 0 (minutes) / ≥ 0 (rate is > 0 too — a $0/hr rate is meaningless). Bounds
 // keep a fat-fingered value from producing an absurd headline. Returns the errors and, when ok, the
 // normalised override the store persists. The route stays a thin validator+persist shell.
 export interface RoiSettingsValidation {
@@ -263,7 +263,7 @@ export interface RoiSettingsValidation {
 }
 
 const MAX_MINUTES_SAVED_PER_RUN = 100_000; // ~69 days/run — a generous ceiling; anything above is a typo.
-const MAX_LOADED_COST_PER_HOUR = 1_000_000; // ₹10L/hr ceiling.
+const MAX_LOADED_COST_PER_HOUR = 100_000; // $100k/hr ceiling — anything above is a typo.
 
 // A field is: undefined/null ⇒ cleared (inherit); else must be a finite number in (0, max].
 function validateEstimateField(
@@ -305,16 +305,16 @@ export function validateRoiSettingsInput(body: unknown): RoiSettingsValidation {
   };
 }
 
-// ─── formatting helpers (₹ / hours) — shared by every ROI surface so units read consistently ──────
-/** Compact ₹ (INR) formatting: ₹1,23,456 with Indian grouping; negatives shown with a leading −. */
-export function formatInr(n: number): string {
+// ─── formatting helpers ($ / hours) — shared by every ROI surface so units read consistently ──────
+/** Compact $ (USD) formatting: $1,234 with en-US grouping; negatives shown with a leading −. */
+export function formatUsd(n: number): string {
   const v = Number.isFinite(n) ? Math.round(n) : 0;
-  const abs = Math.abs(v).toLocaleString('en-IN');
-  return v < 0 ? `−₹${abs}` : `₹${abs}`;
+  const abs = Math.abs(v).toLocaleString('en-US');
+  return v < 0 ? `−$${abs}` : `$${abs}`;
 }
 
-/** Hours with one decimal + a thousands separator (Indian grouping), e.g. "13,520.0 hrs". */
+/** Hours with one decimal + a thousands separator (en-US grouping), e.g. "13,520.0 hrs". */
 export function formatHours(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
-  return `${v.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} hrs`;
+  return `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} hrs`;
 }

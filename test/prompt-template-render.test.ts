@@ -16,9 +16,9 @@ test('substitutes every occurrence of the same variable', () => {
 });
 
 test('tolerates whitespace inside the braces (same grammar as extractVariables)', () => {
-  const tpl = 'Amount {{ amount }} in INR';
+  const tpl = 'Amount {{ amount }} in USD';
   assert.deepEqual(extractVariables(tpl), ['amount']);
-  assert.equal(renderPromptTemplate(tpl, { amount: '1000' }), 'Amount 1000 in INR');
+  assert.equal(renderPromptTemplate(tpl, { amount: '1000' }), 'Amount 1000 in USD');
 });
 
 test('empty-string value is treated as unfilled (placeholder kept)', () => {

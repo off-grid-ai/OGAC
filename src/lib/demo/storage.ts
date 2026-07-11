@@ -4,7 +4,7 @@
 //   • writes these objects via files.saveFile IF SeaweedFS is reachable;
 //   • otherwise FLAGS them (the data is here, the upload is infra) and the operator runs the object
 //     upload step against their SeaweedFS.
-// Content is synthetic Indian-BFSI text (INR, PAN/IFSC masked) — never real customer data.
+// Content is synthetic Indian-BFSI text (USD, PAN/IFSC masked) — never real customer data.
 import type { TenantProfile } from '@/lib/tour-demo-seed';
 
 export interface DemoFileSeed {
@@ -49,15 +49,15 @@ export const INSURER_FILES: readonly DemoFileSeed[] = [
     name: 'policy-schedule-SL-2291043.txt',
     mime: 'text/plain',
     content:
-      'SURAKSHA LIFE — Policy Schedule\nPolicy No: SL-2291043\nPlan: YRT Term\nSum Assured (INR): 1,00,00,000\n' +
-      'Commencement: 2021-04-15\nPremium (INR/yr): 18,400\nStatus: In-force\nPAN: ABCXX1234X (masked)\n',
+      'SURAKSHA LIFE — Policy Schedule\nPolicy No: SL-2291043\nPlan: YRT Term\nSum Assured (USD): 120,000\n' +
+      'Commencement: 2021-04-15\nPremium (USD/yr): 220\nStatus: In-force\nPAN: ABCXX1234X (masked)\n',
   },
   {
     name: 'fnol-motor-claim-CLM88120.md',
     mime: 'text/markdown',
     content:
       '# FNOL — Motor Own-Damage\n\n- Claim No: CLM88120\n- Policy: SL-MTR-77120 (in-force)\n' +
-      '- Loss: rear-end collision, third party involved\n- Estimate (INR): 1,40,000 (surveyor mandatory > 1,00,000)\n' +
+      '- Loss: rear-end collision, third party involved\n- Estimate (USD): 1,700 (surveyor mandatory > 1,200)\n' +
       '- Licence valid at time of loss: yes\n- Recommendation: allocate surveyor\n',
   },
   {

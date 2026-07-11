@@ -37,7 +37,7 @@ export interface RunMetric {
   get totalTokens(): number;
   /** End-to-end latency in milliseconds. */
   latencyMs: number;
-  /** Cost of the run in USD (the FinOps unit; INR shown in-product via fx). */
+  /** Cost of the run in USD (the FinOps unit shown in-product). */
   costUsd: number;
   /** The guardrail verdict for the run (pass = clean, redacted = PII masked, blocked = refused). */
   guardrailVerdict: 'pass' | 'redacted' | 'blocked';

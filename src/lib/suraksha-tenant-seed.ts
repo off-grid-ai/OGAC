@@ -10,7 +10,7 @@
 // SOLID: PURE DATA + PURE PLANNERS (zero I/O, zero store imports). A seed script / POST route injects
 // the current tenant/connector/domain rows and drives the planners idempotently. Mirrors
 // data-domains-insurer-seed.ts EXACTLY (deterministic ids, LABEL-based idempotency, "never bind to a
-// missing connector"). Indian BFSI values (INR, PAN, IFSC, Indian names) live in the SOURCE data the
+// missing connector"). Indian BFSI values (USD, PAN, IFSC, Indian names) live in the SOURCE data the
 // connectors point at (seeded on the live data plane — see deploy/onprem, WAREHOUSE_DB=suraksha).
 
 // ─── Tenant identity ─────────────────────────────────────────────────────────────────────────────
