@@ -119,7 +119,8 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ error: 'access denied', reason: agentAccess.reason }, { status: 403 });
   }
-  const query = typeof input.input === 'string' && input.input.trim() ? input.input : String(input.subject ?? '');
+  const subjectText = typeof input.subject === 'string' ? input.subject : '';
+  const query = typeof input.input === 'string' && input.input.trim() ? input.input : subjectText;
   const dispatch = await dispatchAgentRun({
     agentId: trigger.targetId,
     query,

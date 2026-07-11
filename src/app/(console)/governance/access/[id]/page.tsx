@@ -22,16 +22,36 @@ type SubTab = (typeof SUBTABS)[number]['id'];
 export default async function UserDetailPage({
   params,
   searchParams,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   await requireModuleForUser('admin');
   const { id } = await params;
   const sp = await searchParams;
   const rawTab = Array.isArray(sp.subtab) ? sp.subtab[0] : sp.subtab;
   const subtab: SubTab = rawTab === 'activity' ? 'activity' : 'identity';
   const configured = keycloakAdmin() !== null;
+
+  let identityPanel: React.ReactNode;
+  if (configured) {
+    identityPanel = <UserDetailPanel userId={id} />;
+  } else {
+    identityPanel = (
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
+          <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Key className="size-4" />
+          </div>
+          <CardTitle className="text-sm">Identity provider not configured</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Set the identity-provider environment variables (see the Users &amp; Access page) to
+          manage users.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="w-full space-y-6">
@@ -59,24 +79,7 @@ export default async function UserDetailPage({
         ))}
       </div>
 
-      {subtab === 'activity' ? (
-        <UserActivityPanel userId={id} />
-      ) : configured ? (
-        <UserDetailPanel userId={id} />
-      ) : (
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Key className="size-4" />
-            </div>
-            <CardTitle className="text-sm">Identity provider not configured</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Set the identity-provider environment variables (see the Users &amp; Access page) to
-            manage users.
-          </CardContent>
-        </Card>
-      )}
+      {subtab === 'activity' ? <UserActivityPanel userId={id} /> : identityPanel}
     </div>
   );
 }

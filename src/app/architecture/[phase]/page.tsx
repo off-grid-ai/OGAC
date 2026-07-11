@@ -11,7 +11,7 @@ import { ARCH, getPhase } from '@/lib/architecture';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PhasePage({ params }: { params: Promise<{ phase: string }> }) {
+export default async function PhasePage({ params }: Readonly<{ params: Promise<{ phase: string }> }>) {
   const { phase } = await params;
   const p = getPhase(phase);
   if (!p) notFound();

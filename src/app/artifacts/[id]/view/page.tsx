@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 // Stable read-only share surface for a *published* artifact. No auth: publishing is the opt-in.
 // Unpublished / unknown ids 404. Lives outside (console) so it has no console chrome.
-export default async function PublicArtifactPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PublicArtifactPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const a = await getPublishedArtifact(id);
   if (!a) notFound();

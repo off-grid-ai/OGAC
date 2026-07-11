@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // fill-and-copy preview, tags/metadata/usage, and the prompt's actions (copy, edit, delete). Reached
 // by clicking a prompt card on the library (URL-driven). Visibility mirrors the list: a user may view
 // an org-visible prompt or their own private one.
-export default async function PromptDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PromptDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('prompts');
   const { id } = await params;
   const session = await auth();
