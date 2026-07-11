@@ -53,6 +53,17 @@ export interface EmailEgressVerdict {
  *   leashed to on-prem-only must not fan its result out through a third-party mailer. 'cloud'/'allow'
  *   permits it. With NO pipeline bound the leash is permissive (legacy) → allowed.
  */
+function emailEgressReason(
+  allow: boolean,
+  verdict: { egress: string; forceLocal: boolean; reason: string },
+): string {
+  if (allow) return `egress "${verdict.egress}" permits cloud email delivery`;
+  if (verdict.forceLocal) {
+    return 'pipeline egress leashed to LOCAL — a cloud mailer (Resend) is not permitted; use the on-prem SMTP sink';
+  }
+  return `pipeline egress leash blocked cloud email delivery (${verdict.reason})`;
+}
+
 export function emailEgressVerdict(
   contract: PipelineContract | null,
   provider: EmailProvider,
@@ -66,11 +77,7 @@ export function emailEgressVerdict(
   return {
     allow,
     egress: verdict.egress,
-    reason: allow
-      ? `egress "${verdict.egress}" permits cloud email delivery`
-      : verdict.forceLocal
-        ? 'pipeline egress leashed to LOCAL — a cloud mailer (Resend) is not permitted; use the on-prem SMTP sink'
-        : `pipeline egress leash blocked cloud email delivery (${verdict.reason})`,
+    reason: emailEgressReason(allow, verdict),
   };
 }
 

@@ -105,11 +105,9 @@ export function shapeDeployments(
     const egressRaw = m.model_info?.egress;
     const egress: LiteLLMDeployment['egress'] =
       egressRaw === 'on-prem' || egressRaw === 'cloud' ? egressRaw : 'unknown';
-    const health: LiteLLMDeployment['health'] = unhealthyIds.has(id)
-      ? 'unhealthy'
-      : healthyIds.has(id)
-        ? 'healthy'
-        : 'unknown';
+    let health: LiteLLMDeployment['health'] = 'unknown';
+    if (unhealthyIds.has(id)) health = 'unhealthy';
+    else if (healthyIds.has(id)) health = 'healthy';
     return {
       id,
       modelName: m.model_name ?? id,

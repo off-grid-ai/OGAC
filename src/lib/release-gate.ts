@@ -112,13 +112,16 @@ export function evaluateReleaseGate(
   }
 
   const pass = failing.length === 0;
-  const summary = !gated
-    ? 'No eval produced a verdict (engines unavailable) — publish not blocked, but not gated.'
-    : pass
-      ? `Gate passed — ${passed} eval(s) at or above threshold.`
-      : `Gate failed — ${failing.length} eval(s) below threshold: ${failing
-          .map((f) => `${f.name} (${f.score}% < ${f.thresholdPct}%)`)
-          .join(', ')}.`;
+  let summary: string;
+  if (!gated) {
+    summary = 'No eval produced a verdict (engines unavailable) — publish not blocked, but not gated.';
+  } else if (pass) {
+    summary = `Gate passed — ${passed} eval(s) at or above threshold.`;
+  } else {
+    summary = `Gate failed — ${failing.length} eval(s) below threshold: ${failing
+      .map((f) => `${f.name} (${f.score}% < ${f.thresholdPct}%)`)
+      .join(', ')}.`;
+  }
 
   return { pass, gated, failing, unscored, passed, summary };
 }
