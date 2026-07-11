@@ -121,15 +121,25 @@ function looksEvidently(src: RawDriftReport & RawEvidentlyReport): boolean {
   );
 }
 
+// Fallback drift share: explicit counts if present, else the fraction of drifted features, else null.
+function shareFromCounts(src: RawEvidentlyReport, features: FeatureDriftView[]): number | null {
+  if (num(src.number_of_drifted_columns) !== null && num(src.number_of_columns)) {
+    return (src.number_of_drifted_columns ?? 0) / (src.number_of_columns as number);
+  }
+  if (features.length) return features.filter((f) => f.drifted).length / features.length;
+  return null;
+}
+
 function featuresFromEvidently(src: RawEvidentlyReport): FeatureDriftView[] {
-  const cols: RawEvidentlyColumn[] = Array.isArray(src.columns)
-    ? src.columns
-    : src.drift_by_columns != null && typeof src.drift_by_columns === 'object'
-      ? Object.entries(src.drift_by_columns).map(([k, v]) => ({
-          column_name: v?.column_name ?? k,
-          ...v,
-        }))
-      : [];
+  let cols: RawEvidentlyColumn[] = [];
+  if (Array.isArray(src.columns)) {
+    cols = src.columns;
+  } else if (src.drift_by_columns != null && typeof src.drift_by_columns === 'object') {
+    cols = Object.entries(src.drift_by_columns).map(([k, v]) => ({
+      column_name: v?.column_name ?? k,
+      ...v,
+    }));
+  }
   return cols
     .map((c) => {
       const name = str(c?.column_name);
@@ -171,19 +181,12 @@ export function normalizeDrift(input: RawDriftInput): DriftView {
   if (looksEvidently(src)) {
     const features = featuresFromEvidently(src);
     const share =
-      num(src.share_drifted) ??
-      num(src.share_of_drifted_columns) ??
-      (num(src.number_of_drifted_columns) !== null && num(src.number_of_columns)
-        ? (src.number_of_drifted_columns ?? 0) / (src.number_of_columns as number)
-        : features.length
-          ? features.filter((f) => f.drifted).length / features.length
-          : null);
+      num(src.share_drifted) ?? num(src.share_of_drifted_columns) ?? shareFromCounts(src, features);
     const hardDrift = src.drift_detected === true || src.dataset_drift === true;
-    const status: DriftDisplayStatus = hardDrift
-      ? 'drift'
-      : share !== null && share > 0.1
-        ? 'warning'
-        : features.reduce<DriftDisplayStatus>((acc, f) => worst(acc, f.status), 'stable');
+    let status: DriftDisplayStatus;
+    if (hardDrift) status = 'drift';
+    else if (share !== null && share > 0.1) status = 'warning';
+    else status = features.reduce<DriftDisplayStatus>((acc, f) => worst(acc, f.status), 'stable');
     return {
       engine,
       status,
