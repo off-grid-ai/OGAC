@@ -11,6 +11,13 @@ import {
 } from '@/lib/pipeline-detail';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
+// Past-tense confirmation verb for a completed lifecycle transition (used in the success toast).
+function pastTenseVerb(action: PipelineLifecycleAction): string {
+  if (action === 'publish') return 'Published';
+  if (action === 'archive') return 'Archived';
+  return 'Restored';
+}
+
 // PipelineActions — the header action cluster shared by the Overview and Gateway & Routing tabs
 // (DRY: one place owns Edit + the legal lifecycle transitions). Edit is URL-driven (?panel=edit) so
 // Back closes the sheet; publish/archive/restore hit the write routes and refresh the server data.
@@ -62,7 +69,7 @@ export function PipelineActions({
         return;
       }
       if (res.ok) {
-        const verb = action === 'publish' ? 'Published' : action === 'archive' ? 'Archived' : 'Restored';
+        const verb = pastTenseVerb(action);
         toast.success(`${verb} "${name}"`);
         router.refresh();
       } else {

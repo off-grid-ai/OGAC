@@ -29,9 +29,10 @@ export function ErasureForm() {
       const rows = data.erasedRows ?? 0;
       const stores = (data.results ?? []).filter((r) => r.deleted > 0).length;
       const deferred = data.deferred?.length ?? 0;
+      const deferredSuffix = deferred ? ` · ${deferred} store${deferred === 1 ? '' : 's'} deferred (see docs)` : '';
       const detail =
         `${rows} row${rows === 1 ? '' : 's'} erased across ${stores} store${stores === 1 ? '' : 's'}` +
-        (deferred ? ` · ${deferred} store${deferred === 1 ? '' : 's'} deferred (see docs)` : '');
+        deferredSuffix;
       if (data.status === 'partial') {
         toast.warning(`Partial erasure for ${subject} · ${detail}`);
       } else {

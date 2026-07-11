@@ -44,6 +44,13 @@ export interface PipelineLifecycleData {
   stageDescription: string;
 }
 
+// Lifecycle track step tint: the current step is boxed/emerald, past steps solid, future steps muted.
+function trackStepClass(current: boolean, done: boolean): string {
+  if (current) return 'bg-primary/10 font-medium text-primary';
+  if (done) return 'text-foreground';
+  return 'text-muted-foreground';
+}
+
 function statusBadge(status: string) {
   const map: Record<string, string> = {
     published: 'bg-primary/10 text-primary',
@@ -259,13 +266,7 @@ export function PipelineLifecycle({ data }: Readonly<{ data: PipelineLifecycleDa
             return (
               <div key={s.status} className="flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs ${
-                    current
-                      ? 'bg-primary/10 font-medium text-primary'
-                      : done
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs ${trackStepClass(current, done)}`}
                 >
                   {done ? <CheckCircle className="size-3.5" weight="fill" /> : <Circle className="size-3.5" />}
                   {s.label}
