@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 const usd = (n: number) => `$${n.toFixed(2)}`;
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2">
@@ -37,7 +37,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // accounting fact table (computeAccounting), narrowed by the pure pipelineCostSlice to the row this
 // pipeline's runs are stamped under (project/caller = "pipeline:<id>"). Honest: an empty slice means
 // nothing is billed to this pipeline yet — never fabricated.
-export default async function PipelineCostPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineCostPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();

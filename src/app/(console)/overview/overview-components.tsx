@@ -19,7 +19,7 @@ const TONE: Record<HomeTile['tone'], string> = {
   muted: 'text-foreground',
 };
 
-export function TileCard({ t }: { t: HomeTile }) {
+export function TileCard({ t }: Readonly<{ t: HomeTile }>) {
   return (
     <Link
       href={t.href}
@@ -39,12 +39,12 @@ export function Section({
   href,
   linkLabel,
   children,
-}: {
+}: Readonly<{
   title: string;
   href: string;
   linkLabel: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
@@ -76,7 +76,7 @@ const SOURCE_LABEL: Record<BlockingDecision['source'], string> = {
 // The cross-module blocking feed: audit ∪ policy ∪ guardrails, last 24h. Each row deep-links into
 // the module that produced it, so an operator can go straight from "something was stopped" to the
 // full record.
-export function BlockingFeed({ blocking }: { blocking: OperatorHome['blocking'] }) {
+export function BlockingFeed({ blocking }: Readonly<{ blocking: OperatorHome['blocking'] }>) {
   const clear = blocking.total === 0;
   return (
     <Section
@@ -124,7 +124,7 @@ export function BlockingFeed({ blocking }: { blocking: OperatorHome['blocking'] 
   );
 }
 
-export function ServicesCard({ health }: { health: OperatorHome['health'] }) {
+export function ServicesCard({ health }: Readonly<{ health: OperatorHome['health'] }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="divide-y divide-border p-0">
@@ -157,7 +157,7 @@ export function ServicesCard({ health }: { health: OperatorHome['health'] }) {
   );
 }
 
-export function ActivityCard({ activity }: { activity: OperatorHome['activity'] }) {
+export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['activity'] }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="divide-y divide-border p-0">
@@ -170,30 +170,27 @@ export function ActivityCard({ activity }: { activity: OperatorHome['activity'] 
             .
           </p>
         ) : (
-          activity.map((r) => (
-            <Link
-              key={r.id}
-              href={`/build/agent-runs?run=${r.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
-              </span>
-              <Badge
-                variant="secondary"
-                className={
-                  r.status === 'blocked' || r.status === 'denied'
-                    ? 'bg-destructive/10 text-destructive'
-                    : r.status === 'done'
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                }
+          activity.map((r) => {
+            let statusCls = 'bg-muted text-muted-foreground';
+            if (r.status === 'blocked' || r.status === 'denied')
+              statusCls = 'bg-destructive/10 text-destructive';
+            else if (r.status === 'done') statusCls = 'bg-primary/10 text-primary';
+            return (
+              <Link
+                key={r.id}
+                href={`/build/agent-runs?run=${r.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
               >
-                {r.status}
-              </Badge>
-            </Link>
-          ))
+                <span className="flex min-w-0 items-center gap-2">
+                  <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
+                </span>
+                <Badge variant="secondary" className={statusCls}>
+                  {r.status}
+                </Badge>
+              </Link>
+            );
+          })
         )}
       </CardContent>
     </Card>

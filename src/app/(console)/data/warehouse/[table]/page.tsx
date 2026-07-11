@@ -34,9 +34,9 @@ export const dynamic = 'force-dynamic';
 // directly (server component). Deep-linkable: /data/warehouse/[table].
 export default async function WarehouseTableDetailPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ table: string }>;
-}) {
+}>) {
   await requireModuleForUser('data');
   const { table: raw } = await params;
   const name = decodeURIComponent(raw);
@@ -56,6 +56,7 @@ export default async function WarehouseTableDetailPage({
   const rows = sample?.rows ?? [];
   const columnNames = deriveResultColumns(columns, rows);
   const freshness = stats?.freshness;
+  const previewSql = `SELECT * FROM ${name} LIMIT 100`;
 
   return (
     <div className="w-full space-y-6">
@@ -78,9 +79,7 @@ export default async function WarehouseTableDetailPage({
           <p className="mt-1 text-xs text-muted-foreground">{name}</p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/data/query?sql=${encodeURIComponent(`SELECT * FROM ${name} LIMIT 100`)}`}>
-            Query this table
-          </Link>
+          <Link href={`/data/query?sql=${encodeURIComponent(previewSql)}`}>Query this table</Link>
         </Button>
       </div>
 
@@ -166,7 +165,7 @@ export default async function WarehouseTableDetailPage({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="py-4">

@@ -4,11 +4,7 @@ import { AddAssetButton } from '@/components/data-catalog/AddAssetButton';
 import { SeedCatalogButton } from '@/components/data-catalog/SeedCatalogButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  assetPosture,
-  listAssets,
-  listAllClassifications,
-} from '@/lib/data-catalog-store';
+import { listAssets, listAllClassifications } from '@/lib/data-catalog-store';
 import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import { evaluateFreshness } from '@/lib/data-freshness';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -160,9 +156,14 @@ export default async function DataCatalogPage() {
   );
 }
 
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'bad' }) {
-  const valueTone =
-    tone === 'bad' ? 'text-destructive' : tone === 'warn' ? 'text-amber-600' : 'text-foreground';
+function StatCard({
+  label,
+  value,
+  tone,
+}: Readonly<{ label: string; value: string; tone?: 'warn' | 'bad' }>) {
+  let valueTone = 'text-foreground';
+  if (tone === 'bad') valueTone = 'text-destructive';
+  else if (tone === 'warn') valueTone = 'text-amber-600';
   return (
     <Card className="shadow-sm">
       <CardContent className="py-4">

@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // next fire times computed by the pure app-schedule authority. Resolves the current schedule config
 // from the app's trigger, previews it server-side (so the first paint already shows next runs), and
 // hands it to the client editor which PATCHes /api/v1/admin/apps/[id]/schedule.
-export default async function AppScheduleTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppScheduleTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

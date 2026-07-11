@@ -48,9 +48,9 @@ function daysAgo(n: number): string {
 
 export default async function RegulatoryPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ from?: string; to?: string }>;
-}) {
+}>) {
   await requireModuleForUser('regulatory');
   const org = await currentOrgId();
   const sp = await searchParams;
@@ -360,12 +360,12 @@ function Stat({
   value,
   sub,
   tone,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   sub?: string;
   tone?: 'warn';
-}) {
+}>) {
   return (
     <div className="rounded-lg border border-border/60 p-3">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>

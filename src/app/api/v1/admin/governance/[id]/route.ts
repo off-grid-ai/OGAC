@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { deleteGovernance, updateGovernance } from '@/lib/store';
 
-const KINDS = [
+const KINDS = new Set([
   'policy',
   'ethics_review',
   'raci',
@@ -11,8 +11,8 @@ const KINDS = [
   'insurance',
   'drill',
   'impact_assessment',
-];
-const STATUSES = ['draft', 'active', 'due', 'expired'];
+]);
+const STATUSES = new Set(['draft', 'active', 'due', 'expired']);
 
 // Edit a governance record — title / owner / status / kind / detail / reviewedAt. Only supplied
 // fields change; invalid enum values are rejected.
@@ -22,9 +22,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!b) return NextResponse.json({ error: 'body required' }, { status: 400 });
-  if (b.kind !== undefined && !KINDS.includes(String(b.kind)))
+  if (b.kind !== undefined && !KINDS.has(String(b.kind)))
     return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
-  if (b.status !== undefined && !STATUSES.includes(String(b.status)))
+  if (b.status !== undefined && !STATUSES.has(String(b.status)))
     return NextResponse.json({ error: 'invalid status' }, { status: 400 });
   const patch: Record<string, string> = {};
   for (const k of ['title', 'owner', 'status', 'kind', 'detail', 'reviewedAt'] as const) {

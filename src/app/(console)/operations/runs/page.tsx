@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
 // RunsMonitor takes over for interactive filtering + live refresh. URL-driven (?kind=&status=&q=).
 export default async function RunsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ kind?: string; status?: string; q?: string }>;
-}) {
+}>) {
   await requireModuleForUser('runs');
   const { kind: kindRaw, status: statusRaw, q: qRaw } = await searchParams;
   const orgId = await currentOrgId();

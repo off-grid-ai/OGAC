@@ -10,7 +10,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerModeProvider } from '@/components/ViewerModeProvider';
 import { readDemoBanner } from '@/lib/demo-hellobar';
 
-export default async function ConsoleLayout({ children }: { children: ReactNode }) {
+export default async function ConsoleLayout({ children }: Readonly<{ children: ReactNode }>) {
   const session = await auth();
   // Read-only-demo hellobar: shows only for a viewer session, with the demo creds from env.
   const banner = readDemoBanner(session?.user?.role);

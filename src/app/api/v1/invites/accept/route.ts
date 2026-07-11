@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 async function tokenFrom(req: Request): Promise<string> {
   const url = new URL(req.url);
   const qs = url.searchParams.get('token');
-  if (qs && qs.trim()) return qs.trim();
+  if (qs?.trim()) return qs.trim();
   const body = (await req.json().catch(() => null)) as { token?: unknown } | null;
   return typeof body?.token === 'string' ? body.token.trim() : '';
 }

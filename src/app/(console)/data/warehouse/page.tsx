@@ -1,5 +1,6 @@
 import { Database, Table as TableIcon } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { DataPlaneHealthBand } from '@/components/data/DataPlaneHealthBand';
 import { WarehouseSearch } from '@/components/data/WarehouseSearch';
 import { Badge } from '@/components/ui/badge';
@@ -28,9 +29,9 @@ export const dynamic = 'force-dynamic';
 // degrades to an honest empty state, never fabricated rows.
 export default async function WarehousePage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ q?: string }>;
-}) {
+}>) {
   await requireModuleForUser('data');
   const { q = '' } = await searchParams;
 
@@ -47,6 +48,80 @@ export default async function WarehousePage({
 
   const totalRows = tables.reduce((n, t) => n + (t.rows || 0), 0);
   const totalBytes = tables.reduce((n, t) => n + (t.bytes || 0), 0);
+
+  let warehouseBody: ReactNode;
+  if (!healthy && tables.length === 0) {
+    warehouseBody = (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          The warehouse isn&apos;t reachable right now, so its tables can&apos;t be listed. Check
+          the engine-health band below — once the warehouse is back online, your tables appear here
+          automatically.
+          <div className="mt-4">
+            <DataPlaneHealthBand />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  } else if (tables.length === 0) {
+    warehouseBody = (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          The warehouse is online but holds no tables yet. Run a pipeline to move source data in —
+          catalogued tables will show up here.
+        </CardContent>
+      </Card>
+    );
+  } else if (groups.length === 0) {
+    warehouseBody = (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No tables match &quot;{q}&quot;.
+        </CardContent>
+      </Card>
+    );
+  } else {
+    warehouseBody = (
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <section key={group.database} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.database}
+              </h3>
+              <span className="text-[11px] text-muted-foreground/70">
+                {group.tables.length} table{group.tables.length === 1 ? '' : 's'} ·{' '}
+                {formatRows(group.totalRows)} rows · {formatBytes(group.totalBytes)}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {group.tables.map((t) => (
+                <Link key={t.name} href={tableHref(t)} className="group">
+                  <Card className="h-full shadow-sm transition-colors group-hover:border-primary/40">
+                    <CardHeader className="space-y-0 pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="flex items-center gap-1.5 text-sm">
+                          <TableIcon className="size-3.5 text-muted-foreground" />
+                          {bareTableName(t.name)}
+                        </CardTitle>
+                        <Badge className={freshnessTone(t.freshness.label, t.freshness.ageMs)}>
+                          {t.freshness.label}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{formatRows(t.rows)} rows</span>
+                      <span>{formatBytes(t.bytes)}</span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-6">
@@ -73,75 +148,12 @@ export default async function WarehousePage({
         <Stat label="On disk" value={formatBytes(totalBytes)} />
       </StatRail>
 
-      {!healthy && tables.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            The warehouse isn&apos;t reachable right now, so its tables can&apos;t be listed. Check
-            the engine-health band below — once the warehouse is back online, your tables appear here
-            automatically.
-            <div className="mt-4">
-              <DataPlaneHealthBand />
-            </div>
-          </CardContent>
-        </Card>
-      ) : tables.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            The warehouse is online but holds no tables yet. Run a pipeline to move source data in —
-            catalogued tables will show up here.
-          </CardContent>
-        </Card>
-      ) : groups.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No tables match &quot;{q}&quot;.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {groups.map((group) => (
-            <section key={group.database} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {group.database}
-                </h3>
-                <span className="text-[11px] text-muted-foreground/70">
-                  {group.tables.length} table{group.tables.length === 1 ? '' : 's'} ·{' '}
-                  {formatRows(group.totalRows)} rows · {formatBytes(group.totalBytes)}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {group.tables.map((t) => (
-                  <Link key={t.name} href={tableHref(t)} className="group">
-                    <Card className="h-full shadow-sm transition-colors group-hover:border-primary/40">
-                      <CardHeader className="space-y-0 pb-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="flex items-center gap-1.5 text-sm">
-                            <TableIcon className="size-3.5 text-muted-foreground" />
-                            {bareTableName(t.name)}
-                          </CardTitle>
-                          <Badge className={freshnessTone(t.freshness.label, t.freshness.ageMs)}>
-                            {t.freshness.label}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{formatRows(t.rows)} rows</span>
-                        <span>{formatBytes(t.bytes)}</span>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+      {warehouseBody}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="py-4">

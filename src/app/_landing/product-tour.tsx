@@ -10,7 +10,7 @@ import { type TourShot } from '@/lib/landing-hero';
 // The centerpiece: the whole real product, live. The top stage shows the lead product shot on the
 // macOS scroll-rotate frame; the rail below lets a visitor tap any surface to open it full screen.
 // Presentation only - holds no state or logic.
-export function ProductTour({ shots }: { shots: TourShot[] }) {
+export function ProductTour({ shots }: Readonly<{ shots: TourShot[] }>) {
   const hero = shots[0];
 
   return (

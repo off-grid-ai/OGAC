@@ -7,7 +7,6 @@ import {
   ChartLineUp,
   Coins,
   Cube,
-  Database,
   Gauge,
   Lock,
   Plugs,
@@ -200,7 +199,7 @@ const GUARANTEES: Angle[] = [
 ];
 
 // ─── Render helpers ───────────────────────────────────────────────────────────
-function GroupCard({ g }: { g: FeatureGroup }) {
+function GroupCard({ g }: Readonly<{ g: FeatureGroup }>) {
   return (
     <BlurFade inView>
       <MagicCard className="h-full rounded-xl border border-border p-6">
@@ -225,7 +224,7 @@ function GroupCard({ g }: { g: FeatureGroup }) {
   );
 }
 
-function AngleCard({ a }: { a: Angle }) {
+function AngleCard({ a }: Readonly<{ a: Angle }>) {
   return (
     <BlurFade inView>
       <MagicCard className="h-full rounded-xl border border-border p-5">

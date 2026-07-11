@@ -17,12 +17,12 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const pipeRaw = sp.get('pipelineId');
   const appRaw = sp.get('appId');
-  const filter =
-    pipeRaw !== null
-      ? { orgId, pipelineId: pipeRaw === 'none' ? null : pipeRaw }
-      : appRaw !== null
-        ? { orgId, appId: appRaw === 'none' ? null : appRaw }
-        : { orgId };
+  let filter: { orgId: string; pipelineId?: string | null; appId?: string | null } = { orgId };
+  if (pipeRaw !== null) {
+    filter = { orgId, pipelineId: pipeRaw === 'none' ? null : pipeRaw };
+  } else if (appRaw !== null) {
+    filter = { orgId, appId: appRaw === 'none' ? null : appRaw };
+  }
   return NextResponse.json({ object: 'list', data: await listGoldenCases(filter) });
 }
 

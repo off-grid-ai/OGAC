@@ -32,6 +32,62 @@ export default async function SecretsPage() {
   const sealed = view.sealed === true;
   const unsealed = view.sealed === false;
 
+  let sealStatusValue = 'Unknown';
+  let sealStatusTone: 'good' | 'bad' | 'muted' = 'muted';
+  if (sealed) {
+    sealStatusValue = 'Sealed';
+    sealStatusTone = 'bad';
+  } else if (unsealed) {
+    sealStatusValue = 'Unsealed';
+    sealStatusTone = 'good';
+  }
+
+  let statusBanner: React.ReactNode = null;
+  if (!view.configured) {
+    statusBanner = (
+      <Card className="shadow-sm">
+        <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
+          <Warning className="size-5 shrink-0 text-muted-foreground" />
+          <span>
+            The secrets store is not configured. Set{' '}
+            <span className="font-mono">OFFGRID_OPENBAO_URL</span> to enable the KMS-backed secrets
+            store. The console falls back to the{' '}
+            <span className="font-mono">{view.activeAdapterVendor}</span> adapter.
+          </span>
+        </CardContent>
+      </Card>
+    );
+  } else if (error) {
+    statusBanner = (
+      <Card className="border-destructive/40 bg-destructive/5 shadow-sm">
+        <CardContent className="flex items-center gap-3 py-4 text-sm text-foreground">
+          <Warning className="size-5 shrink-0 text-destructive" />
+          <span>
+            <span className="font-semibold text-destructive">Secrets store unreachable.</span>{' '}
+            {error}
+          </span>
+        </CardContent>
+      </Card>
+    );
+  } else if (sealed) {
+    statusBanner = (
+      <Card className="border-destructive/40 bg-destructive/5 shadow-sm">
+        <CardContent className="flex items-center gap-3 py-4 text-sm text-foreground">
+          <LockKey className="size-5 shrink-0 text-destructive" />
+          <span>
+            <span className="font-semibold text-destructive">Vault is SEALED.</span> Secrets cannot
+            be read or written until it is unsealed
+            {view.unsealThreshold !== null && view.unsealShares !== null
+              ? ` (${view.unsealProgress ?? 0}/${view.unsealThreshold} of ${view.unsealShares} key shares provided)`
+              : ''}
+            . Unsealing requires operator key shares and is performed against the secrets store
+            directly — not from this browser.
+          </span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -47,44 +103,7 @@ export default async function SecretsPage() {
         </div>
       </div>
 
-      {!view.configured ? (
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
-            <Warning className="size-5 shrink-0 text-muted-foreground" />
-            <span>
-              The secrets store is not configured. Set{' '}
-              <span className="font-mono">OFFGRID_OPENBAO_URL</span> to enable the KMS-backed secrets
-              store. The console falls back to the{' '}
-              <span className="font-mono">{view.activeAdapterVendor}</span> adapter.
-            </span>
-          </CardContent>
-        </Card>
-      ) : error ? (
-        <Card className="border-destructive/40 bg-destructive/5 shadow-sm">
-          <CardContent className="flex items-center gap-3 py-4 text-sm text-foreground">
-            <Warning className="size-5 shrink-0 text-destructive" />
-            <span>
-              <span className="font-semibold text-destructive">Secrets store unreachable.</span>{' '}
-              {error}
-            </span>
-          </CardContent>
-        </Card>
-      ) : sealed ? (
-        <Card className="border-destructive/40 bg-destructive/5 shadow-sm">
-          <CardContent className="flex items-center gap-3 py-4 text-sm text-foreground">
-            <LockKey className="size-5 shrink-0 text-destructive" />
-            <span>
-              <span className="font-semibold text-destructive">Vault is SEALED.</span> Secrets cannot
-              be read or written until it is unsealed
-              {view.unsealThreshold !== null && view.unsealShares !== null
-                ? ` (${view.unsealProgress ?? 0}/${view.unsealThreshold} of ${view.unsealShares} key shares provided)`
-                : ''}
-              . Unsealing requires operator key shares and is performed against the secrets store
-              directly — not from this browser.
-            </span>
-          </CardContent>
-        </Card>
-      ) : null}
+      {statusBanner}
 
       {/* Summary tiles — horizontal rail on mobile, restored 4-col grid on desktop. */}
       <StatRail cols={4}>
@@ -98,8 +117,8 @@ export default async function SecretsPage() {
         <SummaryTile
           icon={unsealed ? <LockKeyOpen className="size-4" /> : <LockKey className="size-4" />}
           label="Seal status"
-          value={sealed ? 'Sealed' : unsealed ? 'Unsealed' : 'Unknown'}
-          tone={sealed ? 'bad' : unsealed ? 'good' : 'muted'}
+          value={sealStatusValue}
+          tone={sealStatusTone}
           sub={
             view.unsealShares !== null && view.unsealThreshold !== null
               ? `threshold ${view.unsealThreshold} of ${view.unsealShares}`
@@ -199,15 +218,15 @@ function SummaryTile({
   value,
   sub,
   tone,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   label: string;
   value: string;
   sub: string;
   tone: 'good' | 'bad' | 'muted';
-}) {
-  const valueClass =
-    tone === 'good' ? 'text-primary' : tone === 'bad' ? 'text-destructive' : 'text-foreground';
+}>) {
+  const TONE_CLASS = { good: 'text-primary', bad: 'text-destructive', muted: 'text-foreground' };
+  const valueClass = TONE_CLASS[tone];
   return (
     <Card className="shadow-sm">
       <CardContent className="space-y-1 py-4">

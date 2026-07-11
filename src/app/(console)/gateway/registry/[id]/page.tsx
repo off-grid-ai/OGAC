@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 //    in GatewayDetail; the static fleet-served set is passed as the baseline).
 //  • cloud   → the gateway's default model spec if it's a known catalog entry (published specs), else
 //    an honest "spec not in catalog" note. Cloud providers expose thousands of models; we don't guess.
-export default async function GatewayDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function GatewayDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('gateways');
   const { id } = await params;
   const orgId = await currentOrgId();

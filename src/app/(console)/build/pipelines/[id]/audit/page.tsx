@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { LensLink } from '@/components/pipelines/telemetry/LensLink';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +36,7 @@ function fmt(ts: string): string {
 // config changes, egress verdicts) plus who invoked it. A lens over the org-wide audit stream
 // (searchAudit → offgrid-audit) narrowed by the pure filterAuditForPipeline to rows whose
 // resource/project names this pipeline. Honest: an unconfigured/empty index → an empty table + note.
-export default async function PipelineAuditPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineAuditPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();
@@ -45,6 +46,57 @@ export default async function PipelineAuditPage({ params }: { params: Promise<{ 
   const result = await searchAudit({ size: 200 });
   const view = normalizeAudit(result);
   const rows = filterAuditForPipeline(view.rows, id);
+
+  let auditBody: ReactNode;
+  if (!view.configured) {
+    auditBody = (
+      <p className="text-sm text-muted-foreground">
+        The audit index isn&apos;t configured on this deployment, so there are no events to show
+        yet.
+      </p>
+    );
+  } else if (rows.length === 0) {
+    auditBody = (
+      <p className="text-sm text-muted-foreground">
+        No audited events for this pipeline yet. Minting a key, editing config, or invoking the
+        pipeline will record events here.
+      </p>
+    );
+  } else {
+    auditBody = (
+      <div className="overflow-x-auto rounded-md border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Time</TableHead>
+              <TableHead>Actor</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Outcome</TableHead>
+              <TableHead>Model</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="text-xs text-muted-foreground">{fmt(r.ts)}</TableCell>
+                <TableCell className="text-xs">{r.actor}</TableCell>
+                <TableCell className="font-medium">{r.action}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={OUTCOME_TONE[r.outcome] ?? 'text-muted-foreground'}
+                  >
+                    {r.outcome}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{r.model || '—'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4">
@@ -58,53 +110,7 @@ export default async function PipelineAuditPage({ params }: { params: Promise<{ 
             invocations, key lifecycle, config changes, and egress verdicts.
           </p>
         </CardHeader>
-        <CardContent>
-          {!view.configured ? (
-            <p className="text-sm text-muted-foreground">
-              The audit index isn&apos;t configured on this deployment, so there are no events to
-              show yet.
-            </p>
-          ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No audited events for this pipeline yet. Minting a key, editing config, or invoking the
-              pipeline will record events here.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Actor</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>Model</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs text-muted-foreground">{fmt(r.ts)}</TableCell>
-                      <TableCell className="text-xs">{r.actor}</TableCell>
-                      <TableCell className="font-medium">{r.action}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={OUTCOME_TONE[r.outcome] ?? 'text-muted-foreground'}
-                        >
-                          {r.outcome}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {r.model || '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+        <CardContent>{auditBody}</CardContent>
       </Card>
     </div>
   );

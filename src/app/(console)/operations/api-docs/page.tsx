@@ -51,13 +51,24 @@ export default async function ApiDocsPage() {
         </CardHeader>
         <CardContent className="divide-y divide-border p-0">
           {SERVICE_SPECS.map((s) => {
-            const href = s.kind === 'console' ? '/docs' : s.kind === 'native' ? `/api/v1/specs/${s.id}` : null;
+            let href: string | null = null;
+            if (s.kind === 'console') {
+              href = '/docs';
+            } else if (s.kind === 'native') {
+              href = `/api/v1/specs/${s.id}`;
+            }
+            let kindLabel = 'no spec';
+            if (s.kind === 'console') {
+              kindLabel = 'interactive';
+            } else if (s.kind === 'native') {
+              kindLabel = 'OpenAPI';
+            }
             return (
               <div key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <div className="flex items-center gap-2.5">
                   <span className="text-sm text-foreground">{s.label}</span>
                   <Badge variant="secondary" className={KIND_BADGE[s.kind]}>
-                    {s.kind === 'console' ? 'interactive' : s.kind === 'native' ? 'OpenAPI' : 'no spec'}
+                    {kindLabel}
                   </Badge>
                 </div>
                 {href ? (

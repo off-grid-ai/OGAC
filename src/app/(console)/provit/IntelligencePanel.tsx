@@ -2,15 +2,36 @@
 import { useCallback, useEffect, useState } from 'react';
 
 type Repo = {
-  id: string; url: string; name: string; features: number; cases: number; screens: number;
-  hasSession: boolean; runCount: number; latestRunId?: string; latestRunFlagged: number;
+  id: string;
+  url: string;
+  name: string;
+  features: number;
+  cases: number;
+  screens: number;
+  hasSession: boolean;
+  runCount: number;
+  latestRunId?: string;
+  latestRunFlagged: number;
 };
-type Status = { running: boolean; phase: string; message: string; error: string | null; repo: string | null } | null;
+type Status = {
+  running: boolean;
+  phase: string;
+  message: string;
+  error: string | null;
+  repo: string | null;
+} | null;
+
+// The live map-job line: the error if any, otherwise the phase with an optional trailing message.
+function mapJobStatusText(status: NonNullable<Status>): string {
+  if (status.error) return status.error;
+  const suffix = status.message ? ` — ${status.message}` : '';
+  return `${status.phase}${suffix}`;
+}
 
 // Provit's INTELLIGENCE ENGINE, surfaced through the console: map a public repo (Provit reads the
 // code + tests and synthesizes a feature map), watch the live job, and chat with the test copilot
 // grounded in a mapped repo. Everything flows through /api/v1/provit/intelligence(/chat).
-export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
+export function IntelligencePanel({ baseUrl }: Readonly<{ baseUrl: string }>) {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [status, setStatus] = useState<Status>(null);
   const [repoUrl, setRepoUrl] = useState('');
@@ -23,10 +44,14 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
       const d = await r.json();
       setRepos(d.repos ?? []);
       setStatus(d.status ?? null);
-    } catch { /* leave last-known */ }
+    } catch {
+      /* leave last-known */
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
   // Poll while a map job is running so the operator sees progress without a manual refresh.
   useEffect(() => {
     if (!status?.running) return;
@@ -35,16 +60,25 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
   }, [status?.running, load]);
 
   const map = async () => {
-    setBusy(true); setErr(null);
+    setBusy(true);
+    setErr(null);
     try {
       const r = await fetch('/api/v1/provit/intelligence', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: repoUrl }),
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repo: repoUrl }),
       });
       const d = await r.json();
       if (!r.ok) setErr(d.error ?? 'map failed');
-      else { setRepoUrl(''); load(); }
-    } catch (e) { setErr(e instanceof Error ? e.message : 'map failed'); }
-    finally { setBusy(false); }
+      else {
+        setRepoUrl('');
+        load();
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'map failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -78,7 +112,7 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
         <div className="rounded-md border border-border bg-background px-3 py-2 text-xs">
           <span className="font-medium text-foreground">Map job:</span>{' '}
           <span className={status.error ? 'text-destructive' : 'text-muted-foreground'}>
-            {status.error ? status.error : `${status.phase}${status.message ? ` — ${status.message}` : ''}`}
+            {mapJobStatusText(status)}
           </span>
           {status.repo && <span className="text-muted-foreground"> ({status.repo})</span>}
         </div>
@@ -86,8 +120,12 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapped by Provit</h3>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{repos.length}</span>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Mapped by Provit
+          </h3>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {repos.length}
+          </span>
         </div>
         {repos.length === 0 ? (
           <p className="text-sm text-muted-foreground">No repos mapped yet — map one above.</p>
@@ -97,15 +135,30 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
               <li key={r.id} className="rounded-md border border-border bg-background p-3">
                 <div className="flex items-start justify-between gap-2">
                   <span className="break-all text-sm font-medium text-foreground">{r.name}</span>
-                  <a href={`${baseUrl}/features?repo=${encodeURIComponent(r.id)}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs text-primary hover:underline">
+                  <a
+                    href={`${baseUrl}/features?repo=${encodeURIComponent(r.id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-xs text-primary hover:underline"
+                  >
                     open →
                   </a>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span><b className="text-foreground">{r.features}</b> features</span>
-                  <span><b className="text-foreground">{r.cases}</b> tests</span>
-                  <span><b className="text-foreground">{r.screens}</b> screens</span>
-                  {r.runCount > 0 && <span><b className="text-foreground">{r.runCount}</b> runs</span>}
+                  <span>
+                    <b className="text-foreground">{r.features}</b> features
+                  </span>
+                  <span>
+                    <b className="text-foreground">{r.cases}</b> tests
+                  </span>
+                  <span>
+                    <b className="text-foreground">{r.screens}</b> screens
+                  </span>
+                  {r.runCount > 0 && (
+                    <span>
+                      <b className="text-foreground">{r.runCount}</b> runs
+                    </span>
+                  )}
                 </div>
                 <Copilot repo={r.id} />
               </li>
@@ -119,7 +172,7 @@ export function IntelligencePanel({ baseUrl }: { baseUrl: string }) {
 
 // The test copilot for one mapped repo — Provit answers on the console's gateway, grounded in that
 // repo's feature/batch context. A collapsible ask box per repo (kept simple: one question → reply).
-function Copilot({ repo }: { repo: string }) {
+function Copilot({ repo }: Readonly<{ repo: string }>) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
@@ -128,22 +181,31 @@ function Copilot({ repo }: { repo: string }) {
 
   const ask = async () => {
     if (!q.trim()) return;
-    setBusy(true); setErr(null); setAnswer(null);
+    setBusy(true);
+    setErr(null);
+    setAnswer(null);
     try {
       const r = await fetch('/api/v1/provit/intelligence/chat', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ repo, messages: [{ role: 'user', content: q }] }),
       });
       const d = await r.json();
       if (!r.ok) setErr(d.error ?? 'copilot unavailable');
       else setAnswer(d.content ?? '');
-    } catch (e) { setErr(e instanceof Error ? e.message : 'copilot unavailable'); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'copilot unavailable');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="mt-2 border-t border-border pt-2">
-      <button onClick={() => setOpen((o) => !o)} className="text-xs font-medium text-primary hover:underline">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs font-medium text-primary hover:underline"
+      >
         {open ? 'Hide copilot' : 'Ask the test copilot'}
       </button>
       {open && (
@@ -152,16 +214,26 @@ function Copilot({ repo }: { repo: string }) {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') ask(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') ask();
+              }}
               placeholder="e.g. what corner cases are missing?"
               className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs"
             />
-            <button onClick={ask} disabled={busy} className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50">
+            <button
+              onClick={ask}
+              disabled={busy}
+              className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+            >
               {busy ? '…' : 'Ask'}
             </button>
           </div>
           {err && <p className="text-xs text-destructive">{err}</p>}
-          {answer !== null && <p className="whitespace-pre-wrap rounded bg-muted/50 p-2 text-xs text-foreground">{answer || '(no answer)'}</p>}
+          {answer !== null && (
+            <p className="whitespace-pre-wrap rounded bg-muted/50 p-2 text-xs text-foreground">
+              {answer || '(no answer)'}
+            </p>
+          )}
         </div>
       )}
     </div>

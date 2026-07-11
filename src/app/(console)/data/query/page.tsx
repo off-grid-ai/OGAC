@@ -8,9 +8,9 @@ export const dynamic = 'force-dynamic';
 // `?sql=` param so "Query this table" deep-links land with the statement pre-filled.
 export default async function QueryPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ sql?: string }>;
-}) {
+}>) {
   await requireModuleForUser('data');
   const { sql = '' } = await searchParams;
   return <QueryConsole initialSql={sql} />;

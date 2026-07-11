@@ -34,7 +34,7 @@ const STATUS_STYLE: Record<VerificationStatus, { label: string; className: strin
   unsigned: { label: 'unsigned', className: 'bg-muted text-muted-foreground', Icon: Warning },
 };
 
-function StatusBadge({ status, verified }: { status: RowStatus; verified: boolean }) {
+function StatusBadge({ status, verified }: Readonly<{ status: RowStatus; verified: boolean }>) {
   if (status === '') {
     // No live verdict yet — fall back to the server's read-time boolean.
     return verified ? (
@@ -56,7 +56,7 @@ function StatusBadge({ status, verified }: { status: RowStatus; verified: boolea
   );
 }
 
-export function ProvenanceLedger({ rows }: { rows: ProvenanceRow[] }) {
+export function ProvenanceLedger({ rows }: Readonly<{ rows: ProvenanceRow[] }>) {
   // Live verdicts keyed by runId, layered over the server-rendered rows.
   const [verdicts, setVerdicts] = useState<Record<string, RowStatus>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
