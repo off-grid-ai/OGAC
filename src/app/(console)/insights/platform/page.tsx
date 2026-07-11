@@ -38,7 +38,7 @@ const ENV_HINT: Record<string, string> = {
   traces: 'OFFGRID_JAEGER_URL',
 };
 
-function NotConfigured({ envVar }: { envVar: string }) {
+function NotConfigured({ envVar }: Readonly<{ envVar: string }>) {
   return (
     <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
       Not configured (<code>{envVar}</code> is unset). Set it to the backend URL to read live
@@ -49,9 +49,9 @@ function NotConfigured({ envVar }: { envVar: string }) {
 
 export default async function PlatformHealthPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ tab?: string; logsq?: string; svc?: string }>;
-}) {
+}>) {
   await requireModuleForUser('platform-health');
   const { tab: rawTab, logsq, svc } = await searchParams;
   const tab = pickTab(rawTab);
@@ -112,7 +112,7 @@ async function MetricsTab() {
   );
 }
 
-async function LogsTab({ query }: { query?: string }) {
+async function LogsTab({ query }: Readonly<{ query?: string }>) {
   const result = await safeSearchLogs(query ?? '', 200);
   if (!result.configured) return <NotConfigured envVar={ENV_HINT.logs} />;
   return (
@@ -158,7 +158,7 @@ async function LogsTab({ query }: { query?: string }) {
   );
 }
 
-async function TracesTab({ svc }: { svc?: string }) {
+async function TracesTab({ svc }: Readonly<{ svc?: string }>) {
   const { configured, services, traces, selectedService, webUrl, error } = await safeJaegerOverview(
     svc,
     20,

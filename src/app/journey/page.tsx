@@ -95,7 +95,7 @@ const GUARANTEES: Guarantee[] = [
   },
 ];
 
-function StageRow({ stage, last }: { stage: (typeof STAGES)[number]; last: boolean }) {
+function StageRow({ stage, last }: Readonly<{ stage: (typeof STAGES)[number]; last: boolean }>) {
   return (
     <BlurFade inView>
       <div className="relative grid grid-cols-[auto_1fr] gap-5">
@@ -122,7 +122,7 @@ function StageRow({ stage, last }: { stage: (typeof STAGES)[number]; last: boole
   );
 }
 
-function DiagramBlock({ d, flip }: { d: Diagram; flip: boolean }) {
+function DiagramBlock({ d, flip }: Readonly<{ d: Diagram; flip: boolean }>) {
   return (
     <BlurFade inView>
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">

@@ -22,9 +22,9 @@ export const dynamic = 'force-dynamic';
 // linkable and history-aware. Best-effort: an unreachable index degrades to zeros + an error note.
 export default async function SiemPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ outcome?: string; pipeline?: string }>;
-}) {
+}>) {
   await requireModuleForUser('siem');
   const { outcome, pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();

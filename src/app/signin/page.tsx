@@ -104,9 +104,9 @@ async function withDev(formData: FormData): Promise<void> {
 // eslint-disable-next-line complexity
 export default async function SignInPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
-}) {
+}>) {
   const { error, callbackUrl } = await searchParams;
   const sso = [
     { enabled: googleEnabled, action: withGoogle, label: 'Continue with Google' },

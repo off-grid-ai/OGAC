@@ -25,9 +25,9 @@ export const dynamic = 'force-dynamic';
 // Best-effort: an unconfigured/unreachable index degrades to an empty table + a note, never a throw.
 export default async function AuditLogPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   await requireModuleForUser('audit');
   const sp = await searchParams;
   const get = (k: string): string | null => {
@@ -58,12 +58,15 @@ export default async function AuditLogPage({
   const query = auditFiltersToQuery(filters);
   const pipeQ = facet ? `&pipeline=${encodeURIComponent(facet)}` : '';
   const exportBase = `/api/v1/admin/audit-log/export`;
-  const exportCsv = `${exportBase}?format=csv${query ? `&${query}` : ''}`;
-  const exportJson = `${exportBase}?format=json${query ? `&${query}` : ''}`;
+  const exportQuery = query ? `&${query}` : '';
+  const exportCsv = `${exportBase}?format=csv${exportQuery}`;
+  const exportJson = `${exportBase}?format=json${exportQuery}`;
 
+  const facetHref = facet ? `?pipeline=${encodeURIComponent(facet)}` : '';
   const pageHref = (p: number) => {
     const q = auditFiltersToQuery({ ...filters, page: p }, { includePaging: true });
-    return `/insights/audit${q ? `?${q}${pipeQ}` : facet ? `?pipeline=${encodeURIComponent(facet)}` : ''}`;
+    const suffix = q ? `?${q}${pipeQ}` : facetHref;
+    return `/insights/audit${suffix}`;
   };
 
   return (
@@ -204,7 +207,7 @@ export default async function AuditLogPage({
   );
 }
 
-function ExportLink({ href, label }: { href: string; label: string }) {
+function ExportLink({ href, label }: Readonly<{ href: string; label: string }>) {
   return (
     <a
       href={href}
@@ -216,7 +219,7 @@ function ExportLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-function PageLink({ href, disabled, label }: { href: string; disabled: boolean; label: string }) {
+function PageLink({ href, disabled, label }: Readonly<{ href: string; disabled: boolean; label: string }>) {
   if (disabled) {
     return <span className="rounded-md border border-border px-2 py-1 opacity-40">{label}</span>;
   }
@@ -230,13 +233,14 @@ function PageLink({ href, disabled, label }: { href: string; disabled: boolean; 
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: AuditOutcome }) {
+function OutcomeBadge({ outcome }: Readonly<{ outcome: AuditOutcome }>) {
   const danger = outcome === 'denied' || outcome === 'blocked' || outcome === 'error';
   const good = outcome === 'ok';
-  const cls = danger
-    ? 'bg-destructive/10 text-destructive'
-    : good
-      ? 'bg-primary/10 text-primary'
-      : 'text-muted-foreground';
+  let cls = 'text-muted-foreground';
+  if (danger) {
+    cls = 'bg-destructive/10 text-destructive';
+  } else if (good) {
+    cls = 'bg-primary/10 text-primary';
+  }
   return <span className={`rounded px-1.5 py-0.5 text-xs ${cls}`}>{outcome}</span>;
 }

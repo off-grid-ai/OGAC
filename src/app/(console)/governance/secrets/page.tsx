@@ -199,13 +199,13 @@ function SummaryTile({
   value,
   sub,
   tone,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   label: string;
   value: string;
   sub: string;
   tone: 'good' | 'bad' | 'muted';
-}) {
+}>) {
   const valueClass =
     tone === 'good' ? 'text-primary' : tone === 'bad' ? 'text-destructive' : 'text-foreground';
   return (
