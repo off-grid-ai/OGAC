@@ -13,7 +13,7 @@ import { SkeletonDetailBody } from '@/components/PageSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toDisplayHost } from '@/lib/display-host';
+import { joinUrlPath, toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -117,7 +117,7 @@ async function GatewayBody() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
             <CardTitle className="text-sm">{info.name}</CardTitle>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{`${toDisplayHost(GATEWAY_URL)}/v1`}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{joinUrlPath(toDisplayHost(GATEWAY_URL), 'v1')}</p>
           </div>
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             <Plug className="size-3" />

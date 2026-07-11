@@ -130,6 +130,18 @@ export function toDisplayHost(input: string | null | undefined): string {
 }
 
 /**
+ * Join a base URL with a path segment using exactly one slash between them — regardless of
+ * whether the base has a trailing slash or the path a leading one. Prevents the `…:8800//v1`
+ * double-slash that appears when a configured `OFFGRID_GATEWAY_URL` ends in `/` and code naively
+ * appends `/v1`. Pure, zero-IO. An empty path returns the base with any trailing slash trimmed.
+ */
+export function joinUrlPath(base: string | null | undefined, path: string): string {
+  const b = String(base ?? '').replace(/\/+$/, '');
+  const p = String(path ?? '').replace(/^\/+/, '');
+  return p ? `${b}/${p}` : b;
+}
+
+/**
  * The host[:port] alone (no scheme, no path) — for compact UI chips like the services cards
  * that already strip the scheme. Convenience over `toDisplayHost`.
  */
