@@ -4,6 +4,7 @@ import {
   BHARAT_PROFILE,
   SURAKSHA_PROFILE,
   TOUR_PROFILES,
+  profileForOrg,
   BANK_APPS,
   INSURER_APPS,
   BANK_AGENTS,
@@ -50,6 +51,23 @@ test('two tour profiles: a bank (org_bharat) and an insurer (org_suraksha)', () 
 test('viewer emails follow the demo convention per tenant', () => {
   assert.equal(BHARAT_PROFILE.viewerEmail, 'viewer@bharatunion.demo');
   assert.equal(SURAKSHA_PROFILE.viewerEmail, 'viewer@suraksha.demo');
+});
+
+test('profileForOrg maps org id → flavour, defaulting unknown/empty to the bank profile', () => {
+  assert.equal(profileForOrg('org_bharat').flavour, 'bank');
+  assert.equal(profileForOrg('org_suraksha').flavour, 'insurer');
+  // Unknown / null / undefined must NOT resolve to the insurer — default to the canonical bank.
+  assert.equal(profileForOrg('org_unknown'), BHARAT_PROFILE);
+  assert.equal(profileForOrg(null), BHARAT_PROFILE);
+  assert.equal(profileForOrg(undefined), BHARAT_PROFILE);
+});
+
+test('YRT is the insurer product label — no stray OYRT anywhere in the seed', () => {
+  const insurerKnowledge = knowledgeFor(SURAKSHA_PROFILE);
+  const flat = JSON.stringify(insurerKnowledge);
+  assert.doesNotMatch(flat, /OYRT/);
+  assert.match(flat, /YRT Rate Card Guide/);
+  assert.match(flat, /Yearly Renewable Term/);
 });
 
 // ─── hash12 determinism ──────────────────────────────────────────────────────────────────────────
