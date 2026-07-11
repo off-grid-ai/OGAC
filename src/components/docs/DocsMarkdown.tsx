@@ -18,7 +18,10 @@ function headingText(children: React.ReactNode): string {
 
 // A fenced code block with a copy button (docs are terminal/mono; the copy affordance is the key
 // finesse for API samples).
-function CodeBlock({ children, className }: Readonly<{ children: React.ReactNode; className?: string }>) {
+function CodeBlock({
+  children,
+  className,
+}: Readonly<{ children: React.ReactNode; className?: string }>) {
   const [copied, setCopied] = useState(false);
   const text = headingText(children);
   // rehype-highlight adds `hljs language-*` to the <code> className; keep it so the highlight.js
@@ -48,6 +51,90 @@ function CodeBlock({ children, className }: Readonly<{ children: React.ReactNode
   );
 }
 
+// react-markdown's element-renderer map. Hoisted to module scope (not defined inside DocsMarkdown)
+// so these renderers aren't re-created as nested components each render — they close over nothing
+// from the component, only module-scope helpers. Render output is identical to the previous inline map.
+const DOCS_COMPONENTS: Parameters<typeof ReactMarkdown>[0]['components'] = {
+  h2: ({ children }) => (
+    <h2
+      id={slugifyHeading(headingText(children))}
+      className="mt-8 scroll-mt-20 border-b border-border pb-1.5 text-lg font-semibold text-foreground"
+    >
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3
+      id={slugifyHeading(headingText(children))}
+      className="mt-6 scroll-mt-20 text-base font-medium text-foreground"
+    >
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => <p className="text-muted-foreground">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="ml-5 list-disc space-y-1.5 text-muted-foreground marker:text-muted-foreground/50">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="ml-5 list-decimal space-y-1.5 text-muted-foreground marker:text-muted-foreground/50">
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => <li className="pl-1">{children}</li>,
+  strong: ({ children }) => <strong className="font-medium text-foreground">{children}</strong>,
+  a: ({ href, children }) => {
+    const url = href ?? '#';
+    if (url.startsWith('/')) {
+      return (
+        <Link href={url} className="text-primary underline-offset-4 hover:underline">
+          {children}
+        </Link>
+      );
+    }
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline-offset-4 hover:underline"
+      >
+        {children}
+      </a>
+    );
+  },
+  img: ({ src, alt }) => (
+    // Screenshots on capability guides. Bordered/rounded to read as a framed screenshot,
+    // responsive, with the alt as a caption. Plain <img> (not next/image) keeps /docs a
+    // clean static export.
+    <span className="mt-4 block">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={typeof src === 'string' ? src : ''}
+        alt={alt ?? ''}
+        loading="lazy"
+        className="w-full rounded-lg border border-border shadow-sm"
+      />
+      {alt ? (
+        <span className="mt-1.5 block text-center text-xs text-muted-foreground">{alt}</span>
+      ) : null}
+    </span>
+  ),
+  code: ({ children, className }) => {
+    const inline = !className;
+    if (inline) {
+      return (
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">
+          {children}
+        </code>
+      );
+    }
+    return <CodeBlock className={className}>{children}</CodeBlock>;
+  },
+  pre: ({ children }) => <>{children}</>,
+};
+
 // Markdown renderer for docs pages — brand-styled headings, links, code, lists, tables. Internal
 // /docs links use next/link for client nav; external links open in a new tab. Headings get slug ids
 // so the on-page table of contents can anchor to them.
@@ -57,81 +144,7 @@ export function DocsMarkdown({ body }: Readonly<{ body: string }>) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
-        components={{
-          h2: ({ children }) => (
-            <h2
-              id={slugifyHeading(headingText(children))}
-              className="mt-8 scroll-mt-20 border-b border-border pb-1.5 text-lg font-semibold text-foreground"
-            >
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3
-              id={slugifyHeading(headingText(children))}
-              className="mt-6 scroll-mt-20 text-base font-medium text-foreground"
-            >
-              {children}
-            </h3>
-          ),
-          p: ({ children }) => <p className="text-muted-foreground">{children}</p>,
-          ul: ({ children }) => (
-            <ul className="ml-5 list-disc space-y-1.5 text-muted-foreground marker:text-muted-foreground/50">
-              {children}
-            </ul>
-          ),
-          ol: ({ children }) => (
-            <ol className="ml-5 list-decimal space-y-1.5 text-muted-foreground marker:text-muted-foreground/50">
-              {children}
-            </ol>
-          ),
-          li: ({ children }) => <li className="pl-1">{children}</li>,
-          strong: ({ children }) => <strong className="font-medium text-foreground">{children}</strong>,
-          a: ({ href, children }) => {
-            const url = href ?? '#';
-            if (url.startsWith('/')) {
-              return (
-                <Link href={url} className="text-primary underline-offset-4 hover:underline">
-                  {children}
-                </Link>
-              );
-            }
-            return (
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline">
-                {children}
-              </a>
-            );
-          },
-          img: ({ src, alt }) => (
-            // Screenshots on capability guides. Bordered/rounded to read as a framed screenshot,
-            // responsive, with the alt as a caption. Plain <img> (not next/image) keeps /docs a
-            // clean static export.
-            <span className="mt-4 block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={typeof src === 'string' ? src : ''}
-                alt={alt ?? ''}
-                loading="lazy"
-                className="w-full rounded-lg border border-border shadow-sm"
-              />
-              {alt ? (
-                <span className="mt-1.5 block text-center text-xs text-muted-foreground">{alt}</span>
-              ) : null}
-            </span>
-          ),
-          code: ({ children, className }) => {
-            const inline = !className;
-            if (inline) {
-              return (
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">
-                  {children}
-                </code>
-              );
-            }
-            return <CodeBlock className={className}>{children}</CodeBlock>;
-          },
-          pre: ({ children }) => <>{children}</>,
-        }}
+        components={DOCS_COMPONENTS}
       >
         {body}
       </ReactMarkdown>
