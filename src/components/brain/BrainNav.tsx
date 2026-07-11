@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { SubNav } from '@/components/nav/SubNav';
 import {
-  BRAIN_VIEWS,
   type BrainView,
   DEFAULT_BRAIN_VIEW,
   normalizeBrainView,
@@ -13,7 +12,8 @@ import { cn } from '@/lib/utils';
 
 // Tab types/helpers now live in the server-safe @/lib/brain-view so the server page can import
 // normalizeBrainView without crossing the RSC boundary. Re-exported for existing importers.
-export { BRAIN_VIEWS, type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView };
+export { BRAIN_VIEWS } from '@/lib/brain-view';
+export { type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView };
 
 // Scoped secondary-nav for Brain — the "ingestion → retrieval (RAG)" plane. Brain is ONE page
 // whose long section stack is organised into switchable views, so unlike DataNav (one tab = one
