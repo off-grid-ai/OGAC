@@ -65,7 +65,10 @@ export interface SecretsPort {
   writable?: boolean;
   set?(key: string, value: string): Promise<void>;
   remove?(key: string): Promise<void>;
-  list?(): Promise<string[]>;
+  // `prefix` (optional) scopes the enumeration to one KV folder — used to isolate a tenant's
+  // `<org>/` namespace so listing never returns sibling tenants' folders. Returns keys RELATIVE to
+  // the prefix (as OpenBao's LIST does). Absent/empty prefix lists the mount root (single-tenant).
+  list?(prefix?: string): Promise<string[]>;
 }
 
 // Grounding / attribution — verify a generated answer against its cited sources. Standalone:

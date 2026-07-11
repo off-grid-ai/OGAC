@@ -12,6 +12,7 @@
 // A single actor-level token sum can't be priced (it mixes rates). The org total is Σ over the
 // top-level by-model buckets. No `fetch`, no `process.env` here — the adapter in accounting.ts wires
 // those in. MIRRORS analytics-aggs.ts (buildAggsQuery / parseAggsResponse).
+import { analyticsScopeFilters, scopedQuery } from '@/lib/analytics-aggs';
 import { costForTokens } from '@/lib/finops';
 
 // Field names in the gateway OpenSearch index (`offgrid-gateway`). `caller` is the actor (the
@@ -49,37 +50,49 @@ function tokenSums(): Record<string, unknown> {
 }
 
 /**
- * Compose the `query` clause from an optional time range + an optional pipeline filter. When a
- * pipeline tag is given, the calls attributed to that pipeline are those whose `project` equals the
- * canonical `pipeline:<id>` tag (PA-12 stamps it there), so we AND a `term` on `project.keyword`.
- * Pure. Returns a bare range/match_all when no pipeline filter, else a `bool` combining both.
+ * Compose the `query` clause from an optional time range + optional org + optional pipeline filter.
+ *
+ * TENANT ISOLATION (mirrors analytics): `org` scopes the WHOLE accounting rollup to one tenant via a
+ * `{ term: { org } }` filter on the gateway docs. Without it, a tenant sees combined cross-tenant
+ * spend/usage (the SURFACE-3 leak: `org_bharat:fraud-screening` showing up on the insurer). The org
+ * + pipeline filters reuse `analyticsScopeFilters`/`scopedQuery` so accounting and analytics scope
+ * IDENTICALLY (DRY — one org-filter rule, one place). When a pipeline tag is given, calls attributed
+ * to it are those whose `project` equals the canonical `pipeline:<id>` tag (PA-12 stamps it there).
+ *
+ * Pure. An empty/absent `org` means "no org scoping" (single-tenant / the default org that isn't
+ * stamped) — matching every other org-scoped surface. The time range is ANDed in alongside.
  */
 export function accountingQueryClause(
   fromIso?: string,
   toIso?: string,
   pipelineTag?: string | null,
+  org?: string | null,
 ): Record<string, unknown> {
-  const range =
-    fromIso || toIso
-      ? { range: { '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) } } }
-      : { match_all: {} };
-  if (!pipelineTag) return range;
-  return { bool: { filter: [range, { term: { [PROJECT_FIELD]: pipelineTag } }] } };
+  const scopeFilters = analyticsScopeFilters(org, pipelineTag);
+  if (!fromIso && !toIso) return scopedQuery(scopeFilters);
+  const range = {
+    range: { '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) } },
+  };
+  // No org/pipeline scope → keep the bare range clause (backward-compatible single-tenant shape).
+  // With scope filters, AND them alongside the range under a bool.filter.
+  return scopeFilters.length ? { bool: { filter: [range, ...scopeFilters] } } : range;
 }
 
 /**
  * The single `size:0` accounting query. Time range is injected as ISO strings (pure — no Date.now
  * here). `fromIso`/`toIso` are optional; when both omitted it's a `match_all` over all time. An
- * optional `pipelineTag` (`pipeline:<id>`) narrows the whole rollup to one pipeline's slice.
+ * optional `pipelineTag` (`pipeline:<id>`) narrows the whole rollup to one pipeline's slice. `org`
+ * scopes the whole rollup to the caller's tenant (see accountingQueryClause).
  */
 export function buildAccountingQuery(
   fromIso?: string,
   toIso?: string,
   pipelineTag?: string | null,
+  org?: string | null,
 ): Record<string, unknown> {
   return {
     size: 0,
-    query: accountingQueryClause(fromIso, toIso, pipelineTag),
+    query: accountingQueryClause(fromIso, toIso, pipelineTag, org),
     aggs: {
       // Org-wide token totals (prompt/completion/total) across the whole window.
       org_tokens: { sum: { field: 'tokens' } },
