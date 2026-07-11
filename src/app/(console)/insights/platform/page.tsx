@@ -95,7 +95,7 @@ async function MetricsTab() {
         <span className="rounded-md border border-border px-3 py-1.5">
           Targets up:{' '}
           <span className="font-semibold tabular-nums text-foreground">
-            {targetsUp == null ? 'awaiting emission' : targetsUp}
+            {targetsUp ?? 'awaiting emission'}
           </span>
         </span>
         <span className="text-xs text-muted-foreground">

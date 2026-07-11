@@ -43,7 +43,7 @@ const GOV_STATUS: Record<string, string> = {
 
 // A date-only string (YYYY-MM-DD) N days ago, for the default activity window.
 function daysAgo(n: number): string {
-  return new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
+  return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 }
 
 export default async function RegulatoryPage({
