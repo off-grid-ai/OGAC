@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatInr } from '@/lib/roi';
+import { formatUsd } from '@/lib/roi';
 
 // ─── Org-default ROI estimates editor ──────────────────────────────────────────────────────────────
 // Sets the org-wide minutes-saved-per-run and loaded-cost-per-hour that every app inherits unless it
@@ -49,7 +49,7 @@ export function RoiOrgDefaults({
           The org-wide <span className="font-medium text-amber-600">estimates</span> every app
           inherits unless it sets its own. Set them from typical manual-handling time and a
           fully-loaded staff cost. Current: {initial.minutesSavedPerRun} min/run @{' '}
-          {formatInr(initial.loadedCostPerHour)}/hr.
+          {formatUsd(initial.loadedCostPerHour)}/hr.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -65,7 +65,7 @@ export function RoiOrgDefaults({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="org-roi-rate">Loaded cost per hour (₹)</Label>
+            <Label htmlFor="org-roi-rate">Loaded cost per hour ($)</Label>
             <Input
               id="org-roi-rate"
               type="number"

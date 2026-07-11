@@ -29,7 +29,7 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
 
   await ensureAppAccessSchema();
 
-  // ── seed: an app + an approval-authority policy (manager may approve up to ₹1,00,000) ──
+  // ── seed: an app + an approval-authority policy (manager may approve up to $100,000) ──
   const app = await createApp(ORG, OWNER, {
     title: 'Reimbursement Approver',
     summary: 'Approves employee reimbursements above the auto-limit',
@@ -55,7 +55,7 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
     answer: 'Recommend approval — within policy.',
     status: 'done',
     steps: [],
-    citations: [{ ref: 'doc:1', title: 'Reimbursement Policy', snippet: 'limit is ₹1,00,000', score: 0.72, supported: true }],
+    citations: [{ ref: 'doc:1', title: 'Reimbursement Policy', snippet: 'limit is $100,000', score: 0.72, supported: true }],
     checks: [
       { name: 'grounding', verdict: 'pass', score: 0.88 },
       { name: 'pii', verdict: 'redacted', detail: 'PAN' },
@@ -63,7 +63,7 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
     provenance: null,
   } as never);
 
-  // ── seed: an awaiting_human run for that app (amount ₹5,00,000 → above manager authority) ──
+  // ── seed: an awaiting_human run for that app (amount $500,000 → above manager authority) ──
   const runId = `apprun_int_${Date.now()}`;
   await upsertAppRunState(
     {
@@ -99,9 +99,9 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
   const mgrInbox = await getReviewInbox(manager, ORG, 200);
   const mine = mgrInbox.find((i) => i.runId === runId);
   assert.ok(mine, 'manager sees the pending run in their inbox');
-  assert.equal(mine.amountLabel, '₹5,00,000');
+  assert.equal(mine.amountLabel, '$500,000');
   assert.equal(mine.appTitle, 'Reimbursement Approver');
-  // ₹5,00,000 is above the manager's ₹1,00,000 authority → surfaced as cannot-approve (but still shown).
+  // $500,000 is above the manager's $100,000 authority → surfaced as cannot-approve (but still shown).
   assert.equal(mine.canApprove, false);
 
   const strangerInbox = await getReviewInbox(stranger, ORG, 200);
@@ -110,18 +110,18 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
   // ── the DETAIL pulls the child trace: citations + faithfulness + guardrail notes ──
   const detail = await getReviewDetail(runId, manager, ORG);
   assert.ok(detail);
-  assert.equal(detail.question, 'Approve ₹5,00,000 — Reimbursement Approver for EMP00001?');
+  assert.equal(detail.question, 'Approve $500,000 — Reimbursement Approver for EMP00001?');
   assert.equal(detail.faithfulnessPct, 88);
   assert.equal(detail.citations.length, 1);
   assert.equal(detail.citations[0].title, 'Reimbursement Policy');
   assert.equal(detail.citations[0].scorePct, 72);
   assert.ok(detail.guardrailNotes.some((n) => /masked before the model/.test(n)));
-  assert.match(detail.policyContext, /above the ₹1,00,000/);
-  // under-authority: manager cannot approve ₹5,00,000, reason surfaced (gracefully, not a crash).
+  assert.match(detail.policyContext, /above the \$100,000/);
+  // under-authority: manager cannot approve $500,000, reason surfaced (gracefully, not a crash).
   assert.equal(detail.canApprove, false);
   assert.match(detail.approveBlockedReason ?? '', /exceeds approver authority/);
 
-  // ── approve-WITH-authority: the same manager on a ₹50,000 run CAN approve ──
+  // ── approve-WITH-authority: the same manager on a $50,000 run CAN approve ──
   const smallRunId = `apprun_int_small_${Date.now()}`;
   await upsertAppRunState(
     {
@@ -139,6 +139,6 @@ test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_ME
   });
   const smallDetail = await getReviewDetail(smallRunId, manager, ORG);
   assert.ok(smallDetail);
-  assert.equal(smallDetail.canApprove, true, 'manager can approve within their ₹1,00,000 authority');
+  assert.equal(smallDetail.canApprove, true, 'manager can approve within their $100,000 authority');
   assert.equal(smallDetail.approveBlockedReason, null);
 });

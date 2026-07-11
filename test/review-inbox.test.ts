@@ -7,7 +7,7 @@ import {
   childRunIdForReview,
   decisionQuestion,
   faithfulnessPct,
-  formatInr,
+  formatUsd,
   guardrailNotesFrom,
   humanizeKey,
   inputPairs,
@@ -54,21 +54,21 @@ function run(p: Partial<AppRunView> = {}): AppRunView {
   };
 }
 
-// ─── formatInr ────────────────────────────────────────────────────────────────────────────────────
-test('formatInr: Indian grouping for numbers + numeric strings, null otherwise', () => {
-  assert.equal(formatInr(500000), '₹5,00,000');
-  assert.equal(formatInr('500000'), '₹5,00,000');
-  assert.equal(formatInr('  '), null);
-  assert.equal(formatInr('abc'), null);
-  assert.equal(formatInr(undefined), null);
-  assert.equal(formatInr(null), null);
+// ─── formatUsd ────────────────────────────────────────────────────────────────────────────────────
+test('formatUsd: en-US grouping for numbers + numeric strings, null otherwise', () => {
+  assert.equal(formatUsd(500000), '$500,000');
+  assert.equal(formatUsd('500000'), '$500,000');
+  assert.equal(formatUsd('  '), null);
+  assert.equal(formatUsd('abc'), null);
+  assert.equal(formatUsd(undefined), null);
+  assert.equal(formatUsd(null), null);
 });
 
 // ─── decisionQuestion ──────────────────────────────────────────────────────────────────────────────
 test('decisionQuestion: amount + requester + subject fallbacks', () => {
   assert.equal(
     decisionQuestion(app(), { amount: 500000, employeeId: 'EMP00001' }),
-    'Approve ₹5,00,000 — Reimbursement Approver for EMP00001?',
+    'Approve $500,000 — Reimbursement Approver for EMP00001?',
   );
   // subject overrides app title as the noun; no amount.
   assert.equal(decisionQuestion(app(), { subject: 'Travel claim' }), 'Approve Travel claim?');
@@ -78,7 +78,7 @@ test('decisionQuestion: amount + requester + subject fallbacks', () => {
 
 // ─── amountLabelFor / requestedByFor ─────────────────────────────────────────────────────────────
 test('amountLabelFor + requestedByFor read the priority keys', () => {
-  assert.equal(amountLabelFor({ quote: 12500000 }), '₹1,25,00,000');
+  assert.equal(amountLabelFor({ quote: 12500000 }), '$12,500,000');
   assert.equal(amountLabelFor({}), null);
   assert.equal(requestedByFor({ requester: 'Asha' }), 'Asha');
   assert.equal(requestedByFor({ emp_id: 'EMP42' }), 'EMP42');
@@ -135,7 +135,7 @@ test('isReviewerFor: owner, admin, approver role/user, approve allow-list, and d
 test('summarizeInboxItem: maps run+app to a scannable row with canApprove', () => {
   const a = app({ policy: policy({ approval: { approverRoles: ['manager'], thresholdAttribute: 'amount', maxThreshold: 100000 } }) });
   const item = summarizeInboxItem(run({ input: { amount: 90000, employeeId: 'EMP1' } }), a, caller());
-  assert.equal(item.amountLabel, '₹90,000');
+  assert.equal(item.amountLabel, '$90,000');
   assert.equal(item.requestedBy, 'EMP1');
   assert.equal(item.stepLabel, 'Manager approval');
   assert.equal(item.canApprove, true);
@@ -222,20 +222,20 @@ test('recommendationFrom: pending outcome, else last prior, else run outcome, el
 });
 
 // ─── policyContextFrom ───────────────────────────────────────────────────────────────────────────
-test('policyContextFrom: threshold explained in plain INR, or generic', () => {
+test('policyContextFrom: threshold explained in plain USD, or generic', () => {
   const a = app({ policy: policy({ approval: { thresholdAttribute: 'amount', maxThreshold: 100000 } }) });
-  assert.match(policyContextFrom(a, { amount: 500000 }), /₹5,00,000 is above the ₹1,00,000 auto-approval limit/);
+  assert.match(policyContextFrom(a, { amount: 500000 }), /\$500,000 is above the \$100,000 auto-approval limit/);
   // amount not present → the "amounts above X" form.
-  assert.match(policyContextFrom(a, {}), /Amounts above ₹1,00,000 need a manager/);
+  assert.match(policyContextFrom(a, {}), /Amounts above \$100,000 need a manager/);
   // no approval config → generic.
   assert.match(policyContextFrom(app(), {}), /require a person to sign off/);
 });
 
 // ─── inputPairs + humanizeKey ────────────────────────────────────────────────────────────────────
-test('inputPairs: labelled rows, amount as INR, objects stringified, skips null', () => {
+test('inputPairs: labelled rows, amount as USD, objects stringified, skips null', () => {
   const pairs = inputPairs({ amount: 500000, employeeId: 'EMP1', meta: { a: 1 }, empty: null });
   assert.deepEqual(pairs, [
-    { key: 'Amount', value: '₹5,00,000' },
+    { key: 'Amount', value: '$500,000' },
     { key: 'Employee Id', value: 'EMP1' },
     { key: 'Meta', value: '{"a":1}' },
   ]);
@@ -277,11 +277,11 @@ test('buildReviewDetail: full plain-language detail with citations, faithfulness
   });
   const t = trace(
     [{ name: 'grounding', verdict: 'pass', score: 0.88 }, { name: 'pii', verdict: 'redacted', detail: 'PAN' }],
-    [{ ref: 'doc:1', title: 'Reimbursement Policy', snippet: '…limit ₹1L…', score: 0.7, supported: true }],
+    [{ ref: 'doc:1', title: 'Reimbursement Policy', snippet: '…limit $100k…', score: 0.7, supported: true }],
   );
   const detail = buildReviewDetail(r, a, t, caller());
-  assert.equal(detail.question, 'Approve ₹5,00,000 — Reimbursement Approver for EMP00001?');
-  assert.equal(detail.amountLabel, '₹5,00,000');
+  assert.equal(detail.question, 'Approve $500,000 — Reimbursement Approver for EMP00001?');
+  assert.equal(detail.amountLabel, '$500,000');
   assert.equal(detail.requestedBy, 'EMP00001');
   assert.equal(detail.stepLabel, 'Manager sign-off');
   assert.equal(detail.recommendation, 'Recommend approval');
@@ -289,8 +289,8 @@ test('buildReviewDetail: full plain-language detail with citations, faithfulness
   assert.equal(detail.citations.length, 1);
   assert.equal(detail.citations[0].scorePct, 70);
   assert.equal(detail.citations[0].supported, true);
-  assert.match(detail.policyContext, /above the ₹1,00,000/);
-  // ₹5,00,000 > manager's ₹1,00,000 authority → cannot approve, reason surfaced.
+  assert.match(detail.policyContext, /above the \$100,000/);
+  // $500,000 > manager's $100,000 authority → cannot approve, reason surfaced.
   assert.equal(detail.canApprove, false);
   assert.match(detail.approveBlockedReason ?? '', /exceeds approver authority/);
   // and a manager under the limit CAN approve.
