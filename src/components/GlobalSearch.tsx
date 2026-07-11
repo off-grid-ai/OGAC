@@ -92,6 +92,7 @@ export function GlobalSearch() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape')    { e.preventDefault(); setOpen(false); }
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
     if (e.key === 'ArrowUp')   { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
     if (e.key === 'Enter' && results[active]) go(results[active].href);
@@ -100,18 +101,17 @@ export function GlobalSearch() {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-      onClick={() => setOpen(false)}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+      {/* Backdrop — clicking it (or pressing Enter/Space on it) dismisses the palette. */}
+      <button
+        type="button"
+        aria-label="Close search"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={() => setOpen(false)}
+      />
 
       {/* Panel */}
-      <div
-        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
         {/* Input row */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <MagnifyingGlass className="size-4 shrink-0 text-muted-foreground" />

@@ -138,7 +138,7 @@ function isoList(xs: (Date | string | number)[] | undefined): string[] {
   const out: string[] = [];
   for (const x of xs) {
     const d = x instanceof Date ? x : new Date(x);
-    if (!isNaN(d.getTime())) out.push(d.toISOString());
+    if (!Number.isNaN(d.getTime())) out.push(d.toISOString());
   }
   return out;
 }
@@ -164,9 +164,12 @@ export interface SchedulesView {
   schedules: ScheduleRow[];
 }
 
+type SchedulesViewOpts = { configured: boolean; reachable: boolean; note?: string };
+const DEFAULT_SCHEDULES_OPTS: SchedulesViewOpts = { configured: false, reachable: false };
+
 export function buildSchedulesView(
   raws: RawScheduleDescription[],
-  opts: { configured: boolean; reachable: boolean; note?: string } = { configured: false, reachable: false },
+  opts: SchedulesViewOpts = DEFAULT_SCHEDULES_OPTS,
 ): SchedulesView {
   return {
     object: 'temporal_schedules',

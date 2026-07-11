@@ -80,7 +80,7 @@ class RedisClient {
   private takeReply(): string | null | undefined {
     const nl = this.buf.indexOf('\r\n');
     if (nl === -1) return undefined;
-    const type = String.fromCharCode(this.buf[0]);
+    const type = String.fromCodePoint(this.buf[0]);
     const line = this.buf.subarray(1, nl).toString();
     if (type === '$') return this.takeBulk(nl, Number(line));
     // Simple string (+), integer (:), error (-), or anything else — single line.

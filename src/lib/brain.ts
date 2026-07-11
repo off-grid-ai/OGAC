@@ -232,7 +232,7 @@ export async function deleteDocument(id: string): Promise<boolean> {
   }
   const tbl = await getTable();
   // id is a server-generated UUID; single-quote-escape defensively before the SQL-ish filter.
-  const safe = id.replace(/'/g, "''");
+  const safe = id.replaceAll("'", "''");
   await tbl.delete(`id = '${safe}'`);
   return true;
 }

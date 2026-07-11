@@ -107,7 +107,7 @@ export function buildSampleSql(table: string, limit?: number): string {
 // Single-quote-escape a string literal for ClickHouse (double the quote + backslash). Used only for
 // our own db/table names (already identifier-safe), never for arbitrary input, but correct regardless.
 export function sqlString(s: string): string {
-  return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return `'${s.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 }
 
 // ─── Read-only query guard (pure) ──────────────────────────────────────────────

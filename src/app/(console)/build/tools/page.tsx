@@ -110,8 +110,7 @@ function RegisteredTab({
             Register, edit, enable, or remove them here; add from the{' '}
             <a href="/build/tools?tab=catalog" className="text-primary underline-offset-4 hover:underline">
               Catalog
-            </a>
-            .
+            </a>.
           </p>
         </div>
         <RegisterToolButton />
@@ -123,8 +122,7 @@ function RegisteredTab({
               No tools registered yet. Register one above, or one-click add a server from the{' '}
               <a href="/build/tools?tab=catalog" className="text-primary underline-offset-4 hover:underline">
                 Catalog
-              </a>
-              .
+              </a>.
             </p>
           </div>
         ) : (
@@ -323,8 +321,7 @@ function PrimitivesTab() {
               deployment&apos;s environment (see{' '}
               <a href="/operations/config" className="text-primary underline-offset-4 hover:underline">
                 Configuration
-              </a>
-              ). Applied on restart.
+              </a>). Applied on restart.
             </p>
           </div>
         </CardContent>

@@ -45,26 +45,20 @@ export function PublicArtifact({
       </header>
       {showEmbed ? (
         <div className="border-b border-border bg-card px-4 py-2">
-          <pre
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             aria-label="Copy the embed code"
-            className="cursor-pointer overflow-x-auto rounded border border-border bg-background p-2 font-mono text-[11px]"
+            title="Click to copy"
+            className="block w-full cursor-pointer text-left"
             onClick={() => {
               void navigator.clipboard.writeText(embed);
               toast.success('Embed code copied');
             }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                void navigator.clipboard.writeText(embed);
-                toast.success('Embed code copied');
-              }
-            }}
-            title="Click to copy"
           >
-            {embed}
-          </pre>
+            <pre className="overflow-x-auto rounded border border-border bg-background p-2 font-mono text-[11px]">
+              {embed}
+            </pre>
+          </button>
         </div>
       ) : null}
       <div className="flex-1 overflow-auto">

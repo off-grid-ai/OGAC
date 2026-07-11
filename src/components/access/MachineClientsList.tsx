@@ -115,7 +115,7 @@ function AddClientForm({
           onChange={(e) => setServiceAccount(e.target.checked)}
           className="accent-primary"
         />
-        Enable service account (client_credentials grant)
+        <span>Enable service account (client_credentials grant)</span>
       </label>
 
       {/* ── Scope (RBAC/ABAC): pick a role AND/OR tick services this token may access ── */}
@@ -126,7 +126,7 @@ function AddClientForm({
           </p>
           {customRoles.length > 0 && (
             <label className="block text-xs text-muted-foreground">
-              Custom role
+              <span>Custom role</span>
               <select
                 value={roleName}
                 onChange={(e) => setRoleName(e.target.value)}
@@ -469,9 +469,17 @@ export function MachineClientsList() {
                       <span
                         role="button"
                         tabIndex={0}
+                        aria-label="Delete client"
                         className="shrink-0 text-muted-foreground hover:text-destructive"
                         title="Delete client"
                         onClick={(e) => { e.stopPropagation(); void deleteClient(c); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void deleteClient(c);
+                          }
+                        }}
                       >
                         <Trash className="size-3.5" />
                       </span>

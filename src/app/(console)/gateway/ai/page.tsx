@@ -150,7 +150,7 @@ async function GatewayBody() {
                     key={name}
                     className="flex items-center justify-between rounded-md border border-border px-3 py-2"
                   >
-                    <span className="text-sm text-foreground">{name.replace(/_/g, ' ')}</span>
+                    <span className="text-sm text-foreground">{name.replaceAll('_', ' ')}</span>
                     {ready ? (
                       <span className="flex items-center gap-1 text-xs text-primary">
                         <CircleCheck className="size-3.5" />

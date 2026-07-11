@@ -108,7 +108,7 @@ export function defaultAppAccessPolicy(
 function toNum(v: unknown): number {
   if (typeof v === 'number') return v;
   if (typeof v === 'string' && v.trim() !== '') return Number(v);
-  return NaN;
+  return Number.NaN;
 }
 
 // Evaluate ONE ABAC predicate against the request attributes. Fail-closed: a missing attribute or an

@@ -72,3 +72,8 @@ test('safeWithTimeout: a slow thunk degrades to the fallback at the deadline', a
   const out = await safeWithTimeout(() => later('slow', 1000), 20, 'fallback');
   assert.equal(out, 'fallback');
 });
+
+test('safeWithTimeout: a thunk whose promise rejects before the deadline degrades to the fallback', async () => {
+  const out = await safeWithTimeout(() => rejectLater(5), 1000, 'fallback');
+  assert.equal(out, 'fallback');
+});

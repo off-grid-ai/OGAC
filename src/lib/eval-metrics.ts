@@ -220,7 +220,10 @@ export function heuristicSummarization(summary: string, source: string): number 
 }
 
 const PII_PATTERNS: RegExp[] = [
-  /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, // email
+  // Email. Class lengths are bounded to RFC limits (local ≤64, domain ≤255, TLD ≤24) so the
+  // `[a-z0-9.-]{1,255}` / `\.` overlap can't backtrack super-linearly on a long dotted run in
+  // untrusted scanned text — same matched language as the unbounded form for any real input.
+  /[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,255}\.[a-z]{2,24}/i, // email
   /\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/, // SSN-ish
   /\b(?:\d[ -]*?){13,16}\b/, // card number
   /\b\+?\d{1,2}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/, // phone

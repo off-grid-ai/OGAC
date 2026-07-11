@@ -32,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     headers: {
       'content-type': meta.mime,
       'content-length': String(meta.size),
-      'content-disposition': `inline; filename="${meta.name.replace(/"/g, '')}"`,
+      'content-disposition': `inline; filename="${meta.name.replaceAll('"', '')}"`,
       'cache-control': meta.visibility === 'public' ? 'public, max-age=300' : 'private, no-store',
     },
   });

@@ -219,7 +219,7 @@ export function buildCreatePayload(input: CreateCollectionInput): BuildCreateRes
       ? sizeRaw
       : typeof sizeRaw === 'string' && sizeRaw.trim() !== ''
         ? Number(sizeRaw)
-        : NaN;
+        : Number.NaN;
   if (!Number.isInteger(size) || size < 1 || size > 65536) {
     return { name, payload: null, error: 'vectorSize must be an integer between 1 and 65536' };
   }

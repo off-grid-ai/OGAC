@@ -439,7 +439,7 @@ function PromptEditPanel({
             checked={draft.visibility === 'org'}
             onChange={(e) => onChange({ ...draft, visibility: e.target.checked ? 'org' : 'private' })}
           />
-          Share with org
+          <span>Share with org</span>
         </label>
         <div className="mt-auto flex justify-end gap-2 border-t border-border pt-3">
           <Button size="sm" variant="outline" onClick={onCancel}>

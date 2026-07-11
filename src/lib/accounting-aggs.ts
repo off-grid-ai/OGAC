@@ -224,9 +224,13 @@ function attributedSpend(b: OsGroupBucket): AttributedSpend {
  * Parse an OpenSearch accounting aggregation response into the `Accounting` breakdown. Pure — no
  * I/O. Groups are sorted by spend desc (the terms agg orders by tokens; we re-sort by priced cost).
  */
+type AccountingRange = { from: string | null; to: string | null };
+// Shared default; frozen so a caller mutating a returned view.range can't leak back here.
+const EMPTY_RANGE: AccountingRange = Object.freeze({ from: null, to: null });
+
 export function parseAccountingResponse(
   resp: OsAccountingResponse,
-  range: { from: string | null; to: string | null } = { from: null, to: null },
+  range: AccountingRange = EMPTY_RANGE,
 ): Accounting {
   const aggs = resp.aggregations ?? {};
 
@@ -256,7 +260,7 @@ export function parseAccountingResponse(
 
 // Real-zeros fallback when OpenSearch is unreachable — identical to aggregating over no docs.
 export function emptyAccounting(
-  range: { from: string | null; to: string | null } = { from: null, to: null },
+  range: AccountingRange = EMPTY_RANGE,
 ): Accounting {
   return {
     range,

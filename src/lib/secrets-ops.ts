@@ -92,7 +92,7 @@ function asStr(v: unknown): string | null {
 
 function asPosInt(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return Math.floor(v);
-  if (typeof v === 'string' && /^\d+$/.test(v)) return parseInt(v, 10);
+  if (typeof v === 'string' && /^\d+$/.test(v)) return Number.parseInt(v, 10);
   return null;
 }
 

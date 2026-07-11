@@ -84,8 +84,7 @@ export default async function AgentsPage() {
             Open one to view, edit, and run it; build multi-step workflows in{' '}
             <a href="/build/studio" className="text-primary underline-offset-4 hover:underline">
               Studio
-            </a>
-            .
+            </a>.
           </p>
         </div>
         <CreateAgentButton />

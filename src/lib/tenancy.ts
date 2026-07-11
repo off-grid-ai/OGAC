@@ -35,7 +35,7 @@ function orgClaimFromJwt(token: string): string | undefined {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return undefined;
-    const json = Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
+    const json = Buffer.from(parts[1].replaceAll('-', '+').replaceAll('_', '/'), 'base64').toString();
     const c = JSON.parse(json) as Record<string, unknown>;
     const org = c['org'] ?? c['organization'];
     return typeof org === 'string' && org.trim() ? org.trim() : undefined;

@@ -480,6 +480,7 @@ function ToolRow({
     >
       <input
         type="checkbox"
+        aria-label={name}
         className="mt-0.5 size-3.5 shrink-0 accent-primary"
         checked={checked}
         disabled={disabled}

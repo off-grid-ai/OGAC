@@ -139,10 +139,10 @@ export function buildRefsPayload(refs: MentionRef[]): RefsPayload | null {
 // reused by every context-block builder (DRY). Pure.
 export function neutralizeForContextBlock(value: string): string {
   return (value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 // ─── Server-side: format referenced memory facts as a system block ────────────

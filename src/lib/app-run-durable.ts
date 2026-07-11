@@ -44,7 +44,7 @@ export interface EnvLike {
 /** Build an AppDurableConfig from an env map, applying the fleet defaults. */
 export function appDurableConfigFromEnv(env: EnvLike = {}): AppDurableConfig {
   const n = (v: string | undefined, d: number): number => {
-    const parsed = v == null ? NaN : Number(v);
+    const parsed = v == null ? Number.NaN : Number(v);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : d;
   };
   return {
