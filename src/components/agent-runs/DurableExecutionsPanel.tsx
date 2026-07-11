@@ -20,6 +20,9 @@ import { workflowActionsFor, type WorkflowExecutionStatus } from '@/lib/temporal
 // /api/v1/admin/agent-runs/workflows and auto-refreshes while anything is still running. Detail
 // drill-in is URL-driven (?wf=). Graceful when Temporal is off — empty state + a clear note.
 
+// The three lifecycle actions an operator can take on a durable job.
+type WorkflowActionKind = 'rerun' | 'cancel' | 'terminate';
+
 interface ExecutionRow {
   workflowId: string;
   executionRunId?: string;
@@ -76,7 +79,7 @@ function StatusPill({ status, temporalStatus }: Readonly<{ status: string; tempo
 
 async function workflowAction(
   workflowId: string,
-  action: 'rerun' | 'cancel' | 'terminate',
+  action: WorkflowActionKind,
 ): Promise<{ ok: boolean; message: string }> {
   const base = `/api/v1/admin/agent-runs/workflows/${encodeURIComponent(workflowId)}`;
   const res =
@@ -139,7 +142,7 @@ export function DurableExecutionsPanel() {
   );
 
   const act = useCallback(
-    async (e: ExecutionRow, action: 'rerun' | 'cancel' | 'terminate') => {
+    async (e: ExecutionRow, action: WorkflowActionKind) => {
       if (action === 'cancel' && !confirm(`Cancel job ${e.workflowId}?`)) return;
       if (action === 'terminate' && !confirm(`Force-terminate job ${e.workflowId}? This cannot be undone.`))
         return;
@@ -302,7 +305,7 @@ function ExecutionDetail({ workflowId, onBack }: Readonly<{ workflowId: string; 
   const e = detail?.execution;
   const actions = e ? workflowActionsFor(e.temporalStatus) : { rerun: false, cancel: false };
 
-  async function act(action: 'rerun' | 'cancel' | 'terminate') {
+  async function act(action: WorkflowActionKind) {
     if (action === 'cancel' && !confirm(`Cancel job ${workflowId}?`)) return;
     if (action === 'terminate' && !confirm(`Force-terminate job ${workflowId}? This cannot be undone.`)) return;
     setBusy(true);

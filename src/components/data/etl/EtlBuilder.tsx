@@ -41,8 +41,8 @@ import {
   type FilterOp,
   type CastType,
   type AggFn,
+  type EtlRunView,
 } from '@/lib/etl-job';
-import type { EtlRunView } from '@/lib/etl-job';
 import { EtlRunHistory } from './EtlRunHistory';
 
 const SELECT_CLASS =
