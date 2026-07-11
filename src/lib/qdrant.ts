@@ -240,7 +240,7 @@ export async function qdrantSearch(
   const baseFilter = buildQdrantFilter(opts.filter);
   const filter =
     baseFilter || aclShould
-      ? { ...(baseFilter ?? {}), ...(aclShould ? { should: aclShould } : {}) }
+      ? { ...baseFilter, ...(aclShould ? { should: aclShould } : {}) }
       : undefined;
   // When an ACL applies, over-fetch so the post-filter still yields up to k allowed hits.
   const fetchK = opts.asker ? Math.max(k * 4, 20) : k;
@@ -264,7 +264,7 @@ export async function qdrantSearch(
   await ensureTextIndex();
   const should = keywordShould(query);
   const prefetchFilter = (extra?: Record<string, unknown>) =>
-    filter || extra ? { filter: { ...(filter ?? {}), ...(extra ?? {}) } } : {};
+    filter || extra ? { filter: { ...filter, ...extra } } : {};
 
   const body = {
     prefetch: [
