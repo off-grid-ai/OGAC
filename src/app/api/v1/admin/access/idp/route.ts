@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { keycloakAdmin } from '@/lib/keycloak-admin';
-import { KeycloakError } from '@/lib/keycloak-admin';
+import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
 import { buildOidcIdpRep, forbiddenGrantMessage, normalizeIdps, type KcRawIdp } from '@/lib/keycloak-realm';
 import { currentOrgId } from '@/lib/tenancy';
 
