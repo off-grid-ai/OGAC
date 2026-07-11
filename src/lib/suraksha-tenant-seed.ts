@@ -71,7 +71,7 @@ export const SURAKSHA_CONNECTORS: ConnectorSpec[] = [
     // Isolated per-tenant database `suraksha` on the SHARED Postgres server (same box as bharatunion's
     // corebank, separate DB) — so the insurer's book never collides with the bank tenant's rows.
     // Seeded by deploy/onprem/seed-suraksha-dataplane.mjs.
-    endpoint: 'postgres://corebank:corebank@127.0.0.1:5433/suraksha',
+    endpoint: 'postgres://corebank@127.0.0.1:5433/suraksha',
     auth: 'password',
     description: 'Policy administration OLTP — policies, premiums, claims, KYC, pricing.',
     status: 'connected',
@@ -82,7 +82,7 @@ export const SURAKSHA_CONNECTORS: ConnectorSpec[] = [
     type: 'mysql',
     // Isolated per-tenant schema `suraksha` on the SHARED MySQL server (same box as bharatunion's
     // policyadmin, separate schema). Seeded by deploy/onprem/seed-suraksha-dataplane.mjs.
-    endpoint: 'mysql://policyadmin:policyadmin@127.0.0.1:3307/suraksha',
+    endpoint: 'mysql://policyadmin@127.0.0.1:3307/suraksha',
     auth: 'password',
     description: 'Advisor/agency force + HR — advisors, requisitions, candidates, reimbursement quota.',
     status: 'connected',

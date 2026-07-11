@@ -112,7 +112,7 @@ test('connectors point at the ISOLATED per-tenant `suraksha` databases (not shar
   const pg = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_coreins');
   const my = SURAKSHA_CONNECTORS.find((c) => c.id === 'surcon_policyadmin');
   assert.ok(pg && pg.endpoint.endsWith('/suraksha'), 'coreins → …/suraksha');
-  assert.ok(pg && pg.endpoint.includes('corebank:corebank@'), 'uses the real corebank server creds');
+  assert.ok(pg && pg.endpoint.includes('corebank@'), 'points at the corebank server (auth via vault, not inline)');
   assert.ok(!pg.endpoint.includes('coreins'), 'no stale coreins DB');
   assert.ok(my && my.endpoint.endsWith('/suraksha'), 'policyadmin → …/suraksha');
 });
