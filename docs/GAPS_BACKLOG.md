@@ -994,3 +994,21 @@ surface{RSC,API-GET,API-write} × method{GET,POST,PATCH,DELETE,PUT}. Verified LI
 - viewer × own-host × overview → own-org data only, write blocked ✓
 UNTESTED intersections logged for follow-up: bearer/service-token × tenant-host (data-plane org binding);
 no-org viewer × tenant-host (binds to default — should it be denied?); admin × cross-tenant (intended: allowed).
+
+## G-DEMO-GUARDRAIL-NAMES (open) — guardrails surfaces leak the OSS engine name (found by #238 sanity crawl, 2026-07-11)
+
+**Evidence:** live read-only demo (both tenants). Home Overview PII-guardrails tile showed `LLM-GUARD` +
+red "engine unreachable" — FIXED in `440cb410` (outcome-based `guardrailPosture()`: ACTIVE/BASELINE/
+OFFLINE/NOT SET, no engine name, calm state on the demo). STILL OPEN on the guardrails DETAIL surface
+(`/governance/guardrails`): the "LLM Guard scanner" category filter chip, "regex floor" and
+"engine off / the engine is unreachable, so only the regex floor applies" copy — all customer-facing.
+
+**Sources:** `src/components/guardrails/GuardrailCatalog.tsx:46-53`, `src/lib/guardrails-catalog.ts`
+(display labels; distinguish these from internal `kind: 'llm-guard-scanner'` identifiers, which are fine),
+`src/components/guardrails/GuardrailRules.tsx:290`. Also data/ETL "engine is unreachable" strings
+(`TableQualityCheck.tsx:64`, `EtlRunHistory.tsx:176`, `etl-jobs-store.ts`) — lower priority (data-quality
+engine, less prominent).
+
+**Fix:** outcome-based display labels only (e.g. "Behaviour & content checks" not "LLM Guard scanner");
+never render the engine/product name on a customer-facing surface. Keep internal `kind` identifiers.
+Regression of #171 (honesty sweep) specific to the guardrails catalog. Needs a focused, gated pass + tests.
