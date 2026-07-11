@@ -156,6 +156,11 @@ export function AgentFormPanel({
     }
   }
 
+  // Submit-button label: mid-flight ("Saving…"/"Creating…") vs idle, editing an existing agent vs new.
+  let submitLabel: string;
+  if (busy) submitLabel = editId ? 'Saving…' : 'Creating…';
+  else submitLabel = editId ? 'Save changes' : 'Create agent';
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && setPanel(null)}>
       <SheetContent className="sm:max-w-lg">
@@ -299,7 +304,7 @@ export function AgentFormPanel({
         </SheetBody>
         <SheetFooter>
           <Button onClick={submit} disabled={busy} className="w-full">
-            {busy ? (editId ? 'Saving…' : 'Creating…') : editId ? 'Save changes' : 'Create agent'}
+            {submitLabel}
           </Button>
         </SheetFooter>
       </SheetContent>

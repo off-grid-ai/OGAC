@@ -57,15 +57,15 @@ function when(iso?: string): string {
 }
 
 // Emerald/amber/red status dot vocabulary, matching the console's run-status palette.
+function statusPillTone(status: string): string {
+  if (status === 'running' || status === 'queued') return 'text-primary border-primary/40';
+  if (status === 'failed') return 'text-destructive border-destructive/40';
+  if (status === 'cancelled') return 'text-muted-foreground border-border';
+  return 'text-foreground border-border';
+}
+
 function StatusPill({ status, temporalStatus }: Readonly<{ status: string; temporalStatus: string }>) {
-  const tone =
-    status === 'running' || status === 'queued'
-      ? 'text-primary border-primary/40'
-      : status === 'failed'
-        ? 'text-destructive border-destructive/40'
-        : status === 'cancelled'
-          ? 'text-muted-foreground border-border'
-          : 'text-foreground border-border';
+  const tone = statusPillTone(status);
   return (
     <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${tone}`}>
       {status}
