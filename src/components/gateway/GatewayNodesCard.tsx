@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHost } from '@/lib/display-host';
+import { modelLabel } from '@/lib/model-catalog';
 
 interface Node {
   name: string;
@@ -81,7 +82,7 @@ export function GatewayNodesCard({ initial }: Readonly<{ initial: Node[] }>) {
                   <span className="text-sm font-medium text-foreground">{g.name}</span>
                   {g.vision ? <Badge variant="secondary" className="px-1 py-0 text-[10px]">vision</Badge> : null}
                 </div>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">{g.model} · {toDisplayHost(g.host)}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{modelLabel(g.model)} <span className="font-mono">· {toDisplayHost(g.host)}</span></p>
               </div>
               <span className="flex shrink-0 items-center gap-1 text-xs">
                 <span className={`size-2 rounded-full ${dotCls}`} />

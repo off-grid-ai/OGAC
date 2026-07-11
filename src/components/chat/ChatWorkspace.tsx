@@ -1531,7 +1531,7 @@ export function ChatWorkspace({
             {gatewayError ? (
               <a
                 href="/gateway/ai"
-                title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — set OFFGRID_GATEWAY_URL`}
+                title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — check the gateway connection in Settings`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >
                 <span>⚠ gateway offline</span>

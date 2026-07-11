@@ -158,8 +158,7 @@ export default async function PolicyPage() {
         <CardContent className="p-0">
           {decisions.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
-              No decision-log records. Configure{' '}
-              <span className="font-mono">OFFGRID_OPA_DECISION_LOG_URL</span> to stream policy
+              No decision-log records yet. Turn on decision-log streaming in Settings to see policy
               decisions here.
             </p>
           ) : (

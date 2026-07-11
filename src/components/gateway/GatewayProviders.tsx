@@ -104,10 +104,8 @@ export function GatewayProviders() {
           <div>
             <span className="font-medium text-foreground">No cloud provider configured.</span> Cloud
             routes fall back to local (honest degradation) — the console never fabricates a cloud
-            answer. Set <code className="font-mono">OFFGRID_CLOUD_OPENAI_API_KEY</code>,{' '}
-            <code className="font-mono">OFFGRID_CLOUD_ANTHROPIC_API_KEY</code>, or{' '}
-            <code className="font-mono">OFFGRID_CLOUD_COMPAT_BASE_URL</code>+<code className="font-mono">_API_KEY</code>{' '}
-            to wire one.
+            answer. Connect OpenAI, Anthropic, or an OpenAI-compatible provider in Settings to wire
+            one.
           </div>
         </div>
       )}

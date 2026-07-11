@@ -201,10 +201,8 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
             <p className="max-w-xl text-sm text-muted-foreground">
               This is fully operational — documents indexed through the retrieval layer are stored
               and searched here on your infrastructure. An external vector database (Qdrant) is{' '}
-              <span className="font-medium">optional</span>: set{' '}
-              <span className="font-mono">OFFGRID_ADAPTER_RETRIEVAL=qdrant</span> and{' '}
-              <span className="font-mono">OFFGRID_QDRANT_URL</span> only if you want to manage
-              collections from this screen. The embedded store needs no external service.
+              <span className="font-medium">optional</span>: connect one in Settings only if you want
+              to manage collections from this screen. The embedded store needs no external service.
             </p>
           </CardContent>
         </Card>
@@ -213,8 +211,8 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
             <Warning className="size-5 text-muted-foreground" />
             <span>
-              Vector store unreachable{error ? ` — ${error}` : ''}. Check{' '}
-              <span className="font-mono">OFFGRID_QDRANT_URL</span> and that Qdrant is running.
+              Vector store unreachable{error ? ` — ${error}` : ''}. Check the Qdrant connection in
+              Settings and that Qdrant is running.
             </span>
             <Button variant="ghost" size="sm" onClick={reload}>
               <ArrowClockwise className="size-4" /> Retry

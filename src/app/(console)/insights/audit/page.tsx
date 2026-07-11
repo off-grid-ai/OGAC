@@ -92,8 +92,7 @@ export default async function AuditLogPage({
 
       {!configured && (
         <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          OpenSearch is not configured (<code>OFFGRID_OPENSEARCH_URL</code>). No audit events to
-          show.
+          OpenSearch isn&apos;t connected yet — connect it in Settings. No audit events to show.
         </p>
       )}
       {error && (

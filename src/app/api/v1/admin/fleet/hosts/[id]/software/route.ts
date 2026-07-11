@@ -17,7 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const mdm = getMdm();
   if (!mdm.supportsFleet || !mdm.hostSoftware) {
     return NextResponse.json(
-      { error: 'software inventory requires a FleetDM backend (set OFFGRID_ADAPTER_MDM=fleetdm)' },
+      { error: 'Software inventory requires a FleetDM backend — connect one in Settings.' },
       { status: 501 },
     );
   }

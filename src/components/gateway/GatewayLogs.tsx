@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { modelLabel } from '@/lib/model-catalog';
 
 interface LogsResponse {
   available: boolean;
@@ -301,7 +302,7 @@ export function GatewayLogs() {
                               {c.gateway}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{c.model}</TableCell>
+                          <TableCell className="text-xs">{modelLabel(c.model)}</TableCell>
                           <TableCell className="text-xs">{c.kind}</TableCell>
                           <TableCell
                             className={`font-mono text-xs ${

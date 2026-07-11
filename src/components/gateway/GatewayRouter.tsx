@@ -4,6 +4,8 @@ import { CheckCircle, Info, Warning, XCircle } from '@phosphor-icons/react/dist/
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toDisplayHost } from '@/lib/display-host';
+import { modelLabel } from '@/lib/model-catalog';
 
 // The LiteLLM Proxy ROUTER — the professional load-balancer / failover / budget layer that sits
 // behind the gateway's single endpoint (GET /api/v1/gateway/router). It shows every DEPLOYMENT the
@@ -88,10 +90,9 @@ export function GatewayRouter() {
         <Info size={13} className="mt-0.5 shrink-0" />
         <div>
           <span className="font-medium text-foreground">Router not wired yet.</span> The gateway is
-          still served by the built-in aggregator. Point the console at a LiteLLM Proxy by setting{' '}
-          <code className="font-mono">OFFGRID_LITELLM_URL</code> and{' '}
-          <code className="font-mono">OFFGRID_LITELLM_MASTER_KEY</code> to get health-checked
-          load-balancing, automatic failover, and per-key budgets across the fleet + cloud.
+          still served by the built-in aggregator. Connect a LiteLLM Proxy in Settings to get
+          health-checked load-balancing, automatic failover, and per-key budgets across the fleet +
+          cloud.
         </div>
       </div>
     );
@@ -157,11 +158,11 @@ export function GatewayRouter() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-1.5 pt-0 text-xs text-muted-foreground">
-                    <p className="truncate font-mono text-[11px] text-foreground" title={d.modelName}>
-                      {d.modelName}
+                    <p className="truncate text-[11px] font-medium text-foreground" title={d.modelName}>
+                      {modelLabel(d.modelName)}
                     </p>
-                    <p className="truncate font-mono text-[11px]" title={d.apiBase}>
-                      {d.apiBase || '—'}
+                    <p className="truncate font-mono text-[11px]" title={toDisplayHost(d.apiBase)}>
+                      {toDisplayHost(d.apiBase) || '—'}
                     </p>
                     <div className="flex flex-wrap gap-1 pt-0.5">
                       <Badge variant="outline" className="text-[10px]">

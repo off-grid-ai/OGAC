@@ -32,17 +32,17 @@ function pickTab(v: string | undefined): TabId {
   return v === 'logs' || v === 'traces' ? v : 'metrics';
 }
 
-const ENV_HINT: Record<string, string> = {
-  metrics: 'OFFGRID_VICTORIAMETRICS_URL',
-  logs: 'OFFGRID_VICTORIALOGS_URL',
-  traces: 'OFFGRID_JAEGER_URL',
+const SOURCE_LABEL: Record<string, string> = {
+  metrics: 'metrics',
+  logs: 'logs',
+  traces: 'traces',
 };
 
-function NotConfigured({ envVar }: Readonly<{ envVar: string }>) {
+function NotConfigured({ source }: Readonly<{ source: string }>) {
   return (
     <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-      Not configured (<code>{envVar}</code> is unset). Set it to the backend URL to read live
-      telemetry here.
+      The {source} backend isn&apos;t connected yet. Connect it in Settings to read live telemetry
+      here.
     </p>
   );
 }
@@ -82,7 +82,7 @@ export default async function PlatformHealthPage({
 
 async function MetricsTab() {
   const { configured, charts, targetsUp, error } = await safePlatformMetrics();
-  if (!configured) return <NotConfigured envVar={ENV_HINT.metrics} />;
+  if (!configured) return <NotConfigured source={SOURCE_LABEL.metrics} />;
   const hintByTitle = new Map(PLATFORM_CHARTS.map((c) => [c.title, c.hint]));
   return (
     <div className="space-y-4">
@@ -114,7 +114,7 @@ async function MetricsTab() {
 
 async function LogsTab({ query }: Readonly<{ query?: string }>) {
   const result = await safeSearchLogs(query ?? '', 200);
-  if (!result.configured) return <NotConfigured envVar={ENV_HINT.logs} />;
+  if (!result.configured) return <NotConfigured source={SOURCE_LABEL.logs} />;
   return (
     <div className="space-y-4">
       <LogsSearchBox query={result.query} />
@@ -163,7 +163,7 @@ async function TracesTab({ svc }: Readonly<{ svc?: string }>) {
     svc,
     20,
   );
-  if (!configured) return <NotConfigured envVar={ENV_HINT.traces} />;
+  if (!configured) return <NotConfigured source={SOURCE_LABEL.traces} />;
   return (
     <div className="space-y-4">
       {error && (
