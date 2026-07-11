@@ -29,13 +29,16 @@ export interface SupersetChartDataResponse {
 // rather than an empty axis pretending to be live. Deterministic column order.
 export type SupersetChartKind = 'line' | 'bar' | 'number';
 
+/** A single cell value in a chart data row. */
+export type CellValue = string | number | null;
+
 export interface NativeChartData {
   id: string; // stable key for the panel (chart title / spec id)
   title: string;
   kind: SupersetChartKind;
   xKey: string; // the category / time column recharts plots on the X axis
   valueKeys: string[]; // the numeric series columns
-  rows: Array<Record<string, string | number | null>>;
+  rows: Array<Record<string, CellValue>>;
   hasData: boolean;
   // For kind:'number' — the single scalar to show as a stat tile (first value column, first row).
   scalar: number | null;
@@ -107,8 +110,8 @@ export function shapeChart(
   const xKey = spec.xColumn ?? dims[0] ?? '';
   const valueKeys = (spec.valueColumns ?? numeric).filter((k) => k !== xKey);
 
-  const rows: Array<Record<string, string | number | null>> = raw.map((r) => {
-    const row: Record<string, string | number | null> = {};
+  const rows: Array<Record<string, CellValue>> = raw.map((r) => {
+    const row: Record<string, CellValue> = {};
     if (xKey) row[xKey] = toLabel(r[xKey]);
     for (const k of valueKeys) row[k] = toNumber(r[k]);
     return row;

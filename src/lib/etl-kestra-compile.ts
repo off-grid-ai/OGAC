@@ -40,7 +40,8 @@ export const KESTRA_NAMESPACE = 'offgrid.etl';
 // Emits a canonical subset: maps, lists, scalars. Strings that need quoting (contain special chars)
 // are single-quoted with '' escaping. Multiline scripts use the literal block scalar (|). This is
 // enough for a Kestra flow and keeps the output diffable/unit-testable.
-type Yaml = string | number | boolean | null | Yaml[] | { [k: string]: Yaml };
+type YamlScalar = string | number | boolean | null;
+type Yaml = YamlScalar | Yaml[] | { [k: string]: Yaml };
 
 function needsQuote(s: string): boolean {
   if (s === '') return true;
@@ -52,7 +53,7 @@ function needsQuote(s: string): boolean {
   return false;
 }
 
-function scalar(v: string | number | boolean | null): string {
+function scalar(v: YamlScalar): string {
   if (v === null) return 'null';
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (v.includes('\n')) return ''; // handled by caller as a block scalar
@@ -72,7 +73,7 @@ function emit(node: Yaml, indent: number): string[] {
         lines.push(`${pad}- ${firstContent}`);
         for (const l of sub.slice(1)) lines.push(l);
       } else {
-        lines.push(`${pad}- ${scalar(item as string | number | boolean | null)}`);
+        lines.push(`${pad}- ${scalar(item as YamlScalar)}`);
       }
     }
     return lines;
@@ -95,12 +96,12 @@ function emit(node: Yaml, indent: number): string[] {
         lines.push(`${pad}${k}: |`);
         for (const l of v.replace(/\n$/, '').split('\n')) lines.push(`${pad}  ${l}`);
       } else {
-        lines.push(`${pad}${k}: ${scalar(v as string | number | boolean | null)}`);
+        lines.push(`${pad}${k}: ${scalar(v as YamlScalar)}`);
       }
     }
     return lines;
   }
-  return [`${pad}${scalar(node as string | number | boolean | null)}`];
+  return [`${pad}${scalar(node as YamlScalar)}`];
 }
 
 export function toYaml(node: Yaml): string {

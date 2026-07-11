@@ -417,9 +417,11 @@ export function isAddable(
 // kinds (`password`, `s3-keys`) are collected in the form but must be narrowed to a route-accepted
 // value before POST. password/s3-keys → 'api-key' (a credential is carried); everything else maps
 // 1:1. This keeps the stored `auth` column honest AND route-valid.
+/** The auth kinds the connector-create route accepts (a subset of {@link AuthKind}). */
+export type RouteAuth = 'none' | 'api-key' | 'oauth';
 const ROUTE_AUTHS = new Set(['none', 'api-key', 'oauth']);
-export function toStoredAuth(authKind: AuthKind): 'none' | 'api-key' | 'oauth' {
-  if (ROUTE_AUTHS.has(authKind)) return authKind as 'none' | 'api-key' | 'oauth';
+export function toStoredAuth(authKind: AuthKind): RouteAuth {
+  if (ROUTE_AUTHS.has(authKind)) return authKind as RouteAuth;
   // password + s3-keys both mean "a credential is supplied" → api-key is the closest route value.
   return 'api-key';
 }
@@ -437,7 +439,7 @@ export interface ConnectorAddPayload {
   name: string;
   type: string;
   endpoint: string;
-  auth: 'none' | 'api-key' | 'oauth';
+  auth: RouteAuth;
   description: string;
 }
 

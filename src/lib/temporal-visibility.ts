@@ -19,6 +19,9 @@ export type { WorkflowExecutionStatus };
 // Declared locally so this module imports nothing from @temporalio. The adapter maps the real
 // client objects onto these before calling in — a thin seam that keeps the pure part cluster-free.
 
+/** A workflow timestamp as the Temporal client may hand it to us (Date, ISO string, epoch, or null). */
+export type RawTime = Date | string | number | null;
+
 /** Subset of @temporalio/client WorkflowExecutionInfo we read from client.workflow.list(). */
 export interface RawWorkflowExecutionInfo {
   workflowId: string;
@@ -26,8 +29,8 @@ export interface RawWorkflowExecutionInfo {
   type?: string;
   /** Status name string, e.g. 'RUNNING' | 'COMPLETED' … (the client exposes .status.name). */
   status?: string;
-  startTime?: Date | string | number | null;
-  closeTime?: Date | string | number | null;
+  startTime?: RawTime;
+  closeTime?: RawTime;
   historyLength?: number | bigint | null;
   taskQueue?: string;
 }
@@ -38,8 +41,8 @@ export interface RawWorkflowDescription {
   runId?: string;
   type?: string;
   status?: string;
-  startTime?: Date | string | number | null;
-  closeTime?: Date | string | number | null;
+  startTime?: RawTime;
+  closeTime?: RawTime;
   historyLength?: number | bigint | null;
   taskQueue?: string;
 }
@@ -93,7 +96,7 @@ export function normalizeWorkflowStatus(name: string | undefined): WorkflowExecu
 }
 
 /** Convert a Date/string/number/bigint timestamp to an ISO string, or undefined. */
-function toIso(v: Date | string | number | null | undefined): string | undefined {
+function toIso(v: RawTime | undefined): string | undefined {
   if (v == null) return undefined;
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString();
   if (typeof v === 'number') {

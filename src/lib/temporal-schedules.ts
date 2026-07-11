@@ -104,6 +104,9 @@ export function scheduleRunIdSeed(scheduleId: string): string {
 
 // ── Describe shaping (list / detail) ───────────────────────────────────────────────────────────
 
+/** A timestamp as the Temporal client may hand it to us (Date, ISO string, or epoch number). */
+export type RawTime = Date | string | number;
+
 /** Subset of @temporalio/client ScheduleSummary / ScheduleDescription we read. */
 export interface RawScheduleDescription {
   scheduleId: string;
@@ -115,9 +118,9 @@ export interface RawScheduleDescription {
   /** The workflow type the action starts (should be AgentRunWorkflow). */
   workflowType?: string;
   /** Recent action times (ISO), most recent first. */
-  recentActions?: (Date | string | number)[];
+  recentActions?: RawTime[];
   /** Upcoming action times (ISO). */
-  nextActions?: (Date | string | number)[];
+  nextActions?: RawTime[];
   /** How many times it has fired. */
   numActionsTaken?: number | bigint;
 }
@@ -133,7 +136,7 @@ export interface ScheduleRow {
   numActionsTaken?: number;
 }
 
-function isoList(xs: (Date | string | number)[] | undefined): string[] {
+function isoList(xs: RawTime[] | undefined): string[] {
   if (!xs) return [];
   const out: string[] = [];
   for (const x of xs) {
