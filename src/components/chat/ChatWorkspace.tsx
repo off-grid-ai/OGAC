@@ -324,14 +324,16 @@ function MessageBubble({
         {m.images?.length ? (
           <div className="mb-2 flex flex-wrap gap-2">
             {m.images.map((src, k) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <button
                 key={k}
-                src={src}
-                alt=""
+                type="button"
                 onClick={() => onViewImage(src)}
-                className="max-h-40 cursor-zoom-in rounded border border-border transition-opacity hover:opacity-90"
-              />
+                aria-label="View image full screen"
+                className="cursor-zoom-in rounded border border-border transition-opacity hover:opacity-90"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="max-h-40 rounded" />
+              </button>
             ))}
           </div>
         ) : null}
@@ -1370,7 +1372,15 @@ export function ChatWorkspace({
           {visibleConversations.map((c) => (
             <div
               key={c.id}
+              role="button"
+              tabIndex={0}
               onClick={() => openConversation(c.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openConversation(c.id);
+                }
+              }}
               className={cn(
                 'group flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.99]',
                 activeId === c.id
