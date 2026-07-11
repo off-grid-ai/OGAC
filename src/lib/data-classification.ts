@@ -77,7 +77,7 @@ export function makeClassification(input: {
   return {
     level: normalizeLevel(input.level),
     piiTags: normalizePiiTags(input.piiTags ?? []),
-    column: input.column != null && input.column.trim() ? input.column.trim() : null,
+    column: input.column?.trim() ? input.column.trim() : null,
   };
 }
 

@@ -323,7 +323,7 @@ async function cloudSignal(kind: string): Promise<GatewayHealthSignal> {
   // reaches here (handled by onPremSignal); any non-first-class kind falls back to the generic compat.
   const providerId = gatewayKindToProviderId(kind) ?? 'compat';
   const s = statuses.find((p) => p.id === providerId);
-  if (!s || !s.configured) {
+  if (!s?.configured) {
     return { configured: false, reachable: false, status: 'unconfigured', detail: 'not configured' };
   }
   const reachable = await probeCloud(s.baseUrl);

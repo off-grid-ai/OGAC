@@ -101,7 +101,7 @@ export function extractPrompt(body: Record<string, unknown>): string {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i] as { role?: unknown; content?: unknown };
-    if (m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()) {
+    if (m?.role === 'user' && typeof m.content === 'string' && m.content.trim()) {
       return m.content.trim();
     }
   }

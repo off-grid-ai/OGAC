@@ -438,7 +438,7 @@ type Mark = (kind: string, label: string, detail: string, refs: string[], start:
 // the no-exec default refuses) and record a 'sandbox' step. Tool.endpoint holds the script.
 async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
   const tool = (await listTools()).find((t) => `tool:${t.id}` === ref);
-  if (!tool || tool.type !== 'sandbox') return;
+  if (tool?.type !== 'sandbox') return;
   if (!(await getFlags().isEnabled('agent-code-exec', false))) {
     mark('sandbox', 'gated', 'agent-code-exec flag off — execution skipped', [ref], Date.now());
     return;

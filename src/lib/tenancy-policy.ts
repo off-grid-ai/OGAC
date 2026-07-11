@@ -11,7 +11,7 @@ export const DEFAULT_ORG = 'default';
  *   3. DEFAULT_ORG
  */
 export function resolveOrg(claim: unknown, envOverride?: string): string {
-  if (envOverride && envOverride.trim()) return envOverride.trim();
+  if (envOverride?.trim()) return envOverride.trim();
   if (typeof claim === 'string' && claim.trim()) return claim.trim();
   return DEFAULT_ORG;
 }

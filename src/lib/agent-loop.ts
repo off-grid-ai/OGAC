@@ -314,7 +314,7 @@ export function buildPlannerPrompt(input: PlanInput): string {
         .map(
           (t) =>
             `  - ${t.ref} (${t.name}): ${t.description}${
-              t.paramKeys && t.paramKeys.length ? ` [args: ${t.paramKeys.join(', ')}]` : ''
+              t.paramKeys?.length ? ` [args: ${t.paramKeys.join(', ')}]` : ''
             }`,
         )
         .join('\n')

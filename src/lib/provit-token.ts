@@ -21,7 +21,7 @@ export async function mintToken(orgId: string, ownerId: string, label: string): 
 
 /** Verify a Bearer value against the store. Returns the org/owner binding, or null. */
 export async function verifyToken(token: string): Promise<ProvitTokenBinding | null> {
-  if (!token || !token.startsWith('pvt_')) return null;
+  if (!token?.startsWith('pvt_')) return null;
   const rows = await db.select().from(provitTokens).where(
     and(eq(provitTokens.tokenHash, sha256(token)), eq(provitTokens.revoked, false)),
   ).limit(1);

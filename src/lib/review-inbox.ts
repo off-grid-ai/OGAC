@@ -318,10 +318,10 @@ export function guardrailNotesFrom(trace: ReviewAgentTrace | null): string[] {
 // (what it produced), falling back to the last upstream step's output, then the run outcome.
 export function recommendationFrom(run: AppRunView): string {
   const pending = awaitingStep(run.steps);
-  if (pending?.outcome && pending.outcome.trim()) return pending.outcome.trim();
+  if (pending?.outcome?.trim()) return pending.outcome.trim();
   const prior = priorContextForReview(run.steps);
   for (let i = prior.length - 1; i >= 0; i--) {
-    if (prior[i].outcome && prior[i].outcome!.trim()) return prior[i].outcome!.trim();
+    if (prior[i].outcome?.trim()) return prior[i].outcome!.trim();
   }
   return run.outcome?.trim() || 'The app produced no draft output at this step.';
 }

@@ -188,7 +188,7 @@ export async function sendEmail(
 ): Promise<SendEmailResult> {
   const cfgResult = smtpConfigFromEnv(env);
   if (!cfgResult.ok) return { ok: false, configured: false, reason: cfgResult.reason };
-  if (!msg.to || !msg.to.trim()) {
+  if (!msg.to?.trim()) {
     return {
       ok: false,
       configured: true,

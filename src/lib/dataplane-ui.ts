@@ -67,7 +67,7 @@ export function tableHref(t: Pick<WarehouseTable, 'name'>): string {
 export function groupTablesByDatabase(tables: WarehouseTable[]): TableGroup[] {
   const byDb = new Map<string, WarehouseTable[]>();
   for (const t of tables ?? []) {
-    const db = t.database && t.database.trim() ? t.database : 'default';
+    const db = t.database?.trim() ? t.database : 'default';
     const arr = byDb.get(db) ?? [];
     arr.push(t);
     byDb.set(db, arr);
@@ -193,7 +193,7 @@ export function formatCell(v: unknown): string {
 // column is non-null (the universal, always-supported expectation). Operators can trim the set in
 // the panel. Pure: takes the column list, returns the expectation objects + a stable suite name.
 export function defaultExpectationsForColumns(columns: { name: string }[] | undefined): Expectation[] {
-  return (columns ?? []).filter((c) => c && c.name).map((c) => expectNotNull(c.name));
+  return (columns ?? []).filter((c) => c?.name).map((c) => expectNotNull(c.name));
 }
 
 export function suiteNameForTable(table: string): string {

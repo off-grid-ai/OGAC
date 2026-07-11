@@ -136,7 +136,7 @@ export async function resolveAgent(
   const builtin = AGENTS.find((a) => a.id === id);
   if (builtin) return builtin;
   const custom = await getCustomAgent(id, orgId);
-  return custom && custom.enabled ? toDef(custom) : undefined;
+  return custom?.enabled ? toDef(custom) : undefined;
 }
 
 export interface AgentActivity {

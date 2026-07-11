@@ -337,7 +337,7 @@ export async function prepareRegenerate(conversationId: string): Promise<string 
   await ensureChatSchema();
   const path = await listMessages(conversationId);
   const last = path[path.length - 1];
-  if (!last || last.role !== 'assistant') return null;
+  if (last?.role !== 'assistant') return null;
   await deactivateSiblings(conversationId, last.parentId ?? '');
   return last.parentId ?? null;
 }
@@ -416,7 +416,7 @@ export async function listMessages(conversationId: string): Promise<ThreadMessag
   let parentKey = '';
   for (;;) {
     const siblings = byParent.get(parentKey);
-    if (!siblings || !siblings.length) break;
+    if (!siblings?.length) break;
     const idx = Math.max(0, siblings.findIndex((s) => s.active));
     const chosen = siblings[idx] ?? siblings[siblings.length - 1];
     out.push({ ...chosen, branchIndex: idx, branchCount: siblings.length });
@@ -477,7 +477,7 @@ export async function branchUserMessage(
     .select()
     .from(chatMessages)
     .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, conversationId)));
-  if (!orig || orig.role !== 'user') return null;
+  if (orig?.role !== 'user') return null;
   // Deactivate every sibling under the same parent so the new branch becomes the shown path.
   const parentKey = orig.parentId ?? '';
   await deactivateSiblings(conversationId, parentKey);

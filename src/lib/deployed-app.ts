@@ -28,7 +28,7 @@ export interface ResolvedDeployedApp {
  * unpublished apps — publishing (apps-store.publishApp) is what mints the slug + sets published.
  */
 export function resolveDeployedApp(app: DeployableApp | null | undefined): ResolvedDeployedApp | null {
-  if (!app || !app.published) return null;
+  if (!app?.published) return null;
   const slug = typeof app.slug === 'string' ? app.slug.trim() : '';
   if (!slug) return null;
   return {
