@@ -12,10 +12,10 @@ import { Button } from '@/components/ui/button';
 export default function ConsoleError({
   error,
   reset,
-}: {
+}: Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}>) {
   useEffect(() => {
     // Surface for server logs / observability; the digest correlates with the server-side stack.
     console.error('[console] render error:', error);

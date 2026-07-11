@@ -37,11 +37,11 @@ export async function POST(req: Request) {
   const patch: PolicyPatch = {};
   if (typeof body?.egressAllowed === 'boolean') patch.egressAllowed = body.egressAllowed;
   if (Array.isArray(body?.guardrails)) {
-    patch.guardrails = sanitizeGuardrails(body.guardrails.map((g: unknown) => String(g)));
+    patch.guardrails = sanitizeGuardrails(body.guardrails.map(String));
   }
   if (Array.isArray(body?.allowedModels)) {
     patch.allowedModels = sanitizeModels(
-      body.allowedModels.map((m: unknown) => String(m)),
+      body.allowedModels.map(String),
       liveTags,
     );
   }

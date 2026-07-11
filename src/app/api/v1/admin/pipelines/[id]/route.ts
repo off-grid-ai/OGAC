@@ -20,6 +20,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(p);
 }
 
+// Pure: build the partial pipeline-update patch from the (already-validated) request body. Each
+// field is coerced only when present; behavior-identical to the previous inline construction.
+function buildPipelinePatch(
+  body: Record<string, unknown> | null,
+): Parameters<typeof updatePipeline>[1] {
+  const patch: Parameters<typeof updatePipeline>[1] = {};
+  if (body?.name !== undefined) patch.name = String(body.name).trim();
+  if (body?.description !== undefined) patch.description = String(body.description);
+  if (body?.visibility !== undefined) patch.visibility = String(body.visibility);
+  if (body && 'gatewayId' in body) patch.gatewayId = body.gatewayId ? String(body.gatewayId) : null;
+  if (body && 'defaultModel' in body) patch.defaultModel = body.defaultModel ? String(body.defaultModel) : null;
+  if (body?.routing !== undefined) patch.routing = normalizeRouting(body.routing);
+  if (body?.dataAllowlist !== undefined) patch.dataAllowlist = normalizeAllowlist(body.dataAllowlist);
+  if (body?.policyOverlay !== undefined) patch.policyOverlay = body.policyOverlay as Record<string, unknown>;
+  if (body?.guardrailOverlay !== undefined) patch.guardrailOverlay = body.guardrailOverlay as Record<string, unknown>;
+  if (body?.status !== undefined) patch.status = String(body.status);
+  if (body?.isTemplate !== undefined) patch.isTemplate = Boolean(body.isTemplate);
+  return patch;
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -35,18 +55,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: check.errors.join('; '), errors: check.errors }, { status: 400 });
   }
 
-  const patch: Parameters<typeof updatePipeline>[1] = {};
-  if (body?.name !== undefined) patch.name = String(body.name).trim();
-  if (body?.description !== undefined) patch.description = String(body.description);
-  if (body?.visibility !== undefined) patch.visibility = String(body.visibility);
-  if (body && 'gatewayId' in body) patch.gatewayId = body.gatewayId ? String(body.gatewayId) : null;
-  if (body && 'defaultModel' in body) patch.defaultModel = body.defaultModel ? String(body.defaultModel) : null;
-  if (body?.routing !== undefined) patch.routing = normalizeRouting(body.routing);
-  if (body?.dataAllowlist !== undefined) patch.dataAllowlist = normalizeAllowlist(body.dataAllowlist);
-  if (body?.policyOverlay !== undefined) patch.policyOverlay = body.policyOverlay as Record<string, unknown>;
-  if (body?.guardrailOverlay !== undefined) patch.guardrailOverlay = body.guardrailOverlay as Record<string, unknown>;
-  if (body?.status !== undefined) patch.status = String(body.status);
-  if (body?.isTemplate !== undefined) patch.isTemplate = Boolean(body.isTemplate);
+  const patch = buildPipelinePatch(body);
 
   const orgId = await currentOrgId();
   const editedBy = gate.user.email ?? 'service@offgrid.local';
