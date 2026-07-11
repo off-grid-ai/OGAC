@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { AppScheduleEditor } from '@/components/build/AppScheduleEditor';
-import { getApp } from '@/lib/apps-store';
 import { buildScheduleView, normalizeScheduleConfig } from '@/lib/app-schedule';
 import { scheduleRuntimeConfigured } from '@/lib/app-schedules';
+import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import { deleteDomain, getDomain, updateDomain } from '@/lib/data-domains-store';
 import { parseAliases } from '@/lib/data-domains-ui';
 import { currentOrgId } from '@/lib/tenancy';

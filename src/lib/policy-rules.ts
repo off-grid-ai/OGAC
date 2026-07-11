@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type OpaPolicyDocument,
   type PolicyRule,
@@ -9,6 +8,7 @@ import {
   toOpaDocument,
   validatePolicyRulePatch,
 } from '@/lib/policy-rules-policy';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Console-owned policy-rule store (I/O adapter). The pure rules live in policy-rules-policy.ts; this
 // file is the thin DB/network seam. The `policy_rules` table is created idempotently on first use

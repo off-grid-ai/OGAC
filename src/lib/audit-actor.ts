@@ -2,10 +2,10 @@
 // PURE actorFrom() mapping (audit-event.ts). This is the impure seam — it reads the NextAuth session
 // and the Authorization bearer via the existing authz gate — kept deliberately tiny so the mapping
 // stays unit-testable without an auth chain.
-import { type AuthzSession, requireUser } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { type Actor, type AuditEventInput, actorFrom } from '@/lib/audit-event';
+import { type AuthzSession, requireUser } from '@/lib/authz';
 import { recordAudit } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export interface ResolvedActor {
   actor: Actor;

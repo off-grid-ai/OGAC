@@ -21,16 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  validateDagSpec,
-  type EtlDagSpec,
-  type EtlNode,
-  type EtlNodeConfig,
-  type EtlTransformKind,
-  type FilterOp,
-  type CastType,
-  type AggFn,
-} from '@/lib/etl-job';
+import type { RedactionAction } from '@/lib/data-redaction';
 import {
   addNode,
   connectNodes,
@@ -41,7 +32,16 @@ import {
   setTrigger,
   updateNodeConfig,
 } from '@/lib/etl-dag-edit';
-import type { RedactionAction } from '@/lib/data-redaction';
+import {
+  validateDagSpec,
+  type EtlDagSpec,
+  type EtlNode,
+  type EtlNodeConfig,
+  type EtlTransformKind,
+  type FilterOp,
+  type CastType,
+  type AggFn,
+} from '@/lib/etl-job';
 import type { EtlRunView } from '@/lib/etl-job';
 import { EtlRunHistory } from './EtlRunHistory';
 

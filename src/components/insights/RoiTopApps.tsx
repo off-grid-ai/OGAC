@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Pagination } from '@/components/ui/Pagination';
 import {
   Table,
   TableBody,
@@ -9,9 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Pagination } from '@/components/ui/Pagination';
-import { usePagination } from '@/lib/use-pagination';
 import { type AppRoi, formatHours, formatInr } from '@/lib/roi';
+import { usePagination } from '@/lib/use-pagination';
 
 // ─── Top apps by value — paginated, URL-driven, drills into each app's Reports (ROI card) ─────────
 // The list → detail rule: a row links to /build/apps/[id]/reports where the per-app ROI card lives.

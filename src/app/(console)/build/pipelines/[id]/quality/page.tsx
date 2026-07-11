@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 import { PipelineQualityPanel } from '@/components/pipelines/governance/PipelineQualityPanel';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listGoldenCases } from '@/lib/evals';
-import { getPipeline } from '@/lib/pipelines';
-import { listRollbackHistory } from '@/lib/pipeline-release';
 import { FEEDBACK_SUITE } from '@/lib/feedback-map';
+import { listRollbackHistory } from '@/lib/pipeline-release';
+import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

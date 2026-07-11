@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { managedCreateFlag, managedListFlags, managedSetEnabled } from '@/lib/flags-manager';
+import { currentOrgId } from '@/lib/tenancy';
 
 // A flag key is a lowercase, dash/dot-segmented identifier (e.g. agent-code-exec, online-evals).
 const KEY_RE = /^[a-z0-9][a-z0-9._-]{1,62}$/;

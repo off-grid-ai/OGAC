@@ -9,8 +9,8 @@
 // chat-pipeline-policy.ts; this file only does the reads (org governance + the pipeline's name) and
 // composes the view. Honest: when nothing resolves it returns an "ungoverned" chip, never a fake one.
 
-import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
+import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { getPipeline, listPipelines } from '@/lib/pipelines';
 import { getChatBindingGovernance } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';

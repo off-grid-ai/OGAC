@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { getPipeline, reassignPipelineOwner } from '@/lib/pipelines';
+import { requireUser } from '@/lib/authz';
 import { resolvePipelineRole } from '@/lib/pipeline-lifecycle';
 import { roleAtLeast } from '@/lib/pipeline-lifecycle-model';
+import { getPipeline, reassignPipelineOwner } from '@/lib/pipelines';
 import { validateOwnerReassign } from '@/lib/teams-policy';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

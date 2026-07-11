@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { CLASSIFICATION_LEVELS } from '@/lib/data-classification';
 import {
   assetPosture,
   getAsset,
   listClassifications,
   setClassification,
 } from '@/lib/data-catalog-store';
+import { CLASSIFICATION_LEVELS } from '@/lib/data-classification';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

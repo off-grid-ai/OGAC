@@ -11,8 +11,8 @@
 // relative specifiers work without depending on an @/-alias resolver in that runtime (mirrors
 // agent-run.activities.ts).
 
-import { recordChatRunGovernance } from '../lib/chat-run-record';
 import type { ChatRunWorkflowInput, ChatRunWorkflowResult } from '../lib/chat-run';
+import { recordChatRunGovernance } from '../lib/chat-run-record';
 
 /** Record the governed chat run durably. Reuses recordChatRunGovernance verbatim. */
 export async function recordChatRun(

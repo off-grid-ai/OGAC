@@ -28,10 +28,10 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import type { BindingNames } from '@/lib/app-builder';
 import {
   addEdge,
@@ -54,6 +54,7 @@ import {
   type OutputStep,
   validateAppSpec,
 } from '@/lib/app-model';
+import type { StepResult } from '@/lib/app-run';
 import {
   KIND_LABEL,
   emptySpec,
@@ -61,7 +62,6 @@ import {
   specToGraph,
   stepById,
 } from '@/lib/canvas-graph';
-import type { StepResult } from '@/lib/app-run';
 
 // ─── StudioCanvas (Builder Epic Phase 3B) — the WORKING visual editor of an AppSpec ──────────────
 //

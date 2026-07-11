@@ -17,8 +17,8 @@
 // alias) and must never be imported by a route.
 
 import { proxyActivities } from '@temporalio/workflow';
-import type * as activities from './chat-run.activities';
 import type { ChatRunWorkflowInput, ChatRunWorkflowResult } from '../lib/chat-run';
+import type * as activities from './chat-run.activities';
 
 function record(maxAttempts: number) {
   return proxyActivities<typeof activities>({

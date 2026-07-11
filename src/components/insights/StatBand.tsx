@@ -1,5 +1,5 @@
-import type { StatTile } from '@/lib/insights-stats';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { StatTile } from '@/lib/insights-stats';
 import { cn } from '@/lib/utils';
 
 // Shared value-forward stat band for the Insights surfaces. Renders a small array of pre-shaped

@@ -18,8 +18,8 @@
 // is surfaced as a clean error (status 'error'), never a fabricated 200.
 
 import type { CheckResult } from '@/lib/checks';
-import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
 import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
+import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
 import { buildRunPlan, extractPrompt, type PipelineRunPlan } from '@/lib/pipeline-run-plan';
 
 // ─── the resolved pipeline facts the executor needs (a DB-free snapshot) ────────────────────────────

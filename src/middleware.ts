@@ -2,13 +2,6 @@ import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/auth.config';
 import {
-  isPublicFileGet,
-  isPublicPath,
-  isTenantRootRedirect,
-  tenantSlugFromHost,
-} from '@/lib/route-access';
-import { isViewerWriteAttempt, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
-import {
   checkRateLimit as decideRateLimit,
   resolveRateLimit,
   GLOBAL_RATE_LIMIT,
@@ -16,6 +9,13 @@ import {
   type Counter,
   type RateLimitConfig,
 } from '@/lib/rate-limit';
+import {
+  isPublicFileGet,
+  isPublicPath,
+  isTenantRootRedirect,
+  tenantSlugFromHost,
+} from '@/lib/route-access';
+import { isViewerWriteAttempt, VIEWER_FORBIDDEN_BODY } from '@/lib/viewer-policy';
 
 // The internal resolver route the edge uses to look up a key's configured limit (Node runtime → DB).
 // The edge short-circuits it so it isn't itself gated or rate-limited.

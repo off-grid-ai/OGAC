@@ -2,10 +2,10 @@ import { randomUUID } from 'crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { abacRules, apiKeys, auditEvents } from '@/db/schema';
-import { effectiveBaseRole } from '@/lib/module-access';
 import { actorFrom } from '@/lib/audit-event';
 import { budgetEnforced } from '@/lib/budget-config';
 import { checkBudget, costForTokens } from '@/lib/finops';
+import { effectiveBaseRole } from '@/lib/module-access';
 import { recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 

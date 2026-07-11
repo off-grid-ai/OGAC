@@ -1,7 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
 
 // Route-level entrance. Keying the wrapper on the pathname re-mounts it on every
 // navigation, which replays the `og-page-enter` animation — a calm, opacity-only 120ms

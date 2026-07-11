@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { getConnector } from '@/lib/connector-detail';
 import { testConnection } from '@/lib/connector-exec';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Test-connection probe. Resolves the connector (org-scoped), injects its vaulted credential at
 // query time, and runs the lightest possible check (SELECT 1 for SQL, a GET of the base URL for

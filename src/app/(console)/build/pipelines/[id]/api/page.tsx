@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation';
 import { PipelineApiKeys } from '@/components/pipelines/telemetry/PipelineApiKeys';
 import { PipelineEndpoint } from '@/components/pipelines/telemetry/PipelineEndpoint';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getPipeline } from '@/lib/pipelines';
 import { listKeys } from '@/lib/pipeline-api-keys';
+import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

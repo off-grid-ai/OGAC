@@ -15,6 +15,9 @@
 //   • summarizeOrgContext() — PURE, zero-IO fold to counts + names (no secrets) (unit-tested).
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
+import { type BrainDoc, listDocuments } from '@/lib/brain';
+import { listDomains } from '@/lib/data-domains-store';
+import { type GuardrailRule, listGuardrailRules } from '@/lib/guardrails-rules';
 import {
   type Connector,
   type Dataset,
@@ -27,10 +30,7 @@ import {
   listRoutingRules,
   listTools,
 } from '@/lib/store';
-import { type GuardrailRule, listGuardrailRules } from '@/lib/guardrails-rules';
-import { type BrainDoc, listDocuments } from '@/lib/brain';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { listDomains } from '@/lib/data-domains-store';
 
 // ─── Data domains (Phase 1B — statically imported) ───────────────────────────────────────────────
 // `lib/data-domains-store.ts` (`listDomains`) is long since merged, so we import it statically (top

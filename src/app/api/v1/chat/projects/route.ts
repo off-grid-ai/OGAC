@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createProject, listProjects } from '@/lib/chat';
+import { availableChatPipelines, isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 import { listPipelines } from '@/lib/pipelines';
 import { getChatBindingGovernance } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
-import { availableChatPipelines, isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 
 export const dynamic = 'force-dynamic';
 

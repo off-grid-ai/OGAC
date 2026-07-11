@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getApp } from '@/lib/apps-store';
-import { newAppRunId } from '@/lib/app-run';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { callerFromMachine } from '@/lib/app-access-caller';
+import { newAppRunId } from '@/lib/app-run';
+import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
+import { getApp } from '@/lib/apps-store';
+import { machineActor } from '@/lib/audit-event';
 import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
 import { getCustomAgent, recordAudit } from '@/lib/store';
-import { machineActor } from '@/lib/audit-event';
 import { buildTriggerInput } from '@/lib/trigger-dispatch';
 import { verifyWebhook } from '@/lib/webhook-trigger-policy';
 import {
@@ -15,8 +17,6 @@ import {
   markWebhookFired,
   resolveWebhookSecret,
 } from '@/lib/webhook-triggers';
-import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
-import { callerFromMachine } from '@/lib/app-access-caller';
 
 export const dynamic = 'force-dynamic';
 

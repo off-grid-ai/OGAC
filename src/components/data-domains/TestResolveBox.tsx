@@ -2,9 +2,9 @@
 
 import { ArrowRight, MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { resolveDomain, resolveDomainRanked, type DataDomain } from '@/lib/data-domains';
 
 // "Test resolve" — the operator types a phrase and sees exactly which rule the connector engine

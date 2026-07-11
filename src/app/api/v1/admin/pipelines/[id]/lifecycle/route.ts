@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import { transitionPipeline } from '@/lib/pipeline-lifecycle';
+import { resolvePipelineRole } from '@/lib/pipeline-lifecycle';
 import {
   type LifecycleAction,
   allowedTransitions,
   isLifecycleStatus,
 } from '@/lib/pipeline-lifecycle-model';
 import { getPipeline } from '@/lib/pipelines';
-import { resolvePipelineRole } from '@/lib/pipeline-lifecycle';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

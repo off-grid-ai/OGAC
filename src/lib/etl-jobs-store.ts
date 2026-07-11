@@ -15,9 +15,8 @@
 import { randomUUID } from 'crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { kestraOrchestration } from '@/lib/adapters/kestra';
 import { execConnectorQuery } from '@/lib/connector-exec';
-import { listConnectors } from '@/lib/store';
 import { redactBatch, activePiiPort } from '@/lib/data-redaction';
 import {
   buildCountSql,
@@ -39,8 +38,9 @@ import {
   type EtlRunView,
 } from '@/lib/etl-job';
 import { compileToKestraFlow } from '@/lib/etl-kestra-compile';
-import { kestraOrchestration } from '@/lib/adapters/kestra';
 import type { EtlJobStatus } from '@/lib/etl-model';
+import { listConnectors } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ── self-migrate ────────────────────────────────────────────────────────────────
 let ensurePromise: Promise<void> | null = null;

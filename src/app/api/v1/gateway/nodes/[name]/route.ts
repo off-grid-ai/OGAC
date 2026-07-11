@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
 import {
   GATEWAY_URL,
   gatewayHeaders,
@@ -11,6 +10,7 @@ import {
   type NodeAction,
   type NodeActionRequest,
 } from '@/lib/gateway';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

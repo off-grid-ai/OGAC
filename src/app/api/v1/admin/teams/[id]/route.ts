@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
+import { listPipelinesByTeam, setPipelineTeam } from '@/lib/pipelines';
 import { deleteTeam, getTeam, updateTeam } from '@/lib/teams';
 import { validateTeamUpdate } from '@/lib/teams-policy';
-import { listPipelinesByTeam, setPipelineTeam } from '@/lib/pipelines';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

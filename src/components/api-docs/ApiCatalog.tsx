@@ -2,14 +2,14 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   API_CATALOG,
   type ApiEndpoint,
   type AuthLevel,
   type HttpMethod,
 } from '@/lib/api-catalog';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 // The API docs & playground surface. The catalog comes from the pure `src/lib/api-catalog` module

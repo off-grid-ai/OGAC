@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
-import { renderPromptWithPartials } from '@/lib/prompt-template';
-import { resolvePartialMap } from '@/lib/prompt-partials';
 import { runInboundGuardrails, runOutboundGuardrails } from '@/lib/chat-run';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { promptRunTag } from '@/lib/prompt-observability';
+import { resolvePartialMap } from '@/lib/prompt-partials';
+import { renderPromptWithPartials } from '@/lib/prompt-template';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;

@@ -2,6 +2,7 @@ import { IssueKeyButton } from '@/components/finops/IssueKeyButton';
 import { KeysTable } from '@/components/finops/KeysTable';
 import { TokenBudgets } from '@/components/finops/TokenBudgets';
 import { GatewayCost } from '@/components/gateway/GatewayCost';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import {
@@ -14,10 +15,9 @@ import {
 } from '@/components/ui/table';
 import { computeFinOps } from '@/lib/finops';
 import { requireModuleForUser } from '@/lib/module-access';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

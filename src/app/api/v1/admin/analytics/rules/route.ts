@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { createRule, listRules, validateRule } from '@/lib/analytics-rules';
+import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

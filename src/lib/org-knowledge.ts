@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { orgKnowledgeChunks, orgKnowledgeCollections, orgKnowledgeDocs } from '@/db/schema';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { effectiveBaseRole } from '@/lib/role-permissions';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -11,7 +12,6 @@ import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 // <knowledge_base> output format — but org-scoped and RBAC-gated. Tables are ensured idempotently
 // so it deploys over SSH with no migration step (mirrors lib/chat.ts).
 
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 
 let ensurePromise: Promise<void> | null = null;
 async function ensureSchema(): Promise<void> {

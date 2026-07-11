@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { validatePolicyRule } from '@/lib/policy-rules-policy';
+import { requireAdmin } from '@/lib/authz';
 import { createPolicyRule, listPolicyRules } from '@/lib/policy-rules';
+import { validatePolicyRule } from '@/lib/policy-rules-policy';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Console-owned policy-rule collection: list + create. Thin — validation is the pure module,

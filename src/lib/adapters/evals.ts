@@ -5,7 +5,6 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { searchDocuments } from '@/lib/brain';
 import { listGoldenCases, runEval } from '@/lib/evals';
-import type { EvalRunResult, EvalsPort } from './types';
 
 // Evals adapters. The golden set (recall over the Brain) is the always-on first-party default and
 // runs fully in-process. promptfoo and Ragas/DeepEval are real swap-ins that invoke their tool /
@@ -15,6 +14,7 @@ const execFileAsync = promisify(execFile);
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
 import { getServiceCredential } from '@/lib/service-credentials';
 import { chooseGatewayAuth, type ServiceCredential } from '@/lib/service-credentials-lib';
+import type { EvalRunResult, EvalsPort } from './types';
 const EVAL_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
 const RAGAS_URL = process.env.OFFGRID_RAGAS_URL;
 const PROMPTFOO_BIN = process.env.OFFGRID_PROMPTFOO_BIN ?? 'promptfoo';

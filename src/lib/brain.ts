@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto';
 import * as lancedb from '@lancedb/lancedb';
 import { qdrantAdd, qdrantDelete, qdrantList, qdrantSearch } from '@/lib/qdrant';
-import { buildLanceWhere, rrfFuse, type RetrievalOptions } from '@/lib/retrieval/query';
 import { filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
+import { buildLanceWhere, rrfFuse, type RetrievalOptions } from '@/lib/retrieval/query';
 
 export type { RetrievalOptions } from '@/lib/retrieval/query';
 export type { DocAcl } from '@/lib/retrieval/acl';

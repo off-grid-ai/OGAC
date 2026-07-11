@@ -15,14 +15,6 @@
 // SOLID: no business rules here — gating + cycle rules are imported from the pure modules. Only the
 // reach itself (fetch) + the org policy lookup are I/O.
 
-import {
-  getPrimitive,
-  isPrimitiveEnabled,
-  isPrimitiveRef,
-  parsePrimitiveRef,
-  type EgressDecision,
-  type ToolPrimitive,
-} from '@/lib/tool-primitives';
 import { governedWebSearch, WEBSEARCH_URL_ENV } from '@/lib/adapters/web-search';
 import {
   buildAppToolGraph,
@@ -31,6 +23,14 @@ import {
   parseAppToolRef,
   wouldCreateCycle,
 } from '@/lib/app-tools';
+import {
+  getPrimitive,
+  isPrimitiveEnabled,
+  isPrimitiveRef,
+  parsePrimitiveRef,
+  type EgressDecision,
+  type ToolPrimitive,
+} from '@/lib/tool-primitives';
 
 // ─── env-var reconciliation (web_search endpoint) ─────────────────────────────────────────────────
 // Two names for the SAME on-prem search endpoint existed: this adapter's legacy OFFGRID_WEB_SEARCH_URL

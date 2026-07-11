@@ -28,6 +28,12 @@
 import { randomUUID } from 'crypto';
 import type { AppSpec, AppStep } from '@/lib/app-model';
 import {
+  type RunMode,
+  buildWouldPerform,
+  shadowDetail,
+  shouldIntercept,
+} from '@/lib/app-run-controls';
+import {
   applyStepResult,
   completedStepIds,
   initState,
@@ -35,24 +41,18 @@ import {
   type AppRunState,
 } from '@/lib/app-run-plan';
 import {
-  type PipelineContract,
-  enforceDataAccess,
-  enforceModelCall,
-} from '@/lib/pipeline-enforcement';
-import { auditEnforcement } from '@/lib/pipeline-contract';
-import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
-import {
-  type RunMode,
-  buildWouldPerform,
-  shadowDetail,
-  shouldIntercept,
-} from '@/lib/app-run-controls';
-import {
   emailEgressVerdict,
   emailMaskingRequired,
   maskEmailForSend,
   selectEmailProvider,
 } from '@/lib/email-sink-governance';
+import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
+import { auditEnforcement } from '@/lib/pipeline-contract';
+import {
+  type PipelineContract,
+  enforceDataAccess,
+  enforceModelCall,
+} from '@/lib/pipeline-enforcement';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 

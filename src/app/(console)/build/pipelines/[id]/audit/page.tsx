@@ -11,8 +11,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { normalizeAudit } from '@/lib/audit-log-view';
-import { getPipeline } from '@/lib/pipelines';
 import { filterAuditForPipeline, pipelineTag } from '@/lib/pipeline-api-key-format';
+import { getPipeline } from '@/lib/pipelines';
 import { searchAudit } from '@/lib/siem';
 import { currentOrgId } from '@/lib/tenancy';
 

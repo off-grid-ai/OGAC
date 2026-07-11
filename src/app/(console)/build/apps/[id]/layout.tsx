@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { AppLifecycleNav } from '@/components/build/AppLifecycleNav';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';

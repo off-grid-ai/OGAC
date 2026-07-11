@@ -13,7 +13,6 @@
 //
 // Keeping this out of pipelines.ts avoids pulling the eval runner (which imports the gateway/brain)
 // into the low-level store, and keeps the store free of a policy dependency (SOLID / no cycles).
-import { recordAudit } from '@/lib/store';
 import { actorFrom } from '@/lib/audit-event';
 import { listEvalDefs, type EvalDef } from '@/lib/eval-defs';
 import { runEvalDef } from '@/lib/eval-runner';
@@ -24,6 +23,12 @@ import {
   rollbackPipeline,
   type PipelineView,
 } from '@/lib/pipelines';
+import {
+  resolveFromGate,
+  type PublishJobDecision,
+  type PublishJobView,
+} from '@/lib/publish-job';
+import { createPublishJob, resolvePublishJob } from '@/lib/publish-jobs-store';
 import {
   evaluateReleaseGate,
   thresholdToPct,
@@ -37,12 +42,7 @@ import {
   type RollbackCandidate,
   type RollbackReason,
 } from '@/lib/rollback-policy';
-import {
-  resolveFromGate,
-  type PublishJobDecision,
-  type PublishJobView,
-} from '@/lib/publish-job';
-import { createPublishJob, resolvePublishJob } from '@/lib/publish-jobs-store';
+import { recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ─── 1. Release gate on publish ─────────────────────────────────────────────────────────────────────

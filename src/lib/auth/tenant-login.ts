@@ -1,7 +1,7 @@
-import { getTenantBySlug } from '@/lib/store';
-import { tenantSlugFromHost } from '@/lib/route-access';
-import { mayLoginToTenant } from '@/lib/tenancy-policy';
 import type { AppUser } from '@/lib/auth/identity';
+import { tenantSlugFromHost } from '@/lib/route-access';
+import { getTenantBySlug } from '@/lib/store';
+import { mayLoginToTenant } from '@/lib/tenancy-policy';
 
 // Impure adapter for the tenant-login gate (pure rule = mayLoginToTenant). Given the request Host
 // (the TRUSTED host behind Cloudflare) and the just-authenticated user, decide whether the sign-in

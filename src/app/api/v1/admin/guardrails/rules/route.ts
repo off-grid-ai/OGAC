@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import { createGuardrailRule, listGuardrailRules, validateRule } from '@/lib/guardrails-rules';
 import { currentOrgId } from '@/lib/tenancy';
 

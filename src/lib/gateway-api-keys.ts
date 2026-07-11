@@ -4,7 +4,6 @@
 // Keycloak is the single source of truth (revoke = disable the client → the aggregator's
 // client_credentials exchange fails).
 import { randomBytes } from 'node:crypto';
-import { KeycloakError, type KeycloakAdminClient, type KcClient, keycloakAdmin } from '@/lib/keycloak-admin';
 import {
   type GatewayKeyView,
   GATEWAY_KEY_SCOPE,
@@ -15,6 +14,7 @@ import {
   sortKeyViews,
   validateKeyName,
 } from '@/lib/gateway-api-key';
+import { KeycloakError, type KeycloakAdminClient, type KcClient, keycloakAdmin } from '@/lib/keycloak-admin';
 
 // Sentinel returned when Keycloak isn't configured — the routes surface `{ configured:false }` so the
 // UI can render an honest "Keycloak not configured" state instead of a 500.

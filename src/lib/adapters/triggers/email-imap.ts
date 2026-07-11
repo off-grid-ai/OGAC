@@ -14,11 +14,11 @@
 // is the thin I/O bridge (socket + submit). It matches a message to an app by a configurable
 // subject/recipient convention. Every op is graceful — errors are logged and the poll loop continues.
 
-import { connect as tlsConnect } from 'node:tls';
 import { connect as netConnect, type Socket } from 'node:net';
-import { getAppBySlug } from '@/lib/apps-store';
-import { newAppRunId } from '@/lib/app-run';
+import { connect as tlsConnect } from 'node:tls';
 import { submitAppRun } from '@/lib/adapters/apprun';
+import { newAppRunId } from '@/lib/app-run';
+import { getAppBySlug } from '@/lib/apps-store';
 import {
   buildTriggerInput,
   imapConfigFromEnv,

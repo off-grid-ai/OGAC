@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getMdm } from '@/lib/adapters/registry';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { validateOsquery } from '@/lib/fleetdm';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

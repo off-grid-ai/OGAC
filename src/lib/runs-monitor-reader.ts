@@ -16,10 +16,9 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { listAgentRuns } from '@/lib/agentrun';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
-import { listAgentRuns } from '@/lib/agentrun';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type AgentRunSource,
   type AppRunSource,
@@ -27,6 +26,7 @@ import {
   type RunRow,
   mergeRuns,
 } from '@/lib/runs-monitor';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Per-plane read cap. The pure layer paginates the merged result; we bound each source read so a
 // huge single plane can't starve the others out of the newest window.

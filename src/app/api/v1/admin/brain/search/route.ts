@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { searchDocuments } from '@/lib/brain';
-import { normalizeFilter, normalizeMode, type RetrievalOptions } from '@/lib/retrieval/query';
 import { askerFrom } from '@/lib/retrieval/acl';
+import { normalizeFilter, normalizeMode, type RetrievalOptions } from '@/lib/retrieval/query';
 
 // Semantic retrieval over the Brain — returns scored hits (the citation set).
 //

@@ -5,7 +5,6 @@ import { PolicyTemplatesPanel } from '@/components/policy/PolicyTemplatesPanel';
 import { RegoModulesManager } from '@/components/policy/RegoModulesManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listModules } from '@/lib/opa-policy';
 import { listPolicyRules } from '@/lib/policy-rules';

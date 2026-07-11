@@ -1,9 +1,9 @@
 'use client';
 
+import type { Icon } from '@phosphor-icons/react';
 import { ChatCircleDots, Cube, FolderOpen, TextAlignLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { Icon } from '@phosphor-icons/react';
 import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';

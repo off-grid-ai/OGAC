@@ -16,9 +16,9 @@
 // merely LOADING this module — e.g. under node:test to unit-test the enforcement wiring — doesn't
 // drag the whole gateway/DB/next-auth chain in. The pure decisions + the dep-injected orchestration
 // stay light and testable; the real runAgent is resolved only when Temporal actually invokes it.
-import type { AgentRun } from '../lib/agentrun';
 import type { RunContext } from '../lib/agent-run-context';
 import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
+import type { AgentRun } from '../lib/agentrun';
 import type { PipelineContract } from '../lib/pipeline-enforcement';
 
 /**

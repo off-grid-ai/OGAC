@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { route } from '@/lib/retrieval/router';
-import { normalizeFilter, normalizeMode } from '@/lib/retrieval/query';
+import { requireAdmin } from '@/lib/authz';
 import { askerFrom } from '@/lib/retrieval/acl';
+import { normalizeFilter, normalizeMode } from '@/lib/retrieval/query';
+import { route } from '@/lib/retrieval/router';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Route a query: detect intent → query the matching sources (KB / database / tool) → return
 // fused, provenance-carrying hits. The "routing magic" as an API. Optional `mode` ('vector' |

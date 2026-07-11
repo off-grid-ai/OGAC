@@ -8,13 +8,13 @@
 // This file is deliberately thin: no reasoning here (that's copilot-context.ts, pure). It only wires
 // real readers → the context shape. It is unit-testable by injecting fake readers via `gatherWith`.
 
-import { readAuditPage } from './audit-log-reader';
-import { computeFinOps, type FinOps } from './finops';
-import { readDriftView, type DriftView } from './drift-view';
-import { readEvalsView, type EvalsView } from './evals-view';
 import { detectAnomalies, type SeriesPoint } from './anomaly';
+import { readAuditPage } from './audit-log-reader';
 import type { AuditRow } from './audit-log-view';
 import type { CopilotContext } from './copilot-context';
+import { readDriftView, type DriftView } from './drift-view';
+import { readEvalsView, type EvalsView } from './evals-view';
+import { computeFinOps, type FinOps } from './finops';
 
 /** Injectable readers so the gather is unit-testable with fakes (no DB/gateway). */
 export interface CopilotReaders {

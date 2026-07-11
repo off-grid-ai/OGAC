@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/table';
 import { computeAccounting } from '@/lib/accounting';
 import { safeListTraces } from '@/lib/langfuse';
-import { getPipeline } from '@/lib/pipelines';
 import { pipelineCostSlice, pipelineTag } from '@/lib/pipeline-api-key-format';
+import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

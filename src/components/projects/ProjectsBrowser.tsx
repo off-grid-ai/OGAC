@@ -13,8 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { CardRail } from '@/components/workspace/CardRail';
-import { accentHue, initials, preview, relativeTime } from '@/lib/workspace-grid';
 import { cn } from '@/lib/utils';
+import { accentHue, initials, preview, relativeTime } from '@/lib/workspace-grid';
 
 interface ProjectRow {
   id: string;

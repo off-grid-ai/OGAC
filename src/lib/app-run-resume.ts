@@ -19,11 +19,6 @@
 
 import type { AppSpec } from '@/lib/app-model';
 import {
-  type AppRunState,
-  type StepState,
-  applyStepResult,
-} from '@/lib/app-run-plan';
-import {
   type AppRunContext,
   type AppRunDeps,
   type AppRunOutcome,
@@ -31,6 +26,11 @@ import {
   defaultDeps,
   driveRunnableSteps,
 } from '@/lib/app-run';
+import {
+  type AppRunState,
+  type StepState,
+  applyStepResult,
+} from '@/lib/app-run-plan';
 
 // The reviewer's decision, as the review route captures it (approve|reject + optional edit/note).
 export interface ResumeDecision {

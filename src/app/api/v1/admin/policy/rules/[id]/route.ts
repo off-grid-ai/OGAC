@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { validatePolicyRulePatch } from '@/lib/policy-rules-policy';
+import { requireAdmin } from '@/lib/authz';
 import { deletePolicyRule, updatePolicyRule } from '@/lib/policy-rules';
+import { validatePolicyRulePatch } from '@/lib/policy-rules-policy';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Console-owned policy-rule item: update (PATCH) + delete. Org-scoped so a rule can only be touched

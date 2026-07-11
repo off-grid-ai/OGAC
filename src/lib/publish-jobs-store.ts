@@ -9,7 +9,6 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { publishJobs } from '@/db/schema';
 import type { PublishJob } from '@/db/schema';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   isTerminal,
   nextStatus,
@@ -17,6 +16,7 @@ import {
   type PublishJobStatus,
   type PublishJobView,
 } from '@/lib/publish-job';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 let ensurePromise: Promise<void> | null = null;
 export async function ensurePublishJobsSchema(): Promise<void> {

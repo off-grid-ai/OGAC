@@ -17,8 +17,8 @@
 //   • maskTextForModel (guardrail-rules-runtime) performs the raw→redacted substitution. We reuse it
 //     verbatim; this module only decides WHEN it applies and reports the escalation outcome.
 
-import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
 import { maskTextForModel, type PiiScanLike } from '@/lib/guardrail-rules-runtime';
+import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
 
 /**
  * The effective PII-masking decision for a model call: the MAX of the org floor and the pipeline

@@ -10,7 +10,6 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import {
   type AppAccessCaller,
   type AppAccessPolicy,
@@ -20,6 +19,7 @@ import {
   defaultAppAccessPolicy,
   evaluateAppAccess,
 } from '@/lib/app-access-policy';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // ─── self-migrate (memoized; mirrors ensurePolicyRulesSchema) ───────────────────────────────────────
 let ensurePromise: Promise<void> | null = null;

@@ -17,12 +17,12 @@
 // (and in checks.ts / pipeline-enforcement.ts); the I/O lives behind the adapter registry.
 
 import { randomUUID } from 'crypto';
-import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { getLineage, getPii, getSigning } from '@/lib/adapters/registry';
+import { type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
 import { correlationIds } from '@/lib/correlation';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import { enforceModelCall } from '@/lib/pipeline-enforcement';
-import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 
 // ─── durable identity (mirrors agent-run-durable.ts) ────────────────────────────────────────────
 

@@ -6,7 +6,6 @@
 // honest empty state instead of a 500. Airbyte's config API is POST-based under /api/v1/ with JSON
 // bodies (verified against the live 0.63.15 box).
 
-import type { AdapterMeta } from './types';
 import {
   type EtlConnection,
   type EtlJob,
@@ -17,6 +16,7 @@ import {
   summarizeConnection,
   summarizeJob,
 } from '../etl-model';
+import type { AdapterMeta } from './types';
 
 const env = process.env;
 

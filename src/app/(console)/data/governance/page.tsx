@@ -11,13 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import {
   listAllClassifications,
   listAssets,
   listErasureRequests,
   listRetentionPolicies,
 } from '@/lib/data-catalog-store';
+import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import { evaluateFreshness, summarizeFreshness, type FreshnessResult } from '@/lib/data-freshness';
 import { evaluateRetention } from '@/lib/data-retention';
 import { requireModuleForUser } from '@/lib/module-access';

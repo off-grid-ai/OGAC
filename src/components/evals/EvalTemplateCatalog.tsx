@@ -4,18 +4,12 @@ import { Lightning, Plus } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { EvalCatalogFilterBar } from '@/components/evals/EvalCatalogFilterBar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  type CatalogSortKey,
-  type CatalogTemplate,
-  catalogFacets,
-  filterTemplates,
-  isFilterActive,
-  sortTemplates,
-} from '@/lib/eval-catalog-filter';
-import { EvalCatalogFilterBar } from '@/components/evals/EvalCatalogFilterBar';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Sheet,
   SheetBody,
@@ -25,9 +19,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  type CatalogSortKey,
+  type CatalogTemplate,
+  catalogFacets,
+  filterTemplates,
+  isFilterActive,
+  sortTemplates,
+} from '@/lib/eval-catalog-filter';
 
 type Template = CatalogTemplate;
 

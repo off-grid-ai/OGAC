@@ -41,13 +41,8 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
-import {
-  type ChatSelection,
-  selectionEquals,
-  selectionFromParams,
-  selectionToPath,
-} from '@/lib/chat-nav';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -69,10 +64,15 @@ import {
   candidateToRef,
   matchMentions,
 } from '@/lib/chat-mentions';
+import {
+  type ChatSelection,
+  selectionEquals,
+  selectionFromParams,
+  selectionToPath,
+} from '@/lib/chat-nav';
+import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { thinkingLabel, thinkingState } from '@/lib/chat-thinking';
 import { toDisplayHost } from '@/lib/display-host';
-import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
-import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/workspace-grid';

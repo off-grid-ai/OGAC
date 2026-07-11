@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SubNav } from '@/components/nav/SubNav';
 import { isModuleEnabled } from '@/lib/modules';
 import { cn } from '@/lib/utils';
-import { SubNav } from '@/components/nav/SubNav';
 
 // Scoped secondary-nav for the Data family — the "harness your internal intelligence" plane
 // (the builder/data persona). Reads in the flow order data actually moves: connect a source →

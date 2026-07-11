@@ -1,7 +1,7 @@
 import { ChartBar, DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { StatBand } from '@/components/insights/StatBand';
 import { StatusBadge } from '@/components/build/AppRunStatus';
+import { StatBand } from '@/components/insights/StatBand';
 import {
   bucketByDay,
   buildReportStats,

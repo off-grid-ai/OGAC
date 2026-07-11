@@ -1,10 +1,10 @@
 import { ShieldCheck } from '@phosphor-icons/react/dist/ssr';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GuardrailCatalog } from '@/components/guardrails/GuardrailCatalog';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
 import { PresidioRecognizers } from '@/components/guardrails/PresidioRecognizers';
 import { PresidioThresholds } from '@/components/guardrails/PresidioThresholds';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getPii } from '@/lib/adapters/registry';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { readGuardrailsView } from '@/lib/guardrails-view';

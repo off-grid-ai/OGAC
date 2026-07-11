@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { getPrompt } from '@/lib/prompts';
 import {
   buildPromptAggsQuery,
   emptyPromptObservability,
   parsePromptAggsResponse,
 } from '@/lib/prompt-observability';
+import { getPrompt } from '@/lib/prompts';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

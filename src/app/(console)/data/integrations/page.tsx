@@ -1,8 +1,8 @@
 import { AdapterCatalog } from '@/components/integrations/AdapterCatalog';
 import { AddConnectorButton } from '@/components/integrations/AddConnectorButton';
 import { CachePanel } from '@/components/integrations/CachePanel';
-import { ConnectorCatalog } from '@/components/integrations/ConnectorCatalog';
 import { ConnectorCard } from '@/components/integrations/ConnectorCard';
+import { ConnectorCatalog } from '@/components/integrations/ConnectorCatalog';
 import { GatewayIntegrations } from '@/components/integrations/GatewayIntegrations';
 import { ToolPolicySelect } from '@/components/integrations/ToolPolicySelect';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +17,8 @@ import {
 } from '@/components/ui/table';
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
 import { listConnectors, listIngestJobs, listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 function relTime(iso: string | null): string {
   if (!iso) return 'never';

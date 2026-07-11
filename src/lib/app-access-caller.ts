@@ -10,9 +10,9 @@
 // governed by its base's access. Department is best-effort from the actor's team memberships (null
 // when unknown) — the pure decision treats a null department as "no department grant".
 
-import { type AuthzSession } from '@/lib/authz';
-import { type Actor } from '@/lib/audit-event';
 import { type AppAccessCaller } from '@/lib/app-access-policy';
+import { type Actor } from '@/lib/audit-event';
+import { type AuthzSession } from '@/lib/authz';
 import { effectiveBaseRole } from '@/lib/role-permissions';
 import { listMembershipsForUser } from '@/lib/teams';
 

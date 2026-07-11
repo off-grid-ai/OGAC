@@ -238,6 +238,9 @@ export function summarizeErasure(
 // target is `deferred` with a reason, never counted as erased. Adapters are injected (default = the
 // real ones) so the orchestrator is integration-testable with fakes over the real plan.
 
+import { eraseSubjectDeviceReplicas } from '@/lib/adapters/erasure-device';
+import { eraseSubjectLakeObjects, isLakeConfigured } from '@/lib/adapters/erasure-lake';
+import { eraseSubjectVectors, isVectorConfigured } from '@/lib/adapters/erasure-vector';
 import {
   planPropagation,
   summarizePropagation,
@@ -245,9 +248,6 @@ import {
   type PropagationReport,
   type PropagationResult,
 } from '@/lib/erasure-plan';
-import { eraseSubjectVectors, isVectorConfigured } from '@/lib/adapters/erasure-vector';
-import { eraseSubjectLakeObjects, isLakeConfigured } from '@/lib/adapters/erasure-lake';
-import { eraseSubjectDeviceReplicas } from '@/lib/adapters/erasure-device';
 
 /** The adapter surface the orchestrator drives — injectable so tests can supply fakes. */
 export interface PropagationAdapters {

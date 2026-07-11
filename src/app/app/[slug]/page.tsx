@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
+import { DeployedApp } from '@/components/studio/DeployedApp';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
-import { DeployedApp } from '@/components/studio/DeployedApp';
 
 export const dynamic = 'force-dynamic';
 

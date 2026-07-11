@@ -16,13 +16,13 @@
 // so this is defence-in-depth, not the only guard.
 
 import type { AgentTool } from '@/lib/agent-loop';
+import { isAppToolRef as isAppRef } from '@/lib/app-tools';
 import {
   getPrimitive,
   isPrimitiveEnabled,
   isPrimitiveRef,
   parsePrimitiveRef,
 } from '@/lib/tool-primitives';
-import { isAppToolRef as isAppRef } from '@/lib/app-tools';
 
 // A registry-tool descriptor the caller resolves (from the tools table) and passes in. Kept minimal +
 // plain so this module stays pure. `ref` is `tool:<id>`.

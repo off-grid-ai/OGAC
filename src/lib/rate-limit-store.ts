@@ -8,8 +8,8 @@
 //   - resolve a presented Bearer/x-api-key secret → its key row + configured limit (the cleartext
 //     secret is never stored; only its sha-256 fingerprint).
 
-import { sql } from 'drizzle-orm';
 import { createHash } from 'crypto';
+import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 

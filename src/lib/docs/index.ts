@@ -2,14 +2,14 @@
 // old single-file module (DOC_SECTIONS, DocPage, DocSection, findDocBySlug, allDocSlugs, docIndex),
 // so importers keep working. Each section lives in its own file so pages can be expanded in
 // parallel without collisions.
-import { conceptsSection } from './concepts';
-import { pipelinesGatewaysSection } from './pipelines-gateways';
-import { integrationsSection } from './integrations';
-import { introductionSection } from './introduction';
 import { apiSection } from './api';
+import { conceptsSection } from './concepts';
 import { buildSection } from './guides-build';
 import { governSection } from './guides-govern';
 import { operateSection } from './guides-operate';
+import { integrationsSection } from './integrations';
+import { introductionSection } from './introduction';
+import { pipelinesGatewaysSection } from './pipelines-gateways';
 import { selfHostingSection } from './self-hosting';
 import type { DocPage, DocSection } from './types';
 

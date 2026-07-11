@@ -22,7 +22,6 @@ import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { fleetModelTags } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { modelOptions } from '@/lib/policy-catalog';
-import { currentOrgId } from '@/lib/tenancy';
 import { siemConfigured } from '@/lib/siem';
 import {
   getOrgPolicy,
@@ -31,6 +30,7 @@ import {
   listRoutingRules,
   listUsers,
 } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

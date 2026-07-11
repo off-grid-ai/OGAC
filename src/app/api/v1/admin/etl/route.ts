@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
+import { requireAdmin } from '@/lib/authz';
 
 // ETL overview — { healthy, workspaces, connections }. Best-effort: every field degrades to a
 // safe empty when Airbyte is unreachable or not yet set up (fresh install with no workspace), so

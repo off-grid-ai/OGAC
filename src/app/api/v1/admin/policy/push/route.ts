@@ -1,5 +1,5 @@
-import { auditFromSession } from '@/lib/audit-actor';
 import { NextResponse } from 'next/server';
+import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { pushRulesToOpa } from '@/lib/policy-rules';
 import { currentOrgId } from '@/lib/tenancy';

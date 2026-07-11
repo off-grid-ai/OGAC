@@ -13,6 +13,7 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useMemo, useState } from 'react';
+import { WafControls } from '@/components/edge/WafControls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { WafControls } from '@/components/edge/WafControls';
 
 interface EdgeEvent {
   ts: string;

@@ -12,8 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { EtlJobStatus } from '@/lib/etl-model';
 import type { EtlRunView } from '@/lib/etl-job';
+import type { EtlJobStatus } from '@/lib/etl-model';
 
 const TONE: Record<EtlJobStatus, string> = {
   succeeded: 'bg-primary/10 text-primary',

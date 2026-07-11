@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import {
   getChatBindingGovernance,
   getOrgSystemPrompt,
   setChatBindingGovernance,
   setOrgSystemPrompt,
 } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Org-wide settings — the system prompt injected into every chat + the GOVERNED chat-binding
 // (org-default chat pipeline + the SET of pipelines a user may pick per-project). Admin-only.

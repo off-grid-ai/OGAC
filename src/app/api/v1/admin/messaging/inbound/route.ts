@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
+import { inboundAddressFor, inboundConfigFromEnv } from '@/lib/inbound-email';
 import { currentOrgId } from '@/lib/tenancy';
 import { isWebhookTargetKind } from '@/lib/webhook-trigger-policy';
 import { createWebhookTrigger, listWebhookTriggers } from '@/lib/webhook-triggers';
-import { inboundAddressFor, inboundConfigFromEnv } from '@/lib/inbound-email';
 
 export const dynamic = 'force-dynamic';
 

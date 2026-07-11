@@ -18,9 +18,9 @@ import {
   saveQueryBody,
   type SoftwareInventory,
 } from '@/lib/fleetdm';
-import { listDevices } from '@/lib/store';
 import { getServiceCredential, invalidateServiceCredential } from '@/lib/service-credentials';
 import { chooseFleetToken } from '@/lib/service-credentials-lib';
+import { listDevices } from '@/lib/store';
 import type { MdmDevice, MdmPort } from './types';
 
 // MDM / device-management backends behind the Fleet Control port. The first-party registry is the

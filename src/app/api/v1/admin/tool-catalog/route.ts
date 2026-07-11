@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { currentOrgId } from '@/lib/tenancy';
-import { listTools } from '@/lib/store';
-import { listApps } from '@/lib/apps-store';
-import { primitiveCatalog } from '@/lib/tool-primitives';
 import { appToolCatalog } from '@/lib/app-tools';
+import { listApps } from '@/lib/apps-store';
+import { requireAdmin } from '@/lib/authz';
+import { listTools } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
+import { primitiveCatalog } from '@/lib/tool-primitives';
 
 // ─── Tool catalog (Builder Epic #117) — the three grouped, labeled tool sources the picker offers ─
 // Assembles, for the builder's dead-simple tool picker, the three sources a non-technical builder can

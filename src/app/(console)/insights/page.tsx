@@ -9,10 +9,10 @@ import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
 import { LangfuseRegistryPanel } from '@/components/observability/LangfuseRegistryPanel';
-import { resolveRegistryTab } from '@/lib/langfuse-registry';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
+import type { DriftReport } from '@/lib/adapters/types';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listEvalRuns } from '@/lib/evals';
 import {
@@ -33,14 +34,13 @@ import {
   safeLangfuseRegistry,
   safeListTraces,
 } from '@/lib/langfuse';
+import { resolveRegistryTab } from '@/lib/langfuse-registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
-import { currentOrgId } from '@/lib/tenancy';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { scoringConfigured } from '@/lib/qa/scoring';
-import type { DriftReport } from '@/lib/adapters/types';
+import { currentOrgId } from '@/lib/tenancy';
 import { withTimeout } from '@/lib/with-timeout';
 
 export const dynamic = 'force-dynamic';

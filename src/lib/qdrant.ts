@@ -1,13 +1,13 @@
 import { randomUUID } from 'crypto';
 import { EMBED_DIM } from '@/lib/adapters/types';
 import type { BrainDoc, BrainHit } from '@/lib/brain';
+import { ACL_FIELDS, aclFromPayload, filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
 import {
   buildQdrantFilter,
   buildQdrantAclShould,
   type QdrantFieldCondition,
   type RetrievalOptions,
 } from '@/lib/retrieval/query';
-import { ACL_FIELDS, aclFromPayload, filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
 
 // Superuser roles that bypass server-side ACL narrowing (the post-filter also passes them).
 const SUPERUSER_ROLES = ['admin'];

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppControlsEditor } from '@/components/build/AppControlsEditor';
-import { getApp } from '@/lib/apps-store';
 import { getControls, usageFor } from '@/lib/app-run-controls-store';
+import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 

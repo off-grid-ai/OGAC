@@ -11,15 +11,15 @@
 // exactly like victoria-metrics.ts / langfuse.ts: returns { configured:false } when unset and a typed
 // empty view + error string when unreachable — never throws into the page.
 import {
-  CHART_REQUESTS_OVER_TIME,
-  CHART_TOKENS_BY_MODEL,
-} from './superset-provision';
-import {
   type NativeChartData,
   type SupersetChartDataResponse,
   type SupersetChartSpec,
   shapeChart,
 } from './superset-data-shape';
+import {
+  CHART_REQUESTS_OVER_TIME,
+  CHART_TOKENS_BY_MODEL,
+} from './superset-provision';
 
 // Re-export the display model so presentation (NativeSupersetPanel) imports its props from this one
 // client module rather than reaching into the pure shaper directly.

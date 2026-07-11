@@ -3,7 +3,6 @@
 import { randomUUID } from 'crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { slugifyTenant } from '@/lib/tenant-domain';
 import {
   abacRules,
   apiKeys,
@@ -28,10 +27,20 @@ import {
   tools,
   users,
 } from '@/db/schema';
-import type { CheckResult } from '@/lib/checks';
+import {
+  type AuditEvent as CanonicalAuditEvent,
+  type AuditEventInput,
+  buildAuditEvent,
+} from '@/lib/audit-event';
 import type { ChatBindingGovernance } from '@/lib/chat-pipeline-policy';
+import type { CheckResult } from '@/lib/checks';
 // The live connector query path lives in connector-exec.ts (Builder Epic Phase 0). `recordCount`
 // backs realRecordCount below; execConnectorQuery is re-exported so callers keep one import site.
+import type {
+  ActivityQuery,
+  ActivityRow,
+  ProvenanceCoverage,
+} from '@/lib/compliance-activity';
 import { recordCount } from '@/lib/connector-exec';
 export { execConnectorQuery, recordCount } from '@/lib/connector-exec';
 export type {
@@ -39,21 +48,12 @@ export type {
   ConnectorQuery,
   ConnectorQueryResult,
 } from '@/lib/connector-exec';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
 import { emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
 import { shipAudit, shipAuditEvent } from '@/lib/siem';
-import {
-  type AuditEvent as CanonicalAuditEvent,
-  type AuditEventInput,
-  buildAuditEvent,
-} from '@/lib/audit-event';
-import type {
-  ActivityQuery,
-  ActivityRow,
-  ProvenanceCoverage,
-} from '@/lib/compliance-activity';
-import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { slugifyTenant } from '@/lib/tenant-domain';
 
 // Additive columns/tables for Wave-2 org/connector parity. Created idempotently on first use so
 // the deploy needs no migration step (matches the chat module's ensure* pattern). Memoized.

@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 
 // ─── LensLink — "this pipeline's slice of <global surface>" ────────────────────────────────────────
 //

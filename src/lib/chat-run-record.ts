@@ -9,7 +9,6 @@
 // It duplicates NEITHER the guardrail scan (that ran on the model path, in the route/chat-run.ts)
 // NOR the token stream (that is inline in the route). It records the run's trust artifacts + audit.
 
-import { recordAudit } from '@/lib/store';
 import { actorFrom, outcomeFromStatus } from '@/lib/audit-event';
 import {
   type ChatProvenance,
@@ -18,8 +17,9 @@ import {
   emitChatLineage,
   signChatAnswer,
 } from '@/lib/chat-run';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import { outcomeFromChecks } from '@/lib/checks';
+import { recordAudit } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 /**
  * Record a governed chat run: lineage + provenance + attributed audit. Returns the run result AND

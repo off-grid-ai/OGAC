@@ -11,8 +11,8 @@
 //                  that default (still a link) with an "org default" hint, OR — when no default is
 //                  configured at all — a neutral "ungoverned" chip (never a fabricated pipeline).
 
-import Link from 'next/link';
 import { GitBranch } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 

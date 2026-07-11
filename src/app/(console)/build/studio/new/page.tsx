@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { AppBuilder } from '@/components/build/AppBuilder';
 import { listManagedAgents } from '@/lib/agents';
-import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { requireModuleForUser } from '@/lib/module-access';
+import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 

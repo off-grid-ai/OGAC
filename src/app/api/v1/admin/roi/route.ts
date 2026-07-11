@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { validateRoiSettingsInput } from '@/lib/roi';
 import { computeOrgRoiRollup } from '@/lib/roi-reader';
 import { getOrgRoiDefault, setOrgRoiDefault } from '@/lib/roi-settings-store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

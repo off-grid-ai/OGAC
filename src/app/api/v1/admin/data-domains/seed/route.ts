@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
-import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
-import { createConnector, listConnectors } from '@/lib/store';
-import { createDomain, listDomains } from '@/lib/data-domains-store';
 import { createApp, listApps } from '@/lib/apps-store';
+import { auditFromSession } from '@/lib/audit-actor';
+import { requireAdmin } from '@/lib/authz';
 import {
   buildReimbursementAppSpec,
   planConnectors,
   planDomains,
   shouldSeedSampleApp,
 } from '@/lib/data-domains-demo-seed';
+import { createDomain, listDomains } from '@/lib/data-domains-store';
+import { createConnector, listConnectors } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

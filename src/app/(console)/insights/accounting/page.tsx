@@ -1,5 +1,6 @@
-import Link from 'next/link';
 import { Coins, CurrencyDollar, Users, FolderSimple } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import {
@@ -13,10 +14,9 @@ import {
 import { computeAccounting } from '@/lib/accounting';
 import { isRangePreset, type RangePreset } from '@/lib/accounting-aggs';
 import { requireModuleForUser } from '@/lib/module-access';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

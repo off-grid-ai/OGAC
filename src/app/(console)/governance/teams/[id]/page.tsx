@@ -3,8 +3,8 @@ import { TeamDetail } from '@/components/teams/TeamDetail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelinesByTeam } from '@/lib/pipelines';
 import { getTeam, listTeamMembers, listTeams } from '@/lib/teams';
-import { currentOrgId } from '@/lib/tenancy';
 import { distinctDepartments } from '@/lib/teams-policy';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

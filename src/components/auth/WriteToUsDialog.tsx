@@ -3,7 +3,6 @@
 import { CheckCircle } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 // "Write to us" → a request-access form that posts to /api/waitlist (which forwards to the same
 // Google Sheet the marketing waitlist uses). No mailto, no third-party script — keeps the auth-page

@@ -15,8 +15,8 @@
 // SOLID/DRY: the run COUNTS and per-app persona already live in tour-demo-seed (runStatuses/appsFor);
 // this module reuses them and only adds the per-run METRICS the existing planners don't carry. The
 // runner maps these records onto the store rows.
-import { hash12, type TenantProfile, appsFor, runStatuses, type AppSpecSeed } from '@/lib/tour-demo-seed';
 import { makePrng, type Prng } from '@/lib/demo/prng';
+import { hash12, type TenantProfile, appsFor, runStatuses, type AppSpecSeed } from '@/lib/tour-demo-seed';
 
 /** One synthetic run's metrics — engine-agnostic, maps onto agent_runs/app_runs + the gateway sink. */
 export interface RunMetric {

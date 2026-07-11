@@ -17,12 +17,12 @@
 //   - run === null with mode 'sync'/'durable' means unknown agent (404).
 
 import { randomUUID } from 'crypto';
-import type { Actor } from '@/lib/audit-event';
-import type { RunContext } from '@/lib/agent-run-context';
-import type { PipelineContract } from '@/lib/pipeline-enforcement';
-import type { AgentRun } from '@/lib/agentrun';
 import type { DurableRunHandle } from '@/lib/adapters/agentruntime';
+import type { RunContext } from '@/lib/agent-run-context';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
+import type { AgentRun } from '@/lib/agentrun';
+import type { Actor } from '@/lib/audit-event';
+import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // The heavy collaborators (runAgent → gateway/DB chain, the Temporal client adapter) are pulled in

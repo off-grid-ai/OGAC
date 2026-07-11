@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { deleteProject, projectAccess, updateProjectFields } from '@/lib/chat';
+import { isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 import { getChatBindingGovernance } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
-import { isChatPipelineAllowed } from '@/lib/chat-pipeline-policy';
 
 export const dynamic = 'force-dynamic';
 

@@ -12,32 +12,6 @@ import {
   getSigning,
 } from '@/lib/adapters/registry';
 import { maybeRunComposableTool } from '@/lib/adapters/tool-primitives';
-import type { EgressDecision } from '@/lib/tool-primitives';
-import { type AgentDef, resolveAgent } from '@/lib/agents';
-import { cacheLookup, cacheStore } from '@/lib/cache';
-import { estimateTokens, projectBudget } from '@/lib/chat-governance';
-import { costForTokens } from '@/lib/finops';
-import { type CheckResult } from '@/lib/checks';
-import { screenGuardrail } from '@/lib/guardrail-seam';
-import { emitRunTrace } from '@/lib/chat-trace';
-import { correlationIds } from '@/lib/correlation';
-import { shipRunAudit } from '@/lib/siem';
-import { recordAudit } from '@/lib/store';
-import { outcomeFromStatus } from '@/lib/audit-event';
-import {
-  effectiveRunId,
-  type RunContext,
-  resolveRunAttribution,
-} from '@/lib/agent-run-context';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
-import { emitSpan } from '@/lib/otel';
-import { scoreInteraction } from '@/lib/qa/scoring';
-import { route } from '@/lib/retrieval/router';
-import type { RetrievalHit } from '@/lib/retrieval/types';
-import { listTools } from '@/lib/store';
-import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
-import { auditEnforcement } from '@/lib/pipeline-contract';
-import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import {
   type AgentTool,
   type LoopStep,
@@ -47,7 +21,33 @@ import {
   parseAgentAction,
   runAgentLoop,
 } from '@/lib/agent-loop';
+import {
+  effectiveRunId,
+  type RunContext,
+  resolveRunAttribution,
+} from '@/lib/agent-run-context';
 import { buildAgentToolCatalog, isAutonomousAgent } from '@/lib/agent-tools-catalog';
+import { type AgentDef, resolveAgent } from '@/lib/agents';
+import { outcomeFromStatus } from '@/lib/audit-event';
+import { cacheLookup, cacheStore } from '@/lib/cache';
+import { estimateTokens, projectBudget } from '@/lib/chat-governance';
+import { emitRunTrace } from '@/lib/chat-trace';
+import { type CheckResult } from '@/lib/checks';
+import { correlationIds } from '@/lib/correlation';
+import { costForTokens } from '@/lib/finops';
+import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { screenGuardrail } from '@/lib/guardrail-seam';
+import { emitSpan } from '@/lib/otel';
+import { auditEnforcement } from '@/lib/pipeline-contract';
+import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
+import { scoreInteraction } from '@/lib/qa/scoring';
+import { shipRunAudit } from '@/lib/siem';
+import { recordAudit } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { route } from '@/lib/retrieval/router';
+import type { RetrievalHit } from '@/lib/retrieval/types';
+import { listTools } from '@/lib/store';
+import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the
 // platform's capabilities actually fire in-path, not just from admin endpoints:
@@ -55,7 +55,7 @@ import { buildAgentToolCatalog, isAutonomousAgent } from '@/lib/agent-tools-cata
 //   → provenance-sign → persist → lineage (best-effort) → [async, sampled] online QA score.
 // Safety checks run on every request; the LLM-as-judge score runs out-of-band (see scoreRun) so it
 // never adds latency to the response.
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import type { EgressDecision } from '@/lib/tool-primitives';
 const ANSWER_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 
 export interface RunStep {

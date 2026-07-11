@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { getGatewayRow, provisionGatewayHost } from '@/lib/gateways';
+import { currentOrgId } from '@/lib/tenancy';
 import { slugifyTenant } from '@/lib/tenant-domain';
 
 export const dynamic = 'force-dynamic';

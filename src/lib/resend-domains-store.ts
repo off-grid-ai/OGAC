@@ -9,8 +9,8 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 import type { DomainDnsRecord, DomainStatus, SendingDomain } from '@/lib/resend-domains';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 let ensurePromise: Promise<void> | null = null;
 export function ensureResendDomainSchema(): Promise<void> {

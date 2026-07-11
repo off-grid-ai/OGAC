@@ -15,8 +15,8 @@
 // PURE + unit-tested; this file's only I/O is the socket conversation in SmtpClient. Every op is
 // graceful — it returns a typed SendEmailResult, never throws into the executor.
 
-import { connect as tlsConnect } from 'node:tls';
 import { connect as netConnect, type Socket } from 'node:net';
+import { connect as tlsConnect } from 'node:tls';
 
 // ─── config ───────────────────────────────────────────────────────────────────────────────────────
 export interface SmtpConfig {

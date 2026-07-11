@@ -17,11 +17,11 @@
 //   • any external/user-facing text → toxicity + prompt-injection guardrails + safety evals
 //   • defaultEnabled catalog items are always in the recommended floor.
 
+import { EVAL_TEMPLATES, type EvalTemplate } from './eval-templates';
 import {
   GUARDRAIL_CATALOG,
   type GuardrailCatalogItem,
 } from './guardrails-catalog';
-import { EVAL_TEMPLATES, type EvalTemplate } from './eval-templates';
 
 /** The draft-pipeline descriptor the suggester reads. Pure input — no IDs into the DB. */
 export interface PipelineDraft {

@@ -3,8 +3,8 @@
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
-import { Button } from '@/components/ui/button';
 import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
+import { Button } from '@/components/ui/button';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
 // Declare a new data-domain rule. The create panel's open/closed state lives in the URL

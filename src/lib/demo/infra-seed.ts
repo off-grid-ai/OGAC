@@ -10,8 +10,8 @@
 // DETERMINISTIC key (`orgs/<orgId>/demo/<slug>`) instead — same content, same key, so putObject
 // overwrites in place. The key still sits under the org prefix, so listFiles(orgId) / isKeyInOrg
 // surface it exactly as a real tenant upload.
-import { orgFilePrefix } from '@/lib/files-tenancy';
 import type { DemoSecretSeed } from '@/lib/demo/secrets';
+import { orgFilePrefix } from '@/lib/files-tenancy';
 
 // Only these two demo tenants may ever be targeted — a hard allowlist so a mistyped org can't write
 // somewhere it shouldn't (mirrors seed-guard.assertAllowed for the DB seed).

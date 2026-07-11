@@ -2,9 +2,9 @@
 
 import { ArrowRight, Bank, ShieldCheck } from '@phosphor-icons/react';
 import { type ComponentType } from 'react';
+import { Magnetic } from '@/components/ui/magnetic';
 import { DEMO_TENANTS, demoTenantHref } from '@/lib/demo-tenants';
 import { cn } from '@/lib/utils';
-import { Magnetic } from '@/components/ui/magnetic';
 
 // The core call to action: open a real, fully-seeded console and tour the whole product yourself.
 // One card per industry (bank, insurer), each a validated https link to its read-only demo tenant.

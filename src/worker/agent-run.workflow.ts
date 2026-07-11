@@ -12,9 +12,9 @@
 // excluded from the Next build (see next.config.mjs serverExternalPackages + worker alias).
 
 import { proxyActivities } from '@temporalio/workflow';
+import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
 import type * as activities from './agent-run.activities';
 // Type-only + relative: erased at compile, so the sandbox bundle stays clean and self-contained.
-import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
 
 function pipeline(maxAttempts: number) {
   return proxyActivities<typeof activities>({

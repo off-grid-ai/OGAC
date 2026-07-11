@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { managedDeleteFlag, managedGetFlag, managedSetDescription } from '@/lib/flags-manager';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Flag detail — enabled state + variants + gradual-rollout % for the active environment. When
 // Unleash drives management this comes from the Admin API; otherwise from the first-party store

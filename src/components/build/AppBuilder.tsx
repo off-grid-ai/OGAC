@@ -18,14 +18,16 @@ import {
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
+import { InheritanceBanner } from '@/components/build/InheritanceBanner';
+import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
+import { StudioCanvas } from '@/components/studio/StudioCanvas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import type { OrgContextSummary } from '@/lib/org-context';
-import { type AppSpec, type AppStepKind, type TriggerKind, validateAppSpec } from '@/lib/app-model';
 import {
   addStep,
   moveStep,
@@ -43,6 +45,7 @@ import {
   toggleGrounding,
   type BindingNames,
 } from '@/lib/app-builder';
+import { type AppSpec, type AppStepKind, type TriggerKind, validateAppSpec } from '@/lib/app-model';
 import { setStepTools } from '@/lib/app-tools';
 import {
   analyzeGaps,
@@ -51,10 +54,7 @@ import {
   mergeFixIts,
   type FixIt,
 } from '@/lib/builder-gaps';
-import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
-import { InheritanceBanner } from '@/components/build/InheritanceBanner';
-import { StudioCanvas } from '@/components/studio/StudioCanvas';
-import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
+import type { OrgContextSummary } from '@/lib/org-context';
 
 // ─── AppBuilder (Builder Epic #115) — the USABLE guided BUILD screen ──────────────────────────────
 //

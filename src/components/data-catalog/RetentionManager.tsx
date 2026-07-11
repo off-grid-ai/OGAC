@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { RETENTION_ACTIONS } from '@/lib/data-retention';
 import type { RetentionPolicyRow } from '@/db/schema';
+import { RETENTION_ACTIONS } from '@/lib/data-retention';
 
 // Full CRUD over an asset's retention policy (one per asset). PUT upserts; DELETE removes. Legal hold
 // overrides the window (never auto-purged while held).

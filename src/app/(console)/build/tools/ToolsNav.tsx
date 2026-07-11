@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { SubNav } from '@/components/nav/SubNav';
-import { cn } from '@/lib/utils';
 import { DEFAULT_TOOLS_TAB, normalizeToolsTab, type ToolsTab } from '@/lib/tools-view';
+import { cn } from '@/lib/utils';
 
 // Scoped secondary-nav for the Tools home (#121). Tabs are ?tab= on the same route — state lives in
 // the URL (deep-linkable, Back-coherent — Back steps between tabs, not off the page), never local

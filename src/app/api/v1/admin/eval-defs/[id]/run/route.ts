@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/authz';
 import { getEvalDef } from '@/lib/eval-defs';
 import { runEvalDef } from '@/lib/eval-runner';
-import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

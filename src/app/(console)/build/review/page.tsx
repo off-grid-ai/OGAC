@@ -7,12 +7,12 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { type AuthzSession } from '@/lib/authz';
-import { callerFromSession } from '@/lib/app-access-caller';
-import { getReviewInbox } from '@/lib/review-inbox-reader';
-import { requireModuleForUser } from '@/lib/module-access';
-import { currentOrgId } from '@/lib/tenancy';
 import { auth } from '@/auth';
+import { callerFromSession } from '@/lib/app-access-caller';
+import { type AuthzSession } from '@/lib/authz';
+import { requireModuleForUser } from '@/lib/module-access';
+import { getReviewInbox } from '@/lib/review-inbox-reader';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 

@@ -3,10 +3,10 @@ import Link from 'next/link';
 import { NewEtlJobButton } from '@/components/data/etl/NewEtlJobButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { listConnectors } from '@/lib/store';
 import { listEtlJobs } from '@/lib/etl-jobs-store';
 import type { EtlJobStatus } from '@/lib/etl-model';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

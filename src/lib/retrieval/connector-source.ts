@@ -9,10 +9,10 @@
 // Implements the same `RetrievalSource` shape as kb/database/tool in sources.ts. Its `kind` is
 // 'database' (a connector read is a structured-data read; SourceKind has no 'connector' member and
 // types.ts is owned by another agent), but its `id` is 'connector' so it's distinct in routing.
-import { listConnectors } from '@/lib/store';
 import { queryDomain } from '@/lib/adapters/connector-query';
 import { resolveDomain } from '@/lib/data-domains';
 import { listDomains } from '@/lib/data-domains-store';
+import { listConnectors } from '@/lib/store';
 import type { RetrievalSource } from './types';
 
 // Injectable I/O boundary so the source can be unit-tested without a live DB/connector. Production

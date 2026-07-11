@@ -1,9 +1,6 @@
 import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { messagesUpToInclusive } from '@/lib/chat-policy';
-import { skillVisibleTo } from '@/lib/chat-skill-policy';
-import { getObjectText, putObject } from '@/lib/files';
 import {
   chatArtifacts,
   chatArtifactVersions,
@@ -17,6 +14,9 @@ import {
   chatSettings,
   chatSkills,
 } from '@/db/schema';
+import { messagesUpToInclusive } from '@/lib/chat-policy';
+import { skillVisibleTo } from '@/lib/chat-skill-policy';
+import { getObjectText, putObject } from '@/lib/files';
 
 // Chat workspace server logic — ports Off Grid AI Desktop's project/thread/message store to the
 // console, backed by the on-prem gateway for inference. Tables are created idempotently on first

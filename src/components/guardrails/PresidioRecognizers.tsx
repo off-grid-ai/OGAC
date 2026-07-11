@@ -4,7 +4,6 @@ import { PencilSimple, Plus, Trash, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { toggleMessage } from '@/lib/toast-messages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { toggleMessage } from '@/lib/toast-messages';
 
 // Custom Presidio recognizers management surface. Full CRUD over console-owned recognizers that
 // become Presidio `ad_hoc_recognizers` on every /analyze call: a regex `pattern` recognizer (regex

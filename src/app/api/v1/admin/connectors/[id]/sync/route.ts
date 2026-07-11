@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { syncConnector } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Trigger an ingest run for a connector (creates an ingest job).
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

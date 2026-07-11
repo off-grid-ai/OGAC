@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { createApiKey, listApiKeys } from '@/lib/store';
+import { requireAdmin } from '@/lib/authz';
 import { finalizeKeyCreation } from '@/lib/rate-limit-store';
+import { createApiKey, listApiKeys } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 const TYPES = ['user', 'project'];

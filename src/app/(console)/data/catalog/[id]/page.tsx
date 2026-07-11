@@ -6,13 +6,13 @@ import { ClassificationManager } from '@/components/data-catalog/ClassificationM
 import { RetentionManager } from '@/components/data-catalog/RetentionManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import {
   getAsset,
   getRetention,
   listClassifications,
   toClassification,
 } from '@/lib/data-catalog-store';
+import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import { evaluateFreshness } from '@/lib/data-freshness';
 import { evaluateRetention } from '@/lib/data-retention';
 import { requireModuleForUser } from '@/lib/module-access';

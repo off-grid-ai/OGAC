@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { readAuditForExport } from '@/lib/audit-log-reader';
 import {
   auditRowsToCsv,
   auditRowsToJson,
   parseAuditFilters,
 } from '@/lib/audit-log-view';
+import { requireAdmin } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 

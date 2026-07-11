@@ -10,8 +10,8 @@
 //   • scanPii        → the guardrails PII port (registry.ts), org-scoped.
 //   • audit          → recordAudit (store.ts), tagged with the pipeline resource.
 
-import type { ExecuteDeps, GatewayCompletion } from '@/lib/pipeline-execute';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
+import type { ExecuteDeps, GatewayCompletion } from '@/lib/pipeline-execute';
 
 const DEFAULT_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 

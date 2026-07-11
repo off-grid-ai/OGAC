@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { listTenants } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 import { createInvite, listInvites, sendInviteEmail } from '@/lib/user-invites';
 import { baseUrlFromHeaders, validateInviteCreate } from '@/lib/user-invites-policy';
 

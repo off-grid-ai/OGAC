@@ -17,9 +17,9 @@
 // (the egress leash) + applyPiiEscalation (the mask) + effectivePiiMasking (the mask-required
 // authority); it owns no I/O.
 
-import { enforceModelCall, type PipelineContract } from '@/lib/pipeline-enforcement';
-import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
 import type { PiiScanLike } from '@/lib/guardrail-rules-runtime';
+import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
+import { enforceModelCall, type PipelineContract } from '@/lib/pipeline-enforcement';
 
 export type EmailProvider = 'resend' | 'smtp';
 

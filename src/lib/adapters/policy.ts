@@ -1,5 +1,5 @@
-import { evaluateAbac } from '@/lib/store';
 import { recordDecision } from '@/lib/policy-decision-log';
+import { evaluateAbac } from '@/lib/store';
 import { POLICY } from './services';
 import type { PolicyDecision, PolicyInput, PolicyPort } from './types';
 

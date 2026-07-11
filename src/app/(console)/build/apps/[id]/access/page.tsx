@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import { AppAccessEditor } from '@/components/build/AppAccessEditor';
 import { AppShareManager } from '@/components/build/AppShareManager';
-import { getApp } from '@/lib/apps-store';
 import { resolveAppAccessPolicy } from '@/lib/app-access';
 import { listAppGrants } from '@/lib/app-sharing';
+import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 

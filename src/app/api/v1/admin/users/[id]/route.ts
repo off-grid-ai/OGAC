@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { auditFromSession } from '@/lib/audit-actor';
-import { currentOrgId } from '@/lib/tenancy';
+import { requireAdmin } from '@/lib/authz';
 import { isRbacRole } from '@/lib/roles';
 import { setUserRole } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Change a user's RBAC role.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

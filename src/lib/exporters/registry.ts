@@ -2,10 +2,10 @@
 // exporter and shapes the spine's cost/usage rollup into Prometheus/OTLP metric samples.
 
 import type { FinOps } from '@/lib/finops';
-import type { Exporter, ExporterKind } from './types';
-import { splunkHecExporter } from './splunk-hec';
 import { openLineageExporter } from './openlineage';
 import { prometheusExporter, type MetricSample } from './prometheus';
+import { splunkHecExporter } from './splunk-hec';
+import type { Exporter, ExporterKind } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REGISTRY: Record<ExporterKind, Exporter<any>> = {

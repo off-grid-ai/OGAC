@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CLASSIFICATION_LEVELS } from '@/lib/data-classification';
 import type { DataClassificationRow } from '@/db/schema';
+import { CLASSIFICATION_LEVELS } from '@/lib/data-classification';
 
 const LEVEL_TONE: Record<string, string> = {
   public: 'bg-muted text-muted-foreground',

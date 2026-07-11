@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import { ClipboardText, DownloadSimple } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { AuditFilterBar } from '@/components/audit/AuditFilterBar';
 import { StatBand } from '@/components/insights/StatBand';
+import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { readAuditPage } from '@/lib/audit-log-reader';
 import {
   auditFiltersToQuery,
@@ -10,10 +11,9 @@ import {
 } from '@/lib/audit-log-view';
 import { buildAuditStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
-import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
-import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { listPipelines } from '@/lib/pipelines';
+import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';

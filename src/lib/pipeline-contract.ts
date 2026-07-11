@@ -11,16 +11,16 @@
 // The org governance baseline is the seeded ORG_POLICY_DEFAULTS / ORG_GUARDRAIL_DEFAULTS (there is no
 // org-governance store yet — see pipeline-governance.ts; those constants ARE the org substrate today).
 
-import { recordAudit } from '@/lib/store';
-import { getPipeline } from '@/lib/pipelines';
+import { type PipelineContract, enforcementResource } from '@/lib/pipeline-enforcement';
 import {
   ORG_GUARDRAIL_DEFAULTS,
   ORG_POLICY_DEFAULTS,
   normalizeOverlay,
 } from '@/lib/pipeline-governance';
-import { type PipelineContract, enforcementResource } from '@/lib/pipeline-enforcement';
-import { parseModelRules, parseRequestParamsPolicy } from '@/lib/request-policy';
 import { isConsumable } from '@/lib/pipeline-lifecycle-model';
+import { getPipeline } from '@/lib/pipelines';
+import { parseModelRules, parseRequestParamsPolicy } from '@/lib/request-policy';
+import { recordAudit } from '@/lib/store';
 
 /**
  * Resolve the enforceable contract for a run's bound pipeline. Returns null when:

@@ -8,9 +8,10 @@ import {
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppReview } from '@/components/build/AppReview';
 import { Badge } from '@/components/ui/badge';
-import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import {
   type AppRunView,
   type AppRunStepRow,
@@ -23,7 +24,6 @@ import {
   statusLabel,
   statusTone,
 } from '@/lib/app-runs-view';
-import { AppReview } from '@/components/build/AppReview';
 
 // ─── AppRunStatus (Builder Epic Phase 4A) — the RUNNING screen (screen 3 of 5) ────────────────────
 //

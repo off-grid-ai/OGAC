@@ -19,8 +19,6 @@ import {
 import { listBindings } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
-import { tenantHost, tenantUrl } from '@/lib/tenant-domain';
-import { currentOrgId } from '@/lib/tenancy';
 import {
   getChatBindingGovernance,
   getOrgSystemPrompt,
@@ -29,6 +27,8 @@ import {
   listFlags,
   listTenants,
 } from '@/lib/store';
+import { currentOrgId } from '@/lib/tenancy';
+import { tenantHost, tenantUrl } from '@/lib/tenant-domain';
 import { MODULES } from '@/modules/registry';
 
 export const dynamic = 'force-dynamic';
