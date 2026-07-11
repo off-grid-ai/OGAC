@@ -564,6 +564,90 @@ export interface EvalDocInput {
   cases: EvalCaseLine[];
 }
 
+// ── Family: Data Processing Activity Report / DPIA (DPO) ─────────────────────────────────────────────
+
+/** Money as USD with 2dp (the ledger carries 4dp; a report reads at 2dp). */
+export function usd(v: number | null | undefined): string {
+  return `$${num(v).toFixed(2)}`;
+}
+
+export function buildActivityDoc(a: ComplianceActivity, meta: DocMetaInput): ReportDoc {
+  const sections: ReportSection[] = [
+    {
+      heading: 'Processing activity summary',
+      blocks: [
+        {
+          type: 'keyValues',
+          rows: [
+            { label: 'Events processed', value: count(a.totals.events) },
+            { label: 'Distinct actors', value: count(a.totals.actors) },
+            { label: 'Tokens', value: count(a.totals.tokens) },
+            { label: 'Cost', value: usd(a.totals.costUsd) },
+            { label: 'Enforcement actions (blocked/denied)', value: count(a.totals.blockedOrDenied) },
+            { label: 'Redactions (PII masked)', value: count(a.totals.redacted) },
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'Outcomes',
+      blocks: [
+        {
+          type: 'keyValues',
+          rows: [
+            { label: 'OK', value: count(a.outcomes.ok) },
+            { label: 'Redacted', value: count(a.outcomes.redacted) },
+            { label: 'Blocked', value: count(a.outcomes.blocked) },
+            { label: 'Denied', value: count(a.outcomes.denied) },
+            { label: 'Error', value: count(a.outcomes.error) },
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'By actor',
+      blocks: [
+        {
+          type: 'table',
+          columns: ['Actor', 'Events', 'Enforced', 'Cost'],
+          rows: a.byActor.map((r) => [cell(r.key), count(r.events), count(r.blocked), usd(r.costUsd)]),
+          declaredCount: a.byActor.length,
+        },
+      ],
+    },
+    {
+      heading: 'By model',
+      blocks: [
+        {
+          type: 'table',
+          columns: ['Model', 'Events', 'Tokens', 'Cost'],
+          rows: a.byModel.map((r) => [cell(r.key), count(r.events), count(r.tokens), usd(r.costUsd)]),
+          declaredCount: a.byModel.length,
+        },
+      ],
+    },
+    {
+      heading: 'Provenance coverage',
+      blocks: [
+        {
+          type: 'keyValues',
+          rows: [
+            { label: 'Agent runs', value: count(a.provenance.runs) },
+            { label: 'Signed', value: count(a.provenance.signed) },
+            { label: 'Coverage', value: pct(a.provenance.coveragePct) },
+          ],
+        },
+        {
+          type: 'callout',
+          tone: a.provenance.coveragePct >= 100 ? 'attest' : 'info',
+          text: `${count(a.provenance.signed)} of ${count(a.provenance.runs)} agent runs in this period carry a tamper-evident, signed provenance record.`,
+        },
+      ],
+    },
+  ];
+  return assemble(meta, sections);
+}
+
 export function buildEvalDoc(input: EvalDocInput, meta: DocMetaInput): ReportDoc {
   const summaryRows = [
     { label: 'Golden cases', value: count(input.caseCount) },

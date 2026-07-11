@@ -55,7 +55,7 @@ export function isReportDocId(id: string): boolean {
 
 /** Resolve the tenant display name for an org id (org id === tenant id). Falls back to a readable
  * label so the cover never shows a raw id or an empty string. */
-async function tenantNameFor(orgId: string | undefined): Promise<string> {
+export async function tenantNameFor(orgId: string | undefined): Promise<string> {
   const id = orgId ?? DEFAULT_ORG;
   const tenants = await listTenants();
   const t = tenants.find((x) => x.id === id || x.slug === id);
