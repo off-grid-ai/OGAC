@@ -24,9 +24,9 @@ export const dynamic = 'force-dynamic';
 // route (Phase 4B sink). Value-forward: the stat band + charts lead; the table is the drill-down.
 export default async function AppReportsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ appId?: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
   const { appId } = await searchParams;

@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const rawBody = await req.text().catch(() => '');
 
   const trigger = await getWebhookTriggerByToken(token).catch(() => null);
-  if (!trigger || !trigger.enabled) {
+  if (!trigger?.enabled) {
     return NextResponse.json({ error: 'unknown or disabled trigger' }, { status: 404 });
   }
 

@@ -28,9 +28,9 @@ export const dynamic = 'force-dynamic';
 // degrades to an honest empty state, never fabricated rows.
 export default async function WarehousePage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ q?: string }>;
-}) {
+}>) {
   await requireModuleForUser('data');
   const { q = '' } = await searchParams;
 

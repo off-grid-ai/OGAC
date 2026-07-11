@@ -130,11 +130,11 @@ function Stat({
   label,
   value,
   tone,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   tone: 'warn' | 'success' | 'neutral';
-}) {
+}>) {
   const toneCls =
     tone === 'warn'
       ? 'text-amber-600 dark:text-amber-500'

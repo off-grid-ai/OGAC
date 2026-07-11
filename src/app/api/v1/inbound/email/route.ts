@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   const trigger = await getWebhookTriggerByToken(token).catch(() => null);
-  if (!trigger || !trigger.enabled) {
+  if (!trigger?.enabled) {
     return NextResponse.json({ error: 'unknown or disabled inbound address' }, { status: 404 });
   }
 

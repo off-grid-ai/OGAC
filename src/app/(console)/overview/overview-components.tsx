@@ -39,12 +39,12 @@ export function Section({
   href,
   linkLabel,
   children,
-}: {
+}: Readonly<{
   title: string;
   href: string;
   linkLabel: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">

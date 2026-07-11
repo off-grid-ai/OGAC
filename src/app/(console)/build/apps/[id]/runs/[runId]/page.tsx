@@ -14,9 +14,9 @@ export const dynamic = 'force-dynamic';
 // human step pauses it). Deep-linkable within the app shell: /apps/<id>/runs/<runId>.
 export default async function AppRunDetail({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string; runId: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const { id, runId } = await params;
   const orgId = await currentOrgId();

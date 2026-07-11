@@ -40,9 +40,9 @@ function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
 // with the pipeline tag (logged as a gap); an empty match shows an honest note.
 export default async function PipelineObservabilityPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
-}) {
+}>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();

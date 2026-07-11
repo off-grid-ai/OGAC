@@ -20,9 +20,9 @@ export const dynamic = 'force-dynamic';
 // run (/build/review/<runId>). Approval respects authority (surfaced gracefully, not a crash).
 export default async function ReviewDetailPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ runId: string }>;
-}) {
+}>) {
   await requireModuleForUser('studio');
   const { runId } = await params;
   const orgId = await currentOrgId();

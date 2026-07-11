@@ -20,9 +20,9 @@ export const dynamic = 'force-dynamic';
 // pipeline's guardrailOverlay, not the org guardrail store.
 export default async function PipelineGuardrailsPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
-}) {
+}>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();
