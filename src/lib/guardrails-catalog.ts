@@ -761,12 +761,9 @@ export function buildEnablePayload(
   action: EnableAction = 'redact',
 ): EnableRulePayload {
   const act = isEnableAction(action) ? action : 'redact';
-  const engineLabel =
-    item.engine === 'presidio'
-      ? 'Presidio'
-      : item.engine === 'llm-guard'
-        ? 'LLM Guard'
-        : 'Guardrails-AI';
+  let engineLabel = 'Guardrails-AI';
+  if (item.engine === 'presidio') engineLabel = 'Presidio';
+  else if (item.engine === 'llm-guard') engineLabel = 'LLM Guard';
   return {
     matcher: 'entity',
     pattern: item.entity,
