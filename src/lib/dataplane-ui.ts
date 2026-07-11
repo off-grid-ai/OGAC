@@ -30,7 +30,7 @@ export function formatBytes(bytes: number | null | undefined): string {
 export function formatRows(rows: number | null | undefined): string {
   const n = Number(rows);
   if (!Number.isFinite(n) || n < 0) return '0';
-  return Math.floor(n).toLocaleString('en-IN');
+  return Math.floor(n).toLocaleString('en-US');
 }
 
 // ─── Table grouping (Catalog list → grouped-by-database grid) ──────────────────

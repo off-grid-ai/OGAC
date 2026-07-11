@@ -64,7 +64,7 @@ function bfsiRouting(): PipelineRouting {
   };
 }
 
-// Six Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/INR
+// Six Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/USD
 // context). Overlays TIGHTEN org defaults (e.g. force PII masking on).
 export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
   {

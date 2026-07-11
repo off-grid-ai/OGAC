@@ -16,7 +16,7 @@
 //
 // HONESTY: apps bind to data-domain LABELS that already resolve to the REAL seeded connectors
 // (mirrors data-domains-demo-seed / suraksha-tenant-seed). No fabricated PII — every value is
-// synthetic Indian-BFSI (INR, PAN, IFSC, Indian names, banks/NBFCs/insurers). Runs are seeded in a
+// synthetic Indian-BFSI (USD, PAN, IFSC, Indian names, banks/NBFCs/insurers). Runs are seeded in a
 // mix of `done` + `awaiting_human` so Runs/Review light up; apps are SHADOW-safe (side-effecting
 // sinks are `report`/`console`, never live delivery) so a public demo never acts on the world.
 //
@@ -147,12 +147,12 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     key: 'loan-underwriting',
     title: 'Personal Loan Underwriting Assist',
     summary:
-      'Personal-loan eligibility — pull the applicant and their transactions, compute FOIR and check CIBIL/income floors from policy, recommend approve/decline with reasons. Ticket ₹50k–₹40L.',
+      'Personal-loan eligibility — pull the applicant and their transactions, compute FOIR and check CIBIL/income floors from policy, recommend approve/decline with reasons. Ticket $600–$50,000.',
     pipelineName: 'Loan Underwriting',
     steps: [
       q('Pull the applicant', 'customer data'),
       q('Pull 6-month bank statement', 'transactions'),
-      ag('Assess eligibility (FOIR, CIBIL, income)', 'Compute FOIR after the new EMI and check CIBIL and income floors. Recommend approve, decline, or refer-to-senior with the reason and policy clause. All amounts in ₹.'),
+      ag('Assess eligibility (FOIR, CIBIL, income)', 'Compute FOIR after the new EMI and check CIBIL and income floors. Recommend approve, decline, or refer-to-senior with the reason and policy clause. All amounts in $.'),
       hu('Credit officer decision'),
       out('Underwriting recommendation'),
     ],
@@ -166,7 +166,7 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     pipelineName: 'Fraud Screening',
     steps: [
       q('Pull the transaction & customer', 'transactions'),
-      ag('Score fraud risk', 'Score the transaction for fraud against velocity, geolocation and beneficiary patterns. Explain the drivers. Flag anything above the risk threshold for analyst review. Amounts in ₹.'),
+      ag('Score fraud risk', 'Score the transaction for fraud against velocity, geolocation and beneficiary patterns. Explain the drivers. Flag anything above the risk threshold for analyst review. Amounts in $.'),
       hu('Fraud analyst review'),
       out('Fraud verdict + risk score'),
     ],
@@ -176,12 +176,12 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     key: 'reimbursement',
     title: 'Reimbursement Approval',
     summary:
-      "Employee reimbursement — read the invoice, check the employee's quota, decide eligibility, then approve/reject. PAN/bank details masked, everything on-prem. Amounts in ₹.",
+      "Employee reimbursement — read the invoice, check the employee's quota, decide eligibility, then approve/reject. PAN/bank details masked, everything on-prem. Amounts in $.",
     pipelineName: 'Reimbursement Governance',
     steps: [
       q('Read the invoice', 'invoices'),
       q("Check the employee's reimbursement quota", 'reimbursement quota'),
-      ag('Decide eligibility', 'Given the invoice amount and the employee reimbursement quota, decide whether the employee is within quota and eligible. State the remaining quota and a clear eligible / not-eligible recommendation. Amounts in ₹.'),
+      ag('Decide eligibility', 'Given the invoice amount and the employee reimbursement quota, decide whether the employee is within quota and eligible. State the remaining quota and a clear eligible / not-eligible recommendation. Amounts in $.'),
       hu('Approve or reject'),
       out('Reimbursement decision'),
     ],
@@ -195,7 +195,7 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     pipelineName: 'Cross-Sell Advisor',
     steps: [
       q('Pull the customer holdings', 'customer data'),
-      ag('Recommend next best action', 'From the customer holding pattern, suggest the next-best product with a one-line rationale. Aggregate insights only — never expose individual PII. Amounts in ₹.'),
+      ag('Recommend next best action', 'From the customer holding pattern, suggest the next-best product with a one-line rationale. Aggregate insights only — never expose individual PII. Amounts in $.'),
       out('Cross-sell recommendation'),
     ],
     runs: { done: 8, awaitingReview: 0 },
@@ -204,12 +204,12 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     key: 'fnol-triage',
     title: 'Motor Claim FNOL Triage',
     summary:
-      'Motor own-damage FNOL — read the policy & claim, check the vehicle is covered and premium paid, decide cashless vs surveyor, route for approval. Amounts in ₹.',
+      'Motor own-damage FNOL — read the policy & claim, check the vehicle is covered and premium paid, decide cashless vs surveyor, route for approval. Amounts in $.',
     pipelineName: 'Motor-Claim FNOL',
     steps: [
       q('Read the claim & policy', 'claims'),
       q('Look up the customer & vehicle', 'customer data'),
-      ag('Decide cashless vs surveyor', 'Given the FNOL claim and in-force policy, decide cashless at a network garage vs a surveyor (mandatory above ₹1,00,000). Never approve if the licence was invalid at the time of loss.'),
+      ag('Decide cashless vs surveyor', 'Given the FNOL claim and in-force policy, decide cashless at a network garage vs a surveyor (mandatory above $1,200). Never approve if the licence was invalid at the time of loss.'),
       hu('Claims officer approval'),
       out('Claim decision + audit note'),
     ],
@@ -223,12 +223,12 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     key: 'fnol-motor',
     title: 'Motor-Claim FNOL Intake',
     summary:
-      'First Notice of Loss intake — read the claim & policy, confirm cover and premium paid, decide cashless vs surveyor, route for approval. Policyholder PII never leaves the network. Amounts in ₹.',
+      'First Notice of Loss intake — read the claim & policy, confirm cover and premium paid, decide cashless vs surveyor, route for approval. Policyholder PII never leaves the network. Amounts in $.',
     pipelineName: 'Motor-Claim FNOL',
     steps: [
       q('Read the FNOL claim', 'claims'),
       q('Check the policy is in force', 'policies'),
-      ag('Decide cashless vs surveyor', 'Given the FNOL claim and in-force policy, decide cashless vs a mandatory surveyor (above ₹1,00,000). Cite the SOP. Never approve if the licence was invalid at the time of loss.'),
+      ag('Decide cashless vs surveyor', 'Given the FNOL claim and in-force policy, decide cashless vs a mandatory surveyor (above $1,200). Cite the SOP. Never approve if the licence was invalid at the time of loss.'),
       hu('Claims officer approval'),
       out('Claim decision + audit note'),
     ],
@@ -238,12 +238,12 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     key: 'policy-underwriting',
     title: 'Policy Underwriting Assist',
     summary:
-      'Life-policy underwriting — read the proposal & rate card, assess sum-assured vs income and medical risk, recommend standard/loaded/decline per the YRT rate card. Amounts in ₹.',
+      'Life-policy underwriting — read the proposal & rate card, assess sum-assured vs income and medical risk, recommend standard/loaded/decline per the YRT rate card. Amounts in $.',
     pipelineName: 'Loan Underwriting',
     steps: [
       q('Read the proposal', 'policies'),
       q('Pull the YRT rate card', 'pricing rate card'),
-      ag('Assess underwriting decision', 'Assess sum-assured vs declared income and medical risk against the YRT rate card. Recommend standard, loaded (with the loading %), or decline, with the reason. Amounts in ₹.'),
+      ag('Assess underwriting decision', 'Assess sum-assured vs declared income and medical risk against the YRT rate card. Recommend standard, loaded (with the loading %), or decline, with the reason. Amounts in $.'),
       hu('Underwriter decision'),
       out('Underwriting recommendation'),
     ],
@@ -253,12 +253,12 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     key: 'claims-triage',
     title: 'Death-Claim Assessment',
     summary:
-      'Death-claim assessment — read the claim documents, cross-check the policy and premium history, flag early-claim / non-disclosure risk for investigation. Amounts in ₹.',
+      'Death-claim assessment — read the claim documents, cross-check the policy and premium history, flag early-claim / non-disclosure risk for investigation. Amounts in $.',
     pipelineName: 'Fraud Screening',
     steps: [
       q('Read the claim documents', 'claim documents'),
       q('Check premium & persistency', 'premiums'),
-      ag('Assess claim risk', 'Cross-check the death claim against the policy in-force date and premium history. Flag early-claim (within 3 years), non-disclosure or fraud-risk indicators for investigation, else fast-track. Amounts in ₹.'),
+      ag('Assess claim risk', 'Cross-check the death claim against the policy in-force date and premium history. Flag early-claim (within 3 years), non-disclosure or fraud-risk indicators for investigation, else fast-track. Amounts in $.'),
       hu('Claims committee review'),
       out('Claim assessment + risk flag'),
     ],
@@ -272,7 +272,7 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     pipelineName: 'Cross-Sell Advisor',
     steps: [
       q('Read the premium ledger', 'premiums'),
-      ag('Recommend a retention action', 'Identify policies nearing grace-period end at lapse risk. Recommend the retention action (advisor call, auto-debit setup, part-payment). Aggregate insights only — mask individual PII. Amounts in ₹.'),
+      ag('Recommend a retention action', 'Identify policies nearing grace-period end at lapse risk. Recommend the retention action (advisor call, auto-debit setup, part-payment). Aggregate insights only — mask individual PII. Amounts in $.'),
       out('Persistency action list'),
     ],
     runs: { done: 9, awaitingReview: 0 },
@@ -295,11 +295,11 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
     key: 'reimbursement',
     title: 'Reimbursement Approval',
     summary:
-      "Employee reimbursement — read the invoice, check the employee's quota, decide eligibility, then approve/reject. PAN/bank details masked, everything on-prem. Amounts in ₹.",
+      "Employee reimbursement — read the invoice, check the employee's quota, decide eligibility, then approve/reject. PAN/bank details masked, everything on-prem. Amounts in $.",
     pipelineName: 'Reimbursement Governance',
     steps: [
       q("Check the employee's reimbursement quota", 'reimbursement quota'),
-      ag('Decide eligibility', 'Given the claim amount and the employee reimbursement quota, decide whether the employee is within quota and eligible. State the remaining quota and a clear recommendation. Amounts in ₹.'),
+      ag('Decide eligibility', 'Given the claim amount and the employee reimbursement quota, decide whether the employee is within quota and eligible. State the remaining quota and a clear recommendation. Amounts in $.'),
       hu('Approve or reject'),
       out('Reimbursement decision'),
     ],
@@ -378,15 +378,15 @@ export interface CustomAgentSeed {
 
 export const BANK_AGENTS: readonly CustomAgentSeed[] = [
   { key: 'kyc-analyst', name: 'KYC Analyst', role: 'Compliance', description: 'Verifies OVDs and screens PEP/UAPA against the RBI Master Direction.', systemPrompt: 'You verify KYC documents against the RBI KYC Master Direction. PAN mandatory; Aadhaar masked. Cite the clause.' },
-  { key: 'credit-officer', name: 'Credit Officer', role: 'Lending', description: 'Computes FOIR and checks CIBIL/income floors for retail loans.', systemPrompt: 'You assess retail loan eligibility using FOIR, CIBIL and income floors. Amounts in ₹. State the decision and reason.' },
-  { key: 'fraud-analyst', name: 'Fraud Analyst', role: 'Risk', description: 'Scores UPI/NEFT/IMPS transactions for fraud risk.', systemPrompt: 'You score transactions for fraud against velocity, geo and beneficiary patterns. Explain the drivers. Amounts in ₹.' },
+  { key: 'credit-officer', name: 'Credit Officer', role: 'Lending', description: 'Computes FOIR and checks CIBIL/income floors for retail loans.', systemPrompt: 'You assess retail loan eligibility using FOIR, CIBIL and income floors. Amounts in $. State the decision and reason.' },
+  { key: 'fraud-analyst', name: 'Fraud Analyst', role: 'Risk', description: 'Scores UPI/NEFT/IMPS transactions for fraud risk.', systemPrompt: 'You score transactions for fraud against velocity, geo and beneficiary patterns. Explain the drivers. Amounts in $.' },
   { key: 'rm-advisor', name: 'RM Advisor', role: 'Sales', description: 'Suggests next-best-action products from the customer holding pattern.', systemPrompt: 'You suggest the next-best product from the customer holdings with a one-line rationale. Aggregate only; mask PII.' },
 ];
 
 export const INSURER_AGENTS: readonly CustomAgentSeed[] = [
-  { key: 'claims-assessor', name: 'Claims Assessor', role: 'Claims', description: 'Assesses death claims against policy in-force date and premium history.', systemPrompt: 'You assess death claims for early-claim and non-disclosure risk against the policy and premium history. Amounts in ₹.' },
-  { key: 'underwriter', name: 'Underwriter', role: 'Underwriting', description: 'Assesses life proposals against the YRT rate card.', systemPrompt: 'You underwrite life proposals against the YRT rate card: standard, loaded (with %), or decline, with reason. Amounts in ₹.' },
-  { key: 'persistency-advisor', name: 'Persistency Advisor', role: 'Retention', description: 'Flags lapse-risk policies and recommends retention actions.', systemPrompt: 'You flag policies near grace-period end and recommend retention actions. Aggregate only; mask PII. Amounts in ₹.' },
+  { key: 'claims-assessor', name: 'Claims Assessor', role: 'Claims', description: 'Assesses death claims against policy in-force date and premium history.', systemPrompt: 'You assess death claims for early-claim and non-disclosure risk against the policy and premium history. Amounts in $.' },
+  { key: 'underwriter', name: 'Underwriter', role: 'Underwriting', description: 'Assesses life proposals against the YRT rate card.', systemPrompt: 'You underwrite life proposals against the YRT rate card: standard, loaded (with %), or decline, with reason. Amounts in $.' },
+  { key: 'persistency-advisor', name: 'Persistency Advisor', role: 'Retention', description: 'Flags lapse-risk policies and recommends retention actions.', systemPrompt: 'You flag policies near grace-period end and recommend retention actions. Aggregate only; mask PII. Amounts in $.' },
   { key: 'grievance-officer', name: 'Grievance Officer', role: 'Service', description: 'Classifies grievances by IRDAI category and drafts resolutions.', systemPrompt: 'You classify grievances by IRDAI category and draft compliant, empathetic resolutions. Route for approval; never auto-send.' },
 ];
 
@@ -482,9 +482,9 @@ const BANK_KNOWLEDGE: readonly KnowledgeCollectionSeed[] = [
     name: 'BFSI Policies & SOPs',
     description: 'RBI-aligned KYC, lending and claims standard operating procedures.',
     docs: [
-      { key: 'kyc', name: 'KYC & Periodic Re-KYC Policy (RBI Master Direction)', text: 'Officially Valid Documents: Aadhaar (masked), PAN, Passport, Voter ID, DL. PAN mandatory above INR 50,000. Re-KYC: high-risk 2y, medium 8y, low 10y. PEP/UAPA screening on every onboarding.' },
-      { key: 'lending', name: 'Personal Loan Underwriting Guidelines', text: 'Min net monthly income INR 25,000 (salaried). FOIR below 50% after the new EMI. CIBIL floor 730. Ticket INR 50,000 to INR 40,00,000, tenure 12 to 60 months. Decline on CIBIL below 700 or FOIR above 55%.' },
-      { key: 'fnol', name: 'Motor Claim FNOL SOP (IRDAI-aligned)', text: 'Capture policy number, vehicle registration, chassis, date and place of loss, PAN. Verify in-force plus premium paid. Surveyor mandatory above INR 1,00,000. Reject if the DL was invalid at the time of loss.' },
+      { key: 'kyc', name: 'KYC & Periodic Re-KYC Policy (RBI Master Direction)', text: 'Officially Valid Documents: Aadhaar (masked), PAN, Passport, Voter ID, DL. PAN mandatory above USD 600. Re-KYC: high-risk 2y, medium 8y, low 10y. PEP/UAPA screening on every onboarding.' },
+      { key: 'lending', name: 'Personal Loan Underwriting Guidelines', text: 'Min net monthly income USD 300 (salaried). FOIR below 50% after the new EMI. CIBIL floor 730. Ticket USD 600 to USD 48,000, tenure 12 to 60 months. Decline on CIBIL below 700 or FOIR above 55%.' },
+      { key: 'fnol', name: 'Motor Claim FNOL SOP (IRDAI-aligned)', text: 'Capture policy number, vehicle registration, chassis, date and place of loss, PAN. Verify in-force plus premium paid. Surveyor mandatory above USD 1,200. Reject if the DL was invalid at the time of loss.' },
     ],
   },
 ];

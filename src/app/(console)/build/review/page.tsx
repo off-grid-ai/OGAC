@@ -110,7 +110,7 @@ export default async function ReviewInboxPage() {
               <div className="mt-auto flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="size-3" />
-                  {item.startedAt ? new Date(item.startedAt).toLocaleString('en-IN') : '—'}
+                  {item.startedAt ? new Date(item.startedAt).toLocaleString('en-US') : '—'}
                 </span>
                 {item.requestedBy ? <span>by {item.requestedBy}</span> : null}
               </div>

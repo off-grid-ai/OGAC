@@ -8,13 +8,13 @@ import { PDFDocument, type PDFFont } from 'pdf-lib';
 // heading emphasis, which is enough for an auditable, signable artifact. The signed C2PA-style
 // provenance lives in a detached manifest (src/lib/provenance.ts), not in the PDF itself.
 //
-// UNICODE: reports are Indian-BFSI-first, so the body routinely contains ₹ (U+20B9), arrows (→),
-// bullets, and em-dashes. pdf-lib's built-in StandardFonts use WinAnsi encoding, which THROWS on any
-// of those ("WinAnsi cannot encode …") — breaking every rupee-denominated report. We instead embed a
-// real Unicode TrueType face (DejaVu Sans Mono — monospace, so the fixed-width layout below still
-// holds) via @pdf-lib/fontkit and subset it so the PDF stays small. Any codepoint the face genuinely
-// can't draw (e.g. Devanagari — a documented follow-up) is sanitized to a placeholder so drawText
-// never throws; ₹ and → render for real.
+// UNICODE: report bodies routinely contain currency symbols, arrows (→), bullets, and em-dashes.
+// pdf-lib's built-in StandardFonts use WinAnsi encoding, which THROWS on many of those ("WinAnsi
+// cannot encode …") — breaking any non-ASCII report. We instead embed a real Unicode TrueType face
+// (DejaVu Sans Mono — monospace, so the fixed-width layout below still holds) via @pdf-lib/fontkit
+// and subset it so the PDF stays small. Any codepoint the face genuinely can't draw (e.g. Devanagari
+// — a documented follow-up) is sanitized to a placeholder so drawText never throws; $ and → render
+// for real.
 const FONT_SIZE = 9;
 const LINE_HEIGHT = 12;
 const MARGIN = 48;
@@ -54,7 +54,7 @@ function wrap(line: string): string[] {
 
 // Replace any codepoint the embedded font can't encode with a visible placeholder, so drawText never
 // throws on an exotic glyph (e.g. Devanagari — not yet covered by DejaVu Sans Mono). Pure: it takes
-// the font's own coverage predicate. ₹, →, ←, bullets and dashes ARE in the face, so they pass
+// the font's own coverage predicate. $, →, ←, bullets and dashes ARE in the face, so they pass
 // through untouched; only genuinely-uncovered codepoints and control chars are rewritten.
 export function sanitizeForFont(text: string, canEncode: (codePoint: number) => boolean): string {
   let out = '';

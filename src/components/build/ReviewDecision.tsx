@@ -190,7 +190,7 @@ export function ReviewDecision({
               <span className="text-foreground">{detail.stepLabel}</span>
             </span>
             {detail.startedAt ? (
-              <span>{new Date(detail.startedAt).toLocaleString('en-IN')}</span>
+              <span>{new Date(detail.startedAt).toLocaleString('en-US')}</span>
             ) : null}
           </div>
         </div>
