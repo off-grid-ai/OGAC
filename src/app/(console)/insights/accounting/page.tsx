@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { computeAccounting } from '@/lib/accounting';
 import { isRangePreset, type RangePreset } from '@/lib/accounting-aggs';
+import { modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { pipelineTag } from '@/lib/pipeline-api-key-format';
 import { listPipelines } from '@/lib/pipelines';
@@ -239,7 +240,7 @@ export default async function AccountingPage({
               ) : (
                 a.byModel.map((m) => (
                   <TableRow key={m.model}>
-                    <TableCell className="font-medium text-foreground">{m.model}</TableCell>
+                    <TableCell className="font-medium text-foreground">{modelLabel(m.model)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {num(m.requests)}
                     </TableCell>

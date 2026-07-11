@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { modelLabel } from '@/lib/model-catalog';
 
 interface Decision {
   action: string;
@@ -71,9 +72,9 @@ export function RoutingTester() {
           <Badge variant="secondary" className={ACTION_STYLE[result.effective]}>
             {result.effective}
           </Badge>
-          {result.model ? <Badge variant="outline">{result.model}</Badge> : null}
+          {result.model ? <Badge variant="outline">{modelLabel(result.model)}</Badge> : null}
           {result.fallback ? (
-            <span className="text-xs text-muted-foreground">fallback: {result.fallback}</span>
+            <span className="text-xs text-muted-foreground">fallback: {modelLabel(result.fallback)}</span>
           ) : null}
           <span className="text-xs text-muted-foreground">· {result.reason}</span>
         </div>

@@ -1,4 +1,5 @@
 import { gatewayEvents } from '@/lib/analytics';
+import { modelLabel } from '@/lib/model-catalog';
 import { type ApiKey, type AuditEvent, listApiKeys } from '@/lib/store';
 
 // FinOps: metering + cost + usage analytics, computed from the audit/traffic log (the source of
@@ -172,7 +173,7 @@ export async function computeFinOps(pipelineTag?: string | null): Promise<FinOps
       costUsd: totalCost,
       localShare: events.length ? Math.round((localReq / events.length) * 100) : 0,
     },
-    byModel: group(events, (e) => e.model),
+    byModel: group(events, (e) => e.model).map((b) => ({ ...b, label: modelLabel(b.label) })),
     bySubject: group(
       events.filter((e) => e.keyId),
       (e) => {

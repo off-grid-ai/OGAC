@@ -24,6 +24,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { LoadingBlock } from '@/components/ui/spinner';
+import { modelLabel } from '@/lib/model-catalog';
 
 // ── Shapes (mirror the API response — the pure lib's ActivityPage) ────────────────────────────────
 type ActivityKind = 'chat' | 'agent-run' | 'app-run' | 'query' | 'governance' | 'action';
@@ -327,7 +328,7 @@ export function UserActivityPanel({ userId }: Readonly<{ userId: string }>) {
                       {vb.label}
                     </Badge>
                     {it.model && (
-                      <span className="font-mono text-[10px] text-muted-foreground">{it.model}</span>
+                      <span className="text-[10px] text-muted-foreground">{modelLabel(it.model)}</span>
                     )}
                   </div>
                   {it.content && (
@@ -404,7 +405,7 @@ export function UserActivityPanel({ userId }: Readonly<{ userId: string }>) {
                   {openItem.model && (
                     <div>
                       <dt className="text-muted-foreground">Model</dt>
-                      <dd className="font-mono text-foreground">{openItem.model}</dd>
+                      <dd className="text-foreground">{modelLabel(openItem.model)}</dd>
                     </div>
                   )}
                   {openItem.tokens > 0 && (

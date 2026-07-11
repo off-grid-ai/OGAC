@@ -3,6 +3,7 @@
 import { CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
+import { modelLabel } from '@/lib/model-catalog';
 import { usePagination } from '@/lib/use-pagination';
 
 interface Trace {
@@ -60,7 +61,7 @@ function Waterfall({ traceId }: Readonly<{ traceId: string }>) {
             <div
               className="absolute h-3 rounded bg-primary/60"
               style={{ left: `${s.offsetPct}%`, width: `${s.widthPct}%` }}
-              title={s.model ? `${s.type} · ${s.model}` : s.type}
+              title={s.model ? `${s.type} · ${modelLabel(s.model)}` : s.type}
             />
           </div>
           <span className="w-16 shrink-0 text-right font-mono text-muted-foreground">
