@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_ORG, bindTenantOrg, resolveOrg } from '../src/lib/tenancy-policy.ts';
+import { DEFAULT_ORG, bindTenantOrg, resolveOrg, slugForOrg } from '../src/lib/tenancy-policy.ts';
 
 // Unit tests for the org-resolution rule — pure function, NO mocks. Exercises the real
 // precedence policy that governs tenant isolation, so a regression here is caught directly.
@@ -58,4 +58,28 @@ test('bindTenantOrg: off a tenant subdomain the actor keeps their own org (sessi
   assert.equal(bindTenantOrg(null, DEFAULT_ORG, 'admin'), DEFAULT_ORG);
   assert.equal(bindTenantOrg(null, 'org_x', 'viewer'), 'org_x');
   assert.equal(bindTenantOrg(null, 'org_x', undefined), 'org_x');
+});
+
+// ── slugForOrg — reverse org→slug map for the authenticated in-app hellobar (cache-safe) ────────────
+const TENANTS = [
+  { id: 'org_bharat', slug: 'bharatunion' },
+  { id: 'org_suraksha', slug: 'suraksha' },
+  { id: 'org_noslug', slug: null },
+];
+
+test('slugForOrg: maps the signed-in org to its tenant slug', () => {
+  assert.equal(slugForOrg(TENANTS, 'org_suraksha'), 'suraksha');
+  assert.equal(slugForOrg(TENANTS, 'org_bharat'), 'bharatunion');
+});
+
+test('slugForOrg: two orgs never collide (insurer never resolves to the bank slug)', () => {
+  assert.notEqual(slugForOrg(TENANTS, 'org_suraksha'), slugForOrg(TENANTS, 'org_bharat'));
+});
+
+test('slugForOrg: null org, unknown org, and a slugless tenant all yield null (host fallback)', () => {
+  assert.equal(slugForOrg(TENANTS, null), null);
+  assert.equal(slugForOrg(TENANTS, undefined), null);
+  assert.equal(slugForOrg(TENANTS, 'org_missing'), null);
+  assert.equal(slugForOrg(TENANTS, 'org_noslug'), null);
+  assert.equal(slugForOrg([], 'org_suraksha'), null);
 });

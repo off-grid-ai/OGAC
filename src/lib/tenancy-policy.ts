@@ -43,6 +43,23 @@ export function bindTenantOrg(
 }
 
 /**
+ * Reverse-map an org id to its tenant slug. Used by the AUTHENTICATED in-app surfaces (e.g. the
+ * read-only-demo hellobar) to resolve "which tenant am I in" from the SIGNED-IN principal's org
+ * rather than the request host — because a client-side RSC navigation can render a shared layout in
+ * a host-ambiguous context (the host header isn't reliably the tenant subdomain), so keying the
+ * banner off the host flapped to the generic pair. The session org is stable across render context
+ * and router cache, so it is the correct source post-auth. Returns null when the org is unset or has
+ * no matching tenant (single-tenant / apex deploys). Pure — tenant list + org id in, slug out.
+ */
+export function slugForOrg(
+  tenants: ReadonlyArray<{ id: string; slug: string | null }>,
+  orgId: string | null | undefined,
+): string | null {
+  if (!orgId) return null;
+  return tenants.find((t) => t.id === orgId)?.slug ?? null;
+}
+
+/**
  * LOGIN gate for a tenant subdomain (distinct from bindTenantOrg's data-scoping). A person may
  * sign IN on a tenant's host ONLY if they are a platform admin OR a member of THAT tenant's org.
  * So the SAME credentials cannot log into both the bank host and the insurer host — each tenant is

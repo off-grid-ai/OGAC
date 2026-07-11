@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { cache } from 'react';
 import { auth } from '@/auth';
 import { requireUser } from '@/lib/authz';
-import { getTenantBySlug } from '@/lib/store';
-import { DEFAULT_ORG, bindTenantOrg, resolveOrg } from '@/lib/tenancy-policy';
+import { getTenantBySlug, listTenants } from '@/lib/store';
+import { DEFAULT_ORG, bindTenantOrg, resolveOrg, slugForOrg } from '@/lib/tenancy-policy';
 
 // Multi-tenancy spine (Phase 3). Every tenant-scoped row carries an `org_id`. The pure
 // resolution RULE lives in tenancy-policy.ts (zero imports → unit-testable, no mocks); these
@@ -84,6 +84,23 @@ export async function currentOrgId(): Promise<string> {
   const tenantOrg = await tenantOrgFromHost();
   return bindTenantOrg(tenantOrg, actorOrg, role);
 }
+
+// Resolve the CURRENT tenant slug for an authenticated in-app surface from the SIGNED-IN principal's
+// org (memoized per request). This is the cache-safe source for the read-only-demo hellobar: a
+// post-login client RSC navigation renders the shared (console) layout in a host-ambiguous context,
+// so reading the host there flapped to the generic demo pair — the session org does not. Returns null
+// for an unauthenticated request or an org with no tenant row (apex / single-tenant), where the
+// caller falls back to its own host-based path. Never throws (safe in any render context).
+export const currentTenantSlug = cache(async (): Promise<string | null> => {
+  try {
+    const session = (await auth()) as { user?: { org?: string } } | null;
+    const org = session?.user?.org;
+    if (!org) return null;
+    return slugForOrg(await listTenants(), org);
+  } catch {
+    return null;
+  }
+});
 
 // Claims adapter — for machine/service principals whose JWT was already verified.
 export function orgFromClaims(claims: { org?: unknown } | null | undefined): string {
