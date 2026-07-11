@@ -195,6 +195,12 @@ function AddExporterSheet({
     }
   }
 
+  // Endpoint placeholder hint by exporter kind (audit → SIEM, lineage → catalog, else OTel collector).
+  let endpointPlaceholder: string;
+  if (kind === 'audit') endpointPlaceholder = 'https://splunk.example.com:8088';
+  else if (kind === 'lineage') endpointPlaceholder = 'https://purview.example.com/api/v1/lineage';
+  else endpointPlaceholder = 'https://otel-collector.example.com  (blank = Prometheus scrape mode)';
+
   return (
     <FormSheet
       open={open}
@@ -229,13 +235,7 @@ function AddExporterSheet({
           </Label>
           <Input
             id="ex-endpoint"
-            placeholder={
-              kind === 'audit'
-                ? 'https://splunk.example.com:8088'
-                : kind === 'lineage'
-                  ? 'https://purview.example.com/api/v1/lineage'
-                  : 'https://otel-collector.example.com  (blank = Prometheus scrape mode)'
-            }
+            placeholder={endpointPlaceholder}
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
           />

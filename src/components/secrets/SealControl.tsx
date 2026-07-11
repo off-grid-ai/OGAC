@@ -79,6 +79,12 @@ export function SealControl({
     await post({ action: 'unseal', reset: true }, 'Unseal attempt reset.');
   };
 
+  // Seal-state word: true → SEALED, false → unsealed, null/undefined (not yet known) → unknown.
+  let sealStateLabel: string;
+  if (isSealed === true) sealStateLabel = 'SEALED';
+  else if (isSealed === false) sealStateLabel = 'unsealed';
+  else sealStateLabel = 'unknown';
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-3">
@@ -95,7 +101,7 @@ export function SealControl({
         <p className="text-xs text-muted-foreground">
           Seal state:{' '}
           <span className={isSealed ? 'font-semibold text-destructive' : 'font-semibold text-primary'}>
-            {isSealed === true ? 'SEALED' : isSealed === false ? 'unsealed' : 'unknown'}
+            {sealStateLabel}
           </span>
           {status.threshold !== null && status.shares !== null && (
             <>
