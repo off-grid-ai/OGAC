@@ -339,16 +339,13 @@ function Stat({
   value: number;
   tone?: 'active' | 'warn' | 'success' | 'error';
 }>) {
-  const toneCls =
-    tone === 'active'
-      ? 'text-sky-600 dark:text-sky-400'
-      : tone === 'warn'
-        ? 'text-amber-600 dark:text-amber-500'
-        : tone === 'success'
-          ? 'text-primary'
-          : tone === 'error'
-            ? 'text-destructive'
-            : 'text-foreground';
+  const toneClsMap = {
+    active: 'text-sky-600 dark:text-sky-400',
+    warn: 'text-amber-600 dark:text-amber-500',
+    success: 'text-primary',
+    error: 'text-destructive',
+  } as const;
+  const toneCls = (tone && toneClsMap[tone]) || 'text-foreground';
   return (
     <div className="rounded-md border border-border p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
