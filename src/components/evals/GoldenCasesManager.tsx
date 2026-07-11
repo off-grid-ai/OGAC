@@ -173,6 +173,11 @@ export function GoldenCasesManager() {
     }
   }
 
+  // Save-button label: mid-save, editing an existing case, or adding a new one.
+  let saveButtonLabel: string;
+  if (saving) saveButtonLabel = 'Saving…';
+  else saveButtonLabel = draft?.id ? 'Save changes' : 'Add case';
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
@@ -313,7 +318,7 @@ export function GoldenCasesManager() {
               Cancel
             </Button>
             <Button onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : draft?.id ? 'Save changes' : 'Add case'}
+              {saveButtonLabel}
             </Button>
           </SheetFooter>
         </SheetContent>

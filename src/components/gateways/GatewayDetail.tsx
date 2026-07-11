@@ -303,6 +303,13 @@ export function GatewayDetail({
     { label: 'Available', value: gateway.available ? 'yes' : 'no' },
   ];
 
+  let credentialsNote = 'No provider key configured — this gateway is unconfigured.';
+  if (isOnPrem) {
+    credentialsNote = 'Served by the fleet — no outbound key. Aggregator auth is handled server-side.';
+  } else if (gateway.configured) {
+    credentialsNote = 'A provider key is configured (stored server-side; never shown here).';
+  }
+
   return (
     <div className="w-full space-y-6">
       <Link
@@ -417,13 +424,7 @@ export function GatewayDetail({
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Credentials</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {isOnPrem
-                  ? 'Served by the fleet — no outbound key. Aggregator auth is handled server-side.'
-                  : gateway.configured
-                    ? 'A provider key is configured (stored server-side; never shown here).'
-                    : 'No provider key configured — this gateway is unconfigured.'}
-              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{credentialsNote}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Health</div>

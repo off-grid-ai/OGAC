@@ -28,6 +28,14 @@ interface PlaygroundResult {
   checks?: Check[];
 }
 
+// Guardrail-verdict badge severity: blocked/fail is loud (destructive), warn/redacted notable
+// (secondary), everything else (pass) muted (outline).
+function verdictBadgeVariant(verdict: string): 'destructive' | 'secondary' | 'outline' {
+  if (verdict === 'blocked' || verdict === 'fail') return 'destructive';
+  if (verdict === 'warn' || verdict === 'redacted') return 'secondary';
+  return 'outline';
+}
+
 // Prompt Playground — run THIS prompt against a model and see the result, in the console. Fills the
 // prompt's {{variables}}, then POSTs to /api/v1/prompts/playground, which inlines any {{>partials}},
 // sends the rendered text through the GOVERNED gateway (same inbound/outbound guardrail floor as chat)
@@ -191,13 +199,7 @@ export function PromptPlayground({
                 {result.checks.map((c, i) => (
                   <Badge
                     key={`${c.name}-${i}`}
-                    variant={
-                      c.verdict === 'blocked' || c.verdict === 'fail'
-                        ? 'destructive'
-                        : c.verdict === 'warn' || c.verdict === 'redacted'
-                          ? 'secondary'
-                          : 'outline'
-                    }
+                    variant={verdictBadgeVariant(c.verdict)}
                     className="text-[10px]"
                     title={c.detail}
                   >

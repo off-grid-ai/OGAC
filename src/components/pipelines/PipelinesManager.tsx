@@ -58,6 +58,12 @@ function statusBadge(status: string) {
   return <Badge variant="outline" className="text-amber-600 dark:text-amber-400">draft</Badge>;
 }
 
+// The "data ceiling" line for a pipeline card: "none" or "N domain(s)".
+function dataCeilingSummary(count: number): string {
+  if (count === 0) return 'none';
+  return `${count} domain${count === 1 ? '' : 's'}`;
+}
+
 function egressBadge(egressClass: string | undefined) {
   if (egressClass === 'on-prem') {
     return (
@@ -111,7 +117,7 @@ function PipelineCard({ p, onDelete }: Readonly<{ p: PipelineCardData; onDelete:
           <div className="flex justify-between gap-2">
             <dt>Data ceiling</dt>
             <dd className="text-foreground">
-              {p.dataAllowlist.length === 0 ? 'none' : `${p.dataAllowlist.length} domain${p.dataAllowlist.length === 1 ? '' : 's'}`}
+              {dataCeilingSummary(p.dataAllowlist.length)}
             </dd>
           </div>
         </dl>

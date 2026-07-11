@@ -41,6 +41,29 @@ import {
 // input and, on publish, POSTs the two payloads to the existing governed routes.
 
 type StepId = 'goal' | 'skills' | 'data' | 'publish';
+// The "Knowledge" summary line: joined collection names when grounded to specific collections,
+// else the "all access" text; the "not grounded" text when the plan isn't grounded at all.
+// Copy varies per surface (compact summary vs review), so the wording is passed in.
+function knowledgeSummary(
+  grounded: boolean,
+  collectionNames: string[],
+  allAccessText: string,
+  notGroundedText: string,
+): string {
+  if (!grounded) return notGroundedText;
+  return collectionNames.length ? collectionNames.join(', ') : allAccessText;
+}
+
+// Stepper button classes by state: the active step is boxed/emerald, completed steps are hoverable,
+// upcoming steps are muted.
+function stepButtonClass(active: boolean, done: boolean): string {
+  if (active)
+    return 'flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-primary lg:w-full lg:py-2';
+  if (done)
+    return 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-foreground hover:bg-muted lg:w-full lg:py-2';
+  return 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground lg:w-full lg:py-2';
+}
+
 const STEPS: { id: StepId; label: string }[] = [
   { id: 'goal', label: 'Goal' },
   { id: 'skills', label: 'Skills' },
@@ -254,13 +277,7 @@ export function StudioBuilder({
                   type="button"
                   onClick={() => (i <= stepIndex ? goTo(s.id) : undefined)}
                   disabled={i > stepIndex}
-                  className={
-                    active
-                      ? 'flex items-center gap-1.5 rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-primary lg:w-full lg:py-2'
-                      : done
-                        ? 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-foreground hover:bg-muted lg:w-full lg:py-2'
-                        : 'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-muted-foreground lg:w-full lg:py-2'
-                  }
+                  className={stepButtonClass(active, done)}
                 >
                   <span
                     className={
@@ -304,11 +321,7 @@ export function StudioBuilder({
             </SummaryRow>
             <SummaryRow label="Knowledge">
               {plan
-                ? plan.grounded
-                  ? plan.collectionNames.length
-                    ? plan.collectionNames.join(', ')
-                    : 'All you can access'
-                  : 'Model (not grounded)'
+                ? knowledgeSummary(plan.grounded, plan.collectionNames, 'All you can access', 'Model (not grounded)')
                 : '—'}
             </SummaryRow>
             <SummaryRow label="Model">{plan?.suggestedModel || 'Platform default'}</SummaryRow>
@@ -583,11 +596,12 @@ export function StudioBuilder({
                     {plan.skillNames.length ? plan.skillNames.join(', ') : 'None'}
                   </ReviewRow>
                   <ReviewRow label="Knowledge">
-                    {plan.grounded
-                      ? plan.collectionNames.length
-                        ? plan.collectionNames.join(', ')
-                        : 'All knowledge you can access'
-                      : 'Answers from the model (not grounded)'}
+                    {knowledgeSummary(
+                      plan.grounded,
+                      plan.collectionNames,
+                      'All knowledge you can access',
+                      'Answers from the model (not grounded)',
+                    )}
                   </ReviewRow>
                   <ReviewRow label="Model">
                     {plan.suggestedModel || 'Platform default'}
