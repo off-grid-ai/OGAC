@@ -34,6 +34,12 @@ export function DeployedApp({ slug }: { slug: string }) {
     }
   };
 
+  // One place for the webhook curl copy (used by the pre's click + keyboard handlers).
+  const copyCurl = () => {
+    const cmd = `curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`;
+    void navigator.clipboard.writeText(cmd).then(() => toast.success('Copied'));
+  };
+
   return (
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex-1 space-y-3">
@@ -76,10 +82,16 @@ export function DeployedApp({ slug }: { slug: string }) {
       <details className="mt-2 text-[11px] text-muted-foreground">
         <summary className="cursor-pointer hover:text-foreground">Call this app via API (webhook)</summary>
         <pre
+          role="button"
+          tabIndex={0}
+          aria-label="Copy the curl command to call this app"
           className="mt-1 cursor-copy overflow-x-auto rounded border border-border bg-muted/40 p-2 font-mono"
-          onClick={() => {
-            const cmd = `curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`;
-            void navigator.clipboard.writeText(cmd).then(() => toast.success('Copied'));
+          onClick={copyCurl}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              copyCurl();
+            }
           }}
         >{`curl -X POST /api/v1/app/${slug}/run -H 'content-type: application/json' -d '{"input":"..."}'`}</pre>
       </details>
