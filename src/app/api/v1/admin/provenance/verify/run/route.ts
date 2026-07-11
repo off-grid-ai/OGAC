@@ -12,11 +12,12 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
 
   const body = (await req.json().catch(() => null)) as { runId?: unknown; runIds?: unknown } | null;
-  const ids: string[] = Array.isArray(body?.runIds)
-    ? body!.runIds.filter((x): x is string => typeof x === 'string' && x.trim() !== '')
-    : typeof body?.runId === 'string' && body.runId.trim()
-      ? [body.runId.trim()]
-      : [];
+  let ids: string[] = [];
+  if (Array.isArray(body?.runIds)) {
+    ids = body!.runIds.filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+  } else if (typeof body?.runId === 'string' && body.runId.trim()) {
+    ids = [body.runId.trim()];
+  }
 
   if (ids.length === 0) {
     return NextResponse.json({ error: 'runId or runIds[] required' }, { status: 400 });

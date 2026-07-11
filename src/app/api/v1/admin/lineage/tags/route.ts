@@ -26,16 +26,16 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const action = String(b?.action ?? '');
   try {
-    const r =
-      action === 'declare'
-        ? await createTag({ name: b?.name, description: b?.description })
-        : action === 'tag-dataset'
-          ? await tagDataset({ namespace: b?.namespace, dataset: b?.dataset, tag: b?.tag })
-          : action === 'untag-dataset'
-            ? await untagDataset({ namespace: b?.namespace, dataset: b?.dataset, tag: b?.tag })
-            : action === 'tag-job'
-              ? await tagJob({ namespace: b?.namespace, job: b?.job, tag: b?.tag })
-              : null;
+    let r = null;
+    if (action === 'declare') {
+      r = await createTag({ name: b?.name, description: b?.description });
+    } else if (action === 'tag-dataset') {
+      r = await tagDataset({ namespace: b?.namespace, dataset: b?.dataset, tag: b?.tag });
+    } else if (action === 'untag-dataset') {
+      r = await untagDataset({ namespace: b?.namespace, dataset: b?.dataset, tag: b?.tag });
+    } else if (action === 'tag-job') {
+      r = await tagJob({ namespace: b?.namespace, job: b?.job, tag: b?.tag });
+    }
     if (!r) return NextResponse.json({ error: 'unknown action' }, { status: 400 });
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status ?? 502 });
     return NextResponse.json({ ok: true }, { status: 201 });
