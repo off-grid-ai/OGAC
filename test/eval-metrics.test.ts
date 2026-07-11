@@ -87,6 +87,21 @@ test('heuristicRefusal detects a refusal', () => {
 test('heuristicPiiLeakage catches an email', () => {
   assert.ok(heuristicPiiLeakage('contact me at jane@example.com') > 0);
   assert.equal(heuristicPiiLeakage('no personal data here'), 0);
+  // Same matches after bounding the email regex to RFC lengths (S8786 ReDoS fix).
+  assert.ok(heuristicPiiLeakage('reach priya.sharma@icicibank.com today') > 0);
+  assert.ok(heuristicPiiLeakage('user+tag@mail-server.co.uk') > 0);
+  assert.equal(heuristicPiiLeakage('trailing@dot. and a@b.c are not emails'), 0);
+});
+
+test('heuristicPiiLeakage stays fast on an adversarial dotted run (no ReDoS)', () => {
+  // The old unbounded email regex was O(n^2) on a long run of dots with no valid TLD; the bounded
+  // form scans this in a few ms. Guard the linearity so a regression re-introducing the overlap fails.
+  const evil = 'a' + '.'.repeat(100_000);
+  const start = process.hrtime.bigint();
+  const score = heuristicPiiLeakage(evil);
+  const ms = Number(process.hrtime.bigint() - start) / 1e6;
+  assert.equal(score, 0);
+  assert.ok(ms < 250, `PII scan took ${ms}ms — expected sub-linear/linear, possible ReDoS regression`);
 });
 
 test('heuristicScore dispatches by metric name', () => {
