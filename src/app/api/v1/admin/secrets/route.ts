@@ -3,6 +3,7 @@ import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
+import { orgSecretPrefix, scopeSecretKey, scopeSecretKeyList } from '@/lib/secret-scope';
 import { readSecretsView } from '@/lib/secrets-view';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -18,7 +19,20 @@ export async function GET(req: Request) {
   if (!openBaoConfigured() || !openBaoSecrets.list) {
     return NextResponse.json({ configured: false, keys: [], status, error });
   }
-  const keys = normalizeKeyList(await openBaoSecrets.list());
+  // TENANT ISOLATION (SURFACE-2): list only THIS tenant's `<org>/` namespace so the UI never shows a
+  // sibling tenant's `org_*/` folder. The adapter LISTs under the prefix (OpenBao returns keys
+  // relative to it); scopeSecretKeyList is a defensive belt that also drops anything outside the
+  // namespace should a backend ever return absolute keys. Default org → no prefix (single-tenant).
+  const org = await currentOrgId();
+  const prefix = orgSecretPrefix(org);
+  const raw = await openBaoSecrets.list(prefix || undefined);
+  // When scoped, the adapter already returns tenant-relative keys; only strip when a returned key
+  // still carries the absolute prefix (belt-and-suspenders). Root keys under a namespaced org that
+  // don't belong to it are dropped by scopeSecretKeyList.
+  const relative = prefix
+    ? raw.map((k) => (k.startsWith(prefix) ? k : `${prefix}${k}`))
+    : raw;
+  const keys = normalizeKeyList(scopeSecretKeyList(org, prefix ? relative : raw));
   return NextResponse.json({ configured: true, keys, status, error });
 }
 
@@ -38,10 +52,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
   try {
-    await openBaoSecrets.set(v.key, b.value);
-    auditFromSession(gate, await currentOrgId(), {
+    // TENANT ISOLATION: write into THIS tenant's `<org>/` namespace. The client sends a tenant-
+    // relative key; scopeSecretKey prepends the org prefix, so a tenant can never write outside its
+    // own namespace (even by typing an absolute path). Echo the RELATIVE key the client knows.
+    const org = await currentOrgId();
+    await openBaoSecrets.set(scopeSecretKey(org, v.key), b.value);
+    auditFromSession(gate, org, {
       action: 'secret.write',
-      resource: `secret:${v.key}`,
+      resource: `secret:${scopeSecretKey(org, v.key)}`,
       outcome: 'ok',
     });
     // Echo only the KEY name back — never the value.
@@ -60,10 +78,13 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
   try {
-    await openBaoSecrets.remove(v.key);
-    auditFromSession(gate, await currentOrgId(), {
+    // TENANT ISOLATION: delete only within THIS tenant's `<org>/` namespace (scopeSecretKey prefixes
+    // the client's relative key) — a tenant cannot delete another org's secret by absolute path.
+    const org = await currentOrgId();
+    await openBaoSecrets.remove(scopeSecretKey(org, v.key));
+    auditFromSession(gate, org, {
       action: 'secret.write',
-      resource: `secret:${v.key}`,
+      resource: `secret:${scopeSecretKey(org, v.key)}`,
       outcome: 'ok',
     });
     return NextResponse.json({ ok: true, key: v.key });

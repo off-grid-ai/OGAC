@@ -6,6 +6,7 @@ import {
   parseAccountingResponse,
   resolveRange,
 } from '@/lib/accounting-aggs';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Usage & spend accounting — token usage + spend attributed PER USER, PER PROJECT/ORG, and PER
 // MODEL over a time range, read from REAL gateway traffic in OpenSearch (index `offgrid-gateway`,
@@ -22,6 +23,10 @@ export type { Accounting, AttributedSpend, ModelSpend, RangePreset } from '@/lib
 /**
  * Compute the attributed usage/spend breakdown for a time-range preset via native OpenSearch
  * aggregations. Graceful fallback to real zeros when OpenSearch is unreachable.
+ *
+ * TENANT ISOLATION: the org is resolved INTERNALLY from the session/bearer (currentOrgId), never a
+ * caller argument — so no route/page can forget to scope it (the SURFACE-3 leak was exactly a caller
+ * that fetched orgId but never passed it down). Mirrors computeAnalytics.
  */
 export async function computeAccounting(
   preset: RangePreset = 'all',
@@ -29,11 +34,12 @@ export async function computeAccounting(
 ): Promise<Accounting> {
   const range = resolveRange(preset, Date.now());
   try {
+    const org = await currentOrgId();
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(
-        buildAccountingQuery(range.from ?? undefined, range.to ?? undefined, pipelineTag),
+        buildAccountingQuery(range.from ?? undefined, range.to ?? undefined, pipelineTag, org),
       ),
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),

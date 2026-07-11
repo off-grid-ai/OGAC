@@ -9,6 +9,8 @@ import {
 } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
 import { validateKeyPath } from '@/lib/secret-keys';
+import { scopeSecretKey } from '@/lib/secret-scope';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +46,8 @@ export async function GET(req: Request) {
   const blocked = guard();
   if (blocked) return blocked;
   try {
-    const versions = await baoVersions(v.key);
+    // TENANT ISOLATION: read version metadata only within this tenant's `<org>/` namespace.
+    const versions = await baoVersions(scopeSecretKey(await currentOrgId(), v.key));
     return NextResponse.json({ key: v.key, versions });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
@@ -72,23 +75,26 @@ export async function POST(req: Request) {
   const blocked = guard();
   if (blocked) return blocked;
 
+  // TENANT ISOLATION: every version op targets the org-namespaced stored key, so a tenant can only
+  // rotate/delete/destroy secrets within its own `<org>/` namespace.
+  const key = scopeSecretKey(await currentOrgId(), v.key);
   try {
     switch (b?.action) {
       case 'rotate': {
         if (typeof b.value !== 'string' || b.value.length === 0) {
           return NextResponse.json({ error: 'value (non-empty string) required' }, { status: 400 });
         }
-        const result = await baoRotate(v.key, b.value, parseVersions(b.destroyPrior));
+        const result = await baoRotate(key, b.value, parseVersions(b.destroyPrior));
         return NextResponse.json({ ok: true, key: v.key, version: result.version }, { status: 201 });
       }
       case 'delete':
-        await baoDeleteVersions(v.key, parseVersions(b.versions));
+        await baoDeleteVersions(key, parseVersions(b.versions));
         return NextResponse.json({ ok: true, key: v.key });
       case 'undelete':
-        await baoUndeleteVersions(v.key, parseVersions(b.versions));
+        await baoUndeleteVersions(key, parseVersions(b.versions));
         return NextResponse.json({ ok: true, key: v.key });
       case 'destroy':
-        await baoDestroyVersions(v.key, parseVersions(b.versions));
+        await baoDestroyVersions(key, parseVersions(b.versions));
         return NextResponse.json({ ok: true, key: v.key });
       default:
         return NextResponse.json({ error: 'unknown action' }, { status: 400 });

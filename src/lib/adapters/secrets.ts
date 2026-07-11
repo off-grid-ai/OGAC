@@ -84,11 +84,17 @@ async function baoRemove(key: string): Promise<void> {
   if (!res.ok && res.status !== 404) throw new Error(`OpenBao delete ${res.status}`);
 }
 
-// Enumerate keys: LIST <url>/v1/<mount>/metadata (KV v2 metadata path).
-async function baoList(): Promise<string[]> {
+// Enumerate keys: LIST <url>/v1/<mount>/metadata[/<prefix>] (KV v2 metadata path). A `prefix`
+// (a tenant's `<org>/` folder) scopes the listing to that folder so OpenBao returns only that
+// tenant's keys (relative to the folder) — never a sibling tenant's `<org>/` folder (SURFACE-2).
+async function baoList(prefix?: string): Promise<string[]> {
   if (!BAO_URL) return [];
+  // KV v2 LIST is under /metadata; a folder prefix is appended path-segment-encoded (keep the "/").
+  const folder = prefix
+    ? '/' + prefix.split('/').filter(Boolean).map(encodeURIComponent).join('/')
+    : '';
   try {
-    const res = await fetch(`${BAO_URL}/v1/${BAO_MOUNT}/metadata?list=true`, {
+    const res = await fetch(`${BAO_URL}/v1/${BAO_MOUNT}/metadata${folder}?list=true`, {
       headers: baoHeaders(),
       signal: AbortSignal.timeout(4000),
     });
