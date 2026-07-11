@@ -56,7 +56,7 @@ export interface MonitorSummary {
   primaryTerm: number | null;
 }
 
-const OPS: ThresholdOp[] = ['gt', 'gte', 'lt', 'lte'];
+const OPS = new Set<ThresholdOp>(['gt', 'gte', 'lt', 'lte']);
 
 function clampInt(v: unknown, min: number, max: number, dflt: number): number {
   const n = Math.floor(Number(v));
@@ -83,7 +83,7 @@ export function normalizeMonitorSpec(input: {
   const name = str(input.name).slice(0, 255);
   const index = str(input.index).slice(0, 255);
   if (!name || !index) return null;
-  const op = OPS.includes(input.op as ThresholdOp) ? (input.op as ThresholdOp) : 'gt';
+  const op = OPS.has(input.op as ThresholdOp) ? (input.op as ThresholdOp) : 'gt';
   return {
     name,
     index,

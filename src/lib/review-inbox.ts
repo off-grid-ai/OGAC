@@ -123,7 +123,7 @@ export function formatInr(value: unknown): string | null {
 
 // The keys we treat as "the amount" for the at-a-glance line + the decision question, in priority
 // order. This mirrors the approval-authority thresholdAttribute vocabulary (amount/quote/value).
-const AMOUNT_KEYS = ['amount', 'quote', 'value', 'sum', 'total', 'premium'];
+const AMOUNT_KEYS = new Set(['amount', 'quote', 'value', 'sum', 'total', 'premium']);
 
 // The keys we treat as "who requested this", in priority order.
 const REQUESTER_KEYS = [
@@ -356,7 +356,7 @@ export function inputPairs(input: Record<string, unknown>): { key: string; value
   for (const [key, raw] of Object.entries(input ?? {})) {
     if (raw === undefined || raw === null) continue;
     let value: string;
-    if (AMOUNT_KEYS.includes(key)) {
+    if (AMOUNT_KEYS.has(key)) {
       value = formatInr(raw) ?? String(raw);
     } else if (typeof raw === 'object') {
       value = JSON.stringify(raw);
