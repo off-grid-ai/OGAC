@@ -42,7 +42,8 @@ export function CopilotConsole({ anomalies }: Readonly<{ anomalies: FlaggedAnoma
       const next = new URLSearchParams(params.toString());
       if (id === 'ask') next.delete('tool');
       else next.set('tool', id);
-      router.push(`${pathname}${next.toString() ? `?${next.toString()}` : ''}`);
+      const qs = next.toString();
+      router.push(`${pathname}${qs ? `?${qs}` : ''}`);
     },
     [params, pathname, router],
   );
