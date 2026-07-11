@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     receiveEndpoint: '/api/v1/inbound/email',
     setup: cfg.ok
       ? `At your email provider, route inbound mail for @${cfg.domain} (or a specific address) to POST the parsed message to <console-host>/api/v1/inbound/email. The recipient <token>@${cfg.domain} selects the app/agent.`
-      : 'Set OFFGRID_INBOUND_EMAIL_DOMAIN on the server to enable forward-to-address inbound.',
+      : 'Configure an inbound email domain in Settings to enable forward-to-address inbound.',
     data,
   });
 }

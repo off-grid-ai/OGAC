@@ -60,9 +60,9 @@ export function RegoModulesManager({
   if (!reachable) {
     return (
       <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-        The policy engine is not reachable{reason ? ` (${reason})` : ''}. Set{' '}
-        <span className="font-mono">OFFGRID_OPA_URL</span> to author, validate, and deploy
-        policy-as-code modules. The first-party ABAC engine keeps serving decisions in the meantime.
+        The policy engine is not reachable{reason ? ` (${reason})` : ''}. Connect it in Settings to
+        author, validate, and deploy policy-as-code modules. The first-party ABAC engine keeps
+        serving decisions in the meantime.
       </div>
     );
   }

@@ -89,8 +89,8 @@ export function LangfuseTraces({
   if (!configured) {
     return (
       <p className="text-xs text-muted-foreground">
-        Langfuse read-back not configured — set OFFGRID_LANGFUSE_URL + OFFGRID_LANGFUSE_PUBLIC_KEY /
-        OFFGRID_LANGFUSE_SECRET_KEY (or reuse OFFGRID_LANGFUSE_AUTH) to pull traces back.
+        Langfuse read-back isn&apos;t connected yet — connect Langfuse in Settings to pull traces
+        back.
       </p>
     );
   }

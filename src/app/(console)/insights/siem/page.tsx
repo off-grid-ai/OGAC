@@ -66,8 +66,7 @@ export default async function SiemPage({
 
       {!configured && (
         <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          OpenSearch is not configured (<code>OFFGRID_OPENSEARCH_URL</code>). No security events to
-          show.
+          OpenSearch isn&apos;t connected yet — connect it in Settings. No security events to show.
         </p>
       )}
       {error && (

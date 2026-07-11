@@ -79,7 +79,7 @@ export default async function FleetPage() {
           {mdm.vendor}
         </Badge>
         <span className="text-xs text-muted-foreground">
-          swap with OFFGRID_ADAPTER_MDM (native registry · FleetDM/osquery)
+          swap the backend in Settings (native registry · FleetDM/osquery)
         </span>
       </div>
 

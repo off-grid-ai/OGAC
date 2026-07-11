@@ -90,10 +90,9 @@ export function GatewayRouter() {
         <Info size={13} className="mt-0.5 shrink-0" />
         <div>
           <span className="font-medium text-foreground">Router not wired yet.</span> The gateway is
-          still served by the built-in aggregator. Point the console at a LiteLLM Proxy by setting{' '}
-          <code className="font-mono">OFFGRID_LITELLM_URL</code> and{' '}
-          <code className="font-mono">OFFGRID_LITELLM_MASTER_KEY</code> to get health-checked
-          load-balancing, automatic failover, and per-key budgets across the fleet + cloud.
+          still served by the built-in aggregator. Connect a LiteLLM Proxy in Settings to get
+          health-checked load-balancing, automatic failover, and per-key budgets across the fleet +
+          cloud.
         </div>
       </div>
     );
