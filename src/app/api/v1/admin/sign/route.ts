@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     payload?: unknown;
     signature?: string;
   } | null;
-  if (!b || b.payload === undefined) {
+  if (b?.payload === undefined) {
     return NextResponse.json({ error: 'payload required' }, { status: 400 });
   }
   const signer = getSigning();

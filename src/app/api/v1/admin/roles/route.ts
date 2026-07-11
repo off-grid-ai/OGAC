@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const name = b?.name as string | undefined;
-  if (!name || !name.trim()) {
+  if (!name?.trim()) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
   const basedOn = (b?.basedOn as string | undefined) ?? 'viewer';

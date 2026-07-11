@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!b || !b.title || !KINDS.has(b.kind as string)) {
+  if (!b?.title || !KINDS.has(b.kind as string)) {
     return NextResponse.json({ error: 'title and a valid kind required' }, { status: 400 });
   }
   return NextResponse.json(
