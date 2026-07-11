@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     'Become an intelligent enterprise, without compromising. A private AI platform on your own infrastructure — anyone builds governed apps and agents in plain language. Open source.',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-mono antialiased">

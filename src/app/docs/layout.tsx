@@ -6,7 +6,7 @@ import { DocsNav } from '@/components/docs/DocsNav';
 
 // Public documentation shell — its own layout (not the console chrome). Left sidebar of sections,
 // a content column, and a link back into the console.
-export default function DocsLayout({ children }: { children: ReactNode }) {
+export default function DocsLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
