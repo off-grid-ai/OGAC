@@ -41,7 +41,7 @@ interface JWK { kid: string; kty: string; use?: string; n?: string; e?: string; 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 function b64url(s: string): Buffer {
-  return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  return Buffer.from(s.replaceAll('-', '+').replaceAll('_', '/'), 'base64');
 }
 function jwkToKey(k: JWK): crypto.KeyObject {
   if (k.kty === 'RSA') return crypto.createPublicKey({ key: { kty: 'RSA', n: k.n, e: k.e }, format: 'jwk' });

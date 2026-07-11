@@ -347,7 +347,7 @@ export async function createEnrollmentToken(
 // verified on every data-plane call. `dt_` prefix keeps it recognizable in logs; the entropy is the
 // UUID, not the id (unlike the legacy predictable dt_<id>).
 function mintDeviceToken(): string {
-  return `dt_${randomUUID()}${randomUUID()}`.replace(/-/g, '');
+  return `dt_${randomUUID()}${randomUUID()}`.replaceAll('-', '');
 }
 
 // Enroll a node. Returns the Device AND its freshly-minted data-plane token (shown ONCE — the node
@@ -1568,7 +1568,7 @@ export async function createApiKey(input: {
   orgId?: string;
 }): Promise<{ key: ApiKey; token: string }> {
   const id = `key_${randomUUID().slice(0, 8)}`;
-  const secret = randomUUID().replace(/-/g, '');
+  const secret = randomUUID().replaceAll('-', '');
   const token = `ogak_${secret}`;
   const prefix = `ogak_${secret.slice(0, 6)}…`;
   const [row] = await db

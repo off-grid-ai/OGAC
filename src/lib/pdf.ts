@@ -103,7 +103,7 @@ export async function markdownToPdf(title: string, body: string): Promise<Uint8A
   const font = await doc.embedFont(fontBytes, { subset: true });
   const canEncode = encoderFor(font);
 
-  const lines = body.replace(/\r/g, '').split('\n').flatMap(wrap);
+  const lines = body.replaceAll('\r', '').split('\n').flatMap(wrap);
   let page = doc.addPage([PAGE.w, PAGE.h]);
   let y = PAGE.h - MARGIN;
   for (const raw of lines) {

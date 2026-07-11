@@ -34,7 +34,7 @@ export interface IdentityProvider {
 function claims(jwt: string): Record<string, unknown> {
   try {
     const part = jwt.split('.')[1] ?? '';
-    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const b64 = part.replaceAll('-', '+').replaceAll('_', '/');
     return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
   } catch {
     return {};

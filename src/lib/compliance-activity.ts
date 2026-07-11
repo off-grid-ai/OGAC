@@ -229,7 +229,7 @@ export function parseActivityFormat(raw: string | null | undefined): ActivityFor
 
 function csvCell(v: string | number): string {
   const s = String(v ?? '');
-  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  if (/[",\r\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
 

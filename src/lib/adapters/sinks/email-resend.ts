@@ -167,10 +167,10 @@ function sanitizeTagToken(v: string): string {
 // Minimal, injection-safe text→HTML: escape entities, split on blank lines into <p>, <br> single NLs.
 function textToHtml(text: string): string {
   const esc = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  const paras = esc.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`);
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+  const paras = esc.split(/\n{2,}/).map((p) => `<p>${p.replaceAll('\n', '<br>')}</p>`);
   return paras.join('\n');
 }
 

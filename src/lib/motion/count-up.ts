@@ -37,7 +37,7 @@ export function parseFormattedNumber(input: string): NumberFormat {
   const prefix = input.slice(0, start);
   const suffix = input.slice(start + raw.length);
   const grouped = raw.includes(',');
-  const plain = raw.replace(/,/g, '');
+  const plain = raw.replaceAll(',', '');
   const dot = plain.indexOf('.');
   const decimals = dot === -1 ? 0 : plain.length - dot - 1;
   const value = Number(plain);

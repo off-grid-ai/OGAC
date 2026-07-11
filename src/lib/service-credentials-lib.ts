@@ -217,7 +217,7 @@ export function decodeJwtExp(token: string): number | null {
   const parts = token.split('.');
   if (parts.length < 2) return null;
   try {
-    const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payloadB64 = parts[1].replaceAll('-', '+').replaceAll('_', '/');
     const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4);
     const json = JSON.parse(atob(padded)) as { exp?: unknown };
     return typeof json.exp === 'number' && json.exp > 0 ? json.exp : null;

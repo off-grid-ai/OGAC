@@ -55,7 +55,7 @@ const inflight = new Map<string, Promise<CachedToken | null>>();
 /** The service-account client id for a service. Convention: `offgrid-<service>` (overridable). */
 function clientIdFor(service: string): string {
   const svc = normalizeService(service);
-  const override = process.env[`OFFGRID_${svc.toUpperCase().replace(/-/g, '_')}_CLIENT_ID`];
+  const override = process.env[`OFFGRID_${svc.toUpperCase().replaceAll('-', '_')}_CLIENT_ID`];
   return override ?? `offgrid-${svc}`;
 }
 
@@ -64,7 +64,7 @@ function legacyStaticToken(service: string): string | undefined {
   const svc = normalizeService(service);
   // e.g. OFFGRID_GATEWAY_API_KEY, OFFGRID_FLEET_TOKEN — resolved by the caller today; the broker only
   // exposes it so a future caller can ask the broker for "whatever auth you have" uniformly.
-  return process.env[`OFFGRID_${svc.toUpperCase().replace(/-/g, '_')}_STATIC_TOKEN`];
+  return process.env[`OFFGRID_${svc.toUpperCase().replaceAll('-', '_')}_STATIC_TOKEN`];
 }
 
 function tokenEndpoint(): string | null {
