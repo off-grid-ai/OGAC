@@ -124,6 +124,11 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
     }
   }
 
+  // Save-button label: mid-save, editing an existing rule, or adding a new one.
+  let saveRuleLabel: string;
+  if (busy) saveRuleLabel = 'Saving…';
+  else saveRuleLabel = editId ? 'Save rule' : 'Add rule';
+
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -209,7 +214,7 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
         description="A custom rule layered on the baseline Caddy WAF. Persisted as intent — it applies on the next edge reload."
         footer={
           <Button onClick={saveRule} disabled={busy} className="w-full">
-            {busy ? 'Saving…' : editId ? 'Save rule' : 'Add rule'}
+            {saveRuleLabel}
           </Button>
         }
       >

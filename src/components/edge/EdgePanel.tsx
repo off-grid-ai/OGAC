@@ -91,6 +91,13 @@ type KindFilter = 'all' | 'waf' | 'rate-limit';
 
 const KIND_LABELS: Record<KindFilter, string> = { all: 'All', waf: 'WAF', 'rate-limit': '429' };
 
+// Repeat-count badge severity: ≥50 hits is loud (destructive), ≥10 notable (outline), else muted.
+function countBadgeVariant(count: number): 'destructive' | 'outline' | 'secondary' {
+  if (count >= 50) return 'destructive';
+  if (count >= 10) return 'outline';
+  return 'secondary';
+}
+
 export function EdgePanel() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [search, setSearch] = useState('');
@@ -388,7 +395,7 @@ export function EdgePanel() {
                     <TableCell className="text-right">
                       {e.count > 1 ? (
                         <Badge
-                          variant={e.count >= 50 ? 'destructive' : e.count >= 10 ? 'outline' : 'secondary'}
+                          variant={countBadgeVariant(e.count)}
                           className="text-[10px] font-mono"
                         >
                           ×{e.count}
