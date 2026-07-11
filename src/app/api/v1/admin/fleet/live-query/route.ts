@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   const hostIds = Array.isArray(body.hostIds)
-    ? body.hostIds.map((h) => Number(h)).filter((n) => Number.isInteger(n) && n > 0)
+    ? body.hostIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
     : [];
   if (hostIds.length === 0) {
     return NextResponse.json({ error: 'select at least one host' }, { status: 400 });
