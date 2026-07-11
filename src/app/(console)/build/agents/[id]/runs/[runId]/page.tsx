@@ -132,9 +132,9 @@ function ProvenanceCard({ run }: Readonly<{ run: AgentRun }>) {
 
 export default async function RunTracePage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string; runId: string }>;
-}) {
+}>) {
   await requireModuleForUser('agents');
   const { id, runId } = await params;
   const run = await getAgentRun(runId, await currentOrgId());
