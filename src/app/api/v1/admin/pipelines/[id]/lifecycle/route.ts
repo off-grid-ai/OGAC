@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { transitionPipeline } from '@/lib/pipeline-lifecycle';
-import { resolvePipelineRole } from '@/lib/pipeline-lifecycle';
+import { resolvePipelineRole, transitionPipeline } from '@/lib/pipeline-lifecycle';
 import {
   type LifecycleAction,
   allowedTransitions,

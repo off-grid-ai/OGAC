@@ -15,30 +15,47 @@ export const maxDuration = 120;
 // uses (runInboundGuardrails / runOutboundGuardrails). An injection-blocked verdict is a hard refusal;
 // the completion is a non-streaming call to the on-prem gateway. We return the rendered prompt, the
 // model output, and the guardrail check results so the operator sees exactly what was governed.
+interface PlaygroundInput {
+  content: string;
+  model: string;
+  values: Record<string, string>;
+  system: string;
+  // Prompt-observability tagging: when the caller identifies which library prompt + version it is
+  // running, we stamp the gateway call with an `x-offgrid-run` header. Optional — an ad-hoc run
+  // (no promptId) is untagged and simply not counted, which is honest.
+  promptId: string;
+  version: string;
+  temperature: number;
+}
+
+// Pure: normalize the raw request body into the playground's typed inputs, clamping temperature to
+// [0, 2] and defaulting to 0.7. Behavior-identical to the previous inline field parsing.
+function parsePlaygroundBody(body: Record<string, unknown>): PlaygroundInput {
+  return {
+    content: typeof body.content === 'string' ? body.content : '',
+    model: typeof body.model === 'string' ? body.model.trim() : '',
+    values:
+      body.values && typeof body.values === 'object' && !Array.isArray(body.values)
+        ? (body.values as Record<string, string>)
+        : {},
+    system: typeof body.system === 'string' ? body.system : '',
+    promptId: typeof body.promptId === 'string' ? body.promptId.trim() : '',
+    version: typeof body.version === 'string' ? body.version.trim() : '',
+    temperature:
+      typeof body.temperature === 'number' && Number.isFinite(body.temperature)
+        ? Math.max(0, Math.min(2, body.temperature))
+        : 0.7,
+  };
+}
+
 export async function POST(req: NextRequest) {
   const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
   const owner = gate.user.email ?? '';
 
-  const body = await req.json().catch(() => ({}));
-  const content = typeof body.content === 'string' ? body.content : '';
-  const model = typeof body.model === 'string' ? body.model.trim() : '';
-  const values =
-    body.values && typeof body.values === 'object' && !Array.isArray(body.values)
-      ? (body.values as Record<string, string>)
-      : {};
-  const system = typeof body.system === 'string' ? body.system : '';
-  // Prompt-observability tagging: when the caller identifies which library prompt + version it is
-  // running, we stamp the gateway call with an `x-offgrid-run` header. The gateway aggregator records
-  // that header verbatim into the OpenSearch `corrId` field, so the run is attributable back to this
-  // prompt/version for the observability rollup (src/lib/prompt-observability.ts). Optional — an
-  // ad-hoc playground run (no promptId) is untagged and simply not counted, which is honest.
-  const promptId = typeof body.promptId === 'string' ? body.promptId.trim() : '';
-  const version = typeof body.version === 'string' ? body.version.trim() : '';
-  const temperature =
-    typeof body.temperature === 'number' && Number.isFinite(body.temperature)
-      ? Math.max(0, Math.min(2, body.temperature))
-      : 0.7;
+  const { content, model, values, system, promptId, version, temperature } = parsePlaygroundBody(
+    await req.json().catch(() => ({})),
+  );
 
   if (!content.trim()) {
     return NextResponse.json({ error: 'prompt content is required' }, { status: 400 });

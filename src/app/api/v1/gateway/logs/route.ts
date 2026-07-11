@@ -20,16 +20,17 @@ const STATUS_RANGE: Record<string, { gte: number; lte: number }> = {
   '5xx': { gte: 500, lte: 599 },
 };
 
-// eslint-disable-next-line complexity
-export async function GET(req: NextRequest) {
-  const p = req.nextUrl.searchParams;
+// Pure: translate the explorer's query params (+ the resolved org scope filters) into the
+// OpenSearch request body. No I/O — org is passed in already resolved. Behavior-identical to the
+// previous inline construction; unit-testable in isolation.
+function buildSearchBody(p: URLSearchParams, scopeFilters: unknown[]) {
   const q = p.get('q')?.trim();
   const size = Math.min(Number(p.get('size')) || 50, 200);
   const from = Math.max(Number(p.get('from')) || 0, 0);
 
   // TENANT ISOLATION (G-ADV-OBS-ORG): every logs query is scoped to the caller's org via an `org`
   // term — without it the explorer would surface another tenant's request bodies/outputs.
-  const filter: unknown[] = [...analyticsScopeFilters(await currentOrgId())];
+  const filter: unknown[] = [...scopeFilters];
   for (const field of ['gateway', 'model', 'kind', 'caller'] as const) {
     const v = p.get(field);
     if (v) filter.push({ term: { [`${field}.keyword`]: v } });
@@ -54,12 +55,14 @@ export async function GET(req: NextRequest) {
     ? [{ multi_match: { query: q, fields: ['input', 'output', 'model', 'caller', 'gateway'], type: 'phrase_prefix' } }]
     : [{ match_all: {} }];
 
-  const body = {
-    size,
-    from,
-    sort: [{ '@timestamp': 'desc' }],
-    query: { bool: { must, filter } },
-  };
+  return { size, from, sort: [{ '@timestamp': 'desc' }], query: { bool: { must, filter } } };
+}
+
+export async function GET(req: NextRequest) {
+  const p = req.nextUrl.searchParams;
+  // TENANT ISOLATION (G-ADV-OBS-ORG): resolve the caller's org scope, then build the query purely.
+  const body = buildSearchBody(p, [...analyticsScopeFilters(await currentOrgId())]);
+  const { size, from } = body;
 
   try {
     const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {

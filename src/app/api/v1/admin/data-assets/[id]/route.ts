@@ -15,17 +15,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(asset);
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireAdmin(req);
-  if (gate instanceof NextResponse) return gate;
-  const { id } = await params;
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
-
+// Pure: validate + build the partial asset-update patch from the request body. The one required
+// field (name) is rejected when blank via an error result the handler maps to a 400 — otherwise a
+// field is coerced only when present. Behavior-identical to the previous inline construction.
+function buildAssetPatch(
+  body: Record<string, unknown>,
+): { ok: true; patch: UpdateAssetInput } | { ok: false; error: string } {
   const patch: UpdateAssetInput = {};
   if (body.name !== undefined) {
     const name = String(body.name).trim();
-    if (!name) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
+    if (!name) return { ok: false, error: 'name cannot be empty' };
     patch.name = name;
   }
   if (body.source !== undefined) patch.source = String(body.source).trim();
@@ -51,6 +50,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (!Number.isNaN(d.getTime())) patch.lastRefreshAt = d;
     }
   }
+  return { ok: true, patch };
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin(req);
+  if (gate instanceof NextResponse) return gate;
+  const { id } = await params;
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+
+  const built = buildAssetPatch(body);
+  if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
+  const patch = built.patch;
 
   const orgId = await currentOrgId();
   const updated = await updateAsset(id, patch, orgId);
