@@ -25,7 +25,7 @@ giving people the ability
 
 giving people the power
 
-the gioal is to have population scale impact
+the goal is to have population scale impact
 
 ---
 
@@ -73,3 +73,26 @@ Here is the gap nobody has closed. Individual productivity with AI is solved (an
 3. Consolidate organizational knowledge into a brain. Could be as simple as watching the screen, understanding the standard operating procedure for a process, and codifying it, so the knowledge in people's heads and habits becomes something the org owns and reuses.
 
 The three compound: the edge (2) captures the context and the SOPs, the brain (3) consolidates them, and the builder (1) lets anyone turn that into governed work. The moat gets amplified, governed by default, on infrastructure the enterprise controls.
+
+---
+
+## Privacy-first — the non-negotiable framing (typed 2026-07-11, verbatim)
+
+people need to know what we sell right> we're going to have to tell people this anyway
+
+just make sure that you ensure this is privacy first, on device processing, so no sensitive data even goes to the enterprise ever
+
+### Guardrail for ALL derived copy (landing, README, profile, decks)
+
+The "harness the dark / offline / WhatsApp / email / phone conversations" story must NEVER read as
+the enterprise surveilling its people. It is the opposite. The mechanism, stated plainly every time:
+
+- Processing happens **on-device / at the edge** (OGAM + OGAD). The raw sensitive content stays on the
+  person's device.
+- **No sensitive/raw data ever leaves the device or reaches the enterprise.** Ever.
+- Only the **derived intelligence** surfaces to the org, governed and RBAC-scoped: the identified SoP,
+  the in-the-moment nudge, the aggregated pattern (upsell/cross-sell signal, mis-sell flag), the peer
+  L&D insight. Never the underlying private conversation.
+
+Privacy-first is the mechanism that makes the moat-harvesting acceptable and legal. Lead with it; never
+bury it. See [[feedback-founder-freehand-is-sacred]].
