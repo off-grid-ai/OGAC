@@ -19,6 +19,12 @@ import { Label } from '@/components/ui/label';
 // Per-key request rate limit editor, rendered inline in the keys roster. Reads the key's current
 // limit lazily when opened (GET /api/v1/admin/keys/[id]) and saves via PATCH { rateLimit }. A blank
 // value clears the per-key limit → the key falls back to the workspace / global default.
+function summarizeLimit(current: number | null | undefined): string {
+  if (current === undefined) return 'set limit';
+  if (current === null) return 'default';
+  return `${current}/min`;
+}
+
 export function KeyRateLimit({ id, label }: Readonly<{ id: string; label?: string }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,8 +76,7 @@ export function KeyRateLimit({ id, label }: Readonly<{ id: string; label?: strin
     }
   }
 
-  const summary =
-    current === undefined ? 'set limit' : current === null ? 'default' : `${current}/min`;
+  const summary = summarizeLimit(current);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
