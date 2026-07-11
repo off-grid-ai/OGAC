@@ -105,7 +105,7 @@ export function buildQdrantFilter(filter?: MetaFilter | null): QdrantFilter | un
 // Single-quote-escape a string literal for LanceDB's SQL-ish filter grammar.
 function sqlStr(v: string | number): string {
   if (typeof v === 'number') return String(v);
-  return `'${v.replace(/'/g, "''")}'`;
+  return `'${v.replaceAll("'", "''")}'`;
 }
 
 // Only allow plain identifiers as column names — defends the generated SQL against injection via a
@@ -128,7 +128,7 @@ export function buildLanceWhere(filter?: MetaFilter | null): string | undefined 
       clauses.push(`${c.field} IN (${c.any.map(sqlStr).join(', ')})`);
     } else {
       // Case-insensitive substring match; escape LIKE wildcards in the needle.
-      const needle = c.text.replace(/'/g, "''").replace(/([%_])/g, '\\$1');
+      const needle = c.text.replaceAll("'", "''").replace(/([%_])/g, '\\$1');
       clauses.push(`LOWER(${c.field}) LIKE LOWER('%${needle}%') ESCAPE '\\'`);
     }
   }

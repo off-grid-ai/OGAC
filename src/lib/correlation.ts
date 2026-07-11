@@ -46,7 +46,7 @@ export const LINEAGE_UUID_NAMESPACE = '6f1a9d3e-2c4b-5a67-8f90-1b2c3d4e5f60';
 // is trivially reproducible in bash (openssl sha1 over the namespace bytes + name), so the harness can
 // derive the identical id for its GET /api/v1/jobs/runs/<uuid> lookup.
 export function uuidv5(name: string, namespace: string = LINEAGE_UUID_NAMESPACE): string {
-  const nsHex = namespace.replace(/-/g, '');
+  const nsHex = namespace.replaceAll('-', '');
   const nsBytes = Buffer.from(nsHex, 'hex');
   const hash = createHash('sha1')
     .update(nsBytes)

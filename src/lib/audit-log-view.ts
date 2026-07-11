@@ -383,7 +383,7 @@ const CSV_COLUMNS: { key: keyof AuditRow; header: string }[] = [
 function csvCell(v: string | number): string {
   const s = String(v ?? '');
   // Quote if the value contains a comma, quote, CR, LF — and escape embedded quotes.
-  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  if (/[",\r\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
 
