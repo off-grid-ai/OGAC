@@ -3,7 +3,7 @@ import { test } from 'node:test';
 // Fleet IP→host topology is seeded once in test/support/register-alias.mjs (OFFGRID_FLEET_HOST_MAP),
 // loaded via --import before this module — so the g1..g8 mapping assertions below exercise the real
 // env-driven path. Production ships no LAN IPs in source; the box sets the env.
-import { toConnectHost, toDisplayHost, toDisplayHostname, parseFleetHostMap } from '@/lib/display-host';
+import { joinUrlPath, toConnectHost, toDisplayHost, toDisplayHostname, parseFleetHostMap } from '@/lib/display-host';
 
 test('loopback host maps to S1', () => {
   assert.equal(toDisplayHost('http://127.0.0.1:6333'), 'http://offgrid-s1.local:6333/');
@@ -155,4 +155,27 @@ test('parseFleetHostMap: empty / malformed / non-object input all yield an empty
   assert.deepEqual(parseFleetHostMap('not json'), {});
   assert.deepEqual(parseFleetHostMap('[1,2,3]'), {}); // array is not a host map
   assert.deepEqual(parseFleetHostMap('{"10.0.0.9":"node.local"}'), { '10.0.0.9': 'node.local' });
+});
+
+test('joinUrlPath: single slash regardless of trailing/leading slashes', () => {
+  // The concrete bug: toDisplayHost adds a trailing slash for a bare authority; naive `${base}/v1`
+  // then yields `…:8800//v1`. joinUrlPath collapses to exactly one slash.
+  assert.equal(joinUrlPath('http://offgrid-s1.local:8800/', 'v1'), 'http://offgrid-s1.local:8800/v1');
+  assert.equal(joinUrlPath('http://offgrid-s1.local:8800', 'v1'), 'http://offgrid-s1.local:8800/v1');
+  assert.equal(joinUrlPath('http://offgrid-s1.local:8800/', '/v1'), 'http://offgrid-s1.local:8800/v1');
+  assert.equal(joinUrlPath('http://offgrid-s1.local:8800', '/v1'), 'http://offgrid-s1.local:8800/v1');
+  // Multiple trailing/leading slashes still collapse to one.
+  assert.equal(joinUrlPath('http://x//', '//v1'), 'http://x/v1');
+});
+
+test('joinUrlPath: composes with toDisplayHost (the real call site) without double slash', () => {
+  assert.equal(joinUrlPath(toDisplayHost('http://127.0.0.1:8800'), 'v1'), 'http://offgrid-s1.local:8800/v1');
+});
+
+test('joinUrlPath: empty path trims trailing slash; null/undefined base is empty', () => {
+  assert.equal(joinUrlPath('http://x:8800/', ''), 'http://x:8800');
+  // Empty base → a root-relative path (single leading slash), never a double slash.
+  assert.equal(joinUrlPath(null, 'v1'), '/v1');
+  assert.equal(joinUrlPath(undefined, 'v1'), '/v1');
+  assert.equal(joinUrlPath('', ''), '');
 });
