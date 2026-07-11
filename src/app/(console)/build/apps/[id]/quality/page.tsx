@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // global entity. This screen shows the evals + golden set THIS pipeline owns (app_id = this app), run
 // in the pipeline's own context, plus the org-wide library you can attach from. Answers "where do I
 // run it, how do I test it, what does it apply to" — it applies to THIS pipeline.
-export default async function AppQualityTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppQualityTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

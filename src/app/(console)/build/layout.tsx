@@ -7,7 +7,7 @@ import { BuildNav } from '@/components/build/BuildNav';
 // read as one connected surface. Studio and Agents were separate sidebar rows before; consolidating
 // them here keeps the sidebar scannable while preserving every route. Each page keeps its own
 // heading and content below the nav.
-export default function BuildLayout({ children }: { children: ReactNode }) {
+export default function BuildLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="space-y-6">
       <BuildNav />

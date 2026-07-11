@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // ─── Per-app BUILD tab (Builder Epic #116, screen 1) ──────────────────────────────────────────────
 // Mounts the SAME guided builder used to create the app, seeded with the saved app (initialApp) so
 // Save PATCHes it in place. Guided + Advanced-visual are both available here; both edit the one spec.
-export default async function AppBuildTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppBuildTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

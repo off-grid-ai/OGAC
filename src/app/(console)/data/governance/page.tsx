@@ -247,7 +247,7 @@ export default async function DataGovernancePage() {
   );
 }
 
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'bad' }) {
+function StatCard({ label, value, tone }: Readonly<{ label: string; value: string; tone?: 'warn' | 'bad' }>) {
   const valueTone =
     tone === 'bad' ? 'text-destructive' : tone === 'warn' ? 'text-amber-600' : 'text-foreground';
   return (

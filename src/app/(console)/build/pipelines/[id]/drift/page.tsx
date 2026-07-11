@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // runs to split into baseline vs current windows, so we only enable the check once the pipeline has
 // evals AND there is recorded run history — never a fabricated verdict. The check runs through the
 // existing drift path (Evidently when configured, built-in PSI heuristic otherwise).
-export default async function PipelineDriftPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineDriftPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);

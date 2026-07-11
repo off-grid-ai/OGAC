@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // Services drill-through (Task C3): the deep-linkable detail for one service. Live health with a
 // session history, the honest management note (why it can't be restarted from the console), and a
 // jump to its logs — the real management surface, not a flat status tile.
-export default async function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ServiceDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('services');
   const { id } = await params;
   const service = findService(getServices(), id);

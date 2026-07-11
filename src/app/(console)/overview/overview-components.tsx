@@ -19,7 +19,7 @@ const TONE: Record<HomeTile['tone'], string> = {
   muted: 'text-foreground',
 };
 
-export function TileCard({ t }: { t: HomeTile }) {
+export function TileCard({ t }: Readonly<{ t: HomeTile }>) {
   return (
     <Link
       href={t.href}
@@ -76,7 +76,7 @@ const SOURCE_LABEL: Record<BlockingDecision['source'], string> = {
 // The cross-module blocking feed: audit ∪ policy ∪ guardrails, last 24h. Each row deep-links into
 // the module that produced it, so an operator can go straight from "something was stopped" to the
 // full record.
-export function BlockingFeed({ blocking }: { blocking: OperatorHome['blocking'] }) {
+export function BlockingFeed({ blocking }: Readonly<{ blocking: OperatorHome['blocking'] }>) {
   const clear = blocking.total === 0;
   return (
     <Section
@@ -124,7 +124,7 @@ export function BlockingFeed({ blocking }: { blocking: OperatorHome['blocking'] 
   );
 }
 
-export function ServicesCard({ health }: { health: OperatorHome['health'] }) {
+export function ServicesCard({ health }: Readonly<{ health: OperatorHome['health'] }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="divide-y divide-border p-0">
@@ -157,7 +157,7 @@ export function ServicesCard({ health }: { health: OperatorHome['health'] }) {
   );
 }
 
-export function ActivityCard({ activity }: { activity: OperatorHome['activity'] }) {
+export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['activity'] }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="divide-y divide-border p-0">

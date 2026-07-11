@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // real. Sets the shadow-default (dry-run every run), the daily run + spend caps, and the kill-switch.
 // The effective controls + live usage (runs-today, spend-today) are resolved server-side and handed
 // to the client editor, which PATCHes changes to /api/v1/admin/apps/[id]/controls.
-export default async function AppControlsTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppControlsTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // The HITL queue for this app: every run paused at a human step, awaiting a decision. Opening one
 // goes to its run detail, where AppRunStatus inlines the AppReview surface (approve / reject / edit)
 // that resumes the durable workflow. Scoped to the app id.
-export default async function AppReviewTab({ params }: { params: Promise<{ id: string }> }) {
+export default async function AppReviewTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
   const orgId = await currentOrgId();

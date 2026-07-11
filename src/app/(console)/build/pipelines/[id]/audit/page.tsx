@@ -35,7 +35,7 @@ function fmt(ts: string): string {
 // config changes, egress verdicts) plus who invoked it. A lens over the org-wide audit stream
 // (searchAudit → offgrid-audit) narrowed by the pure filterAuditForPipeline to rows whose
 // resource/project names this pipeline. Honest: an unconfigured/empty index → an empty table + note.
-export default async function PipelineAuditPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineAuditPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const p = await getPipeline(id, await currentOrgId());
   if (!p) notFound();

@@ -141,7 +141,7 @@ export default async function WarehousePage({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <Card className="shadow-sm">
       <CardContent className="py-4">

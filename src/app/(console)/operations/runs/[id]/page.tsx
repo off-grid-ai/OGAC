@@ -156,25 +156,22 @@ export default async function RunDetailPage({ params }: Readonly<{ params: Promi
   );
 }
 
-function StatusBadge({ status }: { status: RunStatus }) {
-  const cls =
-    status === 'succeeded'
-      ? 'bg-primary/10 text-primary'
-      : status === 'failed'
-        ? 'bg-destructive/10 text-destructive'
-        : status === 'paused'
-          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-500'
-          : status === 'running'
-            ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-            : 'bg-muted text-muted-foreground';
-  const Icon =
-    status === 'succeeded'
-      ? CheckCircle
-      : status === 'failed'
-        ? XCircle
-        : status === 'paused'
-          ? PauseCircle
-          : Clock;
+const STATUS_BADGE_CLASS: Partial<Record<RunStatus, string>> = {
+  succeeded: 'bg-primary/10 text-primary',
+  failed: 'bg-destructive/10 text-destructive',
+  paused: 'bg-amber-500/10 text-amber-600 dark:text-amber-500',
+  running: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+};
+
+const STATUS_BADGE_ICON: Partial<Record<RunStatus, typeof CheckCircle>> = {
+  succeeded: CheckCircle,
+  failed: XCircle,
+  paused: PauseCircle,
+};
+
+function StatusBadge({ status }: Readonly<{ status: RunStatus }>) {
+  const cls = STATUS_BADGE_CLASS[status] ?? 'bg-muted text-muted-foreground';
+  const Icon = STATUS_BADGE_ICON[status] ?? Clock;
   return (
     <Badge variant="secondary" className={`${cls} gap-1`}>
       <Icon className="size-3.5" weight="fill" />
@@ -183,7 +180,7 @@ function StatusBadge({ status }: { status: RunStatus }) {
   );
 }
 
-function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Meta({ label, value, mono }: Readonly<{ label: string; value: string; mono?: boolean }>) {
   return (
     <div className="rounded-md border border-border p-3">
       <div className="text-xs text-muted-foreground">{label}</div>

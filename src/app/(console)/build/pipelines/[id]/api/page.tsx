@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // The API / Integrate tab — the pipeline consumed as its OWN provisioned API. Shows the callable
 // endpoint + curl/SDK snippets, and full CRUD over provisioned keys (mint shows the plaintext once,
 // revoke with confirm). Every call through a key runs THROUGH this pipeline's governance — no bypass.
-export default async function PipelineApiPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PipelineApiPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);
