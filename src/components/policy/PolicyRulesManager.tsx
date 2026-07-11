@@ -320,6 +320,11 @@ function RuleDialog({
     }
   }
 
+  // Save-button label: mid-save, editing an existing rule, or adding a new one.
+  let saveButtonLabel: string;
+  if (busy) saveButtonLabel = 'Saving…';
+  else saveButtonLabel = rule ? 'Save changes' : 'Add rule';
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
@@ -414,7 +419,7 @@ function RuleDialog({
             Cancel
           </Button>
           <Button onClick={save} disabled={busy || !form.name.trim() || !form.value.trim()}>
-            {busy ? 'Saving…' : rule ? 'Save changes' : 'Add rule'}
+            {saveButtonLabel}
           </Button>
         </SheetFooter>
       </SheetContent>

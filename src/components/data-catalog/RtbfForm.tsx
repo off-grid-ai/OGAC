@@ -23,6 +23,13 @@ interface PropagationResult {
   reason: string | null;
 }
 
+// Text tint for a propagation outcome: erased → primary, error → destructive, else (deferred) → amber.
+function propagationOutcomeClass(outcome: PropagationResult['outcome']): string {
+  if (outcome === 'erased') return 'text-primary';
+  if (outcome === 'error') return 'text-destructive';
+  return 'text-amber-600';
+}
+
 // Right-to-be-forgotten form. Submits a subject; the route runs the console-plane erasure now,
 // resolves the cross-plane scope, and records a durable request. Shows the resolved scope so the
 // operator sees exactly what was erased vs. what waits on the warehouse data engine.
@@ -102,16 +109,7 @@ export function RtbfForm() {
                   <span className="uppercase text-foreground/70">{p.target}</span> · {p.label}
                   {p.outcome === 'erased' && p.removed > 0 ? ` (${p.removed})` : ''}
                 </span>
-                <span
-                  className={
-                    p.outcome === 'erased'
-                      ? 'text-primary'
-                      : p.outcome === 'error'
-                        ? 'text-destructive'
-                        : 'text-amber-600'
-                  }
-                  title={p.reason ?? undefined}
-                >
+                <span className={propagationOutcomeClass(p.outcome)} title={p.reason ?? undefined}>
                   {p.outcome === 'erased' ? 'propagated' : p.outcome}
                 </span>
               </div>

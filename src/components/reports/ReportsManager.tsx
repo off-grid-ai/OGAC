@@ -382,13 +382,20 @@ function TemplateForm({
   onSave: () => void;
   onCancel: () => void;
 }>) {
+  // Editor heading: editing an existing report (built-in vs template) or creating a new one.
+  let editorHeading: string;
+  if (!draft.id) editorHeading = 'New report template';
+  else editorHeading = builtin ? 'Edit built-in report' : 'Edit template';
+  // Save-button label: mid-save, editing an existing template, or creating a new one.
+  let saveButtonLabel: string;
+  if (saving) saveButtonLabel = 'Saving…';
+  else saveButtonLabel = draft.id ? 'Save changes' : 'Create template';
+
   return (
     <Card className="shadow-sm">
       <CardContent className="space-y-4 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-mono text-sm font-semibold">
-            {draft.id ? (builtin ? 'Edit built-in report' : 'Edit template') : 'New report template'}
-          </h2>
+          <h2 className="font-mono text-sm font-semibold">{editorHeading}</h2>
           <button onClick={onCancel} aria-label="Close" className="text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
@@ -492,7 +499,7 @@ function TemplateForm({
             onClick={onSave}
             disabled={saving || (!builtin && (!draft.name.trim() || draft.sections.length === 0))}
           >
-            {saving ? 'Saving…' : draft.id ? 'Save changes' : 'Create template'}
+            {saveButtonLabel}
           </Button>
         </div>
       </CardContent>
