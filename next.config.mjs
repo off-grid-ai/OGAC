@@ -136,6 +136,10 @@ const nextConfig = {
     '@temporalio/client',
     '@temporalio/worker',
     '@temporalio/workflow',
+    // @react-pdf/renderer renders governance PDFs server-side (src/lib/reports/render.tsx). It ships
+    // native yoga/wasm and reads public/logo.png off disk at render time — keep it out of the webpack
+    // bundle so `next build` doesn't try to inline those and so the disk read resolves under next start.
+    '@react-pdf/renderer',
   ],
   // Stable build id so the multiple console instances behind the edge LB produce identical
   // asset hashes — otherwise /_next/static/* 404s when a request lands on the other instance.
