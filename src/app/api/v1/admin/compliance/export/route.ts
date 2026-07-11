@@ -1,17 +1,26 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { buildExport } from '@/lib/compliance';
+import { renderReportWithProvenance } from '@/lib/reports/build';
+import { incompleteReport, pdfResponse } from '@/lib/reports/http';
+import { validateReportDoc } from '@/lib/reports/validate';
+import { currentOrgId } from '@/lib/tenancy';
 
-// One-click DPIA / evidence pack (Markdown) the DPO can hand to a regulator.
+// react-pdf renders on Node (yoga/wasm + disk read of public/logo.png).
+export const runtime = 'nodejs';
+
+// One-click compliance evidence pack the DPO hands to a regulator — a branded, regulator-grade PDF
+// built from a validated ReportDoc (an incomplete document is refused with 422, never shipped).
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const framework = new URL(req.url).searchParams.get('framework') ?? undefined;
-  const { filename, body } = await buildExport(framework);
-  return new Response(body, {
-    headers: {
-      'content-type': 'text/markdown; charset=utf-8',
-      'content-disposition': `attachment; filename="${filename}"`,
-    },
-  });
+
+  const built = await renderReportWithProvenance(
+    'compliance',
+    await currentOrgId(),
+    new Date().toISOString(),
+  );
+  if (!built) return NextResponse.json({ error: 'unknown report' }, { status: 404 });
+  const refuse = incompleteReport(validateReportDoc(built.doc));
+  if (refuse) return refuse;
+  return pdfResponse(built.bytes, built.filename, built.manifest);
 }

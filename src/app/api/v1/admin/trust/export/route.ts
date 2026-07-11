@@ -1,38 +1,28 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import {
-  buildPosture,
-  COMPLIANCE_ARTIFACTS,
-  INDIA_BFSI_FRAMINGS,
-  rollupFramings,
-  summarisePosture,
-} from '@/lib/trust-center';
-import { collectPostureInputs } from '@/lib/trust-center-inputs';
-import { buildTrustReport } from '@/lib/trust-report';
+import { renderReportWithProvenance } from '@/lib/reports/build';
+import { incompleteReport, pdfResponse } from '@/lib/reports/http';
+import { validateReportDoc } from '@/lib/reports/validate';
+import { currentOrgId } from '@/lib/tenancy';
 
+// react-pdf renders on Node (yoga/wasm + disk read of public/logo.png).
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // One-click downloadable "trust summary" — the security & compliance evidence pack a buyer's
-// procurement team asks for. Generated live from real deployment posture; honest about open items.
+// procurement team asks for. Generated live from real deployment posture, honest about open items,
+// as a branded PDF built from a validated ReportDoc (incomplete → 422, never shipped).
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
 
-  const inputs = await collectPostureInputs();
-  const posture = buildPosture(inputs);
-  const summary = summarisePosture(posture, new Date().toISOString());
-  const framings = rollupFramings(INDIA_BFSI_FRAMINGS, posture);
-  const { filename, body } = buildTrustReport({
-    summary,
-    posture,
-    framings,
-    artifacts: COMPLIANCE_ARTIFACTS,
-  });
-
-  return new Response(body, {
-    headers: {
-      'content-type': 'text/markdown; charset=utf-8',
-      'content-disposition': `attachment; filename="${filename}"`,
-    },
-  });
+  const built = await renderReportWithProvenance(
+    'trust',
+    await currentOrgId(),
+    new Date().toISOString(),
+  );
+  if (!built) return NextResponse.json({ error: 'unknown report' }, { status: 404 });
+  const refuse = incompleteReport(validateReportDoc(built.doc));
+  if (refuse) return refuse;
+  return pdfResponse(built.bytes, built.filename, built.manifest);
 }
