@@ -31,7 +31,7 @@ const TABS: { id: ToolTab; label: string; blurb: string }[] = [
   { id: 'expectations', label: 'Data-quality checks', blurb: 'Expectations from a table schema' },
 ];
 
-export function CopilotConsole({ anomalies }: { anomalies: FlaggedAnomaly[] }) {
+export function CopilotConsole({ anomalies }: Readonly<{ anomalies: FlaggedAnomaly[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -42,7 +42,8 @@ export function CopilotConsole({ anomalies }: { anomalies: FlaggedAnomaly[] }) {
       const next = new URLSearchParams(params.toString());
       if (id === 'ask') next.delete('tool');
       else next.set('tool', id);
-      router.push(`${pathname}${next.toString() ? `?${next.toString()}` : ''}`);
+      const qs = next.toString();
+      router.push(`${pathname}${qs ? `?${qs}` : ''}`);
     },
     [params, pathname, router],
   );
@@ -83,7 +84,7 @@ export function CopilotConsole({ anomalies }: { anomalies: FlaggedAnomaly[] }) {
   );
 }
 
-function AnomalyRail({ anomalies }: { anomalies: FlaggedAnomaly[] }) {
+function AnomalyRail({ anomalies }: Readonly<{ anomalies: FlaggedAnomaly[] }>) {
   return (
     <Card className="h-fit shadow-sm">
       <CardHeader>

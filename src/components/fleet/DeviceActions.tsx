@@ -40,11 +40,11 @@ export function DeviceActions({
   deviceId,
   name,
   fleet = false,
-}: {
+}: Readonly<{
   deviceId: string;
   name: string;
   fleet?: boolean;
-}) {
+}>) {
   const router = useRouter();
 
   async function kill() {

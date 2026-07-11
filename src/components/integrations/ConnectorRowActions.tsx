@@ -42,7 +42,7 @@ export interface ConnectorLite {
 // connectors — edit its config or delete it. Server routes: POST /sync, PATCH & DELETE /[id].
 // The edit panel is a URL-driven side panel (?panel=edit-connector&id=<id>) so Back closes it and
 // it's deep-linkable; delete stays a confirmation modal (local state) per the NO-MODALS carve-out.
-export function ConnectorRowActions({ connector }: { connector: ConnectorLite }) {
+export function ConnectorRowActions({ connector }: Readonly<{ connector: ConnectorLite }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

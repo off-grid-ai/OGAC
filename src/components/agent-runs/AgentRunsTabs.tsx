@@ -30,11 +30,11 @@ export function AgentRunsTabs({
   runs,
   statusCounts,
   totalRuns,
-}: {
+}: Readonly<{
   runs: RunSummaryRow[];
   statusCounts: RunsSummary['statusCounts'];
   totalRuns: number;
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

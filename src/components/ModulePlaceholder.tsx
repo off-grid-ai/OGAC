@@ -8,7 +8,7 @@ interface ModulePlaceholderProps {
   note?: string;
 }
 
-export function ModulePlaceholder({ id, milestone, note }: ModulePlaceholderProps) {
+export function ModulePlaceholder({ id, milestone, note }: Readonly<ModulePlaceholderProps>) {
   const mod = MODULES.find((m) => m.id === id);
   if (!mod) return null;
   const Icon = MODULE_ICONS[id];

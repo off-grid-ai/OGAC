@@ -17,10 +17,10 @@ export interface PickableUser {
 export function UserPicker({
   selectedId,
   onSelect,
-}: {
+}: Readonly<{
   selectedId: string | null;
   onSelect: (u: PickableUser) => void;
-}) {
+}>) {
   const [users, setUsers] = useState<PickableUser[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);

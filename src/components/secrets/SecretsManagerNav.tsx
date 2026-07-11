@@ -7,7 +7,7 @@ import { SecretsManager } from './SecretsManager';
 // URL-driven wrapper around SecretsManager. The add-secret panel is a navigational position, so it
 // lives in the query string (?add=1) — opening/closing it pushes a history entry, so browser Back
 // closes the panel rather than leaving the page (per the console nav standard).
-export function SecretsManagerNav({ configured, sealed }: { configured: boolean; sealed: boolean }) {
+export function SecretsManagerNav({ configured, sealed }: Readonly<{ configured: boolean; sealed: boolean }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

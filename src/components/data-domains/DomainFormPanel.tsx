@@ -38,7 +38,7 @@ export function DomainFormPanel({
   submitUrl,
   method,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -49,7 +49,7 @@ export function DomainFormPanel({
   submitUrl: string;
   method: 'POST' | 'PATCH';
   onSaved: () => void;
-}) {
+}>) {
   const [label, setLabel] = useState(initial.label);
   const [connectorId, setConnectorId] = useState(initial.connectorId);
   const [resource, setResource] = useState(initial.resource);

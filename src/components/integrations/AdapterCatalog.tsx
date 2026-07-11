@@ -37,7 +37,7 @@ function healthLabel(
 // sub-nav. The active category lives in the URL (?cat=) so it's deep-linkable and Back-coherent;
 // the default (no ?cat=) is "All". Every card keeps its swap-via config, live health, and the
 // register action — this is organization, not removal.
-export function AdapterCatalog({ bindings }: { bindings: CapabilityBinding[] }) {
+export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBinding[] }>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = normalizeCategory(searchParams.get('cat'));

@@ -47,12 +47,12 @@ function EditDialog({
   open,
   onOpenChange,
   onSaved,
-}: {
+}: Readonly<{
   node: FleetNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => Promise<void>;
-}) {
+}>) {
   const [form, setForm] = useState<FleetNode>(node);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);

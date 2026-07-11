@@ -17,7 +17,7 @@ interface Node {
 
 const REFRESH_MS = 5000;
 
-export function GatewayNodesCard({ initial }: { initial: Node[] }) {
+export function GatewayNodesCard({ initial }: Readonly<{ initial: Node[] }>) {
   const [nodes, setNodes] = useState<Node[]>(initial);
   const [loading, setLoading] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);

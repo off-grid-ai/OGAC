@@ -24,10 +24,10 @@ interface MemoryItem {
 export function MemoryDialog({
   open,
   onOpenChange,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
-}) {
+}>) {
   const [items, setItems] = useState<MemoryItem[]>([]);
   const [draft, setDraft] = useState('');
 

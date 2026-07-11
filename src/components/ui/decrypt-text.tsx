@@ -17,7 +17,7 @@ interface DecryptTextProps {
   duration?: number;
 }
 
-export function DecryptText({ text, className, duration = DURATION.data }: DecryptTextProps) {
+export function DecryptText({ text, className, duration = DURATION.data }: Readonly<DecryptTextProps>) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduce = useReducedMotion();
   const inView = useInView(ref, { once: true, margin: '0px 0px -40px 0px' });

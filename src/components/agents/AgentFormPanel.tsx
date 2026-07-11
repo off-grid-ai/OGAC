@@ -82,10 +82,10 @@ function draftFromAgent(a: EditableAgent): Draft {
 export function AgentFormPanel({
   tools = [],
   editable = [],
-}: {
+}: Readonly<{
   tools?: ToolOption[];
   editable?: EditableAgent[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

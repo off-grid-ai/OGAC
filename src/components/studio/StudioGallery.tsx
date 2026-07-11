@@ -58,11 +58,11 @@ function AppCard({
   app,
   onEdit,
   onDelete,
-}: {
+}: Readonly<{
   app: StudioApp;
   onEdit: () => void;
   onDelete: () => void;
-}) {
+}>) {
   const hue = accentHue(app.id || app.title);
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
@@ -134,7 +134,7 @@ function AppCard({
 // The Studio gallery: a responsive card grid of saved assistants with URL-driven edit (title,
 // summary, visibility, publish) and delete. Publishing mints /app/<slug>. Navigation lives in the
 // URL (?panel=st-edit:<id>) so Back closes the panel and it's deep-linkable.
-export function StudioGallery({ apps }: { apps: StudioApp[] }) {
+export function StudioGallery({ apps }: Readonly<{ apps: StudioApp[] }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

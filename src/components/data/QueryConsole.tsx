@@ -26,7 +26,7 @@ interface QueryResult {
 // results table fills the page width and scrolls horizontally inside its own container. Reads are
 // enforced read-only server-side — a rejected statement returns 400 and we surface the guard's exact
 // reason. Starter queries run against the live `bfsi` schema.
-export function QueryConsole({ initialSql = '' }: { initialSql?: string }) {
+export function QueryConsole({ initialSql = '' }: Readonly<{ initialSql?: string }>) {
   const [sql, setSql] = useState(initialSql);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);

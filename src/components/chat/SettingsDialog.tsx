@@ -41,10 +41,10 @@ interface Prefs {
 export function SettingsDialog({
   open,
   onOpenChange,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
-}) {
+}>) {
   const [section, setSection] = useState<Section>('profile');
   const [instructions, setInstructions] = useState('');
   const [prefs, setPrefs] = useState<Prefs>({ memory: true, codeExecution: true, search: true });
@@ -245,11 +245,11 @@ function Field({
   title,
   hint,
   children,
-}: {
+}: Readonly<{
   title: string;
   hint: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="space-y-3">
       <div>
@@ -265,11 +265,11 @@ function Row({
   label,
   desc,
   children,
-}: {
+}: Readonly<{
   label: string;
   desc: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
       <div className="space-y-0.5">

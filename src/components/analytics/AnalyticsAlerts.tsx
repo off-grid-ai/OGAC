@@ -66,12 +66,12 @@ function RuleDialog({
   open,
   onClose,
   onSaved,
-}: {
+}: Readonly<{
   rule: Rule | null;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-}) {
+}>) {
   const [draft, setDraft] = useState<Rule>(blankRule());
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -205,7 +205,7 @@ function RuleDialog({
 }
 
 // ─── Saved-view create dialog ─────────────────────────────────────────────────────────────────────
-function ViewDialog({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+function ViewDialog({ open, onClose, onSaved }: Readonly<{ open: boolean; onClose: () => void; onSaved: () => void }>) {
   const [name, setName] = useState('');
   const [range, setRange] = useState<string>('7d');
   const [model, setModel] = useState('');

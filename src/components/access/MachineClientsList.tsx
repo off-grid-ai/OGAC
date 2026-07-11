@@ -31,10 +31,10 @@ interface KcClient {
 function AddClientForm({
   onDone,
   onCancel,
-}: {
+}: Readonly<{
   onDone: (secret: string, clientId: string) => void;
   onCancel: () => void;
-}) {
+}>) {
   const [clientId, setClientId] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -187,11 +187,11 @@ function NewSecretBanner({
   clientId,
   secret,
   onDismiss,
-}: {
+}: Readonly<{
   clientId: string;
   secret: string;
   onDismiss: () => void;
-}) {
+}>) {
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
@@ -229,7 +229,7 @@ function NewSecretBanner({
 // ─── Expanded client row ──────────────────────────────────────────────────────
 
 // eslint-disable-next-line complexity
-function ExpandedClient({ client }: { client: KcClient }) {
+function ExpandedClient({ client }: Readonly<{ client: KcClient }>) {
   const [secret, setSecret] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [loadingSecret, setLoadingSecret] = useState(false);

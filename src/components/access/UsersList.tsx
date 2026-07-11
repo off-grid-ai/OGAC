@@ -41,11 +41,11 @@ function AddUserForm({
   roles,
   onDone,
   onCancel,
-}: {
+}: Readonly<{
   roles: KcRole[];
   onDone: () => void;
   onCancel: () => void;
-}) {
+}>) {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');

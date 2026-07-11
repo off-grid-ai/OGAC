@@ -55,13 +55,13 @@ function AddMemberSheet({
   teamId,
   teamName,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   teamId: string | null;
   teamName: string;
   onSaved: () => void;
-}) {
+}>) {
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('member');
   const [busy, setBusy] = useState(false);
@@ -139,12 +139,12 @@ function TeamNode({
   members,
   onAddMember,
   onRemoveMember,
-}: {
+}: Readonly<{
   team: TeamRow;
   members: MemberRow[] | undefined;
   onAddMember: (t: TeamRow) => void;
   onRemoveMember: (teamId: string, memberId: string, userId: string) => void;
-}) {
+}>) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -207,12 +207,12 @@ function DepartmentSection({
   membersByTeam,
   onAddMember,
   onRemoveMember,
-}: {
+}: Readonly<{
   group: DepartmentGroup<TeamRow>;
   membersByTeam: Record<string, MemberRow[] | undefined>;
   onAddMember: (t: TeamRow) => void;
   onRemoveMember: (teamId: string, memberId: string, userId: string) => void;
-}) {
+}>) {
   const [open, setOpen] = useState(true);
   const memberTotal = group.teams.reduce((n, t) => n + t.memberCount, 0);
   return (

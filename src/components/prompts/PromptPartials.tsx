@@ -171,7 +171,7 @@ export function PromptPartials() {
   );
 }
 
-function PartialCard({ p, onEdit, onDelete }: { p: Partial; onEdit: () => void; onDelete: () => void }) {
+function PartialCard({ p, onEdit, onDelete }: Readonly<{ p: Partial; onEdit: () => void; onDelete: () => void }>) {
   const vars = extractVariables(p.content);
   async function copyRef() {
     await navigator.clipboard.writeText(`{{>${p.name}}}`);
@@ -241,13 +241,13 @@ function PartialEditPanel({
   onChange,
   onSave,
   onCancel,
-}: {
+}: Readonly<{
   draft: Draft;
   saving: boolean;
   onChange: (d: Draft) => void;
   onSave: () => void;
   onCancel: () => void;
-}) {
+}>) {
   return (
     <aside className="sticky top-0 hidden h-[calc(100vh-7rem)] w-96 shrink-0 flex-col overflow-y-auto rounded-lg border border-border bg-card shadow-sm lg:flex">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">

@@ -115,7 +115,7 @@ interface ModelInfo {
   image?: boolean; // image-generation model (sd-server) — the composer generates instead of chats
 }
 
-function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifact) => void }) {
+function ArtifactChip({ content, onOpen }: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
   const art = parseArtifact(content);
   if (!art) return null;
   return (
@@ -132,10 +132,10 @@ function ArtifactChip({ content, onOpen }: { content: string; onOpen: (a: Artifa
 function BranchNav({
   m,
   onNav,
-}: {
+}: Readonly<{
   m: Message;
   onNav: (delta: number) => void;
-}) {
+}>) {
   if (!m.branchCount || m.branchCount < 2) return null;
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -157,11 +157,11 @@ function BranchNav({
 // answer starts it collapses to a one-line header the reader can re-open. Presentation state is the
 // pure `thinkingState` decision (task rule: "collapsed by default once the answer starts"); the only
 // local state is the reader's manual open/close override, seeded from that default.
-function ThinkingBlock({ reasoning, content, streaming }: {
+function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
   reasoning: string;
   content: string;
   streaming: boolean;
-}) {
+}>) {
   const state = thinkingState(reasoning, content, streaming);
   const [override, setOverride] = useState<boolean | null>(null);
   // Follow the phase-driven default until the reader intervenes; a manual toggle sticks.
@@ -198,11 +198,11 @@ function ThinkingBlock({ reasoning, content, streaming }: {
 // "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
 // [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
 // briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
-function SourcesFooter({ citations, activeIndex, registerRef }: {
+function SourcesFooter({ citations, activeIndex, registerRef }: Readonly<{
   citations: Citation[];
   activeIndex: number | null;
   registerRef: (index: number, el: HTMLLIElement | null) => void;
-}) {
+}>) {
   const sources = buildSources(citations);
   if (!sources.length) return null;
   return (
@@ -247,7 +247,7 @@ function MessageBubble({
   canRegenerate,
   canEdit,
   streaming,
-}: {
+}: Readonly<{
   message: Message;
   onOpenArtifact: (a: Artifact) => void;
   onCopy: (text: string) => void;
@@ -263,7 +263,7 @@ function MessageBubble({
   canRegenerate: boolean;
   canEdit: boolean;
   streaming: boolean;
-}) {
+}>) {
   const isAssistant = m.role === 'assistant';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.content);
@@ -421,10 +421,10 @@ function MessageBubble({
 export function ChatWorkspace({
   role = 'viewer',
   userEmail = '',
-}: {
+}: Readonly<{
   role?: string;
   userEmail?: string;
-}) {
+}>) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [skillsOpen, setSkillsOpen] = useState(false);
   // Conversation starters surfaced when a fresh chat is opened under an assistant/skill.
@@ -1004,7 +1004,7 @@ export function ChatWorkspace({
             // Surface inline on the assistant bubble (keeps partial output) instead of a toast.
             setMessages((prev) => {
               const next = [...prev];
-              const last = next[next.length - 1];
+              const last = next.at(-1);
               if (last?.role === 'assistant') last.error = String(evt.error);
               return next;
             });
@@ -1014,7 +1014,7 @@ export function ChatWorkspace({
             // drop the empty assistant placeholder while awaiting approval
             setMessages((prev) => {
               const next = [...prev];
-              if (next[next.length - 1]?.role === 'assistant' && !next[next.length - 1].content) {
+              if (next.at(-1)?.role === 'assistant' && !next.at(-1)!.content) {
                 next.pop();
               }
               return next;
@@ -1023,7 +1023,7 @@ export function ChatWorkspace({
           }
           setMessages((prev) => {
             const next = [...prev];
-            const last = next[next.length - 1];
+            const last = next.at(-1);
             if (last?.role === 'assistant') {
               if (evt.content) last.content += evt.content;
               if (evt.reasoning) last.reasoning = (last.reasoning ?? '') + evt.reasoning;
@@ -1038,7 +1038,7 @@ export function ChatWorkspace({
         const reason = (e as Error).message || 'Chat failed — is the gateway up?';
         setMessages((prev) => {
           const next = [...prev];
-          const last = next[next.length - 1];
+          const last = next.at(-1);
           if (last?.role === 'assistant') { last.error = reason; }
           else next.push({ role: 'assistant', content: '', error: reason });
           return next;
@@ -1073,7 +1073,7 @@ export function ChatWorkspace({
       const data = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       setMessages((prev) => {
         const next = [...prev];
-        const last = next[next.length - 1];
+        const last = next.at(-1);
         if (last?.role === 'assistant') {
           if (r.ok && data.url) {
             next[next.length - 1] = { ...last, content: '', images: [data.url] };
@@ -1086,7 +1086,7 @@ export function ChatWorkspace({
     } catch (e) {
       setMessages((prev) => {
         const next = [...prev];
-        const last = next[next.length - 1];
+        const last = next.at(-1);
         if (last?.role === 'assistant') {
           next[next.length - 1] = { ...last, content: '', error: e instanceof Error ? e.message : 'failed' };
         }
@@ -1242,7 +1242,7 @@ export function ChatWorkspace({
     if (!lastUser) return;
     setMessages((prev) => {
       const next = [...prev];
-      if (next[next.length - 1]?.role === 'assistant') next.pop();
+      if (next.at(-1)?.role === 'assistant') next.pop();
       next.push({ role: 'assistant', content: '', reasoning: '' });
       return next;
     });

@@ -35,11 +35,11 @@ export function ReviewDecision({
   detail,
   reviewable,
   runStatus,
-}: {
+}: Readonly<{
   detail: ReviewDetail;
   reviewable: boolean;
   runStatus: string;
-}) {
+}>) {
   const router = useRouter();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);

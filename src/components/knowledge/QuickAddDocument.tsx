@@ -24,10 +24,10 @@ import {
 export function QuickAddDocument({
   collectionId,
   collectionName,
-}: {
+}: Readonly<{
   collectionId: string;
   collectionName: string;
-}) {
+}>) {
   const router = useRouter();
   const params = useSearchParams();
   const open =

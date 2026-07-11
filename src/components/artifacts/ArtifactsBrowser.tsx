@@ -285,11 +285,11 @@ function ArtifactCard({
   a,
   onOpen,
   onDelete,
-}: {
+}: Readonly<{
   a: ArtifactRow;
   onOpen: () => void;
   onDelete: () => void;
-}) {
+}>) {
   const hue = accentHue(a.id || a.title);
   const live = isLiveKind(a.kind);
   return (

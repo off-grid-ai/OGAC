@@ -16,10 +16,10 @@ import { RETENTION_ACTIONS } from '@/lib/data-retention';
 export function RetentionManager({
   assetId,
   initial,
-}: {
+}: Readonly<{
   assetId: string;
   initial: RetentionPolicyRow | null;
-}) {
+}>) {
   const router = useRouter();
   const [retainDays, setRetainDays] = useState(initial?.retainDays ?? 0);
   const [action, setAction] = useState(initial?.action ?? 'delete');

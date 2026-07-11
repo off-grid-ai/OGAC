@@ -37,7 +37,7 @@ export interface CatalogEntry {
   secretRequired: boolean;
 }
 
-function StatusBadge({ t }: { t: ExporterCardData }) {
+function StatusBadge({ t }: Readonly<{ t: ExporterCardData }>) {
   if (t.lastStatus === 'ok') {
     return (
       <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-500">
@@ -66,14 +66,14 @@ function ExporterCard({
   onRun,
   onToggle,
   busyId,
-}: {
+}: Readonly<{
   t: ExporterCardData;
   onDelete: (t: ExporterCardData) => void;
   onTest: (t: ExporterCardData) => void;
   onRun: (t: ExporterCardData) => void;
   onToggle: (t: ExporterCardData, enabled: boolean) => void;
   busyId: string | null;
-}) {
+}>) {
   const busy = busyId === t.id;
   return (
     <Card className="flex flex-col shadow-sm transition-colors hover:border-primary/40">
@@ -154,12 +154,12 @@ function AddExporterSheet({
   onOpenChange,
   onSaved,
   catalog,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   catalog: CatalogEntry[];
-}) {
+}>) {
   const [kind, setKind] = useState<CatalogEntry['kind']>(catalog[0]?.kind ?? 'audit');
   const [endpoint, setEndpoint] = useState('');
   const [secretRef, setSecretRef] = useState('');
@@ -272,10 +272,10 @@ function AddExporterSheet({
 export function ExportersManager({
   targets,
   catalog,
-}: {
+}: Readonly<{
   targets: ExporterCardData[];
   catalog: CatalogEntry[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

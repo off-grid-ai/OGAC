@@ -33,11 +33,11 @@ export function ServiceDetail({
   service,
   control,
   logsHref,
-}: {
+}: Readonly<{
   service: ServiceEntry;
   control: ServiceControl;
   logsHref: string | null;
-}) {
+}>) {
   const [health, setHealth] = useState<ServiceHealth | null>(null);
   const [history, setHistory] = useState<Sample[]>([]);
   const [probing, setProbing] = useState(false);
@@ -148,10 +148,11 @@ export function ServiceDetail({
                 {history.map((s, i) => {
                   const down = s.status === 'down';
                   const h = s.ms != null ? Math.min(48, Math.max(6, Math.round(s.ms / 40))) : 20;
+                  const msSuffix = s.ms != null ? ` · ${s.ms}ms` : '';
                   return (
                     <div
                       key={i}
-                      title={`${new Date(s.at).toLocaleTimeString()} · ${s.status}${s.ms != null ? ` · ${s.ms}ms` : ''}`}
+                      title={`${new Date(s.at).toLocaleTimeString()} · ${s.status}${msSuffix}`}
                       className={`w-2 shrink-0 rounded-sm ${down ? 'bg-red-500' : 'bg-emerald-500'}`}
                       style={{ height: down ? 48 : h }}
                     />

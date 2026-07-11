@@ -23,13 +23,13 @@ export function AppQualityPanel({
   evals,
   golden,
   libraryEvals,
-}: {
+}: Readonly<{
   appId: string;
   appTitle: string;
   evals: EvalDef[];
   golden: GoldenCase[];
   libraryEvals: EvalDef[];
-}) {
+}>) {
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, RunResult>>({});

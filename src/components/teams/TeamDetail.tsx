@@ -42,13 +42,13 @@ function EditTeamSheet({
   team,
   departments,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   team: TeamDetailData;
   departments: string[];
   onSaved: () => void;
-}) {
+}>) {
   const [name, setName] = useState(team.name);
   const [description, setDescription] = useState(team.description);
   const [department, setDepartment] = useState(team.department ?? '');
@@ -130,12 +130,12 @@ function AddMemberSheet({
   onOpenChange,
   teamId,
   onSaved,
-}: {
+}: Readonly<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   teamId: string;
   onSaved: () => void;
-}) {
+}>) {
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState('member');
   const [busy, setBusy] = useState(false);
@@ -204,10 +204,10 @@ function AddMemberSheet({
 export function TeamDetail({
   team,
   departments = [],
-}: {
+}: Readonly<{
   team: TeamDetailData;
   departments?: string[];
-}) {
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

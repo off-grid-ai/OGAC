@@ -60,7 +60,7 @@ function fmtCtx(n: number | null): string {
   return String(n);
 }
 
-function ModelSpecTable({ specs, emptyNote }: { specs: ModelSpec[]; emptyNote: string }) {
+function ModelSpecTable({ specs, emptyNote }: Readonly<{ specs: ModelSpec[]; emptyNote: string }>) {
   if (specs.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">{emptyNote}</p>;
   }
@@ -205,7 +205,7 @@ export function GatewayDetail({
   fleetModelBaseline,
   defaultModelSpec,
   tenantSlug = '',
-}: {
+}: Readonly<{
   gateway: GatewayView;
   pipelines: PipelineSummary[];
   isOnPrem: boolean;
@@ -213,7 +213,7 @@ export function GatewayDetail({
   defaultModelSpec: ModelSpec | null;
   /** PA-15: the current tenant's slug (prefills the provision-endpoint form) — '' off a subdomain. */
   tenantSlug?: string;
-}) {
+}>) {
   const router = useRouter();
 
   // PA-15 — per-tenant provisioned gateway endpoint. Optimistically track the stored hostname so the

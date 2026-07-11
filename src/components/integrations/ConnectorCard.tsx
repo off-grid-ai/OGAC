@@ -22,7 +22,7 @@ export interface ConnectorCardData {
   custom: boolean;
 }
 
-export function ConnectorCard({ connector }: { connector: ConnectorCardData }) {
+export function ConnectorCard({ connector }: Readonly<{ connector: ConnectorCardData }>) {
   return (
     <div className="flex flex-col justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm transition-shadow duration-300 ease-out hover:shadow-md">
       <div className="space-y-3">

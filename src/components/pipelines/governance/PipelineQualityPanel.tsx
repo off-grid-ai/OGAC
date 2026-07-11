@@ -36,7 +36,7 @@ export function PipelineQualityPanel({
   libraryEvals,
   rollbacks,
   feedbackCount,
-}: {
+}: Readonly<{
   pipelineId: string;
   pipelineName: string;
   status: string;
@@ -46,7 +46,7 @@ export function PipelineQualityPanel({
   libraryEvals: EvalDef[];
   rollbacks: RollbackHistoryEntry[];
   feedbackCount: number;
-}) {
+}>) {
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, RunResult>>({});

@@ -11,7 +11,6 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -34,19 +33,34 @@ interface ConfigEntry {
 
 const SECRET_SENTINEL = '••••••••';
 
+/** The value shown in a field: a pending edit wins; otherwise secrets mask (or reveal), plain values show as-is. */
+function fieldDisplay(entry: ConfigEntry, pending: string | undefined, revealed: string | undefined): string {
+  if (pending !== undefined) return pending;
+  if (!entry.secret) return entry.value;
+  if (revealed !== undefined) return revealed;
+  return entry.isSet ? SECRET_SENTINEL : '';
+}
+
+/** Placeholder for an unset field: secrets say "not set", others hint the mDNS default; set fields have none. */
+function fieldPlaceholder(entry: ConfigEntry): string {
+  if (entry.isSet) return '';
+  if (entry.secret) return 'not set';
+  return entry.default ?? '';
+}
+
 function Field({
   entry,
   pending,
   revealed,
   onChange,
   onReveal,
-}: {
+}: Readonly<{
   entry: ConfigEntry;
   pending: string | undefined;
   revealed: string | undefined;
   onChange: (key: string, value: string | undefined) => void;
   onReveal: (key: string) => void;
-}) {
+}>) {
   const dirty = pending !== undefined;
 
   if (entry.type === 'boolean') {
@@ -66,9 +80,9 @@ function Field({
 
   // For secrets: masked until revealed. Once revealed (or edited), show the text.
   const showText = !entry.secret || dirty || revealed !== undefined;
-  const display = pending ?? (entry.secret ? (revealed ?? (entry.isSet ? SECRET_SENTINEL : '')) : entry.value);
+  const display = fieldDisplay(entry, pending, revealed);
   // When unset, hint the mDNS default (never a raw IP). Secrets just say "not set".
-  const placeholder = entry.secret && !entry.isSet ? 'not set' : (!entry.isSet ? (entry.default ?? '') : '');
+  const placeholder = fieldPlaceholder(entry);
 
   return (
     <div className="relative w-full">
@@ -144,6 +158,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
   };
 
   const dirtyKeys = Object.keys(pending);
+  const dirtyCount = dirtyKeys.length ? ` (${dirtyKeys.length})` : '';
 
   const save = async () => {
     if (!dirtyKeys.length) return;
@@ -214,7 +229,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
         )}
         <Button size="sm" className="h-8 gap-1.5" disabled={!dirtyKeys.length || saving} onClick={save}>
           <FloppyDisk className="size-3.5" />
-          {saving ? 'Saving…' : `Save${dirtyKeys.length ? ` (${dirtyKeys.length})` : ''}`}
+          {saving ? 'Saving…' : `Save${dirtyCount}`}
         </Button>
       </div>
 

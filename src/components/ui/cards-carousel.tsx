@@ -22,7 +22,7 @@ interface CardsCarouselProps {
   cards: CarouselCard[];
 }
 
-export function CardsCarousel({ cards }: CardsCarouselProps) {
+export function CardsCarousel({ cards }: Readonly<CardsCarouselProps>) {
   const railRef = useRef<HTMLUListElement>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);

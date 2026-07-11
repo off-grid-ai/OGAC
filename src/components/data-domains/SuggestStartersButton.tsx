@@ -20,7 +20,7 @@ import type { ProposedDomain } from '@/lib/data-domains-seed';
 // quota/invoices) that the pure proposer matched to REAL connectors the org already has. The
 // operator reviews the proposals, then creates them all with one action (each a POST). Nothing is
 // invented: every proposal already points at a real connector id.
-export function SuggestStartersButton({ proposals }: { proposals: ProposedDomain[] }) {
+export function SuggestStartersButton({ proposals }: Readonly<{ proposals: ProposedDomain[] }>) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);

@@ -35,7 +35,7 @@ function fmtTime(t: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function MetricChart({ chart, hint }: { chart: ChartData; hint?: string }) {
+export function MetricChart({ chart, hint }: Readonly<{ chart: ChartData; hint?: string }>) {
   const single = chart.keys.length <= 1;
   return (
     <Card className="shadow-sm">

@@ -7,7 +7,7 @@ function href(slug: string): string {
 }
 
 // Prev/next footer for a doc page, in sidebar order.
-export function DocPager({ slug }: { slug: string }) {
+export function DocPager({ slug }: Readonly<{ slug: string }>) {
   const { prev, next } = docNeighbors(slug);
   if (!prev && !next) return null;
   return (

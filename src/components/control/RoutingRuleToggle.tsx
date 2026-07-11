@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 
-export function RoutingRuleToggle({ id, enabled }: { id: string; enabled: boolean }) {
+export function RoutingRuleToggle({ id, enabled }: Readonly<{ id: string; enabled: boolean }>) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);

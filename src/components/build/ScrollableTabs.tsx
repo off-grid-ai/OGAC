@@ -27,12 +27,12 @@ export function ScrollableTabs({
   active,
   className,
   'aria-label': ariaLabel,
-}: {
+}: Readonly<{
   tabs: ScrollableTabItem[];
   active: string;
   className?: string;
   'aria-label'?: string;
-}) {
+}>) {
   const activeRef = useRef<HTMLAnchorElement | null>(null);
 
   // Pull the active tab into view on the mobile rail so an off-screen selection is never hidden.

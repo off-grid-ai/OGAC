@@ -25,7 +25,7 @@ const TOOLTIP = {
   },
 };
 
-export function EventsChart({ data }: { data: DayPoint[] }) {
+export function EventsChart({ data }: Readonly<{ data: DayPoint[] }>) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -45,7 +45,7 @@ export function EventsChart({ data }: { data: DayPoint[] }) {
   );
 }
 
-export function LatencyChart({ data }: { data: DayPoint[] }) {
+export function LatencyChart({ data }: Readonly<{ data: DayPoint[] }>) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -66,7 +66,7 @@ export function LatencyChart({ data }: { data: DayPoint[] }) {
 }
 
 // Eval-score history (0–100). `data` is oldest→newest so the line reads left-to-right in time.
-export function ScoreTrendChart({ data }: { data: { label: string; score: number }[] }) {
+export function ScoreTrendChart({ data }: Readonly<{ data: { label: string; score: number }[] }>) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -86,7 +86,7 @@ export function ScoreTrendChart({ data }: { data: { label: string; score: number
   );
 }
 
-export function ModelTokensChart({ data }: { data: ModelStat[] }) {
+export function ModelTokensChart({ data }: Readonly<{ data: ModelStat[] }>) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>

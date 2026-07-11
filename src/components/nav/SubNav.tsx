@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 // plus matching inner padding lets the band bleed to the content edges so it reads as a full-width
 // strip, while the tabs stay aligned with the page content below. The active-tab emerald treatment
 // stays on the tabs themselves.
-export function SubNav({ children, className }: { children: ReactNode; className?: string }) {
+export function SubNav({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
     <div
       className={cn(

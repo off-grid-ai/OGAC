@@ -16,7 +16,7 @@ function nodeText(node: ReactNode): string {
   return '';
 }
 
-function CodeBlock({ children }: { children: ReactNode }) {
+function CodeBlock({ children }: Readonly<{ children: ReactNode }>) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard.writeText(nodeText(children)).then(() => {
@@ -41,7 +41,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
 // Inline citation chip: a small superscript [n] the reader clicks to jump to source n in the
 // footer. On-brand — mono, emerald, minimal radius. Purely a transform target; when the answer has
 // no sources the caller never wires onCiteClick so no chips render.
-function CiteChip({ n, onClick }: { n: number; onClick: (n: number) => void }) {
+function CiteChip({ n, onClick }: Readonly<{ n: number; onClick: (n: number) => void }>) {
   return (
     <sup>
       <button
@@ -96,11 +96,11 @@ export function Markdown({
   children,
   sourceCount = 0,
   onCiteClick,
-}: {
+}: Readonly<{
   children: string;
   sourceCount?: number;
   onCiteClick?: (n: number) => void;
-}) {
+}>) {
   // Strip inline model control/tool tokens (`<function=…>`, `<think>…</think>`, `<tool_call>…`,
   // `<|im_start|>`) before rendering so a leaked token never appears as visible text nor a private
   // chain-of-thought bleeds into the bubble. Same rule TTS uses (single source of truth).

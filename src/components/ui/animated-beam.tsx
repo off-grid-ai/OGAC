@@ -66,7 +66,7 @@ export function AnimatedBeam({
   duration = 3,
   delay = 0,
   className,
-}: AnimatedBeamProps) {
+}: Readonly<AnimatedBeamProps>) {
   const id = useId();
   const [geo, setGeo] = useState<Geometry>(EMPTY);
 

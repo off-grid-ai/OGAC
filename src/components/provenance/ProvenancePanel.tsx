@@ -22,7 +22,7 @@ function parse(text: string): unknown {
   }
 }
 
-function PublicKeyFooter({ info }: { info: KeyInfo | null }) {
+function PublicKeyFooter({ info }: Readonly<{ info: KeyInfo | null }>) {
   if (!info?.publicKey) return null;
   return (
     <div className="space-y-1.5 lg:col-span-2">
@@ -36,7 +36,7 @@ function PublicKeyFooter({ info }: { info: KeyInfo | null }) {
   );
 }
 
-function KeyDescription({ info }: { info: KeyInfo | null }) {
+function KeyDescription({ info }: Readonly<{ info: KeyInfo | null }>) {
   if (!info) return <>Loading signing key…</>;
   const note = info.publicKey
     ? 'Public-key — third parties verify with the key below, no shared secret.'

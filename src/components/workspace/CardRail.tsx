@@ -24,12 +24,12 @@ export function CardRail({
   children,
   className,
   itemClassName,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   className?: string;
   /** Extra classes applied to each rail item wrapper on mobile (e.g. a wider min-width). */
   itemClassName?: string;
-}) {
+}>) {
   const items = normalizeChildren(children);
   return (
     <>

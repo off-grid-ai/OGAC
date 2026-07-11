@@ -27,7 +27,7 @@ interface Span {
 
 // Langfuse read-back UI: a trace list; expanding one fetches its observations and renders a
 // normalized span waterfall (offset + width in % of the trace's wall-clock).
-function Waterfall({ traceId }: { traceId: string }) {
+function Waterfall({ traceId }: Readonly<{ traceId: string }>) {
   const [spans, setSpans] = useState<Span[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +60,7 @@ function Waterfall({ traceId }: { traceId: string }) {
             <div
               className="absolute h-3 rounded bg-primary/60"
               style={{ left: `${s.offsetPct}%`, width: `${s.widthPct}%` }}
-              title={`${s.type}${s.model ? ` · ${s.model}` : ''}`}
+              title={s.model ? `${s.type} · ${s.model}` : s.type}
             />
           </div>
           <span className="w-16 shrink-0 text-right font-mono text-muted-foreground">
@@ -76,11 +76,11 @@ export function LangfuseTraces({
   configured,
   traces,
   error,
-}: {
+}: Readonly<{
   configured: boolean;
   traces: Trace[];
   error?: string;
-}) {
+}>) {
   const [open, setOpen] = useState<string | null>(null);
   // Traces come from a server window that can be large; paginate the fetched list client-side.
   // URL-namespaced by `traces` so it deep-links and coexists with other lists on the page.

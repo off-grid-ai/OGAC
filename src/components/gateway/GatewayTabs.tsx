@@ -20,7 +20,7 @@ type TabValue = (typeof TABS)[number];
 // The gateway page's tabs, with the active tab reflected in the `?tab=` query string
 // (shareable, bookmarkable, survives refresh). Overview content is server-rendered and
 // passed in as a prop; the other tabs are live client components.
-export function GatewayTabs({ overview }: { overview: ReactNode }) {
+export function GatewayTabs({ overview }: Readonly<{ overview: ReactNode }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

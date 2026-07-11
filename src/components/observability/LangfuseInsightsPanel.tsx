@@ -39,7 +39,7 @@ const RANGES = ['24h', '7d', '30d', '90d'] as const;
 
 // URL-driven range selector — the active range lives in ?lfRange so the view is deep-linkable and
 // Back-coherent (a distinct param from any FinOps range, since this is the Langfuse-sourced view).
-function RangeSelector({ active }: { active: string }) {
+function RangeSelector({ active }: Readonly<{ active: string }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -100,13 +100,13 @@ export function LangfuseInsightsPanel({
   trends,
   error,
   range,
-}: {
+}: Readonly<{
   configured: boolean;
   cost: LangfuseCostSummary;
   trends: ScoreTrendSeries[];
   error?: string;
   range: string;
-}) {
+}>) {
   const { rows, names } = mergeTrendData(trends);
 
   return (

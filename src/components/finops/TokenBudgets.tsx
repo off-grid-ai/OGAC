@@ -41,7 +41,7 @@ function barColor(pct: number): string {
   return 'text-primary';
 }
 
-function IssueBudgetForm({ onDone }: { onDone: () => void }) {
+function IssueBudgetForm({ onDone }: Readonly<{ onDone: () => void }>) {
   const [subject, setSubject] = useState('');
   const [allocated, setAllocated] = useState('');
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>('monthly');

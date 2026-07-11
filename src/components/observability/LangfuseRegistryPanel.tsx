@@ -31,7 +31,7 @@ function fmtTs(ts: string): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
-function TabBar({ active, counts }: { active: RegistryTab; counts: Record<RegistryTab, number> }) {
+function TabBar({ active, counts }: Readonly<{ active: RegistryTab; counts: Record<RegistryTab, number> }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -68,14 +68,14 @@ export function LangfuseRegistryPanel({
   sessions,
   error,
   tab,
-}: {
+}: Readonly<{
   configured: boolean;
   prompts: PromptRow[];
   datasets: DatasetRow[];
   sessions: SessionRow[];
   error?: string;
   tab: RegistryTab;
-}) {
+}>) {
   const counts: Record<RegistryTab, number> = {
     prompts: prompts.length,
     datasets: datasets.length,

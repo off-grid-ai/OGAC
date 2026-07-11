@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 // Renders the pipeline's own provisioned endpoint (origin resolved client-side from window.location so
 // it's correct on every tenant subdomain) plus copy-paste curl + JS snippets. The key is a placeholder
 // (og_pl_…) the operator swaps for one they mint above — we NEVER echo a real secret here.
-function CopyRow({ label, value }: { label: string; value: string }) {
+function CopyRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -32,7 +32,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function PipelineEndpoint({ pipelineId }: { pipelineId: string }) {
+export function PipelineEndpoint({ pipelineId }: Readonly<{ pipelineId: string }>) {
   const [origin, setOrigin] = useState('https://your-console.example.com');
   useEffect(() => {
     if (typeof window !== 'undefined') setOrigin(window.location.origin);

@@ -32,7 +32,7 @@ interface Flag {
 // all driving the /admin/flags routes. When Unleash is configured the routes drive the Unleash
 // Admin API (variants + gradual rollout available via the detail panel); otherwise the first-party
 // store. The open flag detail is a navigational position, so it lives in ?flag=<key>.
-export function FlagManager({ forcedOpen = false }: { forcedOpen?: boolean }) {
+export function FlagManager({ forcedOpen = false }: Readonly<{ forcedOpen?: boolean }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

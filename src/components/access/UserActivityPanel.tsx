@@ -121,7 +121,7 @@ function fmt(ts: string): string {
 }
 
 // ── The panel ──────────────────────────────────────────────────────────────────────────────────────
-export function UserActivityPanel({ userId }: { userId: string }) {
+export function UserActivityPanel({ userId }: Readonly<{ userId: string }>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();

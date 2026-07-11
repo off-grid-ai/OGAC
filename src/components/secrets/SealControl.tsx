@@ -17,12 +17,12 @@ export function SealControl({
   threshold,
   shares,
   progress,
-}: {
+}: Readonly<{
   sealed: boolean | null;
   threshold: number | null;
   shares: number | null;
   progress: number | null;
-}) {
+}>) {
   const [status, setStatus] = useState<SealActionView>({
     sealed,
     threshold,

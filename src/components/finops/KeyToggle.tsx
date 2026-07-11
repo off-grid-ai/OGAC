@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { toggleMessage } from '@/lib/toast-messages';
 
-export function KeyToggle({ id, enabled, label }: { id: string; enabled: boolean; label?: string }) {
+export function KeyToggle({ id, enabled, label }: Readonly<{ id: string; enabled: boolean; label?: string }>) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [busy, setBusy] = useState(false);

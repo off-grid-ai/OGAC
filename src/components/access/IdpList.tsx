@@ -27,7 +27,7 @@ interface Idp {
   clientId?: string;
 }
 
-function AddOidcIdpForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+function AddOidcIdpForm({ onDone, onCancel }: Readonly<{ onDone: () => void; onCancel: () => void }>) {
   const [alias, setAlias] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [authorizationUrl, setAuthorizationUrl] = useState('');

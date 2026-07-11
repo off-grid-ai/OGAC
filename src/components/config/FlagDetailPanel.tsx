@@ -33,13 +33,13 @@ export function FlagDetailPanel({
   environment,
   onClose,
   onChanged,
-}: {
+}: Readonly<{
   flagKey: string;
   backend: 'unleash' | 'native';
   environment: string | null;
   onClose: () => void;
   onChanged: () => void;
-}) {
+}>) {
   const [detail, setDetail] = useState<FlagDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [desc, setDesc] = useState('');
