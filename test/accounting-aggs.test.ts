@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   UNATTRIBUTED,
+  accountingQueryClause,
   buildAccountingQuery,
   emptyAccounting,
   isRangePreset,
@@ -59,6 +60,55 @@ test('buildAccountingQuery applies a time-range filter when bounds are given', (
   // an open-ended (from-only) range keeps just the lower bound.
   const openEnded = buildAccountingQuery('2026-01-01T00:00:00.000Z') as any;
   assert.deepEqual(openEnded.query, { range: { '@timestamp': { gte: '2026-01-01T00:00:00.000Z' } } });
+});
+
+// ─── TENANT ISOLATION (SURFACE-3): every accounting query carries the org term ──────
+test('buildAccountingQuery scopes the whole rollup to one org (bool.filter { term: { org } })', () => {
+  const q = buildAccountingQuery(undefined, undefined, null, 'org_suraksha') as any;
+  // No time bounds + an org → a bool/filter carrying ONLY the org term (no match_all leak).
+  assert.deepEqual(q.query, { bool: { filter: [{ term: { org: 'org_suraksha' } }] } });
+});
+
+test('buildAccountingQuery ANDs org with a time range AND a pipeline tag', () => {
+  const q = buildAccountingQuery(
+    '2026-01-01T00:00:00.000Z',
+    undefined,
+    'pipeline:p1',
+    'org_bharat',
+  ) as any;
+  assert.deepEqual(q.query, {
+    bool: {
+      filter: [
+        { range: { '@timestamp': { gte: '2026-01-01T00:00:00.000Z' } } },
+        { term: { org: 'org_bharat' } },
+        { term: { 'project.keyword': 'pipeline:p1' } },
+      ],
+    },
+  });
+});
+
+test('accountingQueryClause: an org filter is present whenever org is set, absent otherwise', () => {
+  // With org, no range, no pipeline → org-only bool.filter.
+  assert.deepEqual(accountingQueryClause(undefined, undefined, null, 'org_a'), {
+    bool: { filter: [{ term: { org: 'org_a' } }] },
+  });
+  // Empty/absent org (single-tenant / default) → no scoping, plain match_all.
+  assert.deepEqual(accountingQueryClause(undefined, undefined, null, null), { match_all: {} });
+  assert.deepEqual(accountingQueryClause(undefined, undefined, null, ''), { match_all: {} });
+  assert.deepEqual(accountingQueryClause(), { match_all: {} });
+  // Range-only (no org) keeps the bare range — unchanged single-tenant behaviour.
+  assert.deepEqual(accountingQueryClause('2026-01-01T00:00:00.000Z'), {
+    range: { '@timestamp': { gte: '2026-01-01T00:00:00.000Z' } },
+  });
+});
+
+test('ISOLATION: org A query never carries org B — the terms agg only rolls up A docs', () => {
+  // The aggregation groups by caller/project across whatever docs the QUERY admits. Scoping the
+  // query to org A is what stops `org_bharat:fraud-screening` appearing on the insurer: the query
+  // filter, not the aggs, is the tenant boundary. Prove A's query cannot match B.
+  const qA = JSON.stringify(buildAccountingQuery(undefined, undefined, null, 'org_suraksha'));
+  assert.ok(qA.includes('"org":"org_suraksha"'), 'A query filters to org_suraksha');
+  assert.ok(!qA.includes('org_bharat'), 'A query never references org_bharat');
 });
 
 // ─── parseAccountingResponse ─────────────────────────────────────────────────────
