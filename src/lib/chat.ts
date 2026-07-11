@@ -336,7 +336,7 @@ export async function dropLastAssistant(conversationId: string): Promise<void> {
 export async function prepareRegenerate(conversationId: string): Promise<string | null> {
   await ensureChatSchema();
   const path = await listMessages(conversationId);
-  const last = path[path.length - 1];
+  const last = path.at(-1);
   if (last?.role !== 'assistant') return null;
   await deactivateSiblings(conversationId, last.parentId ?? '');
   return last.parentId ?? null;
@@ -418,7 +418,7 @@ export async function listMessages(conversationId: string): Promise<ThreadMessag
     const siblings = byParent.get(parentKey);
     if (!siblings?.length) break;
     const idx = Math.max(0, siblings.findIndex((s) => s.active));
-    const chosen = siblings[idx] ?? siblings[siblings.length - 1];
+    const chosen = siblings[idx] ?? siblings.at(-1);
     out.push({ ...chosen, branchIndex: idx, branchCount: siblings.length });
     parentKey = chosen.id;
   }
@@ -429,7 +429,7 @@ export async function listMessages(conversationId: string): Promise<ThreadMessag
 // appended message. Null for an empty conversation.
 export async function activeLeafId(conversationId: string): Promise<string | null> {
   const path = await listMessages(conversationId);
-  return path.length ? path[path.length - 1].id : null;
+  return path.length ? path.at(-1)!.id : null;
 }
 
 export async function addMessage(m: {
@@ -523,7 +523,7 @@ export async function editUserMessage(
   const path = await listMessages(conversationId);
   const survivors = messagesUpToInclusive(path, messageId);
   if (!survivors.length) return null;
-  const target = survivors[survivors.length - 1];
+  const target = survivors.at(-1)!;
   if (target.role !== 'user') return null;
   // Update the target's content in place.
   await db
