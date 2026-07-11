@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toDisplayHost } from '@/lib/display-host';
+import { getModelSpec, modelLabel } from '@/lib/model-catalog';
 
 // The fleet_nodes SSOT editor — the authoritative place to configure a node: which
 // model it serves (id + gguf + mmproj), its context size, role/kind, and whether it's
@@ -145,7 +146,7 @@ function EditDialog({
               {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </div>
-          {field('Model tag (routing)', 'model', { placeholder: 'qwythos-9b' })}
+          {field('Model tag (routing)', 'model', { placeholder: 'e.g. fleet-chat-9b' })}
           {field('Context size (n_ctx)', 'contextSize', { type: 'number', placeholder: 'node default' })}
           {field('Model id', 'modelId', { placeholder: 'empero-ai/…-GGUF' })}
           {field('Host', 'host')}
@@ -249,9 +250,14 @@ export function GatewayFleetConfig() {
                     ) : null}
                   </div>
                   {n.role !== 'server' ? (
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {n.model || '(no model)'}
-                      {n.contextSize ? ` · ${n.contextSize} ctx` : ''}
+                    <p className="truncate text-xs text-muted-foreground">
+                      {n.model ? modelLabel(n.model) : '(no model)'}
+                      {(() => {
+                        // Prefer the node's own configured ctx; else the catalog's published
+                        // context window; else show nothing (never print "unknown").
+                        const ctx = n.contextSize ?? getModelSpec(n.model)?.contextWindow ?? null;
+                        return ctx ? ` · ${ctx.toLocaleString()} ctx` : '';
+                      })()}
                     </p>
                   ) : (
                     <p className="truncate font-mono text-xs text-muted-foreground">{toDisplayHost(n.host)}</p>

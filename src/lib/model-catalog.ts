@@ -59,6 +59,13 @@ export const MODEL_FAMILIES: ModelFamily[] = [
 export interface ModelSpec {
   /** The routing tag / id the gateway speaks and `createRoutingRule({model})` stores. */
   id: string;
+  /**
+   * Alternate routing tags that resolve to THIS spec (e.g. a versioned fleet tag
+   * `juggernaut-xl-v9` for the canonical `juggernaut-xl`). Lets one curated spec cover
+   * several live tags without duplicating the entry — so `modelLabel` never falls back to
+   * an ugly prettified codename. Matched case-insensitively alongside `id`.
+   */
+  aliases?: string[];
   /** Human display name. */
   name: string;
   /** Lineage, for grouping. */
@@ -122,6 +129,7 @@ export const MODEL_CATALOG: ModelSpec[] = [
   },
   {
     id: 'juggernaut-xl',
+    aliases: ['juggernaut-xl-v9'], // versioned live fleet tag resolves to this canonical spec
     name: 'Juggernaut XL v9',
     family: 'SDXL',
     contextWindow: null, // diffusion image model — no token context window
@@ -343,7 +351,9 @@ export const MODEL_CATALOG: ModelSpec[] = [
 // ─── Lookups & grouping ───────────────────────────────────────────────────────────────────────
 export function getModelSpec(id: string, catalog: ModelSpec[] = MODEL_CATALOG): ModelSpec | undefined {
   const needle = id.trim().toLowerCase();
-  return catalog.find((m) => m.id.toLowerCase() === needle);
+  return catalog.find(
+    (m) => m.id.toLowerCase() === needle || m.aliases?.some((a) => a.toLowerCase() === needle),
+  );
 }
 
 // Customer-facing DISPLAY name for a raw model id / routing tag. NEVER surface an internal routing
