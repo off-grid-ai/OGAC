@@ -176,19 +176,19 @@ export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['ac
               statusCls = 'bg-destructive/10 text-destructive';
             else if (r.status === 'done') statusCls = 'bg-primary/10 text-primary';
             return (
-            <Link
-              key={r.id}
-              href={`/build/agent-runs?run=${r.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
-              </span>
-              <Badge variant="secondary" className={statusCls}>
-                {r.status}
-              </Badge>
-            </Link>
+              <Link
+                key={r.id}
+                href={`/build/agent-runs?run=${r.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
+                </span>
+                <Badge variant="secondary" className={statusCls}>
+                  {r.status}
+                </Badge>
+              </Link>
             );
           })
         )}

@@ -5,6 +5,7 @@ import {
   Stack,
   TreeStructure,
 } from '@phosphor-icons/react/dist/ssr';
+import type { ReactNode } from 'react';
 import { DatasetDetailPanel } from '@/components/lineage/DatasetDetailPanel';
 import { LineageCurate } from '@/components/lineage/LineageCurate';
 import { Badge } from '@/components/ui/badge';
