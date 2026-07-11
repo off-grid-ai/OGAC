@@ -14,7 +14,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { deriveResultColumns, formatCell, formatRows, STARTER_QUERIES } from '@/lib/dataplane-ui';
+import {
+  deriveResultColumns,
+  formatCell,
+  formatRows,
+  STARTER_QUERIES,
+  type StarterQuery,
+} from '@/lib/dataplane-ui';
 
 interface QueryResult {
   columns: { name: string; type?: string }[];
@@ -26,7 +32,10 @@ interface QueryResult {
 // results table fills the page width and scrolls horizontally inside its own container. Reads are
 // enforced read-only server-side — a rejected statement returns 400 and we surface the guard's exact
 // reason. Starter queries run against the live `bfsi` schema.
-export function QueryConsole({ initialSql = '' }: Readonly<{ initialSql?: string }>) {
+export function QueryConsole({
+  initialSql = '',
+  starters = STARTER_QUERIES,
+}: Readonly<{ initialSql?: string; starters?: readonly StarterQuery[] }>) {
   const [sql, setSql] = useState(initialSql);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +97,7 @@ export function QueryConsole({ initialSql = '' }: Readonly<{ initialSql?: string
           <Textarea
             value={sql}
             onChange={(e) => setSql(e.target.value)}
-            placeholder="SELECT ... FROM bfsi.fact_transaction LIMIT 100"
+            placeholder="SELECT ... LIMIT 100"
             spellCheck={false}
             rows={8}
             className="font-mono text-xs"
@@ -114,7 +123,7 @@ export function QueryConsole({ initialSql = '' }: Readonly<{ initialSql?: string
             <CardTitle className="text-sm">Starter queries</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {STARTER_QUERIES.map((s) => (
+            {starters.map((s) => (
               <button
                 key={s.id}
                 type="button"

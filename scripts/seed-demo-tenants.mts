@@ -50,6 +50,8 @@ import {
   goldenId,
   governanceId,
   knowledgeFor,
+  collectionId,
+  adminOwnerEmail,
   runStatuses,
   teamsFor,
   teamId,
@@ -69,7 +71,7 @@ import { createAsset, listAssets, setClassification, setRetention } from '../src
 import { createTeam, listTeams } from '../src/lib/teams.ts';
 import { createGuardrailRule, listGuardrailRules } from '../src/lib/guardrails-rules.ts';
 import { setControlStatus } from '../src/lib/compliance-adoption.ts';
-import { createCollection, addDocument, listCollections, listDocuments } from '../src/lib/org-knowledge.ts';
+import { createCollection, addDocument, listDocuments } from '../src/lib/org-knowledge.ts';
 import { setOrgSystemPrompt } from '../src/lib/store.ts';
 import { assertAllowed, identity, domainsFor, MODULES, type TenantIdentity } from '../src/lib/demo/seed-guard.ts';
 import { buildRunCorpus, flavourProfile, rollupCorpus } from '../src/lib/demo/telemetry.ts';
@@ -329,15 +331,17 @@ async function seedEvals(profile: TenantProfile, pipelineByName: Map<string, str
   log(`evals: golden cases + eval_runs seeded per app (drift trend over 30d)`);
 }
 
-// ─── 13. Knowledge (Brain) — collections + docs (name-idempotent). ──
-async function seedKnowledge(profile: TenantProfile, ownerId: string): Promise<void> {
-  const existingColl = await listCollections(profile.orgId);
-  const collByName = new Map(existingColl.map((c) => [c.name.trim().toLowerCase(), c.id]));
+// ─── 13. Knowledge (Brain) — collections + docs (IDEMPOTENT by deterministic id). ──
+// Each collection uses the stable collectionId(orgId, key) and createCollection's ON CONFLICT DO
+// NOTHING, so a re-run can NEVER mint a second copy (the earlier bug — a name-lookup that queried
+// the wrong org via listCollections(orgId) as the ROLE arg — silently created a duplicate
+// "Insurance Policies & SOPs" every run). "Created by" is an ADMIN identity, not the read-only
+// demo viewer: a curated corpus is authored by an administrator.
+async function seedKnowledge(profile: TenantProfile): Promise<void> {
+  const owner = adminOwnerEmail(profile);
   for (const coll of knowledgeFor(profile)) {
-    let collId = collByName.get(coll.name.trim().toLowerCase());
-    if (!collId) {
-      collId = await createCollection(ownerId, { name: coll.name, description: coll.description }, profile.orgId);
-    }
+    const collId = collectionId(profile.orgId, coll.key);
+    await createCollection(owner, { id: collId, name: coll.name, description: coll.description }, profile.orgId);
     const haveDocs = new Set((await listDocuments(collId, profile.orgId)).map((d: { name: string }) => d.name.trim().toLowerCase()));
     for (const doc of coll.docs) {
       if (haveDocs.has(doc.name.trim().toLowerCase())) continue;
@@ -432,7 +436,7 @@ async function seedProfile(profile: TenantProfile, now: number): Promise<void> {
   await runSurface(org, 'apps', () => seedApps(profile, ownerId, pipelineByName));
   await runSurface(org, 'agent_runs', () => seedAgentRuns(profile, now));
   await runSurface(org, 'evals', () => seedEvals(profile, pipelineByName, now));
-  await runSurface(org, 'knowledge', () => seedKnowledge(profile, ownerId));
+  await runSurface(org, 'knowledge', () => seedKnowledge(profile));
   await runSurface(org, 'chat', () => seedChat(profile));
   flagInfra(profile);
   const failed = results.filter((r) => r.org === org && !r.ok);

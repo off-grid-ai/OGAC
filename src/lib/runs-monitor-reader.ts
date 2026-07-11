@@ -19,6 +19,7 @@ import { db } from '@/db';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
+import { isAutotestActor, isDemoTenantOrg } from '@/lib/demo-test-artifacts';
 import {
   type AgentRunSource,
   type AppRunSource,
@@ -40,16 +41,26 @@ async function readAppRuns(orgId: string): Promise<AppRunSource[]> {
       listApps(orgId).catch(() => []),
     ]);
     const titleById = new Map(apps.map((a) => [a.id, a.title]));
-    return runs.map((r) => ({
-      id: r.id,
-      appId: r.appId,
-      status: r.status,
-      steps: r.steps.map((s) => ({ status: s.status })),
-      startedAt: r.startedAt,
-      finishedAt: r.finishedAt,
-      title: titleById.get(r.appId) ?? null,
-      actor: appRunActor(r.input),
-    }));
+    // On demo tenants `listApps` has already dropped `[autotest]` apps, so a run whose app is no
+    // longer visible is a QA artifact — exclude it (and any autotest-actor run) so Reports/Review
+    // never surface autotest rows. Non-demo tenants keep every run (behaviour-preserving).
+    const hideOnDemo = isDemoTenantOrg(orgId);
+    return runs
+      .filter((r) => {
+        if (!hideOnDemo) return true;
+        if (!titleById.has(r.appId)) return false;
+        return !isAutotestActor(appRunActor(r.input));
+      })
+      .map((r) => ({
+        id: r.id,
+        appId: r.appId,
+        status: r.status,
+        steps: r.steps.map((s) => ({ status: s.status })),
+        startedAt: r.startedAt,
+        finishedAt: r.finishedAt,
+        title: titleById.get(r.appId) ?? null,
+        actor: appRunActor(r.input),
+      }));
   } catch {
     return [];
   }

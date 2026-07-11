@@ -9,6 +9,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { appRuns } from '@/db/schema';
 import { type AppRunView, toAppRunView } from '@/lib/app-runs-view';
+import { listApps } from '@/lib/apps-store';
+import { isDemoTenantOrg } from '@/lib/demo-test-artifacts';
 
 const DEFAULT_ORG = 'default';
 
@@ -38,5 +40,12 @@ export async function listAppRunsView(
     .where(where)
     .orderBy(desc(appRuns.startedAt))
     .limit(limit);
-  return rows.map(toAppRunView);
+  const views = rows.map(toAppRunView);
+  // On customer-facing demo tenants, drop runs that belong to a hidden `[autotest]` app so the
+  // Reports table, Review inbox and runs monitor never surface QA runs. `listApps` is the single
+  // source of "which apps are visible" (it already excludes autotest apps), so this stays DRY and
+  // consistent with the Studio grid. Non-demo tenants keep every run (behaviour-preserving).
+  if (!isDemoTenantOrg(orgId)) return views;
+  const visibleAppIds = new Set((await listApps(orgId).catch(() => [])).map((a) => a.id));
+  return views.filter((v) => visibleAppIds.has(v.appId));
 }

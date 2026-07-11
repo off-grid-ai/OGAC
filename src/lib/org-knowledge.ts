@@ -133,21 +133,29 @@ export async function listCollections(
 }
 
 // Admin-only: create a curated collection for the caller's org with an optional role allow-list.
+//
+// `input.id` (optional) lets a SEED pass a DETERMINISTIC id so a re-run is idempotent: the insert
+// is ON CONFLICT DO NOTHING on the primary key, and we return the id that now owns the row (the
+// existing one on a conflict). Interactive creates omit `id` and get a random one, as before. This
+// is what stops the demo seed from minting a fresh "Insurance Policies & SOPs" every run.
 export async function createCollection(
   createdBy: string,
-  input: { name: string; description?: string; allowedRoles?: string[] },
+  input: { name: string; description?: string; allowedRoles?: string[]; id?: string },
   orgId: string = DEFAULT_ORG,
 ): Promise<string> {
   await ensureSchema();
-  const id = rid();
-  await db.insert(orgKnowledgeCollections).values({
-    id,
-    orgId,
-    name: String(input.name).slice(0, 200),
-    description: String(input.description ?? ''),
-    allowedRoles: Array.isArray(input.allowedRoles) ? input.allowedRoles : [],
-    createdBy,
-  });
+  const id = input.id ?? rid();
+  await db
+    .insert(orgKnowledgeCollections)
+    .values({
+      id,
+      orgId,
+      name: String(input.name).slice(0, 200),
+      description: String(input.description ?? ''),
+      allowedRoles: Array.isArray(input.allowedRoles) ? input.allowedRoles : [],
+      createdBy,
+    })
+    .onConflictDoNothing({ target: orgKnowledgeCollections.id });
   return id;
 }
 

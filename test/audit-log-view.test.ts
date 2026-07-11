@@ -243,6 +243,17 @@ test('filterAuditRows with no filters returns everything', () => {
   assert.equal(filterAuditRows(ROWS, {}).length, 3);
 });
 
+test('filterAuditRows hideAutotest drops the autotest actor (only when the flag is set)', () => {
+  const withAt: AuditRow[] = [
+    ...ROWS,
+    row({ id: 'at', ts: '2026-07-06T00:00:00Z', actor: 'autotest@offgrid', action: 'app.run', project: 'ops', outcome: 'ok' }),
+  ];
+  // Flag off → autotest row is kept (behaviour-preserving for non-demo tenants).
+  assert.deepEqual(ids(filterAuditRows(withAt, {})), ['1', '2', '3', 'at']);
+  // Flag on → autotest row is dropped.
+  assert.deepEqual(ids(filterAuditRows(withAt, { hideAutotest: true })), ['1', '2', '3']);
+});
+
 // ── auditFacets ──────────────────────────────────────────────────────────────────────────────
 test('auditFacets returns distinct sorted values', () => {
   const f = auditFacets(ROWS);

@@ -6,6 +6,7 @@ import {
   parseAuditFilters,
 } from '@/lib/audit-log-view';
 import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   const format = (url.searchParams.get('format') ?? 'csv').toLowerCase();
   const filters = parseAuditFilters((k) => url.searchParams.get(k));
 
-  const { rows, configured, error } = await readAuditForExport(filters);
+  const { rows, configured, error } = await readAuditForExport(filters, await currentOrgId());
   if (!configured) {
     return NextResponse.json({ error: 'audit search not configured (OFFGRID_OPENSEARCH_URL)' }, {
       status: 503,

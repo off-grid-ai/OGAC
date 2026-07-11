@@ -13,6 +13,7 @@ import {
   freshnessTone,
   groupTablesByDatabase,
   STARTER_QUERIES,
+  starterQueriesFor,
   suiteNameForTable,
   tableHref,
   type WarehouseTable,
@@ -93,12 +94,43 @@ test('freshnessTone escalates green→amber→red by age and is muted when unkno
 });
 
 // ─── starter queries are all read-only (pass the server guard) ──────────────────
-test('every starter query is a single read-only statement against bfsi', () => {
-  assert.ok(STARTER_QUERIES.length >= 3);
-  for (const s of STARTER_QUERIES) {
-    assert.ok(guardReadOnlySql(s.sql).ok, `starter "${s.id}" must pass the read-only guard`);
-    assert.match(s.sql, /bfsi\./, `starter "${s.id}" must target the bfsi schema`);
+// Bank concepts that must NEVER appear in the insurer tenant's starter examples.
+const BANK_ONLY = /\b(transaction|npa|non-performing|loan|branch|account)\b/i;
+
+test('every starter query (both flavours) is a single read-only statement against bfsi', () => {
+  for (const flavour of ['bank', 'insurer'] as const) {
+    const starters = starterQueriesFor(flavour);
+    assert.ok(starters.length >= 3, `${flavour} needs ≥3 starters`);
+    for (const s of starters) {
+      assert.ok(guardReadOnlySql(s.sql).ok, `starter "${s.id}" must pass the read-only guard`);
+      assert.match(s.sql, /bfsi\./, `starter "${s.id}" must target the bfsi schema`);
+    }
   }
+});
+
+test('the default STARTER_QUERIES export is the bank set (back-compat)', () => {
+  assert.deepEqual(STARTER_QUERIES, starterQueriesFor('bank'));
+});
+
+test('insurer starters carry NO bank-flavoured concepts (no transactions/NPA-loans/branches)', () => {
+  for (const s of starterQueriesFor('insurer')) {
+    const haystack = `${s.title} ${s.description} ${s.sql}`;
+    assert.doesNotMatch(haystack, BANK_ONLY, `insurer starter "${s.id}" leaks a bank concept`);
+  }
+  // …and it IS insurance: the set as a whole talks policies/premiums/claims.
+  const all = starterQueriesFor('insurer')
+    .map((s) => `${s.title} ${s.description} ${s.sql}`)
+    .join(' ');
+  assert.match(all, /polic|premium|persistency|claim/i);
+});
+
+test('bank starters still cover the bank book (transactions/NPA/branches present)', () => {
+  const all = starterQueriesFor('bank')
+    .map((s) => `${s.title} ${s.description} ${s.sql}`)
+    .join(' ');
+  assert.match(all, /transaction/i);
+  assert.match(all, /npa|non-performing/i);
+  assert.match(all, /branch/i);
 });
 
 // ─── deriveResultColumns ─────────────────────────────────────────────────────────
