@@ -193,11 +193,11 @@ export const kestraOrchestration: OrchestrationPort = {
       const r = await req('GET', `/api/v1/${tenant()}/flows/${encodeURIComponent(KESTRA_NS)}`);
       if (!r.ok) return [];
       const body = JSON.parse(r.text) as unknown;
-      const arr = Array.isArray(body)
-        ? body
-        : Array.isArray((body as { results?: unknown[] })?.results)
-          ? (body as { results: unknown[] }).results
-          : [];
+      let arr: unknown[] = [];
+      if (Array.isArray(body)) arr = body;
+      else if (Array.isArray((body as { results?: unknown[] })?.results)) {
+        arr = (body as { results: unknown[] }).results;
+      }
       return arr
         .map((f) => {
           const r2 = (f ?? {}) as Record<string, unknown>;
@@ -323,11 +323,11 @@ export const kestraOrchestration: OrchestrationPort = {
       );
       if (!r.ok) return [];
       const body = JSON.parse(r.text) as unknown;
-      const arr = Array.isArray(body)
-        ? body
-        : Array.isArray((body as { results?: unknown[] })?.results)
-          ? (body as { results: unknown[] }).results
-          : [];
+      let arr: unknown[] = [];
+      if (Array.isArray(body)) arr = body;
+      else if (Array.isArray((body as { results?: unknown[] })?.results)) {
+        arr = (body as { results: unknown[] }).results;
+      }
       return arr.map((l) => {
         const r2 = (l ?? {}) as Record<string, unknown>;
         return {

@@ -241,12 +241,9 @@ export function deriveDataPlaneHealth(
     else if (status === 'optional') state = 'optional';
     else if (status === 'down') state = 'down';
     else state = 'unknown';
-    const tone =
-      state === 'up'
-        ? 'bg-primary/10 text-primary'
-        : state === 'down'
-          ? 'bg-destructive/10 text-destructive'
-          : 'bg-muted text-muted-foreground';
+    let tone = 'bg-muted text-muted-foreground';
+    if (state === 'up') tone = 'bg-primary/10 text-primary';
+    else if (state === 'down') tone = 'bg-destructive/10 text-destructive';
     let stateLabel = 'Unknown';
     if (state === 'up') stateLabel = 'Online';
     else if (state === 'down') stateLabel = 'Offline';

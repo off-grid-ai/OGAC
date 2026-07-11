@@ -107,12 +107,9 @@ export interface ReviewDetail {
 // The Indian grouping (₹5,00,000) is the reviewer's native format; a plain Intl 'en-IN' currency
 // formatter produces exactly that. Non-numeric / absent ⇒ null (no amount to show).
 export function formatInr(value: unknown): string | null {
-  const n =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string' && value.trim() !== ''
-        ? Number(value)
-        : Number.NaN;
+  let n = Number.NaN;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
   if (!Number.isFinite(n)) return null;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

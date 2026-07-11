@@ -115,6 +115,12 @@ export interface GatewayView {
 }
 
 /** Derive the coarse status shown on a card, honestly, from the merged facts. PURE. */
+function gatewayDetailLabel(enabled: boolean, configured: boolean, reachable: boolean): string {
+  if (!enabled) return 'disabled';
+  if (!configured) return 'not configured';
+  return reachable ? 'reachable' : 'not answering';
+}
+
 export function deriveStatus(
   enabled: boolean,
   signal: GatewayHealthSignal,
@@ -134,15 +140,7 @@ export function deriveStatus(
  */
 export function mergeGatewayHealth(row: GatewayRow, signal: GatewayHealthSignal): GatewayView {
   const available = row.enabled && signal.configured && signal.reachable;
-  const detail =
-    signal.detail ??
-    (!row.enabled
-      ? 'disabled'
-      : !signal.configured
-        ? 'not configured'
-        : signal.reachable
-          ? 'reachable'
-          : 'not answering');
+  const detail = signal.detail ?? gatewayDetailLabel(row.enabled, signal.configured, signal.reachable);
   const createdAt =
     row.createdAt instanceof Date
       ? row.createdAt.toISOString()

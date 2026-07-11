@@ -146,12 +146,9 @@ function normalizeAttachments(raw: unknown): { filename: string; contentType: st
     const o = (a ?? {}) as Record<string, unknown>;
     const filename = str(o.filename) || str(o.name) || 'attachment';
     const contentType = str(o.contentType) || str(o.content_type) || str(o.type) || 'application/octet-stream';
-    const size =
-      typeof o.size === 'number'
-        ? o.size
-        : typeof o.content === 'string'
-          ? Math.floor((o.content.length * 3) / 4) // base64 → approx byte length
-          : 0;
+    let size = 0;
+    if (typeof o.size === 'number') size = o.size;
+    else if (typeof o.content === 'string') size = Math.floor((o.content.length * 3) / 4); // base64 → approx byte length
     return { filename, contentType, size };
   });
 }

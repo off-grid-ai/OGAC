@@ -255,12 +255,9 @@ export function parseAgentAction(raw: string): AgentAction | null {
 
   // finish: { action: "finish", answer: "..." } (also accept { finish: "..." } / a bare answer).
   if (act === 'finish' || typeof o.answer === 'string' || typeof o.finish === 'string') {
-    const answer =
-      typeof o.answer === 'string'
-        ? o.answer
-        : typeof o.finish === 'string'
-          ? o.finish
-          : '';
+    let answer = '';
+    if (typeof o.answer === 'string') answer = o.answer;
+    else if (typeof o.finish === 'string') answer = o.finish;
     if (answer.trim()) return { kind: 'finish', answer: answer.trim(), thought };
   }
 
