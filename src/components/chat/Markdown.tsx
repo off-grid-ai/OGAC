@@ -12,7 +12,8 @@ function nodeText(node: ReactNode): string {
   if (node == null || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(nodeText).join('');
-  if (typeof node === 'object' && 'props' in node) return nodeText((node as { props: { children?: ReactNode } }).props.children);
+  if (typeof node === 'object' && 'props' in node)
+    return nodeText((node as { props: { children?: ReactNode } }).props.children);
   return '';
 }
 
@@ -88,6 +89,69 @@ function linkifyCitations(
   return children;
 }
 
+// A citation-linkifier: wraps a node tree, turning [n] markers into chips (or a pass-through no-op).
+type CiteFn = (nodes: ReactNode) => ReactNode;
+
+// Build react-markdown's element-renderer map. Kept at module scope (not defined inside <Markdown>)
+// so the renderer functions aren't re-created as nested components each render; the only per-render
+// dependency, `cite`, is passed in. Render output is identical to the previous inline map.
+function markdownComponents(cite: CiteFn): Parameters<typeof ReactMarkdown>[0]['components'] {
+  return {
+    code({ className, children, ...props }) {
+      const inline = !className;
+      if (inline) {
+        return (
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]" {...props}>
+            {children}
+          </code>
+        );
+      }
+      return (
+        <code className={`font-mono text-xs ${className ?? ''}`} {...props}>
+          {children}
+        </code>
+      );
+    },
+    pre({ children }) {
+      return <CodeBlock>{children}</CodeBlock>;
+    },
+    a({ children, ...props }) {
+      return (
+        <a className="text-primary underline underline-offset-2" {...props}>
+          {children}
+        </a>
+      );
+    },
+    table({ children }) {
+      return (
+        <div className="my-2 overflow-x-auto">
+          <table className="w-full border-collapse text-xs">{children}</table>
+        </div>
+      );
+    },
+    th({ children }) {
+      return (
+        <th className="border border-border px-2 py-1 text-left font-medium">{cite(children)}</th>
+      );
+    },
+    td({ children }) {
+      return <td className="border border-border px-2 py-1">{cite(children)}</td>;
+    },
+    ul({ children }) {
+      return <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>;
+    },
+    ol({ children }) {
+      return <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>;
+    },
+    li({ children }) {
+      return <li>{cite(children)}</li>;
+    },
+    p({ children }) {
+      return <p className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0">{cite(children)}</p>;
+    },
+  };
+}
+
 // Markdown renderer for assistant replies — GFM tables/lists, styled code blocks, in the
 // console's mono/emerald look. Deliberately dependency-light (no syntax highlighter).
 // When `sourceCount`>0 and `onCiteClick` is provided, inline [n] markers become clickable citation
@@ -106,65 +170,11 @@ export function Markdown({
   // chain-of-thought bleeds into the bubble. Same rule TTS uses (single source of truth).
   const safe = stripControlTokens(children);
   // Only linkify when we actually have somewhere for chips to point.
-  const cite = (nodes: ReactNode): ReactNode =>
+  const cite: CiteFn = (nodes) =>
     sourceCount > 0 && onCiteClick ? linkifyCitations(nodes, sourceCount, onCiteClick) : nodes;
   return (
     <div className="prose-chat max-w-none text-sm leading-relaxed text-foreground">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          code({ className, children, ...props }) {
-            const inline = !className;
-            if (inline) {
-              return (
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]" {...props}>
-                  {children}
-                </code>
-              );
-            }
-            return (
-              <code className={`font-mono text-xs ${className ?? ''}`} {...props}>
-                {children}
-              </code>
-            );
-          },
-          pre({ children }) {
-            return <CodeBlock>{children}</CodeBlock>;
-          },
-          a({ children, ...props }) {
-            return (
-              <a className="text-primary underline underline-offset-2" {...props}>
-                {children}
-              </a>
-            );
-          },
-          table({ children }) {
-            return (
-              <div className="my-2 overflow-x-auto">
-                <table className="w-full border-collapse text-xs">{children}</table>
-              </div>
-            );
-          },
-          th({ children }) {
-            return <th className="border border-border px-2 py-1 text-left font-medium">{cite(children)}</th>;
-          },
-          td({ children }) {
-            return <td className="border border-border px-2 py-1">{cite(children)}</td>;
-          },
-          ul({ children }) {
-            return <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>;
-          },
-          ol({ children }) {
-            return <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>;
-          },
-          li({ children }) {
-            return <li>{cite(children)}</li>;
-          },
-          p({ children }) {
-            return <p className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0">{cite(children)}</p>;
-          },
-        }}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents(cite)}>
         {safe}
       </ReactMarkdown>
     </div>

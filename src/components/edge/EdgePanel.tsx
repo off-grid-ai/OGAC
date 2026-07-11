@@ -89,6 +89,22 @@ type SortField = 'ts' | 'count' | 'ip' | 'host';
 type SortDir = 'asc' | 'desc';
 type KindFilter = 'all' | 'waf' | 'rate-limit';
 
+// Sort-direction indicator for a column header. Lifted to module scope (was defined inside EdgePanel)
+// so it isn't re-created each render; the sort state it needs is passed as props. Render-identical:
+// inactive → faint up/down glyph, active → emerald arrow matching the current direction.
+function SortIcon({
+  field,
+  sortField,
+  sortDir,
+}: Readonly<{ field: SortField; sortField: SortField; sortDir: SortDir }>) {
+  if (sortField !== field) return <ArrowsDownUp className="size-3 opacity-30" />;
+  return sortDir === 'desc' ? (
+    <ArrowDown className="size-3 text-primary" />
+  ) : (
+    <ArrowUp className="size-3 text-primary" />
+  );
+}
+
 const KIND_LABELS: Record<KindFilter, string> = { all: 'All', waf: 'WAF', 'rate-limit': '429' };
 
 // Repeat-count badge severity: ≥50 hits is loud (destructive), ≥10 notable (outline), else muted.
@@ -111,11 +127,16 @@ export function EdgePanel() {
       try {
         const r = await fetch('/api/v1/edge', { cache: 'no-store' });
         if (r.ok && alive) setSnap(await r.json());
-      } catch { /* keep last */ }
+      } catch {
+        /* keep last */
+      }
     };
     load();
     const t = setInterval(load, 15_000);
-    return () => { alive = false; clearInterval(t); };
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, []);
 
   const p = snap?.policy;
@@ -148,14 +169,10 @@ export function EdgePanel() {
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortField(field); setSortDir('desc'); }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowsDownUp className="size-3 opacity-30" />;
-    return sortDir === 'desc'
-      ? <ArrowDown className="size-3 text-primary" />
-      : <ArrowUp className="size-3 text-primary" />;
+    else {
+      setSortField(field);
+      setSortDir('desc');
+    }
   };
 
   const totalBlocked = snap?.summary.total ?? 0;
@@ -169,7 +186,8 @@ export function EdgePanel() {
       <div>
         <h1 className="text-lg font-semibold text-foreground">Gateway</h1>
         <p className="text-sm text-muted-foreground">
-          The network gateway — the public HTTP edge (reverse proxy, WAF, rate limiting) where the internet meets your fleet. Distinct from the AI Gateway, which routes LLM traffic.
+          The network gateway — the public HTTP edge (reverse proxy, WAF, rate limiting) where the
+          internet meets your fleet. Distinct from the AI Gateway, which routes LLM traffic.
         </p>
       </div>
 
@@ -200,7 +218,9 @@ export function EdgePanel() {
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-foreground">{snap.traffic.total}</span>
             <span className="text-muted-foreground">requests</span>
-            <span className="text-emerald-600 dark:text-emerald-400">· {snap.traffic.allowed} allowed</span>
+            <span className="text-emerald-600 dark:text-emerald-400">
+              · {snap.traffic.allowed} allowed
+            </span>
           </div>
         ) : null}
 
@@ -219,21 +239,23 @@ export function EdgePanel() {
           <span className="flex items-center gap-1.5">
             <ShieldCheck className="size-3" />
             WAF
-            <Badge variant={p?.wafEnabled ? 'default' : 'outline'} className="text-[10px] px-1 py-0">
+            <Badge
+              variant={p?.wafEnabled ? 'default' : 'outline'}
+              className="text-[10px] px-1 py-0"
+            >
               {p?.wafEnabled ? 'on' : 'off'}
             </Badge>
             {p?.wafRules.map((r) => (
-              <Badge key={r} variant="secondary" className="text-[10px] px-1 py-0">{r}</Badge>
+              <Badge key={r} variant="secondary" className="text-[10px] px-1 py-0">
+                {r}
+              </Badge>
             ))}
           </span>
         </div>
       </div>
 
       {/* ── WAF control (toggle + rule CRUD) ── */}
-      <WafControls
-        liveWafEnabled={p?.wafEnabled ?? false}
-        liveRuleNames={p?.wafRules ?? []}
-      />
+      <WafControls liveWafEnabled={p?.wafEnabled ?? false} liveRuleNames={p?.wafRules ?? []} />
 
       {/* ── Blocks table ── */}
       <div className="rounded-lg border border-border bg-card shadow-sm">
@@ -283,7 +305,10 @@ export function EdgePanel() {
               variant="ghost"
               size="sm"
               className="h-7 gap-1 text-xs"
-              onClick={() => { setKindFilter('all'); setSearch(''); }}
+              onClick={() => {
+                setKindFilter('all');
+                setSearch('');
+              }}
             >
               <Funnel className="size-3" /> Clear
             </Button>
@@ -324,11 +349,20 @@ export function EdgePanel() {
                           {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={e.status >= 400 ? 'destructive' : 'secondary'} className="text-[10px]">{e.status}</Badge>
+                          <Badge
+                            variant={e.status >= 400 ? 'destructive' : 'secondary'}
+                            className="text-[10px]"
+                          >
+                            {e.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{e.ip}</TableCell>
-                        <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">{e.host}</TableCell>
-                        <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">{e.method} {e.uri}</TableCell>
+                        <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">
+                          {e.host}
+                        </TableCell>
+                        <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">
+                          {e.method} {e.uri}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -336,7 +370,9 @@ export function EdgePanel() {
               </div>
             ) : (
               <p className="py-12 text-center text-xs text-muted-foreground">
-                {grouped.length === 0 ? 'No requests logged yet. The edge is quiet.' : 'No results match your filter.'}
+                {grouped.length === 0
+                  ? 'No requests logged yet. The edge is quiet.'
+                  : 'No results match your filter.'}
               </p>
             )
           ) : (
@@ -347,27 +383,35 @@ export function EdgePanel() {
                     className="cursor-pointer select-none whitespace-nowrap"
                     onClick={() => toggleSort('ts')}
                   >
-                    <span className="flex items-center gap-1">When <SortIcon field="ts" /></span>
+                    <span className="flex items-center gap-1">
+                      When <SortIcon field="ts" sortField={sortField} sortDir={sortDir} />
+                    </span>
                   </TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead
                     className="cursor-pointer select-none"
                     onClick={() => toggleSort('ip')}
                   >
-                    <span className="flex items-center gap-1">Client IP <SortIcon field="ip" /></span>
+                    <span className="flex items-center gap-1">
+                      Client IP <SortIcon field="ip" sortField={sortField} sortDir={sortDir} />
+                    </span>
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none"
                     onClick={() => toggleSort('host')}
                   >
-                    <span className="flex items-center gap-1">Host <SortIcon field="host" /></span>
+                    <span className="flex items-center gap-1">
+                      Host <SortIcon field="host" sortField={sortField} sortDir={sortDir} />
+                    </span>
                   </TableHead>
                   <TableHead>Request</TableHead>
                   <TableHead
                     className="cursor-pointer select-none text-right"
                     onClick={() => toggleSort('count')}
                   >
-                    <span className="flex items-center justify-end gap-1">Count <SortIcon field="count" /></span>
+                    <span className="flex items-center justify-end gap-1">
+                      Count <SortIcon field="count" sortField={sortField} sortDir={sortDir} />
+                    </span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
