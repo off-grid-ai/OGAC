@@ -19,7 +19,9 @@ export function slugFromTitle(title: string, suffix = randomToken(4)): string {
 
 /** Coerce an arbitrary visibility value to the allowed set (default 'private'). */
 export function normalizeVisibility(v: unknown): Visibility {
-  return v === 'org' ? 'org' : v === 'public' ? 'public' : 'private';
+  if (v === 'org') return 'org';
+  if (v === 'public') return 'public';
+  return 'private';
 }
 
 export interface TemplatePatch {

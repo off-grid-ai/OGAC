@@ -95,7 +95,9 @@ function firstRow(res: unknown): Record<string, unknown> | undefined {
 }
 
 function toLimit(v: unknown): number | null {
-  return typeof v === 'number' ? v : v == null ? null : Number(v);
+  if (typeof v === 'number') return v;
+  if (v == null) return null;
+  return Number(v);
 }
 
 /**

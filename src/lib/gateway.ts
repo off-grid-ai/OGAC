@@ -219,7 +219,9 @@ function tuneNum(v: number | undefined): string {
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : '—';
 }
 function tuneBool(v: boolean | undefined): string {
-  return v === true ? 'on' : v === false ? 'off' : '—';
+  if (v === true) return 'on';
+  if (v === false) return 'off';
+  return '—';
 }
 
 const CHANGE_RESTART = 'aggregator env (launchd plist on S1) — restart to change';

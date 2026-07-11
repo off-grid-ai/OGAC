@@ -48,7 +48,9 @@ function roleFrom(p: Record<string, unknown>): string {
     (r) => r.roles ?? [],
   );
   const all = new Set([...realm, ...resource]);
-  return all.has('admin') ? 'admin' : all.has('editor') ? 'editor' : 'viewer';
+  if (all.has('admin')) return 'admin';
+  if (all.has('editor')) return 'editor';
+  return 'viewer';
 }
 
 // Keycloak implementation via Direct Access Grant (ROPC): POST the credentials to the

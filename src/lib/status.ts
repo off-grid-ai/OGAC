@@ -68,14 +68,25 @@ export interface StatusSummary {
   checkedAt: string;
 }
 
+// Pure classifiers (extracted from nested ternaries so each branch reads as a rule).
+function ratePerformance(status: string, ms: number | null | undefined): StatusEntry['performance'] {
+  if (status !== 'up') return 'unknown';
+  if (ms != null && ms > SLOW_MS) return 'degraded';
+  return 'good';
+}
+function rollupStatus(healthy: number, total: number, anySlow: boolean): StatusSummary['status'] {
+  if (healthy === 0) return 'down';
+  if (healthy < total || anySlow) return 'degraded';
+  return 'operational';
+}
+
 // Public, node-free status: each declared service's up/down + performance + an overall rollup.
 export async function computeStatus(): Promise<StatusSummary> {
   const services: ServiceEntry[] = getServices();
   const results = await Promise.all(
     services.map(async (s): Promise<StatusEntry> => {
       const h = await probeEntry(s);
-      const performance: StatusEntry['performance'] =
-        h.status !== 'up' ? 'unknown' : (h.ms != null && h.ms > SLOW_MS ? 'degraded' : 'good');
+      const performance: StatusEntry['performance'] = ratePerformance(h.status, h.ms);
       return { id: s.id, label: s.label, status: h.status, performance, ms: h.ms };
     }),
   );
@@ -84,7 +95,6 @@ export async function computeStatus(): Promise<StatusSummary> {
   const total = results.length;
   const up = healthy;
   const anySlow = results.some((r) => r.status === 'up' && r.performance === 'degraded');
-  const overall: StatusSummary['status'] =
-    healthy === 0 ? 'down' : (healthy < total || anySlow) ? 'degraded' : 'operational';
+  const overall: StatusSummary['status'] = rollupStatus(healthy, total, anySlow);
   return { status: overall, up, total, services: results, checkedAt: new Date().toISOString() };
 }
