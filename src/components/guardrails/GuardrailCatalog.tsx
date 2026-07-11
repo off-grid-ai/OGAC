@@ -41,16 +41,18 @@ import { enableGuardrailOnPipeline, pipelinesEnforcingGuardrail } from '@/lib/pi
 // availability logic is PURE in @/lib; this component is thin. Search + kind + category live in the
 // URL (?cat_q / ?cat_kind / ?cat_cat) so the browser Back button and deep-links work.
 
+// Outcome-based labels only — never surface the underlying engine/product name on this
+// customer-facing surface (the `kind` identifiers below stay internal).
 const KIND_LABEL: Record<GuardrailKind, string> = {
   'presidio-entity': 'PII / PHI detection',
   'guardrails-validator': 'Behaviour check',
-  'llm-guard-scanner': 'LLM Guard scanner',
+  'llm-guard-scanner': 'Content & behaviour scanner',
 };
 
 const AVAIL_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
   ready: { label: 'ready', variant: 'default' },
-  fallback: { label: 'stored — engine off', variant: 'secondary' },
-  floor: { label: 'regex floor', variant: 'outline' },
+  fallback: { label: 'stored — not yet enforcing', variant: 'secondary' },
+  floor: { label: 'baseline', variant: 'outline' },
 };
 
 export interface EnabledRuleRef {

@@ -442,7 +442,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'detect-pii',
-    name: 'Detect PII (Guardrails)',
+    name: 'Detect PII',
     category: 'Prompt Security',
     kind: 'guardrails-validator',
     engine: 'guardrails-ai',
@@ -495,7 +495,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   // operator's clarity, not as the headline).
   {
     id: 'llm-guard-dlp-pii-in',
-    name: 'Mask PII in prompts (LLM Guard)',
+    name: 'Mask PII in prompts',
     category: 'Prompt Security',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -507,7 +507,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-secrets',
-    name: 'Block secrets & API keys (LLM Guard)',
+    name: 'Block secrets & API keys',
     category: 'Prompt Security',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -519,7 +519,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-pii-out',
-    name: 'Catch PII in responses (LLM Guard)',
+    name: 'Catch PII in responses',
     category: 'Prompt Security',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -531,7 +531,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-prompt-injection',
-    name: 'Block prompt injection (LLM Guard)',
+    name: 'Block prompt injection',
     category: 'Prompt Security',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -543,7 +543,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-toxicity',
-    name: 'Block toxic language (LLM Guard)',
+    name: 'Block toxic language',
     category: 'Content Safety',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -555,7 +555,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-bias',
-    name: 'Flag biased output (LLM Guard)',
+    name: 'Flag biased output',
     category: 'Content Safety',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -567,7 +567,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-ban-topics',
-    name: 'Keep off banned topics (LLM Guard)',
+    name: 'Keep off banned topics',
     category: 'Content Safety',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -579,7 +579,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-language',
-    name: 'Restrict to allowed languages (LLM Guard)',
+    name: 'Restrict to allowed languages',
     category: 'Content Safety',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -591,7 +591,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-regex',
-    name: 'Custom regex match (LLM Guard)',
+    name: 'Custom regex match',
     category: 'Prompt Security',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',
@@ -603,7 +603,7 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
   },
   {
     id: 'llm-guard-token-limit',
-    name: 'Enforce a token limit (LLM Guard)',
+    name: 'Enforce a token limit',
     category: 'Output Quality',
     kind: 'llm-guard-scanner',
     engine: 'llm-guard',

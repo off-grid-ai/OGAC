@@ -107,7 +107,7 @@ export default async function GuardrailsPage({
           <CardContent>
             {view.entityTypes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No entity types reported — the engine is unreachable, so only the regex floor applies.
+                No entity types reported yet — the always-on baseline pattern protection still applies.
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">

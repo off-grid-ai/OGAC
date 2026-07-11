@@ -287,7 +287,7 @@ export function GuardrailRules({ rules }: Readonly<{ rules: Rule[] }>) {
           {rules.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                No rules yet — the always-on regex floor still applies.
+                No rules yet — the always-on baseline PII protection still applies.
               </TableCell>
             </TableRow>
           ) : (
