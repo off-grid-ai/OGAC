@@ -68,10 +68,12 @@ export const SURAKSHA_CONNECTORS: ConnectorSpec[] = [
     id: SUR_COREINS,
     name: 'Core Insurance (Postgres)',
     type: 'postgres',
-    // Isolated per-tenant database `suraksha` on the SHARED Postgres server (same box as bharatunion's
-    // corebank, separate DB) — so the insurer's book never collides with the bank tenant's rows.
-    // Seeded by deploy/onprem/seed-suraksha-dataplane.mjs.
-    endpoint: 'postgres://corebank@127.0.0.1:5433/suraksha',
+    // Isolated per-tenant database `suraksha` on the SHARED Postgres server (same box as the bank
+    // tenant's core DB, separate DB + role) — so the insurer's book never collides with the bank's
+    // rows. The connect ROLE is the insurer's own `coreins` (NOT the bank's `corebank`), so nothing
+    // the insurer tenant renders reads bank-flavoured. Seeded on the on-prem data plane (private
+    // fleet repo). NOTE: the live Postgres role must be `coreins` for this to connect.
+    endpoint: 'postgres://coreins@127.0.0.1:5433/suraksha',
     auth: 'password',
     description: 'Policy administration OLTP — policies, premiums, claims, KYC, pricing.',
     status: 'connected',
