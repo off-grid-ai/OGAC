@@ -1,0 +1,2 @@
+S6551 | src/app/api/v1/chat/transcribe/route.ts:18 | `String(form?.get('filename') ?? 'audio.webm')` already wraps in String(). form.get() is string|File|null; narrowing to typeof==='string' would change the File-field edge behavior. Existing String() coercion is intentional; narrowing is not behavior-preserving.
+S6551 | src/app/api/v1/chat/transcribe/route.ts:20 | `form.get('model') ? String(form.get('model')) : undefined` already String()-wrapped; same reasoning as :18 — behavior-preserving narrowing not available without altering the File-field edge case.

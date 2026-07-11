@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 // generic detail serves agent + chat runs: it resolves the `${kind}:${id}` key, shows the normalized
 // header (kind/status/started/duration/pipeline/actor), and — for agent runs — the recorded step
 // timeline + answer/checks. Deep-linkable at /operations/runs/<key>.
-export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RunDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('runs');
   const { id } = await params;
   const key = decodeURIComponent(id);

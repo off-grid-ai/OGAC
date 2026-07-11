@@ -33,7 +33,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const planeLabel = (id: string) => MODULES.find((m) => m.id === id)?.label ?? id;
 
-function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] }) {
+function RecentRunsTable({ agentId, runs }: Readonly<{ agentId: string; runs: AgentRun[] }>) {
   if (!runs.length) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -82,7 +82,9 @@ function RecentRunsTable({ agentId, runs }: { agentId: string; runs: AgentRun[] 
   );
 }
 
-export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AgentDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -236,7 +238,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{label}</span>
