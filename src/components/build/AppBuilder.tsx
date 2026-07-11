@@ -295,6 +295,11 @@ export function AppBuilder({
     };
   }
 
+  let saveLabel: string;
+  if (saving) saveLabel = 'Saving…';
+  else if (editing) saveLabel = 'Save changes';
+  else saveLabel = 'Save app';
+
   return (
     <div className="w-full space-y-5">
       <InheritanceBanner summary={summary} />
@@ -423,7 +428,7 @@ export function AppBuilder({
                 className="gap-1.5"
               >
                 <FloppyDisk className="size-4" />
-                {saving ? 'Saving…' : editing ? 'Save changes' : 'Save app'}
+                {saveLabel}
               </Button>
             </div>
           </div>
@@ -716,14 +721,16 @@ function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixI
   // pure review notes stay as read-only bullets so nothing is hidden.
   const optionalActions = advisories.filter((i) => i.action !== 'review');
   const notes = advisories.filter((i) => i.action === 'review');
+  const advisoryHeadline =
+    blockers.length > 0
+      ? `${blockers.length} thing${blockers.length === 1 ? '' : 's'} to resolve before saving`
+      : 'You can save now — a few optional things to finish';
   return (
     <div className="rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-4">
       <div className="flex items-center gap-1.5">
         <Warning className="size-4 text-amber-600 dark:text-amber-500" weight="fill" />
         <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-          {blockers.length > 0
-            ? `${blockers.length} thing${blockers.length === 1 ? '' : 's'} to resolve before saving`
-            : 'You can save now — a few optional things to finish'}
+          {advisoryHeadline}
         </span>
       </div>
       {blockers.length > 0 ? (
@@ -759,6 +766,14 @@ function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixI
   );
 }
 
+// The call-to-action label for a fix-it row, by the remedy it offers.
+function fixItCta(action: FixIt['action']): string {
+  if (action === 'wire-data-source') return 'Wire a data source';
+  if (action === 'bind-step') return 'Pick a data source';
+  if (action === 'add-instructions') return 'Write instructions';
+  return 'Fix this step';
+}
+
 function FixItRow({
   item,
   onAct,
@@ -768,14 +783,7 @@ function FixItRow({
   onAct: (f: FixIt) => void;
   tone: 'blocker' | 'optional';
 }>) {
-  const cta =
-    item.action === 'wire-data-source'
-      ? 'Wire a data source'
-      : item.action === 'bind-step'
-        ? 'Pick a data source'
-        : item.action === 'add-instructions'
-          ? 'Write instructions'
-          : 'Fix this step';
+  const cta = fixItCta(item.action);
   const Icon =
     item.action === 'wire-data-source' || item.action === 'bind-step' ? Database : PencilSimple;
   return (
