@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { HANDBOOK } from '@/lib/handbook';
 
 // Public, hosted handbook — the prose docs, alongside the API reference at /docs.
-export default function HandbookLayout({ children }: { children: ReactNode }) {
+export default function HandbookLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl gap-8 px-6 py-8">
       <aside className="w-60 shrink-0">
