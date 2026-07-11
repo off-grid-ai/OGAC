@@ -1,4 +1,4 @@
-import { Clock, CurrencyInr, Lightning, TrendUp, UsersThree } from '@phosphor-icons/react/dist/ssr';
+import { Clock, CurrencyDollar, Lightning, TrendUp, UsersThree } from '@phosphor-icons/react/dist/ssr';
 import { RoiOrgDefaults } from '@/components/insights/RoiOrgDefaults';
 import { RoiTopApps } from '@/components/insights/RoiTopApps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { requireModuleForUser } from '@/lib/module-access';
-import { formatHours, formatInr, resolveRoiSettings } from '@/lib/roi';
+import { formatHours, formatUsd, resolveRoiSettings } from '@/lib/roi';
 import { computeOrgRoiRollup } from '@/lib/roi-reader';
 import { getOrgRoiDefault } from '@/lib/roi-settings-store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -20,7 +20,7 @@ import { currentOrgId } from '@/lib/tenancy';
 export const dynamic = 'force-dynamic';
 
 // ─── Insights › ROI — the value story per app + per department ────────────────────────────────────
-// The renewal + budget-justification lever: hours + ₹ saved by department and the top apps by value,
+// The renewal + budget-justification lever: hours + $ saved by department and the top apps by value,
 // against the actual AI cost. Real run counts + real cost; ESTIMATED time-saved (labelled as such).
 export default async function RoiPage() {
   await requireModuleForUser('analytics');
@@ -38,10 +38,10 @@ export default async function RoiPage() {
     icon: React.ComponentType<{ className?: string }>;
     estimate: boolean;
   }[] = [
-    { label: 'Runs completed', value: t.runsCompleted.toLocaleString('en-IN'), icon: Lightning, estimate: false },
+    { label: 'Runs completed', value: t.runsCompleted.toLocaleString('en-US'), icon: Lightning, estimate: false },
     { label: 'Hours saved', value: formatHours(t.hoursSaved), icon: Clock, estimate: true },
-    { label: 'Value of time saved', value: formatInr(t.grossValue), icon: CurrencyInr, estimate: true },
-    { label: 'AI cost', value: formatInr(t.actualAiCost), icon: CurrencyInr, estimate: false },
+    { label: 'Value of time saved', value: formatUsd(t.grossValue), icon: CurrencyDollar, estimate: true },
+    { label: 'AI cost', value: formatUsd(t.actualAiCost), icon: CurrencyDollar, estimate: false },
   ];
 
   return (
@@ -50,7 +50,7 @@ export default async function RoiPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Return on investment</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            What your automations are worth — hours and ₹ saved per app and per department, against the
+            What your automations are worth — hours and $ saved per app and per department, against the
             actual AI cost. Run counts and AI cost are{' '}
             <span className="font-medium text-primary">measured</span>; time-saved is an{' '}
             <span className="font-medium text-amber-600">estimate</span> you set (org default below,
@@ -96,14 +96,14 @@ export default async function RoiPage() {
                 t.netValue >= 0 ? 'text-primary' : 'text-destructive'
               }`}
             >
-              {formatInr(t.netValue)}
+              {formatUsd(t.netValue)}
             </div>
           </div>
         </div>
         {t.roiMultiple !== null ? (
           <div className="text-right">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Value per ₹ of AI cost
+              Value per $ of AI cost
             </div>
             <div className="text-3xl font-semibold tabular-nums text-foreground">
               {t.roiMultiple}×
@@ -150,17 +150,17 @@ export default async function RoiPage() {
                           {formatHours(d.hoursSaved)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-foreground">
-                          {formatInr(d.grossValue)}
+                          {formatUsd(d.grossValue)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {formatInr(d.actualAiCost)}
+                          {formatUsd(d.actualAiCost)}
                         </TableCell>
                         <TableCell
                           className={`text-right font-medium tabular-nums ${
                             d.netValue >= 0 ? 'text-primary' : 'text-destructive'
                           }`}
                         >
-                          {formatInr(d.netValue)}
+                          {formatUsd(d.netValue)}
                         </TableCell>
                       </TableRow>
                     ))

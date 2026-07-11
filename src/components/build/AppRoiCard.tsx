@@ -1,16 +1,16 @@
 'use client';
 
-import { Clock, CurrencyInr, Lightning, TrendUp } from '@phosphor-icons/react/dist/ssr';
+import { Clock, CurrencyDollar, Lightning, TrendUp } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type AppRoi, formatHours, formatInr } from '@/lib/roi';
+import { type AppRoi, formatHours, formatUsd } from '@/lib/roi';
 
 // ─── Per-app ROI card — the value story for ONE app ────────────────────────────────────────────────
-// Shows the four headline numbers (real runs, est. hours saved, est. ₹ value, ACTUAL AI cost) and the
+// Shows the four headline numbers (real runs, est. hours saved, est. $ value, ACTUAL AI cost) and the
 // resulting net, then an editable panel for the two ESTIMATES that drive it. Estimates are labelled as
 // such throughout so nobody mistakes them for measured facts. The form PUTs to
 // /api/v1/admin/apps/[id]/roi and refreshes the row from the response.
@@ -133,7 +133,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
           <Metric
             icon={Lightning}
             label="Runs completed"
-            value={roi.runsCompleted.toLocaleString('en-IN')}
+            value={roi.runsCompleted.toLocaleString('en-US')}
             sub="successful runs this period"
             estimate={false}
           />
@@ -145,16 +145,16 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
             estimate
           />
           <Metric
-            icon={CurrencyInr}
+            icon={CurrencyDollar}
             label="Value of time saved"
-            value={formatInr(roi.grossValue)}
-            sub={`@ ${formatInr(roi.loadedCostPerHour)}/hr loaded cost`}
+            value={formatUsd(roi.grossValue)}
+            sub={`@ ${formatUsd(roi.loadedCostPerHour)}/hr loaded cost`}
             estimate
           />
           <Metric
-            icon={CurrencyInr}
+            icon={CurrencyDollar}
             label="AI cost"
-            value={formatInr(roi.actualAiCost)}
+            value={formatUsd(roi.actualAiCost)}
             sub="actual gateway spend"
             estimate={false}
           />
@@ -172,14 +172,14 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
                   netTone === 'good' ? 'text-primary' : 'text-destructive'
                 }`}
               >
-                {formatInr(roi.netValue)}
+                {formatUsd(roi.netValue)}
               </div>
             </div>
           </div>
           {roi.roiMultiple !== null ? (
             <div className="text-right">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Value per ₹ of AI cost
+                Value per $ of AI cost
               </div>
               <div className="text-2xl font-semibold tabular-nums text-foreground">
                 {roi.roiMultiple}×
@@ -214,7 +214,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="roi-rate">Loaded cost per hour (₹)</Label>
+                <Label htmlFor="roi-rate">Loaded cost per hour ($)</Label>
                 <Input
                   id="roi-rate"
                   type="number"
@@ -224,7 +224,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
                 />
                 {orgDefault ? (
                   <p className="text-xs text-muted-foreground">
-                    Org default: {formatInr(orgDefault.loadedCostPerHour)}/hr
+                    Org default: {formatUsd(orgDefault.loadedCostPerHour)}/hr
                   </p>
                 ) : null}
               </div>
