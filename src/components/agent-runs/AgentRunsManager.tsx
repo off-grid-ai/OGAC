@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/button';
 import { actionsFor, type RunAction } from '@/lib/agent-run-actions';
 import type { RunSummaryRow, RunsSummary } from '@/lib/agent-runs';
 
+// Every action a run row exposes: the lifecycle actions plus the two inline HITL review decisions.
+type RunRowAction = RunAction | 'review-approve' | 'review-reject';
+
 // Full run trace, as returned by GET /api/v1/admin/agent-runs/[id].
 interface RunTrace {
   id: string;
@@ -135,7 +138,7 @@ function RunRow({
   const [busy, setBusy] = useState(false);
   const actions = actionsFor(run.status);
 
-  async function act(action: RunAction | 'review-approve' | 'review-reject') {
+  async function act(action: RunRowAction) {
     if (action === 'delete' && !confirm(`Delete run ${run.id}? This cannot be undone.`)) return;
     if (action === 'cancel' && !confirm(`Cancel run ${run.id}?`)) return;
     setBusy(true);
@@ -198,7 +201,7 @@ function RunRow({
 // Dispatch an action to the right route. Review is split into approve/reject via a synthetic action.
 async function runAction(
   id: string,
-  action: RunAction | 'review-approve' | 'review-reject',
+  action: RunRowAction,
 ): Promise<{ ok: boolean; message: string }> {
   const base = `/api/v1/admin/agent-runs/${id}`;
   let res: Response;
@@ -245,7 +248,7 @@ function RunDetail({ id, onBack, onChanged }: Readonly<{ id: string; onBack: () 
     void load();
   }, [load]);
 
-  async function act(action: RunAction | 'review-approve' | 'review-reject') {
+  async function act(action: RunRowAction) {
     if (action === 'delete' && !confirm(`Delete run ${id}? This cannot be undone.`)) return;
     if (action === 'cancel' && !confirm(`Cancel run ${id}?`)) return;
     setBusy(true);

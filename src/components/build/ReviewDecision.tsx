@@ -21,6 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { type ReviewDetail } from '@/lib/review-inbox';
 
+// The reviewer's terminal decision — approve or reject.
+type ReviewOutcome = 'approve' | 'reject';
+
 // Pick one of three values by the run's decided outcome — approved / rejected / undecided.
 // A tiny pure selector so the outcome→tone/label mappings read as flat lookups, not nested ternaries.
 function byOutcome<T>(approved: boolean, rejected: boolean, whenApproved: T, whenRejected: T, otherwise: T): T {
@@ -57,11 +60,11 @@ export function ReviewDecision({
 }>) {
   const router = useRouter();
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
-  const [resolved, setResolved] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState<ReviewOutcome | null>(null);
+  const [resolved, setResolved] = useState<ReviewOutcome | null>(null);
   const [authBlocked, setAuthBlocked] = useState<string | null>(null);
 
-  async function decide(decision: 'approve' | 'reject') {
+  async function decide(decision: ReviewOutcome) {
     if (busy) return;
     if (decision === 'reject' && !note.trim()) {
       toast.error('Please add a reason before rejecting.');
@@ -112,13 +115,13 @@ export function ReviewDecision({
   // (`resolved`), else infer from the persisted terminal status when we land on an already-resolved
   // run: done → approved/completed, cancelled/error → rejected/halted.
   // Infer the outcome when we land on an already-resolved run: done → approve, cancelled/error → reject.
-  function inferredOutcome(): 'approve' | 'reject' | null {
+  function inferredOutcome(): ReviewOutcome | null {
     if (reviewable) return null;
     if (runStatus === 'done') return 'approve';
     if (runStatus === 'cancelled' || runStatus === 'error') return 'reject';
     return null;
   }
-  const outcome: 'approve' | 'reject' | null = resolved ?? inferredOutcome();
+  const outcome: ReviewOutcome | null = resolved ?? inferredOutcome();
   const decidedApproved = outcome === 'approve';
   const decidedRejected = outcome === 'reject';
   const headerTone = byOutcome(
