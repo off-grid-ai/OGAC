@@ -30,7 +30,10 @@ function fmtMs(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 function fmtNum(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
+  if (n < 1000) return String(n);
+  // ≥10k drops the decimal (12k), 1k–10k keeps one (1.2k).
+  const decimals = n >= 10000 ? 0 : 1;
+  return `${(n / 1000).toFixed(decimals)}k`;
 }
 function fmtPct(r: number): string {
   return `${Math.round(r * 100)}%`;
