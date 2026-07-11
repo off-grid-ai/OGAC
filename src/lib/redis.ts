@@ -116,6 +116,6 @@ class RedisClient {
 let client: RedisClient | null = null;
 
 export function redis(url: string): RedisClient {
-  if (!client) client = new RedisClient(url);
+  client ??= new RedisClient(url);
   return client;
 }

@@ -29,9 +29,7 @@ const FONT_PATH = join(process.cwd(), 'src', 'lib', 'fonts', 'DejaVuSansMono.ttf
 
 let cachedFontBytes: Uint8Array | null = null;
 function loadFontBytes(): Uint8Array {
-  if (!cachedFontBytes) {
-    cachedFontBytes = new Uint8Array(readFileSync(FONT_PATH));
-  }
+  cachedFontBytes ??= new Uint8Array(readFileSync(FONT_PATH));
   return cachedFontBytes;
 }
 

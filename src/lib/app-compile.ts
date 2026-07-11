@@ -99,7 +99,7 @@ export async function compileAppSpec(
   }
 
   // 2. Deterministic heuristic fallback — same binding rules, no model.
-  if (!assembled) assembled = heuristicDecompose(desc, domains);
+  assembled ??= heuristicDecompose(desc, domains);
 
   const spec = finalizeSpec(assembled, ctx, desc);
 

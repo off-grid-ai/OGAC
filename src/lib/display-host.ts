@@ -42,7 +42,7 @@ export function parseFleetHostMap(raw: string | undefined): Record<string, strin
 
 let _ipToHost: Record<string, string> | null = null;
 function ipToHost(): Record<string, string> {
-  if (_ipToHost === null) _ipToHost = parseFleetHostMap(process.env.OFFGRID_FLEET_HOST_MAP);
+  _ipToHost ??= parseFleetHostMap(process.env.OFFGRID_FLEET_HOST_MAP);
   return _ipToHost;
 }
 

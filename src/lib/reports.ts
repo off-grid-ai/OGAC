@@ -486,11 +486,11 @@ export async function updateReportTemplate(
   const isCustom = existing.kind === 'custom';
   const next = {
     name: isCustom && patch.name !== undefined ? patch.name : existing.name,
-    description: patch.description !== undefined ? patch.description : existing.description,
-    source: patch.source !== undefined ? patch.source : existing.source,
+    description: patch.description ?? existing.description,
+    source: patch.source ?? existing.source,
     sections: isCustom && patch.sections !== undefined ? patch.sections : existing.sections,
-    frameworks: patch.frameworks !== undefined ? patch.frameworks : existing.frameworks,
-    schedule: patch.schedule !== undefined ? patch.schedule : existing.schedule,
+    frameworks: patch.frameworks ?? existing.frameworks,
+    schedule: patch.schedule ?? existing.schedule,
   };
   await db.execute(sql`
     UPDATE ${REPORT_TABLE} SET

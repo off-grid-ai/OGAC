@@ -94,16 +94,14 @@ class KeycloakVerifier implements IdentityVerifier {
     const stale = !this.cache || Date.now() - this.cache.at > CACHE_TTL_MS;
     const unknown = kid && this.cache && !this.cache.keys.has(kid);
     if (stale || unknown) {
-      if (!this.fetching) {
-        this.fetching = (async () => {
-          const r = await fetch(`${this.issuer}/protocol/openid-connect/certs`, { signal: AbortSignal.timeout(5000) });
-          if (!r.ok) throw new Error(`JWKS ${r.status}`);
-          const { keys } = (await r.json()) as { keys: JWK[] };
-          const m = new Map<string, crypto.KeyObject>();
-          for (const k of keys) if (k.use === 'sig' || !k.use) { try { m.set(k.kid, jwkToKey(k)); } catch { /* skip */ } }
-          return { keys: m, at: Date.now() };
-        })().finally(() => { this.fetching = null; });
-      }
+      this.fetching ??= (async () => {
+        const r = await fetch(`${this.issuer}/protocol/openid-connect/certs`, { signal: AbortSignal.timeout(5000) });
+        if (!r.ok) throw new Error(`JWKS ${r.status}`);
+        const { keys } = (await r.json()) as { keys: JWK[] };
+        const m = new Map<string, crypto.KeyObject>();
+        for (const k of keys) if (k.use === 'sig' || !k.use) { try { m.set(k.kid, jwkToKey(k)); } catch { /* skip */ } }
+        return { keys: m, at: Date.now() };
+      })().finally(() => { this.fetching = null; });
       this.cache = await this.fetching;
     }
     return this.cache!.keys;
@@ -160,6 +158,6 @@ export function getTokenVerifier(): IdentityVerifier | null {
   const url = process.env.OFFGRID_KEYCLOAK_URL;
   const realm = process.env.OFFGRID_KEYCLOAK_REALM;
   if (!url || !realm) return null;
-  if (!instance) instance = new KeycloakVerifier(url, realm, process.env.OFFGRID_KEYCLOAK_CLIENT_ID);
+  instance ??= new KeycloakVerifier(url, realm, process.env.OFFGRID_KEYCLOAK_CLIENT_ID);
   return instance;
 }

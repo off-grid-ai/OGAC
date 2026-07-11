@@ -252,15 +252,13 @@ function rowToHit(r: DocRow & { _distance: number }): BrainHit {
 // if it can't be created (older engine, empty table) hybrid degrades to vector-only.
 let ftsReady: Promise<boolean> | null = null;
 async function ensureFts(tbl: lancedb.Table): Promise<boolean> {
-  if (!ftsReady) {
-    ftsReady = tbl
-      .createIndex('text', { config: lancedb.Index.fts() })
-      .then(() => true)
-      .catch(() => {
-        ftsReady = null; // allow a later retry once the table has rows/index support
-        return false;
-      });
-  }
+  ftsReady ??= tbl
+    .createIndex('text', { config: lancedb.Index.fts() })
+    .then(() => true)
+    .catch(() => {
+      ftsReady = null; // allow a later retry once the table has rows/index support
+      return false;
+    });
   return ftsReady;
 }
 
