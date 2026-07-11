@@ -133,12 +133,9 @@ export function GatewayRouter() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {deployments.map((d) => {
-              const dot =
-                d.health === 'healthy'
-                  ? 'bg-emerald-500'
-                  : d.health === 'unhealthy'
-                    ? 'bg-red-500'
-                    : 'bg-muted-foreground/40';
+              let dot = 'bg-muted-foreground/40';
+              if (d.health === 'healthy') dot = 'bg-emerald-500';
+              else if (d.health === 'unhealthy') dot = 'bg-red-500';
               return (
                 <Card key={d.id} className="shadow-sm">
                   <CardHeader className="pb-2">
