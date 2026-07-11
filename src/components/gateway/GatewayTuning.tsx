@@ -41,7 +41,9 @@ interface TuningResponse {
 export function GatewayTuning() {
   const [data, setData] = useState<TuningResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<'forbidden' | 'unauthorized' | string | null>(null);
+  const [apiError, setApiError] = useState<
+    'forbidden' | 'unauthorized' | (string & {}) | null
+  >(null);
 
   useEffect(() => {
     let alive = true;

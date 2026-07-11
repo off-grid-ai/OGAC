@@ -13,16 +13,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { DatasetRow, PromptRow, SessionRow } from '@/lib/langfuse';
-import {
-  DEFAULT_REGISTRY_TAB,
-  type RegistryTab,
-  REGISTRY_TABS,
-  resolveRegistryTab,
-} from '@/lib/langfuse-registry';
+import { type RegistryTab, REGISTRY_TABS } from '@/lib/langfuse-registry';
 
 // Tab types/helpers now live in the server-safe @/lib/langfuse-registry so the server page can import
 // resolveRegistryTab without crossing the RSC boundary. Re-exported for existing importers.
-export { DEFAULT_REGISTRY_TAB, type RegistryTab, resolveRegistryTab };
+export { DEFAULT_REGISTRY_TAB, resolveRegistryTab } from '@/lib/langfuse-registry';
+export { type RegistryTab };
 const TABS = REGISTRY_TABS;
 
 function fmtTs(ts: string): string {

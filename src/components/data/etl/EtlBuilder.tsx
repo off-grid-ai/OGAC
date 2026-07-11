@@ -37,12 +37,13 @@ import {
   type EtlDagSpec,
   type EtlNode,
   type EtlNodeConfig,
+  type EtlNodeKind,
   type EtlTransformKind,
   type FilterOp,
   type CastType,
   type AggFn,
+  type EtlRunView,
 } from '@/lib/etl-job';
-import type { EtlRunView } from '@/lib/etl-job';
 import { EtlRunHistory } from './EtlRunHistory';
 
 const SELECT_CLASS =
@@ -77,36 +78,33 @@ function nodeColor(kind: string): string {
   return '#6b7280';
 }
 
+// Per-kind one-line config summaries. Split from the old switch into a dispatch table so each
+// arm's ternary lives in its own tiny formatter (flat cognitive complexity) — behaviour-identical
+// to the previous switch, arm for arm.
+type ConfigSummary = (c: EtlNodeConfig) => string;
+const NODE_SUMMARY_BY_KIND: Partial<Record<EtlNodeKind, ConfigSummary>> = {
+  source: (c) =>
+    c.resource ? `${c.connectorId ?? '?'} · ${c.resource}` : 'pick a connector + table',
+  destination: (c) =>
+    c.database && c.table ? `${c.database}.${c.table}` : 'pick a warehouse table',
+  filter: (c) => (c.column ? `${c.column} ${c.op ?? ''} ${c.value ?? ''}` : 'set a condition'),
+  select: (c) => (c.columns ?? []).join(', ') || 'choose columns',
+  dedupe: (c) => (c.columns ?? []).join(', ') || 'choose columns',
+  rename: (c) => (c.from && c.to ? `${c.from} → ${c.to}` : 'from → to'),
+  cast: (c) => (c.column ? `${c.column} → ${c.castType}` : 'column + type'),
+  derive: (c) => (c.target ? `${c.target} = ${c.expression ?? ''}` : 'target = expression'),
+  redact: (c) => (c.column ? `${c.column}: ${c.action}` : 'column + action'),
+  join: (c) => (c.joinResource ? `+ ${c.joinResource}` : 'second source'),
+  aggregate: (c) =>
+    c.aggFn
+      ? `${c.aggFn}(${c.aggColumn ?? '*'}) by ${(c.groupBy ?? []).join(',')}`
+      : 'group + measure',
+  limit: (c) => (c.limit ? `${c.limit} rows` : 'row cap'),
+};
+
 // One-line summary of a node's config for the card.
 function nodeSummary(n: EtlNode): string {
-  const c = n.config;
-  switch (n.kind) {
-    case 'source':
-      return c.resource ? `${c.connectorId ?? '?'} · ${c.resource}` : 'pick a connector + table';
-    case 'destination':
-      return c.database && c.table ? `${c.database}.${c.table}` : 'pick a warehouse table';
-    case 'filter':
-      return c.column ? `${c.column} ${c.op ?? ''} ${c.value ?? ''}` : 'set a condition';
-    case 'select':
-    case 'dedupe':
-      return (c.columns ?? []).join(', ') || 'choose columns';
-    case 'rename':
-      return c.from && c.to ? `${c.from} → ${c.to}` : 'from → to';
-    case 'cast':
-      return c.column ? `${c.column} → ${c.castType}` : 'column + type';
-    case 'derive':
-      return c.target ? `${c.target} = ${c.expression ?? ''}` : 'target = expression';
-    case 'redact':
-      return c.column ? `${c.column}: ${c.action}` : 'column + action';
-    case 'join':
-      return c.joinResource ? `+ ${c.joinResource}` : 'second source';
-    case 'aggregate':
-      return c.aggFn ? `${c.aggFn}(${c.aggColumn ?? '*'}) by ${(c.groupBy ?? []).join(',')}` : 'group + measure';
-    case 'limit':
-      return c.limit ? `${c.limit} rows` : 'row cap';
-    default:
-      return '';
-  }
+  return NODE_SUMMARY_BY_KIND[n.kind]?.(n.config) ?? '';
 }
 
 type EtlNodeData = {
@@ -130,7 +128,11 @@ function DagNode({ data }: NodeProps) {
       }}
     >
       {d.kind !== 'source' ? (
-        <Handle type="target" position={Position.Left} style={{ background: d.color, width: 9, height: 9 }} />
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{ background: d.color, width: 9, height: 9 }}
+        />
       ) : null}
       <div className="flex items-center justify-between gap-1">
         <span className="text-[9px] font-medium uppercase tracking-wide" style={{ color: d.color }}>
@@ -138,14 +140,21 @@ function DagNode({ data }: NodeProps) {
         </span>
         {d.incomplete ? <Warning className="size-3 text-amber-500" /> : <span className="w-3" />}
       </div>
-      <p className="mt-1 truncate font-mono text-[11px] font-medium text-foreground" title={d.label}>
+      <p
+        className="mt-1 truncate font-mono text-[11px] font-medium text-foreground"
+        title={d.label}
+      >
         {d.label}
       </p>
       <p className="truncate text-[10px] text-muted-foreground" title={d.summary}>
         {d.summary}
       </p>
       {d.kind !== 'destination' ? (
-        <Handle type="source" position={Position.Right} style={{ background: d.color, width: 9, height: 9 }} />
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{ background: d.color, width: 9, height: 9 }}
+        />
       ) : null}
     </div>
   );
@@ -183,7 +192,9 @@ export function EtlBuilder({
   // Derive the React-Flow graph.
   const { rfNodes, rfEdges } = useMemo(() => {
     const nodes: Node[] = spec.nodes.map((n, i) => {
-      const incomplete = validation.errors.some((e) => e.includes(n.label ?? n.id) || e.includes(n.kind));
+      const incomplete = validation.errors.some(
+        (e) => e.includes(n.label ?? n.id) || e.includes(n.kind),
+      );
       return {
         id: n.id,
         type: 'dag',
@@ -211,19 +222,16 @@ export function EtlBuilder({
     return { rfNodes: nodes, rfEdges: edges };
   }, [spec, selectedId, validation]);
 
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      // Persist position changes (incl. interim drag frames, so dragging renders smoothly) back into
-      // the spec — the spec stays the single source of truth. Selection/dimension changes are UI-only.
-      for (const c of changes) {
-        if (c.type === 'position' && c.position) {
-          const nc = c;
-          setSpec((s) => moveNode(s, nc.id, nc.position!));
-        }
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    // Persist position changes (incl. interim drag frames, so dragging renders smoothly) back into
+    // the spec — the spec stays the single source of truth. Selection/dimension changes are UI-only.
+    for (const c of changes) {
+      if (c.type === 'position' && c.position) {
+        const nc = c;
+        setSpec((s) => moveNode(s, nc.id, nc.position!));
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -240,18 +248,15 @@ export function EtlBuilder({
     [edit],
   );
 
-  const addTransform = useCallback(
-    (kind: EtlTransformKind) => {
-      setSpec((s) => {
-        const pos = { x: 120 + s.nodes.length * 60, y: 260 };
-        const { spec: next, id } = addNode(s, kind, pos);
-        setSelectedId(id);
-        return next;
-      });
-      setDirty(true);
-    },
-    [],
-  );
+  const addTransform = useCallback((kind: EtlTransformKind) => {
+    setSpec((s) => {
+      const pos = { x: 120 + s.nodes.length * 60, y: 260 };
+      const { spec: next, id } = addNode(s, kind, pos);
+      setSelectedId(id);
+      return next;
+    });
+    setDirty(true);
+  }, []);
 
   async function save(): Promise<boolean> {
     const v = validateDagSpec(spec);
@@ -290,7 +295,10 @@ export function EtlBuilder({
       const res = await fetch(`/api/v1/admin/etl/jobs/${jobId}/run`, { method: 'POST' });
       const run = (await res.json().catch(() => null)) as EtlRunView | { error?: string } | null;
       if (!res.ok) {
-        const msg = (run && 'message' in run && run.message) || (run && 'error' in run && run.error) || 'Run failed.';
+        const msg =
+          (run && 'message' in run && run.message) ||
+          (run && 'error' in run && run.error) ||
+          'Run failed.';
         toast.error(String(msg));
       } else if (run && 'status' in run) {
         if (run.status === 'failed') toast.error(run.message ?? 'Run failed.');
@@ -314,7 +322,10 @@ export function EtlBuilder({
       {/* Action bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <TriggerControls spec={spec} onChange={(t, cron) => edit((s) => setTrigger(s, t, cron))} />
+          <TriggerControls
+            spec={spec}
+            onChange={(t, cron) => edit((s) => setTrigger(s, t, cron))}
+          />
         </div>
         <div className="flex items-center gap-2">
           {!validation.ok ? (
@@ -394,8 +405,9 @@ export function EtlBuilder({
             <div className="space-y-2 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Select a node to configure it.</p>
               <p>
-                Drag from a node&apos;s right edge to its target&apos;s left edge to connect steps. The
-                source (left) reads your data; the destination (right) lands it in the warehouse.
+                Drag from a node&apos;s right edge to its target&apos;s left edge to connect steps.
+                The source (left) reads your data; the destination (right) lands it in the
+                warehouse.
               </p>
               {!validation.ok ? (
                 <ul className="mt-2 space-y-1 text-amber-600">
@@ -460,11 +472,17 @@ function NodeConfigPanel({
   onRemove?: () => void;
 }>) {
   const c = node.config;
-  const cols = (v: string): string[] => v.split(',').map((s) => s.trim()).filter(Boolean);
+  const cols = (v: string): string[] =>
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   return (
     <div className="space-y-3 text-xs">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">{node.kind}</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+          {node.kind}
+        </span>
         {onRemove ? (
           <button type="button" onClick={onRemove} className="text-destructive hover:underline">
             <Trash className="size-3.5" />
@@ -473,13 +491,21 @@ function NodeConfigPanel({
       </div>
       <div>
         <Label className="text-xs">Label</Label>
-        <Input className="mt-1 h-8" value={node.label ?? ''} onChange={(e) => onLabel(e.target.value)} />
+        <Input
+          className="mt-1 h-8"
+          value={node.label ?? ''}
+          onChange={(e) => onLabel(e.target.value)}
+        />
       </div>
 
       {node.kind === 'source' ? (
         <>
           <Field label="Source connector">
-            <select className={SELECT_CLASS} value={c.connectorId ?? ''} onChange={(e) => onConfig({ connectorId: e.target.value })}>
+            <select
+              className={SELECT_CLASS}
+              value={c.connectorId ?? ''}
+              onChange={(e) => onConfig({ connectorId: e.target.value })}
+            >
               <option value="">Choose a connector…</option>
               {connectors.map((k) => (
                 <option key={k.id} value={k.id}>
@@ -489,7 +515,12 @@ function NodeConfigPanel({
             </select>
           </Field>
           <Field label="Table / resource">
-            <Input className="h-8" value={c.resource ?? ''} onChange={(e) => onConfig({ resource: e.target.value })} placeholder="customers" />
+            <Input
+              className="h-8"
+              value={c.resource ?? ''}
+              onChange={(e) => onConfig({ resource: e.target.value })}
+              placeholder="customers"
+            />
           </Field>
         </>
       ) : null}
@@ -497,10 +528,20 @@ function NodeConfigPanel({
       {node.kind === 'destination' ? (
         <>
           <Field label="Warehouse database">
-            <Input className="h-8" value={c.database ?? ''} onChange={(e) => onConfig({ database: e.target.value })} placeholder="analytics" />
+            <Input
+              className="h-8"
+              value={c.database ?? ''}
+              onChange={(e) => onConfig({ database: e.target.value })}
+              placeholder="analytics"
+            />
           </Field>
           <Field label="Warehouse table">
-            <Input className="h-8" value={c.table ?? ''} onChange={(e) => onConfig({ table: e.target.value })} placeholder="customers_clean" />
+            <Input
+              className="h-8"
+              value={c.table ?? ''}
+              onChange={(e) => onConfig({ table: e.target.value })}
+              placeholder="customers_clean"
+            />
           </Field>
         </>
       ) : null}
@@ -508,34 +549,62 @@ function NodeConfigPanel({
       {node.kind === 'filter' ? (
         <>
           <Field label="Column">
-            <Input className="h-8" value={c.column ?? ''} onChange={(e) => onConfig({ column: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.column ?? ''}
+              onChange={(e) => onConfig({ column: e.target.value })}
+            />
           </Field>
           <Field label="Operator">
-            <select className={SELECT_CLASS} value={c.op ?? 'eq'} onChange={(e) => onConfig({ op: e.target.value as FilterOp })}>
-              {(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'in'] as FilterOp[]).map((o) => (
-                <option key={o} value={o}>{o}</option>
-              ))}
+            <select
+              className={SELECT_CLASS}
+              value={c.op ?? 'eq'}
+              onChange={(e) => onConfig({ op: e.target.value as FilterOp })}
+            >
+              {(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'in'] as FilterOp[]).map(
+                (o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ),
+              )}
             </select>
           </Field>
           <Field label="Value">
-            <Input className="h-8" value={c.value ?? ''} onChange={(e) => onConfig({ value: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.value ?? ''}
+              onChange={(e) => onConfig({ value: e.target.value })}
+            />
           </Field>
         </>
       ) : null}
 
       {node.kind === 'select' || node.kind === 'dedupe' ? (
         <Field label="Columns (comma-separated)">
-          <Input className="h-8" value={(c.columns ?? []).join(', ')} onChange={(e) => onConfig({ columns: cols(e.target.value) })} />
+          <Input
+            className="h-8"
+            value={(c.columns ?? []).join(', ')}
+            onChange={(e) => onConfig({ columns: cols(e.target.value) })}
+          />
         </Field>
       ) : null}
 
       {node.kind === 'rename' ? (
         <>
           <Field label="From column">
-            <Input className="h-8" value={c.from ?? ''} onChange={(e) => onConfig({ from: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.from ?? ''}
+              onChange={(e) => onConfig({ from: e.target.value })}
+            />
           </Field>
           <Field label="To column">
-            <Input className="h-8" value={c.to ?? ''} onChange={(e) => onConfig({ to: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.to ?? ''}
+              onChange={(e) => onConfig({ to: e.target.value })}
+            />
           </Field>
         </>
       ) : null}
@@ -543,12 +612,22 @@ function NodeConfigPanel({
       {node.kind === 'cast' ? (
         <>
           <Field label="Column">
-            <Input className="h-8" value={c.column ?? ''} onChange={(e) => onConfig({ column: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.column ?? ''}
+              onChange={(e) => onConfig({ column: e.target.value })}
+            />
           </Field>
           <Field label="Type">
-            <select className={SELECT_CLASS} value={c.castType ?? 'string'} onChange={(e) => onConfig({ castType: e.target.value as CastType })}>
+            <select
+              className={SELECT_CLASS}
+              value={c.castType ?? 'string'}
+              onChange={(e) => onConfig({ castType: e.target.value as CastType })}
+            >
               {(['string', 'int', 'float', 'bool', 'date'] as CastType[]).map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
           </Field>
@@ -558,11 +637,23 @@ function NodeConfigPanel({
       {node.kind === 'derive' ? (
         <>
           <Field label="New column">
-            <Input className="h-8" value={c.target ?? ''} onChange={(e) => onConfig({ target: e.target.value })} placeholder="gst_amount" />
+            <Input
+              className="h-8"
+              value={c.target ?? ''}
+              onChange={(e) => onConfig({ target: e.target.value })}
+              placeholder="gst_amount"
+            />
           </Field>
           <Field label="Expression">
-            <Input className="h-8 font-mono" value={c.expression ?? ''} onChange={(e) => onConfig({ expression: e.target.value })} placeholder="amount * 0.18" />
-            <p className="mt-1 text-[10px] text-muted-foreground">Arithmetic + comparisons only (e.g. amount * 1.18). Code is rejected.</p>
+            <Input
+              className="h-8 font-mono"
+              value={c.expression ?? ''}
+              onChange={(e) => onConfig({ expression: e.target.value })}
+              placeholder="amount * 0.18"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Arithmetic + comparisons only (e.g. amount * 1.18). Code is rejected.
+            </p>
           </Field>
         </>
       ) : null}
@@ -570,12 +661,23 @@ function NodeConfigPanel({
       {node.kind === 'redact' ? (
         <>
           <Field label="Column">
-            <Input className="h-8" value={c.column ?? ''} onChange={(e) => onConfig({ column: e.target.value })} placeholder="pan" />
+            <Input
+              className="h-8"
+              value={c.column ?? ''}
+              onChange={(e) => onConfig({ column: e.target.value })}
+              placeholder="pan"
+            />
           </Field>
           <Field label="Action">
-            <select className={SELECT_CLASS} value={c.action ?? 'mask'} onChange={(e) => onConfig({ action: e.target.value as RedactionAction })}>
+            <select
+              className={SELECT_CLASS}
+              value={c.action ?? 'mask'}
+              onChange={(e) => onConfig({ action: e.target.value as RedactionAction })}
+            >
               {REDACT_ACTIONS.map((a) => (
-                <option key={a.value} value={a.value}>{a.label}</option>
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
               ))}
             </select>
           </Field>
@@ -585,21 +687,39 @@ function NodeConfigPanel({
       {node.kind === 'join' ? (
         <>
           <Field label="Second source connector">
-            <select className={SELECT_CLASS} value={c.joinConnectorId ?? ''} onChange={(e) => onConfig({ joinConnectorId: e.target.value })}>
+            <select
+              className={SELECT_CLASS}
+              value={c.joinConnectorId ?? ''}
+              onChange={(e) => onConfig({ joinConnectorId: e.target.value })}
+            >
               <option value="">Choose…</option>
               {connectors.map((k) => (
-                <option key={k.id} value={k.id}>{k.name} ({k.type})</option>
+                <option key={k.id} value={k.id}>
+                  {k.name} ({k.type})
+                </option>
               ))}
             </select>
           </Field>
           <Field label="Second resource">
-            <Input className="h-8" value={c.joinResource ?? ''} onChange={(e) => onConfig({ joinResource: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.joinResource ?? ''}
+              onChange={(e) => onConfig({ joinResource: e.target.value })}
+            />
           </Field>
           <Field label="Left key">
-            <Input className="h-8" value={c.leftKey ?? ''} onChange={(e) => onConfig({ leftKey: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.leftKey ?? ''}
+              onChange={(e) => onConfig({ leftKey: e.target.value })}
+            />
           </Field>
           <Field label="Right key">
-            <Input className="h-8" value={c.rightKey ?? ''} onChange={(e) => onConfig({ rightKey: e.target.value })} />
+            <Input
+              className="h-8"
+              value={c.rightKey ?? ''}
+              onChange={(e) => onConfig({ rightKey: e.target.value })}
+            />
           </Field>
         </>
       ) : null}
@@ -607,18 +727,32 @@ function NodeConfigPanel({
       {node.kind === 'aggregate' ? (
         <>
           <Field label="Group by (comma-separated)">
-            <Input className="h-8" value={(c.groupBy ?? []).join(', ')} onChange={(e) => onConfig({ groupBy: cols(e.target.value) })} />
+            <Input
+              className="h-8"
+              value={(c.groupBy ?? []).join(', ')}
+              onChange={(e) => onConfig({ groupBy: cols(e.target.value) })}
+            />
           </Field>
           <Field label="Function">
-            <select className={SELECT_CLASS} value={c.aggFn ?? 'count'} onChange={(e) => onConfig({ aggFn: e.target.value as AggFn })}>
+            <select
+              className={SELECT_CLASS}
+              value={c.aggFn ?? 'count'}
+              onChange={(e) => onConfig({ aggFn: e.target.value as AggFn })}
+            >
               {(['count', 'sum', 'avg', 'min', 'max'] as AggFn[]).map((f) => (
-                <option key={f} value={f}>{f}</option>
+                <option key={f} value={f}>
+                  {f}
+                </option>
               ))}
             </select>
           </Field>
           {c.aggFn && c.aggFn !== 'count' ? (
             <Field label="Measure column">
-              <Input className="h-8" value={c.aggColumn ?? ''} onChange={(e) => onConfig({ aggColumn: e.target.value })} />
+              <Input
+                className="h-8"
+                value={c.aggColumn ?? ''}
+                onChange={(e) => onConfig({ aggColumn: e.target.value })}
+              />
             </Field>
           ) : null}
         </>
@@ -626,7 +760,12 @@ function NodeConfigPanel({
 
       {node.kind === 'limit' ? (
         <Field label="Max rows">
-          <Input className="h-8" type="number" value={c.limit ?? ''} onChange={(e) => onConfig({ limit: Number(e.target.value) })} />
+          <Input
+            className="h-8"
+            type="number"
+            value={c.limit ?? ''}
+            onChange={(e) => onConfig({ limit: Number(e.target.value) })}
+          />
         </Field>
       ) : null}
     </div>

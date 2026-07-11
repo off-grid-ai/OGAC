@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  type ModelFamily,
   type ModelSpec,
   type Modality,
   catalogByFamily,
@@ -190,4 +189,5 @@ export function ModelBrowser({
   );
 }
 
-export type { ModelSpec, ModelFamily, Modality };
+export type { ModelFamily } from '@/lib/model-catalog';
+export type { ModelSpec, Modality };
