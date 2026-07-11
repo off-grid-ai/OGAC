@@ -81,13 +81,12 @@ export function normalizeLlmGuardResponse(
     flaggedScanners = scores.filter(([, s]) => s > 0).map(([name]) => name);
   }
   const hits = invalid || flaggedScanners.length > 0;
-  const entities = flaggedScanners.length > 0 ? flaggedScanners : hits ? ['GUARDRAIL'] : [];
-  const sanitized =
-    typeof r.sanitized_prompt === 'string'
-      ? r.sanitized_prompt
-      : typeof r.sanitized_output === 'string'
-        ? r.sanitized_output
-        : original;
+  let entities: string[] = [];
+  if (flaggedScanners.length > 0) entities = flaggedScanners;
+  else if (hits) entities = ['GUARDRAIL'];
+  let sanitized = original;
+  if (typeof r.sanitized_prompt === 'string') sanitized = r.sanitized_prompt;
+  else if (typeof r.sanitized_output === 'string') sanitized = r.sanitized_output;
   return { hits, entities, redacted: sanitized, engine, configured: true };
 }
 

@@ -67,8 +67,9 @@ export async function safeJaegerOverview(
   try {
     const svcRes = await jGet<JaegerServicesResponse>(BASE, fetcher, '/api/services');
     const services = shapeServices(svcRes);
-    const selected =
-      service && services.includes(service) ? service : services.length ? services[0] : null;
+    let selected: string | null = null;
+    if (service && services.includes(service)) selected = service;
+    else if (services.length) selected = services[0];
     let traces: TraceSummary[] = [];
     if (selected) {
       const qs = new URLSearchParams({

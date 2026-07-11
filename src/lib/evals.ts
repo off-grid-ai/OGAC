@@ -157,8 +157,10 @@ function goldenWhere(filter: GoldenFilter) {
 // `{orgId}` scopes to a tenant; omitting all returns ALL (the internal global view).
 export async function listGoldenCases(arg?: string | null | GoldenFilter): Promise<GoldenCase[]> {
   await ensureEvalsSchema();
-  const filter: GoldenFilter =
-    arg === undefined ? {} : arg === null || typeof arg === 'string' ? { appId: arg } : arg;
+  let filter: GoldenFilter = {};
+  if (arg === undefined) filter = {};
+  else if (arg === null || typeof arg === 'string') filter = { appId: arg };
+  else filter = arg;
   const { rows } = await db.execute<GoldenRow>(
     sql`SELECT ${GOLDEN_COLS} FROM golden_cases ${goldenWhere(filter)} ORDER BY created_at DESC;`,
   );

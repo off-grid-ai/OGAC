@@ -201,7 +201,11 @@ export function normalizeDrift(input: RawDriftInput): DriftView {
   const features = featuresFromMetrics(src.metrics);
   const status = normalizeStatus(src.status);
   const strongest = features.reduce<number | null>(
-    (max, f) => (f.score === null ? max : max === null ? f.score : Math.max(max, f.score)),
+    (max, f) => {
+      if (f.score === null) return max;
+      if (max === null) return f.score;
+      return Math.max(max, f.score);
+    },
     null,
   );
   return {
