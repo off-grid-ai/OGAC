@@ -27,6 +27,21 @@ function statusFromDelta(delta: number): DriftStatus {
   return 'stable';
 }
 
+// Evidently verdict: honor the operator's drift-share threshold `t` when supplied (>0 → banded by
+// t and t/2; ===0 → any positive share is drift), else Evidently's own flag / the 0.1 warning band.
+function statusFromEvidently(
+  driftDetected: boolean,
+  share: number,
+  t: number | undefined,
+): DriftStatus {
+  if (driftDetected) return 'drift';
+  if (t === undefined) return share > 0.1 ? 'warning' : 'stable';
+  if (share >= t && t > 0) return 'drift';
+  if (share >= t / 2 && t > 0) return 'warning';
+  if (t === 0 && share > 0) return 'drift';
+  return 'stable';
+}
+
 function worst(a: DriftStatus, b: DriftStatus): DriftStatus {
   const rank: Record<DriftStatus, number> = { stable: 0, warning: 1, drift: 2 };
   return rank[a] >= rank[b] ? a : b;
@@ -186,19 +201,7 @@ export const evidentlyDrift: DriftPort = {
       // Honor the operator's drift-share threshold for the verdict when supplied; else Evidently's
       // own drift_detected flag / the default 0.1 warning band.
       const t = options?.driftShareThreshold;
-      const status: DriftStatus = data.drift_detected
-        ? 'drift'
-        : t !== undefined
-          ? share >= t && t > 0
-            ? 'drift'
-            : share >= t / 2 && t > 0
-              ? 'warning'
-              : t === 0 && share > 0
-                ? 'drift'
-                : 'stable'
-          : share > 0.1
-            ? 'warning'
-            : 'stable';
+      const status: DriftStatus = statusFromEvidently(Boolean(data.drift_detected), share, t);
       const selected = options?.preset ?? options?.method;
       return {
         engine: 'evidently',
