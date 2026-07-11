@@ -126,7 +126,7 @@ function AddUserForm({
           onChange={(e) => setTemporary(e.target.checked)}
           className="accent-primary"
         />
-        Temporary password — user must change on first login
+        <span>Temporary password — user must change on first login</span>
       </label>
       {roles.length > 0 && (
         <div>

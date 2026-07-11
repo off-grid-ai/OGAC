@@ -488,7 +488,7 @@ function VersionPanel({ keyPath, sealed }: { keyPath: string; sealed: boolean })
               checked={destroyOld}
               onChange={(e) => setDestroyOld(e.target.checked)}
             />
-            Also permanently destroy prior versions (irreversible)
+            <span>Also permanently destroy prior versions (irreversible)</span>
           </label>
           <div className="flex gap-2">
             <Button size="sm" type="submit" disabled={busy}>

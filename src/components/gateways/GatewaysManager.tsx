@@ -398,8 +398,8 @@ export function GatewaysManager({ gateways }: { gateways: GatewayView[] }) {
       {gateways.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No gateways registered yet. Add one, or seed the samples with
-            <span className="font-mono"> POST /api/v1/admin/gateways/seed</span>.
+            No gateways registered yet. Add one, or seed the samples with{' '}
+            <span className="font-mono">POST /api/v1/admin/gateways/seed</span>.
           </CardContent>
         </Card>
       ) : (

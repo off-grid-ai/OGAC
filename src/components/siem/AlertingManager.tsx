@@ -500,7 +500,7 @@ function MonitorEditor({
               checked={draft.enabled}
               onChange={(e) => set('enabled', e.target.checked)}
             />
-            Enabled
+            <span>Enabled</span>
           </label>
         </div>
     </FormSheet>

@@ -101,8 +101,8 @@ export function GatewayTuning() {
           <span className="font-medium text-foreground">Read-only.</span> These are the aggregator&apos;s
           live tuning values. They&apos;re set from environment in the aggregator&apos;s launchd plist on S1 and
           take effect on restart — the router has no live-reconfigure endpoint, so the console reads them but
-          doesn&apos;t fake an editable control. Routing (which nodes serve, their models) is edited in the
-          <span className="font-medium text-foreground"> Control</span> tab&apos;s Fleet configuration.
+          doesn&apos;t fake an editable control. Routing (which nodes serve, their models) is edited in the{' '}
+          <span className="font-medium text-foreground">Control</span> tab&apos;s Fleet configuration.
         </div>
       </div>
 

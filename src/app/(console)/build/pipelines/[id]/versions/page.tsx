@@ -20,8 +20,8 @@ export default async function PipelineVersionsPage({ params }: { params: Promise
       <div>
         <h2 className="text-base font-medium text-foreground">Version history</h2>
         <p className="text-sm text-muted-foreground">
-          Immutable snapshots — every publish and edit is frozen here. Current version:
-          <span className="font-medium text-foreground"> v{p.version}</span>.
+          Immutable snapshots — every publish and edit is frozen here. Current version:{' '}
+          <span className="font-medium text-foreground">v{p.version}</span>.
         </p>
       </div>
 

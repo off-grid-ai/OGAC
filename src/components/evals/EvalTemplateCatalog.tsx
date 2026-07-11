@@ -290,8 +290,7 @@ export function EvalTemplateCatalog({ onApplied }: { onApplied?: () => void }) {
                       className="text-primary underline underline-offset-2"
                     >
                       clear all filters
-                    </button>
-                    .
+                    </button>.
                   </p>
                 </div>
               ) : (
