@@ -196,7 +196,7 @@ const RESTORE_TARGETS: ReadonlyArray<{
     match: /^policyadmin\.sql\.gz$/,
     target: 'Policy Admin (MySQL)',
     command: (p) =>
-      `gunzip -c '${p}' | /Users/admin/.orbstack/bin/docker exec -i offgrid-ds-policyadmin mysql -upolicyadmin -ppolicyadmin policyadmin`,
+      `gunzip -c '${p}' | docker exec -i offgrid-ds-policyadmin mysql -upolicyadmin -p"$MYSQL_PWD" policyadmin`,
   },
 ];
 
