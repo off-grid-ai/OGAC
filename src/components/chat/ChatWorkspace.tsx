@@ -1301,7 +1301,7 @@ export function ChatWorkspace({
   else micButtonTint = 'text-muted-foreground';
 
   return (
-    <div className="-m-6 flex h-[calc(100%+3rem)] min-h-0">
+    <div className="flex h-full min-h-0">
       {/* Mobile backdrop — closes the drawer on tap. Only rendered/interactive below md. */}
       {sidebarOpen ? (
         <button
