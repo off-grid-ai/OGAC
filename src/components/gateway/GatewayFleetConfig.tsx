@@ -85,7 +85,10 @@ function EditDialog({
       if (!r.ok) {
         setMsg({ ok: false, text: d.error ?? `save failed (${r.status})` });
       } else {
-        const pushed = d.push?.ok ? ' · pushed to node' : d.push?.status === 501 ? ' · saved (node push not actionable)' : d.push?.error ? ` · push error: ${d.push.error}` : '';
+        let pushed = '';
+        if (d.push?.ok) pushed = ' · pushed to node';
+        else if (d.push?.status === 501) pushed = ' · saved (node push not actionable)';
+        else if (d.push?.error) pushed = ` · push error: ${d.push.error}`;
         setMsg({ ok: true, text: `saved${pushed}` });
         await onSaved();
         setTimeout(() => onOpenChange(false), 900);
@@ -105,16 +108,11 @@ function EditDialog({
         type={opts?.type ?? 'text'}
         placeholder={opts?.placeholder}
         value={form[k] === null ? '' : String(form[k])}
-        onChange={(e) =>
-          set(
-            k,
-            (opts?.type === 'number'
-              ? e.target.value === ''
-                ? null
-                : Number(e.target.value)
-              : e.target.value) as never,
-          )
-        }
+        onChange={(e) => {
+          let next: string | number | null = e.target.value;
+          if (opts?.type === 'number') next = e.target.value === '' ? null : Number(e.target.value);
+          set(k, next as never);
+        }}
       />
     </div>
   );
