@@ -18,6 +18,7 @@ import {
   type AuditRow,
   type AuditView,
 } from '@/lib/audit-log-view';
+import { isDemoTenantOrg } from '@/lib/demo-test-artifacts';
 import { searchAudit } from '@/lib/siem';
 
 export interface AuditPage {
@@ -36,9 +37,10 @@ const FETCH_WINDOW = 2000;
 
 // Read one page of audit rows for the given filters. Never throws — a search outage surfaces as
 // { configured, error } and an empty page.
-export async function readAuditPage(f: AuditFilters): Promise<AuditPage> {
+export async function readAuditPage(f: AuditFilters, orgId?: string): Promise<AuditPage> {
   const page = f.page && f.page >= 1 ? f.page : 1;
   const size = Math.min(f.size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const hideAutotest = isDemoTenantOrg(orgId);
   // Only pass filters searchAudit is known to support today; the rest are applied by filterAuditRows.
   const result = await searchAudit({
     q: f.q,
@@ -47,7 +49,10 @@ export async function readAuditPage(f: AuditFilters): Promise<AuditPage> {
     offset: 0,
   });
   const view: AuditView = normalizeAudit(result);
-  const filtered = filterAuditRows(view.rows, f);
+  // On demo tenants, drop QA autotest rows BEFORE facets so the filter chips never list the
+  // autotest actor, then apply the user's filters + paginate over the visible set.
+  const visible = hideAutotest ? filterAuditRows(view.rows, { hideAutotest: true }) : view.rows;
+  const filtered = filterAuditRows(visible, f);
   const start = (page - 1) * size;
   const rows = filtered.slice(start, start + size);
   return {
@@ -57,17 +62,21 @@ export async function readAuditPage(f: AuditFilters): Promise<AuditPage> {
     size,
     configured: view.configured,
     error: view.error,
-    facets: auditFacets(view.rows),
+    facets: auditFacets(visible),
   };
 }
 
 // Read the WHOLE filtered set (up to the fetch window) for export — no pagination slice.
-export async function readAuditForExport(f: AuditFilters): Promise<{
+export async function readAuditForExport(
+  f: AuditFilters,
+  orgId?: string,
+): Promise<{
   rows: AuditRow[];
   configured: boolean;
   error?: string;
 }> {
   const result = await searchAudit({ q: f.q, outcome: f.outcome, size: FETCH_WINDOW, offset: 0 });
   const view = normalizeAudit(result);
-  return { rows: filterAuditRows(view.rows, f), configured: view.configured, error: view.error };
+  const withHide: AuditFilters = { ...f, hideAutotest: isDemoTenantOrg(orgId) };
+  return { rows: filterAuditRows(view.rows, withHide), configured: view.configured, error: view.error };
 }

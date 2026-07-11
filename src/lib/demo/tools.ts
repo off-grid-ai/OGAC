@@ -71,10 +71,10 @@ export const INSURER_TOOLS: readonly DemoToolSeed[] = [
     policy: 'allow',
   },
   {
-    name: 'OYRT Rate Card',
+    name: 'YRT Rate Card',
     type: 'http',
-    endpoint: 'https://actuarial.internal/oyrt/rates',
-    description: 'Fetch the One-Year Renewable Term rate card by age band and sum assured for underwriting. Pipeline-only.',
+    endpoint: 'https://actuarial.internal/yrt/rates',
+    description: 'Fetch the Yearly Renewable Term rate card by age band and sum assured for underwriting. Pipeline-only.',
     policy: 'blocked',
   },
 ];

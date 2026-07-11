@@ -101,8 +101,8 @@ export const INSURER_CHATS: readonly DemoChatSeed[] = [
       {
         role: 'assistant',
         content:
-          'A super top-up with a 5,00,000 deductible sitting above a 5,00,000 base cover is a standard and eligible structure, since the deductible equals the base sum insured, so there is no coverage gap. Eligibility is subject to the age band and medical underwriting per the OYRT-style rate card. For a healthy applicant in the standard band, recommend proceeding to underwriting; load or defer only on adverse medical findings.',
-        citations: [cite('Life Underwriting OYRT Rate Card Guide', 0.86), cite('Insurance Policies & SOPs', 0.83)],
+          'A super top-up with a 5,00,000 deductible sitting above a 5,00,000 base cover is a standard and eligible structure, since the deductible equals the base sum insured, so there is no coverage gap. Eligibility is subject to the age band and medical underwriting per the YRT-style rate card. For a healthy applicant in the standard band, recommend proceeding to underwriting; load or defer only on adverse medical findings.',
+        citations: [cite('Life Underwriting YRT Rate Card Guide', 0.86), cite('Insurance Policies & SOPs', 0.83)],
       },
     ],
   },

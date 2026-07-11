@@ -35,6 +35,7 @@ export default async function AuditLogPage({
     return typeof v === 'string' ? v : null;
   };
   const filters = parseAuditFilters(get);
+  const orgId = await currentOrgId();
   const {
     rows: allRows,
     total,
@@ -43,12 +44,11 @@ export default async function AuditLogPage({
     configured,
     error,
     facets,
-  } = await readAuditPage(filters);
+  } = await readAuditPage(filters, orgId);
 
   // Pipeline facet — narrow the page's rows to the events attributed to one pipeline (resource/project
   // == pipeline:<id>). Applied client-side over the fetched page window (the audit reader isn't yet
   // pipeline-aware server-side), so the note below is explicit about the scope.
-  const orgId = await currentOrgId();
   const pipelines = await listPipelines(orgId).catch(() => []);
   const facet = resolvePipelineFacet(get('pipeline'), pipelines.map((p) => p.id));
   const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;

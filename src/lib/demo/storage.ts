@@ -49,7 +49,7 @@ export const INSURER_FILES: readonly DemoFileSeed[] = [
     name: 'policy-schedule-SL-2291043.txt',
     mime: 'text/plain',
     content:
-      'SURAKSHA LIFE — Policy Schedule\nPolicy No: SL-2291043\nPlan: OYRT Term\nSum Assured (INR): 1,00,00,000\n' +
+      'SURAKSHA LIFE — Policy Schedule\nPolicy No: SL-2291043\nPlan: YRT Term\nSum Assured (INR): 1,00,00,000\n' +
       'Commencement: 2021-04-15\nPremium (INR/yr): 18,400\nStatus: In-force\nPAN: ABCXX1234X (masked)\n',
   },
   {
