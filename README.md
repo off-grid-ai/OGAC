@@ -158,13 +158,13 @@ variable at a best-in-class open-source engine. Same governance either way.
 |---|---|---|---|
 | Model gateway | [Off Grid AI Desktop](https://github.com/off-grid-ai/off-grid-ai-desktop) in gateway mode, OpenAI-compatible, local fleet or cloud | — | Gateway |
 | State + audit | [Postgres](https://www.postgresql.org) (append-only audit is always on) | — | everywhere |
-| Identity / SSO | [Keycloak](https://www.keycloak.org) (OIDC) | — | Access |
+| Identity / SSO | Auth.js (NextAuth) with dev credentials | [Keycloak](https://www.keycloak.org) OIDC (or Google / Microsoft Entra) | Access |
 | Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Knowledge, Retrieval |
 | Policy decisions | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
-| Guardrails (screen prompts + responses) | regex floor (PII detect + mask) | [Presidio](https://microsoft.github.io/presidio/) (ML PII) or an external guard over HTTP ([Lakera](https://www.lakera.ai), [Aporia](https://www.aporia.com), self-hosted) | Control |
+| Guardrails (screen prompts + responses) | regex PII floor for data-movement redaction (always on, no network) | [LLM Guard](https://github.com/protectai/llm-guard) (Protect AI) for content guardrails — PII/DLP, prompt-injection, toxicity, secrets, language, India recognizers folded in (`OFFGRID_HTTP_GUARDRAIL_URL`) | Control |
 | Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
 | Cost + budgets (FinOps) | first-party pricing + budget enforcement | — | Insights |
-| Compliance mapping | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act) + exports | — | Governance |
+| Compliance mapping | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act, article-level) + control-mapped framings (DPDP, GDPR, HIPAA, DORA, RBI, IRDAI) + exports | — | Governance |
 | Response cache | in-process | [Redis](https://redis.io) | — |
 | Feature flags | Postgres | [Unleash](https://www.getunleash.io) (reads) | Admin |
 | Secrets | env vars | [OpenBao](https://openbao.org) (KV) | Control |
@@ -175,8 +175,8 @@ variable at a best-in-class open-source engine. Same governance either way.
 
 **Working, with a caveat we will not hide**
 
-- **PII masking** is regex string-replace today. Presidio's ML detection runs in-path; its ML redaction (`/anonymize`) is next, not yet wired.
-- **External guardrail engines** (Lakera, Aporia, Prompt-Security) plug into a generic HTTP seam that ships and works today. A named-vendor mapping is one config plus at most one field-map, documented, not a pre-built branded integration per vendor.
+- **PII masking.** The data-movement path is deterministic regex redaction (always on, no network). Content-path PII/DLP, injection, toxicity and secrets run through self-hosted [LLM Guard](https://github.com/protectai/llm-guard), with the India recognizers folded into its scanner config and its Anonymize scanner doing the ML rewrite. It fails closed when configured (an unreachable engine blocks the run) and is surfaced honestly as "not configured" when no endpoint is set — never a silent fall-open.
+- **Content guardrails are consolidated on one engine.** Rather than a multi-vendor marketplace, the console relies completely on LLM Guard over HTTP (`OFFGRID_HTTP_GUARDRAIL_URL`). Pointing it at a different scanner service that speaks the same `/analyze` contract is a config change, not a code change.
 - **Durable runs.** Temporal execution visibility is wired (you can see workflow state). Durable execution itself is opt-in (`OFFGRID_QUEUE_ENABLED=1`) and still being hardened. Runs are synchronous by default.
 - **BI dashboards.** [Superset](https://superset.apache.org) embeds on Insights after a one-time `superset init`.
 - **Device fleet.** Host inventory, live osquery, software/CVE, and policies work today via [Fleet](https://fleetdm.com)'s open-source core (agent-enrolled). Full **MDM control (lock/wipe/config profiles, Apple APNs) is coming soon**, and some advanced MDM/RBAC is Fleet Premium (separately licensed).
@@ -184,7 +184,7 @@ variable at a best-in-class open-source engine. Same governance either way.
 
 **On the roadmap (not built yet)**
 
-Agent frameworks ([CrewAI](https://www.crewai.com) / [Agno](https://www.agno.com)), runtime threat detection (Falco), cloud microVM sandboxing (E2B), full durable execution, the Prove-It test-recording module, the cross-device capture + "Soul" intelligence layer, managed hosting, and the `@offgrid/sdk`. Tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Agent frameworks ([CrewAI](https://www.crewai.com) / [Agno](https://www.agno.com)), runtime threat detection (Falco), cloud microVM sandboxing (E2B), full durable execution, the cross-device capture + "Soul" intelligence layer, managed hosting, and the `@offgrid/sdk`. Tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Run it
 
