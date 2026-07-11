@@ -56,6 +56,7 @@ export default async function WarehouseTableDetailPage({
   const rows = sample?.rows ?? [];
   const columnNames = deriveResultColumns(columns, rows);
   const freshness = stats?.freshness;
+  const previewSql = `SELECT * FROM ${name} LIMIT 100`;
 
   return (
     <div className="w-full space-y-6">
@@ -78,9 +79,7 @@ export default async function WarehouseTableDetailPage({
           <p className="mt-1 text-xs text-muted-foreground">{name}</p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/data/query?sql=${encodeURIComponent(`SELECT * FROM ${name} LIMIT 100`)}`}>
-            Query this table
-          </Link>
+          <Link href={`/data/query?sql=${encodeURIComponent(previewSql)}`}>Query this table</Link>
         </Button>
       </div>
 

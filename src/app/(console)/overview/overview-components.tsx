@@ -170,7 +170,12 @@ export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['ac
             .
           </p>
         ) : (
-          activity.map((r) => (
+          activity.map((r) => {
+            let statusCls = 'bg-muted text-muted-foreground';
+            if (r.status === 'blocked' || r.status === 'denied')
+              statusCls = 'bg-destructive/10 text-destructive';
+            else if (r.status === 'done') statusCls = 'bg-primary/10 text-primary';
+            return (
             <Link
               key={r.id}
               href={`/build/agent-runs?run=${r.id}`}
@@ -180,20 +185,12 @@ export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['ac
                 <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
               </span>
-              <Badge
-                variant="secondary"
-                className={
-                  r.status === 'blocked' || r.status === 'denied'
-                    ? 'bg-destructive/10 text-destructive'
-                    : r.status === 'done'
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                }
-              >
+              <Badge variant="secondary" className={statusCls}>
                 {r.status}
               </Badge>
             </Link>
-          ))
+            );
+          })
         )}
       </CardContent>
     </Card>
