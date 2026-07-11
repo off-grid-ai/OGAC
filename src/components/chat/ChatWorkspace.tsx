@@ -2004,17 +2004,31 @@ export function ChatWorkspace({
       {/* Image lightbox — click a message image to view it full-size */}
       {lightbox && (
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Close image preview"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-8"
-          onClick={() => setLightbox(null)}
+          // Dismiss only when the backdrop itself is clicked, not the image inside it.
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLightbox(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setLightbox(null);
+            }
+          }}
         >
           <button
+            type="button"
+            aria-label="Close image preview"
             className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
             onClick={() => setLightbox(null)}
           >
             <X className="size-5" />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox} alt="" className="max-h-full max-w-full rounded object-contain" onClick={(e) => e.stopPropagation()} />
+          <img src={lightbox} alt="" className="max-h-full max-w-full rounded object-contain" />
         </div>
       )}
     </div>

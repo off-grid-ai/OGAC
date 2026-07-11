@@ -19,3 +19,7 @@ on the next `i++`, so it is NOT behavior-preserving. Left as-is.
 - typescript:S7758 | src/lib/device-token.ts:53 | Constant-time token compare, per-code-unit XOR; codePointAt would change values and break the fixed-length walk. Security-sensitive — do not alter.
 - typescript:S7758 | src/lib/workspace-grid.ts:61 | djb2-style hash, per-code-unit; non-BMP divergence.
 - typescript:S7758 | src/lib/adapters/inference.ts:14 | Bag-of-words feature hash, per-code-unit; non-BMP divergence.
+
+## typescript:S6847 — non-interactive element with mouse/keyboard listener (kept)
+
+- typescript:S6847 | src/components/ui/cards-carousel.tsx:165 | This is a proper `role="dialog" aria-modal="true"` modal. Its `onMouseDown` is click-outside-to-dismiss (guarded by `e.target === e.currentTarget`). The keyboard equivalent (Escape-to-close) is already wired via a `document` keydown effect in the same component, so keyboard users can close it. Adding a redundant element-level onKeyDown or converting the dialog container to a native control would either duplicate the handler or break the modal-dialog semantics — no accessibility gap to fix.
