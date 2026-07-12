@@ -1,11 +1,33 @@
-// PURE analytics-aggregation logic — zero I/O, unit-testable. Owns two halves of the OpenSearch
-// rollup path that replaced the old "pull 5000 raw docs and loop in JS" approach:
+// PURE analytics-aggregation logic — zero I/O, unit-testable. Owns:
 //   1. buildAggsQuery()   — the `size:0` `_search` body (terms / date_histogram / percentiles /
 //                           value_count / sum, plus recent-vs-baseline filters for drift & perf).
 //   2. parseAggsResponse() — turns the OpenSearch aggregation response into the SAME `Analytics`
 //                           shape the page/routes/reports already consume, byte-identical in fields.
+//   3. assembleAnalytics() — the SAME `Analytics` shape computed IN JS from already-fetched raw docs
+//                           (mirrors finops.ts `assembleFinOps`). This is the source-of-truth path
+//                           computeAnalytics uses: it string-buckets the day series off the `ts`
+//                           field EXACTLY as FinOps' `daily` does, so the per-day charts (`series`)
+//                           bind to the SAME populated docs that feed the stat cards — regardless of
+//                           whether the OpenSearch `@timestamp` field is mapped as a `date`. A
+//                           `date_histogram` on an un-mapped/mis-mapped `@timestamp` returns ZERO
+//                           buckets, which flattened the Events/Latency charts while the scalar sums
+//                           feeding the cards still populated — the #238 "cards have data, charts are
+//                           flat" bug. Assembling in JS removes that fragility (the terminal artifact
+//                           the charts render is a real series whenever the cards are non-empty).
 // No `fetch`, no `process.env` here — the thin adapter in analytics.ts wires those in.
 import type { Analytics, DayPoint, ModelStat } from '@/lib/analytics-types';
+
+// The subset of a gateway traffic record the JS rollup reads. Structurally a `store.AuditEvent`
+// (what `gatewayEvents()` returns) but declared locally so this pure module never imports the heavy,
+// I/O-laden `@/lib/store` graph — keeping it zero-IO and unit-testable. `ts` is the record time
+// (ISO string, as `gatewayEvents` maps it); `latencyMs` is optional (missing → 0).
+export interface AnalyticsEvent {
+  ts: string;
+  model: string;
+  tokens: number;
+  latencyMs?: number;
+  outcome: 'ok' | 'blocked' | 'redacted';
+}
 
 const DRIFT_FACTOR = 1.5;
 const PERF_FACTOR = 1.3;
@@ -212,6 +234,102 @@ export function parseAggsResponse(resp: OsResponse): Analytics {
     // Egress rate: leftDevice is always false for gateway records, so this was — and stays — 0.0.
     egressRate: 0,
     outcomes: { ok, redacted: 0, blocked },
+    byModel,
+    series,
+    drift: {
+      recent: recentBlocked,
+      baseline: baseBlocked,
+      flagged: recentBlocked > baseBlocked * DRIFT_FACTOR,
+    },
+    perf: { recent: recentP95, baseline: baseP95, flagged: recentP95 > baseP95 * PERF_FACTOR },
+  };
+}
+
+// ─── JS assembly over already-fetched raw docs (mirrors finops.ts assembleFinOps) ───────────────
+// A record's blocked-rate flag: blocked OR redacted (redacted never occurs from the gateway stream
+// today, but include it so the rule matches the FinOps/old-loop definition exactly).
+function isFlagged(e: AnalyticsEvent): boolean {
+  return e.outcome === 'blocked' || e.outcome === 'redacted';
+}
+
+// Exact percentile of a set of latencies — matches the old JS-loop percentile() (ceil index, rounded).
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1);
+  return Math.round(sorted[Math.max(0, idx)]);
+}
+
+// Blocked-rate over a window: flagged / total, to 3 decimals (matches parseAggsResponse's `rate`).
+function flaggedRate(events: AnalyticsEvent[]): number {
+  return rate(events.filter(isFlagged).length, events.length);
+}
+
+/**
+ * Compute the full `Analytics` rollup IN JS from already-fetched gateway docs — the SAME output shape
+ * `parseAggsResponse` produces, but never dependent on the OpenSearch `@timestamp` date-mapping (the
+ * source of the #238 flat-chart bug). Pure: `nowMs` is injected so the recent/baseline split is
+ * deterministic. The day series buckets by `ts.slice(0,10)` — identical to finops.ts `daily` and the
+ * original JS-loop `series()` — so the charts bind to the same docs the stat cards do.
+ */
+export function assembleAnalytics(events: AnalyticsEvent[], nowMs: number): Analytics {
+  const totalEvents = events.length;
+  const totalTokens = events.reduce((a, e) => a + e.tokens, 0);
+  const lat = (e: AnalyticsEvent) => e.latencyMs ?? 0;
+  const allLat = events.map(lat);
+
+  // byModel — tokens desc, avgLatency = round(latencySum / events) (matches the old loop + parser).
+  const modelMap = new Map<string, { events: number; tokens: number; latency: number }>();
+  for (const e of events) {
+    const m = modelMap.get(e.model) ?? { events: 0, tokens: 0, latency: 0 };
+    m.events += 1;
+    m.tokens += e.tokens;
+    m.latency += lat(e);
+    modelMap.set(e.model, m);
+  }
+  const byModel: ModelStat[] = [...modelMap.entries()]
+    .map(([model, v]) => ({
+      model,
+      events: v.events,
+      tokens: v.tokens,
+      avgLatency: avgLatency(v.latency, v.events),
+    }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  // series — one point per calendar day (UTC), keyed by the ISO date prefix (mapping-independent).
+  const dayMap = new Map<string, { events: number; latency: number }>();
+  for (const e of events) {
+    const day = e.ts.slice(0, 10);
+    const d = dayMap.get(day) ?? { events: 0, latency: 0 };
+    d.events += 1;
+    d.latency += lat(e);
+    dayMap.set(day, d);
+  }
+  const series: DayPoint[] = [...dayMap.entries()]
+    .map(([day, v]) => ({ day, events: v.events, avgLatency: avgLatency(v.latency, v.events) }))
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  // outcomes — redacted never occurs from the gateway stream (stays 0); ok = total - blocked.
+  const blocked = events.filter((e) => e.outcome === 'blocked').length;
+  const redacted = events.filter((e) => e.outcome === 'redacted').length;
+
+  // drift & perf — split on the 2-day recent/baseline boundary (matches the old loop + query).
+  const recentGte = nowMs - RECENT_MS;
+  const recent = events.filter((e) => Date.parse(e.ts) >= recentGte);
+  const baseline = events.filter((e) => Date.parse(e.ts) < recentGte);
+  const recentBlocked = flaggedRate(recent);
+  const baseBlocked = flaggedRate(baseline);
+  const recentP95 = percentile(recent.map(lat), 0.95);
+  const baseP95 = percentile(baseline.map(lat), 0.95);
+
+  return {
+    totalEvents,
+    totalTokens,
+    p50: percentile(allLat, 0.5),
+    p95: percentile(allLat, 0.95),
+    // Egress rate: gateway records never leftDevice — 0.0, unchanged from every prior implementation.
+    egressRate: 0,
+    outcomes: { ok: totalEvents - blocked, redacted, blocked },
     byModel,
     series,
     drift: {

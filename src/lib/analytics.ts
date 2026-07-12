@@ -1,25 +1,27 @@
 import {
   analyticsScopeFilters,
-  buildAggsQuery,
+  assembleAnalytics,
   emptyAnalytics,
-  parseAggsResponse,
   scopedQuery,
 } from '@/lib/analytics-aggs';
 import { type Analytics } from '@/lib/analytics-types';
 import { type AuditEvent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
-// Analytics now reads REAL gateway traffic from OpenSearch (index offgrid-gateway — the same
-// durable sink the gateway usage/logs views use), NOT the seeded Postgres audit table. Empty or
-// unreachable → real zeros, never synthetic.
+// Analytics reads REAL gateway traffic from OpenSearch (index offgrid-gateway — the same durable
+// sink the gateway usage/logs views use), NOT the seeded Postgres audit table. Empty or unreachable
+// → real zeros, never synthetic.
 //
-// The rollups (byModel / time-series / percentiles / outcomes / drift / perf) are computed by
-// OpenSearch itself via a single `size:0` `_search` with `aggs` — see computeAnalytics(). We no
-// longer pull up to 5000 raw docs and loop in JS for the rollups (correctness + scale). The pure
-// query builder + response parser live in analytics-aggs.ts (zero-IO, unit-tested).
+// The rollups (byModel / time-series / percentiles / outcomes / drift / perf) are computed IN JS
+// over the raw docs `gatewayEvents()` fetches — the SAME docs that feed the FinOps cost model and
+// the stat cards — via the pure `assembleAnalytics()` (analytics-aggs.ts, zero-IO, unit-tested).
 //
-// gatewayEvents() (raw-doc fetch) is retained for the FinOps cost model (finops.ts), which needs
-// per-event keyId/subject attribution the aggregation can't provide.
+// WHY JS assembly and not an OpenSearch `date_histogram` (which we used to do): the day-series agg
+// keyed off `@timestamp` returns ZERO buckets whenever that field is not mapped as a `date`, which
+// flattened the per-day charts while the scalar sums feeding the cards still populated (#238). The
+// scalar rollups derive from `tokens`/`ms` (always numeric) so the cards looked fine; only the
+// histogram silently died. Bucketing days by `ts.slice(0,10)` in JS — exactly as FinOps' `daily`
+// does — makes the charts bind to the same populated docs the cards do, mapping-independent.
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
@@ -63,24 +65,12 @@ export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditE
   }
 }
 
-// Compute the analytics rollups via native OpenSearch aggregations — one `size:0` `_search`, no raw
-// docs. Graceful fallback to real zeros when OpenSearch is unreachable (identical to the old empty
-// path). The output shape is byte-identical to the previous JS-loop implementation.
+// Compute the analytics rollups over the raw gateway docs (org- + pipeline-scoped by gatewayEvents).
+// assembleAnalytics is pure + unit-tested; the day series buckets by `ts` in JS so the charts bind
+// to the same populated docs the stat cards do, independent of the `@timestamp` field mapping (#238).
+// Empty (no docs / OpenSearch unreachable — gatewayEvents returns []) → real zeros, never synthetic.
 export async function computeAnalytics(pipelineTag?: string | null): Promise<Analytics> {
-  try {
-    // TENANT ISOLATION (G-ADV-OBS-ORG): scope the whole aggregation to the caller's org.
-    const org = await currentOrgId();
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildAggsQuery(Date.now(), pipelineTag, org)),
-      cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!r.ok) return emptyAnalytics();
-    const data = await r.json();
-    return parseAggsResponse(data);
-  } catch {
-    return emptyAnalytics();
-  }
+  const events = await gatewayEvents(pipelineTag);
+  if (events.length === 0) return emptyAnalytics();
+  return assembleAnalytics(events, Date.now());
 }
