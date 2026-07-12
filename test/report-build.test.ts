@@ -216,6 +216,30 @@ test('buildInventoryDoc: devices/connectors/datasets tables reconcile, passes va
   }
 });
 
+// The corner that broke live (a real tenant with 0 devices / 0 connectors / 0 datasets): the builder
+// must NOT emit an empty table (validateReportDoc rejects those) — it renders an honest paragraph
+// instead, and the document is STILL complete + valid.
+test('buildInventoryDoc: empty collections yield a valid doc with "none on record" paragraphs, no empty tables', () => {
+  const doc = buildInventoryDoc(
+    { residency, devices: [], connectors: [], datasets: [] },
+    baseMeta({
+      title: 'Model & Data Inventory',
+      recipient: { role: 'cdo', name: `${TENANT} Chief Data Officer` },
+      classification: 'Internal',
+      filenameBase: 'offgrid-inventory',
+    }),
+  );
+  assertValid(doc); // would fail if any empty table survived
+  const emptyTables = doc.sections.flatMap((s) =>
+    s.blocks.filter((b) => b.type === 'table' && b.rows.length === 0),
+  );
+  assert.equal(emptyTables.length, 0, 'no empty tables may reach the document');
+  const hasNoneParagraph = doc.sections.some((s) =>
+    s.blocks.some((b) => b.type === 'paragraph' && /on record/.test(b.text)),
+  );
+  assert.ok(hasNoneParagraph, 'empty collections render as a "none on record" paragraph');
+});
+
 const analytics: Analytics = {
   totalEvents: 128450,
   totalTokens: 9820000,
