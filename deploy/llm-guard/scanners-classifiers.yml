@@ -1,0 +1,59 @@
+app:
+  name: ${APP_NAME:LLM Guard API (classifiers shard)}
+  log_level: ${LOG_LEVEL:INFO}
+  log_json: ${LOG_JSON:true}
+  scan_fail_fast: ${SCAN_FAIL_FAST:false}
+  scan_prompt_timeout: ${SCAN_PROMPT_TIMEOUT:30}
+  scan_output_timeout: ${SCAN_OUTPUT_TIMEOUT:30}
+  lazy_load: false
+
+rate_limit:
+  enabled: ${RATE_LIMIT_ENABLED:false}
+  limit: ${RATE_LIMIT_LIMIT:100/minute}
+
+auth:
+  type: http_bearer
+  token: ${AUTH_TOKEN:}
+
+tracing:
+  exporter: ${TRACING_EXPORTER:console}
+  endpoint: ${TRACING_OTEL_ENDPOINT:}
+
+metrics:
+  exporter: ${METRICS_TYPE:prometheus}
+  endpoint: ${METRICS_ENDPOINT:}
+
+# CLASSIFIER SHARD (runs on the aux box, S2) — the HEAVY transformer scanners that OOM'd when
+# co-loaded with the PII shard in one 7.8 GB VM. Here they run ALONE on S2 (which has the RAM
+# headroom after the data stack), while S1 keeps the PII/DLP + substrings shard. The guardrail
+# aggregator (scripts/guardrail-aggregator.mjs) fans /analyze/prompt to BOTH and merges the verdicts,
+# so the console still sees the full suite behind one endpoint.
+#
+# `use_onnx: false` on EVERY transformer scanner is REQUIRED — the archived laiyer image's ONNX model
+# references 404 at their pinned HF revisions; the PyTorch weights load fine (see README.md).
+#
+# Scanner set sized to fit S2's free VM: two transformer classifiers (PromptInjection = deberta-v3,
+# Toxicity = roberta) + two light ones (Gibberish, Language). PII/Anonymize/Secrets/Regex live on the
+# S1 shard, NOT here — this shard does not redact.
+input_scanners:
+  - type: PromptInjection
+    params:
+      threshold: 0.92
+      match_type: truncate_head_tail
+      use_onnx: false
+  - type: Toxicity
+    params:
+      threshold: 0.7
+      use_onnx: false
+  - type: Gibberish
+    params:
+      threshold: 0.97
+      use_onnx: false
+  - type: Language
+    params:
+      valid_languages: ["en"]
+      use_onnx: false
+
+# No output_scanners on this shard — /analyze/prompt only runs input_scanners, and the redacting
+# output scanners (Deanonymize/Sensitive) belong with the PII shard's Anonymize on S1.
+output_scanners: []
