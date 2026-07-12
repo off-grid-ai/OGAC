@@ -93,6 +93,7 @@
     "src/lib/chat-audio.ts",
     "src/lib/chat-run-dispatch.ts",
     "src/lib/reports.ts",
+    "src/lib/reports/build.ts",
     "src/lib/brain.ts",
     "src/lib/files.ts",
     "src/lib/trigger-dispatch.ts",

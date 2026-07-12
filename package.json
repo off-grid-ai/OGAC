@@ -29,6 +29,7 @@
     "test:integration": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.integration.test.ts",
     "coverage": "c8 --config .c8rc.json node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "coverage:check": "c8 --config .c8rc.json --check-coverage node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
+    "verify:reports": "node --import ./test/support/register-alias.mjs scripts/verify-report-pdfs.mjs",
     "depcruise": "depcruise src scripts --config .dependency-cruiser.js",
     "depcruise:report": "depcruise src scripts --config .dependency-cruiser.js --output-type err-long",
     "depcruise:graph": "depcruise src --config .dependency-cruiser.js --output-type dot | dot -T svg -o docs/dependency-graph.svg",
