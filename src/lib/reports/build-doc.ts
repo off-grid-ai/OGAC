@@ -94,6 +94,25 @@ export function periodEndingAt(now: string): { from: string; to: string } {
   return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
 }
 
+// A table built from a LIVE tenant collection can legitimately be empty (0 devices, 0 region rules,
+// an unseeded dataset list). validateReportDoc rejects an empty table by design — a regulator document
+// must never show a blank grid — so the builder must never EMIT one. This normalizes any empty table
+// into an honest "none on record" paragraph, which is complete + valid. Applied once for EVERY builder
+// via assemble(), so no family can regress. Pure.
+function normalizeEmptyTables(section: ReportSection): ReportSection {
+  return {
+    ...section,
+    blocks: section.blocks.map((b) =>
+      b.type === 'table' && b.rows.length === 0
+        ? {
+            type: 'paragraph',
+            text: `No ${section.heading.toLowerCase()} on record for this reporting period.`,
+          }
+        : b,
+    ),
+  };
+}
+
 function assemble(meta: DocMetaInput, sections: ReportSection[]): ReportDoc {
   return {
     filenameBase: meta.filenameBase,
@@ -108,7 +127,7 @@ function assemble(meta: DocMetaInput, sections: ReportSection[]): ReportDoc {
       generatedAt: meta.now,
       provenance: meta.provenance,
     },
-    sections,
+    sections: sections.map(normalizeEmptyTables),
   };
 }
 
