@@ -1,0 +1,59 @@
+app:
+  name: ${APP_NAME:LLM Guard API}
+  log_level: ${LOG_LEVEL:INFO}
+  log_json: ${LOG_JSON:true}
+  scan_fail_fast: ${SCAN_FAIL_FAST:false}
+  scan_prompt_timeout: ${SCAN_PROMPT_TIMEOUT:30}
+  scan_output_timeout: ${SCAN_OUTPUT_TIMEOUT:30}
+  lazy_load: false
+
+rate_limit:
+  enabled: ${RATE_LIMIT_ENABLED:false}
+  limit: ${RATE_LIMIT_LIMIT:100/minute}
+
+auth:
+  type: http_bearer
+  token: ${AUTH_TOKEN:}
+
+tracing:
+  exporter: ${TRACING_EXPORTER:console}
+  endpoint: ${TRACING_OTEL_ENDPOINT:}
+
+metrics:
+  exporter: ${METRICS_TYPE:prometheus}
+  endpoint: ${METRICS_ENDPOINT:}
+
+# PII-ONLY for the memory-constrained demo box: ONE ML model (Anonymize = PII detection, the exact
+# thing the console's "PII Guardrails" tile represents) + zero-model regex/heuristic scanners.
+# PromptInjection + all other ML scanners dropped (two transformer models pinned the 3GB cap).
+input_scanners:
+  - type: Anonymize
+    params:
+      use_faker: false
+      threshold: 0.75
+  - type: Secrets
+    params:
+      redact_mode: "all"
+  - type: Regex
+    params:
+      patterns: ["Bearer [A-Za-z0-9-._~+/]+"]
+      is_blocked: true
+      match_type: search
+      redact: true
+  - type: BanSubstrings
+    params:
+      substrings: ["ignore previous instructions", "disregard the above"]
+      match_type: "str"
+      case_sensitive: false
+      redact: false
+      contains_all: false
+  - type: InvisibleText
+    params: {}
+
+output_scanners:
+  - type: Regex
+    params:
+      patterns: ["Bearer [A-Za-z0-9-._~+/]+"]
+      is_blocked: true
+      match_type: search
+      redact: true
