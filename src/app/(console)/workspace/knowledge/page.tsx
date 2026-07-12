@@ -67,7 +67,7 @@ export default async function KnowledgePage() {
                   <Books className="size-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="truncate text-base">
+                  <CardTitle className="line-clamp-2 text-base">
                     {/* The whole card is the way IN: this Link routes to the deep-linkable detail. */}
                     <Link
                       href={`/workspace/knowledge/${c.id}`}
