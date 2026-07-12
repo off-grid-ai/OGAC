@@ -36,3 +36,11 @@ deploy/onprem/ragas-sidecar/.env
 __pycache__/
 *.pyc
 .shots/
+
+# Confidential client-derived material — MUST NOT be committed (scrubbed 2026-07-12)
+# Requirement docs / use-case plans / seed data derived from a client's confidential brief
+# stay local only. Keep only the FICTIONAL demo tenant (Suraksha/bharatunion) seeds in git.
+docs/EY_USE_CASES_PLAN.md
+**/*-ey-seed.ts
+**/ey-usecase*
+**/data-domains-ey-seed*
