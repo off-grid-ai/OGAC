@@ -318,52 +318,46 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     kind: 'api',
   },
 
-  // ── Canonical planes NOT deployed on THIS fleet (honest, non-alarming — never 'down') ────
-  // The observability plane (VictoriaMetrics/VictoriaLogs/OTel/Jaeger) is canonical in
-  // docker-compose.yml (observability profile) but is intentionally NOT run here: this fleet
-  // uses OpenSearch (log/audit search) + Langfuse (LLM traces) instead. Probing them would
-  // always read 'down' — misleading — so they're modelled as 'optional' with a non-http URL
-  // (never network-probed, see status.ts#isHttpProbeable) and a fallbackLabel that states the
-  // reason. They render muted "Optional" + the reason, NOT a red outage.
+  // ── Observability plane (metrics/logs/traces) — DEPLOYED across the fleet ────────────────────
+  // VictoriaMetrics on S1; VictoriaLogs + Jaeger on S3 (reached via S1 root loopbacks). The console
+  // probes them at 127.0.0.1 like every other service. OTel-collector is being provisioned (kept
+  // 'optional' so it reads as a calm "provisioning", never a red outage, until it lands).
   {
     id: 'victoriametrics',
     label: 'Metrics Store',
-    description: 'Metrics store (observability profile) — canonical in compose, not run on this fleet.',
-    url: process.env.OFFGRID_VICTORIAMETRICS_URL ?? 'not-deployed://victoriametrics',
+    description: 'Time-series metrics store for platform observability (Prometheus-compatible).',
+    url: process.env.OFFGRID_VICTORIAMETRICS_URL ?? 'http://127.0.0.1:8428',
+    healthPath: '/health',
     auth: 'api-key',
     kind: 'api',
-    probe: 'optional',
-    fallbackLabel: 'not deployed here — log search + observability cover logs/traces on this fleet',
   },
   {
     id: 'victorialogs',
     label: 'Log Store',
-    description: 'Log store (observability profile) — canonical in compose, not run on this fleet.',
-    url: process.env.OFFGRID_VICTORIALOGS_URL ?? 'not-deployed://victorialogs',
+    description: 'High-cardinality log store for platform logs and traces.',
+    url: process.env.OFFGRID_VICTORIALOGS_URL ?? 'http://127.0.0.1:9428',
+    healthPath: '/',
     auth: 'api-key',
     kind: 'api',
-    probe: 'optional',
-    fallbackLabel: 'not deployed here — the log search & SIEM plane covers log/audit search',
   },
   {
     id: 'otel-collector',
     label: 'Telemetry Collector',
-    description: 'OpenTelemetry collector (observability profile) — canonical in compose, not run on this fleet.',
+    description: 'OpenTelemetry collector — the OTLP ingest that fans spans/metrics/logs to the backends.',
     url: process.env.OFFGRID_OTEL_URL ?? 'not-deployed://otel-collector',
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'not deployed here — the console fans OTLP spans straight to the tracing plane',
+    fallbackLabel: 'provisioning — OTLP ingest coming online on the observability node',
   },
   {
     id: 'jaeger',
     label: 'Trace Explorer',
-    description: 'Distributed-trace UI (observability profile) — canonical in compose, not run on this fleet.',
-    url: process.env.OFFGRID_JAEGER_URL ?? 'not-deployed://jaeger',
+    description: 'Distributed-trace explorer — span search across services.',
+    url: process.env.OFFGRID_JAEGER_URL ?? 'http://127.0.0.1:16686',
+    healthPath: '/',
     auth: 'session',
     kind: 'api',
-    probe: 'optional',
-    fallbackLabel: 'not deployed here — the observability & tracing plane is the trace backend on this fleet',
   },
 ];
 
