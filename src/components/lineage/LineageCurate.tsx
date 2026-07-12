@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { lineageNodeLabel } from '@/lib/lineage-view';
 
 // Marquez delete capability, mirrored from lineage-writer.ts MARQUEZ_CAPABILITIES — surfaced
 // honestly to the operator rather than faked. (Client can't import server env-gated modules cleanly,
@@ -71,9 +72,10 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: R
                     variant="outline"
                     className="h-7 gap-1 text-xs"
                     onClick={() => openDataset(d)}
+                    title={d}
                   >
                     <Tag className="size-3" />
-                    {d}
+                    {lineageNodeLabel(d)}
                   </Button>
                   <button
                     type="button"

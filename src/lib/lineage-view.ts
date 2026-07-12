@@ -85,6 +85,47 @@ function str(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
+// ── Human-readable node label (id → display) ───────────────────────────────────────────────────
+// The lineage graph's dataset/job NAMES are, in practice, opaque typed ids the emit path wrote
+// verbatim (e.g. `da-0745bee-6d80-4a1b-…`, `dc-97462aa-…`, `run-…`). Rendering those raw hex ids
+// as node titles reads as broken on a customer surface. This PURE formatter turns such an id into
+// a readable title — a friendly type word for a known short prefix, plus a short id suffix — while
+// the raw id is kept as the tooltip (`title=`) by the caller. A name that is NOT opaque-id-shaped
+// (a real human name Marquez holds) passes through UNCHANGED. Zero-IO; unit-tested exhaustively.
+const LINEAGE_ID_PREFIXES: Record<string, string> = {
+  da: 'Data asset',
+  dc: 'Data collection',
+  ds: 'Dataset',
+  dm: 'Data domain',
+  kb: 'Knowledge base',
+  cl: 'Collection',
+  ag: 'Agent',
+  ap: 'App',
+  rn: 'Run',
+  run: 'Run',
+};
+
+// Opaque-id shape: an optional short alpha prefix (`da-`, `run-`), then hex/uuid-ish segments.
+// Matches `da-0745bee-6d80-4a1b`, `dc-97462aa`, `run-9f3c1d2e`, or a bare uuid/hex ≥ 6 chars.
+const OPAQUE_ID_RE = /^(?:([a-z]{2,3})-)?([0-9a-f]{6,}(?:-[0-9a-f]{3,})*)$/i;
+
+/**
+ * Map a lineage node's raw name to the human-readable label shown as its title. Opaque typed ids
+ * become "Data collection 97462aa" (known prefix) or "97462aa" (unknown prefix); a real name is
+ * returned unchanged. The caller keeps the raw id as the tooltip. Pure, zero-IO.
+ */
+export function lineageNodeLabel(rawName: string | null | undefined): string {
+  const raw = (rawName ?? '').trim();
+  if (!raw) return '(unnamed)';
+  const m = OPAQUE_ID_RE.exec(raw);
+  if (!m) return raw; // a genuine human-readable name — leave it be
+  const prefix = m[1]?.toLowerCase();
+  // First hex segment, lowercased (hex ids are conventionally lowercase) and capped so the chip
+  // stays compact (the full id lives in the tooltip).
+  const shortId = m[2].split('-')[0].slice(0, 8).toLowerCase();
+  const typeWord = prefix ? LINEAGE_ID_PREFIXES[prefix] : undefined;
+  return typeWord ? `${typeWord} ${shortId}` : shortId;
+}
 function normalizeState(state: string | null | undefined): RunState {
   switch ((state ?? '').toUpperCase()) {
     case 'COMPLETED':
