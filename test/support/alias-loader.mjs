@@ -43,6 +43,28 @@ function withExtension(url) {
   return url;
 }
 
+// Node's built-in type stripping handles `.ts`, but THROWS on `.tsx`/`.jsx` (it does not transform
+// JSX). The branded PDF renderer (src/lib/reports/render.tsx) is JSX, and the report integration test
+// imports it — so intercept `.tsx`/`.jsx` in the load hook and transform them with esbuild (already a
+// dependency) to plain ESM. Purely additive: only .tsx/.jsx are transformed; everything else falls
+// through to Node's own loader (which keeps stripping .ts types).
+export async function load(url, context, nextLoad) {
+  if (url.endsWith('.tsx') || url.endsWith('.jsx')) {
+    const { readFile } = await import('node:fs/promises');
+    const { transform } = await import('esbuild');
+    const source = await readFile(fileURLToPath(url), 'utf8');
+    const { code } = await transform(source, {
+      loader: url.endsWith('.tsx') ? 'tsx' : 'jsx',
+      format: 'esm',
+      jsx: 'automatic',
+      target: 'es2022',
+      sourcefile: fileURLToPath(url),
+    });
+    return { format: 'module', shortCircuit: true, source: code };
+  }
+  return nextLoad(url, context);
+}
+
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/navigation') return nextResolve(NEXT_NAV_STUB, context);
   if (specifier === 'next/server') return nextResolve(NEXT_SERVER_STUB, context);

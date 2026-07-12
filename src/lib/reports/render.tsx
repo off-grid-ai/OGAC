@@ -8,7 +8,9 @@
 //
 // Brand: Off Grid AI — emerald accent (the LIGHT #059669 for print legibility), near-black ink, a
 // clean sans (react-pdf's built-in Helvetica — no external font fetch, deterministic on the server).
-import { Document, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { Document, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
 import type { JSX } from 'react';
 import type {
   CalloutBlock,
@@ -32,6 +34,19 @@ const ZEBRA = '#F5F5F5';
 const RED = '#DC2626';
 const AMBER = '#D97706';
 const GREY = '#737373';
+
+// ── Brand logo ─────────────────────────────────────────────────────────────────────────────────
+// The REAL Off Grid AI chip mark. Read off disk once (module scope) as a data: URI so react-pdf's
+// <Image> can embed it with no external fetch and no filesystem access at draw time. public/ is
+// present on disk under `next start` (the deploy rsync ships it), matching src/lib/pdf.ts's font read.
+const LOGO_PATH = join(process.cwd(), 'public', 'logo.png');
+let cachedLogoUri: string | null = null;
+function logoDataUri(): string {
+  if (cachedLogoUri === null) {
+    cachedLogoUri = `data:image/png;base64,${readFileSync(LOGO_PATH).toString('base64')}`;
+  }
+  return cachedLogoUri;
+}
 
 const styles = StyleSheet.create({
   page: {
@@ -58,7 +73,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   headerMarkRow: { flexDirection: 'row', alignItems: 'center' },
-  headerMark: { width: 8, height: 8, backgroundColor: EMERALD, marginRight: 5 },
+  headerLogo: { width: 16, height: 16, marginRight: 6 },
   footer: {
     position: 'absolute',
     bottom: 26,
@@ -246,8 +261,8 @@ function Section({ section }: { section: ReportSection }): JSX.Element {
 const cover = StyleSheet.create({
   page: { padding: 56, fontFamily: 'Helvetica', color: INK },
   wordmarkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  mark: { width: 20, height: 20, backgroundColor: EMERALD, marginRight: 10 },
-  wordmark: { fontFamily: 'Helvetica-Bold', fontSize: 15, color: INK },
+  logo: { width: 48, height: 48, marginRight: 14 },
+  wordmark: { fontFamily: 'Helvetica-Bold', fontSize: 20, color: INK },
   classification: {
     marginTop: 22,
     alignSelf: 'flex-start',
@@ -303,7 +318,7 @@ function Cover({ doc }: { doc: ReportDoc }): JSX.Element {
   return (
     <Page size="A4" style={cover.page}>
       <View style={cover.wordmarkRow}>
-        <View style={cover.mark} />
+        <Image style={cover.logo} src={logoDataUri()} />
         <Text style={cover.wordmark}>Off Grid AI Console</Text>
       </View>
       <Text style={cover.classification}>{m.classification.toUpperCase()}</Text>
@@ -348,7 +363,7 @@ function ReportDocument({ doc }: { doc: ReportDoc }): JSX.Element {
       <Page size="A4" style={styles.page}>
         <View style={styles.header} fixed>
           <View style={styles.headerMarkRow}>
-            <View style={styles.headerMark} />
+            <Image style={styles.headerLogo} src={logoDataUri()} />
             <Text>
               {m.title} · {m.tenantName}
             </Text>
