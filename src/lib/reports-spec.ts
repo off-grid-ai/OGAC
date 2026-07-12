@@ -89,7 +89,7 @@ export const REGULATORS: Record<string, RegulatorSpec> = {
     name: 'IRDAI — insurers',
     status:
       'No standalone IRDAI AI rule exists. AI is governed indirectly via the IN-FORCE Information & Cyber Security Guidelines 2023, Policyholder Protection Regs 2024, Bima Bharosa grievance, Sandbox Regs 2025, and DPDP. "Explainable AI" is best practice, not a current IRDAI mandate.',
-    frameworks: ['dpdp', 'iso-42001', 'hipaa'],
+    frameworks: ['dpdp', 'iso-42001', 'nist-ai-rmf'],
     questions: [
       'What data trains/feeds the model and the lawful basis/consent (DPDP) per category — esp. health/telematics/wearables?',
       'Bias / disparate-impact testing across protected + proxy variables in underwriting / pricing / claims — how often?',
@@ -111,7 +111,7 @@ export const REGULATORS: Record<string, RegulatorSpec> = {
     name: 'RBI — banks / NBFCs',
     status:
       'AI-specific instruments are NON-BINDING (FREE-AI report Aug 2025; draft Model-Risk-in-Credit Aug 2024). Enforceable obligations come from the IN-FORCE IT Outsourcing MD (2023), Payment Data Localization (2018), and IT Governance/GRCA MD (2024).',
-    frameworks: ['dpdp', 'occ-sr-11-7', 'dora', 'iso-42001'],
+    frameworks: ['dpdp', 'iso-42001', 'nist-ai-rmf'],
     questions: [
       'Board-approved AI / model-risk policy over the model lifecycle + named accountable owner — last board review?',
       'Independent pre-deployment validation + ≥annual revalidation, with drift/performance monitoring — show reports.',
@@ -133,7 +133,7 @@ export const REGULATORS: Record<string, RegulatorSpec> = {
     name: 'SEBI — market participants',
     status:
       'IN FORCE: the 2019 AI/ML quarterly reporting circulars (file within 15 days of quarter-end). DRAFT: Responsible AI/ML Guidelines (Jun 2025 consultation) — not yet binding, but signals ≥5-yr input/output retention, accountability, and explainability.',
-    frameworks: ['iso-42001', 'occ-sr-11-7', 'eu-ai-act'],
+    frameworks: ['iso-42001', 'nist-ai-rmf', 'eu-ai-act'],
     questions: [
       'What is the system used for (advice / algo execution / surveillance / KYC), is it investor-facing, in-house/vendor/joint?',
       'Named senior accountable person + where the human-in-the-loop sits?',
@@ -155,7 +155,7 @@ export const REGULATORS: Record<string, RegulatorSpec> = {
     name: 'DPDP Act 2023 / DPDP Rules 2025 (MeitY)',
     status:
       'FINAL — Rules notified 14 Nov 2025, phased. Core duties (notice/consent, rights, breach, retention) + Significant-Data-Fiduciary obligations (DPO, annual DPIA + independent audit, algorithmic-fairness verification) land by ~13 May 2027. Country lists / SDF designations pending notification.',
-    frameworks: ['dpdp', 'gdpr', 'hipaa'],
+    frameworks: ['dpdp', 'gdpr', 'eu-ai-act'],
     questions: [
       'Lawful basis/consent per personal-data category used in training/fine-tuning/inference — notice + affirmative consent, no repurposing?',
       'Why each field is necessary + how you correct/erase a principal’s data, including data embedded in trained models / vector stores?',
@@ -176,7 +176,7 @@ export const REGULATORS: Record<string, RegulatorSpec> = {
     name: 'CERT-In (2022 Directions)',
     status:
       'IN FORCE since Jun 2022 under IT Act s.70B. Annexure-I explicitly lists AI/ML-system incidents.',
-    frameworks: ['iso-42001', 'dora'],
+    frameworks: ['iso-42001', 'nist-ai-rmf'],
     questions: [
       'Are all clocks synced to NIC / NPL NTP — config + drift monitoring?',
       'Are logs retained ≥180 rolling days, stored within India — location + policy?',
