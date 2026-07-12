@@ -46,17 +46,9 @@ const FRAMEWORKS = [
     name: 'NIST AI RMF',
     controlIds: ['audit', 'grounding', 'input-guardrails', 'rbac'],
   },
-  {
-    id: 'hipaa',
-    name: 'HIPAA',
-    controlIds: ['pii-masking', 'erasure', 'audit', 'rbac', 'identity'],
-  },
-  { id: 'dora', name: 'DORA', controlIds: ['audit', 'rbac', 'egress-dlp', 'identity'] },
-  {
-    id: 'occ-sr-11-7',
-    name: 'OCC SR 11-7 (model risk)',
-    controlIds: ['audit', 'grounding', 'rbac', 'input-guardrails'],
-  },
+  // NOTE: US/EU-financial-specific frameworks (HIPAA, DORA, OCC SR 11-7) were removed — wrong-domain
+  // for the Indian BFSI tenants this console serves; they read as an error on a regulator/DPO/CDO
+  // submission. The India-first + globally-referenced AI frameworks above are the set.
 ] as const;
 
 function pick<T>(ok: boolean, yes: T, no: T): T {
