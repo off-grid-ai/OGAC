@@ -20,7 +20,7 @@ export interface ValidationResult {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 // Placeholder tells that must never reach a regulator: empty, a lone dash, or an author's TODO.
-const PLACEHOLDER = /^\s*(|-|—|–|n\/a|na|tbd|todo|xxx|placeholder|lorem)\s*$/i;
+const PLACEHOLDER = /^\s*(-|—|–|n\/a|na|tbd|todo|xxx|placeholder|lorem)?\s*$/i;
 
 function isPlaceholder(v: string): boolean {
   return PLACEHOLDER.test(v);
