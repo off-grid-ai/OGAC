@@ -13,43 +13,69 @@ const BASE = process.env.BASE || 'https://onprem-console.getoffgridai.co';
 const OUT = process.env.OUT || 'public/docs-shots';
 const USER = process.env.USER_EMAIL || process.env.USER || 'mac@getoffgridai.co';
 const PASS = process.env.PASS || 'changeme';
-const REIMB = process.env.REIMB_APP || 'app_bdd24eab';
+// Seeded ids for detail/flow screens (bank tenant = the canonical demo). Override via env.
+const REIMB = process.env.REIMB_APP || 'bhapp_fnol';
+const PIPE = process.env.PIPE_ID || 'pl_seed_org_bharat_cross-sell-advisor';
+const GW = process.env.GW_ID || 'gw_seed_org_bharat_onprem-cluster';
 const only = process.argv.slice(2);
 mkdirSync(OUT, { recursive: true });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// route -> filename. Detail/flow screens use a seeded id. Extend freely.
+// route -> filename. Routes are the current section-nested paths (post #177). Detail/flow screens use
+// a seeded id. Filenames match what README.md + the /docs pages already reference. Extend freely.
 const TARGETS = [
-  ['fleet', 'fleet'],
-  ['gateway', 'gateway'],
-  ['control', 'control'],
-  ['data/connectors/con_corebank', 'connectors'],
-  ['data', 'data'],
-  ['brain', 'brain'],
-  ['knowledge', 'knowledge'],
-  ['studio', 'studio'],
-  [`apps/${REIMB}`, 'app-lifecycle'],
-  [`apps/${REIMB}/runs`, 'app-runs'],
-  [`apps/${REIMB}/review`, 'app-review'],
-  [`apps/${REIMB}/reports`, 'app-reports'],
-  ['chat', 'chat'],
-  ['evals', 'evals'],
-  ['observability', 'observability'],
-  ['policy', 'policy'],
-  ['guardrails', 'guardrails'],
-  ['secrets', 'secrets'],
-  ['access', 'access'],
-  ['audit', 'audit'],
-  ['lineage', 'lineage'],
-  ['regulatory', 'regulatory'],
+  ['overview', 'overview'],
+  ['workspace/chat', 'chat'],
+  ['workspace/knowledge', 'knowledge'],
+  ['workspace/prompts', 'prompts'],
   ['storage', 'storage'],
-  ['integrations', 'integrations'],
-  ['prompts', 'prompts'],
-  ['finops', 'finops'],
+  ['build/studio', 'studio'],
+  ['build/agents', 'agents'],
+  ['build/evals', 'evals'],
+  ['build/pipelines', 'pipelines-list'],
+  [`build/apps/${REIMB}`, 'app-lifecycle'],
+  [`build/apps/${REIMB}/runs`, 'app-runs'],
+  [`build/apps/${REIMB}/review`, 'app-review'],
+  [`build/apps/${REIMB}/reports`, 'app-reports'],
+  [`build/pipelines/${PIPE}`, 'pipeline-overview'],
+  [`build/pipelines/${PIPE}/policy`, 'pipeline-policy'],
+  [`build/pipelines/${PIPE}/api`, 'pipeline-api'],
+  ['gateway/ai', 'gateway'],
+  ['gateway/registry', 'gateways-list'],
+  [`gateway/registry/${GW}`, 'gateway-detail'],
+  ['gateway/services', 'services'],
+  ['data', 'data'],
+  ['data', 'connectors'],
+  ['data/warehouse', 'warehouse'],
+  ['data/lineage', 'lineage'],
+  ['data/retrieval', 'retrieval'],
+  ['data/integrations', 'integrations'],
+  ['governance', 'control'],
+  ['governance/access', 'access'],
+  ['governance/policy', 'policy'],
+  ['governance/guardrails', 'guardrails'],
+  ['governance/secrets', 'secrets'],
+  ['governance/provenance', 'provenance'],
+  ['governance/regulatory', 'regulatory'],
+  ['insights/analytics', 'observability'],
+  ['insights/finops', 'finops'],
+  ['insights/audit', 'audit'],
+  ['insights/accounting', 'accounting'],
 ];
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
+const ctx = await browser.newContext({
+  viewport: { width: 1600, height: 1000 },
+  deviceScaleFactor: 2,
+  colorScheme: 'light',
+});
+// Force next-themes to LIGHT before any page script runs (storageKey 'theme'), on EVERY navigation —
+// the demo session otherwise renders dark, which would clash with the light /docs gallery.
+await ctx.addInitScript(() => {
+  try {
+    localStorage.setItem('theme', 'light');
+  } catch {}
+});
 const page = await ctx.newPage();
 
 console.log('login…');
