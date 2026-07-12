@@ -52,6 +52,15 @@ export interface SiemView {
 function str(v: unknown): string {
   if (typeof v === 'string') return v.trim();
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  // Structured field (e.g. the audit `actor` is shipped as {type,id,label}, not a bare string).
+  // Read a human-meaningful leaf so the SIEM row shows "Priya Nair" / the email, not "unknown".
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    for (const k of ['label', 'name', 'email', 'id', 'value']) {
+      const leaf = o[k];
+      if (typeof leaf === 'string' && leaf.trim()) return leaf.trim();
+    }
+  }
   return '';
 }
 
