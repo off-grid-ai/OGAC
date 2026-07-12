@@ -20,6 +20,7 @@ import {
   parseStatus,
   sortRuns,
   statusLabel,
+  sumStepMs,
   summarizeRuns,
 } from '../src/lib/runs-monitor.ts';
 
@@ -268,4 +269,17 @@ test('parseKind / parseStatus: valid passthrough, invalid → all', () => {
   assert.equal(parseStatus('paused'), 'paused');
   assert.equal(parseStatus('done'), 'all'); // 'done' is a raw status, not the normalized vocabulary
   assert.equal(parseStatus(undefined), 'all');
+});
+
+test('sumStepMs: sums positive step durations; null when nothing derivable', () => {
+  // a 3.0s timeline across steps (the item-5 case) → 3000ms
+  assert.equal(sumStepMs([{ ms: 1200 }, { ms: 800 }, { ms: 1000 }]), 3000);
+  assert.equal(sumStepMs([{ ms: 250 }]), 250);
+  // ignores non-positive / non-finite / missing ms, but still sums the good ones
+  assert.equal(sumStepMs([{ ms: 0 }, { ms: -5 }, { ms: 500 }, { ms: NaN }, {}]), 500);
+  // no positive total → null (caller shows '—', not a fake 0)
+  assert.equal(sumStepMs([{ ms: 0 }, { ms: -1 }]), null);
+  assert.equal(sumStepMs([]), null);
+  assert.equal(sumStepMs(null), null);
+  assert.equal(sumStepMs(undefined), null);
 });

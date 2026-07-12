@@ -7,6 +7,7 @@ import {
   normalizeDistance,
   normalizeRetrieval,
   normalizeWriteResponse,
+  retrievalEndpointLabel,
   retrievalNote,
   RETRIEVAL_ADAPTER_IDS,
 } from '../src/lib/retrieval-view.ts';
@@ -260,4 +261,38 @@ test('normalizeRetrieval: accepts detail without the result wrapper (flat body)'
   });
   assert.equal(view.collections[0].vectorsCount, 7);
   assert.equal(view.collections[0].status, 'green');
+});
+
+// ── retrievalEndpointLabel: no raw loopback IP may reach a customer surface ──────────────────────
+
+test('retrievalEndpointLabel: embedded store → friendly label, no raw loopback', () => {
+  const label = retrievalEndpointLabel({ isQdrant: false, url: 'http://127.0.0.1:6333' });
+  assert.equal(label, 'Embedded vector store (local)');
+  // Even when a loopback url is present on the view, the embedded case must not leak it.
+  assert.ok(!label.includes('127.0.0.1'), 'must not expose 127.0.0.1');
+  assert.ok(!label.includes('6333'), 'must not expose the raw port');
+});
+
+test('retrievalEndpointLabel: embedded store with null url → still friendly label', () => {
+  assert.equal(
+    retrievalEndpointLabel({ isQdrant: false, url: null }),
+    'Embedded vector store (local)',
+  );
+});
+
+test('retrievalEndpointLabel: qdrant with loopback url → mapped mDNS host, no raw IP', () => {
+  const label = retrievalEndpointLabel({ isQdrant: true, url: 'http://127.0.0.1:6333' });
+  assert.ok(!label.includes('127.0.0.1'), 'loopback IP must be rewritten by toDisplayHost');
+  assert.ok(label.includes('offgrid-s1.local'), 'loopback maps to the S1 mDNS host');
+});
+
+test('retrievalEndpointLabel: qdrant with external host → passed through unchanged', () => {
+  assert.equal(
+    retrievalEndpointLabel({ isQdrant: true, url: 'https://vectors.example.com:6333' }),
+    'https://vectors.example.com:6333',
+  );
+});
+
+test('retrievalEndpointLabel: qdrant with null url → em dash', () => {
+  assert.equal(retrievalEndpointLabel({ isQdrant: true, url: null }), '—');
 });
