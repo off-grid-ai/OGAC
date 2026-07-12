@@ -156,10 +156,11 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
   });
 }
 
-export async function computeFinOps(pipelineTag?: string | null): Promise<FinOps> {
-  // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit. An optional
-  // pipeline tag narrows the traffic to that pipeline's slice server-side (project.keyword filter).
-  const [events, keys] = await Promise.all([gatewayEvents(pipelineTag), listApiKeys()]);
+// Pure assembly: roll a set of traffic events + a set of (already tenant-scoped) virtual keys into
+// the FinOps projection. Zero I/O so the tenant-isolation contract is unit-testable — an event whose
+// keyId is NOT in the supplied key set (e.g. it belongs to another org) attributes to 'unattributed'
+// rather than leaking a foreign subject/key into this tenant's view.
+export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
   const keyById = new Map(keys.map((k) => [k.id, k]));
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
   const localReq = events.filter((e) => priceFor(e.model) === 0).length;
@@ -184,6 +185,18 @@ export async function computeFinOps(pipelineTag?: string | null): Promise<FinOps
     byKey: keySpend(keys, events),
     daily,
   };
+}
+
+export async function computeFinOps(
+  pipelineTag?: string | null,
+  orgId?: string,
+): Promise<FinOps> {
+  // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit. An optional
+  // pipeline tag narrows the traffic to that pipeline's slice server-side (project.keyword filter).
+  // Keys are tenant-scoped: without an orgId, listApiKeys falls back to the default org, so each
+  // per-tenant surface passes its currentOrgId to avoid showing another tenant's keys/subjects.
+  const [events, keys] = await Promise.all([gatewayEvents(pipelineTag), listApiKeys(orgId)]);
+  return assembleFinOps(events, keys);
 }
 
 // silence unused DAY_MS if tree-shaken; kept for future windowing

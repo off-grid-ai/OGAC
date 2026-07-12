@@ -48,7 +48,7 @@ export default async function FinOpsPage({
   const pipelines = await listPipelines(orgId).catch(() => []);
   const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
   const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
-  const f = await computeFinOps(facet ? pipelineTag(facet) : null);
+  const f = await computeFinOps(facet ? pipelineTag(facet) : null, orgId);
 
   return (
     <div className="space-y-6">

@@ -1012,3 +1012,26 @@ engine, less prominent).
 **Fix:** outcome-based display labels only (e.g. "Behaviour & content checks" not "LLM Guard scanner");
 never render the engine/product name on a customer-facing surface. Keep internal `kind` identifiers.
 Regression of #171 (honesty sweep) specific to the guardrails catalog. Needs a focused, gated pass + tests.
+
+---
+
+## GAP: pipeline seed is not tenant-flavor-aware (fresh-deploy only) — #240
+
+`src/lib/pipelines-seed.ts` `SAMPLE_PIPELINES` is a single BANK-flavored set (`loan-underwriting`
+CIBIL/retail-loan, `fraud-screening` UPI/NEFT/IMPS, `cross-sell-advisor` "relationship managers")
+looped over EVERY org by `planSeedPipelines(orgId)`. So a **fresh** deployment gives the life-insurer
+tenant (org_suraksha) the bank's pipelines — wrong-tenant. The live box was corrected directly in
+Postgres (pipelines rethemed to Claims Fraud Screening / Policy Underwriting / insurer Cross-Sell;
+verified) and the seed is idempotent (`onConflictDoNothing` on `pl_seed_<org>_<key>`), so a re-run of
+the seed route does NOT regress the live demo — this only bites a clean re-provision.
+
+**Fix (durable, cross-repo):**
+1. `pipelines-seed.ts` — tag each `SamplePipelineSpec` with `flavours: ('bank'|'insurer')[]` (KYC +
+   Reimbursement + Motor = both; loan/fraud/cross-sell = bank; add insurer variants: Policy
+   Underwriting, Claims Fraud Screening, insurer Cross-Sell). Add pure `pipelineFlavourForOrg(orgId)`
+   (org_suraksha→insurer, else bank) and filter in `planSeedPipelines`. Unit-test the split.
+2. `bfsi-app-pipeline-map.ts` — make the title→key + key→name maps flavor-aware to match.
+3. Private `onprem-fleet-orchestration/deploy/onprem/seed-tour-demo.mjs` INSURER block — point the
+   insurer apps' `pipelineName` at the insurer pipeline names (the name→key map at the top of that
+   file must resolve them) so app→pipeline binding still lands.
+   Keys/ids stay stable where possible to avoid breaking bound consumers + telemetry tags.
