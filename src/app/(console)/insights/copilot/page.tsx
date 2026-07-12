@@ -3,6 +3,7 @@ import { CopilotConsole } from '@/components/copilot/CopilotConsole';
 import { deriveAnomalies } from '@/lib/copilot-gather';
 import { computeFinOps } from '@/lib/finops';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +16,10 @@ export default async function CopilotPage() {
 
   // Best-effort "at a glance" anomaly signal for the header — the copilot chat gathers full context
   // server-side per question. A finops failure just yields no anomalies (surface stays reachable).
+  const orgId = await currentOrgId();
   let anomalies: ReturnType<typeof deriveAnomalies> = [];
   try {
-    anomalies = deriveAnomalies(await computeFinOps());
+    anomalies = deriveAnomalies(await computeFinOps(null, orgId));
   } catch {
     anomalies = [];
   }

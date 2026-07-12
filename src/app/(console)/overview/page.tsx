@@ -90,7 +90,7 @@ export default async function ConsoleHome() {
   const [analytics, finops, policy, guardrails, siem, decisions, runs, connectors, services] =
     await Promise.all([
       safe(() => computeAnalytics(), null),
-      safe(() => computeFinOps(), null),
+      safe(() => computeFinOps(null, org), null),
       safe(() => readPolicyStatus(), null),
       safe(() => readGuardrailsView(), null),
       safe(() => readSiemView(500), null),
