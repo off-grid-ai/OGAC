@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  type AnalyticsEvent,
   RECENT_MS,
+  assembleAnalytics,
   buildAggsQuery,
   emptyAnalytics,
   parseAggsResponse,
@@ -163,4 +165,94 @@ test('emptyAnalytics matches the fallback shape exactly', () => {
     drift: { recent: 0, baseline: 0, flagged: false },
     perf: { recent: 0, baseline: 0, flagged: false },
   });
+});
+
+// ─── assembleAnalytics (the #238 fix) ──────────────────────────────────────────
+// The JS rollup over raw docs that feeds computeAnalytics. Unlike the OpenSearch `date_histogram`
+// path it buckets the day series in JS off the record `ts` — so the per-day charts render a real
+// series whenever there are events, independent of the `@timestamp` field mapping. Tests assert the
+// TERMINAL Analytics shape (what the charts/cards actually receive).
+
+// A small representative corpus spread over three UTC days — the same event set produces the stat
+// cards (totals) AND the chart series, so they must AGREE. `NOW` is fixed for a deterministic
+// recent/baseline split.
+const NOW = Date.parse('2026-07-12T12:00:00.000Z');
+function corpus(): AnalyticsEvent[] {
+  return [
+    // day 1 (baseline — > 2 days old)
+    { ts: '2026-07-08T09:00:00.000Z', model: 'gpt-4o', tokens: 1000, latencyMs: 200, outcome: 'ok' },
+    { ts: '2026-07-08T10:00:00.000Z', model: 'gemma-local', tokens: 500, latencyMs: 100, outcome: 'ok' },
+    // day 2 (baseline)
+    { ts: '2026-07-09T11:00:00.000Z', model: 'gpt-4o', tokens: 2000, latencyMs: 400, outcome: 'ok' },
+    // day 3 (recent — < 2 days old), including one blocked
+    { ts: '2026-07-11T13:00:00.000Z', model: 'gpt-4o', tokens: 3000, latencyMs: 900, outcome: 'ok' },
+    { ts: '2026-07-11T14:00:00.000Z', model: 'gemma-local', tokens: 800, latencyMs: 150, outcome: 'blocked' },
+  ];
+}
+
+// THE REGRESSION GUARD (#238): the charts must NOT be flat while the cards have data. A populated
+// corpus must yield a non-empty `series` whose event count equals `totalEvents` — the exact invariant
+// the old date_histogram path violated (cards non-zero, series []).
+test('assembleAnalytics: series is non-empty and its events sum to totalEvents (charts bind to the cards)', () => {
+  const a = assembleAnalytics(corpus(), NOW);
+  assert.ok(a.totalEvents > 0, 'precondition: cards have data');
+  assert.ok(a.series.length > 0, 'series must not be flat when there are events (#238)');
+  const seriesEvents = a.series.reduce((sum, d) => sum + d.events, 0);
+  assert.equal(seriesEvents, a.totalEvents, 'series event total must equal the card total');
+  // byModel (the Tokens-by-model chart) must likewise bind and its tokens sum to the card total.
+  const byModelTokens = a.byModel.reduce((sum, m) => sum + m.tokens, 0);
+  assert.equal(byModelTokens, a.totalTokens, 'byModel tokens must equal the card total');
+});
+
+test('assembleAnalytics: buckets one point per UTC day, sorted asc, avg latency rounded', () => {
+  const a = assembleAnalytics(corpus(), NOW);
+  assert.deepEqual(
+    a.series.map((d) => d.day),
+    ['2026-07-08', '2026-07-09', '2026-07-11'],
+    'one point per calendar day, ascending',
+  );
+  // 2026-07-08: two events, latency 200 + 100 → avg round(300/2)=150.
+  assert.deepEqual(a.series[0], { day: '2026-07-08', events: 2, avgLatency: 150 });
+  // 2026-07-11: two events (one blocked still counts as an event), latency 900+150 → round(1050/2)=525.
+  assert.deepEqual(a.series[2], { day: '2026-07-11', events: 2, avgLatency: 525 });
+});
+
+test('assembleAnalytics: totals, outcomes, byModel match the raw corpus', () => {
+  const a = assembleAnalytics(corpus(), NOW);
+  assert.equal(a.totalEvents, 5);
+  assert.equal(a.totalTokens, 1000 + 500 + 2000 + 3000 + 800);
+  assert.deepEqual(a.outcomes, { ok: 4, redacted: 0, blocked: 1 });
+  // byModel sorted tokens desc: gpt-4o (6000) before gemma-local (1300).
+  assert.deepEqual(
+    a.byModel.map((m) => m.model),
+    ['gpt-4o', 'gemma-local'],
+  );
+  assert.equal(a.byModel[0].tokens, 6000);
+  assert.equal(a.byModel[0].events, 3);
+});
+
+test('assembleAnalytics: drift & perf split on the 2-day recent/baseline boundary', () => {
+  const a = assembleAnalytics(corpus(), NOW);
+  // recent = 2 events (2026-07-11), 1 blocked → rate 0.5; baseline = 3 events, 0 blocked → 0.
+  assert.equal(a.drift.recent, 0.5);
+  assert.equal(a.drift.baseline, 0);
+  assert.equal(a.drift.flagged, true, '0.5 > 0 * 1.5');
+  // recent p95 over [900,150] = 900; baseline p95 over [200,100,400] = 400 → flagged (900 > 400*1.3).
+  assert.equal(a.perf.recent, 900);
+  assert.equal(a.perf.baseline, 400);
+  assert.equal(a.perf.flagged, true);
+});
+
+test('assembleAnalytics: an empty corpus is real zeros (matches emptyAnalytics)', () => {
+  assert.deepEqual(assembleAnalytics([], NOW), emptyAnalytics());
+});
+
+test('assembleAnalytics: a missing latencyMs is treated as 0 (no NaN)', () => {
+  const a = assembleAnalytics(
+    [{ ts: '2026-07-11T13:00:00.000Z', model: 'm', tokens: 10, outcome: 'ok' }],
+    NOW,
+  );
+  assert.equal(a.series[0].avgLatency, 0);
+  assert.equal(a.byModel[0].avgLatency, 0);
+  assert.equal(a.p95, 0);
 });

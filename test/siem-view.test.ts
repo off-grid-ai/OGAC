@@ -99,6 +99,39 @@ test('normalizeSiem: realistic response → events newest-first with rollups', (
   assert.equal(v.blockedDenied, 3);
 });
 
+test('normalizeSiem: structured actor object ({type,id,label}) renders its label, not "unknown"', () => {
+  // The shipped audit docs carry the actor as a structured object (audit-actor.ts `actorFrom`),
+  // NOT a bare string. Before the str() fix this fell through to '' → 'unknown' on every row.
+  const hits: RawSiemHit[] = [
+    {
+      _id: 'e1',
+      _source: {
+        '@timestamp': '2026-07-10T10:00:00Z',
+        actor: { type: 'user', id: 'priya.nair@surakshalife.example', label: 'Priya Nair' },
+        action: 'run.execute',
+        outcome: 'done',
+        source_ip: '10.20.5.12',
+      },
+    },
+    {
+      _id: 'e2',
+      _source: {
+        // No label → falls back to id (still a real identity, never 'unknown').
+        actor: { type: 'user', id: 'service@offgrid.local' },
+        action: 'policy.push',
+        outcome: 'ok',
+      },
+    },
+  ];
+  const v = normalizeSiem({ hits: { hits } });
+  const e1 = v.events.find((e) => e.id === 'e1')!;
+  const e2 = v.events.find((e) => e.id === 'e2')!;
+  assert.equal(e1.actor, 'Priya Nair');
+  assert.equal(e1.ip, '10.20.5.12');
+  assert.equal(e2.actor, 'service@offgrid.local');
+  assert.ok(!v.events.some((e) => e.actor === 'unknown'));
+});
+
 test('normalizeSiem: accepts a bare hits array', () => {
   const hits: RawSiemHit[] = [{ _id: 'x', _source: { actor: 'u', action: 'a', outcome: 'ok' } }];
   const v = normalizeSiem(hits);

@@ -1,0 +1,97 @@
+app:
+  name: ${APP_NAME:LLM Guard API}
+  log_level: ${LOG_LEVEL:INFO}
+  log_json: ${LOG_JSON:true}
+  scan_fail_fast: ${SCAN_FAIL_FAST:false}
+  scan_prompt_timeout: ${SCAN_PROMPT_TIMEOUT:30}
+  scan_output_timeout: ${SCAN_OUTPUT_TIMEOUT:30}
+  lazy_load: false
+
+rate_limit:
+  enabled: ${RATE_LIMIT_ENABLED:false}
+  limit: ${RATE_LIMIT_LIMIT:100/minute}
+
+auth:
+  type: http_bearer
+  token: ${AUTH_TOKEN:}
+
+tracing:
+  exporter: ${TRACING_EXPORTER:console}
+  endpoint: ${TRACING_OTEL_ENDPOINT:}
+
+metrics:
+  exporter: ${METRICS_TYPE:prometheus}
+  endpoint: ${METRICS_ENDPOINT:}
+
+# FULL scanner suite. `use_onnx: false` on every transformer scanner — the archived laiyer image's
+# ONNX model references (e.g. ProtectAI/deberta-v3-base-prompt-injection-v2 onnx/model.onnx) 404 at
+# their pinned HF revisions; the PyTorch weights load fine. S2 has the RAM; this makes all scanners load.
+input_scanners:
+  - type: Anonymize
+    params:
+      use_faker: false
+      threshold: 0.75
+      use_onnx: false
+  - type: BanCompetitors
+    params:
+      competitors: ["OpenAI", "Anthropic", "Cohere"]
+      threshold: 0.75
+      use_onnx: false
+  - type: BanSubstrings
+    params:
+      substrings: ["ignore previous instructions", "disregard the above"]
+      match_type: "str"
+      case_sensitive: false
+      redact: false
+      contains_all: false
+  - type: BanTopics
+    params:
+      topics: ["violence", "self-harm"]
+      threshold: 0.8
+      use_onnx: false
+  - type: Gibberish
+    params:
+      threshold: 0.97
+      use_onnx: false
+  - type: InvisibleText
+    params: {}
+  - type: Language
+    params:
+      valid_languages: ["en"]
+      use_onnx: false
+  - type: PromptInjection
+    params:
+      threshold: 0.92
+      match_type: truncate_head_tail
+      use_onnx: false
+  - type: Regex
+    params:
+      patterns: ["Bearer [A-Za-z0-9-._~+/]+"]
+      is_blocked: true
+      match_type: search
+      redact: true
+  - type: Secrets
+    params:
+      redact_mode: "all"
+  - type: Toxicity
+    params:
+      threshold: 0.7
+      use_onnx: false
+
+output_scanners:
+  - type: Deanonymize
+    params: {}
+  - type: NoRefusal
+    params:
+      threshold: 0.75
+      use_onnx: false
+  - type: Regex
+    params:
+      patterns: ["Bearer [A-Za-z0-9-._~+/]+"]
+      is_blocked: true
+      match_type: search
+      redact: true
+  - type: Sensitive
+    params:
+      redact: true
+      use_onnx: false

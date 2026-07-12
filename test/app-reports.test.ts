@@ -6,6 +6,8 @@ import {
   buildReportStats,
   computeReportMetrics,
   computeThroughputPerDay,
+  fmtApprovalRate,
+  fmtCostUsd,
   runCost,
   runDurationMs,
   singleRunSummary,
@@ -188,15 +190,59 @@ test('singleRunSummary rolls up one run for the report sink', () => {
   assert.equal(s.durationMs, 1000);
 });
 
-test('buildReportStats: failed tile is bad only when non-zero; approval tile shows dash when undecided', () => {
+test('buildReportStats: failed tile is bad only when non-zero; approval tile reads n/a when undecided', () => {
   const clean = buildReportStats(computeReportMetrics([run({ status: 'done' })]));
   const failed = clean.find((t) => t.label === 'Failed');
   assert.equal(failed?.tone, 'good'); // zero failures reads calm
   const approval = clean.find((t) => t.label === 'Approval rate');
-  assert.equal(approval?.value, '—');
+  // No HITL decisions at all → the rate is not applicable, NOT a bare dash.
+  assert.equal(approval?.value, 'n/a');
 
   const withFail = buildReportStats(computeReportMetrics([run({ status: 'error' })]));
   assert.equal(withFail.find((t) => t.label === 'Failed')?.tone, 'bad');
+});
+
+test('buildReportStats: Cost tile shows $0.00 for a real zero, never a dash', () => {
+  // Completed runs that carry no cost figures → total cost is a real 0, so the tile reads "$0.00".
+  const stats = buildReportStats(computeReportMetrics([run({ status: 'done' })]));
+  const cost = stats.find((t) => t.label === 'Cost');
+  assert.equal(cost?.value, '$0.00');
+  assert.notEqual(cost?.value, '—');
+});
+
+test('buildReportStats: Approval rate shows a real percentage when decisions exist', () => {
+  // Two approvals, one rejection across HITL steps → 67%.
+  const withDecisions = buildReportStats(
+    computeReportMetrics([
+      run({
+        steps: [
+          { id: 's1', kind: 'human', label: 'Review', status: 'done', outcome: 'approved' },
+          { id: 's2', kind: 'human', label: 'Review', status: 'done', outcome: 'approved' },
+          { id: 's3', kind: 'human', label: 'Review', status: 'done', outcome: 'rejected' },
+        ],
+      }),
+    ]),
+  );
+  assert.equal(withDecisions.find((t) => t.label === 'Approval rate')?.value, '67%');
+});
+
+// ── Pure KPI formatters — the one rule ("real zero is a value, absence is n/a") in isolation. ──
+test('fmtApprovalRate: decisions render a percentage; zero decisions render n/a', () => {
+  // Some approved + some rejected → correct rounded %.
+  assert.equal(fmtApprovalRate({ approvals: 2, rejections: 1, approvalRate: 2 / 3 }), '67%');
+  // All approved → 100%.
+  assert.equal(fmtApprovalRate({ approvals: 3, rejections: 0, approvalRate: 1 }), '100%');
+  // A real all-rejected outcome is 0%, NOT n/a — there WERE decisions.
+  assert.equal(fmtApprovalRate({ approvals: 0, rejections: 4, approvalRate: 0 }), '0%');
+  // No decisions at all → not applicable.
+  assert.equal(fmtApprovalRate({ approvals: 0, rejections: 0, approvalRate: 0 }), 'n/a');
+});
+
+test('fmtCostUsd: a real zero is "$0.00"; a genuine number formats; non-finite degrades to n/a', () => {
+  assert.equal(fmtCostUsd(0), '$0.00'); // real zero — never a dash
+  assert.equal(fmtCostUsd(12.5), '$12.50');
+  assert.equal(fmtCostUsd(0.1), '$0.10');
+  assert.equal(fmtCostUsd(Number.NaN), 'n/a'); // absent/undefined figure
 });
 
 test('empty input yields all-zero metrics without dividing by zero', () => {
