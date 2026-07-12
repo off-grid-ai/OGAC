@@ -111,6 +111,20 @@ export function describeDuration(ms: number | null): string {
   return `${ms}ms`;
 }
 
+// Sum the per-step wall-clock (`ms`) of a recorded run timeline. Agent runs record no explicit
+// finish timestamp (so computeDurationMs → null), but each step carries its own `ms`; the run's
+// duration is the sum of its steps' durations. Returns null when there is no positive total, so the
+// caller falls back to '—' rather than showing a fake 0. Pure, zero-IO.
+export function sumStepMs(steps: readonly { ms?: number | null }[] | null | undefined): number | null {
+  if (!Array.isArray(steps) || steps.length === 0) return null;
+  let total = 0;
+  for (const s of steps) {
+    const ms = s?.ms;
+    if (typeof ms === 'number' && Number.isFinite(ms) && ms > 0) total += ms;
+  }
+  return total > 0 ? total : null;
+}
+
 // ─── Source row shapes the mappers accept (mirror the DB rows; kept local so this stays import-free) ─
 
 export interface AppRunSource {
