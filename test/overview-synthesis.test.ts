@@ -148,8 +148,8 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   assert.equal(byLabel.get('Policy engine')!.tone, 'good');
 
   // Outcome-based value (never the engine/product name); reachable+configured => ACTIVE/good.
-  assert.equal(byLabel.get('PII guardrails')!.value, 'ACTIVE');
-  assert.equal(byLabel.get('PII guardrails')!.tone, 'good');
+  assert.equal(byLabel.get('Content guardrails')!.value, 'ACTIVE');
+  assert.equal(byLabel.get('Content guardrails')!.tone, 'good');
 
   assert.equal(byLabel.get('Cloud egress')!.value, '12%');
   assert.equal(byLabel.get('Cloud egress')!.tone, 'warn');
@@ -231,7 +231,7 @@ test('unreachable policy / configured-but-offline guardrails tone bad', () => {
   const { posture } = synthesizeOperatorHome(input);
   const byLabel = new Map(posture.map((t) => [t.label, t]));
   assert.equal(byLabel.get('Policy engine')!.tone, 'bad');
-  const g = byLabel.get('PII guardrails')!;
+  const g = byLabel.get('Content guardrails')!;
   assert.equal(g.tone, 'bad');
   assert.equal(g.value, 'OFFLINE');
   // NEVER surface the engine/product name on the tile.
@@ -242,7 +242,7 @@ test('guardrails not configured => calm NOT SET (muted), no engine name (the dem
   const input = fullInput();
   input.guardrails = { engine: 'llm-guard', reachable: false, configured: false };
   const { posture } = synthesizeOperatorHome(input);
-  const g = new Map(posture.map((t) => [t.label, t])).get('PII guardrails')!;
+  const g = new Map(posture.map((t) => [t.label, t])).get('Content guardrails')!;
   assert.equal(g.value, 'NOT SET');
   assert.equal(g.tone, 'muted');
   assert.ok(!/llm.?guard|presidio/i.test(g.value + ' ' + g.hint), 'no engine name in value/hint');
