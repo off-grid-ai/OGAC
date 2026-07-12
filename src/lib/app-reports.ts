@@ -285,7 +285,7 @@ export function buildReportStats(m: ReportMetrics): ReportStatTile[] {
     { label: 'Failed', value: fmtInt(m.failed), tone: m.failed > 0 ? 'bad' : 'good' },
     {
       label: 'Approval rate',
-      value: m.approvals + m.rejections > 0 ? `${Math.round(m.approvalRate * 100)}%` : '—',
+      value: fmtApprovalRate(m),
       tone: 'default',
     },
     {
@@ -301,10 +301,34 @@ export function buildReportStats(m: ReportMetrics): ReportStatTile[] {
     },
     {
       label: 'Cost',
-      value: m.totalTokens > 0 || m.totalCostUsd > 0 ? `$${m.totalCostUsd.toFixed(2)}` : '—',
+      value: fmtCostUsd(m.totalCostUsd),
       tone: 'default',
     },
   ];
+}
+
+// ─── KPI tile formatters — a REAL zero is a real value, not an absence ────────────────────────────
+// Founder-facing rule (vision defect): the Approval-rate and Cost tiles must never read a bare "—"
+// when the metric is computable. A genuinely-undecided metric reads "n/a"; a real zero reads its
+// zero form ("0%" / "$0.00"). Kept pure + named so the one rule lives in one place.
+
+/**
+ * Approval-rate tile value. With ≥1 HITL decision, the rate is real — render it as a percentage
+ * (a 0/all-rejected outcome legitimately reads "0%"). With NO decisions at all, the rate is not
+ * applicable (there was nothing to approve) → "n/a", never a bare dash.
+ */
+export function fmtApprovalRate(m: Pick<ReportMetrics, 'approvals' | 'rejections' | 'approvalRate'>): string {
+  const decided = m.approvals + m.rejections;
+  return decided > 0 ? `${Math.round(m.approvalRate * 100)}%` : 'n/a';
+}
+
+/**
+ * Cost tile value. Cost is always summable (absent per-run figures contribute 0), so it is always a
+ * real number — a run set that cost nothing reads "$0.00", never a dash. A non-finite value (should
+ * never happen given round2) degrades to "n/a" rather than "$NaN".
+ */
+export function fmtCostUsd(usd: number): string {
+  return Number.isFinite(usd) ? `$${usd.toFixed(2)}` : 'n/a';
 }
 
 function fmtInt(n: number): string {

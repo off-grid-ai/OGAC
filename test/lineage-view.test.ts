@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeDatasetDetail, normalizeLineage } from '../src/lib/lineage-view.ts';
+import {
+  lineageNodeLabel,
+  normalizeDatasetDetail,
+  normalizeLineage,
+} from '../src/lib/lineage-view.ts';
 
 // Pure Marquez → display-model normalizer. No network, no mocks — sample REST JSON in, asserted
 // display model out. Covers a realistic response, empty inputs, and malformed/partial shapes.
@@ -139,4 +143,38 @@ test('normalizeDatasetDetail: null/nameless → null; missing facets degrade saf
   assert.deepEqual(bare.facetNames, []);
   assert.equal(bare.rowCount, null);
   assert.equal(bare.bytes, null);
+});
+
+// ── lineageNodeLabel — opaque id → readable title ─────────────────────────────────────────────
+test('lineageNodeLabel: known-prefix opaque ids → friendly type word + short id (no raw hex wall)', () => {
+  const da = lineageNodeLabel('da-0745bee-6d80-4a1b-9f3c-1d2e3f4a5b6c');
+  assert.equal(da, 'Data asset 0745bee');
+  // the caller keeps the raw id as tooltip; the label itself must not be the full hex string
+  assert.ok(!da.includes('6d80'));
+
+  assert.equal(lineageNodeLabel('dc-97462aa'), 'Data collection 97462aa');
+  assert.equal(lineageNodeLabel('run-9f3c1d2e'), 'Run 9f3c1d2e');
+  assert.equal(lineageNodeLabel('AG-DEADBEEF'), 'Agent deadbeef'); // case-insensitive prefix
+});
+
+test('lineageNodeLabel: unknown prefix or bare hex → short id only', () => {
+  // unknown 2-letter prefix (not in the map) → prefix dropped, short id shown
+  assert.equal(lineageNodeLabel('zz-1234abcd'), '1234abcd');
+  // a bare uuid/hex with no prefix
+  assert.equal(lineageNodeLabel('0745bee1-6d80-4a1b'), '0745bee1');
+});
+
+test('lineageNodeLabel: a real human name passes through unchanged', () => {
+  assert.equal(lineageNodeLabel('corebank.customers'), 'corebank.customers');
+  assert.equal(lineageNodeLabel('answer.grounded'), 'answer.grounded');
+  assert.equal(lineageNodeLabel('Insurance Policies'), 'Insurance Policies');
+  // a short non-hex token is not opaque-id-shaped
+  assert.equal(lineageNodeLabel('policy.docs'), 'policy.docs');
+});
+
+test('lineageNodeLabel: empty / null / whitespace → (unnamed)', () => {
+  assert.equal(lineageNodeLabel(''), '(unnamed)');
+  assert.equal(lineageNodeLabel('   '), '(unnamed)');
+  assert.equal(lineageNodeLabel(null), '(unnamed)');
+  assert.equal(lineageNodeLabel(undefined), '(unnamed)');
 });

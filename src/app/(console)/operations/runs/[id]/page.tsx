@@ -4,9 +4,11 @@ import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { StatRail } from '@/components/ui/StatRail';
 import { getAgentRun } from '@/lib/agentrun';
+import { modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
-import { type RunStatus, describeDuration, kindLabel, statusLabel } from '@/lib/runs-monitor';
+import { type RunStatus, describeDuration, kindLabel, statusLabel, sumStepMs } from '@/lib/runs-monitor';
 import { getRunByKey } from '@/lib/runs-monitor-reader';
+import { parseRunQuery } from '@/lib/run-query-view';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +31,17 @@ export default async function RunDetailPage({ params }: Readonly<{ params: Promi
   if (row.kind === 'app') redirect(row.href);
 
   const agent = row.kind === 'agent' ? await getAgentRun(row.id, orgId) : null;
+
+  // Duration: prefer the normalized start→finish span; agent runs record no finish timestamp, so
+  // fall back to the sum of the recorded step durations (the timeline HAS the numbers). '—' only
+  // when neither is derivable. Item 5 (vision): the page showed '—' despite a 3.0s timeline.
+  const durationMs = row.durationMs ?? sumStepMs(agent?.steps);
+  // A chat run's "pipeline" is really the model tag it ran on — humanize it (item 4: no raw
+  // `llama3.1:70b` codename on a customer surface). Other kinds keep the pipeline id as-is.
+  const isModelPipeline = row.kind === 'chat';
+  const pipelineLabel = isModelPipeline ? modelLabel(row.pipeline) : row.pipeline;
+  // Parse a composed agent-step query into prior-context blocks + the actual task (item 3).
+  const parsedQuery = agent?.query ? parseRunQuery(agent.query) : null;
 
   return (
     <div className="w-full space-y-5">
@@ -59,8 +72,8 @@ export default async function RunDetailPage({ params }: Readonly<{ params: Promi
       <StatRail at="sm" cols={4}>
         <Meta label="Kind" value={kindLabel(row.kind)} />
         <Meta label="Started" value={row.startedAt ? new Date(row.startedAt).toLocaleString() : '—'} />
-        <Meta label="Duration" value={describeDuration(row.durationMs)} />
-        <Meta label="Pipeline" value={row.pipeline} mono />
+        <Meta label="Duration" value={describeDuration(durationMs)} />
+        <Meta label={isModelPipeline ? 'Model' : 'Pipeline'} value={pipelineLabel} mono={!isModelPipeline} />
         <Meta label="Actor" value={row.actor || '—'} />
         <Meta label="Status" value={statusLabel(row.status)} />
       </StatRail>
@@ -68,9 +81,31 @@ export default async function RunDetailPage({ params }: Readonly<{ params: Promi
       {/* Agent run — recorded step timeline + answer + checks */}
       {agent ? (
         <div className="space-y-4">
-          {agent.query ? (
+          {parsedQuery && (parsedQuery.task || parsedQuery.context.length > 0) ? (
             <Section title="Query">
-              <pre className="whitespace-pre-wrap text-sm text-foreground">{agent.query}</pre>
+              {parsedQuery.task ? (
+                <pre className="whitespace-pre-wrap text-sm text-foreground">{parsedQuery.task}</pre>
+              ) : null}
+              {parsedQuery.context.length > 0 ? (
+                <details className="mt-3 rounded-md border border-border/60 bg-muted/30">
+                  <summary className="cursor-pointer select-none px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Prior context · {parsedQuery.context.length} source
+                    {parsedQuery.context.length === 1 ? '' : 's'}
+                  </summary>
+                  <div className="space-y-1.5 px-3 pb-3">
+                    {parsedQuery.context.map((c, i) => (
+                      <div key={i} className="rounded-md border border-border/60 bg-background/60 p-2">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {c.kind}
+                        </span>
+                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] text-foreground">
+                          {c.text}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </Section>
           ) : null}
 

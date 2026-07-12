@@ -26,7 +26,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { CollectionStatus, RetrievalView } from '@/lib/retrieval-view';
+import { type CollectionStatus, type RetrievalView, retrievalEndpointLabel } from '@/lib/retrieval-view';
 
 const STATUS_CLASS: Record<CollectionStatus, string> = {
   green: 'bg-primary/10 text-primary',
@@ -178,7 +178,7 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Endpoint</p>
-            <p className="truncate font-mono text-xs text-foreground">{view.url ?? '—'}</p>
+            <p className="truncate font-mono text-xs text-foreground">{retrievalEndpointLabel(view)}</p>
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Total vectors</p>

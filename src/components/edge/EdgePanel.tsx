@@ -14,6 +14,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useMemo, useState } from 'react';
 import { WafControls } from '@/components/edge/WafControls';
+import { type KindFilter, availableKindFilters } from '@/lib/edge-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +88,6 @@ function groupEvents(events: EdgeEvent[]): GroupedEvent[] {
 
 type SortField = 'ts' | 'count' | 'ip' | 'host';
 type SortDir = 'asc' | 'desc';
-type KindFilter = 'all' | 'waf' | 'rate-limit';
 
 // Sort-direction indicator for a column header. Lifted to module scope (was defined inside EdgePanel)
 // so it isn't re-created each render; the sort state it needs is passed as props. Render-identical:
@@ -142,6 +142,16 @@ export function EdgePanel() {
   const p = snap?.policy;
 
   const grouped = useMemo(() => groupEvents(snap?.recent ?? []), [snap]);
+
+  // Which kind-filter chips to offer — driven by the ACTUAL events, so a "429"/WAF chip never shows
+  // when the edge is quiet (0 events), which would contradict the "0 blocks / 0 requests" stat band.
+  const kinds = useMemo(() => availableKindFilters(grouped), [grouped]);
+
+  // If the selected filter is no longer available (e.g. 429 was picked, then a refresh emptied the
+  // rate-limit events), fall back to 'all' so the filtered view stays coherent.
+  useEffect(() => {
+    if (!kinds.includes(kindFilter)) setKindFilter('all');
+  }, [kinds, kindFilter]);
 
   const filtered = useMemo(() => {
     let rows = grouped;
@@ -265,7 +275,7 @@ export function EdgePanel() {
 
           {/* Kind filter */}
           <div className="flex items-center rounded-md border border-border bg-muted/40 p-0.5">
-            {(['all', 'waf', 'rate-limit'] as KindFilter[]).map((k) => (
+            {kinds.map((k) => (
               <button
                 key={k}
                 onClick={() => setKindFilter(k)}

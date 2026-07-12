@@ -9,6 +9,8 @@
 // by default, overridable via OFFGRID_ADAPTER_RETRIEVAL. We re-derive that here (from a small
 // inlined list) rather than importing the registry, to keep this module import-free and pure.
 
+import { toDisplayHost } from '@/lib/display-host';
+
 // ── Display model ────────────────────────────────────────────────────────────
 
 export type CollectionStatus = 'green' | 'yellow' | 'red' | 'grey' | 'unknown';
@@ -152,6 +154,20 @@ export function retrievalNote(v: {
     return 'Retrieval is served by the external Qdrant vector database.';
   }
   return 'The external Qdrant vector database is configured but unreachable. Check OFFGRID_QDRANT_URL and that Qdrant is running.';
+}
+
+// PURE: the customer-facing "Endpoint" label for the current retrieval backing. A raw loopback IP
+// (e.g. http://127.0.0.1:6333) must NEVER surface on a customer screen (founder directive — see
+// display-host.ts). The embedded store has no external endpoint at all, so we name it plainly; a
+// live external Qdrant URL is routed through toDisplayHost so any loopback maps to its mDNS host.
+export function retrievalEndpointLabel(view: {
+  isQdrant: boolean;
+  url: string | null;
+}): string {
+  // Built-in embedded store: it is not an external service, so show no URL — just what it is.
+  if (!view.isQdrant) return 'Embedded vector store (local)';
+  if (!view.url) return '—';
+  return toDisplayHost(view.url);
 }
 
 // ── Pure: collection-management request/response logic (zero I/O) ──────────────

@@ -11,6 +11,7 @@ import { LineageCurate } from '@/components/lineage/LineageCurate';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listAgentRuns } from '@/lib/agentrun';
+import { lineageNodeLabel } from '@/lib/lineage-view';
 import { readLineageView } from '@/lib/marquez';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -69,7 +70,9 @@ export default async function LineagePage() {
                   className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1"
                 >
                   <Database className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-xs text-foreground">{i}</span>
+                  <span className="truncate text-xs text-foreground" title={i}>
+                    {lineageNodeLabel(i)}
+                  </span>
                 </div>
               ))
             ) : (
@@ -80,9 +83,9 @@ export default async function LineagePage() {
           </div>
           <div className="flex items-center gap-1.5">
             <ArrowRight className="hidden size-4 text-muted-foreground lg:block" />
-            <Badge variant="outline" className="gap-1">
+            <Badge variant="outline" className="gap-1" title={j.name}>
               <TreeStructure className="size-3" />
-              {j.name}
+              {lineageNodeLabel(j.name)}
             </Badge>
             <Badge variant="secondary" className="text-[10px]">
               {j.lastRunState}
@@ -97,7 +100,9 @@ export default async function LineagePage() {
                   className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1"
                 >
                   <Database className="size-3.5 shrink-0 text-primary" />
-                  <span className="truncate text-xs text-foreground">{o}</span>
+                  <span className="truncate text-xs text-foreground" title={o}>
+                    {lineageNodeLabel(o)}
+                  </span>
                 </div>
               ))
             ) : (
