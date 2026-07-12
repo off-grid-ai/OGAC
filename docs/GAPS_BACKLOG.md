@@ -1035,3 +1035,34 @@ the seed route does NOT regress the live demo — this only bites a clean re-pro
    insurer apps' `pipelineName` at the insurer pipeline names (the name→key map at the top of that
    file must resolve them) so app→pipeline binding still lands.
    Keys/ids stay stable where possible to avoid breaking bound consumers + telemetry tags.
+
+---
+
+## E2E vision audit — both tenants, 233 shots (2026-07-12)
+
+Full visual sweep: `scripts/shoot-all.mjs` + new `scripts/capture-dynamic.mjs` crawled EVERY route
+(static + `[id]` dynamic detail + create-dialog state changes) for both demo tenants — bank 121 shots,
+insurer 112 — then all 233 PNGs were run through vision review (12 parallel reviewers). Full verdict +
+evidence in `docs/E2E_VISION_AUDIT.md`. **Verdict: PASS** (renders full-width, correct per-tenant
+flavor, USD currency with 0 ₹, CONTENT GUARDRAILS: ACTIVE on both overviews, CRUD present, no stack
+traces/blank pages). Two real items found:
+
+- **G-VIS1 (P1, `console`/data-seed)** — **BANK tenant carries INSURANCE-flavored data domains +
+  connector.** `/data/domains` on bharatunion shows a `claims` domain (tags "insurance claims / motor
+  claim / health claim"), `claim documents`, `commissions / agent commission`, `candidates`, several
+  bound to a **"Policy Admin (MySQL)"** connector (an insurance policy-admin system). `/insights/reports`
+  (bank) also surfaces an **"IRDAI response pack"** (IRDAI = insurance regulator). A bank prospect drilling
+  into Data → Domains / Reports sees insurer content. Fix = reseed the bank org's `connectors` +
+  `data_domains` (+ regulatory report pack) to bank-only (accounts/loans/cards/KYC, RBI packs). Data-level,
+  not code. Evidence: `/tmp/vision/bank/data_domains.png`, `/tmp/vision/bank/insights_reports.png`.
+- **G-VIS2 (P2, data-seed)** — **no published artifacts exist** (`chat_artifacts=0`), so
+  `/artifacts/[id]/view` (the published built-app "generated link" share surface) and
+  `/workspace/artifacts` have nothing to demo (empty state renders correctly). Seed one published
+  artifact per tenant if the artifact-share flow is part of the demo script.
+
+Dismissed as NOT defects (documented so they aren't re-flagged): model-provider names
+(Anthropic/OpenAI/DeepSeek/OpenRouter/Zhipu) on the **Gateway registry** are expected/correct;
+`/invite-accept` "missing invitation token" is correct behavior when visited without a token;
+"pixelated/unreadable" shots (siem/roi/audit/runs/admin) are full-page-screenshot DOWNSCALING in the
+reviewer's view — spot-verified rendering fine (SIEM: 387 events, populated); the generic starter
+prompt library on `/workspace/prompts` is shared workspace infra by design.
