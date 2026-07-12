@@ -36,6 +36,8 @@ const BASE = (arg('base', 'http://localhost:3000')).replace(/\/$/, '');
 const USER = arg('user', '');
 const PASS = arg('pass', '');
 const THEME = arg('theme', 'light');
+const FOLDS = arg('folds', 'off') !== 'off'; // capture per-viewport fold segments for tall pages (readable review)
+const FOLD_CAP = Number(arg('fold-cap', '5')); // max fold segments per page
 const VIEWPORT_RAW = arg('viewport', 'wide');
 const STATES = arg('states', 'on') !== 'off';
 const PUBLIC = arg('public', 'on') !== 'off';
@@ -111,6 +113,25 @@ async function shoot(page, route, url, rec) {
   const title = await page.title().catch(() => '');
   const file = `${slug(route)}.png`;
   try { await page.screenshot({ path: join(OUT, file), fullPage: true }); } catch (e) { errors.push('shot: ' + e.message.slice(0, 80)); }
+  // Fold segments: on tall pages a single full-page shot downscales to unreadable for a vision model.
+  // Capture readable per-viewport folds (scroll by viewport height) so nothing below the fold is missed.
+  if (FOLDS) {
+    try {
+      const vh = VP.height;
+      const total = await page.evaluate(() => document.documentElement.scrollHeight);
+      const nFolds = Math.min(FOLD_CAP, Math.max(1, Math.ceil(total / vh)));
+      if (nFolds > 1) {
+        for (let i = 0; i < nFolds; i++) {
+          await page.evaluate((y) => window.scrollTo(0, y), i * vh);
+          await page.waitForTimeout(300);
+          const ff = `${slug(route)}__fold${i + 1}.png`;
+          await page.screenshot({ path: join(OUT, ff), fullPage: false });
+          rec.push({ route: `${route} [fold ${i + 1}/${nFolds}]`, url, file: ff, status, title, consoleErrors: [], ok: true, notes: 'fold segment' });
+        }
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
+    } catch { /* fold capture is best-effort */ }
+  }
   page.off('console', onErr);
   const body = (await page.textContent('body').catch(() => '')) || '';
   const brokenState = /application error|unhandled|something went wrong|500|stack trace/i.test(body);
@@ -130,6 +151,8 @@ async function shoot(page, route, url, rec) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     ignoreHTTPSErrors: true, viewport: VP, colorScheme: THEME === 'dark' ? 'dark' : 'light',
+    // 2× DPI so full-page shots stay legible when a vision model downscales them.
+    deviceScaleFactor: 2,
   });
   // next-themes reads a cookie/localStorage; set both for determinism.
   await ctx.addCookies([{ name: 'theme', value: THEME, url: BASE }]);
