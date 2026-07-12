@@ -15,6 +15,7 @@ import type { CopilotContext } from './copilot-context';
 import { readDriftView, type DriftView } from './drift-view';
 import { readEvalsView, type EvalsView } from './evals-view';
 import { computeFinOps, type FinOps } from './finops';
+import { currentOrgId } from './tenancy';
 
 /** Injectable readers so the gather is unit-testable with fakes (no DB/gateway). */
 export interface CopilotReaders {
@@ -38,7 +39,7 @@ const realReaders: CopilotReaders = {
   },
   finops: async () => {
     try {
-      return await computeFinOps();
+      return await computeFinOps(null, await currentOrgId());
     } catch {
       return null;
     }
