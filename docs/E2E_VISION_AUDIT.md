@@ -1,4 +1,35 @@
-# E2E Vision Audit — bharatunion (bank) demo
+# E2E Vision Audit — BOTH tenants, full route sweep (2026-07-12)
+
+**Tier:** E2E — real browser (Playwright) → live deployed server (via SSH forward) → real seeded data, zero mocks.
+**Targets:** bharatunion (bank, `demo-bank@getoffgridai.co`) + suraksha (insurer, `demo-insurer@getoffgridai.co`).
+**Harness:** `scripts/shoot-all.mjs` (every static route + create-dialog state changes + auto-resolved dynamic `[id]` routes) **+ new `scripts/capture-dynamic.mjs`** (resolves real ids the crawler missed — app lifecycle all 9 tabs, pipeline, fleet node, connector/chat/eval detail — from the correct list pages + the DB).
+**Coverage:** **233 screenshots** (bank 121, insurer 112) → run through vision review by **12 parallel reviewers** (~21 shots each), findings triaged against the demo rubric (renders / full-width layout / per-tenant flavor / USD currency / data quality / guardrail tile / no engine-name leak / CRUD affordances).
+
+## Verdict: ✅ PASS (demo-ready)
+
+Every module renders **full-width** with realistic Indian-BFSI seed data, **USD** currency (0 ₹ / INR seen by any reviewer), correct **per-tenant flavor** (bank = loans/KYC/cross-sell/deposits; insurer = policy/claims/underwriting/persistency/FNOL — no cross-bleed in the app/pipeline/knowledge surfaces), **CONTENT GUARDRAILS: ACTIVE** on both overviews, CRUD create/edit/delete/run affordances present, and the read-only demo banner enforced. No stack traces, error boundaries, or blank pages. App lifecycle detail (all tabs), pipeline detail (all tabs), fleet node, connector/chat/eval detail all render populated.
+
+### Real items found (logged to `GAPS_BACKLOG.md` as G-VIS1/G-VIS2)
+- **G-VIS1 (P1, data-seed):** the **bank** tenant's `/data/domains` carries INSURANCE-flavored domains
+  (`claims` → "insurance claims / motor claim / health claim", `claim documents`, `commissions`) bound to a
+  **"Policy Admin (MySQL)"** connector, and `/insights/reports` shows an **IRDAI** pack. Wrong-tenant seed
+  bleed on the bank's DATA/reports surfaces — fix by reseeding bank connectors/domains/regulatory pack to
+  bank-only. Data-level, not code. (The insurer side is correctly insurer-flavored.)
+- **G-VIS2 (P2, data-seed):** `chat_artifacts = 0` → the published-artifact share surface
+  (`/artifacts/[id]/view`, `/workspace/artifacts`) has nothing to demo (empty state renders correctly).
+
+### Dismissed (NOT defects — documented so they don't get re-flagged)
+- Model-provider names (Anthropic/OpenAI/DeepSeek/OpenRouter/Zhipu) on the **Gateway registry** — expected/correct (the gateway routes to those).
+- `/invite-accept` "missing invitation token" — correct behavior when visited without a token.
+- "Pixelated/unreadable" shots (siem/roi/audit/runs/admin) — full-page-screenshot **downscaling** in the reviewer's view; spot-verified rendering fine (SIEM: 387 events, populated table).
+- Generic starter prompt library on `/workspace/prompts` — shared workspace infra by design.
+- `/data/retrieval` shows the "lancedb" adapter name — an operator/technical surface; acceptable (LOW; relabel if desired).
+
+Shots live under `/tmp/vision/{bank,insurer}/` with a per-tenant `manifest.json` (route, url, status, ok, notes).
+
+---
+
+# E2E Vision Audit — bharatunion (bank) demo — earlier single-tenant pass (2026-07-11)
 
 **Tier:** E2E — real browser (Playwright) → real deployed server → real seeded data, zero mocks.
 **Target:** `https://bharatunion-onprem-console.getoffgridai.co` (read-only viewer `demo-bank@getoffgridai.co`).
