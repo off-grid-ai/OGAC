@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { auth } from '@/auth';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { Hellobar } from '@/components/Hellobar';
+import { MobileGate } from '@/components/MobileGate';
 import { PageTransition } from '@/components/PageTransition';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
@@ -38,6 +39,9 @@ export default async function ConsoleLayout({ children }: Readonly<{ children: R
         </div>
         <GlobalSearch />
         <Toaster />
+        {/* Desktop-first: below `md` the console shows a "use a bigger screen" gate, not a broken
+            layout. CSS-only (md:hidden) so no hydration flash. Landing site stays mobile-friendly. */}
+        <MobileGate />
       </TooltipProvider>
     </ViewerModeProvider>
   );
