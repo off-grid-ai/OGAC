@@ -53,7 +53,7 @@ const compliance = {
   frameworks: [
     { id: 'dpdp', name: 'DPDP Act 2023', coverage: 71, controlIds: ['audit', 'pii', 'erasure'] },
     { id: 'iso-42001', name: 'ISO/IEC 42001', coverage: 58, controlIds: ['bias'] },
-    { id: 'hipaa', name: 'HIPAA', coverage: 44, controlIds: ['pii'] },
+    { id: 'nist-ai-rmf', name: 'NIST AI RMF', coverage: 62, controlIds: ['audit'] },
   ],
 };
 const governance = [

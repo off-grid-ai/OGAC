@@ -104,7 +104,7 @@ test('periodEndingAt is a 30-day window ending at now, ISO dates, ordered', () =
 const spec: RegulatorSpec = {
   name: 'IRDAI — insurers',
   status: 'No standalone IRDAI AI rule exists; governed via in-force cyber + DPDP.',
-  frameworks: ['dpdp', 'iso-42001', 'hipaa'],
+  frameworks: ['dpdp', 'iso-42001', 'nist-ai-rmf'],
   questions: ['What data trains the model and the lawful basis?', 'How is bias tested in underwriting?'],
   artifacts: ['Model inventory + model cards', 'Bias/fairness reports + audit logs'],
 };

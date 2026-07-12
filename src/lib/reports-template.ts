@@ -22,9 +22,7 @@ export const REPORT_FRAMEWORKS = [
   'gdpr',
   'eu-ai-act',
   'iso-42001',
-  'hipaa',
-  'occ-sr-11-7',
-  'dora',
+  'nist-ai-rmf',
 ] as const;
 
 export const REPORT_SOURCES = [
