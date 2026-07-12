@@ -171,7 +171,7 @@ function guardrailPosture(g: { engine: string; reachable: boolean; configured: b
   hint: string;
   tone: HomeTile['tone'];
 } {
-  if (g.reachable && g.configured) return { value: 'ACTIVE', hint: 'screening prompts and responses in-line', tone: 'good' };
+  if (g.reachable && g.configured) return { value: 'ACTIVE', hint: 'blocking PII, prompt injection & unsafe content in-line', tone: 'good' };
   if (g.engine === 'regex') return { value: 'BASELINE', hint: 'baseline PII floor active', tone: 'muted' };
   if (g.configured && !g.reachable) return { value: 'OFFLINE', hint: 'guardrail service not responding', tone: 'bad' };
   return { value: 'NOT SET', hint: 'no guardrail endpoint configured', tone: 'muted' };
@@ -223,7 +223,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
   if (guardrails) {
     const gp = guardrailPosture(guardrails);
     posture.push({
-      label: 'PII guardrails',
+      label: 'Content guardrails',
       value: gp.value,
       hint: gp.hint,
       tone: gp.tone,
