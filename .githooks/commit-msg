@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Off Grid Console — commit-msg gate.
+#
+# Belt-and-suspenders: strips any AI-attribution trailer from the commit
+# message before it is recorded, regardless of who/what wrote it (Claude Code,
+# another tool, a clone that lacks the `includeCoAuthoredBy: false` setting, or
+# a hand-typed message). Keeps the project history free of co-author noise.
+#
+# Removes:
+#   - "Co-Authored-By: Claude ..." trailer lines (case-insensitive)
+#   - "🤖 Generated with [Claude Code](...)" lines
+# ...whether on their own line or appended inline to a content line, then
+# collapses the trailing blank lines left behind.
+#
+# See CLAUDE.md — commits carry no Claude/Anthropic attribution.
+
+msg_file="$1"
+
+perl -0777 -i -pe '
+  s/[ \t]*\r?\n?[ \t]*Co-Authored-By:[ \t]*Claude[^\r\n]*//gi;
+  s/^.*Generated with[^\r\n]*Claude Code[^\r\n]*\r?\n?//gim;
+  s/[ \t\r\n]+$//;
+  $_ .= "\n";
+' "$msg_file"
