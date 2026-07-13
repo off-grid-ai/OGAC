@@ -144,7 +144,7 @@ export default function LandingPage() {
               </BlurFade>
               <BlurFade delay={0.32} inView>
                 <div className="mt-7 flex max-w-xs">
-                  <BookCallDialog label="Book a demo" variant="default" size="lg" className="w-full" />
+                  <BookCallDialog label="Book a demo" variant="default" size="lg" className="w-full" autoOpenParam="book" />
                 </div>
               </BlurFade>
               <BlurFade delay={0.4} inView>

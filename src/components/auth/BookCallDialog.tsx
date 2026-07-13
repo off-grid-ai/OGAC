@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,13 +25,27 @@ export function BookCallDialog({
   variant = 'outline',
   size = 'sm',
   className = 'w-full',
+  autoOpenParam,
 }: {
   label?: string;
   variant?: 'outline' | 'default';
   size?: 'sm' | 'default' | 'lg';
   className?: string;
+  // When set, the dialog auto-opens if that URL query param is present (e.g. autoOpenParam="book"
+  // opens on `/?book=1`). Lets an external link (the marketing site's "Book a demo") deep-link
+  // straight into the booking modal instead of a dead waitlist page.
+  autoOpenParam?: string;
 } = {}) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!autoOpenParam) return;
+    try {
+      if (new URLSearchParams(window.location.search).get(autoOpenParam) !== null) setOpen(true);
+    } catch {
+      /* SSR / no window — ignore */
+    }
+  }, [autoOpenParam]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
