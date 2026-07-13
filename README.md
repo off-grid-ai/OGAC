@@ -53,16 +53,16 @@ working, governed workflow, tested in a sandbox before it touches anything real.
 
 ## See it live
 
-Click through two fully-seeded example tenants — a bank and a life insurer — on the live,
+Click through two fully-seeded example tenants (a bank and a life insurer) on the live,
 read-only demo:
 
-- 🏦 **[Bharat Union — a bank →](https://bharatunion-onprem-console.getoffgridai.co/overview)**
-- 🛡️ **[Suraksha Life — an insurer →](https://suraksha-onprem-console.getoffgridai.co/overview)**
+- 🏦 **[Bharat Union, a bank →](https://bharatunion-onprem-console.getoffgridai.co/overview)**
+- 🛡️ **[Suraksha Life, an insurer →](https://suraksha-onprem-console.getoffgridai.co/overview)**
 
 Same platform, two industries: the gateway, guardrails, policies, pipelines, and the apps each team
-built in plain language — all populated with realistic data.
+built in plain language, all populated with realistic data.
 
-**[Or see every feature, screen by screen →](features/README.md)** — the gateway, knowledge, the
+**[Or see every feature, screen by screen →](features/README.md).** The gateway, knowledge, the
 Studio, agent QA, signed provenance, data, regulatory report packs, and FinOps, each with a
 screenshot from the live console.
 
