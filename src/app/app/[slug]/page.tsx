@@ -28,6 +28,13 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   // Dashboard data: live from the bound data domain when present, else the deterministic sample.
   const metrics = isCockpit ? computeCockpitMetrics(cockpitRows()) : null;
 
+  // The cockpit runs its own governed next-best-action computation (deterministic, no model
+  // dependency); other apps use the generic governed run endpoint.
+  const base = sharedSurface(resolved.slug);
+  const surface = isCockpit
+    ? { ...base, runUrl: `/api/v1/app/${encodeURIComponent(resolved.slug)}/cockpit-run` }
+    : base;
+
   return (
     <div className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
       <div className="mx-auto w-full max-w-[100rem]">
@@ -38,7 +45,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           metrics={metrics}
           trend={cockpitTrend()}
           fields={fields}
-          surface={sharedSurface(resolved.slug)}
+          surface={surface}
         />
       </div>
     </div>
