@@ -9,9 +9,12 @@
 export interface FormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'file' | 'date';
+  type: 'text' | 'textarea' | 'number' | 'select' | 'file' | 'date';
   required?: boolean;
   options?: string[]; // for type:'select'
+  description?: string; // help text shown under the label
+  placeholder?: string; // input placeholder
+  default?: string; // prefilled value when the field is unset
 }
 
 // ─── TriggerSpec — how an app is invoked ──────────────────────────────────────
