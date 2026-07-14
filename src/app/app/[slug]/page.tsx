@@ -22,8 +22,11 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
 
   // The run form: whatever the app declares, else a sensible cross-sell default (never one bare box).
   const fields = deriveRunFields(app.inputForm);
+  // The cockpit dashboard is the front door for the cross-sell app; other apps land on Run. Detect it
+  // by slug/title so we never render a cross-sell cockpit over an unrelated published app.
+  const isCockpit = /cross[-\s]?sell/i.test(resolved.slug) || /cross[-\s]?sell/i.test(resolved.title);
   // Dashboard data: live from the bound data domain when present, else the deterministic sample.
-  const metrics = computeCockpitMetrics(cockpitRows());
+  const metrics = isCockpit ? computeCockpitMetrics(cockpitRows()) : null;
 
   return (
     <div className="min-h-screen w-full bg-background px-4 py-6 md:px-8">

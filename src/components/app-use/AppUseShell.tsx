@@ -12,11 +12,6 @@ import type { AppSurface } from '@/lib/app-surface';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
 
 type UseView = 'dashboard' | 'run' | 'activity';
-const VIEWS: { key: UseView; label: string }[] = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'run', label: 'Run' },
-  { key: 'activity', label: 'Activity' },
-];
 
 // ─── AppUseShell — the USE surface (the "deployed app you actually use") ───────────────────────────
 // Distinct from the Studio BUILD surface (where you author the app). This is the Lovable/Bolt-style
@@ -36,16 +31,24 @@ export function AppUseShell({
   title: string;
   summary: string;
   live: boolean;
-  metrics: CockpitMetrics;
-  trend: TrendPoint[];
+  metrics?: CockpitMetrics | null;
+  trend?: TrendPoint[];
   fields: RunField[];
   surface: AppSurface;
   editHref?: string;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const view = (params.get('view') as UseView) || 'dashboard';
-  const hrefFor = (v: UseView) => (v === 'dashboard' ? pathname : `${pathname}?view=${v}`);
+  const hasDashboard = Boolean(metrics);
+  const views: { key: UseView; label: string }[] = [
+    ...(hasDashboard ? [{ key: 'dashboard' as UseView, label: 'Dashboard' }] : []),
+    { key: 'run', label: 'Run' },
+    { key: 'activity', label: 'Activity' },
+  ];
+  const fallback: UseView = hasDashboard ? 'dashboard' : 'run';
+  const requested = (params.get('view') as UseView) || fallback;
+  const view = views.some((v) => v.key === requested) ? requested : fallback;
+  const hrefFor = (v: UseView) => (v === fallback ? pathname : `${pathname}?view=${v}`);
 
   const share = () => {
     if (typeof window !== 'undefined') {
@@ -93,7 +96,7 @@ export function AppUseShell({
         </div>
         {/* View tabs */}
         <div className="flex gap-1 border-t border-border/60 px-3">
-          {VIEWS.map((v) => (
+          {views.map((v) => (
             <Link
               key={v.key}
               href={hrefFor(v.key)}
@@ -108,8 +111,8 @@ export function AppUseShell({
         </div>
       </div>
 
-      {view === 'dashboard' ? (
-        <CockpitDashboard metrics={metrics} trend={trend} live={live} customerHrefBase={surface.customerHrefBase} />
+      {view === 'dashboard' && metrics ? (
+        <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />
       ) : view === 'run' ? (
         <RunPanel fields={fields} surface={surface} />
       ) : (
