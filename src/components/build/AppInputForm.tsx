@@ -1,13 +1,15 @@
 'use client';
 
 import { CheckCircle, Play, Warning } from '@phosphor-icons/react/dist/ssr';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { applyInputDefaults, coerceInputValues, validateInputValues } from '@/lib/app-inputs';
 import type { AppSpec, FormField } from '@/lib/app-model';
 
 // ─── AppInputForm (Builder Epic Phase 3A) — the INPUT screen (screen 2 of 5) ─────────────────────
@@ -31,22 +33,46 @@ type RunOutcome = { runId: string; status: string; steps: RunStep[]; outcome: st
 
 export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
   const fields: FormField[] = app.inputForm && app.inputForm.length > 0 ? app.inputForm : FALLBACK_FIELDS;
-  const [values, setValues] = useState<Record<string, string>>({});
+  // Seed from each field's declared default so the form opens pre-filled where the builder said so.
+  const [values, setValues] = useState<Record<string, string>>(() => applyInputDefaults(fields));
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<RunOutcome | null>(null);
+  // Per-field errors: seeded from a server 400 (fieldErrors) or from the local validator on submit.
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
+  // Live validity (the same pure rule the server enforces) drives the Run button's enabled state.
+  const validation = useMemo(() => validateInputValues(fields, values), [fields, values]);
+
+  function setValue(key: string, value: string) {
+    setValues((v) => ({ ...v, [key]: value }));
+    // Clear a field's error as the user edits it.
+    setErrors((e) => (e[key] ? { ...e, [key]: '' } : e));
+  }
 
   async function run() {
-    if (running || missing.length > 0) return;
+    if (running) return;
+    const check = validateInputValues(fields, values);
+    if (!check.ok) {
+      setErrors(check.errors);
+      toast.error('Fix the highlighted fields, then run.');
+      return;
+    }
     setRunning(true);
     setOutcome(null);
+    setErrors({});
     try {
       const res = await fetch(`/api/v1/admin/apps/${app.id}/run`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input: values }),
+        body: JSON.stringify({ input: coerceInputValues(fields, values) }),
       });
+      if (res.status === 400) {
+        const body = (await res.json().catch(() => ({}))) as {
+          fieldErrors?: Record<string, string>;
+        };
+        setErrors(body.fieldErrors ?? {});
+        throw new Error('Some inputs were rejected — see the highlighted fields.');
+      }
       if (!res.ok) throw new Error('The run could not be started');
       const data = (await res.json()) as RunOutcome;
       setOutcome(data);
@@ -71,36 +97,16 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
         </CardHeader>
         <CardContent className="space-y-3">
           {fields.map((f) => (
-            <div key={f.key} className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
-                {f.label}
-                {f.required ? <span className="text-destructive"> *</span> : null}
-              </Label>
-              {f.type === 'select' && f.options?.length ? (
-                <select
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-                >
-                  <option value="">— choose —</option>
-                  {f.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  type={htmlInputType(f.type)}
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.type === 'file' ? 'File reference / path' : undefined}
-                />
-              )}
-            </div>
+            <FieldRow
+              key={f.key}
+              field={f}
+              value={values[f.key] ?? ''}
+              error={errors[f.key]}
+              onChange={(val) => setValue(f.key, val)}
+            />
           ))}
           <div className="flex items-center justify-end pt-1">
-            <Button onClick={run} disabled={running || missing.length > 0} className="gap-1.5">
+            <Button onClick={run} disabled={running || !validation.ok} className="gap-1.5">
               <Play className="size-4" weight="fill" />
               {running ? 'Running…' : 'Run'}
             </Button>
@@ -110,6 +116,94 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
 
       {outcome ? <RunTrace outcome={outcome} /> : null}
     </div>
+  );
+}
+
+// One input field — renders the right control for the field's type (select / textarea / typed
+// input), its optional help text and placeholder, and an inline validation error when present.
+function FieldRow({
+  field,
+  value,
+  error,
+  onChange,
+}: Readonly<{
+  field: FormField;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+}>) {
+  const invalid = !!error;
+  const describedBy = field.description ? `${field.key}-help` : undefined;
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">
+        {field.label}
+        {field.required ? <span className="text-destructive"> *</span> : null}
+      </Label>
+      {field.description ? (
+        <p id={describedBy} className="text-[11px] text-muted-foreground/80">
+          {field.description}
+        </p>
+      ) : null}
+      <FieldControl field={field} value={value} invalid={invalid} onChange={onChange} />
+      {error ? (
+        <p className="flex items-center gap-1 text-[11px] text-destructive">
+          <Warning className="size-3" />
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+const INVALID_RING = 'border-destructive focus-visible:ring-destructive';
+
+function FieldControl({
+  field,
+  value,
+  invalid,
+  onChange,
+}: Readonly<{
+  field: FormField;
+  value: string;
+  invalid: boolean;
+  onChange: (v: string) => void;
+}>) {
+  if (field.type === 'select' && field.options?.length) {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${invalid ? INVALID_RING : 'border-border'}`}
+      >
+        <option value="">{field.placeholder ?? '— choose —'}</option>
+        {field.options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (field.type === 'textarea') {
+    return (
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        placeholder={field.placeholder}
+        className={`text-sm ${invalid ? INVALID_RING : ''}`}
+      />
+    );
+  }
+  return (
+    <Input
+      type={htmlInputType(field.type)}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={field.placeholder ?? (field.type === 'file' ? 'File reference / path' : undefined)}
+      className={invalid ? INVALID_RING : undefined}
+    />
   );
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { submitAppRun } from '@/lib/adapters/apprun';
 import { callerFromSession } from '@/lib/app-access-caller';
+import { coerceInputValues, validateInputValues } from '@/lib/app-inputs';
 import { newAppRunId } from '@/lib/app-run';
 import { evaluateBlastRadius, resolveRunMode, type RunMode } from '@/lib/app-run-controls';
 import { getControls, usageFor } from '@/lib/app-run-controls-store';
@@ -36,8 +37,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     input?: Record<string, unknown>;
     mode?: RunMode;
   };
-  const input = body.input && typeof body.input === 'object' ? body.input : {};
+  const rawInput = body.input && typeof body.input === 'object' ? body.input : {};
   const requestedMode: RunMode | undefined = body.mode === 'shadow' ? 'shadow' : undefined;
+
+  // INPUT VALIDATION — if the app declares an inputForm, the posted input must satisfy it (same pure
+  // rule the Input form uses, so client + server agree). Invalid ⇒ 400 with per-field errors so the
+  // form can render them inline. Then coerce (number strings → numbers, trim, drop empties) so the
+  // executor receives typed values. Apps with no inputForm keep the raw input (unchanged behaviour).
+  const inputForm = app.inputForm ?? [];
+  let input: Record<string, unknown> = rawInput;
+  if (inputForm.length > 0) {
+    const check = validateInputValues(inputForm, rawInput);
+    if (!check.ok) {
+      return NextResponse.json(
+        { error: 'invalid input', fieldErrors: check.errors },
+        { status: 400 },
+      );
+    }
+    input = coerceInputValues(inputForm, rawInput);
+  }
 
   // Per-app ACCESS CONTROL — the WHO/UNDER-WHAT-CONDITIONS gate, layered before the pipeline
   // contract. The run input doubles as the ABAC request attributes (e.g. amount thresholds). Denied →

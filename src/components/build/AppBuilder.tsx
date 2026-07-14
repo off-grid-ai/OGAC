@@ -18,6 +18,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { AppInputFieldsEditor } from '@/components/build/AppInputFieldsEditor';
 import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import { InheritanceBanner } from '@/components/build/InheritanceBanner';
 import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
@@ -45,7 +46,13 @@ import {
   toggleGrounding,
   type BindingNames,
 } from '@/lib/app-builder';
-import { type AppSpec, type AppStepKind, type TriggerKind, validateAppSpec } from '@/lib/app-model';
+import {
+  type AppSpec,
+  type AppStepKind,
+  type FormField,
+  type TriggerKind,
+  validateAppSpec,
+} from '@/lib/app-model';
 import { setStepTools } from '@/lib/app-tools';
 import {
   analyzeGaps,
@@ -526,6 +533,14 @@ function GuidedRefine({
             </div>
           </CardContent>
         </Card>
+
+        {/* Run inputs — the builder defines what a run needs (typed fields, help, validation). */}
+        <AppInputFieldsEditor
+          fields={spec.inputForm ?? []}
+          onChange={(inputForm: FormField[]) =>
+            onSpec((s) => (s ? { ...s, inputForm } : s))
+          }
+        />
       </div>
 
       {/* Identity + trigger + visibility in the side column */}
