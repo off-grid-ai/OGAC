@@ -4,7 +4,6 @@ import { Lightning, PencilSimple, ShareNetwork } from '@phosphor-icons/react/dis
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
 import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
@@ -68,12 +67,6 @@ export function AppUseShell({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-                <Badge
-                  variant="secondary"
-                  className={live ? 'bg-primary/10 text-[10px] text-primary' : 'bg-amber-500/10 text-[10px] text-amber-600'}
-                >
-                  {live ? '● live data' : '● sample data'}
-                </Badge>
               </div>
               {summary ? <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">{summary}</p> : null}
               <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
