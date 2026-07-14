@@ -7,6 +7,7 @@ import {
   parseAuthResult,
   parseModelListResult,
   parseOdooEndpoint,
+  parseOdooInlinePassword,
   parseOdooLogin,
   parseSearchReadResult,
 } from '@/lib/odoo-rpc';
@@ -94,6 +95,17 @@ test('parseOdooLogin defaults to admin when no user or on malformed input', () =
   assert.equal(parseOdooLogin('odoo://h:8069/db'), 'admin');
   assert.equal(parseOdooLogin('https://h/odoo?db=x'), 'admin');
   assert.equal(parseOdooLogin('not a url'), 'admin');
+});
+
+// ─── parseOdooInlinePassword ────────────────────────────────────────────────────────────────────
+test('parseOdooInlinePassword returns the URL-decoded inline password when present', () => {
+  assert.equal(parseOdooInlinePassword('odoo://svc:p%40ss@h:8069/db'), 'p@ss');
+});
+
+test('parseOdooInlinePassword returns empty string when absent or malformed', () => {
+  assert.equal(parseOdooInlinePassword('odoo://svc@h:8069/db'), '');
+  assert.equal(parseOdooInlinePassword('not a url'), '');
+  assert.equal(parseOdooInlinePassword(''), '');
 });
 
 // ─── buildAuthPayload ───────────────────────────────────────────────────────────────────────────
