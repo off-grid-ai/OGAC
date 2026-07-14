@@ -74,6 +74,19 @@ export function parseOdooLogin(endpoint: string): string {
   }
 }
 
+// The password carried inline in an odoo:// endpoint's userinfo, if any. The vault is the primary
+// source (resolved at query time by connector-exec), but a legacy seeded endpoint may carry the
+// password inline — this lets the credential-less recordCount path still authenticate. Returns '' when
+// there's no inline password or the input is malformed (never guesses one).
+export function parseOdooInlinePassword(endpoint: string): string {
+  try {
+    const u = new URL((endpoint ?? '').trim());
+    return decodeURIComponent(u.password || '');
+  } catch {
+    return '';
+  }
+}
+
 // ─── Request-body builders (pure) ─────────────────────────────────────────────────────────────────
 // Each returns the exact JSON-RPC 2.0 envelope Odoo expects. `id` defaults to 1 (Odoo echoes it but
 // we don't rely on it). Kept as plain objects so the I/O layer just JSON.stringify's them.

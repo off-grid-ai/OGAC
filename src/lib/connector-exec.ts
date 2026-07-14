@@ -21,6 +21,18 @@
 // the REST api key as a Bearer header — so the stored endpoint stays credential-free. When absent
 // (or the connector has no vaulted secret) the raw endpoint is used as-is, preserving already-seeded
 // connectors that still carry inline creds. Nothing that works today breaks.
+import {
+  buildAuthPayload,
+  buildModelListPayload,
+  buildSearchReadPayload,
+  parseAuthResult,
+  parseModelListResult,
+  parseOdooEndpoint,
+  parseOdooInlinePassword,
+  parseOdooLogin,
+  parseSearchReadResult,
+} from './odoo-rpc';
+
 export interface ConnectorTarget {
   type: string;
   endpoint: string;
@@ -34,6 +46,9 @@ interface ResolvedExecTarget {
   type: string;
   endpoint: string;
   authHeader: Record<string, string>;
+  // The raw resolved secret, carried through for dialects that use the credential OUTSIDE the URL or
+  // a Bearer header — Odoo's JSON-RPC password is a body argument, not a header or a DSN password.
+  secret?: string;
 }
 
 // Resolve a target's credential from the vault (by `id`) into a ready-to-use exec target. Falls back
@@ -49,11 +64,57 @@ async function resolveTargetCreds(conn: ConnectorTarget): Promise<ResolvedExecTa
     if (!secret) return base;
     const dialect = detectDialect(conn.type, conn.endpoint);
     if (dialect === 'rest') return { ...base, authHeader: { authorization: `Bearer ${secret}` } };
+    // Odoo: the credential is the JSON-RPC password (a body arg), so carry it as `secret` — NOT a
+    // Bearer header (Odoo doesn't read one) and NOT spliced into the URL (odoo:// isn't a DSN).
+    if (dialect === 'odoo') return { ...base, secret };
     // SQL dialects: splice the password into the connection URL (no-op if it already has one).
     return { ...base, endpoint: spliceCredential(conn.type, conn.endpoint, secret) };
   } catch {
     return base;
   }
+}
+
+// ─── Odoo JSON-RPC I/O helpers (thin over the pure odoo-rpc protocol layer) ───────────────────────
+// One place that does the network for Odoo: POST a JSON-RPC envelope to <base>/jsonrpc and parse the
+// body. Everything about the wire format lives in odoo-rpc.ts; this just runs fetch with a timeout
+// and returns the parsed JSON (or null on any transport/HTTP/JSON failure — honest degrade).
+const ODOO_TIMEOUT_MS = 5000;
+
+async function odooRpc(base: string, payload: unknown): Promise<unknown> {
+  try {
+    const r = await fetch(`${base.replace(/\/$/, '')}/jsonrpc`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(ODOO_TIMEOUT_MS),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+// Resolve endpoint → {base, db}, login (userinfo), password (vaulted secret), then authenticate.
+// Returns the connection context + uid on success, or null when the endpoint is unparseable, the
+// password is absent, or auth fails — so every Odoo caller degrades to null uniformly (DRY).
+interface OdooSession {
+  base: string;
+  db: string;
+  uid: number;
+  password: string;
+}
+
+async function odooAuthenticate(resolved: ResolvedExecTarget): Promise<OdooSession | null> {
+  const parsed = parseOdooEndpoint(resolved.endpoint);
+  if (!parsed) return null;
+  const password = resolved.secret ?? '';
+  if (!password) return null; // no credential → we won't guess one; honest miss
+  const login = parseOdooLogin(resolved.endpoint);
+  const authBody = await odooRpc(parsed.base, buildAuthPayload(parsed.db, login, password));
+  const uid = parseAuthResult(authBody);
+  if (uid === null) return null;
+  return { base: parsed.base, db: parsed.db, uid, password };
 }
 
 // A READ request against a bound resource (table / path / object) on a connector.
@@ -65,22 +126,26 @@ export interface ConnectorQuery {
 }
 
 // The result of a READ: the rows plus the row count that came back and the dialect used.
+export type ConnectorDialect = 'postgres' | 'mysql' | 'mssql' | 'rest' | 'odoo';
+
 export interface ConnectorQueryResult {
   rows: Record<string, unknown>[];
   count: number;
-  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest';
+  dialect: ConnectorDialect;
 }
 
 // ─── Dialect detection (pure) ─────────────────────────────────────────────────
 // Which live-query strategy applies to a (type, endpoint) pair. Kept pure + exported so the rule
 // engine and tests can reason about bindings without opening a connection. Returns null when no
 // strategy matches (non-DB connector, or endpoint scheme mismatched to the declared type).
-export function detectDialect(
-  type: string,
-  endpoint: string,
-): 'postgres' | 'mysql' | 'mssql' | 'rest' | null {
+export function detectDialect(type: string, endpoint: string): ConnectorDialect | null {
   const t = (type ?? '').toLowerCase();
   const e = endpoint ?? '';
+  // Odoo takes precedence over the generic REST match: an Odoo connector's endpoint may be an
+  // https:// URL (the `https://host/odoo?db=NAME` form), which would otherwise look like plain REST.
+  // We match odoo ONLY when the type says so AND the endpoint parses to a valid {base, db} — a
+  // scheme/type mismatch (odoo type, un-parseable endpoint) falls through to null, not a wrong dialect.
+  if (t.includes('odoo') && parseOdooEndpoint(e) !== null) return 'odoo';
   if ((t.includes('postgres') || t === 'database') && e.startsWith('postgres')) return 'postgres';
   if (t.includes('mysql') && e.startsWith('mysql')) return 'mysql';
   if (t.includes('mssql') && e.startsWith('mssql')) return 'mssql';
@@ -159,6 +224,19 @@ export async function recordCount(type: string, endpoint: string): Promise<numbe
       }
       return 0;
     } catch { return null; }
+  }
+  if (dialect === 'odoo') {
+    // recordCount has no connector id → no vault; use any inline password from the endpoint userinfo.
+    // Authenticate, then count the res.partner directory (the connector's representative record set —
+    // the master customer/contact model every Odoo instance has). Null on any failure.
+    const session = await odooAuthenticate({ type, endpoint, authHeader: {}, secret: parseOdooInlinePassword(endpoint) });
+    if (!session) return null;
+    const body = await odooRpc(
+      session.base,
+      buildSearchReadPayload({ db: session.db, uid: session.uid, password: session.password, model: 'res.partner', fields: ['id'], limit: 100000 }),
+    );
+    const rows = parseSearchReadResult(body);
+    return rows === null ? null : rows.length;
   }
   return null;
 }
@@ -281,6 +359,31 @@ export async function execConnectorQuery(
     } catch { return null; }
   }
 
+  // Odoo: authenticate, then search_read the model named by `query.resource` (e.g. res.partner).
+  // Returns null on any failure — unparseable endpoint, missing credential, auth reject, or an Odoo
+  // {error} envelope — so a bad binding surfaces as a miss, never a fabricated record.
+  if (dialect === 'odoo') {
+    if (!query.resource) return null;
+    const session = await odooAuthenticate(resolved);
+    if (!session) return null;
+    // For a count we still read the rows (bounded) and count them — Odoo's search_count is a separate
+    // method; keeping to search_read is one code path and honest (the count is of what we can read).
+    const body = await odooRpc(
+      session.base,
+      buildSearchReadPayload({
+        db: session.db,
+        uid: session.uid,
+        password: session.password,
+        model: query.resource,
+        limit,
+      }),
+    );
+    const rows = parseSearchReadResult(body);
+    if (rows === null) return null;
+    if (op === 'count') return { rows: [{ count: rows.length }], count: rows.length, dialect };
+    return { rows, count: rows.length, dialect };
+  }
+
   return null;
 }
 
@@ -291,7 +394,7 @@ export async function execConnectorQuery(
 // before relying on it. Never throws; a failure is `{ ok: false, message }`, never an exception.
 export interface ConnectionTestResult {
   ok: boolean;
-  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | null;
+  dialect: ConnectorDialect | null;
   message: string;
 }
 
@@ -337,6 +440,18 @@ export async function testConnection(conn: ConnectorTarget): Promise<ConnectionT
         await pool.request().query('SELECT 1 AS n');
         return { ok: true, dialect, message: 'Connected — the database responded.' };
       } finally { await pool.close(); }
+    }
+    if (dialect === 'odoo') {
+      const session = await odooAuthenticate(resolved);
+      if (session) {
+        return { ok: true, dialect, message: `Connected — Odoo authenticated (uid ${session.uid}).` };
+      }
+      // Distinguish "reached but rejected" (no credential / bad login) from a transport failure by
+      // re-checking the parse: an unparseable endpoint is a config error, otherwise it's auth.
+      if (!parseOdooEndpoint(resolved.endpoint)) {
+        return { ok: false, dialect, message: 'The Odoo endpoint could not be parsed (need a database).' };
+      }
+      return { ok: false, dialect, message: 'Odoo rejected the credentials or was unreachable.' };
     }
     // rest
     const r = await fetch(endpoint.replace(/\/$/, ''), {
@@ -414,6 +529,15 @@ export async function listResources(conn: ConnectorTarget): Promise<string[] | n
           row.TABLE_SCHEMA === 'dbo' ? String(row.TABLE_NAME) : `${row.TABLE_SCHEMA}.${row.TABLE_NAME}`,
         );
       } finally { await pool.close(); }
+    }
+    if (dialect === 'odoo') {
+      const session = await odooAuthenticate(resolved);
+      if (!session) return null;
+      const body = await odooRpc(
+        session.base,
+        buildModelListPayload({ db: session.db, uid: session.uid, password: session.password }),
+      );
+      return parseModelListResult(body); // null on error → caller degrades to manual entry
     }
     // rest — surface the top-level array keys (json-server collections) or [] for a bare array.
     const r = await fetch(endpoint.replace(/\/$/, ''), {

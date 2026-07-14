@@ -10,7 +10,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { connectors, ingestJobs } from '@/db/schema';
-import { detectDialect } from '@/lib/connector-exec';
+import { detectDialect, type ConnectorDialect } from '@/lib/connector-exec';
 import { listDomains } from '@/lib/data-domains-store';
 import type { Connector, IngestJob } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -30,7 +30,7 @@ export interface ConnectorDetail {
   connector: Connector;
   // The live-query strategy the rule engine resolves for this (type, endpoint) pair, or null when
   // no strategy matches (non-DB / scheme mismatch). Purely derived — no connection is opened here.
-  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | null;
+  dialect: ConnectorDialect | null;
   // Most-recent-first ingest/sync runs for THIS connector.
   syncHistory: IngestJob[];
   // Data-domain rules that route to this connector (label + aliases → resource).
