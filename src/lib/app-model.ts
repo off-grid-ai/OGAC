@@ -6,12 +6,20 @@
 // the `apps` table. Keeping the rules here pure makes them unit-testable in isolation.
 
 // ─── FormField — one field of an input form (collected before a run) ──────────
+// The builder (Studio) defines these so a run's input form is whatever the app ACTUALLY needs —
+// typed fields with help text, placeholders, and defaults — not a single generic box. Extended
+// (Builder Epic input-form work): added 'textarea' to the type union and the optional presentation
+// hints (description/placeholder/default). All additions are OPTIONAL so existing FormField[]
+// consumers (seeded apps, the executor, back-compat shim) keep working unchanged.
 export interface FormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'file' | 'date';
+  type: 'text' | 'textarea' | 'number' | 'select' | 'file' | 'date';
   required?: boolean;
   options?: string[]; // for type:'select'
+  description?: string; // help text shown under the label
+  placeholder?: string; // input placeholder
+  default?: string; // pre-filled value when the form opens
 }
 
 // ─── TriggerSpec — how an app is invoked ──────────────────────────────────────
