@@ -1,13 +1,19 @@
 'use client';
 
 import { CheckCircle, Play, Warning } from '@phosphor-icons/react/dist/ssr';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  applyInputDefaults,
+  coerceInputValues,
+  validateInputValues,
+} from '@/lib/app-inputs';
 import type { AppSpec, FormField } from '@/lib/app-model';
 
 // ─── AppInputForm (Builder Epic Phase 3A) — the INPUT screen (screen 2 of 5) ─────────────────────
@@ -30,22 +36,34 @@ type RunStep = {
 type RunOutcome = { runId: string; status: string; steps: RunStep[]; outcome: string };
 
 export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
-  const fields: FormField[] = app.inputForm && app.inputForm.length > 0 ? app.inputForm : FALLBACK_FIELDS;
-  const [values, setValues] = useState<Record<string, string>>({});
+  const fields: FormField[] = useMemo(
+    () => (app.inputForm && app.inputForm.length > 0 ? app.inputForm : FALLBACK_FIELDS),
+    [app.inputForm],
+  );
+  // Seed from declared defaults so the run form opens pre-filled (defaults live in ONE pure rule).
+  const [values, setValues] = useState<Record<string, string>>(() => applyInputDefaults(fields, {}));
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<RunOutcome | null>(null);
-
-  const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
+  // Per-field inline errors, shown on submit. Empty until the first failed run attempt.
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function run() {
-    if (running || missing.length > 0) return;
+    if (running) return;
+    // Same rule as the server (DRY): validate required + typed fields before submitting.
+    const check = validateInputValues(fields, values);
+    if (!check.ok) {
+      setErrors(check.errors);
+      toast.error('Fix the highlighted fields, then run.');
+      return;
+    }
+    setErrors({});
     setRunning(true);
     setOutcome(null);
     try {
       const res = await fetch(`/api/v1/admin/apps/${app.id}/run`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input: values }),
+        body: JSON.stringify({ input: coerceInputValues(fields, values) }),
       });
       if (!res.ok) throw new Error('The run could not be started');
       const data = (await res.json()) as RunOutcome;
@@ -70,37 +88,31 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {fields.map((f) => (
-            <div key={f.key} className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
-                {f.label}
-                {f.required ? <span className="text-destructive"> *</span> : null}
-              </Label>
-              {f.type === 'select' && f.options?.length ? (
-                <select
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-                >
-                  <option value="">— choose —</option>
-                  {f.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  type={htmlInputType(f.type)}
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.type === 'file' ? 'File reference / path' : undefined}
-                />
-              )}
-            </div>
-          ))}
+          {fields.map((f) => {
+            const err = errors[f.key];
+            const setField = (val: string) =>
+              setValues((v) => ({ ...v, [f.key]: val }));
+            return (
+              <div key={f.key} className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  {f.label}
+                  {f.required ? <span className="text-destructive"> *</span> : null}
+                </Label>
+                {f.description ? (
+                  <p className="text-[11px] text-muted-foreground">{f.description}</p>
+                ) : null}
+                {renderFieldControl(f, values[f.key] ?? '', setField, !!err)}
+                {err ? (
+                  <p className="flex items-center gap-1 text-[11px] text-destructive">
+                    <Warning className="size-3" weight="fill" />
+                    {err}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
           <div className="flex items-center justify-end pt-1">
-            <Button onClick={run} disabled={running || missing.length > 0} className="gap-1.5">
+            <Button onClick={run} disabled={running} className="gap-1.5">
               <Play className="size-4" weight="fill" />
               {running ? 'Running…' : 'Run'}
             </Button>
@@ -152,6 +164,54 @@ function RunTrace({ outcome }: Readonly<{ outcome: RunOutcome }>) {
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+// Render the right control for a field's type: select → dropdown, textarea → multi-line, else a typed
+// <input>. `invalid` toggles the error ring so a failed field reads visually. Placeholder falls back
+// to a sensible default for file fields.
+function renderFieldControl(
+  f: FormField,
+  value: string,
+  onChange: (v: string) => void,
+  invalid: boolean,
+) {
+  const ring = invalid ? 'border-destructive focus-visible:ring-destructive' : '';
+  if (f.type === 'select' && f.options?.length) {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${invalid ? 'border-destructive' : 'border-border'}`}
+      >
+        <option value="">— choose —</option>
+        {f.options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (f.type === 'textarea') {
+    return (
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        placeholder={f.placeholder}
+        className={`text-sm ${ring}`}
+      />
+    );
+  }
+  return (
+    <Input
+      type={htmlInputType(f.type)}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={f.placeholder ?? (f.type === 'file' ? 'File reference / path' : undefined)}
+      className={ring}
+    />
   );
 }
 
