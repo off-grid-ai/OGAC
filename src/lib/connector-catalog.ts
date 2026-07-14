@@ -30,6 +30,7 @@ export type ConnectorCategory =
   | 'Object store'
   | 'Streaming'
   | 'SaaS/REST'
+  | 'ERP'
   | 'NoSQL';
 
 export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
@@ -38,6 +39,7 @@ export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
   'Object store',
   'Streaming',
   'SaaS/REST',
+  'ERP',
   'NoSQL',
 ];
 
@@ -301,6 +303,24 @@ export const CONNECTOR_TYPES: ConnectorType[] = [
     fields: [
       endpointField('Sheet endpoint URL', 'https://sheets.googleapis.com/v4/spreadsheets/<id>/...'),
       { key: 'apiKey', label: 'API key', required: false, secret: true },
+    ],
+    liveQuery: true,
+  },
+
+  // ── ERP (Odoo IS live-queryable via the JSON-RPC dialect) ─────────────────────────────────────────
+  {
+    id: 'odoo',
+    name: 'Odoo ERP',
+    category: 'ERP',
+    connectorType: 'odoo',
+    description:
+      'Connect to an Odoo ERP — the system of record for customers, leads and accounting entries. ' +
+      'Bind its models (contacts, CRM leads, journal entries) into a data domain to ground answers ' +
+      'like cross-sell holdings, KYC contact details, or a customer’s ledger in real ERP records.',
+    authKind: 'password',
+    endpointHint: 'odoo://user:password@host:8069/DBNAME',
+    fields: [
+      endpointField('Odoo connection URI', 'odoo://user:password@host:8069/DBNAME'),
     ],
     liveQuery: true,
   },

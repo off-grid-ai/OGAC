@@ -104,17 +104,33 @@ test('HONESTY: liveQuery flag agrees with connector-exec detectDialect for a rep
   }
 });
 
-test('HONESTY: exactly the DB + REST types are live-queryable; warehouse/streaming/NoSQL/object are metadata-only', () => {
+test('HONESTY: exactly the DB + REST + Odoo types are live-queryable; warehouse/streaming/NoSQL/object are metadata-only', () => {
   const live = liveQueryableTypes().map((t) => t.id).sort();
   assert.deepEqual(
     live,
-    ['gsheets', 'mysql', 'mssql', 'postgres', 'rest', 'salesforce'].sort(),
-    'live-queryable set must be exactly the postgres/mysql/mssql + rest-backed types',
+    ['gsheets', 'mysql', 'mssql', 'odoo', 'postgres', 'rest', 'salesforce'].sort(),
+    'live-queryable set must be exactly the postgres/mysql/mssql + rest-backed + odoo types',
   );
   // Explicitly metadata-only.
   for (const id of ['snowflake', 'bigquery', 'databricks', 's3', 'minio', 'kafka', 'mongodb', 'redis', 'elasticsearch', 'oracle', 'sqlite']) {
     assert.equal(getConnectorType(id)!.liveQuery, false, `${id} must be metadata-only`);
   }
+});
+
+test('the Odoo ERP entry is a live-queryable ERP connector with the odoo connectorType', () => {
+  const odoo = getConnectorType('odoo');
+  assert.ok(odoo, 'odoo entry present');
+  assert.equal(odoo!.category, 'ERP');
+  assert.equal(odoo!.connectorType, 'odoo');
+  assert.equal(odoo!.authKind, 'password');
+  assert.equal(odoo!.liveQuery, true);
+  assert.match(odoo!.endpointHint, /^odoo:\/\//);
+  // ERP is a real category surfaced in the canonical list, in order between SaaS/REST and NoSQL.
+  assert.ok(CONNECTOR_CATEGORIES.includes('ERP'));
+  assert.ok(
+    CONNECTOR_CATEGORIES.indexOf('ERP') > CONNECTOR_CATEGORIES.indexOf('SaaS/REST') &&
+      CONNECTOR_CATEGORIES.indexOf('ERP') < CONNECTOR_CATEGORIES.indexOf('NoSQL'),
+  );
 });
 
 test('filterConnectorCatalog: empty query + null category returns the full set', () => {
