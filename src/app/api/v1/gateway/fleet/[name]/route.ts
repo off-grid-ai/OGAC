@@ -62,6 +62,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ na
     vision: patch.vision ?? current.vision,
     enabled: patch.enabled ?? current.enabled,
     notes: patch.notes ?? current.notes,
+    // RPC cluster membership (null clears it back to standalone). Use `=== undefined` so an
+    // explicit null in the patch is honored — `??` would treat clearing as "no change".
+    clusterHead: patch.clusterHead === undefined ? current.clusterHead : patch.clusterHead,
+    rpcPort: patch.rpcPort === undefined ? current.rpcPort : patch.rpcPort,
   };
   const check = validateFleetNode(merged);
   if (!check.ok) return NextResponse.json({ error: check.reason }, { status: 400 });
