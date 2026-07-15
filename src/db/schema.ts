@@ -1038,6 +1038,10 @@ export const fleetNodes = pgTable('fleet_nodes', {
   mmprojGguf: text('mmproj_gguf').notNull().default(''),  // active-model.json "mmproj" (vision)
   modelId: text('model_id').notNull().default(''),        // active-model.json "id" (HF repo id)
   contextSize: integer('context_size'),                   // n_ctx override (null = node default)
+  // Distributed inference (llama.cpp RPC): a WORKER names the head it's bonded to; the head's
+  // `port` is the cluster's serving port. Both null ⇒ an ordinary standalone node. See src/lib/fleet.ts.
+  clusterHead: text('cluster_head'),                       // head node name this worker is bonded to
+  rpcPort: integer('rpc_port'),                            // worker's ggml-rpc-server port (null = 50052)
   vision: boolean('vision').notNull().default(true),
   enabled: boolean('enabled').notNull().default(true),    // in the routing pool?
   notes: text('notes').notNull().default(''),
