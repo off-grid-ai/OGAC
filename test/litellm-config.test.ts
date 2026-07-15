@@ -92,10 +92,10 @@ test('masterKeyEnvVar override is honored', () => {
   assert.equal(cfg.general_settings.master_key, 'os.environ/MY_KEY');
 });
 
-test('defaults: no input uses the shared SSOT fleet pool (8 nodes), no cloud', () => {
+test('defaults: no input uses the shared SSOT fleet pool (7 nodes), no cloud', () => {
   const cfg = buildLiteLLMConfig();
   assert.equal(cfg.model_list.length, DEFAULT_FLEET_POOL.length);
-  assert.equal(DEFAULT_FLEET_POOL.length, 8);
+  assert.equal(DEFAULT_FLEET_POOL.length, 7);
   assert.ok(cfg.model_list.every((m) => m.model_info.egress === 'on-prem'));
 });
 
