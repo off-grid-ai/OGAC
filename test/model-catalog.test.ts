@@ -210,3 +210,16 @@ test('fleetModelTags feeds mergeFleetServed end-to-end', () => {
   const served = merged.filter((m: ModelSpec) => m.servedOnFleet).map((m) => m.id).sort();
   assert.deepEqual(served, ['gemma-4-e4b', 'qwen3-vl-8b']);
 });
+
+test('the distributed cluster is a DISTINCT selectable model (qwythos-9b-1m), separate from the single-node tag', () => {
+  const cluster = getModelSpec('qwythos-9b-1m');
+  const single = getModelSpec('qwythos-9b');
+  assert.ok(cluster, 'cluster model qwythos-9b-1m must be in the catalog');
+  // Distinct id + distinct human label so the picker shows it as its own option, not merged with g8.
+  assert.notEqual(cluster!.id, single!.id);
+  assert.notEqual(cluster!.name, single!.name);
+  // The whole point of the cluster is the pooled context window (single-node tag is honestly null).
+  assert.equal(cluster!.contextWindow, 524288);
+  assert.equal(cluster!.modality, 'vision');
+  assert.equal(cluster!.servedOnFleet, true);
+});

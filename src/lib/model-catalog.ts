@@ -106,6 +106,21 @@ export const MODEL_CATALOG: ModelSpec[] = [
     note: 'Fleet chat/vision model (g1). Qwen-derived 9B release; context window not publicly fixed.',
   },
   {
+    // Distinct routing tag for the DISTRIBUTED cluster (llama.cpp RPC across g2/g4/g7 over
+    // Thunderbolt). Separate from `qwythos-9b` (the single-node tag on g8) so the picker offers the
+    // cluster as its own selectable model and the aggregator routes cluster requests ONLY to the
+    // head (g7:8439). The extended context is the whole point of pooling the nodes' RAM.
+    id: 'qwythos-9b-1m',
+    name: 'Qwythos 9B · 1M (cluster)',
+    family: 'Qwen',
+    contextWindow: 524288, // 512K served across the 3-node RPC pool (q8_0 KV); the model is 1M-capable
+    modality: 'vision',
+    paramsB: 9,
+    license: null,
+    servedOnFleet: true,
+    note: 'Distributed RPC cluster (g7 head + g2/g4 workers) over Thunderbolt — pools RAM for a 512K context window one node cannot hold.',
+  },
+  {
     id: 'gemma-4-e4b',
     name: 'Gemma 4 E4B',
     family: 'Gemma',
