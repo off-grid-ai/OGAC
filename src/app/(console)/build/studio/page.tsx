@@ -1,4 +1,4 @@
-import { Plus, Robot, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import { Lightning, Plus, Robot, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { AgentsGrid, type AgentCardModel } from '@/components/agents/AgentsGrid';
 import { CreateAgentButton } from '@/components/agents/CreateAgentButton';
@@ -82,12 +82,20 @@ export default async function StudioPage() {
             tamper-evident provenance. Open an app to build, run, monitor, review, and report on it.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/build/studio/new">
-            <Plus className="size-4" />
-            New app
-          </Link>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild>
+            <Link href="/build/studio/forge">
+              <Lightning weight="fill" className="size-4" />
+              Forge with AI
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/build/studio/new">
+              <Plus className="size-4" />
+              New app
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stat band */}
