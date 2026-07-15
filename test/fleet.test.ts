@@ -129,3 +129,16 @@ test('validateFleetNode rejects a self-referential head, a bad clusterHead name,
   assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', rpcPort: 0 })).ok, false);
   assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', rpcPort: 50052 })).ok, true);
 });
+
+test('deriveClusters is generic — groups a minimal {name, clusterHead} view model (DSP seam)', () => {
+  const rows = [
+    { name: 'g7', clusterHead: null },
+    { name: 'g2', clusterHead: 'g7' },
+    { name: 'x1', clusterHead: null },
+  ];
+  const { clusters, standalone } = deriveClusters(rows);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].head.name, 'g7');
+  assert.deepEqual(clusters[0].workers.map((w) => w.name), ['g2']);
+  assert.deepEqual(standalone.map((n) => n.name), ['x1']);
+});

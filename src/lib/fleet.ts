@@ -89,9 +89,9 @@ export function derivePool(nodes: FleetNode[]): { pool: PoolEntry[]; imagePool: 
 }
 
 /** A distributed RPC cluster: one serving HEAD backed by bonded WORKER nodes. */
-export interface FleetCluster {
-  head: FleetNode;
-  workers: FleetNode[];
+export interface FleetCluster<T = FleetNode> {
+  head: T;
+  workers: T[];
 }
 
 /**
@@ -100,21 +100,29 @@ export interface FleetCluster {
  * referencing it. Everything that is neither a head nor a worker is `standalone`. A worker
  * whose `clusterHead` points at a missing node is treated as standalone (defensive — a
  * dangling reference must not vanish from the UI).
+ *
+ * Generic over the node shape (only `name` + `clusterHead` are read) so both the canonical
+ * FleetNode and looser view models (e.g. the Control UI's row type) reuse this one rule.
  */
-export function deriveClusters(nodes: FleetNode[]): { clusters: FleetCluster[]; standalone: FleetNode[] } {
-  const byName = new Map(nodes.map((n) => [n.name, n]));
-  const workersByHead = new Map<string, FleetNode[]>();
+export function deriveClusters<T extends { name: string; clusterHead?: string | null }>(
+  nodes: T[],
+): { clusters: FleetCluster<T>[]; standalone: T[] } {
+  const names = new Set(nodes.map((n) => n.name));
+  const workersByHead = new Map<string, T[]>();
   for (const n of nodes) {
-    if (n.clusterHead && byName.has(n.clusterHead)) {
-      (workersByHead.get(n.clusterHead) ?? workersByHead.set(n.clusterHead, []).get(n.clusterHead)!).push(n);
+    const head = n.clusterHead;
+    if (head && names.has(head)) {
+      const list = workersByHead.get(head) ?? [];
+      list.push(n);
+      workersByHead.set(head, list);
     }
   }
-  const clusters: FleetCluster[] = [];
-  const standalone: FleetNode[] = [];
+  const clusters: FleetCluster<T>[] = [];
+  const standalone: T[] = [];
   for (const n of nodes) {
-    if (n.clusterHead && byName.has(n.clusterHead)) continue; // a bonded worker — rendered under its head
+    if (n.clusterHead && names.has(n.clusterHead)) continue; // a bonded worker — rendered under its head
     const workers = workersByHead.get(n.name);
-    if (workers && workers.length) clusters.push({ head: n, workers });
+    if (workers?.length) clusters.push({ head: n, workers });
     else standalone.push(n);
   }
   return { clusters, standalone };
