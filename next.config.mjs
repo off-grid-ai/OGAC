@@ -114,6 +114,17 @@ function urlRedirects() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
+  experimental: {
+    // Client-side Router Cache TTL. Next 15 defaults `dynamic` to 0s, so every re-visit to a
+    // (dynamic) route refetches its RSC payload from the server — brutal here because the console
+    // is served over a Cloudflare tunnel to an on-prem Mac, so each nav is a full round-trip. Caching
+    // the payload for a short window makes moving BACK to an already-seen page instant (no server
+    // hit), while still refreshing within the window so data never goes stale for long.
+    staleTimes: { dynamic: 30, static: 180 },
+    // Tree-shake big barrel packages so a page ships only the icons/components it uses, not the whole
+    // library. @phosphor-icons/react especially is thousands of modules imported by nearly every page.
+    optimizePackageImports: ['@phosphor-icons/react', '@phosphor-icons/react/dist/ssr', 'recharts', 'date-fns'],
+  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
