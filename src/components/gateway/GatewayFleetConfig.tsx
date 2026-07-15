@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toDisplayHost } from '@/lib/display-host';
+import { deriveClusters } from '@/lib/fleet';
 import { getModelSpec, modelLabel } from '@/lib/model-catalog';
 
 // The fleet_nodes SSOT editor — the authoritative place to configure a node: which
@@ -37,6 +38,8 @@ interface FleetNode {
   vision: boolean;
   enabled: boolean;
   notes: string;
+  clusterHead?: string | null; // RPC worker: the head node it's bonded to (null ⇒ standalone/head)
+  rpcPort?: number | null; // worker's ggml-rpc-server port (null ⇒ 50052)
 }
 
 const ROLES = ['gateway', 'server', 'image', 'spare'];
@@ -80,6 +83,8 @@ function EditDialog({
           contextSize: form.contextSize === null || `${form.contextSize}` === '' ? null : Number(form.contextSize),
           vision: form.vision,
           enabled: form.enabled,
+          clusterHead: form.clusterHead ? String(form.clusterHead).trim() : null,
+          rpcPort: form.rpcPort === null || `${form.rpcPort ?? ''}` === '' ? null : Number(form.rpcPort),
         }),
       });
       const d = await r.json();
@@ -152,6 +157,8 @@ function EditDialog({
           {field('Host', 'host')}
           {field('Primary GGUF', 'primaryGguf', { placeholder: 'Model-Q4_K_M.gguf' })}
           {field('mmproj GGUF (vision)', 'mmprojGguf', { placeholder: 'mmproj-…-f16.gguf' })}
+          {field('Cluster head (RPC worker of…)', 'clusterHead', { placeholder: 'e.g. g7 — empty for standalone' })}
+          {field('RPC port', 'rpcPort', { type: 'number', placeholder: '50052' })}
         </div>
         <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
           <div className="flex items-center gap-2">
@@ -178,6 +185,107 @@ function EditDialog({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+type CardProps = Readonly<{
+  configuring: string | null;
+  setConfiguring: (name: string | null) => void;
+  onSaved: () => Promise<void>;
+}>;
+
+/** The context to show for a serving node: its own override, else the catalog window. */
+function nodeCtx(n: FleetNode): number | null {
+  return n.contextSize ?? getModelSpec(n.model)?.contextWindow ?? null;
+}
+
+/** A single standalone fleet node (gateway / image / server / spare). */
+function NodeCard({ node, configuring, setConfiguring, onSaved }: CardProps & { node: FleetNode }) {
+  const ctx = nodeCtx(node);
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-md border border-border px-3 py-2.5">
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm font-semibold">{node.name}</span>
+          <Badge variant="secondary" className="text-[10px]">{node.role}</Badge>
+          {!node.enabled && node.role !== 'server' ? (
+            <Badge variant="outline" className="text-[10px]">disabled</Badge>
+          ) : null}
+        </div>
+        {node.role !== 'server' ? (
+          <p className="truncate text-xs text-muted-foreground">
+            {node.model ? modelLabel(node.model) : '(no model)'}
+            {ctx ? ` · ${ctx.toLocaleString()} ctx` : ''}
+          </p>
+        ) : (
+          <p className="truncate font-mono text-xs text-muted-foreground">{toDisplayHost(node.host)}</p>
+        )}
+      </div>
+      <Button size="sm" variant="outline" className="h-7 w-full text-xs" onClick={() => setConfiguring(node.name)}>
+        Configure
+      </Button>
+      <EditDialog
+        node={node}
+        open={configuring === node.name}
+        onOpenChange={(o) => setConfiguring(o ? node.name : null)}
+        onSaved={onSaved}
+      />
+    </div>
+  );
+}
+
+/** A distributed RPC cluster: one serving head backed by bonded workers. Workers are shown
+ *  under the head (not as their own gateway cards) and each is individually configurable. */
+function ClusterCard({
+  head,
+  workers,
+  configuring,
+  setConfiguring,
+  onSaved,
+}: CardProps & { head: FleetNode; workers: FleetNode[] }) {
+  const members = [head, ...workers];
+  const ctx = nodeCtx(head);
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2.5">
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm font-semibold">{head.name}</span>
+          <Badge className="text-[10px]">RPC cluster</Badge>
+          <span className="text-[10px] text-muted-foreground">
+            {members.length} nodes · :{head.port}
+          </span>
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {head.model ? modelLabel(head.model) : '(no model)'}
+          {ctx ? ` · ${ctx.toLocaleString()} ctx` : ''}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {members.map((m) => (
+            <button
+              key={m.name}
+              type="button"
+              onClick={() => setConfiguring(m.name)}
+              className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:border-primary"
+            >
+              {m.name}
+              <span className="text-muted-foreground">{m.name === head.name ? ' · head' : ' · worker'}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <Button size="sm" variant="outline" className="h-7 w-full text-xs" onClick={() => setConfiguring(head.name)}>
+        Configure head
+      </Button>
+      {members.map((m) => (
+        <EditDialog
+          key={m.name}
+          node={m}
+          open={configuring === m.name}
+          onOpenChange={(o) => setConfiguring(o ? m.name : null)}
+          onSaved={onSaved}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -234,53 +342,36 @@ export function GatewayFleetConfig() {
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
         {nodes === null && !err ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
         {nodes?.length === 0 ? <p className="text-xs text-muted-foreground">No fleet_nodes rows.</p> : null}
-        {nodes?.length ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {nodes.map((n) => (
-              <div
-                key={n.name}
-                className="flex flex-col justify-between gap-3 rounded-md border border-border px-3 py-2.5"
-              >
-                <div className="min-w-0 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold">{n.name}</span>
-                    <Badge variant="secondary" className="text-[10px]">{n.role}</Badge>
-                    {!n.enabled && n.role !== 'server' ? (
-                      <Badge variant="outline" className="text-[10px]">disabled</Badge>
-                    ) : null}
-                  </div>
-                  {n.role !== 'server' ? (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {n.model ? modelLabel(n.model) : '(no model)'}
-                      {(() => {
-                        // Prefer the node's own configured ctx; else the catalog's published
-                        // context window; else show nothing (never print "unknown").
-                        const ctx = n.contextSize ?? getModelSpec(n.model)?.contextWindow ?? null;
-                        return ctx ? ` · ${ctx.toLocaleString()} ctx` : '';
-                      })()}
-                    </p>
-                  ) : (
-                    <p className="truncate font-mono text-xs text-muted-foreground">{toDisplayHost(n.host)}</p>
-                  )}
+        {nodes?.length
+          ? (() => {
+              // One grouping rule (deriveClusters, unit-tested): RPC workers fold under their
+              // head as a single cluster card; everything else renders as a standalone node.
+              const { clusters, standalone } = deriveClusters(nodes);
+              return (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {clusters.map((c) => (
+                    <ClusterCard
+                      key={c.head.name}
+                      head={c.head}
+                      workers={c.workers}
+                      configuring={configuring}
+                      setConfiguring={setConfiguring}
+                      onSaved={load}
+                    />
+                  ))}
+                  {standalone.map((n) => (
+                    <NodeCard
+                      key={n.name}
+                      node={n}
+                      configuring={configuring}
+                      setConfiguring={setConfiguring}
+                      onSaved={load}
+                    />
+                  ))}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-full text-xs"
-                  onClick={() => setConfiguring(n.name)}
-                >
-                  Configure
-                </Button>
-                <EditDialog
-                  node={n}
-                  open={configuring === n.name}
-                  onOpenChange={(o) => setConfiguring(o ? n.name : null)}
-                  onSaved={load}
-                />
-              </div>
-            ))}
-          </div>
-        ) : null}
+              );
+            })()
+          : null}
       </CardContent>
     </Card>
   );
