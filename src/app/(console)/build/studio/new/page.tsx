@@ -1,7 +1,7 @@
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { AppBuilder } from '@/components/build/AppBuilder';
+import { StudioModes } from '@/components/build/StudioModes';
 import { listManagedAgents } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
@@ -47,7 +47,7 @@ export default async function StudioNewPage() {
         </Link>
       </div>
       <Suspense fallback={null}>
-        <AppBuilder
+        <StudioModes
           summary={summary}
           domains={domains}
           agents={agentOptions}
