@@ -108,19 +108,16 @@ export function deriveClusters<T extends { name: string; clusterHead?: string | 
   nodes: T[],
 ): { clusters: FleetCluster<T>[]; standalone: T[] } {
   const names = new Set(nodes.map((n) => n.name));
+  const isBonded = (n: T): boolean => !!n.clusterHead && names.has(n.clusterHead);
   const workersByHead = new Map<string, T[]>();
-  for (const n of nodes) {
-    const head = n.clusterHead;
-    if (head && names.has(head)) {
-      const list = workersByHead.get(head) ?? [];
-      list.push(n);
-      workersByHead.set(head, list);
-    }
+  for (const n of nodes.filter(isBonded)) {
+    const list = workersByHead.get(n.clusterHead as string) ?? [];
+    list.push(n);
+    workersByHead.set(n.clusterHead as string, list);
   }
   const clusters: FleetCluster<T>[] = [];
   const standalone: T[] = [];
-  for (const n of nodes) {
-    if (n.clusterHead && names.has(n.clusterHead)) continue; // a bonded worker — rendered under its head
+  for (const n of nodes.filter((x) => !isBonded(x))) {
     const workers = workersByHead.get(n.name);
     if (workers?.length) clusters.push({ head: n, workers });
     else standalone.push(n);
