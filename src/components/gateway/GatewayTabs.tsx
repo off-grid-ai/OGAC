@@ -1,7 +1,7 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { type ReactNode, useState } from 'react';
 import { ConfigManager } from '@/components/config/ConfigManager';
 import { GatewayApiKeys } from '@/components/gateway/GatewayApiKeys';
 import { GatewayControl } from '@/components/gateway/GatewayControl';
@@ -21,16 +21,21 @@ type TabValue = (typeof TABS)[number];
 // (shareable, bookmarkable, survives refresh). Overview content is server-rendered and
 // passed in as a prop; the other tabs are live client components.
 export function GatewayTabs({ overview }: Readonly<{ overview: ReactNode }>) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const current = (params.get('tab') as TabValue) ?? 'overview';
-  const active = TABS.includes(current) ? current : 'overview';
+  const initial = (params.get('tab') as TabValue) ?? 'overview';
+  // Local state drives the active tab so switching is INSTANT. router.replace() would
+  // re-navigate this force-dynamic route, re-running the aggregator's live all-nodes health
+  // probe (fans out to every node, up to 8s) on EVERY tab click. Reflect the tab in the URL
+  // via the History API instead — deep-linkable/bookmarkable, but zero server round-trip.
+  const [active, setActive] = useState<TabValue>(TABS.includes(initial) ? initial : 'overview');
 
   const onChange = (value: string): void => {
-    const next = new URLSearchParams(params.toString());
-    next.set('tab', value);
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    const next = value as TabValue;
+    setActive(next);
+    const qs = new URLSearchParams(window.location.search);
+    qs.set('tab', next);
+    window.history.replaceState(null, '', `${pathname}?${qs.toString()}`);
   };
 
   return (
