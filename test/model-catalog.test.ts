@@ -223,3 +223,15 @@ test('the distributed cluster is a DISTINCT selectable model (qwythos-9b-1m), se
   assert.equal(cluster!.modality, 'vision');
   assert.equal(cluster!.servedOnFleet, true);
 });
+
+test('mergeFleetServed marks the distributed-cluster tag served when it is a live fleet tag', () => {
+  // The RPC cluster head advertises 'qwythos-9b-1m' as its fleet_nodes.model; when that live tag is
+  // present, the catalog entry must reconcile to servedOnFleet:true (so the chat picker offers it),
+  // while a catalog model NOT in the live set flips to false.
+  const merged = mergeFleetServed(MODEL_CATALOG, ['qwythos-9b-1m']);
+  const cluster = merged.find((m) => m.id === 'qwythos-9b-1m');
+  assert.ok(cluster, 'cluster entry present');
+  assert.equal(cluster!.servedOnFleet, true, 'live cluster tag ⇒ served');
+  const single = merged.find((m) => m.id === 'qwythos-9b');
+  assert.equal(single!.servedOnFleet, false, 'a catalog model absent from the live set ⇒ not served');
+});

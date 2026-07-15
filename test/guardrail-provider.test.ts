@@ -231,3 +231,27 @@ test('health probes GET /healthz; false when the probe throws', async () => {
   }) as typeof fetch;
   assert.equal(await llmGuardPii.health(), false);
 });
+
+// ── Regression: real LLM Guard score conventions observed on the live fleet (2026-07-15) ──────────
+// The laiyer/llm-guard-api engine reports a PASSED scanner as a NEGATIVE score (e.g. -1.0), not 0.
+// A benign prompt came back {"is_valid":true,"scanners":{"Anonymize":-1.0,"Secrets":-1.0,…}} — these
+// must NEVER be treated as flags, or every clean message would trip the guardrail.
+test('negative scanner scores (llm-guard -1.0 = passed convention) never flag a clean prompt', () => {
+  const out = normalizeLlmGuardResponse('hi', {
+    is_valid: true,
+    scanners: { Anonymize: -1.0, Secrets: -1.0, Regex: -1.0, BanSubstrings: -1.0, InvisibleText: -1.0 },
+  });
+  assert.equal(out.hits, false, 'all-negative (passed) scanners on a valid verdict is a clean pass');
+  assert.deepEqual(out.entities, []);
+});
+
+test('a negative score never flags even at a low custom threshold (−1 < any threshold)', () => {
+  const out = normalizeLlmGuardResponse('hi', { is_valid: true, scanners: { PromptInjection: -1.0 } }, 0.1);
+  assert.equal(out.hits, false);
+});
+
+test('threshold is inclusive: a score EXACTLY at the threshold flags (>=)', () => {
+  const raw = { is_valid: true, scanners: { Toxicity: 0.5 } };
+  assert.deepEqual(normalizeLlmGuardResponse('x', raw, 0.5).entities, ['Toxicity'], '0.5 >= 0.5 flags');
+  assert.equal(normalizeLlmGuardResponse('x', raw, 0.51).hits, false, '0.5 < 0.51 ⇒ no flag');
+});
