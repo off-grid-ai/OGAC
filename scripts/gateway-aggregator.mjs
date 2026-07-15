@@ -149,7 +149,9 @@ const FALLBACK_POOL = [
   { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
   { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
   { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
-  { name: 'g8',  host: 'offgrid-g8.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
+  // g8 (offgrid-g8.local / 192.168.1.64) was pulled from the fleet and repurposed as an
+  // Off Grid AI Desktop test machine — kept out of the cold-start fallback so a pool-API
+  // outage can't route back to it. Live authority is the fleet_nodes DB (refreshPool()).
 ];
 const FALLBACK_IMAGE_POOL = [{ name: 'g3', host: 'offgrid-g3.local', port: 1234, model: 'juggernaut-xl-v9' }];
 

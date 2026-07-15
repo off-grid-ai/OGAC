@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   activeModelConfig,
   derivePool,
+  deriveClusters,
   validateFleetNode,
   type FleetNode,
 } from '../src/lib/fleet.ts';
@@ -81,4 +82,63 @@ test('serving node requires model + primaryGguf; server does not', () => {
   assert.equal(validateFleetNode(node({ role: 'gateway', model: '' })).ok, false);
   assert.equal(validateFleetNode(node({ role: 'gateway', primaryGguf: '' })).ok, false);
   assert.equal(validateFleetNode(node({ name: 's1', role: 'server', model: '', primaryGguf: '' })).ok, true);
+});
+
+// ── RPC cluster (distributed inference) ─────────────────────────────────────────
+
+test('derivePool excludes RPC workers; only the cluster head is routed', () => {
+  const { pool } = derivePool([
+    node({ name: 'g7', port: 8439, model: 'qwythos-9b' }), // head — the routable endpoint
+    node({ name: 'g2', clusterHead: 'g7', rpcPort: 50052, model: '' }), // worker — bonded, not routed
+    node({ name: 'g4', clusterHead: 'g7', rpcPort: 50052, model: '' }), // worker
+  ]);
+  assert.deepEqual(
+    pool.map((p) => p.name),
+    ['g7'],
+  );
+  assert.equal(pool[0].port, 8439);
+});
+
+test('deriveClusters groups workers under their head; standalone nodes stay separate', () => {
+  const { clusters, standalone } = deriveClusters([
+    node({ name: 'g7', port: 8439 }),
+    node({ name: 'g2', clusterHead: 'g7' }),
+    node({ name: 'g4', clusterHead: 'g7' }),
+    node({ name: 'g8' }), // standalone qwythos
+    node({ name: 's1', role: 'server', model: '', primaryGguf: '' }),
+  ]);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].head.name, 'g7');
+  assert.deepEqual(clusters[0].workers.map((w) => w.name).sort(), ['g2', 'g4']);
+  assert.deepEqual(standalone.map((n) => n.name).sort(), ['g8', 's1']);
+});
+
+test('deriveClusters treats a dangling clusterHead as standalone (never drops a node)', () => {
+  const { clusters, standalone } = deriveClusters([node({ name: 'g2', clusterHead: 'ghost' })]);
+  assert.equal(clusters.length, 0);
+  assert.deepEqual(standalone.map((n) => n.name), ['g2']);
+});
+
+test('an RPC worker is exempt from the model/primaryGguf requirement (the head owns those)', () => {
+  assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', model: '', primaryGguf: '' })).ok, true);
+});
+
+test('validateFleetNode rejects a self-referential head, a bad clusterHead name, and a bad rpcPort', () => {
+  assert.equal(validateFleetNode(node({ name: 'g7', clusterHead: 'g7' })).ok, false);
+  assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'Not Valid!' })).ok, false);
+  assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', rpcPort: 0 })).ok, false);
+  assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', rpcPort: 50052 })).ok, true);
+});
+
+test('deriveClusters is generic — groups a minimal {name, clusterHead} view model (DSP seam)', () => {
+  const rows = [
+    { name: 'g7', clusterHead: null },
+    { name: 'g2', clusterHead: 'g7' },
+    { name: 'x1', clusterHead: null },
+  ];
+  const { clusters, standalone } = deriveClusters(rows);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].head.name, 'g7');
+  assert.deepEqual(clusters[0].workers.map((w) => w.name), ['g2']);
+  assert.deepEqual(standalone.map((n) => n.name), ['x1']);
 });

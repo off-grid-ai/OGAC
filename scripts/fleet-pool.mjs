@@ -26,5 +26,7 @@ export const FLEET_POOL = [
   { name: 'g5', host: '192.168.1.65', port: 7878, vision: true, model: 'qwen3.5-9b' },
   { name: 'g6', host: '192.168.1.66', port: 7878, vision: true, model: 'qwen3.5-9b' },
   { name: 'g7', host: '192.168.1.62', port: 7878, vision: true, model: 'qwythos-9b' },
-  { name: 'g8', host: '192.168.1.64', port: 7878, vision: true, model: 'qwythos-9b' },
+  // g8 (192.168.1.64) was pulled from the pool and repurposed as an Off Grid AI Desktop
+  // test machine. It stays a known host (see the g8 display-name alias) but is no longer
+  // served, so the gateway must not route to it.
 ];

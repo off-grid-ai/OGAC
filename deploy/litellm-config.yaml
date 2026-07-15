@@ -11,7 +11,7 @@
 #
 # Secrets are NEVER written here — api_key values are os.environ/… references LiteLLM resolves at
 # runtime from the container env (see the `litellm` service in docker-compose.yml). The fleet nodes
-# need no key. This sample carries the 8 on-prem nodes only; cloud deployments appear when the
+# need no key. This sample carries the 7 on-prem nodes only; cloud deployments appear when the
 # matching OFFGRID_CLOUD_*_API_KEY is set and the config is regenerated.
 #
 # LiteLLM is OpenAI-compatible, so pointing OFFGRID_GATEWAY_URL at http://litellm:4000 cuts the
@@ -79,15 +79,6 @@ model_list:
       id: g7
       egress: on-prem
       origin: g7
-      vision: true
-  - model_name: onprem/qwythos-9b
-    litellm_params:
-      model: openai/qwythos-9b
-      api_base: "http://192.168.1.64:7878/v1"
-    model_info:
-      id: g8
-      egress: on-prem
-      origin: g8
       vision: true
 router_settings:
   routing_strategy: least-busy

@@ -1,33 +1,94 @@
 import { notFound } from 'next/navigation';
-import { DeployedApp } from '@/components/studio/DeployedApp';
+import { AppUseShell } from '@/components/app-use/AppUseShell';
+import type { RunField } from '@/components/app-use/RunPanel';
+import { sharedSurface } from '@/lib/app-surface';
 import { getAppBySlug } from '@/lib/apps-store';
+import { computeCockpitMetrics } from '@/lib/cockpit-metrics';
+import { cockpitRows, cockpitTrend } from '@/lib/cockpit-fixtures';
 import { resolveDeployedApp } from '@/lib/deployed-app';
+import type { FormField } from '@/lib/app-model';
 
 export const dynamic = 'force-dynamic';
 
-// A DEPLOYED app (S2) — served at /app/<slug>, no console chrome. This is the Lovable-style
-// shareable surface: a published builder app anyone with the link can use. The app lives in the
-// `apps` table (the ONE build artifact — see lib/app-model.ts); the SAME table the run endpoint
-// (POST /api/v1/app/<slug>/run → getAppBySlug) resolves, so page + run stay on one source of truth.
-// A slug that isn't a PUBLISHED app 404s (unpublished apps are never served publicly).
+// A DEPLOYED app served at /app/<slug> — the USE surface (the Lovable/Bolt-style running app you
+// actually use, NOT the Studio build canvas). A published app renders its real running experience:
+// a live dashboard, the run form (whatever inputs it declares), and governed actions. Unpublished
+// slugs 404. Org-gating (only org members may open) is enforced upstream — see task: shared API.
 export default async function DeployedAppPage({ params }: Readonly<{ params: Promise<{ slug: string }> }>) {
   const { slug } = await params;
   const app = await getAppBySlug(slug);
   const resolved = resolveDeployedApp(app);
-  if (!resolved) notFound();
+  if (!resolved || !app) notFound();
+
+  // The run form: whatever the app declares, else a sensible cross-sell default (never one bare box).
+  const fields = deriveRunFields(app.inputForm);
+  // The cockpit dashboard is the front door for the cross-sell app; other apps land on Run. Detect it
+  // by slug/title so we never render a cross-sell cockpit over an unrelated published app.
+  const isCockpit = /cross[-\s]?sell/i.test(resolved.slug) || /cross[-\s]?sell/i.test(resolved.title);
+  // Dashboard data: live from the bound data domain when present, else the deterministic sample.
+  const metrics = isCockpit ? computeCockpitMetrics(cockpitRows()) : null;
+
+  // The cockpit runs its own governed next-best-action computation (deterministic, no model
+  // dependency); other apps use the generic governed run endpoint.
+  const base = sharedSurface(resolved.slug);
+  const surface = isCockpit
+    ? { ...base, runUrl: `/api/v1/app/${encodeURIComponent(resolved.slug)}/cockpit-run` }
+    : base;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">{resolved.title}</h1>
-        {resolved.summary ? (
-          <p className="mt-1 text-sm text-muted-foreground">{resolved.summary}</p>
-        ) : null}
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          Off Grid AI · deployed app · runs governed on-prem
-        </p>
-      </header>
-      <DeployedApp slug={resolved.slug} />
+    <div className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
+      <div className="mx-auto w-full max-w-[100rem]">
+        <AppUseShell
+          title={resolved.title}
+          summary={resolved.summary}
+          live={false}
+          metrics={metrics}
+          trend={cockpitTrend()}
+          fields={fields}
+          surface={surface}
+        />
+      </div>
     </div>
   );
+}
+
+const DEFAULT_FIELDS: RunField[] = [
+  {
+    key: 'segment',
+    label: 'Customer segment',
+    type: 'select',
+    required: true,
+    options: ['Priority', 'Salaried', 'SME', 'NRI'],
+    description: 'Which book of customers to generate next-best-actions for.',
+  },
+  {
+    key: 'region',
+    label: 'Region',
+    type: 'select',
+    options: ['All India', 'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Chennai', 'Hyderabad'],
+  },
+  {
+    key: 'minPipeline',
+    label: 'Minimum opportunity (₹)',
+    type: 'number',
+    placeholder: '100000',
+    description: 'Only surface opportunities above this ticket size.',
+  },
+  {
+    key: 'focus',
+    label: 'Focus for this run',
+    type: 'textarea',
+    placeholder: 'e.g. prioritise protection gaps for young families',
+  },
+];
+
+function deriveRunFields(inputForm: FormField[] | undefined): RunField[] {
+  if (!inputForm || inputForm.length === 0) return DEFAULT_FIELDS;
+  return inputForm.map((f) => ({
+    key: f.key,
+    label: f.label,
+    type: f.type === 'file' ? 'text' : (f.type as RunField['type']),
+    required: f.required,
+    options: f.options,
+  }));
 }

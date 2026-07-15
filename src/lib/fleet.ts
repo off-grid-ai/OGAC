@@ -24,6 +24,13 @@ export interface FleetNode {
   vision: boolean;
   enabled: boolean;
   notes?: string;
+  // Distributed inference (llama.cpp RPC over Thunderbolt). A node is an RPC WORKER when
+  // `clusterHead` names another node: its GPU is bonded into that head's serving process and
+  // it is NOT independently routable. The HEAD is a normal serving node (its `port` is the
+  // cluster's OpenAI-compatible port, e.g. 8439) that other nodes reference. `rpcPort` is the
+  // worker's ggml-rpc-server port (default 50052). Both null/absent ⇒ an ordinary standalone node.
+  clusterHead?: string | null;
+  rpcPort?: number | null;
 }
 
 /** A routing-pool entry in the shape the aggregator's `POOL` expects. */
@@ -61,6 +68,9 @@ export function derivePool(nodes: FleetNode[]): { pool: PoolEntry[]; imagePool: 
   const imagePool: ImagePoolEntry[] = [];
   for (const n of nodes) {
     if (n.role === 'server') continue;
+    // RPC worker: its GPU is bonded into a cluster head's process; the head is the only
+    // routable endpoint, so a worker never appears in the pool on its own.
+    if (n.clusterHead) continue;
     if (n.role === 'image' || n.kind === 'image') {
       imagePool.push({ name: n.name, host: n.host, port: n.port, model: n.model, enabled: n.enabled });
       continue;
@@ -76,6 +86,43 @@ export function derivePool(nodes: FleetNode[]): { pool: PoolEntry[]; imagePool: 
     });
   }
   return { pool, imagePool };
+}
+
+/** A distributed RPC cluster: one serving HEAD backed by bonded WORKER nodes. */
+export interface FleetCluster<T = FleetNode> {
+  head: T;
+  workers: T[];
+}
+
+/**
+ * Group RPC-cluster members under their head (pure; for the UI + status views).
+ * A node is a HEAD iff some other node names it via `clusterHead`; its WORKERS are those
+ * referencing it. Everything that is neither a head nor a worker is `standalone`. A worker
+ * whose `clusterHead` points at a missing node is treated as standalone (defensive — a
+ * dangling reference must not vanish from the UI).
+ *
+ * Generic over the node shape (only `name` + `clusterHead` are read) so both the canonical
+ * FleetNode and looser view models (e.g. the Control UI's row type) reuse this one rule.
+ */
+export function deriveClusters<T extends { name: string; clusterHead?: string | null }>(
+  nodes: T[],
+): { clusters: FleetCluster<T>[]; standalone: T[] } {
+  const names = new Set(nodes.map((n) => n.name));
+  const isBonded = (n: T): boolean => !!n.clusterHead && names.has(n.clusterHead);
+  const workersByHead = new Map<string, T[]>();
+  for (const n of nodes.filter(isBonded)) {
+    const list = workersByHead.get(n.clusterHead as string) ?? [];
+    list.push(n);
+    workersByHead.set(n.clusterHead as string, list);
+  }
+  const clusters: FleetCluster<T>[] = [];
+  const standalone: T[] = [];
+  for (const n of nodes.filter((x) => !isBonded(x))) {
+    const workers = workersByHead.get(n.name);
+    if (workers?.length) clusters.push({ head: n, workers });
+    else standalone.push(n);
+  }
+  return { clusters, standalone };
 }
 
 /** The active-model.json a node's gateway reads. Omits empty optional fields. */
@@ -97,10 +144,22 @@ export function validateFleetNode(n: Partial<FleetNode>): FleetValidation {
     return { ok: false, reason: 'port must be 1–65535' };
   if (!n.role || !ROLES.has(n.role)) return { ok: false, reason: `role must be one of ${[...ROLES].join('|')}` };
   if (!n.kind || !KINDS.has(n.kind)) return { ok: false, reason: `kind must be one of ${[...KINDS].join('|')}` };
-  // Serving nodes need a routing tag + a model file; servers don't.
-  if (n.role !== 'server') {
+  // An RPC worker is bonded into a head's process — it has no routing tag or model file of
+  // its own (the head owns those), so it's exempt from the serving-node requirements below.
+  const isWorker = !!(n.clusterHead ?? '').trim();
+  if (isWorker) {
+    if (!/^[a-z0-9-]{1,32}$/.test(n.clusterHead as string))
+      return { ok: false, reason: 'clusterHead must be a valid node name ([a-z0-9-], 1–32)' };
+    if (n.clusterHead === name) return { ok: false, reason: 'a node cannot be its own cluster head' };
+  }
+  // Serving nodes need a routing tag + a model file; servers and RPC workers don't.
+  if (n.role !== 'server' && !isWorker) {
     if (!(n.model ?? '').trim()) return { ok: false, reason: 'model (routing tag) is required for a serving node' };
     if (!(n.primaryGguf ?? '').trim()) return { ok: false, reason: 'primaryGguf is required for a serving node' };
+  }
+  if (n.rpcPort != null) {
+    if (!Number.isInteger(n.rpcPort) || n.rpcPort < 1 || n.rpcPort > 65535)
+      return { ok: false, reason: 'rpcPort must be 1–65535' };
   }
   if (n.contextSize != null) {
     if (!Number.isInteger(n.contextSize) || n.contextSize < 512 || n.contextSize > 1_000_000)
