@@ -93,6 +93,12 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
   // uses it as the judge criteria). Empty for every other template.
   const [criteria, setCriteria] = useState('');
   const [saving, setSaving] = useState(false);
+  // An eval is meaningless without a TARGET to score and a golden set to score against (the
+  // Braintrust/Phoenix experiment model: evaluate(target, dataset, evaluators)). Applying a template
+  // therefore binds it to a pipeline — never an orphan library eval. The pipeline owns the golden set
+  // the run scores; a pipeline with no cases yet is flagged so the operator adds them first.
+  const [pipelines, setPipelines] = useState<{ id: string; name: string }[]>([]);
+  const [target, setTarget] = useState('');
 
   // Search/filter/sort state lives in the URL so a filtered view is shareable and Back-coherent.
   const router = useRouter();
@@ -124,8 +130,15 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
   }, [params, pathname, router]);
 
   const load = useCallback(async () => {
-    const r = await fetch('/api/v1/admin/eval-templates');
-    if (r.ok) setTemplates((await r.json()).data ?? []);
+    const [tpl, pipes] = await Promise.all([
+      fetch('/api/v1/admin/eval-templates').then((r) => (r.ok ? r.json() : { data: [] })),
+      // Targets = the org's pipelines. An eval binds to one; it scores that pipeline's golden set.
+      fetch('/api/v1/admin/pipelines')
+        .then((r) => (r.ok ? r.json() : { data: [] }))
+        .catch(() => ({ data: [] })),
+    ]);
+    setTemplates(tpl.data ?? []);
+    setPipelines((pipes.data ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
     setLoading(false);
   }, []);
 
@@ -137,6 +150,7 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
     setApplying(t);
     setName(t.name);
     setCriteria('');
+    setTarget(pipelines[0]?.id ?? '');
   }
 
   const isGEval = applying?.metric === 'g_eval';
@@ -149,6 +163,7 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
     const body: Record<string, string> = {
       name: name.trim() || applying.name,
       templateId: applying.id,
+      pipelineId: target, // bind to the target — never an orphan eval
     };
     if (applying.metric === 'g_eval' && criteria.trim()) body.description = criteria.trim();
     const r = await fetch('/api/v1/admin/eval-defs', {
@@ -334,6 +349,34 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
                   placeholder={applying.name}
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="apply-target">Run it on</Label>
+                {pipelines.length === 0 ? (
+                  <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-2.5 py-2 text-[11px] text-muted-foreground">
+                    No pipelines yet. An eval scores a pipeline&apos;s answers against its golden set — create a
+                    pipeline first, then apply an eval to it.
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      id="apply-target"
+                      value={target}
+                      onChange={(e) => setTarget(e.target.value)}
+                      className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs dark:bg-input/30"
+                    >
+                      {pipelines.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      Scores this pipeline’s answers against its golden set and can gate its releases. Add
+                      example cases on the pipeline’s Quality tab if it has none yet.
+                    </p>
+                  </>
+                )}
+              </div>
               {isGEval && (
                 <div className="space-y-1.5">
                   <Label htmlFor="apply-criteria">What should a good answer do? (plain English)</Label>
@@ -371,7 +414,7 @@ export function EvalTemplateCatalog({ onApplied }: Readonly<{ onApplied?: () => 
             <Button variant="ghost" onClick={() => setApplying(null)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={apply} disabled={saving || (isGEval && !criteria.trim())}>
+            <Button onClick={apply} disabled={saving || !target || (isGEval && !criteria.trim())}>
               {saving ? 'Adding…' : 'Add eval'}
             </Button>
           </SheetFooter>
