@@ -1066,3 +1066,37 @@ Dismissed as NOT defects (documented so they aren't re-flagged): model-provider 
 "pixelated/unreadable" shots (siem/roi/audit/runs/admin) are full-page-screenshot DOWNSCALING in the
 reviewer's view — spot-verified rendering fine (SIEM: 387 events, populated); the generic starter
 prompt library on `/workspace/prompts` is shared workspace infra by design.
+
+## Product COHERENCE gaps (2026-07-16 walkthrough) — surfaces work in isolation, connective tissue broken
+
+Surfaced doing a live walkthrough before the advisor demo. Each surface is individually fine; the
+LINKS between them are broken/missing. Priority = demo golden path (Studio → govern → run) first.
+
+- **[G-COH-EVALS] ✅ FIXED — evals could be applied with no target/golden set (orphan evaluators).**
+  Standalone `/build/evals` "Apply" created `pipelineId:null` defs — meaningless (industry model is
+  `evaluate(target, dataset, evaluators)`; Braintrust/LangSmith/Langfuse/Phoenix). Apply now REQUIRES
+  a target pipeline (whose golden set the run scores + gates); "Add eval" disabled until one is picked.
+  FOLLOW-UP: the standalone Evals page should read as a *library* + show each eval's target + last run;
+  and surface the pipeline's golden-set size at apply time (needs a goldenCount on the pipelines API).
+
+- **[G-COH-PIPE-404] OPEN — pipeline chip 404s on a dangling pipelineId.** An app whose `pipelineId`
+  points at a pipeline row absent from THIS deployment (seed drift, e.g. `pl_seed_org_bharat_cross-sell-advisor`)
+  → PipelineChip links to `/build/pipelines/<id>` → the detail page hard-`notFound()`s. Two fixes:
+  (a) the chip/detail should DEGRADE (show "pipeline not found in this org" inline, not a 404), and
+  (b) apps should never persist a pipelineId with no matching row (validate on save / repair seed).
+
+- **[G-COH-STUDIO] PARTIAL — App + Forge unified into one builder w/ Chat|Build modes (shipped).**
+  Remaining: (a) Chat mode isn't editable + doesn't carry the draft into Build; (b) a new builder
+  session has no ID in the URL (refresh loses the draft) — new apps should mint an id and live at
+  `/build/apps/<id>` from the start (bolt/lovable pattern), so App and Forge are literally the same
+  surface with a mode switch.
+
+- **[G-COH-DEPLOY-CACHE] OPEN — deploys don't visibly update the browser.** `generateBuildId` is
+  pinned to `offgrid-onprem`, so after an rsync deploy the browser serves cached chunks/RSC and the UI
+  "looks the same" until a hard refresh. Give each deploy a real build id (or cache-bust) so a normal
+  reload shows the new build.
+
+- **[G-COH-BIGVISION] BACKLOG — "enterprise Lovable" (declarative CRUD apps: stores data + forms +
+  lists + reports + REST APIs + workflows, no code shown, governed by OGAC).** Larger than the current
+  workflow/agent builder; a declarative business-app model + generic runtime. Staged build, not a
+  one-shot. See the session notes — this is the north-star product, distinct from the shipped unify.
