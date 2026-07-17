@@ -7,10 +7,10 @@ const ORG_A = 'test-int-solution-blueprints-a';
 const ORG_B = 'test-int-solution-blueprints-b';
 const dbUp = await dbReachable();
 async function solutionSchemaReady(): Promise<boolean> {
-  if (!dbUp) return false;
   const pool = new Pool({
     connectionString:
       process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
+    connectionTimeoutMillis: 10_000,
   });
   try {
     const result = await pool.query(
@@ -18,6 +18,8 @@ async function solutionSchemaReady(): Promise<boolean> {
        WHERE table_name = 'solution_blueprints' AND column_name = 'current_version'`,
     );
     return result.rowCount === 1;
+  } catch {
+    return false;
   } finally {
     await pool.end();
   }
@@ -145,6 +147,15 @@ test(
     });
     assert.equal(deployment.pipelineId, pipelineId);
     await store.assertSolutionRuntimeBinding(appId, ORG_A);
+    await assert.rejects(
+      store.createSolutionDeployment(ORG_A, {
+        blueprintId: created.id,
+        blueprintVersion: 1,
+        appId,
+        status: 'active',
+      }),
+      (error: unknown) => (error as { code?: string }).code === 'duplicate',
+    );
 
     const updated = await store.updateSolutionBlueprint(
       created.id,

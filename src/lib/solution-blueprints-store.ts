@@ -109,6 +109,16 @@ function toObservation(row: SolutionObservationRow): SolutionObservation {
   });
 }
 
+function databaseErrorCode(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current && typeof current === 'object'; depth += 1) {
+    const record = current as { code?: unknown; cause?: unknown };
+    if (typeof record.code === 'string') return record.code;
+    current = record.cause;
+  }
+  return null;
+}
+
 async function seedBlueprints(orgId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const [state] = await tx
@@ -445,7 +455,7 @@ export async function createSolutionDeployment(
       .returning();
     return toDeployment(row);
   } catch (error) {
-    if ((error as { code?: string }).code === '23505') {
+    if (databaseErrorCode(error) === '23505') {
       throw new SolutionConflictError('App already has a solution deployment', 'duplicate');
     }
     throw error;

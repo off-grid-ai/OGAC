@@ -50,8 +50,7 @@ CREATE TABLE "solution_deployments" (
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "solution_deployments_status_check" CHECK ("status" IN ('active', 'paused', 'retired')),
   CONSTRAINT "solution_deployments_version_fk" FOREIGN KEY ("org_id", "blueprint_id", "blueprint_version") REFERENCES "solution_blueprint_versions"("org_id", "blueprint_id", "version") ON DELETE RESTRICT,
-  CONSTRAINT "solution_deployments_app_fk" FOREIGN KEY ("app_id") REFERENCES "apps"("id") ON DELETE RESTRICT,
-  CONSTRAINT "solution_deployments_pipeline_fk" FOREIGN KEY ("pipeline_id") REFERENCES "pipelines"("id") ON DELETE RESTRICT
+  CONSTRAINT "solution_deployments_app_fk" FOREIGN KEY ("app_id") REFERENCES "apps"("id") ON DELETE RESTRICT
 );
 --> statement-breakpoint
 CREATE INDEX "solution_deployments_org_idx" ON "solution_deployments" ("org_id");

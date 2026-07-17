@@ -67,10 +67,10 @@ test('solution API enforces authentication and rejects invalid enums instead of 
 
 const dbUp = await dbReachable();
 async function solutionSchemaReady(): Promise<boolean> {
-  if (!dbUp) return false;
   const pool = new Pool({
     connectionString:
       process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
+    connectionTimeoutMillis: 10_000,
   });
   try {
     const result = await pool.query(
@@ -78,6 +78,8 @@ async function solutionSchemaReady(): Promise<boolean> {
        WHERE table_name = 'solution_blueprints' AND column_name = 'current_version'`,
     );
     return result.rowCount === 1;
+  } catch {
+    return false;
   } finally {
     await pool.end();
   }
@@ -100,12 +102,13 @@ test(
     const { POST } = await import('../src/app/api/v1/admin/solution-blueprints/route.ts');
     const { db } = await import('@/db');
     const { sql } = await import('drizzle-orm');
+    await db.execute(sql`DELETE FROM audit_events_v2 WHERE org = ${ORG}`).catch(() => undefined);
     let createdId = '';
     t.after(async () => {
       await db.execute(sql`DELETE FROM solution_blueprint_versions WHERE org_id = ${ORG}`);
       await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${ORG}`);
       await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${ORG}`);
-      await db.execute(sql`DELETE FROM audit_events_v2 WHERE org = ${ORG}`);
+      await db.execute(sql`DELETE FROM audit_events_v2 WHERE org = ${ORG}`).catch(() => undefined);
       if (priorToken === undefined) delete process.env.OFFGRID_ADMIN_TOKEN;
       else process.env.OFFGRID_ADMIN_TOKEN = priorToken;
       if (priorOrg === undefined) delete process.env.OFFGRID_ORG;
@@ -129,10 +132,16 @@ test(
     let audit: { rows: Record<string, unknown>[] } = { rows: [] };
     for (let attempt = 0; attempt < 20 && audit.rows.length === 0; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 25));
-      audit = await db.execute(sql`
-        SELECT actor_id, action, resource, outcome
-        FROM audit_events_v2
-        WHERE org = ${ORG} AND action = 'solution-blueprint.create'`);
+      audit = await db
+        .execute(
+          sql`
+          SELECT actor_id, action, resource, outcome
+          FROM audit_events_v2
+          WHERE org = ${ORG}
+            AND action = 'solution-blueprint.create'
+            AND resource = ${`solution-blueprint:${createdId}`}`,
+        )
+        .catch(() => ({ rows: [] }));
     }
     assert.deepEqual(audit.rows[0], {
       actor_id: 'service@offgrid.local',
