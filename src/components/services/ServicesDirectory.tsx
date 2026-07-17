@@ -5,16 +5,17 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
-import { isHealthy, type ServiceEntry, type ServiceHealth } from '@/lib/services-directory';
+import { toDisplayHostname } from '@/lib/display-host';
+import type { ServiceDirectoryEntry } from '@/lib/service-directory-view';
+import { isHealthy, type ServiceHealth } from '@/lib/service-health';
 
-const AUTH_LABEL: Record<ServiceEntry['auth'], string> = {
+const AUTH_LABEL: Record<ServiceDirectoryEntry['auth'], string> = {
   session: 'Login',
   'api-key': 'API key',
   public: 'Public',
 };
 
-const KIND_GROUPS: { kind: ServiceEntry['kind']; label: string }[] = [
+const KIND_GROUPS: { kind: ServiceDirectoryEntry['kind']; label: string }[] = [
   { kind: 'console', label: 'Console' },
   { kind: 'gateway', label: 'Gateway' },
   { kind: 'api', label: 'Internal services' },
@@ -64,7 +65,10 @@ function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
   );
 }
 
-function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | undefined }>) {
+function ServiceCard({
+  s,
+  h,
+}: Readonly<{ s: ServiceDirectoryEntry; h: ServiceHealth | undefined }>) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
@@ -81,14 +85,14 @@ function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | un
       <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
-        {/^https?:\/\//i.test(s.url) ? (
+        {s.displayUrl ? (
           <a
-            href={toDisplayHost(s.url)}
+            href={s.displayUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
           >
-            {toDisplayHostname(s.url)}
+            {toDisplayHostname(s.displayUrl)}
             <ArrowSquareOut className="size-3 shrink-0" />
           </a>
         ) : (
@@ -100,7 +104,7 @@ function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | un
   );
 }
 
-export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntry[] }>) {
+export function ServicesDirectory({ services }: Readonly<{ services: ServiceDirectoryEntry[] }>) {
   const [health, setHealth] = useState<Record<string, ServiceHealth>>({});
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
 

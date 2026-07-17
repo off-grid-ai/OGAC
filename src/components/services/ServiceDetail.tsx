@@ -7,8 +7,10 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
-import type { ServiceControl, ServiceEntry, ServiceHealth } from '@/lib/services-directory';
+import { toDisplayHostname } from '@/lib/display-host';
+import type { ServiceDetailEntry } from '@/lib/service-directory-view';
+import type { ServiceHealth } from '@/lib/service-health';
+import type { ServiceControl } from '@/lib/services-directory';
 import { RedpandaManager } from './RedpandaManager';
 
 const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
@@ -39,7 +41,7 @@ export function ServiceDetail({
   control,
   logsHref,
 }: Readonly<{
-  service: ServiceEntry;
+  service: ServiceDetailEntry;
   control: ServiceControl;
   logsHref: string | null;
 }>) {
@@ -77,7 +79,7 @@ export function ServiceDetail({
   }, [probe]);
 
   const ui = health ? HEALTH_UI[health.status] : null;
-  const isHttp = /^https?:\/\//i.test(service.url);
+  const isHttp = service.displayUrl !== null;
   const ups = history.filter((s) => s.status !== 'down').length;
   const uptimePct = history.length ? Math.round((ups / history.length) * 100) : null;
 
@@ -113,7 +115,7 @@ export function ServiceDetail({
             <ArrowClockwise className={`size-4 ${probing ? 'animate-spin' : ''}`} /> Re-check health
           </Button>
           {isHttp && (
-            <a href={toDisplayHost(service.url)} target="_blank" rel="noopener noreferrer">
+            <a href={service.displayUrl ?? undefined} target="_blank" rel="noopener noreferrer">
               <Button size="sm">
                 Open <ArrowSquareOut className="size-4" />
               </Button>
@@ -198,15 +200,9 @@ export function ServiceDetail({
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-muted-foreground">Endpoint</dt>
                 <dd className="truncate font-mono text-[11px] text-foreground">
-                  {isHttp ? toDisplayHostname(service.url) : 'in-process'}
+                  {service.displayUrl ? toDisplayHostname(service.displayUrl) : 'in-process'}
                 </dd>
               </div>
-              {service.healthPath && (
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="text-muted-foreground">Health path</dt>
-                  <dd className="font-mono text-[11px] text-foreground">{service.healthPath}</dd>
-                </div>
-              )}
             </dl>
             {logsHref && (
               <Link
