@@ -240,11 +240,10 @@ Consumed by the console via ports-and-adapters and seeded with a 600k-row BFSI d
 leap is the **plain-language builder** so non-technical staff author these governed pipelines themselves —
 the empowerment that turns "we have a data platform" into "everyone is intelligent."
 
-Deployment topology is not owned by this strategy document. As of 2026-07-17, the recovery inventory is
-exactly eight serving machines — S1 and g1–g7 — and the Qwythos cluster comprises g2, g4, and g7. Node
-addresses, service placement, and cluster membership are runtime registry data; console routes and product
-documents must not hard-code them. The authoritative deployment configuration and current health records
-live in the private
+Deployment topology is not owned by this strategy document. Node addresses, service placement, fleet
+membership, and cluster membership are runtime registry data; console routes and product documents must
+not hard-code them. The authoritative deployment configuration, recovery automation, and current health
+records live in the private
 [`off-grid-ai/onprem-fleet-orchestration`](https://github.com/off-grid-ai/onprem-fleet-orchestration)
 repository.
 
