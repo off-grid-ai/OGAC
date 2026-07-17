@@ -84,9 +84,6 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                 })()}
               </span>
               <span className="min-w-0 flex-1 truncate">{section.label}</span>
-              <span className="text-[10px] tabular-nums text-muted-foreground/70">
-                {section.items.length}
-              </span>
               <CaretRight
                 className={cn(
                   'size-3.5 shrink-0 transition-transform duration-150',
