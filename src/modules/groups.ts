@@ -11,6 +11,7 @@ import {
 export interface NavGroup {
   id: IaSectionId;
   label: string;
+  navigation: 'direct' | 'grouped';
   sidebar: CanonicalOwnerId[];
   contextual: CanonicalOwnerId[];
 }
@@ -21,6 +22,7 @@ export const NAV_GROUPS: readonly NavGroup[] = IA_SECTIONS.map((section) => {
   return {
     id: section.id,
     label: section.label,
+    navigation: section.navigation,
     sidebar: owners.filter((owner) => owner.placement === 'sidebar').map((owner) => owner.id),
     contextual: owners.filter((owner) => owner.placement === 'contextual').map((owner) => owner.id),
   };
@@ -29,6 +31,7 @@ export const NAV_GROUPS: readonly NavGroup[] = IA_SECTIONS.map((section) => {
 export interface SidebarSection {
   id: IaSectionId;
   label: string;
+  navigation: 'direct' | 'grouped';
   items: CanonicalOwner[];
 }
 
@@ -43,7 +46,9 @@ export function sidebarSections(enabledModules: readonly { id: ModuleId }[]): Si
     const items = CANONICAL_OWNERS.filter(
       (owner) => owner.section === group.id && sidebarIds.has(owner.id) && enabled.has(owner.gate),
     );
-    return items.length ? [{ id: group.id, label: group.label, items }] : [];
+    return items.length
+      ? [{ id: group.id, label: group.label, navigation: group.navigation, items }]
+      : [];
   });
 }
 
@@ -63,7 +68,9 @@ export function groupModules(enabledModules: readonly { id: ModuleId }[]): Sideb
     const items = CANONICAL_OWNERS.filter(
       (owner) => owner.section === group.id && enabled.has(owner.gate),
     );
-    return items.length ? [{ id: group.id, label: group.label, items }] : [];
+    return items.length
+      ? [{ id: group.id, label: group.label, navigation: group.navigation, items }]
+      : [];
   });
 }
 

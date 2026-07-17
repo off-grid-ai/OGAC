@@ -78,6 +78,40 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
           const expanded = openSectionId === section.id;
           const containsActiveItem = activeSectionId === section.id;
           const SectionIcon = MODULE_ICONS[section.items[0].gate];
+          const directItem = section.navigation === 'direct' ? section.items[0] : undefined;
+
+          if (directItem) {
+            const active = activeId === directItem.id;
+            return (
+              <div key={section.id} className="mb-1 last:mb-0">
+                <Link
+                  href={directItem.route}
+                  data-og-interactive
+                  data-current-section={active || undefined}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={onNavigate}
+                  className={cn(
+                    'group flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                    active
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'grid size-7 shrink-0 place-items-center rounded-md border transition-colors',
+                      active
+                        ? 'border-background/20 bg-background/10 text-background'
+                        : 'border-border/80 bg-background text-muted-foreground group-hover:text-foreground',
+                    )}
+                  >
+                    <SectionIcon className="size-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                </Link>
+              </div>
+            );
+          }
 
           return (
             <div key={section.id} className="mb-1 last:mb-0">

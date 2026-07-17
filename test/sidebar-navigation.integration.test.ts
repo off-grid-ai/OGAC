@@ -28,9 +28,11 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
   assert.match(html, /aria-label="Primary navigation"/);
   assert.match(html, /data-og-surface="raised"/);
   assert.ok((html.match(/data-og-interactive="true"/g) ?? []).length > 8);
+  assert.match(html, /href="\/overview"[^>]*>.*Home/s);
+  assert.doesNotMatch(html, /aria-controls="nav-section-home"/);
   assert.match(html, /aria-controls="nav-section-solutions"/);
-  assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 8);
-  assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 8);
+  assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 7);
+  assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 7);
   assert.doesNotMatch(html, /href="\/operations\/clusters"/);
 });
 

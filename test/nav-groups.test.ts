@@ -29,6 +29,12 @@ test('the console has exactly the eight accepted top-level jobs in order', () =>
     NAV_GROUPS.map((group) => group.id),
     IA_SECTIONS.map((section) => section.id),
   );
+  assert.equal(NAV_GROUPS.find((group) => group.id === 'home')?.navigation, 'direct');
+  assert.ok(
+    NAV_GROUPS.filter((group) => group.id !== 'home').every(
+      (group) => group.navigation === 'grouped',
+    ),
+  );
 });
 
 test('every canonical entity has exactly one owner and one canonical route', () => {
@@ -100,9 +106,10 @@ test('every standalone collection is in the sidebar and contextual resources dec
   const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
   assert.deepEqual(
     contextual.map((owner) => owner.id),
-    ['agents', 'clusters'],
+    ['agents', 'sandbox', 'clusters'],
   );
   assert.equal(contextual.find((owner) => owner.id === 'agents')?.sidebarParent, 'apps');
+  assert.equal(contextual.find((owner) => owner.id === 'sandbox')?.sidebarParent, 'apps');
   assert.equal(contextual.find((owner) => owner.id === 'clusters')?.sidebarParent, 'nodes');
 });
 

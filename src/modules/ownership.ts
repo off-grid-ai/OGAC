@@ -56,6 +56,7 @@ export type CanonicalOwnerId =
 export interface IaSection {
   id: IaSectionId;
   label: string;
+  navigation: 'direct' | 'grouped';
   purpose: string;
   ownershipRule: string;
 }
@@ -83,18 +84,21 @@ export const IA_SECTIONS: readonly IaSection[] = [
   {
     id: 'home',
     label: 'Home',
+    navigation: 'direct',
     purpose: 'See what needs attention and where to go next.',
     ownershipRule: 'Owns summaries and shortcuts, never canonical entities.',
   },
   {
     id: 'work',
     label: 'Work',
+    navigation: 'grouped',
     purpose: 'Use Off Grid AI without needing platform knowledge.',
     ownershipRule: 'Owns human work objects; enterprise knowledge belongs to Data.',
   },
   {
     id: 'solutions',
     label: 'Solutions',
+    navigation: 'grouped',
     purpose: 'Build and operate high-value business use cases.',
     ownershipRule:
       'Blueprints prove reusable value; Apps own tenant deployments; built-in Agents are reusable App components, not a parallel registry.',
@@ -102,12 +106,14 @@ export const IA_SECTIONS: readonly IaSection[] = [
   {
     id: 'data',
     label: 'Data',
+    navigation: 'grouped',
     purpose: 'Turn enterprise systems into governed solution context.',
     ownershipRule: 'Owns enterprise data resources, not vendor engines.',
   },
   {
     id: 'runtime',
     label: 'AI Runtime',
+    navigation: 'grouped',
     purpose: 'Control available AI capabilities and governed access.',
     ownershipRule:
       'Owns logical models and access contracts; physical machines belong to Operations.',
@@ -115,18 +121,21 @@ export const IA_SECTIONS: readonly IaSection[] = [
   {
     id: 'governance',
     label: 'Governance',
+    navigation: 'grouped',
     purpose: 'Define, enforce, and prove controls.',
     ownershipRule: 'Global rules and evidence live here; apps and pipelines show assignments.',
   },
   {
     id: 'insights',
     label: 'Insights',
+    navigation: 'grouped',
     purpose: 'Measure effectiveness, reliability, adoption, and economics.',
     ownershipRule: 'Owns measured results, not configuration or service health.',
   },
   {
     id: 'operations',
     label: 'Operations',
+    navigation: 'grouped',
     purpose: 'Run the execution plane, fleet, services, and recovery controls.',
     ownershipRule: 'Owns runtime instances and infrastructure.',
   },
