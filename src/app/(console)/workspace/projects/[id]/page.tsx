@@ -1,12 +1,19 @@
 import { ProjectDetail } from '@/components/projects/ProjectDetail';
+import { PageFrame } from '@/components/PageFrame';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
 
 // Full-page project workspace: instructions editor, knowledge upload/list, and the project's
 // chats with a link into /chat scoped to it. Reuses the existing project + document APIs.
-export default async function ProjectDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function ProjectDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('projects');
   const { id } = await params;
-  return <ProjectDetail projectId={id} />;
+  return (
+    <PageFrame>
+      <ProjectDetail projectId={id} />
+    </PageFrame>
+  );
 }

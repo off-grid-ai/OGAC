@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
 import { QuickAddDocument } from '@/components/knowledge/QuickAddDocument';
+import { PageFrame } from '@/components/PageFrame';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardRail } from '@/components/workspace/CardRail';
@@ -34,7 +35,7 @@ export default async function KnowledgePage() {
   );
 
   return (
-    <div className="w-full space-y-6">
+    <PageFrame className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-3xl">
           <h1 className="text-lg font-semibold text-foreground">Organization Knowledge</h1>
@@ -77,9 +78,7 @@ export default async function KnowledgePage() {
                     </Link>
                   </CardTitle>
                   {c.description ? (
-                    <CardDescription className="mt-1 line-clamp-2">
-                      {c.description}
-                    </CardDescription>
+                    <CardDescription className="mt-1 line-clamp-2">{c.description}</CardDescription>
                   ) : null}
                 </div>
               </CardHeader>
@@ -116,6 +115,6 @@ export default async function KnowledgePage() {
           ))}
         </CardRail>
       )}
-    </div>
+    </PageFrame>
   );
 }

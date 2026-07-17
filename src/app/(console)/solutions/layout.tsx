@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
 
 export default function SolutionsLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <div className="w-full space-y-6">{children}</div>;
+  return children;
 }
