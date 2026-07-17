@@ -83,10 +83,10 @@ test('disabled commercial modules hide their owners without changing IA ownershi
   );
 });
 
-test('secondary routes highlight their section primary and dynamic routes keep ownership', () => {
-  assert.equal(sidebarActiveIdFor('clusters'), 'runs');
+test('secondary routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {
+  assert.equal(sidebarActiveIdFor('clusters'), 'nodes');
   assert.equal(sidebarActiveIdFor('quality-results'), 'outcomes');
-  assert.equal(sidebarActiveIdForPath('/operations/clusters/from-registry'), 'runs');
+  assert.equal(sidebarActiveIdForPath('/operations/clusters/from-registry'), 'nodes');
   assert.equal(sidebarActiveIdForPath('/operations/services/langfuse'), 'services');
   assert.equal(
     sidebarActiveIdForPath('/runtime/pipelines/credit-risk/policy'),
@@ -94,4 +94,14 @@ test('secondary routes highlight their section primary and dynamic routes keep o
   );
   assert.equal(sidebarActiveIdForPath('/solutions/apps/app-42/runs'), 'apps');
   assert.equal(sidebarActiveIdForPath('/nowhere'), undefined);
+});
+
+test('a secondary sidebar parent is a primary owner in the same section', () => {
+  const byId = new Map(CANONICAL_OWNERS.map((owner) => [owner.id, owner]));
+  for (const owner of CANONICAL_OWNERS) {
+    if (!owner.sidebarParent) continue;
+    const parent = byId.get(owner.sidebarParent);
+    assert.ok(parent?.primary, `${owner.id} sidebar parent must be primary`);
+    assert.equal(parent.section, owner.section, `${owner.id} sidebar parent must share its section`);
+  }
 });

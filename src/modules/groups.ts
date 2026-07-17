@@ -64,6 +64,10 @@ export function sidebarActiveIdFor(id: CanonicalOwnerId): CanonicalOwnerId | und
   const owner = CANONICAL_OWNERS.find((candidate) => candidate.id === id);
   if (!owner) return undefined;
   if (owner.primary) return owner.id;
+  if (owner.sidebarParent) {
+    const parent = CANONICAL_OWNERS.find((candidate) => candidate.id === owner.sidebarParent);
+    if (parent?.section === owner.section && parent.primary) return parent.id;
+  }
   return CANONICAL_OWNERS.find(
     (candidate) => candidate.section === owner.section && candidate.primary,
   )?.id;

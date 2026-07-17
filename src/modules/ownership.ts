@@ -66,6 +66,12 @@ export interface CanonicalOwner {
   gate: ModuleId;
   /** Prominent sidebar row; other owners remain reachable from the section's scoped navigation. */
   primary?: boolean;
+  /**
+   * Primary sidebar row that represents this secondary owner. Omit to use the section's first
+   * visible primary. This keeps related secondary resources (for example clusters under physical
+   * topology) highlighted under their real parent instead of an unrelated section default.
+   */
+  sidebarParent?: CanonicalOwnerId;
   comingSoon?: boolean;
 }
 
@@ -448,6 +454,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Registry-derived cluster head and member relationships.',
     route: '/operations/clusters',
     gate: 'gateway',
+    sidebarParent: 'nodes',
   },
   {
     id: 'services',
