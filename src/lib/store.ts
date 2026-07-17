@@ -66,6 +66,9 @@ export async function ensureOrgSchema(): Promise<void> {
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`);
     await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`);
+    // Agent-owned pipeline binding. Existing rows remain deliberately unbound; they must not start
+    // inheriting chat governance merely because this column was introduced.
+    await db.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS pipeline_id text;`);
     // Wave-2 hardening: ingest jobs get a tenant scope, devices get a random data-plane secret.
     await db.execute(sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`);
     await db.execute(sql`ALTER TABLE devices ADD COLUMN IF NOT EXISTS token text;`);
@@ -1839,6 +1842,7 @@ export async function deleteCustomRole(id: string, orgId: string = DEFAULT_ORG):
 // ─── User-authored agents ─────────────────────────────────────────────────────
 export interface CustomAgent {
   id: string;
+  pipelineId: string | null;
   name: string;
   role: string;
   description: string;
@@ -1853,6 +1857,7 @@ export interface CustomAgent {
 function toCustomAgent(r: typeof customAgents.$inferSelect): CustomAgent {
   return {
     id: r.id,
+    pipelineId: r.pipelineId,
     name: r.name,
     role: r.role,
     description: r.description,
@@ -1868,6 +1873,7 @@ function toCustomAgent(r: typeof customAgents.$inferSelect): CustomAgent {
 // Org-scoped: a tenant only ever sees/runs its own custom agents. Every read/write is constrained
 // to the caller's org so agents authored in org A never leak into org B.
 export async function listCustomAgents(orgId: string = DEFAULT_ORG): Promise<CustomAgent[]> {
+  await ensureOrgSchema();
   const rows = await db
     .select()
     .from(customAgents)
@@ -1880,6 +1886,7 @@ export async function getCustomAgent(
   id: string,
   orgId: string = DEFAULT_ORG,
 ): Promise<CustomAgent | undefined> {
+  await ensureOrgSchema();
   const [row] = await db
     .select()
     .from(customAgents)
@@ -1898,14 +1905,17 @@ export async function createCustomAgent(
     tools?: string[];
     grounded?: boolean;
     trigger?: string;
+    pipelineId?: string | null;
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<CustomAgent> {
+  await ensureOrgSchema();
   const [row] = await db
     .insert(customAgents)
     .values({
       id: `agent_${randomUUID().slice(0, 8)}`,
       orgId,
+      pipelineId: input.pipelineId ?? null,
       name: input.name,
       role: input.role || 'Custom',
       description: input.description || '',
@@ -1924,6 +1934,7 @@ export async function setCustomAgentEnabled(
   enabled: boolean,
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
+  await ensureOrgSchema();
   await db
     .update(customAgents)
     .set({ enabled })
@@ -1943,9 +1954,11 @@ export async function updateCustomAgent(
     tools: string[];
     grounded: boolean;
     trigger: string;
+    pipelineId: string | null;
   }>,
   orgId: string = DEFAULT_ORG,
 ): Promise<CustomAgent | undefined> {
+  await ensureOrgSchema();
   const set: Record<string, unknown> = {};
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.role !== undefined) set.role = patch.role;
@@ -1955,6 +1968,7 @@ export async function updateCustomAgent(
   if (patch.tools !== undefined) set.tools = patch.tools;
   if (patch.grounded !== undefined) set.grounded = patch.grounded;
   if (patch.trigger !== undefined) set.trigger = patch.trigger;
+  if (patch.pipelineId !== undefined) set.pipelineId = patch.pipelineId;
   if (Object.keys(set).length === 0) return getCustomAgent(id, orgId);
   const [row] = await db
     .update(customAgents)
@@ -1965,5 +1979,6 @@ export async function updateCustomAgent(
 }
 
 export async function deleteCustomAgent(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
+  await ensureOrgSchema();
   await db.delete(customAgents).where(and(eq(customAgents.id, id), eq(customAgents.orgId, orgId)));
 }

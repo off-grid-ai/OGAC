@@ -308,6 +308,9 @@ export const routingRules = pgTable('routing_rules', {
 export const customAgents = pgTable('custom_agents', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull().default('default'),
+  // An agent is an independent consumer: null means deliberately unbound. It never inherits the
+  // org's chat default (see agent-pipeline-policy.ts).
+  pipelineId: text('pipeline_id'),
   name: text('name').notNull(),
   role: text('role').notNull().default('Custom'),
   description: text('description').notNull().default(''),

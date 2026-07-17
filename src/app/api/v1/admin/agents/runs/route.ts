@@ -6,7 +6,7 @@ import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
-import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
+import { getCustomAgent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
@@ -58,13 +58,10 @@ export async function POST(req: Request) {
     }
   }
 
-  // PA-16b — resolve the bound-pipeline CONTRACT this agent run enforces (data allowlist + egress
-  // leash + policy/guardrail overlay), most-specific-wins: an agent has no per-agent binding column
-  // yet, so this is the org-default chat/consumer pipeline (null agent binding → org default). Null
-  // (nothing bound / unresolvable) ⇒ the run behaves exactly as before (additive-only). Threaded
-  // into dispatch → the sync RunContext so runAgent enforces it per PA-16b.
-  const gov = await getChatBindingGovernance().catch(() => ({ defaultChatPipelineId: null, allowlist: [] }));
-  const { contract, pipelineId } = await resolveAgentBinding(null, gov.defaultChatPipelineId, orgId);
+  // Resolve only the agent's OWN pipeline. An unbound agent deliberately has no pipeline contract;
+  // it never inherits chat's default (changing chat governance must not silently retarget agents).
+  // Built-ins have no persisted binding and therefore remain explicitly unbound.
+  const { contract, pipelineId } = await resolveAgentBinding(agent?.pipelineId ?? null, orgId);
 
   // C4: resolve the caller CONTEXT here — the request is the only place identity/org/project exist.
   // Pass the fully-resolved actor (machine vs user + label preserved, not just the email) so a

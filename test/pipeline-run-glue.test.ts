@@ -13,21 +13,24 @@ import {
 // the binding is resolved most-specific-wins and a NO-binding run degrades to a null contract
 // (legacy behaviour — the ADDITIVE guarantee).
 
-test('resolveAgentBinding — no agent binding + no org default ⇒ pipelineId null, contract null (legacy)', async () => {
-  const r = await resolveAgentBinding(null, null, 'default');
+test('resolveAgentBinding — no agent binding means no contract (never inherits chat default)', async () => {
+  let requested: string | null | undefined = 'not-called';
+  const r = await resolveAgentBinding(null, 'org_a', async (pipelineId, orgId) => {
+    requested = pipelineId;
+    assert.equal(orgId, 'org_a');
+    return null;
+  });
   assert.equal(r.pipelineId, null);
   assert.equal(r.contract, null);
+  assert.equal(requested, null);
 });
 
-test('resolveAgentBinding — org default wins when the agent has no own binding', async () => {
-  // resolveConsumerPipeline(null, 'pl_org') === 'pl_org'; resolveContract fails open to null with no
-  // DB, but the RESOLVED pipeline id proves the most-specific-wins fallback picked the org default.
-  const r = await resolveAgentBinding(null, 'pl_org', 'default');
-  assert.equal(r.pipelineId, 'pl_org');
-});
-
-test('resolveAgentBinding — the agent own binding beats the org default', async () => {
-  const r = await resolveAgentBinding('pl_agent', 'pl_org', 'default');
+test('resolveAgentBinding — explicit agent binding is loaded within the run org', async () => {
+  const r = await resolveAgentBinding('pl_agent', 'org_a', async (pipelineId, orgId) => {
+    assert.equal(pipelineId, 'pl_agent');
+    assert.equal(orgId, 'org_a');
+    return null;
+  });
   assert.equal(r.pipelineId, 'pl_agent');
 });
 

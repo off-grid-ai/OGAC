@@ -11,9 +11,11 @@
 // SOLID: thin adapter. The pure decisions live in chat-pipeline-policy.ts; the DB I/O lives in
 // pipeline-contract.ts / store.ts / chat.ts. This module only wires them together per consumer type.
 
-import { resolveChatPipeline, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
+import { resolveAgentPipeline } from '@/lib/agent-pipeline-policy';
+import { resolveChatPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
+import { getPipeline } from '@/lib/pipelines';
 
 /** A resolved binding: which pipeline (if any) governs this run, and its enforceable contract. */
 export interface ResolvedPipelineBinding {
@@ -24,19 +26,35 @@ export interface ResolvedPipelineBinding {
 }
 
 /**
- * Resolve the contract that governs an AGENT run. Most-specific-wins: the agent's own binding (when a
- * per-agent pipeline binding exists) else the org-default chat/consumer pipeline. Delegates the pure
- * two-level fallback to resolveConsumerPipeline and the load to resolveContract (never throws — a
- * missing/unresolvable pipeline degrades to a null contract = legacy behaviour).
+ * Resolve the contract that governs an AGENT run. Agent bindings are explicit: null means no
+ * contract, never "inherit chat default". The contract loader is injectable at the external DB
+ * boundary so tests can prove the org scope passed to it without replacing our decision code.
  */
+export type PipelineContractResolver = (
+  pipelineId: string | null | undefined,
+  orgId: string,
+) => Promise<PipelineContract | null>;
+
 export async function resolveAgentBinding(
   agentPipelineId: string | null | undefined,
-  orgDefaultPipelineId: string | null | undefined,
   orgId: string,
+  loadContract: PipelineContractResolver = resolveContract,
 ): Promise<ResolvedPipelineBinding> {
-  const pipelineId = resolveConsumerPipeline(agentPipelineId, orgDefaultPipelineId);
-  const contract = await resolveContract(pipelineId, orgId);
+  const pipelineId = resolveAgentPipeline(agentPipelineId);
+  const contract = await loadContract(pipelineId, orgId);
   return { pipelineId, contract };
+}
+
+export type AgentPipelineLookup = typeof getPipeline;
+
+/** Validate a persisted/requested agent binding inside the caller's org. Null is deliberately valid. */
+export async function isAgentPipelineBindingValid(
+  pipelineId: string | null,
+  orgId: string,
+  lookup: AgentPipelineLookup = getPipeline,
+): Promise<boolean> {
+  if (!pipelineId) return true;
+  return (await lookup(pipelineId, orgId)) !== null;
 }
 
 /**
