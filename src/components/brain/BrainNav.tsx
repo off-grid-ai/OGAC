@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { SubNav } from '@/components/nav/SubNav';
-import { type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView } from '@/lib/brain-view';
+import {
+  type BrainView,
+  DEFAULT_BRAIN_VIEW,
+  normalizeBrainView,
+} from '@/lib/brain-view';
 import { cn } from '@/lib/utils';
 
 // Tab types/helpers now live in the server-safe @/lib/brain-view so the server page can import
@@ -63,7 +67,7 @@ export function BrainNav() {
   return (
     <SubNav>
       <nav className="flex flex-wrap items-center gap-x-1 gap-y-2">
-        {GROUPS.map((group, gi) => (
+      {GROUPS.map((group, gi) => (
           <div key={group.heading} className="flex items-center gap-1">
             {gi > 0 ? <span className="mx-1.5 h-4 w-px bg-border" aria-hidden /> : null}
             <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground/50">
@@ -71,7 +75,8 @@ export function BrainNav() {
             </span>
             {group.tabs.map((t) => {
               const isActive = active === t.view;
-              const href = t.view === DEFAULT_BRAIN_VIEW ? pathname : `${pathname}?view=${t.view}`;
+              const href =
+                t.view === DEFAULT_BRAIN_VIEW ? pathname : `${pathname}?view=${t.view}`;
               return (
                 <Link
                   key={t.view}

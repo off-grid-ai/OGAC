@@ -13,9 +13,7 @@ function templateByKey(templates: readonly AppSpecSeed[], key: string): AppSpecS
   return template;
 }
 
-function requirementsFrom(
-  template: AppSpecSeed,
-): Pick<
+function requirementsFrom(template: AppSpecSeed): Pick<
   SolutionBlueprintInput,
   'requiredDataDomains' | 'requiredTools' | 'governedPipeline' | 'sourceTemplateKey'
 > {

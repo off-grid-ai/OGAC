@@ -74,8 +74,7 @@ export function validateBlueprint(input: SolutionBlueprintInput): string[] {
   if (!Number.isInteger(input.proof.provenDeployments) || input.proof.provenDeployments < 0) {
     errors.push('proven deployments must be a non-negative integer');
   }
-  if (!validEvidenceLinks(input.proof.evidenceLinks))
-    errors.push('evidence links must be relative or HTTP URLs');
+  if (!validEvidenceLinks(input.proof.evidenceLinks)) errors.push('evidence links must be relative or HTTP URLs');
   return [...errors, ...validateOutcomeContract(input.outcome)];
 }
 
@@ -83,10 +82,8 @@ export function validateDeployment(input: SolutionDeploymentInput): string[] {
   const errors: string[] = [];
   if (!input.blueprintId.trim()) errors.push('blueprint is required');
   if (!input.appId.trim()) errors.push('app is required');
-  if (!['active', 'paused', 'retired'].includes(input.status))
-    errors.push('invalid deployment status');
-  if (!validEvidenceLinks(input.evidenceLinks))
-    errors.push('evidence links must be relative or HTTP URLs');
+  if (!['active', 'paused', 'retired'].includes(input.status)) errors.push('invalid deployment status');
+  if (!validEvidenceLinks(input.evidenceLinks)) errors.push('evidence links must be relative or HTTP URLs');
   return errors;
 }
 

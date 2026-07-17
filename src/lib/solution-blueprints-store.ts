@@ -42,19 +42,13 @@ export async function ensureSolutionBlueprintSchema(): Promise<void> {
       required_tools jsonb NOT NULL DEFAULT '[]'::jsonb, governed_pipeline text NOT NULL,
       source_template_key text NOT NULL, outcome jsonb NOT NULL, proof jsonb NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
-    await db.execute(
-      sql`CREATE INDEX IF NOT EXISTS solution_blueprints_org_idx ON solution_blueprints (org_id)`,
-    );
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS solution_blueprints_org_idx ON solution_blueprints (org_id)`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_deployments (
       id text PRIMARY KEY, org_id text NOT NULL DEFAULT 'default', blueprint_id text NOT NULL,
       app_id text NOT NULL, status text NOT NULL DEFAULT 'active', evidence_links jsonb NOT NULL DEFAULT '[]'::jsonb,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
-    await db.execute(
-      sql`CREATE INDEX IF NOT EXISTS solution_deployments_org_idx ON solution_deployments (org_id)`,
-    );
-    await db.execute(
-      sql`CREATE UNIQUE INDEX IF NOT EXISTS solution_deployments_binding_idx ON solution_deployments (org_id, blueprint_id, app_id)`,
-    );
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS solution_deployments_org_idx ON solution_deployments (org_id)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS solution_deployments_binding_idx ON solution_deployments (org_id, blueprint_id, app_id)`);
   })().catch((error) => {
     ensurePromise = null;
     throw error;
@@ -79,183 +73,108 @@ const toDeployment = (row: SolutionDeploymentRow): SolutionDeployment => ({
 async function seedBlueprints(orgId: string): Promise<void> {
   for (const seed of SEEDED_SOLUTION_BLUEPRINTS) {
     const now = new Date();
-    await db
-      .insert(solutionBlueprints)
-      .values({
-        id: `sbp_${hash12(`${orgId}:${seed.key}`)}`,
-        orgId,
-        ...seed.input,
-        outcome: seed.input.outcome as unknown as Record<string, unknown>,
-        proof: seed.input.proof as unknown as Record<string, unknown>,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoNothing();
+    await db.insert(solutionBlueprints).values({
+      id: `sbp_${hash12(`${orgId}:${seed.key}`)}`,
+      orgId,
+      ...seed.input,
+      outcome: seed.input.outcome as unknown as Record<string, unknown>,
+      proof: seed.input.proof as unknown as Record<string, unknown>,
+      createdAt: now,
+      updatedAt: now,
+    }).onConflictDoNothing();
   }
 }
 
 export async function listSolutionBlueprints(orgId: string): Promise<SolutionBlueprint[]> {
   await ensureSolutionBlueprintSchema();
   await seedBlueprints(orgId);
-  return (
-    await db
-      .select()
-      .from(solutionBlueprints)
-      .where(eq(solutionBlueprints.orgId, orgId))
-      .orderBy(asc(solutionBlueprints.industry), asc(solutionBlueprints.title))
-  ).map(toBlueprint);
+  return (await db.select().from(solutionBlueprints).where(eq(solutionBlueprints.orgId, orgId)).orderBy(asc(solutionBlueprints.industry), asc(solutionBlueprints.title))).map(toBlueprint);
 }
 
-export async function getSolutionBlueprint(
-  id: string,
-  orgId: string,
-): Promise<SolutionBlueprint | null> {
+export async function getSolutionBlueprint(id: string, orgId: string): Promise<SolutionBlueprint | null> {
   await ensureSolutionBlueprintSchema();
   await seedBlueprints(orgId);
-  const [row] = await db
-    .select()
-    .from(solutionBlueprints)
-    .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-    .limit(1);
+  const [row] = await db.select().from(solutionBlueprints).where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId))).limit(1);
   return row ? toBlueprint(row) : null;
 }
 
-export async function createSolutionBlueprint(
-  orgId: string,
-  input: SolutionBlueprintInput,
-): Promise<SolutionBlueprint> {
+export async function createSolutionBlueprint(orgId: string, input: SolutionBlueprintInput): Promise<SolutionBlueprint> {
   await ensureSolutionBlueprintSchema();
   const errors = validateBlueprint(input);
   if (errors.length) throw new SolutionValidationError(errors);
-  const [row] = await db
-    .insert(solutionBlueprints)
-    .values({
-      ...input,
-      id: `sbp_${randomUUID().slice(0, 12)}`,
-      orgId,
-      outcome: input.outcome as unknown as Record<string, unknown>,
-      proof: input.proof as unknown as Record<string, unknown>,
-    })
-    .returning();
+  const [row] = await db.insert(solutionBlueprints).values({
+    ...input,
+    id: `sbp_${randomUUID().slice(0, 12)}`,
+    orgId,
+    outcome: input.outcome as unknown as Record<string, unknown>,
+    proof: input.proof as unknown as Record<string, unknown>,
+  }).returning();
   return toBlueprint(row);
 }
 
-export async function updateSolutionBlueprint(
-  id: string,
-  orgId: string,
-  patch: Partial<SolutionBlueprintInput>,
-): Promise<SolutionBlueprint | null> {
+export async function updateSolutionBlueprint(id: string, orgId: string, patch: Partial<SolutionBlueprintInput>): Promise<SolutionBlueprint | null> {
   const current = await getSolutionBlueprint(id, orgId);
   if (!current) return null;
   const merged: SolutionBlueprintInput = { ...current, ...patch };
   const errors = validateBlueprint(merged);
   if (errors.length) throw new SolutionValidationError(errors);
-  const [row] = await db
-    .update(solutionBlueprints)
-    .set({
-      title: merged.title,
-      summary: merged.summary,
-      industry: merged.industry,
-      process: merged.process,
-      businessOwner: merged.businessOwner,
-      requiredDataDomains: merged.requiredDataDomains,
-      requiredTools: merged.requiredTools,
-      governedPipeline: merged.governedPipeline,
-      sourceTemplateKey: merged.sourceTemplateKey,
-      outcome: merged.outcome as unknown as Record<string, unknown>,
-      proof: merged.proof as unknown as Record<string, unknown>,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-    .returning();
+  const [row] = await db.update(solutionBlueprints).set({
+    title: merged.title, summary: merged.summary, industry: merged.industry, process: merged.process,
+    businessOwner: merged.businessOwner, requiredDataDomains: merged.requiredDataDomains,
+    requiredTools: merged.requiredTools, governedPipeline: merged.governedPipeline,
+    sourceTemplateKey: merged.sourceTemplateKey,
+    outcome: merged.outcome as unknown as Record<string, unknown>,
+    proof: merged.proof as unknown as Record<string, unknown>, updatedAt: new Date(),
+  }).where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId))).returning();
   return row ? toBlueprint(row) : null;
 }
 
 export async function deleteSolutionBlueprint(id: string, orgId: string): Promise<boolean> {
   await ensureSolutionBlueprintSchema();
   return db.transaction(async (tx) => {
-    await tx
-      .delete(solutionDeployments)
-      .where(and(eq(solutionDeployments.blueprintId, id), eq(solutionDeployments.orgId, orgId)));
-    const deleted = await tx
-      .delete(solutionBlueprints)
-      .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-      .returning({ id: solutionBlueprints.id });
+    await tx.delete(solutionDeployments).where(and(eq(solutionDeployments.blueprintId, id), eq(solutionDeployments.orgId, orgId)));
+    const deleted = await tx.delete(solutionBlueprints).where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId))).returning({ id: solutionBlueprints.id });
     return deleted.length > 0;
   });
 }
 
 export async function listSolutionDeployments(orgId: string): Promise<SolutionDeployment[]> {
   await ensureSolutionBlueprintSchema();
-  return (
-    await db
-      .select()
-      .from(solutionDeployments)
-      .where(eq(solutionDeployments.orgId, orgId))
-      .orderBy(desc(solutionDeployments.updatedAt))
-  ).map(toDeployment);
+  return (await db.select().from(solutionDeployments).where(eq(solutionDeployments.orgId, orgId)).orderBy(desc(solutionDeployments.updatedAt))).map(toDeployment);
 }
 
-export async function getSolutionDeployment(
-  id: string,
-  orgId: string,
-): Promise<SolutionDeployment | null> {
+export async function getSolutionDeployment(id: string, orgId: string): Promise<SolutionDeployment | null> {
   await ensureSolutionBlueprintSchema();
-  const [row] = await db
-    .select()
-    .from(solutionDeployments)
-    .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
-    .limit(1);
+  const [row] = await db.select().from(solutionDeployments).where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId))).limit(1);
   return row ? toDeployment(row) : null;
 }
 
-export async function createSolutionDeployment(
-  orgId: string,
-  input: SolutionDeploymentInput,
-): Promise<SolutionDeployment> {
+export async function createSolutionDeployment(orgId: string, input: SolutionDeploymentInput): Promise<SolutionDeployment> {
   await ensureSolutionBlueprintSchema();
   const errors = validateDeployment(input);
   if (errors.length) throw new SolutionValidationError(errors);
   const [blueprint, app] = await Promise.all([
     getSolutionBlueprint(input.blueprintId, orgId),
-    db
-      .select({ id: apps.id })
-      .from(apps)
-      .where(and(eq(apps.id, input.appId), eq(apps.orgId, orgId)))
-      .limit(1),
+    db.select({ id: apps.id }).from(apps).where(and(eq(apps.id, input.appId), eq(apps.orgId, orgId))).limit(1),
   ]);
   if (!blueprint) throw new SolutionValidationError(['unknown blueprint']);
   if (!app[0]) throw new SolutionValidationError(['unknown app']);
-  const [row] = await db
-    .insert(solutionDeployments)
-    .values({ id: `sdp_${randomUUID().slice(0, 12)}`, orgId, ...input })
-    .returning();
+  const [row] = await db.insert(solutionDeployments).values({ id: `sdp_${randomUUID().slice(0, 12)}`, orgId, ...input }).returning();
   return toDeployment(row);
 }
 
-export async function updateSolutionDeployment(
-  id: string,
-  orgId: string,
-  patch: Partial<Pick<SolutionDeploymentInput, 'status' | 'evidenceLinks'>>,
-): Promise<SolutionDeployment | null> {
+export async function updateSolutionDeployment(id: string, orgId: string, patch: Partial<Pick<SolutionDeploymentInput, 'status' | 'evidenceLinks'>>): Promise<SolutionDeployment | null> {
   const current = await getSolutionDeployment(id, orgId);
   if (!current) return null;
   const merged = { ...current, ...patch };
   const errors = validateDeployment(merged);
   if (errors.length) throw new SolutionValidationError(errors);
-  const [row] = await db
-    .update(solutionDeployments)
-    .set({ status: merged.status, evidenceLinks: merged.evidenceLinks, updatedAt: new Date() })
-    .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
-    .returning();
+  const [row] = await db.update(solutionDeployments).set({ status: merged.status, evidenceLinks: merged.evidenceLinks, updatedAt: new Date() }).where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId))).returning();
   return row ? toDeployment(row) : null;
 }
 
 export async function deleteSolutionDeployment(id: string, orgId: string): Promise<boolean> {
   await ensureSolutionBlueprintSchema();
-  const deleted = await db
-    .delete(solutionDeployments)
-    .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
-    .returning({ id: solutionDeployments.id });
+  const deleted = await db.delete(solutionDeployments).where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId))).returning({ id: solutionDeployments.id });
   return deleted.length > 0;
 }

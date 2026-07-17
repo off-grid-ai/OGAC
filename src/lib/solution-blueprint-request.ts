@@ -25,8 +25,7 @@ function reading(value: unknown): { value: number; label: string } {
 function outcome(value: unknown): OutcomeContract {
   const row = object(value) ?? {};
   const roi = object(row.roi) ?? {};
-  const measured =
-    row.measured === null || row.measured === undefined ? null : reading(row.measured);
+  const measured = row.measured === null || row.measured === undefined ? null : reading(row.measured);
   return {
     metricName: text(row.metricName),
     metricUnit: text(row.metricUnit),
@@ -77,15 +76,7 @@ export function parseBlueprintPatch(value: unknown): Partial<SolutionBlueprintIn
   const body = object(value);
   if (!body) return null;
   const patch: Partial<SolutionBlueprintInput> = {};
-  for (const key of [
-    'title',
-    'summary',
-    'industry',
-    'process',
-    'businessOwner',
-    'governedPipeline',
-    'sourceTemplateKey',
-  ] as const) {
+  for (const key of ['title', 'summary', 'industry', 'process', 'businessOwner', 'governedPipeline', 'sourceTemplateKey'] as const) {
     if (key in body) patch[key] = text(body[key]);
   }
   if ('requiredDataDomains' in body) patch.requiredDataDomains = list(body.requiredDataDomains);
