@@ -52,7 +52,7 @@ function makeDeps(overrides: Partial<DispatchDeps> & { durable?: boolean } = {})
       calls.bindings.push({ agentId, orgId });
       return overrides.resolveBinding
         ? overrides.resolveBinding(agentId, orgId)
-        : { pipelineId: null, contract: null };
+        : { state: 'unbound', pipelineId: null, contract: null };
     },
     durableEnabled: () => overrides.durable ?? false,
     submit: async (input) => {
@@ -204,7 +204,19 @@ test('dispatch resolves the explicit agent binding once and threads it to sync +
   const resolveBinding: DispatchDeps['resolveBinding'] = async (agentId, orgId) => {
     assert.equal(agentId, 'a1');
     assert.equal(orgId, 'acme');
-    return { pipelineId: 'pl_agent', contract: null };
+    return {
+      state: 'bound',
+      pipelineId: 'pl_agent',
+      contract: {
+        pipelineId: 'pl_agent',
+        dataAllowlist: [],
+        routing: {},
+        orgPolicyDefaults: {},
+        orgGuardrailDefaults: {},
+        policyOverlay: {},
+        guardrailOverlay: {},
+      },
+    };
   };
 
   const sync = makeDeps({ durable: false, resolveBinding });
@@ -224,7 +236,7 @@ test('dispatch resolves the explicit agent binding once and threads it to sync +
     }),
   });
   await dispatchAgentRun(ARGS, durable.deps);
-  assert.equal(durable.calls.submit[0]?.pipelineId, 'pl_agent');
+  assert.equal(durable.calls.submit[0]?.binding?.pipelineId, 'pl_agent');
 });
 
 test('invalid explicit binding fails closed before durable submit or synchronous run', async () => {

@@ -19,7 +19,8 @@
 import type { RunContext } from '../lib/agent-run-context';
 import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
 import type { AgentRun } from '../lib/agentrun';
-import type { PipelineContract } from '../lib/pipeline-enforcement';
+import type { AgentPipelineBinding } from '../lib/pipeline-run-glue';
+import { requireRunnableAgentBinding } from '../lib/pipeline-run-glue';
 
 /**
  * PA-16a-durable — resolve the durable run's bound-pipeline CONTRACT (I/O), using the SAME resolver
@@ -35,13 +36,12 @@ import type { PipelineContract } from '../lib/pipeline-enforcement';
  * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as
  * before this gate existed).
  */
-export async function resolveContractActivity(
-  pipelineId: string | null | undefined,
+export async function resolveBindingActivity(
+  agentId: string,
   orgId?: string,
-): Promise<PipelineContract | null> {
-  if (!pipelineId) return null;
-  const { resolveContract } = await import('../lib/pipeline-contract');
-  return resolveContract(pipelineId, orgId ?? 'default');
+): Promise<AgentPipelineBinding> {
+  const { resolveAgentRunBinding } = await import('../lib/pipeline-run-glue');
+  return resolveAgentRunBinding(agentId, orgId ?? 'default');
 }
 
 /**
@@ -51,10 +51,7 @@ export async function resolveContractActivity(
  */
 export interface AgentPipelineDeps {
   /** Resolve the bound-pipeline contract (I/O). Default: resolveContractActivity (real resolver). */
-  resolveContract: (
-    pipelineId: string | null | undefined,
-    orgId?: string,
-  ) => Promise<PipelineContract | null>;
+  resolveBinding: (agentId: string, orgId?: string) => Promise<AgentPipelineBinding>;
   /** Run the governed pipeline (I/O). Default: the real runAgent, which enforces ctx.contract. */
   runAgent: (
     agentId: string,
@@ -68,7 +65,7 @@ export interface AgentPipelineDeps {
 
 function defaultDeps(): AgentPipelineDeps {
   return {
-    resolveContract: resolveContractActivity,
+    resolveBinding: resolveBindingActivity,
     // Lazy import: keeps the gateway/DB/next-auth chain out of module load (see the note above).
     runAgent: async (agentId, query, caller, requireReview, orgId, context) => {
       const { runAgent } = await import('../lib/agentrun');
@@ -99,7 +96,21 @@ export async function runAgentPipeline(
   deps: AgentPipelineDeps = defaultDeps(),
 ): Promise<AgentRunWorkflowResult> {
   // Resolve the bound-pipeline contract for this durable run (I/O). Null ⇒ no binding ⇒ legacy allow.
-  const contract = await deps.resolveContract(input.pipelineId, input.orgId);
+  const binding = requireRunnableAgentBinding(
+    await deps.resolveBinding(input.agentId, input.orgId),
+  );
+  if (input.binding) {
+    const expectedId = input.binding.pipelineId;
+    if (binding.state !== input.binding.state || binding.pipelineId !== expectedId) {
+      requireRunnableAgentBinding({
+        state: 'invalid',
+        pipelineId: expectedId,
+        contract: null,
+        code: 'binding_changed',
+        reason: 'Agent pipeline binding changed after durable submission.',
+      });
+    }
+  }
   const context: RunContext = {
     runId: input.runId,
     actor: input.actor,
@@ -107,8 +118,8 @@ export async function runAgentPipeline(
     project: input.project,
     // The resolved contract + its id ride the context: runAgent enforces the contract and stamps the
     // observability trace with the pipeline tag at the SOURCE, identically to the sync/inline path.
-    contract,
-    pipelineId: input.pipelineId ?? null,
+    contract: binding.contract,
+    pipelineId: binding.pipelineId,
   };
   const run = await deps.runAgent(
     input.agentId,

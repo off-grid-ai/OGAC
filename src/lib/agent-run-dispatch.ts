@@ -22,7 +22,7 @@ import type { RunContext } from '@/lib/agent-run-context';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
 import type { AgentRun } from '@/lib/agentrun';
 import type { Actor } from '@/lib/audit-event';
-import type { ResolvedPipelineBinding } from '@/lib/pipeline-run-glue';
+import { type AgentPipelineBinding, requireRunnableAgentBinding } from '@/lib/pipeline-run-glue';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // The heavy collaborators (runAgent → gateway/DB chain, the Temporal client adapter) are pulled in
@@ -53,7 +53,7 @@ export interface DispatchArgs {
 // The impure collaborators, injected so the orchestration is testable without Temporal/DB.
 export interface DispatchDeps {
   /** Resolve this agent's explicit, org-scoped pipeline binding. Null never inherits chat. */
-  resolveBinding: (agentId: string, orgId: string) => Promise<ResolvedPipelineBinding>;
+  resolveBinding: (agentId: string, orgId: string) => Promise<AgentPipelineBinding>;
   /** True when durable dispatch is opted-in (env-driven). */
   durableEnabled: () => boolean;
   /** Submit to the durable runtime. MUST NOT throw; a submitted:false handle means "run sync". */
@@ -85,12 +85,8 @@ export const PENDING_NOTE = 'workflow started; result pending';
 export function defaultDispatchDeps(): DispatchDeps {
   return {
     resolveBinding: async (agentId, orgId) => {
-      const [{ getCustomAgent }, { resolveAgentBinding }] = await Promise.all([
-        import('@/lib/store'),
-        import('@/lib/pipeline-run-glue'),
-      ]);
-      const agent = await getCustomAgent(agentId, orgId).catch(() => undefined);
-      return resolveAgentBinding(agent?.pipelineId ?? null, orgId);
+      const { resolveAgentRunBinding } = await import('@/lib/pipeline-run-glue');
+      return resolveAgentRunBinding(agentId, orgId);
     },
     durableEnabled: () => durableEnabled(process.env),
     submit: async (input) => {
@@ -124,7 +120,7 @@ export async function dispatchAgentRun(
   // The dispatch seam is the ONE owner for agent binding resolution. Every caller (direct run,
   // Studio, webhook/trigger, rerun, Temporal) therefore receives the same explicit agent contract;
   // routes cannot accidentally omit it or substitute chat's default.
-  const binding = await deps.resolveBinding(args.agentId, orgId);
+  const binding = requireRunnableAgentBinding(await deps.resolveBinding(args.agentId, orgId));
   const input: AgentRunWorkflowInput = {
     agentId: args.agentId,
     query: args.query,
@@ -138,7 +134,7 @@ export async function dispatchAgentRun(
     // same contract the sync path does (mirrors app-run's ctx.contract?.pipelineId ?? null). The
     // route already resolved the binding into args.pipelineId (resolveAgentBinding); the workflow
     // re-resolves the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy.
-    pipelineId: binding.pipelineId,
+    binding,
   };
 
   // Durable path — only when opted in AND the runtime accepts the submission. The adapter never

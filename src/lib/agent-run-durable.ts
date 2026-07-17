@@ -79,6 +79,7 @@ export function workflowIdFor(agentId: string, runId: string): string {
 // Type-only import (erased at compile) so this module stays safe to reference from the deterministic
 // Temporal workflow bundle — it carries no runtime code, only the Actor shape the input embeds.
 import type { Actor } from '@/lib/audit-event';
+import type { AgentPipelineBinding } from '@/lib/pipeline-run-glue';
 
 /**
  * Input handed to AgentRunWorkflow (and through it to the pipeline activity).
@@ -109,7 +110,8 @@ export interface AgentRunWorkflowInput {
    * path enforces the identical contract the sync path does. Null/absent ⇒ no bound pipeline ⇒
    * legacy allow (the ADDITIVE guarantee), unchanged.
    */
-  pipelineId?: string | null;
+  /** Dispatch-time binding decision. The worker re-resolves and verifies it before running. */
+  binding?: AgentPipelineBinding;
 }
 
 /**
@@ -145,7 +147,7 @@ export function toWorkflowInput(raw: {
   orgId?: unknown;
   actor?: unknown;
   project?: unknown;
-  pipelineId?: unknown;
+  binding?: unknown;
 }): AgentRunWorkflowInput {
   if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) {
     throw new Error('agentId required');
@@ -165,10 +167,24 @@ export function toWorkflowInput(raw: {
     orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
     actor: normalizeActor(raw.actor),
     project: typeof raw.project === 'string' && raw.project.trim() ? raw.project.trim() : undefined,
-    // PA-16a-durable — carry the bound-pipeline id (blank → null: no binding ⇒ legacy allow).
-    pipelineId:
-      typeof raw.pipelineId === 'string' && raw.pipelineId.trim() ? raw.pipelineId.trim() : null,
+    binding: normalizeWorkflowBinding(raw.binding),
   };
+}
+
+function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const binding = raw as Partial<AgentPipelineBinding>;
+  if (binding.state === 'unbound') return { state: 'unbound', pipelineId: null, contract: null };
+  if (
+    binding.state === 'bound' &&
+    typeof binding.pipelineId === 'string' &&
+    binding.pipelineId.trim() &&
+    binding.contract &&
+    binding.contract.pipelineId === binding.pipelineId
+  ) {
+    return binding as Extract<AgentPipelineBinding, { state: 'bound' }>;
+  }
+  return undefined;
 }
 
 // ── Status mapping ──────────────────────────────────────────────────────────────────────────

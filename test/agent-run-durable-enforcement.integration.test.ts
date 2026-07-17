@@ -68,7 +68,16 @@ function gatingRunAgent(): {
 }
 
 function wfInput(runId: string, pipelineId: string | null): AgentRunWorkflowInput {
-  return { agentId: 'ag1', query: 'q', runId, orgId: 'default', caller: 'tester', pipelineId };
+  return {
+    agentId: 'ag1',
+    query: 'q',
+    runId,
+    orgId: 'default',
+    caller: 'tester',
+    binding: pipelineId
+      ? { state: 'bound', pipelineId, contract: contract({ pipelineId }) }
+      : { state: 'unbound', pipelineId: null, contract: null },
+  };
 }
 
 function contract(over: Partial<PipelineContract> = {}): PipelineContract {
@@ -86,8 +95,11 @@ function contract(over: Partial<PipelineContract> = {}): PipelineContract {
 
 // An injected resolver that returns the given contract for a non-null pipelineId (mirrors the real
 // resolveContractActivity: null id ⇒ null ⇒ legacy allow).
-function fakeResolve(c: PipelineContract | null): AgentPipelineDeps['resolveContract'] {
-  return async (pipelineId) => (pipelineId ? c : null);
+function fakeResolve(c: PipelineContract | null): AgentPipelineDeps['resolveBinding'] {
+  return async () =>
+    c
+      ? { state: 'bound', pipelineId: c.pipelineId, contract: c }
+      : { state: 'unbound', pipelineId: null, contract: null };
 }
 
 // ── no contract ⇒ unchanged (legacy allow, no regression) ─────────────────────────────────────────
@@ -95,7 +107,7 @@ function fakeResolve(c: PipelineContract | null): AgentPipelineDeps['resolveCont
 test('durable worker (agent): NO pipeline ⇒ resolver returns null ⇒ run proceeds (legacy allow)', async () => {
   const { fn, seen } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_none', null), {
-    resolveContract: fakeResolve(null),
+    resolveBinding: fakeResolve(null),
     runAgent: fn,
   });
   assert.equal(res.found, true);
@@ -109,7 +121,7 @@ test('durable worker (agent): NO pipeline ⇒ resolver returns null ⇒ run proc
 test('durable worker (agent): contract WITH resolved domain allowed ⇒ run proceeds', async () => {
   const { fn, seen } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_allow', 'pl_test'), {
-    resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
+    resolveBinding: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
     runAgent: fn,
   });
   assert.equal(res.status, 'done');
@@ -121,7 +133,7 @@ test('durable worker (agent): contract WITH resolved domain allowed ⇒ run proc
 test('durable worker (agent): contract WITHOUT resolved domain ⇒ data access DENIED', async () => {
   const { fn } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_deny', 'pl_test'), {
-    resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_other'] })),
+    resolveBinding: fakeResolve(contract({ dataAllowlist: ['dom_other'] })),
     runAgent: fn,
   });
   assert.equal(res.found, true);
@@ -135,7 +147,7 @@ test('durable worker (agent): egress OFF + cloud rule for the run data-class ⇒
   // This is the SAME leash the inline/sync path hits.
   const { fn } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_egress', 'pl_test'), {
-    resolveContract: fakeResolve(
+    resolveBinding: fakeResolve(
       contract({
         dataAllowlist: ['dom_hr'],
         routing: {
@@ -169,22 +181,27 @@ test('durable worker (agent): egress OFF + cloud rule for the run data-class ⇒
 test('durable worker (agent): default (local) routing ⇒ model runs on-prem, run completes', async () => {
   const { fn } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_local', 'pl_test'), {
-    resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
+    resolveBinding: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
     runAgent: fn,
   });
   assert.equal(res.status, 'done');
 });
 
-// ── unknown agent (runAgent → null) is still a clean not_found, not an error ────────────────────────
-
-test('durable worker (agent): unknown agent ⇒ found:false (unchanged)', async () => {
-  const res = await runAgentPipeline(wfInput('r_missing', null), {
-    resolveContract: fakeResolve(null),
-    runAgent: async () => null,
-  });
-  assert.equal(res.found, false);
-  assert.equal(res.status, 'not_found');
-  assert.equal(res.runId, 'r_missing');
+test('durable worker: unknown agent binding fails closed before runAgent', async () => {
+  await assert.rejects(
+    () =>
+      runAgentPipeline(wfInput('r_missing', null), {
+        resolveBinding: async () => ({
+          state: 'invalid',
+          pipelineId: null,
+          contract: null,
+          code: 'agent_not_found',
+          reason: 'Unknown or disabled agent',
+        }),
+        runAgent: async () => null,
+      }),
+    /unknown or disabled agent/i,
+  );
 });
 
 test('durable worker: explicit pipeline resolving null fails closed before runAgent', async () => {
@@ -192,7 +209,13 @@ test('durable worker: explicit pipeline resolving null fails closed before runAg
   await assert.rejects(
     () =>
       runAgentPipeline(wfInput('r_deleted', 'pl_deleted'), {
-        resolveContract: async () => null,
+        resolveBinding: async () => ({
+          state: 'invalid',
+          pipelineId: 'pl_deleted',
+          contract: null,
+          code: 'pipeline_unavailable',
+          reason: 'pipeline unavailable',
+        }),
         runAgent: async () => {
           ran = true;
           return fakeRun('r_deleted', 'done');
@@ -208,7 +231,7 @@ test('durable worker: resolver/DB failure fails closed before runAgent', async (
   await assert.rejects(
     () =>
       runAgentPipeline(wfInput('r_db_down', 'pl_live'), {
-        resolveContract: async () => {
+        resolveBinding: async () => {
           throw new Error('postgres unavailable');
         },
         runAgent: async () => {

@@ -18,12 +18,52 @@ import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 import { getPipeline } from '@/lib/pipelines';
 
-/** A resolved binding: which pipeline (if any) governs this run, and its enforceable contract. */
-export interface ResolvedPipelineBinding {
-  /** The resolved pipeline id (most-specific-wins), or null when nothing is bound. */
+/**
+ * The ONE agent-binding contract used by request dispatch and the Temporal worker. `contract:null`
+ * is never ambiguous: it is valid only for a deliberately unbound agent. An explicit id that
+ * cannot produce a published contract is invalid; infrastructure failure is unavailable. Both
+ * terminal states fail closed before any durable submit, retrieval, connector, or model work.
+ */
+export type AgentPipelineBinding =
+  | { state: 'unbound'; pipelineId: null; contract: null }
+  | { state: 'bound'; pipelineId: string; contract: PipelineContract }
+  | {
+      state: 'invalid';
+      pipelineId: string | null;
+      contract: null;
+      reason: string;
+      code: 'agent_not_found' | 'pipeline_unavailable' | 'binding_changed';
+    }
+  | {
+      state: 'unavailable';
+      pipelineId: string | null;
+      contract: null;
+      reason: string;
+      code: 'resolver_unavailable';
+    };
+
+/** Chat retains its separate inheritance semantics; null here still means no effective chat binding. */
+export interface ResolvedChatPipelineBinding {
   pipelineId: string | null;
-  /** The enforceable contract (null ⇒ legacy behaviour — the ADDITIVE guarantee). */
   contract: PipelineContract | null;
+}
+
+export class AgentPipelineBindingError extends Error {
+  readonly binding: Extract<AgentPipelineBinding, { state: 'invalid' | 'unavailable' }>;
+
+  constructor(binding: Extract<AgentPipelineBinding, { state: 'invalid' | 'unavailable' }>) {
+    super(binding.reason);
+    this.name = 'AgentPipelineBindingError';
+    this.binding = binding;
+  }
+}
+
+/** Narrow a resolved binding to the only two states permitted to execute. */
+export function requireRunnableAgentBinding(
+  binding: AgentPipelineBinding,
+): Extract<AgentPipelineBinding, { state: 'bound' | 'unbound' }> {
+  if (binding.state === 'bound' || binding.state === 'unbound') return binding;
+  throw new AgentPipelineBindingError(binding);
 }
 
 /**
@@ -40,10 +80,71 @@ export async function resolveAgentBinding(
   agentPipelineId: string | null | undefined,
   orgId: string,
   loadContract: PipelineContractResolver = resolveContract,
-): Promise<ResolvedPipelineBinding> {
+): Promise<AgentPipelineBinding> {
   const pipelineId = resolveAgentPipeline(agentPipelineId);
-  const contract = await loadContract(pipelineId, orgId);
-  return { pipelineId, contract };
+  if (!pipelineId) return { state: 'unbound', pipelineId: null, contract: null };
+  try {
+    const contract = await loadContract(pipelineId, orgId);
+    if (!contract || contract.pipelineId !== pipelineId) {
+      return {
+        state: 'invalid',
+        pipelineId,
+        contract: null,
+        code: 'pipeline_unavailable',
+        reason: `Agent binding is invalid: pipeline '${pipelineId}' is missing or not published.`,
+      };
+    }
+    return { state: 'bound', pipelineId, contract };
+  } catch {
+    return {
+      state: 'unavailable',
+      pipelineId,
+      contract: null,
+      code: 'resolver_unavailable',
+      reason: `Agent binding resolver is unavailable for pipeline '${pipelineId}'.`,
+    };
+  }
+}
+
+export type AgentDefinitionLookup = (
+  agentId: string,
+  orgId: string,
+) => Promise<{ pipelineId?: string | null } | undefined>;
+
+async function defaultAgentDefinitionLookup(agentId: string, orgId: string) {
+  const { resolveAgent } = await import('@/lib/agents');
+  return resolveAgent(agentId, orgId);
+}
+
+/** Resolve an agent row/definition and then its explicit binding without ever treating lookup failure as unbound. */
+export async function resolveAgentRunBinding(
+  agentId: string,
+  orgId: string,
+  lookupAgent: AgentDefinitionLookup = defaultAgentDefinitionLookup,
+  loadContract: PipelineContractResolver = resolveContract,
+): Promise<AgentPipelineBinding> {
+  let agent: Awaited<ReturnType<AgentDefinitionLookup>>;
+  try {
+    agent = await lookupAgent(agentId, orgId);
+  } catch {
+    return {
+      state: 'unavailable',
+      pipelineId: null,
+      contract: null,
+      code: 'resolver_unavailable',
+      reason: `Agent binding resolver is unavailable for agent '${agentId}'.`,
+    };
+  }
+  if (!agent) {
+    return {
+      state: 'invalid',
+      pipelineId: null,
+      contract: null,
+      code: 'agent_not_found',
+      reason: `Unknown or disabled agent '${agentId}'.`,
+    };
+  }
+  return resolveAgentBinding(agent.pipelineId, orgId, loadContract);
 }
 
 export type AgentPipelineLookup = typeof getPipeline;
@@ -92,7 +193,7 @@ export async function resolveChatBinding(
   projectId: string | null,
   orgId: string,
   io: ChatBindingIO = defaultChatBindingIO(),
-): Promise<ResolvedPipelineBinding> {
+): Promise<ResolvedChatPipelineBinding> {
   const [binding, gov] = await Promise.all([
     io.getProjectBinding(projectId),
     io.getChatBindingGovernance(orgId),
