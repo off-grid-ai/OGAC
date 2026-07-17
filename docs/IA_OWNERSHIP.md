@@ -51,6 +51,7 @@ sidebar and scoped section navigation derive from the registry.
 | API key/budget            | `/runtime/api-budgets`             | Spend results link to Insights Cost                                      |
 | Policy/control evidence   | `/governance/*`                    | Global controls, assignments, and proof                                  |
 | Audit/security/provenance | `/governance/evidence`             | Evidence is not general analytics                                        |
+| Trust/regulatory report   | `/governance/trust`                | Regulatory views and reports are scoped children                         |
 | Outcome                   | `/insights/outcomes`               | Business KPIs and ROI                                                    |
 | AI behavior               | `/insights/ai`                     | Traces, latency, errors, routing behavior                                |
 | Usage                     | `/insights/usage`                  | Requests, tokens, users, apps, adoption                                  |
@@ -114,6 +115,7 @@ Representative migrations:
 | `/insights/platform/:path*` | `/operations/health/:path*`            |
 | `/insights/audit/:path*`    | `/governance/evidence/audit/:path*`    |
 | `/insights/siem/:path*`     | `/governance/evidence/security/:path*` |
+| `/insights/reports/:path*`  | `/governance/trust/reports/:path*`     |
 | `/insights/roi/:path*`      | `/insights/outcomes/:path*`            |
 
 ## Deliberate follow-up work

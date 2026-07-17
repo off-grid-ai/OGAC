@@ -22,6 +22,11 @@ test('old deep links resolve directly to canonical entity owners', () => {
     '/runtime/pipelines/credit-risk/policy',
   );
   assert.equal(canonicalPath('/data/etl/job-9'), '/data/flows/orchestration/job-9');
+  assert.equal(canonicalPath('/build/apps/runs/run-9'), '/operations/runs/run-9');
+  assert.equal(
+    canonicalPath('/data/integrations/cache'),
+    '/operations/configuration/adapters/cache',
+  );
   assert.equal(canonicalPath('/gateway/services/langfuse'), '/operations/services/langfuse');
   assert.equal(canonicalPath('/insights/audit'), '/governance/evidence/audit');
 });

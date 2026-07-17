@@ -252,7 +252,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'reports',
     label: 'Reports',
     description: 'Regulator-ready, citation-backed reports and exports for the DPO/regulator.',
-    route: '/governance/reports',
+    route: '/governance/trust/reports',
     service: 'reports',
   },
   {
@@ -266,7 +266,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'regulatory',
     label: 'Regulatory',
     description: 'DPO view, framework mapping, audit/DPIA exports.',
-    route: '/governance/regulatory',
+    route: '/governance/trust/regulatory',
     service: 'regulatory',
   },
   {
@@ -318,7 +318,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Data governance',
     description:
       'Deep data governance — per-dataset classification, retention & right-to-be-forgotten across the warehouse, vector store, and lineage, plus freshness SLAs and broken-sync alerts.',
-    route: '/data/governance',
+    route: '/data/catalog/governance',
     service: 'ingest',
     internal: true,
   },
@@ -456,7 +456,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'retrieval',
     label: 'Retrieval',
     description: 'Vector store — collections, vector counts, and health for the retrieval backend.',
-    route: '/data/knowledge?view=indexes',
+    route: '/data/knowledge/indexes',
     service: 'control',
     internal: true,
   },

@@ -14,8 +14,11 @@ test('representative legacy links resolve to checked-in canonical route pages', 
     '/build/apps/[id]/runs/[runId]',
     '/build/pipelines/[id]/policy',
     '/data/etl/[id]',
+    '/data/retrieval',
     '/gateway/services/[serviceId]',
     '/insights/audit',
+    '/insights/evals/[id]',
+    '/operations/messaging',
   ]) {
     const canonical = canonicalPath(legacy);
     assert.ok(existsSync(routeFile(canonical)), `${legacy} → ${canonical} has no route page`);
