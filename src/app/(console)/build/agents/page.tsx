@@ -10,6 +10,7 @@ import { filterSingleStepApps } from '@/lib/app-model';
 import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { resolveConsumerChips } from '@/lib/pipeline-chip';
+import { listPipelines } from '@/lib/pipelines';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
@@ -30,11 +31,12 @@ function planeLabel(id: string): string {
 export default async function AgentsPage() {
   await requireModuleForUser('agents');
   const orgId = await currentOrgId();
-  const [agents, activity, tools, apps] = await Promise.all([
+  const [agents, activity, tools, apps, pipelines] = await Promise.all([
     listManagedAgents(orgId),
     agentActivity(orgId),
     listTools(orgId).catch(() => []),
     listApps(orgId).catch(() => []),
+    listPipelines(orgId).catch(() => []),
   ]);
 
   // The distinct list: single-step apps only (an agent IS a one-step app). Multi-step workflows stay
@@ -68,6 +70,13 @@ export default async function AgentsPage() {
     trigger: a.trigger,
     custom: a.custom,
     enabled: a.enabled,
+    pipelineId: a.pipelineId,
+    pipeline: a.pipelineId
+      ? {
+          id: a.pipelineId,
+          name: pipelines.find((p) => p.id === a.pipelineId)?.name ?? a.pipelineId,
+        }
+      : { id: null },
   }));
 
   return (
@@ -84,7 +93,8 @@ export default async function AgentsPage() {
             Open one to view, edit, and run it; build multi-step workflows in{' '}
             <a href="/build/studio" className="text-primary underline-offset-4 hover:underline">
               Studio
-            </a>.
+            </a>
+            .
           </p>
         </div>
         <CreateAgentButton />
@@ -101,7 +111,11 @@ export default async function AgentsPage() {
       {/* The agent roster — each card links to its own detail (/build/agents/[id]). */}
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-foreground">Agent roster</h2>
-        <AgentsGrid agents={cards} tools={toolOptions} />
+        <AgentsGrid
+          agents={cards}
+          tools={toolOptions}
+          pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+        />
       </div>
 
       {/* Single-step apps you built — an agent IS a one-step app; each opens its lifecycle shell. */}

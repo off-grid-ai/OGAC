@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { PipelineView } from '@/lib/pipelines';
 import {
   type ChatBindingIO,
+  isAgentPipelineBindingValid,
   resolveAgentBinding,
   resolveChatBinding,
 } from '@/lib/pipeline-run-glue';
 
 // PA-16b — the I/O glue that resolves the enforceable contract for the agent + chat run paths. These
-// exercise the REAL pure binding resolution (resolveConsumerPipeline / resolveChatPipeline) and the
-// REAL resolveContract loader; only the DB reads are injected (chat) / naturally null (agent, since
-// resolveContract fails open to null when it can't load — no DB in node:test). The point they prove:
-// the binding is resolved most-specific-wins and a NO-binding run degrades to a null contract
-// (legacy behaviour — the ADDITIVE guarantee).
+// exercise the REAL pure binding resolution (explicit agent binding / resolveChatPipeline). DB reads
+// are injected only at their external boundary. The point they prove: an agent never inherits chat,
+// contract lookup remains org-scoped, and a no-binding run degrades to a null contract.
 
 test('resolveAgentBinding — no agent binding means no contract (never inherits chat default)', async () => {
   let requested: string | null | undefined = 'not-called';
@@ -32,6 +32,21 @@ test('resolveAgentBinding — explicit agent binding is loaded within the run or
     return null;
   });
   assert.equal(r.pipelineId, 'pl_agent');
+});
+
+test('agent binding validation is org-scoped and null is deliberately valid', async () => {
+  let lookups = 0;
+  const lookup = async (id: string, orgId: string) => {
+    lookups += 1;
+    assert.equal(id, 'pl_a');
+    assert.equal(orgId, 'org_a');
+    return { id } as PipelineView;
+  };
+  assert.equal(await isAgentPipelineBindingValid(null, 'org_a', lookup), true);
+  assert.equal(lookups, 0);
+  assert.equal(await isAgentPipelineBindingValid('pl_a', 'org_a', lookup), true);
+  assert.equal(lookups, 1);
+  assert.equal(await isAgentPipelineBindingValid('pl_b', 'org_a', async () => null), false);
 });
 
 function chatIO(over: Partial<ChatBindingIO> = {}): ChatBindingIO {

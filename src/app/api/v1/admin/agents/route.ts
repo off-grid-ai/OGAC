@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseCreateInput } from '@/lib/agent-form';
 import { agentActivity, listAllAgents } from '@/lib/agents';
 import { requireAdmin } from '@/lib/authz';
+import { isAgentPipelineBindingValid } from '@/lib/pipeline-run-glue';
 import { createCustomAgent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -18,7 +19,8 @@ export async function GET(req: Request) {
   });
 }
 
-// POST { name, systemPrompt, role?, description?, model?, tools?, grounded?, trigger? } → create a
+// POST { name, systemPrompt, pipelineId?, role?, description?, model?, tools?, grounded?, trigger? }
+// → create a
 // user-authored agent from text. It carries no special powers: every run flows through the same
 // governed pipeline (policy → guardrails → routing → grounding → provenance) as the built-ins, so
 // it inherits every convention configured on the console.
@@ -29,9 +31,13 @@ export async function POST(req: Request) {
   const input = parseCreateInput(b);
   if (!input) {
     return NextResponse.json(
-      { error: 'name and systemPrompt (instructions) required' },
+      { error: 'name/instructions required; pipelineId must be a string or null' },
       { status: 400 },
     );
   }
-  return NextResponse.json(await createCustomAgent(input, await currentOrgId()), { status: 201 });
+  const orgId = await currentOrgId();
+  if (!(await isAgentPipelineBindingValid(input.pipelineId, orgId))) {
+    return NextResponse.json({ error: 'pipeline not found in this organisation' }, { status: 400 });
+  }
+  return NextResponse.json(await createCustomAgent(input, orgId), { status: 201 });
 }

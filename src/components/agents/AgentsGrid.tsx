@@ -3,7 +3,12 @@
 import { Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
-import { AgentFormPanel, type EditableAgent, type ToolOption } from '@/components/agents/AgentFormPanel';
+import {
+  AgentFormPanel,
+  type EditableAgent,
+  type ToolOption,
+} from '@/components/agents/AgentFormPanel';
+import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
 import { accentHue, initials } from '@/lib/workspace-grid';
 
@@ -21,6 +26,8 @@ export interface AgentCardModel {
   trigger: string;
   custom?: boolean;
   enabled?: boolean;
+  pipelineId?: string | null;
+  pipeline?: PipelineChipData;
 }
 
 const TRIGGER: Record<string, string> = {
@@ -75,6 +82,7 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
               grounded
             </Badge>
           ) : null}
+          <PipelineChip pipeline={a.pipeline} size="xs" />
         </div>
         <p className="line-clamp-3 min-h-[3rem] text-xs leading-relaxed text-muted-foreground">
           {a.description || a.systemPrompt || 'No description.'}
@@ -95,7 +103,11 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
             </span>
             {a.planeLabels.length ? (
               a.planeLabels.map((p) => (
-                <Badge key={p} variant="secondary" className="bg-primary/10 text-[10px] text-primary">
+                <Badge
+                  key={p}
+                  variant="secondary"
+                  className="bg-primary/10 text-[10px] text-primary"
+                >
                   {p}
                 </Badge>
               ))
@@ -116,9 +128,11 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
 export function AgentsGrid({
   agents,
   tools,
+  pipelines = [],
 }: Readonly<{
   agents: AgentCardModel[];
   tools: ToolOption[];
+  pipelines?: { id: string; name: string }[];
 }>) {
   const editable: EditableAgent[] = agents
     .filter((a) => a.custom)
@@ -131,6 +145,7 @@ export function AgentsGrid({
       grounded: a.grounded,
       trigger: a.trigger,
       tools: a.tools,
+      pipelineId: a.pipelineId ?? null,
     }));
 
   return (
@@ -140,7 +155,7 @@ export function AgentsGrid({
           <AgentCard key={a.id} a={a} />
         ))}
       </div>
-      <AgentFormPanel tools={tools} editable={editable} />
+      <AgentFormPanel tools={tools} pipelines={pipelines} editable={editable} />
     </>
   );
 }

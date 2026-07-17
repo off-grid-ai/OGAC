@@ -26,6 +26,11 @@ export interface ToolOption {
   policy: string; // 'allow' | 'approval' | 'block'
 }
 
+export interface AgentPipelineOption {
+  id: string;
+  name: string;
+}
+
 // The subset of an agent needed to prefill the edit form. Built-ins aren't editable so only
 // custom agents are ever passed here.
 export interface EditableAgent {
@@ -37,6 +42,7 @@ export interface EditableAgent {
   grounded: boolean;
   trigger: string;
   tools: string[];
+  pipelineId?: string | null;
 }
 
 interface Draft {
@@ -47,6 +53,7 @@ interface Draft {
   grounded: boolean;
   trigger: AgentTriggerValue;
   tools: string[];
+  pipelineId: string | null;
 }
 
 const EMPTY: Draft = {
@@ -57,6 +64,7 @@ const EMPTY: Draft = {
   grounded: true,
   trigger: 'on-demand',
   tools: [],
+  pipelineId: null,
 };
 
 function draftFromAgent(a: EditableAgent): Draft {
@@ -70,6 +78,7 @@ function draftFromAgent(a: EditableAgent): Draft {
       ? (a.trigger as AgentTriggerValue)
       : 'on-demand',
     tools: a.tools ?? [],
+    pipelineId: a.pipelineId ?? null,
   };
 }
 
@@ -81,9 +90,11 @@ function draftFromAgent(a: EditableAgent): Draft {
 // it's deep-linkable — never in local useState.
 export function AgentFormPanel({
   tools = [],
+  pipelines = [],
   editable = [],
 }: Readonly<{
   tools?: ToolOption[];
+  pipelines?: AgentPipelineOption[];
   editable?: EditableAgent[];
 }>) {
   const router = useRouter();
@@ -198,6 +209,26 @@ export function AgentFormPanel({
                 placeholder="Customer Success"
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="agent-pipeline">Runs on</Label>
+            <select
+              id="agent-pipeline"
+              value={draft.pipelineId ?? ''}
+              onChange={(e) => set('pipelineId', e.target.value || null)}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+            >
+              <option value="">No pipeline</option>
+              {pipelines.map((pipeline) => (
+                <option key={pipeline.id} value={pipeline.id}>
+                  {pipeline.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              Explicit per agent. No pipeline means org policy still applies, but this agent does
+              not inherit Chat&apos;s default pipeline.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="agent-prompt">

@@ -18,7 +18,7 @@ import {
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
-import { resolveConsumerChip } from '@/lib/pipeline-chip';
+import { getPipeline, listPipelines } from '@/lib/pipelines';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
@@ -90,16 +90,22 @@ export default async function AgentDetailPage({
   const orgId = await currentOrgId();
   const agent = await resolveAgent(id, orgId);
   if (!agent) notFound();
-  // Agents carry no own pipeline binding — every run flows through the org-default governed pipeline.
-  // Name + link it (was a generic "governed pipeline" mention) so the join-key is legible here too.
-  const pipeline = await resolveConsumerChip(null, orgId).catch(() => null);
+  // Agent bindings are explicit. Null is honestly rendered as "No pipeline" and never resolved via
+  // the chat default.
+  const boundPipeline = agent.pipelineId
+    ? await getPipeline(agent.pipelineId, orgId).catch(() => null)
+    : null;
+  const pipeline = agent.pipelineId
+    ? { id: agent.pipelineId, name: boundPipeline?.name ?? agent.pipelineId }
+    : { id: null };
   // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
   const runs = await listAgentRunsByAgent(id, 8, orgId).catch(() => []);
   const done = runs.filter((r) => r.status === 'done').length;
+  const [toolRows, pipelineRows] = agent.custom
+    ? await Promise.all([listTools(orgId).catch(() => []), listPipelines(orgId).catch(() => [])])
+    : [[], []];
   const tools = agent.custom
-    ? (await listTools(orgId).catch(() => []))
-        .filter((t) => t.enabled)
-        .map((t) => ({ id: t.id, name: t.name, policy: t.policy }))
+    ? toolRows.filter((t) => t.enabled).map((t) => ({ id: t.id, name: t.name, policy: t.policy }))
     : [];
   const editable = agent.custom
     ? [
@@ -112,6 +118,7 @@ export default async function AgentDetailPage({
           grounded: agent.grounded,
           trigger: agent.trigger,
           tools: agent.tools,
+          pipelineId: agent.pipelineId ?? null,
         },
       ]
     : [];
@@ -146,7 +153,13 @@ export default async function AgentDetailPage({
         <AgentCardActions agentId={agent.id} custom={agent.custom} enabled />
       </div>
 
-      {agent.custom ? <AgentFormPanel tools={tools} editable={editable} /> : null}
+      {agent.custom ? (
+        <AgentFormPanel
+          tools={tools}
+          pipelines={pipelineRows.map((p) => ({ id: p.id, name: p.name }))}
+          editable={editable}
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="shadow-sm lg:col-span-2">
@@ -176,6 +189,7 @@ export default async function AgentDetailPage({
             <Row label="Trigger" value={agent.trigger} />
             <Row label="Model" value={agent.model || 'gateway default'} />
             <Row label="Grounded" value={agent.grounded ? 'yes' : 'no'} />
+            <Row label="Pipeline" value={boundPipeline?.name ?? agent.pipelineId ?? 'none'} />
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                 Tools

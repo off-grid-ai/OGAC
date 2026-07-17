@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseEditPatch } from '@/lib/agent-form';
 import { requireAdmin } from '@/lib/authz';
+import { isAgentPipelineBindingValid } from '@/lib/pipeline-run-glue';
 import {
   deleteCustomAgent,
   getCustomAgent,
@@ -38,9 +39,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const patch = parseEditPatch(b);
   if (!patch) {
     return NextResponse.json(
-      { error: 'name and instructions, when provided, must not be blank' },
+      { error: 'name/instructions must not be blank; pipelineId must be a string or null' },
       { status: 400 },
     );
+  }
+  if (
+    patch.pipelineId !== undefined &&
+    !(await isAgentPipelineBindingValid(patch.pipelineId, orgId))
+  ) {
+    return NextResponse.json({ error: 'pipeline not found in this organisation' }, { status: 400 });
   }
   const updated = await updateCustomAgent(id, patch, orgId);
   return NextResponse.json(updated);
