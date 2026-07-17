@@ -89,9 +89,15 @@ export function isValidCron(spec: string): boolean {
   // Strip an optional timezone prefix: "CRON_TZ=America/New_York 0 9 * * *".
   const body = s.replace(/^(CRON_TZ|TZ)=\S+\s+/, '').trim();
   if (body.startsWith('@')) {
-    return ['@yearly', '@annually', '@monthly', '@weekly', '@daily', '@midnight', '@hourly'].includes(
-      body.toLowerCase(),
-    );
+    return [
+      '@yearly',
+      '@annually',
+      '@monthly',
+      '@weekly',
+      '@daily',
+      '@midnight',
+      '@hourly',
+    ].includes(body.toLowerCase());
   }
   const fields = body.split(/\s+/);
   return fields.length === 5 || fields.length === 6;

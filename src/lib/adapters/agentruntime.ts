@@ -128,7 +128,10 @@ export const temporalRuntime: AgentRuntimePort = {
       // its result carries the persisted run's terminal status. If the worker is slow/down the
       // workflow simply sits in the queue durably — but the console request would block, so we
       // bound the await and, on timeout, return a 'running' handle the UI/poller can follow.
-      const result = await withTimeout(handle.result() as Promise<AgentRunWorkflowResult>, awaitBudgetMs());
+      const result = await withTimeout(
+        handle.result() as Promise<AgentRunWorkflowResult>,
+        awaitBudgetMs(),
+      );
       if (result === TIMED_OUT) {
         const wfStatus = await handle
           .describe()
@@ -152,7 +155,13 @@ export const temporalRuntime: AgentRuntimePort = {
       };
     } catch (e) {
       // Any failure to reach/submit to Temporal → fall back to the synchronous path.
-      return { runId: input.runId, workflowId, mode: 'sync', submitted: false, note: (e as Error).message };
+      return {
+        runId: input.runId,
+        workflowId,
+        mode: 'sync',
+        submitted: false,
+        note: (e as Error).message,
+      };
     }
   },
   async health() {
@@ -202,7 +211,8 @@ export function getAgentRuntime(): AgentRuntimePort {
 // onto the raw shapes the PURE temporal-visibility module normalizes. NEVER throws — Temporal
 // unreachable/unconfigured returns an empty, configured/reachable-flagged view with a note.
 
-const NOT_CONFIGURED = 'Durable runtime not enabled — set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_AGENTRUNTIME=temporal.';
+const NOT_CONFIGURED =
+  'Durable runtime not enabled — set OFFGRID_QUEUE_ENABLED=1 or OFFGRID_ADAPTER_AGENTRUNTIME=temporal.';
 
 /** List recent AgentRunWorkflow executions from Temporal's visibility store. */
 export async function listWorkflowExecutions(limit = 50): Promise<WorkflowExecutionsView> {
@@ -296,7 +306,8 @@ export async function cancelWorkflow(
   workflowId: string,
   mode: 'cancel' | 'terminate' = 'cancel',
 ): Promise<WorkflowMutationResult> {
-  if (!durableEnabled(process.env)) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
+  if (!durableEnabled(process.env))
+    return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   const cfg = durableConfigFromEnv(process.env);
   try {
     const client = await temporalClient(cfg);
@@ -331,7 +342,9 @@ export async function listSchedules(orgId: string): Promise<SchedulesView> {
     for await (const s of client.schedule.list()) {
       // ScheduleSummary carries spec + info; fall back gracefully on partial summaries.
       const spec = (s as { spec?: { cronExpressions?: string[] } }).spec;
-      const info = (s as { info?: { recentActions?: { takenAt?: Date }[]; nextActionTimes?: Date[] } }).info;
+      const info = (
+        s as { info?: { recentActions?: { takenAt?: Date }[]; nextActionTimes?: Date[] } }
+      ).info;
       const action = (s as { action?: { workflowType?: string } }).action;
       if (!ownsSchedule(s.scheduleId, orgId, 'agent')) continue;
       raws.push({
@@ -340,7 +353,8 @@ export async function listSchedules(orgId: string): Promise<SchedulesView> {
         note: (s as { state?: { note?: string } }).state?.note,
         cronExpressions: spec?.cronExpressions,
         workflowType: action?.workflowType,
-        recentActions: info?.recentActions?.map((a) => a.takenAt).filter(Boolean) as Date[] | undefined,
+        recentActions: info?.recentActions?.map((a) => a.takenAt).filter(Boolean) as
+          Date[] | undefined,
         nextActions: info?.nextActionTimes,
       });
     }

@@ -28,9 +28,7 @@ const DEFAULT_ORG = 'default';
 // any post-hoc columns (CREATE/ALTER … IF NOT EXISTS). Column names MUST match schema.ts exactly.
 let appsEnsure: Promise<void> | null = null;
 
-async function runAppOwnershipBackfill(
-  execute: (query: SQL) => Promise<unknown>,
-): Promise<void> {
+async function runAppOwnershipBackfill(execute: (query: SQL) => Promise<unknown>): Promise<void> {
   // Refuse an ambiguous upgrade rather than assigning one runtime agent to a random App. This is
   // an actionable data-integrity failure; the normal legacy shape has one step reference per agent.
   await execute(sql`

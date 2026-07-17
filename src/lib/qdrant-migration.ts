@@ -27,4 +27,3 @@ export async function migrateLegacyQdrantPayloads(
     throw new Error(`Qdrant tenant payload migration failed (${response.status})`);
   }
 }
-

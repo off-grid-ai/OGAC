@@ -9,7 +9,10 @@ import {
   deleteApp,
   getApp,
 } from '../src/lib/apps-store.ts';
-import { resolveExplicitPipelineBinding, resolveAgentRunBinding } from '../src/lib/pipeline-run-glue.ts';
+import {
+  resolveExplicitPipelineBinding,
+  resolveAgentRunBinding,
+} from '../src/lib/pipeline-run-glue.ts';
 import { createPipeline, deletePipeline } from '../src/lib/pipelines.ts';
 import { createCustomAgent, getCustomAgent } from '../src/lib/store.ts';
 // @ts-expect-error shared JS reachability helper
@@ -34,8 +37,16 @@ describe('App-owned runtime upgrade and database invariants (real Postgres)', { 
   });
 
   test('idempotent backfill repairs ownership and one DB owner protects every run entry point', async () => {
-    await createPipeline({ id: pipelineA, name: 'Before upgrade', status: 'published' }, owner, orgId);
-    await createPipeline({ id: pipelineB, name: 'After upgrade', status: 'published' }, owner, orgId);
+    await createPipeline(
+      { id: pipelineA, name: 'Before upgrade', status: 'published' },
+      owner,
+      orgId,
+    );
+    await createPipeline(
+      { id: pipelineB, name: 'After upgrade', status: 'published' },
+      owner,
+      orgId,
+    );
     const legacy = await createCustomAgent(
       { name: 'Legacy App runtime', systemPrompt: 'Handle claims.', pipelineId: null },
       orgId,
@@ -47,9 +58,7 @@ describe('App-owned runtime upgrade and database invariants (real Postgres)', { 
       visibility: 'private',
       pipelineId: pipelineA,
       trigger: { kind: 'schedule', config: { cron: '@daily' } },
-      steps: [
-        { id: 'agent', label: 'Decide claim', kind: 'agent', agentId: legacy.id },
-      ],
+      steps: [{ id: 'agent', label: 'Decide claim', kind: 'agent', agentId: legacy.id }],
       edges: [],
     });
     appId = app.id;
@@ -77,7 +86,10 @@ describe('App-owned runtime upgrade and database invariants (real Postgres)', { 
     // Direct run, webhook/email trigger, and recurring schedule all enter dispatchAgentRun and use
     // resolveAgentRunBinding; the App path uses the same explicit resolver. Both see one binding.
     const directTriggerAndSchedule = await resolveAgentRunBinding(agentId, orgId);
-    const appPath = await resolveExplicitPipelineBinding((await getApp(appId, orgId))?.pipelineId, orgId);
+    const appPath = await resolveExplicitPipelineBinding(
+      (await getApp(appId, orgId))?.pipelineId,
+      orgId,
+    );
     assert.equal(directTriggerAndSchedule.state, 'bound');
     assert.equal(directTriggerAndSchedule.pipelineId, pipelineB);
     assert.equal(appPath.state, 'bound');
@@ -85,8 +97,7 @@ describe('App-owned runtime upgrade and database invariants (real Postgres)', { 
 
     await assert.rejects(
       () => deletePipeline(pipelineB, orgId),
-      (error) =>
-        (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
+      (error) => (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
       'retirement is database-enforced even when a caller bypasses the lifecycle service',
     );
   });

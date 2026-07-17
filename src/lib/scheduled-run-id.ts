@@ -11,4 +11,3 @@ export function runInputForExecution<T extends { runId: string; scheduled?: bool
   const fire = temporalRunId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32) || 'fire';
   return { ...input, runId: `${input.runId}_${fire}` };
 }
-

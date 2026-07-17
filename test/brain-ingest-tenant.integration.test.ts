@@ -32,4 +32,3 @@ test('Brain ingest carries the resolved tenant through request dispatch into ret
   assert.ok((await listDocuments(insuranceOrg)).some((doc) => doc.id === insurance.id));
   assert.ok(!(await listDocuments(insuranceOrg)).some((doc) => doc.id === bank.id));
 });
-

@@ -20,4 +20,3 @@ test('two recurring App fires are unique while direct submissions retain idempot
   const direct = { appId: 'indemnity', runId: 'run_operator_1' };
   assert.equal(runInputForExecution(direct, 'temporal-run-a'), direct);
 });
-

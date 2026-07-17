@@ -22,7 +22,9 @@ const HANDLERS: Record<string, Handler> = {
   file: (body, orgId) =>
     body.name && body.text ? ingestFile(body.name, body.text, undefined, orgId) : undefined,
   image: (body, orgId) =>
-    body.title && body.dataUrl ? ingestImage(body.title, body.dataUrl, undefined, orgId) : undefined,
+    body.title && body.dataUrl
+      ? ingestImage(body.title, body.dataUrl, undefined, orgId)
+      : undefined,
   database: (body, orgId) =>
     body.datasetId ? ingestDatabase(body.datasetId, undefined, orgId) : undefined,
 };

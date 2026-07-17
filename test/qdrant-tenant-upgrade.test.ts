@@ -42,4 +42,3 @@ test('Qdrant legacy payload upgrade fails closed when the remote store rejects i
     /tenant payload migration failed \(503\)/,
   );
 });
-

@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     result = await dispatchBrainIngest(b, await currentOrgId());
   } catch (e) {
     // The Brain's store rejected the write — return a clear error, never a bare empty-body 500.
-    if (e instanceof BrainWriteError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof BrainWriteError)
+      return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
   if (result === undefined) return bad('missing fields for this kind');

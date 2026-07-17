@@ -28,4 +28,3 @@ test('operator consumer inventory shows an App once while retaining independent 
     },
   ]);
 });
-
