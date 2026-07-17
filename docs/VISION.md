@@ -236,9 +236,17 @@ Why it wins where point tools and the cloud stack don't:
 - **Sovereign + no lock-in** — every engine on their hardware; permissive OSS; the moat is ownership,
   air-gap, and the governance spine, not proprietary formats or a SaaS dependency.
 
-Live on S2 under OrbStack; consumed by the console via ports-and-adapters; seeded with a 600k-row BFSI
-dataset. The remaining leap is the **plain-language builder** so non-technical staff author these governed
-pipelines themselves — the empowerment that turns "we have a data platform" into "everyone is intelligent."
+Consumed by the console via ports-and-adapters and seeded with a 600k-row BFSI dataset. The remaining
+leap is the **plain-language builder** so non-technical staff author these governed pipelines themselves —
+the empowerment that turns "we have a data platform" into "everyone is intelligent."
+
+Deployment topology is not owned by this strategy document. As of 2026-07-17, the recovery inventory is
+exactly eight serving machines — S1 and g1–g7 — and the Qwythos cluster comprises g2, g4, and g7. Node
+addresses, service placement, and cluster membership are runtime registry data; console routes and product
+documents must not hard-code them. The authoritative deployment configuration and current health records
+live in the private
+[`off-grid-ai/onprem-fleet-orchestration`](https://github.com/off-grid-ai/onprem-fleet-orchestration)
+repository.
 
 ---
 
