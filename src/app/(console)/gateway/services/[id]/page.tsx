@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { ServiceDetail } from '@/components/services/ServiceDetail';
 import { requireModuleForUser } from '@/lib/module-access';
+import { toServiceDetailEntry } from '@/lib/service-directory-view';
 import { findService, getServices, serviceControl } from '@/lib/services-directory';
 
 export const dynamic = 'force-dynamic';
@@ -23,5 +24,7 @@ export default async function ServiceDetailPage({
   // the detail implementation is also mounted by the legacy redirect-compatible route.
   const logsHref = '/operations/health';
 
-  return <ServiceDetail service={service} control={control} logsHref={logsHref} />;
+  return (
+    <ServiceDetail service={toServiceDetailEntry(service)} control={control} logsHref={logsHref} />
+  );
 }

@@ -1,8 +1,11 @@
 import { getOperationalServices } from './operational-services';
 import { resolveOtelConfig } from './otel-config';
 import type { ProbeMode, ServiceEntry } from './service-entry';
+import { isHealthy, type HealthStatus, type ServiceHealth } from './service-health';
 
 export type { ProbeMode, ServiceEntry } from './service-entry';
+export { isHealthy } from './service-health';
+export type { HealthStatus, ServiceHealth } from './service-health';
 
 // The Off Grid AI service/product directory — every public surface in the suite, in one
 // place. Powers the /services page (a health-checked map of what we run) and is the
@@ -415,18 +418,6 @@ export function getServices(): ServiceEntry[] {
 //  · 'optional' — an optional dependency that isn't answering (or a canonical plane not run on
 //                 this fleet); the app is on its documented fallback / alternative. Non-alarming
 //                 — NOT an outage.
-export type HealthStatus = 'up' | 'down' | 'embedded' | 'optional';
-
-export interface ServiceHealth {
-  id: string;
-  status: HealthStatus;
-  httpStatus: number | null;
-  ms: number | null;
-  error?: string;
-  /** Human label for the current state — e.g. the fallback name for an 'optional' service. */
-  detail?: string;
-}
-
 // The raw outcome of a network probe (see src/lib/status.ts#probeService). Split out so the
 // state decision below stays pure and unit-testable without any I/O.
 export interface RawProbe {
@@ -495,10 +486,6 @@ export function needsNetworkProbe(entry: ServiceEntry): boolean {
  * alternative (incl. canonical planes not deployed on this fleet) count as healthy — only
  * 'down' is an outage.
  */
-export function isHealthy(status: HealthStatus): boolean {
-  return status !== 'down';
-}
-
 // ─── Management honesty (Task C3) ──────────────────────────────────────────────────────────────
 // The console does NOT hold a service-control plane — the internal services run as launchd jobs /
 // Docker containers on the on-prem hosts, and there is deliberately no console→host restart path
