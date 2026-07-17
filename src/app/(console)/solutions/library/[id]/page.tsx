@@ -63,7 +63,7 @@ export default async function BlueprintDetailPage({
           ],
           [
             '1Y net value',
-            `${blueprint.outcome.roi.currency} ${outcome.annualNetBenefit.toLocaleString()}`,
+            `${blueprint.outcome.roi.currency} ${outcome.firstYearNetValue.toLocaleString()}`,
           ],
           [
             'Payback',

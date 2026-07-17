@@ -1,3 +1,5 @@
+import { computeInvestmentCase } from '@/lib/roi';
+
 export type OutcomeDirection = 'increase' | 'decrease';
 
 export interface KpiReading {
@@ -27,8 +29,8 @@ export interface OutcomeContract {
 export interface OutcomeSummary {
   targetChangePct: number | null;
   measuredProgressPct: number | null;
-  annualNetBenefit: number;
-  roiMultiple: number | null;
+  firstYearNetValue: number;
+  benefitCostMultiple: number | null;
   paybackMonths: number | null;
 }
 
@@ -89,16 +91,6 @@ export function summarizeOutcome(contract: OutcomeContract): OutcomeSummary {
     measuredProgressPct = round2((measuredDelta / desiredDelta) * 100);
   }
 
-  const annualNetBenefit = round2(contract.roi.annualBenefit - contract.roi.annualOperatingCost);
-  const firstYearCost = contract.roi.implementationCost + contract.roi.annualOperatingCost;
-  const roiMultiple = firstYearCost > 0 ? round2(contract.roi.annualBenefit / firstYearCost) : null;
-  const monthlyNetBenefit = annualNetBenefit / 12;
-  const paybackMonths =
-    contract.roi.implementationCost > 0 && monthlyNetBenefit > 0
-      ? round2(contract.roi.implementationCost / monthlyNetBenefit)
-      : contract.roi.implementationCost === 0 && annualNetBenefit > 0
-        ? 0
-        : null;
-
-  return { targetChangePct, measuredProgressPct, annualNetBenefit, roiMultiple, paybackMonths };
+  const investment = computeInvestmentCase(contract.roi);
+  return { targetChangePct, measuredProgressPct, ...investment };
 }

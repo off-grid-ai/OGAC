@@ -1,57 +1,110 @@
+import type { AppSpec, AppStep } from '@/lib/app-model';
 import type { OutcomeContract } from '@/lib/outcome-contract';
 import { validateOutcomeContract } from '@/lib/outcome-contract';
+import type { PipelineView } from '@/lib/pipelines';
+import { computeRoi, type RoiResult } from '@/lib/roi';
 
+export type BlueprintEvidenceStatus = 'unverified' | 'verified';
+
+/** Evidence attached to a reusable benchmark, never inferred from a seed or a deployment count. */
 export interface BlueprintProof {
-  version: string;
-  provenDeployments: number;
+  status: BlueprintEvidenceStatus;
   summary: string;
   evidenceLinks: string[];
 }
 
-export interface SolutionBlueprint {
-  id: string;
+/** Immutable snapshot. Editing a blueprint appends one of these and advances currentVersion. */
+export interface SolutionBlueprintVersion {
+  blueprintId: string;
   orgId: string;
+  version: number;
   title: string;
   summary: string;
   industry: string;
   process: string;
   businessOwner: string;
   requiredDataDomains: string[];
-  requiredTools: string[];
-  governedPipeline: string;
+  requiredCapabilities: BlueprintCapability[];
+  requiredPipelineName: string;
   sourceTemplateKey: string;
   outcome: OutcomeContract;
   proof: BlueprintProof;
+  createdBy: string;
+  createdAt: Date;
+}
+
+/** Stable catalog identity plus the currently selected immutable version. */
+export interface SolutionBlueprint extends SolutionBlueprintVersion {
+  id: string;
+  currentVersion: number;
+  sourceCatalogKey: string | null;
+  catalogVersion: number | null;
+  tombstonedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type SolutionBlueprintInput = Omit<
-  SolutionBlueprint,
-  'id' | 'orgId' | 'createdAt' | 'updatedAt'
+  SolutionBlueprintVersion,
+  'blueprintId' | 'orgId' | 'version' | 'createdBy' | 'createdAt'
 >;
+
+export type BlueprintCapability = 'grounded-inference' | 'human-approval' | 'report-output';
+
+export interface CompatibilityResult {
+  compatible: boolean;
+  errors: string[];
+  pipelineId: string | null;
+}
 
 export interface SolutionDeployment {
   id: string;
   orgId: string;
   blueprintId: string;
+  /** The immutable definition this tenant adopted. */
+  blueprintVersion: number;
   appId: string;
+  /** Exact runtime binding verified at activation time and checked again before every run. */
+  pipelineId: string;
   status: 'active' | 'paused' | 'retired';
-  evidenceLinks: string[];
+  activatedAt: Date;
+  retiredAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type SolutionDeploymentInput = Pick<
   SolutionDeployment,
-  'blueprintId' | 'appId' | 'status' | 'evidenceLinks'
+  'blueprintId' | 'blueprintVersion' | 'appId' | 'status'
 >;
+
+/** Append-only, deployment-scoped measurement. It cannot rewrite reusable benchmark history. */
+export interface SolutionObservationInput {
+  windowStart: Date;
+  windowEnd: Date;
+  metricValue: number;
+  metricLabel: string;
+  runsCompleted: number;
+  minutesSavedPerRun: number;
+  loadedCostPerHour: number;
+  actualAiCost: number;
+  evidenceLinks: string[];
+}
+
+export interface SolutionObservation extends SolutionObservationInput {
+  id: string;
+  orgId: string;
+  deploymentId: string;
+  createdBy: string;
+  createdAt: Date;
+  realizedRoi: RoiResult;
+}
 
 function nonEmptyList(values: string[]): boolean {
   return values.length > 0 && values.every((value) => value.trim().length > 0);
 }
 
-function validEvidenceLinks(links: string[]): boolean {
+export function validEvidenceLinks(links: string[]): boolean {
   return links.every((link) => link.startsWith('/') || /^https?:\/\//.test(link));
 }
 
@@ -63,31 +116,147 @@ export function validateBlueprint(input: SolutionBlueprintInput): string[] {
     ['industry', input.industry],
     ['process', input.process],
     ['business owner', input.businessOwner],
-    ['governed pipeline', input.governedPipeline],
+    ['required pipeline name', input.requiredPipelineName],
     ['source template key', input.sourceTemplateKey],
-    ['proof version', input.proof.version],
-    ['proof summary', input.proof.summary],
   ] as const;
   for (const [label, value] of required) if (!value.trim()) errors.push(`${label} is required`);
   if (!nonEmptyList(input.requiredDataDomains)) errors.push('at least one data domain is required');
-  if (!nonEmptyList(input.requiredTools)) errors.push('at least one tool is required');
-  if (!Number.isInteger(input.proof.provenDeployments) || input.proof.provenDeployments < 0) {
-    errors.push('proven deployments must be a non-negative integer');
+  if (!nonEmptyList(input.requiredCapabilities)) errors.push('at least one capability is required');
+  if (!['unverified', 'verified'].includes(input.proof.status)) errors.push('invalid proof status');
+  if (input.proof.status === 'verified' && !input.proof.summary.trim()) {
+    errors.push('verified proof requires a summary');
   }
-  if (!validEvidenceLinks(input.proof.evidenceLinks))
+  if (input.proof.status === 'verified' && input.proof.evidenceLinks.length === 0) {
+    errors.push('verified proof requires evidence');
+  }
+  if (!validEvidenceLinks(input.proof.evidenceLinks)) {
     errors.push('evidence links must be relative or HTTP URLs');
-  return [...errors, ...validateOutcomeContract(input.outcome)];
+  }
+  if (input.outcome.measured) {
+    errors.push('measured KPI belongs to deployment observations, not a reusable blueprint');
+  }
+  return [...errors, ...validateOutcomeContract({ ...input.outcome, measured: null })];
 }
 
 export function validateDeployment(input: SolutionDeploymentInput): string[] {
   const errors: string[] = [];
   if (!input.blueprintId.trim()) errors.push('blueprint is required');
+  if (!Number.isInteger(input.blueprintVersion) || input.blueprintVersion < 1) {
+    errors.push('blueprint version must be a positive integer');
+  }
   if (!input.appId.trim()) errors.push('app is required');
-  if (!['active', 'paused', 'retired'].includes(input.status))
+  if (!['active', 'paused', 'retired'].includes(input.status)) {
     errors.push('invalid deployment status');
-  if (!validEvidenceLinks(input.evidenceLinks))
-    errors.push('evidence links must be relative or HTTP URLs');
+  }
   return errors;
+}
+
+export function validateObservation(input: SolutionObservationInput): string[] {
+  const errors: string[] = [];
+  if (!(input.windowStart instanceof Date) || !Number.isFinite(input.windowStart.valueOf())) {
+    errors.push('window start must be a valid date');
+  }
+  if (!(input.windowEnd instanceof Date) || !Number.isFinite(input.windowEnd.valueOf())) {
+    errors.push('window end must be a valid date');
+  }
+  if (
+    input.windowStart instanceof Date &&
+    input.windowEnd instanceof Date &&
+    input.windowEnd <= input.windowStart
+  ) {
+    errors.push('window end must be after window start');
+  }
+  if (!Number.isFinite(input.metricValue)) errors.push('metric value must be finite');
+  if (!input.metricLabel.trim()) errors.push('metric label is required');
+  for (const [label, value] of [
+    ['runs completed', input.runsCompleted],
+    ['minutes saved per run', input.minutesSavedPerRun],
+    ['loaded cost per hour', input.loadedCostPerHour],
+    ['actual AI cost', input.actualAiCost],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0)
+      errors.push(`${label} must be finite and non-negative`);
+  }
+  if (!Number.isInteger(input.runsCompleted)) errors.push('runs completed must be an integer');
+  if (!validEvidenceLinks(input.evidenceLinks)) {
+    errors.push('evidence links must be relative or HTTP URLs');
+  }
+  return errors;
+}
+
+function canonical(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+export function capabilitiesForSteps(steps: AppStep[]): Set<BlueprintCapability> {
+  const capabilities = new Set<BlueprintCapability>();
+  for (const step of steps) {
+    if (step.kind === 'agent' && (step.agentId || step.inlineAgent?.grounded)) {
+      capabilities.add('grounded-inference');
+    }
+    if (step.kind === 'human') capabilities.add('human-approval');
+    if (step.kind === 'output' && step.sink === 'report') capabilities.add('report-output');
+  }
+  return capabilities;
+}
+
+/**
+ * Pure, fail-closed deployment contract. It checks the actual App graph and the exact published
+ * pipeline that the App runtime consumes; free-text metadata is never enough to activate a solution.
+ */
+export function evaluateSolutionCompatibility(
+  blueprint: Pick<
+    SolutionBlueprint,
+    'tombstonedAt' | 'requiredDataDomains' | 'requiredCapabilities' | 'requiredPipelineName'
+  >,
+  app: Pick<AppSpec, 'pipelineId' | 'published' | 'steps'>,
+  pipeline: Pick<PipelineView, 'id' | 'name' | 'status' | 'dataAllowlist'> | null,
+): CompatibilityResult {
+  const errors: string[] = [];
+  if (blueprint.tombstonedAt) errors.push('blueprint is retired');
+  if (!app.published) errors.push('App must be published');
+  if (!app.pipelineId) errors.push('App has no explicit governed pipeline binding');
+  if (!pipeline) errors.push('bound pipeline does not exist');
+  if (pipeline && app.pipelineId !== pipeline.id) errors.push('pipeline binding changed');
+  if (pipeline && pipeline.status !== 'published') errors.push('bound pipeline must be published');
+  if (pipeline && canonical(pipeline.name) !== canonical(blueprint.requiredPipelineName)) {
+    errors.push(`requires pipeline ${blueprint.requiredPipelineName}`);
+  }
+
+  const appDomains = new Set(
+    app.steps
+      .filter(
+        (step): step is Extract<AppStep, { kind: 'connector-query' }> =>
+          step.kind === 'connector-query',
+      )
+      .map((step) => canonical(step.domain)),
+  );
+  const ceiling = new Set((pipeline?.dataAllowlist ?? []).map(canonical));
+  for (const required of blueprint.requiredDataDomains) {
+    const token = canonical(required);
+    if (!appDomains.has(token)) errors.push(`App graph does not read required domain: ${required}`);
+    if (!ceiling.has(token)) errors.push(`pipeline does not allow required domain: ${required}`);
+  }
+
+  const capabilities = capabilitiesForSteps(app.steps);
+  for (const required of blueprint.requiredCapabilities) {
+    if (!capabilities.has(required)) errors.push(`App graph lacks capability: ${required}`);
+  }
+  return { compatible: errors.length === 0, errors, pipelineId: app.pipelineId ?? null };
+}
+
+export function withRealizedRoi(
+  observation: Omit<SolutionObservation, 'realizedRoi'>,
+): SolutionObservation {
+  return {
+    ...observation,
+    realizedRoi: computeRoi({
+      runsCompleted: observation.runsCompleted,
+      minutesSavedPerRun: observation.minutesSavedPerRun,
+      loadedCostPerHour: observation.loadedCostPerHour,
+      actualAiCost: observation.actualAiCost,
+    }),
+  };
 }
 
 export function splitList(value: string): string[] {

@@ -28,8 +28,8 @@ test('summarizeOutcome derives target lift, measured progress, net value and pay
   assert.deepEqual(summarizeOutcome(contract()), {
     targetChangePct: 900,
     measuredProgressPct: 60,
-    annualNetBenefit: 850_000,
-    roiMultiple: 6,
+    firstYearNetValue: 750_000,
+    benefitCostMultiple: 6,
     paybackMonths: 1.41,
   });
 });
@@ -52,7 +52,7 @@ test('summarizeOutcome handles decrease contracts and zero-cost hypotheses', () 
   );
   assert.equal(result.targetChangePct, 33.33);
   assert.equal(result.measuredProgressPct, 50);
-  assert.equal(result.roiMultiple, null);
+  assert.equal(result.benefitCostMultiple, null);
   assert.equal(result.paybackMonths, 0);
 });
 
@@ -73,7 +73,7 @@ test('summarizeOutcome returns honest nulls when percentages or payback are unde
   );
   assert.equal(result.targetChangePct, null);
   assert.equal(result.measuredProgressPct, null);
-  assert.equal(result.annualNetBenefit, -5);
+  assert.equal(result.firstYearNetValue, -15);
   assert.equal(result.paybackMonths, null);
 });
 

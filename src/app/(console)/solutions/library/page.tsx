@@ -58,7 +58,7 @@ export default async function SolutionLibraryPage() {
                 <div>
                   <p className="text-muted-foreground">1Y value</p>
                   <p className="mt-1 font-medium">
-                    {blueprint.outcome.roi.currency} {summary.annualNetBenefit.toLocaleString()}
+                    {blueprint.outcome.roi.currency} {summary.firstYearNetValue.toLocaleString()}
                   </p>
                 </div>
                 <div>
