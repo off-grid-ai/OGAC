@@ -34,10 +34,10 @@ export function AppLifecycleNav({
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Link
-            href="/build/studio"
+            href="/solutions/apps"
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            Studio
+            Apps
           </Link>
           <span className="text-muted-foreground/40" aria-hidden>
             /

@@ -22,7 +22,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   // beats /a), then highlight that module's group landing — so being on a secondary route (e.g.
   // /policy) keeps its section's primary row (Control) active, and the builder's /apps/* surfaces
   // (which have no module of their own) keep the Build → Apps row lit. Pure resolution in groups.ts.
-  const activeId = sidebarActiveIdForPath(pathname, modules);
+  const activeId = sidebarActiveIdForPath(pathname);
 
   return (
     <>
@@ -44,7 +44,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
             </div>
             <div className="space-y-0.5">
               {section.items.map((m) => {
-                const Icon = MODULE_ICONS[m.id];
+                const Icon = MODULE_ICONS[m.gate];
                 const active = activeId === m.id;
                 return (
                   <Link
