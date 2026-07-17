@@ -30,40 +30,52 @@ import { recordAudit } from '@/lib/store';
  *     ENFORCES a contract that exists; it does not invent one when none is resolvable.
  * Never throws — a DB hiccup degrades to null (legacy) rather than failing the run.
  */
-export async function resolveContract(
+export async function resolveContractStrict(
   pipelineId: string | null | undefined,
   orgId: string,
 ): Promise<PipelineContract | null> {
   if (!pipelineId) return null;
+  const pipeline = await getPipeline(pipelineId, orgId);
+  if (!pipeline) return null;
+  // LIFECYCLE GATE (G-ADV-PIPE-2/3): only a PUBLISHED pipeline may govern a consumer run. A
+  // deprecated/archived pipeline (retired → fall back to org default) or a draft/in_review one
+  // (never approved/gate-passed → the release gate must not be bypassable on the internal paths)
+  // resolves to null here — exactly the "fall back to legacy / org default" path a missing binding
+  // takes. ONE gate on the ONE seam every internal consumer (chat/agent/app/trigger) flows through,
+  // mirroring the public run route's `status !== 'published'` 409.
+  if (!isConsumable(pipeline.status)) return null;
+  // The deterministic REQUEST-shape gates are OPTIONAL slices operators set on the RAW policy
+  // overlay JSON (`requestParams` = param ceilings/bounds/banned-list; `modelRules` = model
+  // allow/denylist). We parse them purely (parse* narrows/validates) and attach when present;
+  // absent/garbage ⇒ undefined ⇒ the pre-checks no-op (additive, no behaviour change).
+  const rawPolicyOverlay =
+    pipeline.policyOverlay && typeof pipeline.policyOverlay === 'object'
+      ? (pipeline.policyOverlay as Record<string, unknown>)
+      : {};
+  return {
+    pipelineId: pipeline.id,
+    dataAllowlist: pipeline.dataAllowlist ?? [],
+    routing: pipeline.routing ?? {},
+    orgPolicyDefaults: ORG_POLICY_DEFAULTS,
+    orgGuardrailDefaults: ORG_GUARDRAIL_DEFAULTS,
+    policyOverlay: normalizeOverlay(pipeline.policyOverlay, ORG_POLICY_DEFAULTS),
+    guardrailOverlay: normalizeOverlay(pipeline.guardrailOverlay, ORG_GUARDRAIL_DEFAULTS),
+    requestParamsPolicy: parseRequestParamsPolicy(rawPolicyOverlay.requestParams),
+    modelRules: parseModelRules(rawPolicyOverlay.modelRules),
+  };
+}
+
+/**
+ * Compatibility resolver for chat and read-only previews. Explicit consumer dispatch must use
+ * resolveContractStrict via pipeline-run-glue so a resolver outage is distinguishable from a stale
+ * binding and becomes a 503 instead of silently looking unbound.
+ */
+export async function resolveContract(
+  pipelineId: string | null | undefined,
+  orgId: string,
+): Promise<PipelineContract | null> {
   try {
-    const pipeline = await getPipeline(pipelineId, orgId);
-    if (!pipeline) return null;
-    // LIFECYCLE GATE (G-ADV-PIPE-2/3): only a PUBLISHED pipeline may govern a consumer run. A
-    // deprecated/archived pipeline (retired → fall back to org default) or a draft/in_review one
-    // (never approved/gate-passed → the release gate must not be bypassable on the internal paths)
-    // resolves to null here — exactly the "fall back to legacy / org default" path a missing binding
-    // takes. ONE gate on the ONE seam every internal consumer (chat/agent/app/trigger) flows through,
-    // mirroring the public run route's `status !== 'published'` 409.
-    if (!isConsumable(pipeline.status)) return null;
-    // The deterministic REQUEST-shape gates are OPTIONAL slices operators set on the RAW policy
-    // overlay JSON (`requestParams` = param ceilings/bounds/banned-list; `modelRules` = model
-    // allow/denylist). We parse them purely (parse* narrows/validates) and attach when present;
-    // absent/garbage ⇒ undefined ⇒ the pre-checks no-op (additive, no behaviour change).
-    const rawPolicyOverlay =
-      pipeline.policyOverlay && typeof pipeline.policyOverlay === 'object'
-        ? (pipeline.policyOverlay as Record<string, unknown>)
-        : {};
-    return {
-      pipelineId: pipeline.id,
-      dataAllowlist: pipeline.dataAllowlist ?? [],
-      routing: pipeline.routing ?? {},
-      orgPolicyDefaults: ORG_POLICY_DEFAULTS,
-      orgGuardrailDefaults: ORG_GUARDRAIL_DEFAULTS,
-      policyOverlay: normalizeOverlay(pipeline.policyOverlay, ORG_POLICY_DEFAULTS),
-      guardrailOverlay: normalizeOverlay(pipeline.guardrailOverlay, ORG_GUARDRAIL_DEFAULTS),
-      requestParamsPolicy: parseRequestParamsPolicy(rawPolicyOverlay.requestParams),
-      modelRules: parseModelRules(rawPolicyOverlay.modelRules),
-    };
+    return await resolveContractStrict(pipelineId, orgId);
   } catch {
     return null;
   }

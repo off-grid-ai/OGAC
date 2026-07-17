@@ -6,9 +6,12 @@ import { newAppRunId } from '@/lib/app-run';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { getApp } from '@/lib/apps-store';
 import { machineActor } from '@/lib/audit-event';
-import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
-import { inboundConfigFromEnv, normalizeInboundEmail, type RawInboundEmail } from '@/lib/inbound-email';
-import { resolveContract } from '@/lib/pipeline-contract';
+import {
+  inboundConfigFromEnv,
+  normalizeInboundEmail,
+  type RawInboundEmail,
+} from '@/lib/inbound-email';
+import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
 import { getCustomAgent, recordAudit } from '@/lib/store';
 import { getWebhookTriggerByToken, markWebhookFired } from '@/lib/webhook-triggers';
 
@@ -38,13 +41,18 @@ export async function POST(req: Request) {
   try {
     raw = (await req.json()) as RawInboundEmail;
   } catch {
-    return NextResponse.json({ error: 'body must be JSON (an inbound-parse payload)' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'body must be JSON (an inbound-parse payload)' },
+      { status: 400 },
+    );
   }
 
   const { token, input, attachments } = normalizeInboundEmail(raw, cfg.domain!);
   if (!token) {
     return NextResponse.json(
-      { error: `no recipient matched @${cfg.domain} — set the inbound-parse target to <token>@${cfg.domain}` },
+      {
+        error: `no recipient matched @${cfg.domain} — set the inbound-parse target to <token>@${cfg.domain}`,
+      },
       { status: 400 },
     );
   }
@@ -80,9 +88,21 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
     }
-    const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
-    const contract = await resolveContract(pipelineId, orgId);
-    const handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId, contract });
+    let handle: Awaited<ReturnType<typeof submitAppRun>>;
+    try {
+      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId });
+    } catch (error) {
+      const failure = pipelineBindingHttpFailure(error);
+      if (!failure) throw error;
+      recordAudit({
+        actor,
+        org: orgId,
+        action: 'trigger.denied',
+        resource: `inbound-email:${trigger.id} app:${trigger.targetId} pipeline-binding:${failure.body.code}`,
+        outcome: 'blocked',
+      });
+      return NextResponse.json(failure.body, { status: failure.status });
+    }
     await markWebhookFired(token);
     recordAudit({
       actor,
@@ -117,7 +137,10 @@ export async function POST(req: Request) {
       resource: `inbound-email:${trigger.id} agent:${trigger.targetId} trigger`,
       outcome: 'blocked',
     });
-    return NextResponse.json({ error: 'access denied', reason: agentAccess.reason }, { status: 403 });
+    return NextResponse.json(
+      { error: 'access denied', reason: agentAccess.reason },
+      { status: 403 },
+    );
   }
   const subjectText = typeof input.subject === 'string' ? input.subject : '';
   const query = typeof input.input === 'string' && input.input.trim() ? input.input : subjectText;

@@ -9,7 +9,7 @@ import { getApp } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { pipelineRunTag } from '@/lib/chat-pipeline-policy';
-import { resolveExplicitPipelineBinding } from '@/lib/pipeline-run-glue';
+import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
 import { askerFrom } from '@/lib/retrieval/acl';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -89,38 +89,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const runId = newAppRunId();
 
-  // Resolve the app's explicit pipeline binding before either executor can touch retrieval,
-  // connectors, tools, or models. Deliberately unbound apps retain legacy behavior; an explicit id
-  // that is missing/not-published fails closed. This is the same discriminated binding rule used by
-  // direct agent dispatch, which matters because a single-step AppSpec is the canonical authored
-  // agent. The Temporal activity re-resolves at execution time to close deletion/deprecation races.
-  const binding = await resolveExplicitPipelineBinding(app.pipelineId, orgId);
-  if (binding.state === 'invalid' || binding.state === 'unavailable') {
+  let handle: Awaited<ReturnType<typeof submitAppRun>>;
+  try {
+    handle = await submitAppRun(app, input, {
+      orgId,
+      actor: gate.user.email ?? undefined,
+      runId,
+      asker: askerFrom(gate.user),
+      mode: runMode,
+    });
+  } catch (error) {
+    const failure = pipelineBindingHttpFailure(error);
+    if (!failure) throw error;
     auditFromSession(gate, orgId, {
       action: 'app.run.denied',
-      resource: `app:${id} pipeline-binding:${binding.code}`,
+      resource: `app:${id} pipeline-binding:${failure.body.code}`,
       outcome: 'blocked',
     });
-    return NextResponse.json(
-      { error: 'pipeline binding unavailable', code: binding.code, reason: binding.reason },
-      { status: binding.state === 'unavailable' ? 503 : 409 },
-    );
+    return NextResponse.json(failure.body, { status: failure.status });
   }
-  const { pipelineId, contract } = binding;
-
-  const handle = await submitAppRun(app, input, {
-    orgId,
-    actor: gate.user.email ?? undefined,
-    runId,
-    contract,
-    pipelineId,
-    asker: askerFrom(gate.user),
-    mode: runMode,
-  });
 
   // Tag the run audit with the resolved pipeline so the per-pipeline audit/FinOps lens lights up. The
   // RUN is the join key: stamp runId + a compound resource carrying the pipeline tag.
-  const tag = pipelineRunTag(pipelineId);
+  const tag = pipelineRunTag(app.pipelineId ?? null);
   auditFromSession(gate, orgId, {
     action: 'app.run',
     resource: tag ? `app:${id} ${tag}` : `app:${id}`,

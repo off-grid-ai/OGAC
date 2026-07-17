@@ -21,6 +21,11 @@ import { durableEnabled } from '@/lib/agent-run-durable';
 import type { AppSpec } from '@/lib/app-model';
 import type { AppRunContext, AppRunOutcome } from '@/lib/app-run';
 import {
+  PipelineBindingError,
+  requireRunnablePipelineBinding,
+  resolveExplicitPipelineBinding,
+} from '@/lib/pipeline-run-glue';
+import {
   type AppDurableConfig,
   appDurableConfigFromEnv,
   appWorkflowIdFor,
@@ -91,10 +96,29 @@ export async function submitAppRun(
   input: Record<string, unknown>,
   ctx: AppRunContext,
 ): Promise<AppRunHandle> {
+  if (spec.orgId !== ctx.orgId) {
+    throw new PipelineBindingError({
+      state: 'invalid',
+      pipelineId: spec.pipelineId ?? null,
+      contract: null,
+      code: 'binding_changed',
+      reason: `App '${spec.id}' does not belong to org '${ctx.orgId}'.`,
+    });
+  }
+  // This is the mandatory App dispatch chokepoint. The saved AppSpec is the only binding authority:
+  // caller-supplied pipelineId/contract values are ignored and cannot make an invalid App runnable.
+  const binding = requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(spec.pipelineId, ctx.orgId),
+  );
+  const governedCtx: AppRunContext = {
+    ...ctx,
+    pipelineId: binding.pipelineId,
+    contract: binding.contract,
+  };
   const wantDurable = shouldRunDurably(spec) && appDurableEnabled();
 
   if (wantDurable) {
-    const handle = await trySubmitDurable(spec, input, ctx);
+    const handle = await trySubmitDurable(spec, input, governedCtx);
     if (handle) return handle;
     // Durable requested but Temporal unreachable — fall through to inline (graceful degrade).
   }
@@ -102,7 +126,7 @@ export async function submitAppRun(
   return runInline(
     spec,
     input,
-    ctx,
+    governedCtx,
     wantDurable ? 'durable requested but Temporal unreachable' : undefined,
   );
 }

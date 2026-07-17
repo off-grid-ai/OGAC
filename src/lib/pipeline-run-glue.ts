@@ -13,7 +13,7 @@
 
 import { resolveAgentPipeline } from '@/lib/agent-pipeline-policy';
 import { resolveChatPipeline } from '@/lib/chat-pipeline-policy';
-import { resolveContract } from '@/lib/pipeline-contract';
+import { resolveContract, resolveContractStrict } from '@/lib/pipeline-contract';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 import { getPipeline } from '@/lib/pipelines';
@@ -96,7 +96,7 @@ export type PipelineContractResolver = (
 export async function resolveExplicitPipelineBinding(
   consumerPipelineId: string | null | undefined,
   orgId: string,
-  loadContract: PipelineContractResolver = resolveContract,
+  loadContract: PipelineContractResolver = resolveContractStrict,
 ): Promise<AgentPipelineBinding> {
   const pipelineId = resolveAgentPipeline(consumerPipelineId);
   if (!pipelineId) return { state: 'unbound', pipelineId: null, contract: null };
@@ -108,7 +108,7 @@ export async function resolveExplicitPipelineBinding(
         pipelineId,
         contract: null,
         code: 'pipeline_unavailable',
-        reason: `Agent binding is invalid: pipeline '${pipelineId}' is missing or not published.`,
+        reason: `Pipeline binding is invalid: pipeline '${pipelineId}' is missing or not published.`,
       };
     }
     return { state: 'bound', pipelineId, contract };
@@ -127,7 +127,7 @@ export async function resolveExplicitPipelineBinding(
 export function resolveAgentBinding(
   agentPipelineId: string | null | undefined,
   orgId: string,
-  loadContract: PipelineContractResolver = resolveContract,
+  loadContract: PipelineContractResolver = resolveContractStrict,
 ): Promise<AgentPipelineBinding> {
   return resolveExplicitPipelineBinding(agentPipelineId, orgId, loadContract);
 }
@@ -147,7 +147,7 @@ export async function resolveAgentRunBinding(
   agentId: string,
   orgId: string,
   lookupAgent: AgentDefinitionLookup = defaultAgentDefinitionLookup,
-  loadContract: PipelineContractResolver = resolveContract,
+  loadContract: PipelineContractResolver = resolveContractStrict,
 ): Promise<AgentPipelineBinding> {
   let agent: Awaited<ReturnType<AgentDefinitionLookup>>;
   try {
