@@ -1,28 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  DEFAULT_TOOLS_TAB,
-  TOOLS_TABS,
-  filterCatalog,
-  matchesCatalogQuery,
-  normalizeToolsTab,
-} from '../src/lib/tools-view.ts';
+import { filterCatalog, matchesCatalogQuery } from '../src/lib/tools-view.ts';
 
-// Pure unit tests for the Tools-home view model (#121) — no React, no I/O. Guards the tab vocabulary
-// (deep-link safety) and the catalog search/filter predicate that narrows the 18-server catalog.
-
-test('normalizeToolsTab: known tabs pass through, everything else defaults to Registered', () => {
-  for (const t of TOOLS_TABS) assert.equal(normalizeToolsTab(t), t);
-  assert.equal(normalizeToolsTab(undefined), DEFAULT_TOOLS_TAB);
-  assert.equal(normalizeToolsTab(null), DEFAULT_TOOLS_TAB);
-  assert.equal(normalizeToolsTab('bogus'), DEFAULT_TOOLS_TAB);
-  assert.equal(DEFAULT_TOOLS_TAB, 'registered');
-});
+// Pure tests for the query/filter policy inside the real Catalog route. Route selection is covered
+// by contextual-navigation.test.ts and never shares this query vocabulary.
 
 const SERVERS = [
   { name: 'PostgreSQL', description: 'Run read-only SQL against Postgres.', category: 'Data & DB' },
   { name: 'Brave Search', description: 'Search the public web.', category: 'Search' },
-  { name: 'Filesystem', description: 'Read and write files you allow.', category: 'Filesystem & Dev' },
+  {
+    name: 'Filesystem',
+    description: 'Read and write files you allow.',
+    category: 'Filesystem & Dev',
+  },
 ];
 
 test('matchesCatalogQuery: empty query + no category matches everything', () => {

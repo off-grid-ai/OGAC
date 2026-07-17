@@ -41,3 +41,23 @@ test('a canonical collection layout renders content without a competing horizont
   assert.match(html, /Solution library/);
   assert.doesNotMatch(html, /<nav|Solutions navigation|aria-current/);
 });
+
+test('a level-3 deep link exposes its active ancestors and remains collapsible', () => {
+  process.env.NEXT_TEST_PATHNAME = '/solutions/tools/catalog';
+  try {
+    const html = renderToStaticMarkup(createElement(SidebarNav));
+
+    assert.match(html, /aria-expanded="true"[^>]*aria-controls="nav-section-solutions"/);
+    assert.doesNotMatch(html, /id="nav-section-solutions" hidden=""/);
+    assert.match(html, /<details[^>]*open=""[^>]*>/);
+    assert.match(
+      html,
+      /href="\/solutions\/tools\/catalog"[^>]*aria-current="page"[^>]*>.*Catalog/s,
+    );
+    assert.match(html, /aria-label="Tools destinations"/);
+    assert.match(html, /aria-label="Quality destinations"/);
+    assert.doesNotMatch(html, /href="\/solutions\/tools\?tab=/);
+  } finally {
+    delete process.env.NEXT_TEST_PATHNAME;
+  }
+});

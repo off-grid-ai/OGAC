@@ -1,1 +1,5 @@
-export { default } from '@/app/(console)/build/evals/page';
+import { redirect } from 'next/navigation';
+
+export default function QualityRoot() {
+  redirect('/solutions/quality/evaluators');
+}

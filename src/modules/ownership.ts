@@ -17,6 +17,7 @@ export type CanonicalOwnerId =
   | 'reviews'
   | 'tools'
   | 'quality-definitions'
+  | 'sandbox'
   | 'sources'
   | 'domains'
   | 'data-flows'
@@ -251,6 +252,16 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     route: '/solutions/quality',
     gate: 'evals',
     placement: 'sidebar',
+  },
+  {
+    id: 'sandbox',
+    section: 'solutions',
+    label: 'Sandbox',
+    description: 'Code-execution isolation used by agent-authored steps.',
+    route: '/solutions/test',
+    gate: 'sandbox',
+    placement: 'contextual',
+    sidebarParent: 'apps',
   },
 
   {

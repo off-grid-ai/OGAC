@@ -80,8 +80,8 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
       },
       {
         id: 'runs',
-        label: 'Run history',
-        description: 'Pass rates, suites, and recent evaluation results.',
+        label: 'Executions',
+        description: 'Launch, re-run, and inspect individual evaluation executions.',
         route: '/solutions/quality/runs',
       },
     ],
@@ -106,6 +106,10 @@ export function contextualModule(id: ContextualModuleId): ContextualModule {
 export function contextualModuleForPath(url: string): ContextualModule | undefined {
   const pathname = stripUrlDecoration(url);
   return CONTEXTUAL_MODULES.find((module) => pathIsWithin(pathname, module.baseRoute));
+}
+
+export function contextualModuleForOwner(ownerId: CanonicalOwnerId): ContextualModule | undefined {
+  return CONTEXTUAL_MODULES.find((module) => module.ownerId === ownerId);
 }
 
 export function contextualDestinationForPath(

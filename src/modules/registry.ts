@@ -291,7 +291,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Tool catalog',
     description:
       'A curated catalog of open-source MCP servers (Model Context Protocol) — one-click add a tool from the ecosystem as a registered MCP tool your apps can use.',
-    route: '/solutions/tools?view=catalog',
+    route: '/solutions/tools/catalog',
     service: 'integrations',
     internal: true,
   },
@@ -411,8 +411,7 @@ export const MODULES: readonly ModuleDef[] = [
   {
     id: 'evals',
     label: 'Quality',
-    description:
-      'Golden sets and quality gates — pass-rates and recent eval/red-team runs by suite.',
+    description: 'Evaluators, golden sets, quality gates, and individual evaluation executions.',
     route: '/solutions/quality',
     service: 'control',
     internal: true,

@@ -25,7 +25,7 @@ test('matchFeatures matches baseline → drift and budget → finops', () => {
 });
 
 test('matchFeatures matches on title substring too', () => {
-  assert.ok(matchFeatures('golden').some((f) => f.href === '/build/evals'));
+  assert.ok(matchFeatures('golden').some((f) => f.href === '/solutions/quality/evaluators'));
 });
 
 test('matchFeatures ignores queries shorter than 2 chars and caps results', () => {

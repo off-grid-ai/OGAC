@@ -4,9 +4,16 @@ import { BookOpen, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure';
 import { getEnabledModules } from '@/lib/modules';
 import { cn } from '@/lib/utils';
+import {
+  contextualDestinationForPath,
+  contextualModuleForOwner,
+  contextualModuleForPath,
+  type ContextualModuleId,
+} from '@/modules/contextual-navigation';
 import {
   sidebarActiveIdForPath,
   sidebarSectionIdForActiveId,
@@ -28,9 +35,21 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   // in groups.ts so the desktop rail and mobile drawer cannot drift.
   const activeId = sidebarActiveIdForPath(pathname);
   const activeSectionId = sidebarSectionIdForActiveId(sections, activeId);
-  // Every branch starts collapsed, including on a deep link. The active section is still marked on
-  // its parent button, so operators keep their bearings without paying the vertical-space cost.
-  const [openSectionId, setOpenSectionId] = useState<string | null>(null);
+  const activeContextualModule = contextualModuleForPath(pathname);
+  // Inactive domains start collapsed. Deep links expose their active ancestors, and both levels can
+  // still be collapsed manually after that reveal.
+  const [openSectionId, setOpenSectionId] = useState<string | null>(activeSectionId ?? null);
+  const [openContextualModuleId, setOpenContextualModuleId] = useState<ContextualModuleId | null>(
+    activeContextualModule?.id ?? null,
+  );
+
+  useEffect(() => {
+    setOpenSectionId(activeSectionId ?? null);
+  }, [activeSectionId]);
+
+  useEffect(() => {
+    setOpenContextualModuleId(activeContextualModule?.id ?? null);
+  }, [activeContextualModule?.id]);
 
   return (
     <>
@@ -107,6 +126,70 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
               >
                 {section.items.map((item) => {
                   const active = activeId === item.id;
+                  const contextual = contextualModuleForOwner(item.id);
+                  if (contextual) {
+                    const contextualOpen = openContextualModuleId === contextual.id;
+                    const activeDestination = contextualDestinationForPath(contextual, pathname);
+                    return (
+                      <Disclosure
+                        key={item.id}
+                        open={contextualOpen}
+                        onToggle={(event) => {
+                          const isOpen = event.currentTarget.open;
+                          setOpenContextualModuleId((current) => {
+                            if (isOpen) return contextual.id;
+                            return current === contextual.id ? null : current;
+                          });
+                        }}
+                        className="border-0 bg-transparent shadow-none"
+                      >
+                        <DisclosureTrigger
+                          data-og-interactive
+                          data-active={active || undefined}
+                          className={cn(
+                            'min-h-9 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+                            active
+                              ? 'bg-foreground font-medium text-background'
+                              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                          )}
+                        >
+                          {item.label}
+                        </DisclosureTrigger>
+                        <DisclosureContent className="relative ml-2 border-l border-border/80 p-0 pl-3 pt-1">
+                          <nav aria-label={`${item.label} destinations`} className="space-y-0.5">
+                            {contextual.destinations.map((destination) => {
+                              const destinationActive = activeDestination?.id === destination.id;
+                              return (
+                                <Link
+                                  key={destination.id}
+                                  href={destination.route}
+                                  data-og-interactive
+                                  data-active={destinationActive || undefined}
+                                  onClick={onNavigate}
+                                  aria-current={destinationActive ? 'page' : undefined}
+                                  className={cn(
+                                    'relative flex min-h-8 items-center rounded-md px-2 py-1 text-[12px] transition-colors',
+                                    destinationActive
+                                      ? 'bg-primary/10 font-medium text-primary'
+                                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      'absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2',
+                                      destinationActive ? 'bg-primary' : 'bg-border',
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="truncate">{destination.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </nav>
+                        </DisclosureContent>
+                      </Disclosure>
+                    );
+                  }
                   return (
                     <Link
                       key={item.id}

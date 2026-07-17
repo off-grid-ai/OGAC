@@ -117,7 +117,7 @@ export const FEATURES: FeatureEntry[] = [
     id: 'evals-golden',
     title: 'Evals & golden sets',
     subtitle: 'Evals',
-    href: '/build/evals',
+    href: '/solutions/quality/evaluators',
     moduleId: 'evals',
     keywords: ['eval', 'golden', 'test', 'llm-as-judge', 'quality', 'pass rate'],
   },
