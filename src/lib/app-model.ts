@@ -75,12 +75,7 @@ export interface OutputStep {
   config?: Record<string, unknown>;
 }
 
-export type AppStep =
-  | AgentStep
-  | ConnectorQueryStep
-  | GuardrailStep
-  | HumanStep
-  | OutputStep;
+export type AppStep = AgentStep | ConnectorQueryStep | GuardrailStep | HumanStep | OutputStep;
 
 export type AppStepKind = AppStep['kind'];
 
@@ -101,8 +96,8 @@ export interface AppSpec {
   visibility: 'private' | 'org' | 'public';
   slug?: string;
   published: boolean;
-  // The GOVERNED pipeline this app/agent runs on (CONSUMERS-BIND #166). null/undefined ⇒ resolve to
-  // the org default at run time. Every run is tagged pipeline:<id> so governance + telemetry apply.
+  // The GOVERNED pipeline this App runs on. null/undefined means deliberately unbound; the org Chat
+  // default never applies to Apps. Bound runs are tagged pipeline:<id> for governance + telemetry.
   pipelineId?: string | null;
   trigger: TriggerSpec;
   inputForm?: FormField[];
@@ -124,7 +119,13 @@ export interface ValidationResult {
 }
 
 const TRIGGER_KINDS: TriggerKind[] = ['on-demand', 'webhook', 'email', 'whatsapp', 'schedule'];
-const STEP_KINDS = new Set<AppStepKind>(['agent', 'connector-query', 'guardrail', 'human', 'output']);
+const STEP_KINDS = new Set<AppStepKind>([
+  'agent',
+  'connector-query',
+  'guardrail',
+  'human',
+  'output',
+]);
 
 export function validateAppSpec(spec: AppSpec): ValidationResult {
   const errors: string[] = [];

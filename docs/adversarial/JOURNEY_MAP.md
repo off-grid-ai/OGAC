@@ -102,7 +102,7 @@
 4. **Payload sanitize** (trigger-dispatch.ts) → top-level size check (5MB hard cap); nested structures NOT clamped (G-ADV-BUILD-5: a deep 5000-element array passes through).
 5. **App run fire** → `POST /api/v1/app/[slug]/run` with trigger=webhook + payload.
 6. **Executor path:**
-   - **Pipeline contract resolved** (app.pipelineId or org default).
+   - **Pipeline contract resolved** from the App's explicit `pipelineId`; null is deliberately unbound.
    - **Step 1: connector-query** → data-domain lookup → connector fetch → governed READ (enforceDataAccess checks pipeline allowlist) → query executed → rows masked (PII masking) → result threaded to next.
    - **Step 2: agent** → runAgent() path (policy gate → guardrails(in) → retrieve → answer → ground → guardrails(out) → sign).
    - **Step 3: output (email)** → selectEmailProvider(orgId, pipeline) (email-sink-governance.ts) → checks emailEgressVerdict (cloud email allowed?) → maskEmailForSend(content, pipeline) → format HTML body.
@@ -113,7 +113,7 @@
 **Subsystem seams crossed:**
 - External system → webhook auth (token lookup, HMAC verify, nonce check).
 - Webhook route → app-run executor (payload becomes the run input; org inferred from token).
-- App.pipelineId → contract resolver (null fallback to org default).
+- App.pipelineId → fail-closed contract resolver (null means deliberately unbound).
 - Contract → data enforcement (allowlist check before connector hit).
 - Connector result → masking (PII masking runs on rows, escalated by policy overlay).
 - Agent output → email content (answer text + citations formatted into email HTML).
@@ -232,8 +232,8 @@
 **Terminal artifact:** Every run (chat, agent, app, API) shows the enforced policy + checks in the audit log.
 
 **Failure edges:**
-1. **Deprecated pipeline still governs** (G-ADV-PIPE-2) — operator archives or deprecates a pipeline (lifecycle status = DEPRECATED); apps/agents/chat still bound to it. resolveContract/getPipeline skip lifecycle status → deprecated pipeline still enforces its (stale) rules. "Fall back to org default" promise never fires. *Attack:* bind app to a pipeline, deprecate pipeline, run app, verify it still uses deprecated rules.
-2. **Draft pipeline runs live on internal consumers** (G-ADV-PIPE-3) — operator creates a pipeline, publishes as DRAFT (publish=false). Chat/agent/app (internal consumers) skip the published check; only the PUBLIC `/api/v1/pipeline/[id]/run` route enforces it. Draft pipeline governs internal runs, bypassing review. *Attack:* draft pipeline, bind an app, run it, verify it executes (should reject if pipeline not published).
+1. **✅ RESOLVED — deprecated pipelines fail closed** (G-ADV-PIPE-2). The shared binding resolver rejects retired/missing pipelines before App, agent, trigger, email, WhatsApp, tool, or durable step execution; retirement is also blocked until consumers detach.
+2. **✅ RESOLVED — draft pipelines cannot run on internal consumers** (G-ADV-PIPE-3). Consumability is enforced on the shared binding seam, not only on the public route.
 3. **Policy enforcement applied ad hoc per path** (root cause across multiple domains) — chat.ts, app-run.ts, agentrun.ts each have slightly different policy-gate logic. One path swallows a policy check on error (e.g., guardrail fails open in chat, fails closed in agent). *Attack:* guardrail service down, run chat vs agent, verify they handle the error consistently.
 4. **Guardrail overlay merge is not tightening-only** — a pipeline's guardrailOverlay should ONLY tighten the org defaults (e.g., require masking if default allows). If merge logic is bidirectional, a pipeline can LOOSEN a locked org control. *Attack:* org policy locks masking=true, pipeline sets masking=false, run app, verify masking still applies.
 5. **Per-user override not blocked** — users are NOT meant to bypass org policy per message (chat, app). If the UI exposes a "skip guardrail" toggle or a per-message policy override, the "set once, inherited everywhere" promise breaks. *Attack:* search for client-side toggles that bypass policy; if found, verify they don't actually bypass server-side checks.
@@ -402,8 +402,8 @@
 | **3. DATA→GROUNDING** | 3.1 Connector→ETL→Brain→Chat | 1. Cross-tenant RAG doc leak | retrieve() filters project_id only, no org_id; chat stream doesn't check org |
 | | | 2. DAG with cycle/missing connector runs as success | validateDagSpec client-only, PATCH skips validation, Kestra compiles to 0 steps |
 | | | 3. Warehouse reads cross org | queryWarehouse() org-unscoped, `db.table` syntax allows cross-database reads |
-| **4. GOVERNANCE SET-ONCE** | 4.1 Admin policy inherited | 1. Deprecated pipeline still governs | resolveContract skips lifecycle-status filter, no fallback to org default |
-| | | 2. Draft pipeline runs on internal consumers | Only PUBLIC route checks published; CHAT/AGENT/APP skip check |
+| **4. GOVERNANCE SET-ONCE** | 4.1 Admin policy inherited | 1. ✅ Deprecated pipeline rejected | Shared binding resolver fails closed; retirement requires explicit detach |
+| | | 2. ✅ Draft pipeline rejected | Shared resolver enforces consumability for internal and public paths |
 | | | 3. Policy enforcement duplicated per path | Ad-hoc enforcement, one path fails-open, others fail-closed (DRY) |
 | **5. ADMIN→OPERATOR** | 5.1 Pipeline delegation, team access | 1. Viewer can write via API bypass | API routes don't check requireAdmin; UI hides button but API allows |
 | | | 2. Budget enforcement per key, not per run | Budget checked only at key creation, not enforced at run time |
@@ -445,4 +445,3 @@
 2. **Prioritize by blast radius:** Cluster 3 (DATA) and 4 (GOVERNANCE) have org-isolation + leak risks — start there.
 3. **Check for seams:** For each fix, verify the enforcement seam is ONE place, all consumers use it (no copy-paste).
 4. **Verify live:** After each fix lands, run the reproducer + an integration pass to confirm the attack no longer works.
-

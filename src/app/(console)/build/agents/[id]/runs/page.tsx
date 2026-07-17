@@ -1,6 +1,6 @@
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
+import { findAppByAgentId } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -30,8 +31,10 @@ export default async function AgentRunsPage({
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();
+  const owningApp = await findAppByAgentId(id, orgId);
+  if (owningApp) redirect(`/solutions/apps/${encodeURIComponent(owningApp.id)}/runs`);
   const agent = await resolveAgent(id, orgId);
-  if (!agent) notFound();
+  if (!agent || agent.custom) notFound();
   // Degrade gracefully: DB down → empty run history ("No runs yet.") not the whole-page error boundary.
   const runs = await listAgentRunsByAgent(id, 100, orgId).catch(() => []);
 

@@ -87,12 +87,12 @@ export default async function AgentDetailPage({
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();
+  // AppSpec is the canonical owner of every authored agent. Preserve the old runtime-agent deep
+  // link by resolving it to the owning app lifecycle before runtime enablement can hide the row.
+  const owningApp = await findAppByAgentId(id, orgId);
+  if (owningApp) redirect(`/solutions/apps/${encodeURIComponent(owningApp.id)}`);
   const agent = await resolveAgent(id, orgId);
   if (!agent) notFound();
-  // AppSpec is the canonical owner of every authored agent. Preserve the old runtime-agent deep
-  // link by resolving it to the owning app lifecycle; orphaned legacy rows remain readable below.
-  const owningApp = agent.custom ? await findAppByAgentId(id, orgId) : null;
-  if (owningApp) redirect(`/solutions/apps/${encodeURIComponent(owningApp.id)}`);
   if (agent.custom) notFound();
   // Agent bindings are explicit. Null is honestly rendered as "No pipeline" and never resolved via
   // the chat default.

@@ -130,7 +130,7 @@ export function pipelineTransitions(status: string): PipelineTransition[] {
           action: 'archive',
           to: 'archived',
           label: 'Archive',
-          hint: 'Retire this pipeline — consumers fall back to the org default',
+          hint: 'Retire this pipeline after every consumer is explicitly detached',
         },
       ];
     case 'published':
@@ -139,7 +139,7 @@ export function pipelineTransitions(status: string): PipelineTransition[] {
           action: 'archive',
           to: 'archived',
           label: 'Archive',
-          hint: 'Retire this pipeline — consumers fall back to the org default',
+          hint: 'Retire this pipeline after every consumer is explicitly detached',
         },
       ];
     case 'archived':

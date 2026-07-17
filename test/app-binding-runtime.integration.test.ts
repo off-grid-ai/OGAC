@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
+import { submitAppRun } from '../src/lib/adapters/apprun.ts';
+import { createApp, deleteApp } from '../src/lib/apps-store.ts';
+import { resolveContractStrict } from '../src/lib/pipeline-contract.ts';
 import {
   PipelineBindingError,
   resolveExplicitPipelineBinding,
@@ -18,9 +21,13 @@ describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }
   const otherOrgId = `other_${orgId}`;
   const owner = `owner_${suffix}@test.local`;
   const pipelineId = `pl_app_binding_${suffix}`;
+  const alternatePipelineId = `pl_app_binding_alt_${suffix}`;
+  let appId = '';
 
   after(async () => {
+    if (appId) await deleteApp(appId, orgId).catch(() => {});
     await deletePipeline(pipelineId, orgId).catch(() => {});
+    await deletePipeline(alternatePipelineId, orgId).catch(() => {});
   });
 
   test('dispatch and Temporal re-resolution reject stale or cross-org explicit bindings', async () => {
@@ -29,6 +36,21 @@ describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }
       owner,
       orgId,
     );
+    await createPipeline(
+      { id: alternatePipelineId, name: 'Forged caller binding', status: 'published' },
+      owner,
+      orgId,
+    );
+    const app = await createApp(orgId, owner, {
+      title: 'Bound claims dispatch',
+      summary: '',
+      visibility: 'private',
+      pipelineId,
+      trigger: { kind: 'on-demand' },
+      steps: [{ id: 'output', label: 'Return result', kind: 'output', sink: 'console' }],
+      edges: [],
+    });
+    appId = app.id;
 
     const atDispatch = await resolveExplicitPipelineBinding(pipelineId, orgId);
     assert.equal(atDispatch.state, 'bound');
@@ -52,6 +74,26 @@ describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }
       () => resolveContractActivity(pipelineId, orgId),
       (error) =>
         error instanceof PipelineBindingError && error.binding.code === 'pipeline_unavailable',
+    );
+
+    const forgedContract = await resolveContractStrict(alternatePipelineId, orgId);
+    assert.ok(forgedContract);
+    await assert.rejects(
+      () =>
+        submitAppRun(
+          app,
+          {},
+          {
+            orgId,
+            actor: owner,
+            runId: `forged_${suffix}`,
+            pipelineId: alternatePipelineId,
+            contract: forgedContract,
+          },
+        ),
+      (error) =>
+        error instanceof PipelineBindingError && error.binding.code === 'pipeline_unavailable',
+      'the saved App binding wins; a caller-supplied valid contract cannot bypass it',
     );
 
     await deletePipeline(pipelineId, orgId);

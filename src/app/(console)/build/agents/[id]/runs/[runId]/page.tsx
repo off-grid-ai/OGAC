@@ -1,9 +1,10 @@
 import { ArrowLeft, SealCheck } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type AgentRun, getAgentRun } from '@/lib/agentrun';
+import { findAppByAgentId } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -140,8 +141,11 @@ export default async function RunTracePage({
 }>) {
   await requireModuleForUser('agents');
   const { id, runId } = await params;
-  const run = await getAgentRun(runId, await currentOrgId());
-  if (!run) notFound();
+  const orgId = await currentOrgId();
+  const owningApp = await findAppByAgentId(id, orgId);
+  if (owningApp) redirect(`/solutions/apps/${encodeURIComponent(owningApp.id)}/runs`);
+  const run = await getAgentRun(runId, orgId);
+  if (!run || run.agentId !== id) notFound();
 
   return (
     <div className="space-y-6">
