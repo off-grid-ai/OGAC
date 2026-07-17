@@ -3,20 +3,20 @@
 -- so a failed migration restores the original names and indexes automatically.
 DO $$
 BEGIN
-  IF to_regclass('public.solution_blueprints') IS NOT NULL
+  IF to_regclass(current_schema() || '.solution_blueprints') IS NOT NULL
      AND NOT EXISTS (
        SELECT 1 FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = 'solution_blueprints'
+       WHERE table_schema = current_schema() AND table_name = 'solution_blueprints'
          AND column_name = 'current_version'
      ) THEN
     ALTER TABLE solution_blueprints RENAME TO solution_blueprints_legacy;
     ALTER INDEX IF EXISTS solution_blueprints_org_idx RENAME TO solution_blueprints_legacy_org_idx;
   END IF;
 
-  IF to_regclass('public.solution_deployments') IS NOT NULL
+  IF to_regclass(current_schema() || '.solution_deployments') IS NOT NULL
      AND NOT EXISTS (
        SELECT 1 FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = 'solution_deployments'
+       WHERE table_schema = current_schema() AND table_name = 'solution_deployments'
          AND column_name = 'blueprint_version'
      ) THEN
     ALTER TABLE solution_deployments RENAME TO solution_deployments_legacy;
@@ -41,6 +41,26 @@ CREATE TABLE IF NOT EXISTS "solution_blueprints" (
 CREATE INDEX IF NOT EXISTS "solution_blueprints_org_idx" ON "solution_blueprints" ("org_id");
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "solution_blueprints_catalog_key_idx" ON "solution_blueprints" ("org_id", "source_catalog_key");
+--> statement-breakpoint
+-- The rejected request-time schema already created this table with only (org_id, seeded_at).
+-- Existing rows mean catalog v1 was installed, so backfill them to v1; the normal store seeder then
+-- appends the honest v2 snapshots. Fresh installs still start at v0 below.
+DO $$
+BEGIN
+  IF to_regclass(current_schema() || '.solution_blueprint_seed_state') IS NOT NULL THEN
+    ALTER TABLE solution_blueprint_seed_state
+      ADD COLUMN IF NOT EXISTS catalog_version integer NOT NULL DEFAULT 1;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = to_regclass(current_schema() || '.solution_blueprint_seed_state')
+        AND conname = 'solution_blueprint_seed_catalog_version_check'
+    ) THEN
+      ALTER TABLE solution_blueprint_seed_state
+        ADD CONSTRAINT solution_blueprint_seed_catalog_version_check
+        CHECK (catalog_version >= 0);
+    END IF;
+  END IF;
+END $$;
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "solution_blueprint_versions" (
   "id" text PRIMARY KEY NOT NULL,
@@ -121,11 +141,29 @@ CREATE INDEX IF NOT EXISTS "solution_observations_deployment_idx" ON "solution_o
 -- schema did not pin a trustworthy pipeline contract.
 DO $$
 BEGIN
-  IF to_regclass('public.solution_blueprints_legacy') IS NOT NULL THEN
+  IF to_regclass(current_schema() || '.solution_blueprints_legacy') IS NOT NULL THEN
     EXECUTE $migrate$
       INSERT INTO solution_blueprints
-        (id, org_id, current_version, created_at, updated_at)
-      SELECT id, org_id, 1, created_at, updated_at
+        (id, org_id, current_version, source_catalog_key, catalog_version, created_at, updated_at)
+      SELECT
+        id,
+        org_id,
+        1,
+        CASE
+          WHEN title = 'Delinquency Intervention' AND source_template_key = 'loan-underwriting'
+            THEN 'lending-delinquency-intervention'
+          WHEN title = 'Indemnity Claim Fast Track' AND source_template_key = 'claims-triage'
+            THEN 'insurance-indemnity-fast-track'
+          ELSE NULL
+        END,
+        CASE
+          WHEN (title = 'Delinquency Intervention' AND source_template_key = 'loan-underwriting')
+            OR (title = 'Indemnity Claim Fast Track' AND source_template_key = 'claims-triage')
+            THEN 1
+          ELSE NULL
+        END,
+        created_at,
+        updated_at
       FROM solution_blueprints_legacy
       ON CONFLICT (id) DO NOTHING
     $migrate$;
@@ -163,8 +201,8 @@ BEGIN
     $migrate$;
   END IF;
 
-  IF to_regclass('public.solution_deployments_legacy') IS NOT NULL
-     AND to_regclass('public.solution_blueprints_legacy') IS NOT NULL THEN
+  IF to_regclass(current_schema() || '.solution_deployments_legacy') IS NOT NULL
+     AND to_regclass(current_schema() || '.solution_blueprints_legacy') IS NOT NULL THEN
     EXECUTE $migrate$
       INSERT INTO solution_deployments
         (id, org_id, blueprint_id, blueprint_version, app_id, pipeline_id, status,
