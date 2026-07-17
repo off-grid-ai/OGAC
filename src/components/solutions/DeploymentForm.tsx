@@ -67,7 +67,9 @@ export function DeploymentForm({
   async function remove() {
     if (
       !deployment ||
-      !window.confirm('Retire this deployment binding? Its App, runs, and evidence remain readable.')
+      !window.confirm(
+        'Retire this deployment binding? Its App, runs, and evidence remain readable.',
+      )
     )
       return;
     setSaving(true);
@@ -146,7 +148,7 @@ export function DeploymentForm({
         </select>
       </label>
       {!deployment && blueprintId && compatibleApps.length === 0 ? (
-        <p role="status" className="text-xs text-amber-600 lg:col-span-2">
+        <p role="status" className="text-xs text-muted-foreground lg:col-span-2">
           No published App currently satisfies this Blueprint version&apos;s pipeline, domain, and
           capability contract.
         </p>
@@ -166,9 +168,7 @@ export function DeploymentForm({
         )}
         <Button
           disabled={
-            saving ||
-            deployment?.status === 'retired' ||
-            (!deployment && (!blueprintId || !appId))
+            saving || deployment?.status === 'retired' || (!deployment && (!blueprintId || !appId))
           }
         >
           <Plus />

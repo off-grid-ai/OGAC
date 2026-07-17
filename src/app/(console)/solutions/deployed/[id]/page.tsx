@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { DeploymentForm } from '@/components/solutions/DeploymentForm';
 import { ObservationForm } from '@/components/solutions/ObservationForm';
 import { getApp } from '@/lib/apps-store';
+import { formatOutcomeCurrency } from '@/lib/outcome-contract';
 import {
   getSolutionBlueprint,
   getSolutionDeployment,
@@ -83,12 +84,14 @@ export default async function DeploymentDetailPage({
                   {observation.windowEnd.toLocaleDateString()}
                 </p>
                 <p className="mt-3 font-medium">
-                  ${observation.estimatedRoi.netValue.toLocaleString()} estimated net value
+                  {formatOutcomeCurrency(observation.estimatedRoi.netValue, 'USD')} estimated net
+                  value
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {observation.estimatedRoi.runsCompleted} completed canonical runs ·{' '}
-                  {observation.estimatedRoi.hoursSaved.toLocaleString()} estimated hours · $
-                  {observation.estimatedRoi.actualAiCost.toLocaleString()} recorded AI cost
+                  {observation.estimatedRoi.hoursSaved.toLocaleString()} estimated hours ·{' '}
+                  {formatOutcomeCurrency(observation.estimatedRoi.actualAiCost, 'USD')} recorded AI
+                  cost
                 </p>
                 {observation.evidenceLinks.map((href) => (
                   <Link key={href} href={href} className="mt-2 block text-xs text-primary">

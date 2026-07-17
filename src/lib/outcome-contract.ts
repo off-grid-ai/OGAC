@@ -36,6 +36,28 @@ export interface OutcomeSummary {
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
+/**
+ * Render an outcome amount with its ISO-4217 currency. Keeping this pure formatter beside the
+ * contract prevents pages from guessing symbols (for example, treating every tenant as USD).
+ */
+export function formatOutcomeCurrency(value: number, currency: string, locale = 'en-US'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function isIsoCurrency(currency: string): boolean {
+  if (!/^[A-Za-z]{3}$/.test(currency)) return false;
+  try {
+    new Intl.NumberFormat('en-US', { style: 'currency', currency });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function validateOutcomeContract(contract: OutcomeContract): string[] {
   const errors: string[] = [];
   if (contract.direction !== 'increase' && contract.direction !== 'decrease') {
@@ -65,6 +87,7 @@ export function validateOutcomeContract(contract: OutcomeContract): string[] {
     errors.push('ROI amounts must be finite and non-negative');
   }
   if (!contract.roi.currency.trim()) errors.push('ROI currency is required');
+  else if (!isIsoCurrency(contract.roi.currency)) errors.push('ROI currency must be an ISO code');
   if (!contract.roi.rationale.trim()) errors.push('ROI rationale is required');
   if (contract.direction === 'increase' && contract.target.value <= contract.baseline.value) {
     errors.push('an increase target must exceed its baseline');

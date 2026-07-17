@@ -1,7 +1,7 @@
 import { ArrowRight, Plus } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { BlueprintForm } from '@/components/solutions/BlueprintForm';
-import { summarizeOutcome } from '@/lib/outcome-contract';
+import { formatOutcomeCurrency, summarizeOutcome } from '@/lib/outcome-contract';
 import { listSolutionBlueprints } from '@/lib/solution-blueprints-store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -43,7 +43,9 @@ export default async function SolutionLibraryPage() {
                   </span>
                   <h2 className="mt-1 font-medium">{blueprint.title}</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {blueprint.adoptable ? 'Adoptable runtime' : 'Hypothesis only - no runtime asset'}
+                    {blueprint.adoptable
+                      ? 'Adoptable runtime'
+                      : 'Hypothesis only - no runtime asset'}
                   </p>
                 </div>
                 <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
@@ -61,7 +63,10 @@ export default async function SolutionLibraryPage() {
                 <div>
                   <p className="text-muted-foreground">1Y value</p>
                   <p className="mt-1 font-medium">
-                    {blueprint.outcome.roi.currency} {summary.firstYearNetValue.toLocaleString()}
+                    {formatOutcomeCurrency(
+                      summary.firstYearNetValue,
+                      blueprint.outcome.roi.currency,
+                    )}
                   </p>
                 </div>
                 <div>

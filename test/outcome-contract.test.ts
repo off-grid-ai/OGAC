@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  formatOutcomeCurrency,
   summarizeOutcome,
   validateOutcomeContract,
   type OutcomeContract,
 } from '../src/lib/outcome-contract.ts';
+
+test('formatOutcomeCurrency uses the declared currency instead of assuming dollars', () => {
+  assert.equal(formatOutcomeCurrency(1_234.5, 'INR', 'en-IN'), '₹1,234.50');
+  assert.equal(formatOutcomeCurrency(-42, 'EUR', 'de-DE'), '-42,00 €');
+});
 
 const contract = (patch: Partial<OutcomeContract> = {}): OutcomeContract => ({
   metricName: 'Cases processed per day',
@@ -108,5 +114,9 @@ test('validateOutcomeContract rejects missing fields, impossible direction and u
   assert.deepEqual(
     validateOutcomeContract(contract({ target: { value: 100, label: 'Wrong-way target' } })),
     ['an increase target must exceed its baseline'],
+  );
+  assert.deepEqual(
+    validateOutcomeContract(contract({ roi: { ...contract().roi, currency: 'not-a-currency' } })),
+    ['ROI currency must be an ISO code'],
   );
 });

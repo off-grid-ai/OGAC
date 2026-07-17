@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BlueprintForm } from '@/components/solutions/BlueprintForm';
-import { summarizeOutcome } from '@/lib/outcome-contract';
+import { formatOutcomeCurrency, summarizeOutcome } from '@/lib/outcome-contract';
 import { getSolutionBlueprint, listSolutionDeployments } from '@/lib/solution-blueprints-store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -65,7 +65,7 @@ export default async function BlueprintDetailPage({
           ['Definition version', `v${blueprint.currentVersion}`],
           [
             '1Y net value',
-            `${blueprint.outcome.roi.currency} ${outcome.firstYearNetValue.toLocaleString()}`,
+            formatOutcomeCurrency(outcome.firstYearNetValue, blueprint.outcome.roi.currency),
           ],
           [
             'Payback',

@@ -73,23 +73,11 @@ export function ObservationForm({ deploymentId }: Readonly<{ deploymentId: strin
       </label>
       <label className="text-xs text-muted-foreground">
         Minutes saved / run (estimate)
-        <Input
-          name="estimatedMinutesSavedPerRun"
-          type="number"
-          min="0"
-          step="any"
-          required
-        />
+        <Input name="estimatedMinutesSavedPerRun" type="number" min="0" step="any" required />
       </label>
       <label className="text-xs text-muted-foreground">
-        Loaded cost / hour (estimate)
-        <Input
-          name="estimatedLoadedCostPerHour"
-          type="number"
-          min="0"
-          step="any"
-          required
-        />
+        Loaded cost / hour in USD (estimate)
+        <Input name="estimatedLoadedCostPerHour" type="number" min="0" step="any" required />
       </label>
       <label className="text-xs text-muted-foreground lg:col-span-3">
         Evidence links

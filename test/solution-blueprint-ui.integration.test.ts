@@ -52,6 +52,7 @@ test('observation UI labels operator claims and system-derived evidence honestly
   assert.match(html, /Record an operator KPI claim/);
   assert.match(html, /KPI label/);
   assert.match(html, /Minutes saved \/ run \(estimate\)/);
+  assert.match(html, /Loaded cost \/ hour in USD \(estimate\)/);
   assert.match(html, /Completed runs and AI cost are read from canonical run evidence/);
   assert.doesNotMatch(html, /name="runsCompleted"/);
   assert.doesNotMatch(html, /name="actualAiCost"/);
