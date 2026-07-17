@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/UserMenu';
 import { drawerReducer } from '@/lib/mobile-nav';
-import { getEnabledModules } from '@/lib/modules';
+import { ownerForPath } from '@/modules/ownership';
 
 interface SessionUser {
   name?: string | null;
@@ -18,7 +18,7 @@ interface SessionUser {
 
 export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   const pathname = usePathname();
-  const mod = getEnabledModules().find((m) => pathname.startsWith(m.route));
+  const owner = ownerForPath(pathname);
 
   // Mobile nav drawer state — owned by the pure reducer so the close-on-nav invariant is
   // unit-tested (see src/lib/mobile-nav.ts). Radix already closes on esc/backdrop; the effect below
@@ -50,10 +50,10 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
         </Sheet>
 
         <div className="min-w-0 leading-tight">
-          <h1 className="truncate text-sm font-medium text-foreground">{mod?.label ?? 'Console'}</h1>
-          {mod ? (
+          <h1 className="truncate text-sm font-medium text-foreground">{owner?.label ?? 'Console'}</h1>
+          {owner ? (
             <p className="hidden truncate text-xs text-muted-foreground sm:block">
-              {mod.description}
+              {owner.description}
             </p>
           ) : null}
         </div>

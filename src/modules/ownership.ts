@@ -1,0 +1,154 @@
+import type { ModuleId } from './registry';
+
+export type IaSectionId =
+  | 'home'
+  | 'work'
+  | 'solutions'
+  | 'data'
+  | 'runtime'
+  | 'governance'
+  | 'insights'
+  | 'operations';
+
+export type CanonicalOwnerId =
+  | 'overview'
+  | 'chat'
+  | 'projects'
+  | 'prompts'
+  | 'artifacts'
+  | 'files'
+  | 'apps'
+  | 'reviews'
+  | 'tools'
+  | 'quality-definitions'
+  | 'sources'
+  | 'domains'
+  | 'data-flows'
+  | 'warehouse'
+  | 'catalog'
+  | 'knowledge'
+  | 'lineage'
+  | 'models'
+  | 'gateways'
+  | 'runtime-pipelines'
+  | 'api-budgets'
+  | 'posture'
+  | 'policies'
+  | 'access'
+  | 'teams'
+  | 'guardrails'
+  | 'secrets'
+  | 'evidence'
+  | 'trust'
+  | 'outcomes'
+  | 'ai-behavior'
+  | 'usage'
+  | 'quality-results'
+  | 'cost'
+  | 'runs'
+  | 'nodes'
+  | 'clusters'
+  | 'services'
+  | 'platform-health'
+  | 'edge'
+  | 'managed-devices'
+  | 'configuration'
+  | 'backups'
+  | 'admin';
+
+export interface IaSection {
+  id: IaSectionId;
+  label: string;
+  purpose: string;
+  ownershipRule: string;
+}
+
+export interface CanonicalOwner {
+  id: CanonicalOwnerId;
+  section: IaSectionId;
+  label: string;
+  description: string;
+  route: string;
+  /** Existing commercial capability gate. IA does not create a parallel entitlement system. */
+  gate: ModuleId;
+  /** Prominent sidebar row; other owners remain reachable from the section's scoped navigation. */
+  primary?: boolean;
+  comingSoon?: boolean;
+}
+
+export const IA_SECTIONS: readonly IaSection[] = [
+  { id: 'home', label: 'Home', purpose: 'See what needs attention and where to go next.', ownershipRule: 'Owns summaries and shortcuts, never canonical entities.' },
+  { id: 'work', label: 'Work', purpose: 'Use Off Grid AI without needing platform knowledge.', ownershipRule: 'Owns human work objects; enterprise knowledge belongs to Data.' },
+  { id: 'solutions', label: 'Solutions', purpose: 'Build and operate high-value business use cases.', ownershipRule: 'The App is the product center; an agent is an App kind.' },
+  { id: 'data', label: 'Data', purpose: 'Turn enterprise systems into governed solution context.', ownershipRule: 'Owns enterprise data resources, not vendor engines.' },
+  { id: 'runtime', label: 'AI Runtime', purpose: 'Control available AI capabilities and governed access.', ownershipRule: 'Owns logical models and access contracts; physical machines belong to Operations.' },
+  { id: 'governance', label: 'Governance', purpose: 'Define, enforce, and prove controls.', ownershipRule: 'Global rules and evidence live here; apps and pipelines show assignments.' },
+  { id: 'insights', label: 'Insights', purpose: 'Measure effectiveness, reliability, adoption, and economics.', ownershipRule: 'Owns measured results, not configuration or service health.' },
+  { id: 'operations', label: 'Operations', purpose: 'Run the execution plane, fleet, services, and recovery controls.', ownershipRule: 'Owns runtime instances and infrastructure.' },
+] as const;
+
+export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
+  { id: 'overview', section: 'home', label: 'Overview', description: 'Attention, value, active work, and platform posture.', route: '/overview', gate: 'overview', primary: true },
+
+  { id: 'chat', section: 'work', label: 'Chat', description: 'Private conversations grounded in approved company context.', route: '/work/chat', gate: 'chat', primary: true },
+  { id: 'projects', section: 'work', label: 'Projects', description: 'Shared instructions, conversations, apps, and activity.', route: '/work/projects', gate: 'projects', primary: true },
+  { id: 'prompts', section: 'work', label: 'Prompts', description: 'Reusable prompts, versions, partials, and assignments.', route: '/work/prompts', gate: 'prompts' },
+  { id: 'artifacts', section: 'work', label: 'Artifacts', description: 'Generated outputs, provenance, and shares.', route: '/work/artifacts', gate: 'artifacts' },
+  { id: 'files', section: 'work', label: 'Files', description: 'On-prem files, folders, visibility, and sharing.', route: '/work/files', gate: 'storage', primary: true },
+
+  { id: 'apps', section: 'solutions', label: 'Apps', description: 'Business use cases and agents across their full lifecycle.', route: '/solutions/apps', gate: 'studio', primary: true },
+  { id: 'reviews', section: 'solutions', label: 'Reviews', description: 'Human approvals, exceptions, and decision history.', route: '/solutions/reviews', gate: 'studio', primary: true },
+  { id: 'tools', section: 'solutions', label: 'Tools', description: 'HTTP, MCP, and built-in tools available to apps.', route: '/solutions/tools', gate: 'tools', primary: true },
+  { id: 'quality-definitions', section: 'solutions', label: 'Quality', description: 'Evaluators, golden sets, and reusable quality gates.', route: '/solutions/quality', gate: 'evals', primary: true },
+
+  { id: 'sources', section: 'data', label: 'Sources', description: 'Enterprise systems, connectors, credentials, and connection tests.', route: '/data/sources', gate: 'data', primary: true },
+  { id: 'domains', section: 'data', label: 'Domains', description: 'Business terms, owners, source mappings, policies, and SLAs.', route: '/data/domains', gate: 'data-domains' },
+  { id: 'data-flows', section: 'data', label: 'Flows', description: 'Replicated syncs and orchestrated data jobs.', route: '/data/flows', gate: 'data', primary: true },
+  { id: 'warehouse', section: 'data', label: 'Warehouse', description: 'Tables, columns, queries, profiles, and freshness.', route: '/data/warehouse', gate: 'data' },
+  { id: 'catalog', section: 'data', label: 'Catalog', description: 'Dataset ownership, classification, freshness, and impact.', route: '/data/catalog', gate: 'catalog' },
+  { id: 'knowledge', section: 'data', label: 'Knowledge', description: 'Collections, documents, indexes, permissions, and app bindings.', route: '/data/knowledge', gate: 'knowledge', primary: true },
+  { id: 'lineage', section: 'data', label: 'Lineage', description: 'Source-to-answer trace and impact analysis.', route: '/data/lineage', gate: 'lineage' },
+
+  { id: 'models', section: 'runtime', label: 'Models', description: 'Logical model capabilities, versions, and availability.', route: '/runtime/models', gate: 'gateway', primary: true },
+  { id: 'gateways', section: 'runtime', label: 'Gateways', description: 'Model endpoints, providers, egress class, and health.', route: '/runtime/gateways', gate: 'gateways', primary: true },
+  { id: 'runtime-pipelines', section: 'runtime', label: 'Pipelines', description: 'Governed model-access and routing contracts.', route: '/runtime/pipelines', gate: 'pipelines', primary: true },
+  { id: 'api-budgets', section: 'runtime', label: 'API & budgets', description: 'API keys, clients, rate limits, and budgets.', route: '/runtime/api-budgets', gate: 'finops', primary: true },
+
+  { id: 'posture', section: 'governance', label: 'Posture', description: 'Control status, exceptions, risk, and emergency actions.', route: '/governance/posture', gate: 'control', primary: true },
+  { id: 'policies', section: 'governance', label: 'Policies', description: 'Rules, versions, decisions, and assignments.', route: '/governance/policies', gate: 'policy', primary: true },
+  { id: 'access', section: 'governance', label: 'Access', description: 'Users, roles, sessions, MFA, and service accounts.', route: '/governance/access', gate: 'access', primary: true },
+  { id: 'teams', section: 'governance', label: 'Teams', description: 'Teams, membership, and delegated access.', route: '/governance/teams', gate: 'teams' },
+  { id: 'guardrails', section: 'governance', label: 'Guardrails', description: 'Safety rules, recognizers, masking, thresholds, and tests.', route: '/governance/guardrails', gate: 'guardrails' },
+  { id: 'secrets', section: 'governance', label: 'Secrets', description: 'Secrets, mounts, leases, seal state, and rotation.', route: '/governance/secrets', gate: 'secrets' },
+  { id: 'evidence', section: 'governance', label: 'Evidence', description: 'Audit, security, provenance, and evidence exports.', route: '/governance/evidence', gate: 'audit', primary: true },
+  { id: 'trust', section: 'governance', label: 'Trust & regulatory', description: 'Frameworks, controls, attestations, DPIAs, and reports.', route: '/governance/trust', gate: 'trust' },
+
+  { id: 'outcomes', section: 'insights', label: 'Outcomes', description: 'Business KPIs, ROI, throughput, and effectiveness.', route: '/insights/outcomes', gate: 'roi', primary: true },
+  { id: 'ai-behavior', section: 'insights', label: 'AI behavior', description: 'Traces, latency, errors, routing, and response behavior.', route: '/insights/ai', gate: 'observability', primary: true },
+  { id: 'usage', section: 'insights', label: 'Usage', description: 'Requests, tokens, users, apps, and adoption.', route: '/insights/usage', gate: 'analytics' },
+  { id: 'quality-results', section: 'insights', label: 'Quality', description: 'Eval results, drift, scorecards, and quality trends.', route: '/insights/quality', gate: 'drift' },
+  { id: 'cost', section: 'insights', label: 'Cost', description: 'Spend, attribution, unit cost, budget consumption, and savings.', route: '/insights/cost', gate: 'accounting', primary: true },
+
+  { id: 'runs', section: 'operations', label: 'Runs', description: 'Every app, agent, and chat execution with retry and cancel.', route: '/operations/runs', gate: 'runs', primary: true },
+  { id: 'nodes', section: 'operations', label: 'Physical nodes', description: 'Registry-driven node inventory, roles, health, and capacity.', route: '/operations/nodes', gate: 'gateway', primary: true },
+  { id: 'clusters', section: 'operations', label: 'Compute clusters', description: 'Registry-derived cluster head and member relationships.', route: '/operations/clusters', gate: 'gateway' },
+  { id: 'services', section: 'operations', label: 'Services', description: 'Deployment-registry services, health, placement, and dependencies.', route: '/operations/services', gate: 'services', primary: true },
+  { id: 'platform-health', section: 'operations', label: 'Platform health', description: 'Platform metrics, logs, traces, alerts, and queue health.', route: '/operations/health', gate: 'platform-health', primary: true },
+  { id: 'edge', section: 'operations', label: 'Edge', description: 'Routes, tunnel, WAF, rate limits, and blocked traffic.', route: '/operations/edge', gate: 'edge' },
+  { id: 'managed-devices', section: 'operations', label: 'Managed devices', description: 'Employee device enrollment, inventory, policy, and commands.', route: '/operations/devices', gate: 'fleet', comingSoon: true },
+  { id: 'configuration', section: 'operations', label: 'Configuration', description: 'Adapters, feature flags, auth, and environment references.', route: '/operations/configuration', gate: 'config' },
+  { id: 'backups', section: 'operations', label: 'Backups', description: 'Backup jobs, schedules, restore, retention, and replication.', route: '/operations/backups', gate: 'backups' },
+  { id: 'admin', section: 'operations', label: 'Admin', description: 'Tenants, organization settings, and platform administration.', route: '/operations/admin', gate: 'admin' },
+] as const;
+
+export function ownerById(id: CanonicalOwnerId): CanonicalOwner {
+  const owner = CANONICAL_OWNERS.find((candidate) => candidate.id === id);
+  if (!owner) throw new Error(`Unknown canonical owner: ${id}`);
+  return owner;
+}
+
+export function ownerForPath(pathname: string): CanonicalOwner | undefined {
+  return CANONICAL_OWNERS
+    .filter((owner) => pathname === owner.route || pathname.startsWith(`${owner.route}/`))
+    .sort((a, b) => b.route.length - a.route.length)[0];
+}
