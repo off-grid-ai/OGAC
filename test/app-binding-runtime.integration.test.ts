@@ -1,19 +1,28 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { submitAppRun } from '../src/lib/adapters/apprun.ts';
-import { createApp, deleteApp } from '../src/lib/apps-store.ts';
-import { resolveContractStrict } from '../src/lib/pipeline-contract.ts';
-import {
-  PipelineBindingError,
-  resolveExplicitPipelineBinding,
-} from '../src/lib/pipeline-run-glue.ts';
-import { createPipeline, deletePipeline, updatePipeline } from '../src/lib/pipelines.ts';
-import { resolveContractActivity } from '../src/worker/app-run.activities.ts';
 // @ts-expect-error shared JS reachability helper
 import { dbAvailable } from './helpers/db-available.mjs';
+import { prepareSolutionSchema } from './support/solution-schema.mjs';
 
 const available = await dbAvailable();
 const skip = available.ok ? undefined : available.reason;
+const previousDatabaseUrl = process.env.DATABASE_URL;
+const prepared = available.ok ? await prepareSolutionSchema('app_binding_runtime') : null;
+if (prepared) process.env.DATABASE_URL = prepared.databaseUrl;
+
+const { submitAppRun } = await import('../src/lib/adapters/apprun.ts');
+const { createApp, deleteApp } = await import('../src/lib/apps-store.ts');
+const { resolveContractStrict } = await import('../src/lib/pipeline-contract.ts');
+const { PipelineBindingError, resolveExplicitPipelineBinding } =
+  await import('../src/lib/pipeline-run-glue.ts');
+const { createPipeline, deletePipeline, updatePipeline } = await import('../src/lib/pipelines.ts');
+const { resolveContractActivity } = await import('../src/worker/app-run.activities.ts');
+
+after(async () => {
+  await prepared?.cleanup();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+});
 
 describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }, () => {
   const suffix = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -98,8 +107,7 @@ describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }
 
     await assert.rejects(
       () => deletePipeline(pipelineId, orgId),
-      (error) =>
-        (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
+      (error) => (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
       'the database prevents a direct/legacy caller from retiring a bound pipeline',
     );
   });
