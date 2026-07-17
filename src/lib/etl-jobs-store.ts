@@ -35,8 +35,13 @@ import {
   type EtlJobDraft,
   type EtlJobSpec,
   type EtlRunView,
+  type ManagedEtlBlueprint,
 } from '@/lib/etl-job';
-import { compileToKestraFlow } from '@/lib/etl-kestra-compile';
+import {
+  compileManagedBlueprintToKestraFlow,
+  compileToKestraFlow,
+} from '@/lib/etl-kestra-compile';
+import { managedEtlBlueprint } from '@/lib/etl-blueprints';
 import type { EtlJobStatus } from '@/lib/etl-model';
 import { listConnectors } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -68,6 +73,7 @@ export async function ensureEtlJobsSchema(): Promise<void> {
     // The visual DAG spec (source → transforms → destination) authored in the builder. Added after
     // the flat-mapping model shipped, so ALTER idempotently for a DB that has the older table.
     await db.execute(sql`ALTER TABLE etl_jobs ADD COLUMN IF NOT EXISTS dag jsonb;`);
+    await db.execute(sql`ALTER TABLE etl_jobs ADD COLUMN IF NOT EXISTS managed_blueprint text;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS etl_runs (
         id text PRIMARY KEY,
@@ -85,6 +91,10 @@ export async function ensureEtlJobsSchema(): Promise<void> {
     `);
     await db.execute(sql`ALTER TABLE etl_runs ADD COLUMN IF NOT EXISTS execution_id text;`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS etl_jobs_org_idx ON etl_jobs (org_id);`);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS etl_jobs_managed_blueprint_idx
+      ON etl_jobs (org_id, managed_blueprint) WHERE managed_blueprint IS NOT NULL;
+    `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS etl_runs_job_idx ON etl_runs (job_id);`);
   })().catch((e) => {
     ensurePromise = null;
@@ -118,6 +128,9 @@ function rowToSpec(r: Record<string, unknown>): EtlJobSpec {
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
     dag: r.dag && typeof r.dag === 'object' ? (r.dag as EtlDagSpec) : undefined,
+    managedBlueprint: r.managed_blueprint
+      ? (String(r.managed_blueprint) as ManagedEtlBlueprint)
+      : undefined,
   };
 }
 
@@ -202,6 +215,42 @@ export async function createEtlJob(
        ${draft.cron ?? null}, ${rowLimit}, ${dagJson}::jsonb)
     RETURNING *`);
   return { ok: true, job: rowToSpec((res.rows as Record<string, unknown>[])[0]) };
+}
+
+// Idempotently project a reviewed blueprint into the same jobs table/operators use for CRUD, runs,
+// history and detail. Deployment owns only this projection call; there is no second flow catalog.
+export async function provisionManagedEtlBlueprint(
+  key: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<EtlJobSpec | null> {
+  const definition = managedEtlBlueprint(key);
+  if (!definition) return null;
+  await ensureEtlJobsSchema();
+  const { sql } = await import('drizzle-orm');
+  const draft = definition.draft;
+  const id = `etl_${randomUUID().slice(0, 12)}`;
+  const res = await db.execute(sql`
+    INSERT INTO etl_jobs
+      (id, org_id, name, source_connector_id, source_resource, dest_database, dest_table,
+       mappings, trigger, cron, row_limit, dag, managed_blueprint)
+    VALUES
+      (${id}, ${orgId}, ${draft.name}, ${draft.sourceConnectorId}, ${draft.sourceResource},
+       ${draft.destDatabase}, ${draft.destTable}, '[]'::jsonb, ${draft.trigger}, ${draft.cron ?? null},
+       ${draft.rowLimit ?? null}, NULL, ${definition.key})
+    ON CONFLICT (org_id, managed_blueprint) WHERE managed_blueprint IS NOT NULL DO UPDATE SET
+      name = EXCLUDED.name,
+      source_connector_id = EXCLUDED.source_connector_id,
+      source_resource = EXCLUDED.source_resource,
+      dest_database = EXCLUDED.dest_database,
+      dest_table = EXCLUDED.dest_table,
+      mappings = EXCLUDED.mappings,
+      trigger = EXCLUDED.trigger,
+      cron = EXCLUDED.cron,
+      row_limit = EXCLUDED.row_limit,
+      dag = NULL,
+      updated_at = now()
+    RETURNING *`);
+  return rowToSpec((res.rows as Record<string, unknown>[])[0]);
 }
 
 export async function updateEtlJob(
@@ -378,7 +427,7 @@ export async function runJobViaKestra(
   orgId: string = DEFAULT_ORG,
 ): Promise<EtlRunView> {
   // Older jobs authored before the visual builder have no DAG → run the governed direct-copy.
-  if (!job.dag) return runJob(job, orgId);
+  if (!job.managedBlueprint && !job.dag) return runJob(job, orgId);
 
   await ensureEtlJobsSchema();
   const { sql } = await import('drizzle-orm');
@@ -392,7 +441,15 @@ export async function runJobViaKestra(
   let executionId: string | null = null;
 
   try {
-    const compiled = compileToKestraFlow(job.dag, job.id, job.name);
+    const compiled = job.managedBlueprint
+      ? compileManagedBlueprintToKestraFlow(
+          job.managedBlueprint,
+          job.id,
+          job.name,
+          job.trigger,
+          job.cron,
+        )
+      : compileToKestraFlow(job.dag!, job.id, job.name);
     const up = await kestraOrchestration.upsertFlow(compiled.yaml, compiled.namespace, compiled.flowId);
     if (!up.ok) {
       message = up.configured
@@ -400,10 +457,10 @@ export async function runJobViaKestra(
         : `Orchestration engine not configured or unreachable: ${up.error}`;
       throw new Error(message);
     }
-    const exec = await kestraOrchestration.execute(compiled.namespace, compiled.flowId, {
-      steps: JSON.stringify(compiled.steps),
-      job_id: compiled.flowId,
-    });
+    const inputs: Record<string, string> = job.managedBlueprint
+      ? { console_job_id: job.id, console_run_id: runId }
+      : { steps: JSON.stringify(compiled.steps), job_id: compiled.flowId };
+    const exec = await kestraOrchestration.execute(compiled.namespace, compiled.flowId, inputs);
     if (!exec.ok) {
       message = `Deployed the flow but could not start an execution: ${exec.error}`;
       throw new Error(message);
@@ -435,17 +492,54 @@ export async function refreshRunStatus(run: EtlRunView, orgId: string = DEFAULT_
   if (run.path !== 'kestra' || !run.executionId || run.status !== 'running') return run;
   const exec = await kestraOrchestration.executionStatus(run.executionId);
   if (!exec) return run;
-  const status: EtlJobStatus = exec.status;
+  let status: EtlJobStatus = exec.status;
   if (status === run.status) return run;
   const { sql } = await import('drizzle-orm');
+  let rowsRead = run.rowsRead;
+  let rowsWritten = run.rowsWritten;
+  let message = run.message ?? '';
+  if (status === 'succeeded') {
+    const job = await getEtlJob(run.jobId, orgId);
+    if (job?.managedBlueprint === 'bfsi-delinquency-snapshot') {
+      try {
+        const { sqlString } = await import('@/lib/warehouse-model');
+        const outcomeText = await warehouseExec(`
+          SELECT delinquent_loans, principal_exposure_inr
+          FROM bfsi.delinquency_orchestration_audit FINAL
+          WHERE console_job_id = ${sqlString(run.jobId)}
+            AND console_run_id = ${sqlString(run.runId)}
+            AND execution_id = ${sqlString(run.executionId)}
+          ORDER BY snapshot_at DESC LIMIT 1 FORMAT JSON`);
+        const outcome = JSON.parse(outcomeText) as {
+          data?: { delinquent_loans?: string | number; principal_exposure_inr?: string | number }[];
+        };
+        const row = outcome.data?.[0];
+        if (!row) throw new Error('execution succeeded without a correlated business output');
+        rowsRead = Number(row.delinquent_loans ?? 0);
+        rowsWritten = 1;
+        message = `Persisted delinquency outcome for ${rowsRead} loans (INR ${String(row.principal_exposure_inr ?? 0)} exposure).`;
+      } catch (error) {
+        status = 'failed';
+        message = `Orchestration finished but its business output could not be verified: ${describeError(error)}`;
+      }
+    }
+  }
   const finished = exec.status === 'running' ? null : new Date();
   await db.execute(sql`
-    UPDATE etl_runs SET status = ${status}, finished_at = ${finished}
+    UPDATE etl_runs SET status = ${status}, rows_read = ${rowsRead}, rows_written = ${rowsWritten},
+      message = ${message}, finished_at = ${finished}
     WHERE id = ${run.runId} AND org_id = ${orgId}`);
   await db.execute(
     sql`UPDATE etl_jobs SET last_run_status = ${status} WHERE id = ${run.jobId}`,
   );
-  return { ...run, status, finishedAt: finished ? finished.toISOString() : run.finishedAt };
+  return {
+    ...run,
+    status,
+    rowsRead,
+    rowsWritten,
+    message,
+    finishedAt: finished ? finished.toISOString() : run.finishedAt,
+  };
 }
 
 // Fetch the engine logs for a run's execution (product-language wrapper). Empty when not applicable
