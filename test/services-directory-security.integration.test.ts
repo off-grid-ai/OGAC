@@ -39,6 +39,31 @@ test('real registry keeps the Postgres probe URL server-side while client props 
       serializedDetailProps,
       /rsc-db-user|rsc-db-password|postgres\.internal|sslmode|rsc-query-secret/,
     );
+
+    const httpSecretUrl =
+      'https://rsc-http-user:rsc-http-password@surface.example.com/private?api_key=rsc-http-query-secret#fragment';
+    process.env.OFFGRID_SERVICES = JSON.stringify([
+      {
+        id: 'configured-surface',
+        label: 'Configured surface',
+        description: 'Configured through the real registry override',
+        url: httpSecretUrl,
+        healthPath: '/health?probe_key=rsc-health-secret',
+        auth: 'api-key',
+        kind: 'product',
+      },
+    ]);
+
+    const configuredRegistry = getServices();
+    assert.equal(configuredRegistry[0]?.url, httpSecretUrl);
+    const configuredClientProps = JSON.stringify({
+      services: toServiceDirectoryEntries(configuredRegistry),
+    });
+    assert.match(configuredClientProps, /https:\/\/surface\.example\.com/);
+    assert.doesNotMatch(
+      configuredClientProps,
+      /rsc-http-user|rsc-http-password|private|rsc-http-query-secret|rsc-health-secret/,
+    );
   } finally {
     if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousDatabaseUrl;
@@ -61,8 +86,10 @@ test('ServicesPage projects registry entries before passing them across the clie
   assert.match(client, /services: ServiceDirectoryEntry\[\]/);
   assert.doesNotMatch(client, /services: ServiceEntry\[\]/);
   assert.doesNotMatch(client, /s\.url/);
+  assert.doesNotMatch(client, /from '@\/lib\/services-directory'/);
   assert.match(detailPage, /service=\{toServiceDetailEntry\(service\)\}/);
   assert.doesNotMatch(detailPage, /service=\{service\}/);
   assert.match(detailClient, /service: ServiceDetailEntry/);
   assert.doesNotMatch(detailClient, /service\.(?:url|healthPath)/);
+  assert.doesNotMatch(detailClient, /import \{[^}]*\} from '@\/lib\/services-directory'/);
 });
