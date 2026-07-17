@@ -1,6 +1,6 @@
 import type { SolutionBlueprintInput } from '@/lib/solution-blueprints';
 
-export const SOLUTION_BLUEPRINT_CATALOG_VERSION = 1;
+export const SOLUTION_BLUEPRINT_CATALOG_VERSION = 2;
 
 export interface SeededSolutionBlueprint {
   key: string;
@@ -26,6 +26,7 @@ export const SEEDED_SOLUTION_BLUEPRINTS: readonly SeededSolutionBlueprint[] = [
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
       requiredPipelineName: 'Collections intervention',
       sourceTemplateKey: 'delinquency-intervention',
+      adoptable: false,
       outcome: {
         metricName: '30+ DPD rate',
         metricUnit: '% of active accounts',
@@ -58,6 +59,7 @@ export const SEEDED_SOLUTION_BLUEPRINTS: readonly SeededSolutionBlueprint[] = [
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
       requiredPipelineName: 'Indemnity claims',
       sourceTemplateKey: 'indemnity-fast-track',
+      adoptable: false,
       outcome: {
         metricName: 'Claims processed per day',
         metricUnit: 'claims/day',

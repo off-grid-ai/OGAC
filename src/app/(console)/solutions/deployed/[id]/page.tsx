@@ -28,6 +28,7 @@ export default async function DeploymentDetailPage({
     listSolutionDeploymentRuns(deployment.id, orgId),
   ]);
   if (!blueprint || !app) notFound();
+  const completedRuns = runs.filter((run) => run.status === 'done').length;
   return (
     <div className="space-y-6">
       <header>
@@ -56,38 +57,38 @@ export default async function DeploymentDetailPage({
         </Link>
         <div className="rounded-lg border bg-card p-5">
           <p className="text-xs text-muted-foreground">Execution evidence</p>
-          <p className="mt-2 font-medium">{runs.length} post-adoption runs</p>
+          <p className="mt-2 font-medium">{completedRuns} completed post-adoption runs</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Since {deployment.activatedAt.toLocaleDateString()}; pre-binding history excluded.
           </p>
         </div>
         <div className="rounded-lg border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Measured evidence</p>
-          <p className="mt-2 font-medium">{observations.length} bounded windows</p>
+          <p className="text-xs text-muted-foreground">KPI claims</p>
+          <p className="mt-2 font-medium">{observations.length} evidence-backed windows</p>
         </div>
       </div>
       <ObservationForm deploymentId={deployment.id} />
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Realized value and KPI evidence</h2>
+        <h2 className="text-sm font-medium">Run-derived value and operator KPI claims</h2>
         {observations.length ? (
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {observations.map((observation) => (
               <article key={observation.id} className="rounded-lg border bg-card p-4 text-sm">
                 <div className="flex justify-between gap-3">
-                  <span>{observation.metricLabel}</span>
-                  <strong>{observation.metricValue.toLocaleString()}</strong>
+                  <span>{observation.claimLabel}</span>
+                  <strong>{observation.claimedMetricValue.toLocaleString()}</strong>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {observation.windowStart.toLocaleDateString()} –{' '}
                   {observation.windowEnd.toLocaleDateString()}
                 </p>
                 <p className="mt-3 font-medium">
-                  ${observation.realizedRoi.netValue.toLocaleString()} net realized value
+                  ${observation.estimatedRoi.netValue.toLocaleString()} estimated net value
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {observation.realizedRoi.runsCompleted} runs ·{' '}
-                  {observation.realizedRoi.hoursSaved.toLocaleString()} estimated hours · $
-                  {observation.realizedRoi.actualAiCost.toLocaleString()} actual AI cost
+                  {observation.estimatedRoi.runsCompleted} completed canonical runs ·{' '}
+                  {observation.estimatedRoi.hoursSaved.toLocaleString()} estimated hours · $
+                  {observation.estimatedRoi.actualAiCost.toLocaleString()} recorded AI cost
                 </p>
                 {observation.evidenceLinks.map((href) => (
                   <Link key={href} href={href} className="mt-2 block text-xs text-primary">
@@ -99,7 +100,7 @@ export default async function DeploymentDetailPage({
           </div>
         ) : (
           <p className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
-            No measured evidence yet. Record the first bounded production window above.
+            No KPI claims yet. Record a bounded window with supporting evidence above.
           </p>
         )}
       </section>

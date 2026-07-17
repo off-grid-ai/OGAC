@@ -27,6 +27,8 @@ export interface SolutionBlueprintVersion {
   requiredCapabilities: BlueprintCapability[];
   requiredPipelineName: string;
   sourceTemplateKey: string;
+  /** False for a catalog hypothesis that has no verified App/template/pipeline asset yet. */
+  adoptable: boolean;
   outcome: OutcomeContract;
   proof: BlueprintProof;
   createdBy: string;
@@ -78,16 +80,17 @@ export type SolutionDeploymentInput = Pick<
   'blueprintId' | 'blueprintVersion' | 'appId' | 'status'
 >;
 
-/** Append-only, deployment-scoped measurement. It cannot rewrite reusable benchmark history. */
+/**
+ * Append-only operator claim scoped to one deployment and evidence window. Run counts and AI cost
+ * are deliberately absent: the store derives those facts from canonical app_runs evidence.
+ */
 export interface SolutionObservationInput {
   windowStart: Date;
   windowEnd: Date;
-  metricValue: number;
-  metricLabel: string;
-  runsCompleted: number;
-  minutesSavedPerRun: number;
-  loadedCostPerHour: number;
-  actualAiCost: number;
+  claimedMetricValue: number;
+  claimLabel: string;
+  estimatedMinutesSavedPerRun: number;
+  estimatedLoadedCostPerHour: number;
   evidenceLinks: string[];
 }
 
@@ -95,9 +98,16 @@ export interface SolutionObservation extends SolutionObservationInput {
   id: string;
   orgId: string;
   deploymentId: string;
+  /** Immutable canonical run ids whose completed results fall in this observation window. */
+  runIds: string[];
+  /** Derived from completed canonical app_runs, never entered by an operator. */
+  runsCompleted: number;
+  /** Derived from the canonical run/FinOps cost fields, never entered by an operator. */
+  actualAiCost: number;
   createdBy: string;
   createdAt: Date;
-  realizedRoi: RoiResult;
+  /** Estimate over measured run facts plus the explicitly labelled labor assumptions. */
+  estimatedRoi: RoiResult;
 }
 
 function nonEmptyList(values: string[]): boolean {
@@ -122,6 +132,7 @@ export function validateBlueprint(input: SolutionBlueprintInput): string[] {
   for (const [label, value] of required) if (!value.trim()) errors.push(`${label} is required`);
   if (!nonEmptyList(input.requiredDataDomains)) errors.push('at least one data domain is required');
   if (!nonEmptyList(input.requiredCapabilities)) errors.push('at least one capability is required');
+  if (typeof input.adoptable !== 'boolean') errors.push('adoptable must be true or false');
   if (
     input.requiredCapabilities.some(
       (capability) =>
@@ -159,7 +170,10 @@ export function validateDeployment(input: SolutionDeploymentInput): string[] {
   return errors;
 }
 
-export function validateObservation(input: SolutionObservationInput): string[] {
+export function validateObservation(
+  input: SolutionObservationInput,
+  now: Date = new Date(),
+): string[] {
   const errors: string[] = [];
   if (!(input.windowStart instanceof Date) || !Number.isFinite(input.windowStart.valueOf())) {
     errors.push('window start must be a valid date');
@@ -174,18 +188,23 @@ export function validateObservation(input: SolutionObservationInput): string[] {
   ) {
     errors.push('window end must be after window start');
   }
-  if (!Number.isFinite(input.metricValue)) errors.push('metric value must be finite');
-  if (!input.metricLabel.trim()) errors.push('metric label is required');
+  if (
+    input.windowEnd instanceof Date &&
+    Number.isFinite(input.windowEnd.valueOf()) &&
+    input.windowEnd > now
+  ) {
+    errors.push('window end cannot be in the future');
+  }
+  if (!Number.isFinite(input.claimedMetricValue)) errors.push('claimed metric value must be finite');
+  if (!input.claimLabel.trim()) errors.push('claim label is required');
   for (const [label, value] of [
-    ['runs completed', input.runsCompleted],
-    ['minutes saved per run', input.minutesSavedPerRun],
-    ['loaded cost per hour', input.loadedCostPerHour],
-    ['actual AI cost', input.actualAiCost],
+    ['estimated minutes saved per run', input.estimatedMinutesSavedPerRun],
+    ['estimated loaded cost per hour', input.estimatedLoadedCostPerHour],
   ] as const) {
     if (!Number.isFinite(value) || value < 0)
       errors.push(`${label} must be finite and non-negative`);
   }
-  if (!Number.isInteger(input.runsCompleted)) errors.push('runs completed must be an integer');
+  if (input.evidenceLinks.length === 0) errors.push('operator claims require supporting evidence');
   if (!validEvidenceLinks(input.evidenceLinks)) {
     errors.push('evidence links must be relative or HTTP URLs');
   }
@@ -215,13 +234,18 @@ export function capabilitiesForSteps(steps: AppStep[]): Set<BlueprintCapability>
 export function evaluateSolutionCompatibility(
   blueprint: Pick<
     SolutionBlueprint,
-    'tombstonedAt' | 'requiredDataDomains' | 'requiredCapabilities' | 'requiredPipelineName'
+    | 'tombstonedAt'
+    | 'adoptable'
+    | 'requiredDataDomains'
+    | 'requiredCapabilities'
+    | 'requiredPipelineName'
   >,
   app: Pick<AppSpec, 'pipelineId' | 'published' | 'steps'>,
   pipeline: Pick<PipelineView, 'id' | 'name' | 'status' | 'dataAllowlist'> | null,
 ): CompatibilityResult {
   const errors: string[] = [];
   if (blueprint.tombstonedAt) errors.push('blueprint is retired');
+  if (!blueprint.adoptable) errors.push('blueprint is a hypothesis and has no adoptable runtime asset');
   if (!app.published) errors.push('App must be published');
   if (!app.pipelineId) errors.push('App has no explicit governed pipeline binding');
   if (!pipeline) errors.push('bound pipeline does not exist');
@@ -253,15 +277,15 @@ export function evaluateSolutionCompatibility(
   return { compatible: errors.length === 0, errors, pipelineId: app.pipelineId ?? null };
 }
 
-export function withRealizedRoi(
-  observation: Omit<SolutionObservation, 'realizedRoi'>,
+export function withEstimatedRoi(
+  observation: Omit<SolutionObservation, 'estimatedRoi'>,
 ): SolutionObservation {
   return {
     ...observation,
-    realizedRoi: computeRoi({
+    estimatedRoi: computeRoi({
       runsCompleted: observation.runsCompleted,
-      minutesSavedPerRun: observation.minutesSavedPerRun,
-      loadedCostPerHour: observation.loadedCostPerHour,
+      minutesSavedPerRun: observation.estimatedMinutesSavedPerRun,
+      loadedCostPerHour: observation.estimatedLoadedCostPerHour,
       actualAiCost: observation.actualAiCost,
     }),
   };

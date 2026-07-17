@@ -54,12 +54,18 @@ export async function DELETE(req: Request, { params }: Context) {
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
-  if (!(await deleteSolutionBlueprint(id, orgId)))
-    return NextResponse.json({ error: 'unknown blueprint' }, { status: 404 });
-  auditFromSession(gate, orgId, {
-    action: 'solution-blueprint.delete',
-    resource: `solution-blueprint:${id}`,
-    outcome: 'ok',
-  });
-  return NextResponse.json({ deleted: true });
+  try {
+    if (!(await deleteSolutionBlueprint(id, orgId)))
+      return NextResponse.json({ error: 'unknown blueprint' }, { status: 404 });
+    auditFromSession(gate, orgId, {
+      action: 'solution-blueprint.retire',
+      resource: `solution-blueprint:${id}`,
+      outcome: 'ok',
+    });
+    return NextResponse.json({ retired: true });
+  } catch (error) {
+    const response = solutionErrorResponse(error);
+    if (response) return response;
+    throw error;
+  }
 }

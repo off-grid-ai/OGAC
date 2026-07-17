@@ -44,6 +44,7 @@ test(
 
     const pipelineId = `pl_solution_${Date.now()}`;
     let appId = '';
+    const runIds = [`run_solution_${Date.now()}_1`, `run_solution_${Date.now()}_2`];
     t.after(async () => {
       for (const org of [ORG_A, ORG_B]) {
         await db.execute(sql`DELETE FROM solution_observations WHERE org_id = ${org}`);
@@ -52,6 +53,7 @@ test(
         await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${org}`);
       }
+      await db.execute(sql`DELETE FROM app_runs WHERE id IN (${runIds[0]}, ${runIds[1]})`);
       if (appId) await db.execute(sql`DELETE FROM apps WHERE id = ${appId}`);
       await db.execute(sql`DELETE FROM pipeline_versions WHERE pipeline_id = ${pipelineId}`);
       await db.execute(sql`DELETE FROM pipelines WHERE id = ${pipelineId}`);
@@ -62,6 +64,7 @@ test(
     assert.equal(seedsA.length, 2);
     assert.equal(seedsB.length, 2);
     assert.ok(seedsA.every((item) => item.proof.status === 'unverified'));
+    assert.ok(seedsA.every((item) => item.adoptable === false));
     assert.ok(!seedsB.some((item) => item.id === seedsA[0].id));
     assert.equal(await store.deleteSolutionBlueprint(seedsA[1].id, ORG_A), true);
     assert.equal((await store.listSolutionBlueprints(ORG_A)).length, 1);
@@ -119,6 +122,7 @@ test(
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'] as const,
       requiredPipelineName: 'Collections intervention',
       sourceTemplateKey: 'collections-intervention',
+      adoptable: true,
       outcome: {
         metricName: '30+ DPD',
         metricUnit: '%',
@@ -171,25 +175,84 @@ test(
       [2, 1],
     );
 
-    const start = new Date(deployment.activatedAt.valueOf() + 1_000);
+    const start = new Date('2026-01-01T00:00:00Z');
+    const end = new Date('2026-02-01T00:00:00Z');
+    await db.execute(
+      sql`UPDATE solution_deployments SET activated_at = ${start} WHERE id = ${deployment.id}`,
+    );
+    await db.execute(sql`
+      INSERT INTO app_runs
+        (id, org_id, app_id, status, trigger, input, steps, outcome, provenance, started_at, finished_at)
+      VALUES
+        (${runIds[0]}, ${ORG_A}, ${appId}, 'done', '{"kind":"on-demand"}'::jsonb,
+         '{}'::jsonb, '[{"id":"assess","kind":"agent","label":"Assess","status":"done","costUsd":10}]'::jsonb,
+         'complete', NULL, '2026-01-10T00:00:00Z', '2026-01-10T00:01:00Z'),
+        (${runIds[1]}, ${ORG_A}, ${appId}, 'done', '{"kind":"on-demand"}'::jsonb,
+         '{}'::jsonb, '[]'::jsonb, 'complete',
+         '{"signature":"test","algorithm":"test","publicKey":null,"signedAt":"2026-01-11T00:01:00Z","costUsd":15}'::jsonb,
+         '2026-01-11T00:00:00Z', '2026-01-11T00:01:00Z')
+    `);
     const observation = await store.createSolutionObservation(
       deployment.id,
       ORG_A,
       {
         windowStart: start,
-        windowEnd: new Date(start.valueOf() + 86_400_000),
-        metricValue: 10,
-        metricLabel: '30+ DPD',
-        runsCompleted: 20,
-        minutesSavedPerRun: 30,
-        loadedCostPerHour: 50,
-        actualAiCost: 25,
+        windowEnd: end,
+        claimedMetricValue: 10,
+        claimLabel: '30+ DPD',
+        estimatedMinutesSavedPerRun: 30,
+        estimatedLoadedCostPerHour: 50,
         evidenceLinks: ['/governance/evidence/window-1'],
       },
       'analyst@test.local',
     );
-    assert.equal(observation.realizedRoi.netValue, 475);
+    assert.deepEqual(observation.runIds, runIds);
+    assert.equal(observation.runsCompleted, 2);
+    assert.equal(observation.actualAiCost, 25);
+    assert.equal(observation.estimatedRoi.netValue, 25);
     assert.equal((await store.listSolutionObservations(deployment.id, ORG_B)).length, 0);
+    await assert.rejects(
+      store.createSolutionObservation(
+        deployment.id,
+        ORG_A,
+        {
+          windowStart: new Date('2026-01-15T00:00:00Z'),
+          windowEnd: new Date('2026-01-20T00:00:00Z'),
+          claimedMetricValue: 9,
+          claimLabel: 'Overlapping claim',
+          estimatedMinutesSavedPerRun: 30,
+          estimatedLoadedCostPerHour: 50,
+          evidenceLinks: ['/governance/evidence/window-2'],
+        },
+        'analyst@test.local',
+      ),
+      (error: unknown) => (error as { code?: string }).code === 'duplicate',
+    );
+    await assert.rejects(
+      store.createSolutionObservation(
+        deployment.id,
+        ORG_A,
+        {
+          windowStart: new Date(Date.now() + 86_400_000),
+          windowEnd: new Date(Date.now() + 172_800_000),
+          claimedMetricValue: 9,
+          claimLabel: 'Future claim',
+          estimatedMinutesSavedPerRun: 30,
+          estimatedLoadedCostPerHour: 50,
+          evidenceLinks: ['/governance/evidence/window-3'],
+        },
+        'analyst@test.local',
+      ),
+      (error: unknown) =>
+        (error as { errors?: string[] }).errors?.includes('window end cannot be in the future') ===
+        true,
+    );
+
+    await assert.rejects(
+      store.deleteSolutionBlueprint(created.id, ORG_A),
+      (error: unknown) => (error as { code?: string }).code === 'referenced',
+      'an active deployment must be retired before its immutable Blueprint can be tombstoned',
+    );
 
     const driftedApp = await updateApp(appId, ORG_A, { pipelineId: null });
     assert.ok(driftedApp);
@@ -208,9 +271,38 @@ test(
       'the shared dispatch chokepoint blocks drift before every caller can execute',
     );
     assert.equal(await store.hasSolutionDeploymentsForApp(appId, ORG_A), true);
-    assert.equal(await store.deleteSolutionBlueprint(created.id, ORG_A), true);
-    assert.equal((await store.listSolutionObservations(deployment.id, ORG_A)).length, 1);
+    const restoredApp = await updateApp(appId, ORG_A, { pipelineId });
+    assert.ok(restoredApp);
     assert.equal(await store.deleteSolutionDeployment(deployment.id, ORG_A), true);
     assert.equal((await store.getSolutionDeployment(deployment.id, ORG_A))?.status, 'retired');
+    await assert.rejects(
+      store.createSolutionObservation(
+        deployment.id,
+        ORG_A,
+        {
+          windowStart: new Date(),
+          windowEnd: new Date(Date.now() + 1),
+          claimedMetricValue: 8,
+          claimLabel: 'Post-retirement claim',
+          estimatedMinutesSavedPerRun: 30,
+          estimatedLoadedCostPerHour: 50,
+          evidenceLinks: ['/governance/evidence/window-4'],
+        },
+        'analyst@test.local',
+      ),
+      (error: unknown) => error instanceof Error,
+    );
+
+    const redeployment = await store.createSolutionDeployment(ORG_A, {
+      blueprintId: created.id,
+      blueprintVersion: 2,
+      appId,
+      status: 'active',
+    });
+    assert.equal(redeployment.blueprintVersion, 2);
+    assert.notEqual(redeployment.id, deployment.id);
+    assert.equal(await store.deleteSolutionDeployment(redeployment.id, ORG_A), true);
+    assert.equal(await store.deleteSolutionBlueprint(created.id, ORG_A), true);
+    assert.equal((await store.listSolutionObservations(deployment.id, ORG_A)).length, 1);
   },
 );

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gt, gte, isNull, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNull, lt, ne } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   apps,
@@ -18,6 +18,8 @@ import {
   SEEDED_SOLUTION_BLUEPRINTS,
   SOLUTION_BLUEPRINT_CATALOG_VERSION,
 } from '@/lib/solution-blueprint-seeds';
+import { computeReportMetrics } from '@/lib/app-reports';
+import { toAppRunView } from '@/lib/app-runs-view';
 import {
   evaluateSolutionCompatibility,
   type SolutionBlueprint,
@@ -30,7 +32,7 @@ import {
   validateBlueprint,
   validateDeployment,
   validateObservation,
-  withRealizedRoi,
+  withEstimatedRoi,
 } from '@/lib/solution-blueprints';
 import { getPipeline } from '@/lib/pipelines';
 import { hash12 } from '@/lib/tour-demo-seed';
@@ -103,7 +105,7 @@ function toDeployment(row: SolutionDeploymentRow): SolutionDeployment {
 }
 
 function toObservation(row: SolutionObservationRow): SolutionObservation {
-  return withRealizedRoi({
+  return withEstimatedRoi({
     ...row,
     evidenceLinks: row.evidenceLinks ?? [],
   });
@@ -293,6 +295,7 @@ export async function updateSolutionBlueprint(
     requiredCapabilities: current.requiredCapabilities,
     requiredPipelineName: current.requiredPipelineName,
     sourceTemplateKey: current.sourceTemplateKey,
+    adoptable: current.adoptable,
     outcome: current.outcome,
     proof: current.proof,
     ...patch,
@@ -328,18 +331,45 @@ export async function updateSolutionBlueprint(
 
 /** Retire the catalog entry; immutable versions and deployment evidence remain readable forever. */
 export async function deleteSolutionBlueprint(id: string, orgId: string): Promise<boolean> {
-  const retired = await db
-    .update(solutionBlueprints)
-    .set({ tombstonedAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(solutionBlueprints.id, id),
-        eq(solutionBlueprints.orgId, orgId),
-        isNull(solutionBlueprints.tombstonedAt),
-      ),
-    )
-    .returning({ id: solutionBlueprints.id });
-  return retired.length > 0;
+  return db.transaction(async (tx) => {
+    const [catalog] = await tx
+      .select({ id: solutionBlueprints.id, tombstonedAt: solutionBlueprints.tombstonedAt })
+      .from(solutionBlueprints)
+      .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
+      .for('update')
+      .limit(1);
+    if (!catalog || catalog.tombstonedAt) return false;
+    const [live] = await tx
+      .select({ id: solutionDeployments.id })
+      .from(solutionDeployments)
+      .where(
+        and(
+          eq(solutionDeployments.blueprintId, id),
+          eq(solutionDeployments.orgId, orgId),
+          ne(solutionDeployments.status, 'retired'),
+        ),
+      )
+      .limit(1);
+    if (live) {
+      throw new SolutionConflictError(
+        'Retire every active or paused deployment before retiring this Blueprint',
+        'referenced',
+        ['retire the linked deployment, then retry'],
+      );
+    }
+    const retired = await tx
+      .update(solutionBlueprints)
+      .set({ tombstonedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(solutionBlueprints.id, id),
+          eq(solutionBlueprints.orgId, orgId),
+          isNull(solutionBlueprints.tombstonedAt),
+        ),
+      )
+      .returning({ id: solutionBlueprints.id });
+    return retired.length > 0;
+  });
 }
 
 export async function listSolutionDeployments(orgId: string): Promise<SolutionDeployment[]> {
@@ -444,16 +474,34 @@ export async function createSolutionDeployment(
   if (errors.length) throw new SolutionValidationError(errors);
   const binding = await compatibleBinding(orgId, input);
   try {
-    const [row] = await db
-      .insert(solutionDeployments)
-      .values({
-        id: `sdp_${randomUUID().slice(0, 12)}`,
-        orgId,
-        ...input,
-        pipelineId: binding.pipelineId,
-      })
-      .returning();
-    return toDeployment(row);
+    return await db.transaction(async (tx) => {
+      // Serialize adoption with Blueprint retirement. Whichever operation locks the catalog first
+      // commits its policy decision; the other then observes that committed state.
+      const [catalog] = await tx
+        .select({ tombstonedAt: solutionBlueprints.tombstonedAt })
+        .from(solutionBlueprints)
+        .where(
+          and(
+            eq(solutionBlueprints.id, input.blueprintId),
+            eq(solutionBlueprints.orgId, orgId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (!catalog || catalog.tombstonedAt) {
+        throw new SolutionConflictError('Blueprint is retired', 'retired');
+      }
+      const [row] = await tx
+        .insert(solutionDeployments)
+        .values({
+          id: `sdp_${randomUUID().slice(0, 12)}`,
+          orgId,
+          ...input,
+          pipelineId: binding.pipelineId,
+        })
+        .returning();
+      return toDeployment(row);
+    });
   } catch (error) {
     if (databaseErrorCode(error) === '23505') {
       throw new SolutionConflictError('App already has a solution deployment', 'duplicate');
@@ -580,6 +628,7 @@ export async function listSolutionDeploymentRuns(deploymentId: string, orgId: st
         eq(appRuns.orgId, orgId),
         eq(appRuns.appId, deployment.appId),
         gte(appRuns.startedAt, deployment.activatedAt),
+        deployment.retiredAt ? lt(appRuns.startedAt, deployment.retiredAt) : undefined,
       ),
     )
     .orderBy(desc(appRuns.startedAt));
@@ -598,6 +647,9 @@ export async function createSolutionObservation(
   if (input.windowStart < deployment.activatedAt) {
     throw new SolutionValidationError(['measurement window cannot predate deployment activation']);
   }
+  if (deployment.retiredAt && input.windowEnd > deployment.retiredAt) {
+    throw new SolutionValidationError(['measurement window cannot end after deployment retirement']);
+  }
   const overlap = await db
     .select({ id: solutionObservations.id })
     .from(solutionObservations)
@@ -612,6 +664,20 @@ export async function createSolutionObservation(
   if (overlap.length) {
     throw new SolutionConflictError('measurement window overlaps existing evidence', 'duplicate');
   }
+  const runRows = await db
+    .select()
+    .from(appRuns)
+    .where(
+      and(
+        eq(appRuns.orgId, orgId),
+        eq(appRuns.appId, deployment.appId),
+        eq(appRuns.status, 'done'),
+        gte(appRuns.finishedAt, input.windowStart),
+        lt(appRuns.finishedAt, input.windowEnd),
+      ),
+    )
+    .orderBy(asc(appRuns.finishedAt));
+  const runFacts = computeReportMetrics(runRows.map(toAppRunView));
   const [row] = await db
     .insert(solutionObservations)
     .values({
@@ -619,6 +685,9 @@ export async function createSolutionObservation(
       orgId,
       deploymentId,
       ...input,
+      runIds: runRows.map((run) => run.id),
+      runsCompleted: runFacts.completed,
+      actualAiCost: runFacts.totalCostUsd,
       createdBy,
     })
     .returning();

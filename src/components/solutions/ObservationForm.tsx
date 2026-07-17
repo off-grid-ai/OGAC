@@ -48,7 +48,13 @@ export function ObservationForm({ deploymentId }: Readonly<{ deploymentId: strin
 
   return (
     <form onSubmit={submit} className="grid gap-3 rounded-lg border bg-card p-5 lg:grid-cols-4">
-      <h2 className="text-sm font-medium lg:col-span-4">Record a measured evidence window</h2>
+      <div className="lg:col-span-4">
+        <h2 className="text-sm font-medium">Record an operator KPI claim</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Completed runs and AI cost are read from canonical run evidence for this window. You enter
+          the KPI claim, labor assumptions, and supporting evidence.
+        </p>
+      </div>
       <label className="text-xs text-muted-foreground">
         Window start
         <Input name="windowStart" type="datetime-local" required />
@@ -59,31 +65,35 @@ export function ObservationForm({ deploymentId }: Readonly<{ deploymentId: strin
       </label>
       <label className="text-xs text-muted-foreground">
         KPI label
-        <Input name="metricLabel" required />
+        <Input name="claimLabel" required />
       </label>
       <label className="text-xs text-muted-foreground">
         KPI value
-        <Input name="metricValue" type="number" step="any" required />
-      </label>
-      <label className="text-xs text-muted-foreground">
-        Completed runs
-        <Input name="runsCompleted" type="number" min="0" step="1" required />
+        <Input name="claimedMetricValue" type="number" step="any" required />
       </label>
       <label className="text-xs text-muted-foreground">
         Minutes saved / run (estimate)
-        <Input name="minutesSavedPerRun" type="number" min="0" step="any" required />
+        <Input
+          name="estimatedMinutesSavedPerRun"
+          type="number"
+          min="0"
+          step="any"
+          required
+        />
       </label>
       <label className="text-xs text-muted-foreground">
         Loaded cost / hour (estimate)
-        <Input name="loadedCostPerHour" type="number" min="0" step="any" required />
-      </label>
-      <label className="text-xs text-muted-foreground">
-        Actual AI cost
-        <Input name="actualAiCost" type="number" min="0" step="any" required />
+        <Input
+          name="estimatedLoadedCostPerHour"
+          type="number"
+          min="0"
+          step="any"
+          required
+        />
       </label>
       <label className="text-xs text-muted-foreground lg:col-span-3">
         Evidence links
-        <Input name="evidenceLinks" placeholder="/governance/evidence/…" />
+        <Input name="evidenceLinks" placeholder="/governance/evidence/..." required />
       </label>
       <Button disabled={saving} className="self-end">
         <Plus /> {saving ? 'Recording…' : 'Record evidence'}

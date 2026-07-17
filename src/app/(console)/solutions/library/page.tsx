@@ -12,11 +12,11 @@ export default async function SolutionLibraryPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[10px] uppercase tracking-widest text-primary">Proven use cases</p>
+        <p className="text-[10px] uppercase tracking-widest text-primary">Use-case contracts</p>
         <h1 className="mt-1 text-xl font-semibold">Solution library</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Reusable BFSI blueprints define the business owner, governed requirements, measurable
-          outcome, ROI hypothesis, and proof before an App is deployed.
+          Reusable BFSI contracts define the owner, requirements, outcome hypothesis, and evidence.
+          A Blueprint is deployable only after a real App and governed pipeline implement it.
         </p>
       </header>
       <details className="rounded-lg border">
@@ -42,6 +42,9 @@ export default async function SolutionLibraryPage() {
                     {blueprint.industry} · {blueprint.process}
                   </span>
                   <h2 className="mt-1 font-medium">{blueprint.title}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {blueprint.adoptable ? 'Adoptable runtime' : 'Hypothesis only - no runtime asset'}
+                  </p>
                 </div>
                 <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
               </div>

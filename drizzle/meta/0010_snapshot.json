@@ -5454,17 +5454,11 @@
           "method": "btree",
           "with": {}
         },
-        "solution_deployments_binding_idx": {
-          "name": "solution_deployments_binding_idx",
+        "solution_deployments_live_app_binding_idx": {
+          "name": "solution_deployments_live_app_binding_idx",
           "columns": [
             {
               "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "blueprint_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5479,7 +5473,8 @@
           "isUnique": true,
           "concurrently": false,
           "method": "btree",
-          "with": {}
+          "with": {},
+          "where": "\"solution_deployments\".\"status\" <> 'retired'"
         }
       },
       "foreignKeys": {
@@ -5555,14 +5550,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "metric_value": {
-          "name": "metric_value",
+        "claimed_metric_value": {
+          "name": "claimed_metric_value",
           "type": "double precision",
           "primaryKey": false,
           "notNull": true
         },
-        "metric_label": {
-          "name": "metric_label",
+        "claim_label": {
+          "name": "claim_label",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -5573,14 +5568,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "minutes_saved_per_run": {
-          "name": "minutes_saved_per_run",
+        "run_ids": {
+          "name": "run_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "estimated_minutes_saved_per_run": {
+          "name": "estimated_minutes_saved_per_run",
           "type": "double precision",
           "primaryKey": false,
           "notNull": true
         },
-        "loaded_cost_per_hour": {
-          "name": "loaded_cost_per_hour",
+        "estimated_loaded_cost_per_hour": {
+          "name": "estimated_loaded_cost_per_hour",
           "type": "double precision",
           "primaryKey": false,
           "notNull": true

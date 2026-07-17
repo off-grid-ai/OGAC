@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { SolutionBlueprint, SolutionBlueprintInput } from '@/lib/solution-blueprints';
 import { splitList } from '@/lib/solution-blueprints';
@@ -21,6 +22,7 @@ const EMPTY: EditableBlueprint = {
   requiredCapabilities: ['grounded-inference'],
   requiredPipelineName: '',
   sourceTemplateKey: '',
+  adoptable: false,
   outcome: {
     metricName: '',
     metricUnit: '',
@@ -51,6 +53,7 @@ function editable(blueprint: SolutionBlueprint): EditableBlueprint {
     requiredCapabilities: blueprint.requiredCapabilities,
     requiredPipelineName: blueprint.requiredPipelineName,
     sourceTemplateKey: blueprint.sourceTemplateKey,
+    adoptable: blueprint.adoptable,
     outcome: blueprint.outcome,
     proof: blueprint.proof,
   };
@@ -142,6 +145,20 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
             onChange={(e) => set('businessOwner', e.target.value)}
           />
         </Field>
+      </div>
+      <div className="flex items-center justify-between gap-4 rounded-md border p-4">
+        <div>
+          <p className="text-sm font-medium">Adoptable runtime</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Turn this on only when a published App and governed pipeline implement this exact
+            contract. Hypotheses stay visible but cannot be deployed.
+          </p>
+        </div>
+        <Switch
+          aria-label="Allow this Blueprint to be adopted"
+          checked={model.adoptable}
+          onCheckedChange={(checked) => set('adoptable', checked)}
+        />
       </div>
       <Field label="What business outcome does this solve?">
         <Textarea required value={model.summary} onChange={(e) => set('summary', e.target.value)} />
@@ -362,7 +379,7 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
       <div className="flex justify-between gap-3">
         {blueprint ? (
           <Button type="button" variant="destructive" onClick={remove}>
-            <Trash /> Delete
+            <Trash /> Retire Blueprint
           </Button>
         ) : (
           <span />

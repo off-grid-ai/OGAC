@@ -44,19 +44,20 @@ test('deployment parser never defaults an invalid status to active', () => {
   );
 });
 
-test('observation parser scopes dated evidence and realized-value inputs', () => {
+test('observation parser accepts claims and assumptions but ignores canonical run facts', () => {
   const parsed = parseObservationInput({
     windowStart: '2026-01-01T00:00:00Z',
     windowEnd: '2026-02-01T00:00:00Z',
-    metricValue: '9.4',
-    metricLabel: '30+ DPD',
+    claimedMetricValue: '9.4',
+    claimLabel: '30+ DPD',
     runsCompleted: '100',
-    minutesSavedPerRun: '15',
-    loadedCostPerHour: 50,
+    estimatedMinutesSavedPerRun: '15',
+    estimatedLoadedCostPerHour: 50,
     actualAiCost: 12,
     evidenceLinks: ['/e'],
   });
-  assert.equal(parsed?.metricValue, 9.4);
-  assert.equal(parsed?.runsCompleted, 100);
+  assert.equal(parsed?.claimedMetricValue, 9.4);
+  assert.equal('runsCompleted' in (parsed ?? {}), false);
+  assert.equal('actualAiCost' in (parsed ?? {}), false);
   assert.equal(parsed?.windowStart.toISOString(), '2026-01-01T00:00:00.000Z');
 });

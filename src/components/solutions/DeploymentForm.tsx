@@ -67,9 +67,11 @@ export function DeploymentForm({
   async function remove() {
     if (
       !deployment ||
-      !window.confirm('Remove this deployment binding? The App and its runs will remain intact.')
+      !window.confirm('Retire this deployment binding? Its App, runs, and evidence remain readable.')
     )
       return;
+    setSaving(true);
+    setError('');
     try {
       const response = await fetch(endpoint, { method: 'DELETE' });
       if (!response.ok) {
@@ -81,6 +83,8 @@ export function DeploymentForm({
       router.refresh();
     } catch {
       setError('Unable to reach the control plane. Try again.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -134,7 +138,11 @@ export function DeploymentForm({
         >
           <option value="active">Active</option>
           <option value="paused">Paused</option>
-          <option value="retired">Retired</option>
+          {deployment?.status === 'retired' ? (
+            <option value="retired" disabled>
+              Retired
+            </option>
+          ) : null}
         </select>
       </label>
       {!deployment && blueprintId && compatibleApps.length === 0 ? (
@@ -149,14 +157,20 @@ export function DeploymentForm({
         </p>
       ) : null}
       <div className="flex justify-between gap-2 lg:col-span-4">
-        {deployment ? (
-          <Button type="button" variant="destructive" onClick={remove}>
-            <Trash /> Remove binding
+        {deployment && deployment.status !== 'retired' ? (
+          <Button type="button" variant="destructive" disabled={saving} onClick={remove}>
+            <Trash /> Retire binding
           </Button>
         ) : (
           <span />
         )}
-        <Button disabled={saving || (!deployment && (!blueprintId || !appId))}>
+        <Button
+          disabled={
+            saving ||
+            deployment?.status === 'retired' ||
+            (!deployment && (!blueprintId || !appId))
+          }
+        >
           <Plus />
           {saving ? 'Saving…' : deployment ? 'Save deployment' : 'Adopt Blueprint'}
         </Button>

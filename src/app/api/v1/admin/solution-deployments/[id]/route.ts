@@ -56,9 +56,9 @@ export async function DELETE(req: Request, { params }: Context) {
   if (!(await deleteSolutionDeployment(id, orgId)))
     return NextResponse.json({ error: 'unknown deployment' }, { status: 404 });
   auditFromSession(gate, orgId, {
-    action: 'solution-deployment.delete',
+    action: 'solution-deployment.retire',
     resource: `solution-deployment:${id}`,
     outcome: 'ok',
   });
-  return NextResponse.json({ deleted: true });
+  return NextResponse.json({ retired: true });
 }

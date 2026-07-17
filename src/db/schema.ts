@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
@@ -978,7 +979,9 @@ export const solutionDeployments = pgTable(
   },
   (t) => [
     index('solution_deployments_org_idx').on(t.orgId),
-    uniqueIndex('solution_deployments_app_binding_idx').on(t.orgId, t.appId),
+    uniqueIndex('solution_deployments_live_app_binding_idx')
+      .on(t.orgId, t.appId)
+      .where(sql`${t.status} <> 'retired'`),
     foreignKey({
       columns: [t.orgId, t.blueprintId, t.blueprintVersion],
       foreignColumns: [
@@ -999,11 +1002,12 @@ export const solutionObservations = pgTable(
     deploymentId: text('deployment_id').notNull(),
     windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
     windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
-    metricValue: doublePrecision('metric_value').notNull(),
-    metricLabel: text('metric_label').notNull(),
+    claimedMetricValue: doublePrecision('claimed_metric_value').notNull(),
+    claimLabel: text('claim_label').notNull(),
+    runIds: jsonb('run_ids').$type<string[]>().notNull().default([]),
     runsCompleted: integer('runs_completed').notNull(),
-    minutesSavedPerRun: doublePrecision('minutes_saved_per_run').notNull(),
-    loadedCostPerHour: doublePrecision('loaded_cost_per_hour').notNull(),
+    estimatedMinutesSavedPerRun: doublePrecision('estimated_minutes_saved_per_run').notNull(),
+    estimatedLoadedCostPerHour: doublePrecision('estimated_loaded_cost_per_hour').notNull(),
     actualAiCost: doublePrecision('actual_ai_cost').notNull(),
     evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull().default([]),
     createdBy: text('created_by').notNull(),

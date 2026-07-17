@@ -37,12 +37,19 @@ export default async function BlueprintDetailPage({
             <h1 className="mt-1 text-2xl font-semibold">{blueprint.title}</h1>
             <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{blueprint.summary}</p>
           </div>
-          <Link
-            href={`/solutions/deployed?blueprint=${encodeURIComponent(blueprint.id)}`}
-            className="inline-flex items-center gap-2 text-sm text-primary"
-          >
-            Deploy through an existing App <ArrowRight />
-          </Link>
+          {blueprint.adoptable ? (
+            <Link
+              href={`/solutions/deployed?blueprint=${encodeURIComponent(blueprint.id)}`}
+              className="inline-flex items-center gap-2 text-sm text-primary"
+            >
+              Deploy through an existing App <ArrowRight />
+            </Link>
+          ) : (
+            <p className="max-w-md text-xs text-muted-foreground">
+              Hypothesis only. Create and verify the matching App and governed pipeline before
+              marking this Blueprint adoptable.
+            </p>
+          )}
         </div>
       </header>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

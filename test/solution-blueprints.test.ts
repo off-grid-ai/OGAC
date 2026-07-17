@@ -6,7 +6,7 @@ import {
   validateBlueprint,
   validateDeployment,
   validateObservation,
-  withRealizedRoi,
+  withEstimatedRoi,
   type SolutionBlueprintInput,
 } from '../src/lib/solution-blueprints.ts';
 
@@ -20,6 +20,7 @@ const validBlueprint = (): SolutionBlueprintInput => ({
   requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
   requiredPipelineName: 'Collections intervention',
   sourceTemplateKey: 'collections-intervention',
+  adoptable: true,
   outcome: {
     metricName: '30+ DPD rate',
     metricUnit: '%',
@@ -131,28 +132,29 @@ test('compatibility fails closed when publication, graph, domains or pipeline dr
   ]);
 });
 
-test('observations own a bounded evidence window and use canonical realized ROI', () => {
+test('observations own a bounded claim window and estimate ROI from canonical run facts', () => {
   const input = {
     windowStart: new Date('2026-01-01T00:00:00Z'),
     windowEnd: new Date('2026-02-01T00:00:00Z'),
-    metricValue: 9.4,
-    metricLabel: '30+ DPD rate',
-    runsCompleted: 100,
-    minutesSavedPerRun: 30,
-    loadedCostPerHour: 40,
-    actualAiCost: 50,
+    claimedMetricValue: 9.4,
+    claimLabel: '30+ DPD rate',
+    estimatedMinutesSavedPerRun: 30,
+    estimatedLoadedCostPerHour: 40,
     evidenceLinks: ['/governance/evidence/window-1'],
   };
-  assert.deepEqual(validateObservation(input), []);
-  const observed = withRealizedRoi({
+  assert.deepEqual(validateObservation(input, new Date('2026-02-02T00:00:00Z')), []);
+  const observed = withEstimatedRoi({
     ...input,
     id: 'obs',
     orgId: 'org',
     deploymentId: 'dep',
+    runIds: Array.from({ length: 100 }, (_, index) => `run-${index}`),
+    runsCompleted: 100,
+    actualAiCost: 50,
     createdBy: 'operator@example.com',
     createdAt: new Date('2026-02-02T00:00:00Z'),
   });
-  assert.deepEqual(observed.realizedRoi, {
+  assert.deepEqual(observed.estimatedRoi, {
     runsCompleted: 100,
     hoursSaved: 50,
     grossValue: 2000,
@@ -160,6 +162,28 @@ test('observations own a bounded evidence window and use canonical realized ROI'
     netValue: 1950,
     roiMultiple: 40,
   });
+});
+
+test('observation validation rejects unsupported and future operator claims', () => {
+  assert.deepEqual(
+    validateObservation(
+      {
+        windowStart: new Date('2026-02-01T00:00:00Z'),
+        windowEnd: new Date('2026-03-01T00:00:00Z'),
+        claimedMetricValue: 9.4,
+        claimLabel: '',
+        estimatedMinutesSavedPerRun: 30,
+        estimatedLoadedCostPerHour: 40,
+        evidenceLinks: [],
+      },
+      new Date('2026-02-15T00:00:00Z'),
+    ),
+    [
+      'window end cannot be in the future',
+      'claim label is required',
+      'operator claims require supporting evidence',
+    ],
+  );
 });
 
 test('splitList normalizes comma/newline input and removes duplicates', () => {

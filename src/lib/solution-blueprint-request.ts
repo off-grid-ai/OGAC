@@ -67,6 +67,7 @@ export function parseBlueprintInput(value: unknown): SolutionBlueprintInput | nu
     requiredCapabilities: list(body.requiredCapabilities) as BlueprintCapability[],
     requiredPipelineName: text(body.requiredPipelineName),
     sourceTemplateKey: text(body.sourceTemplateKey),
+    adoptable: body.adoptable as boolean,
     outcome: outcome(body.outcome),
     proof: proof(body.proof),
   };
@@ -87,6 +88,7 @@ export function parseBlueprintPatch(value: unknown): Partial<SolutionBlueprintIn
   ] as const) {
     if (key in body) patch[key] = text(body[key]);
   }
+  if ('adoptable' in body) patch.adoptable = body.adoptable as boolean;
   if ('requiredDataDomains' in body) patch.requiredDataDomains = list(body.requiredDataDomains);
   if ('requiredCapabilities' in body) {
     patch.requiredCapabilities = list(body.requiredCapabilities) as BlueprintCapability[];
@@ -113,12 +115,10 @@ export function parseObservationInput(value: unknown): SolutionObservationInput 
   return {
     windowStart: new Date(text(body.windowStart)),
     windowEnd: new Date(text(body.windowEnd)),
-    metricValue: number(body.metricValue),
-    metricLabel: text(body.metricLabel),
-    runsCompleted: number(body.runsCompleted),
-    minutesSavedPerRun: number(body.minutesSavedPerRun),
-    loadedCostPerHour: number(body.loadedCostPerHour),
-    actualAiCost: number(body.actualAiCost),
+    claimedMetricValue: number(body.claimedMetricValue),
+    claimLabel: text(body.claimLabel),
+    estimatedMinutesSavedPerRun: number(body.estimatedMinutesSavedPerRun),
+    estimatedLoadedCostPerHour: number(body.estimatedLoadedCostPerHour),
     evidenceLinks: list(body.evidenceLinks),
   };
 }
