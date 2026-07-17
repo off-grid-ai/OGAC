@@ -1,5 +1,5 @@
 import { contextualModuleForPath, type ContextualModule } from './contextual-navigation';
-import { IA_SECTIONS, ownerForPath, type CanonicalOwner } from './ownership';
+import { IA_SECTIONS, ownerById, ownerForPath, type CanonicalOwner } from './ownership';
 
 export interface RouteIdentity {
   eyebrow: string;
@@ -11,8 +11,9 @@ export interface RouteIdentity {
 }
 
 function identityForContext(module: ContextualModule): RouteIdentity {
+  const owner = ownerById(module.ownerId);
   return {
-    eyebrow: 'Solutions',
+    eyebrow: IA_SECTIONS.find((section) => section.id === owner.section)!.label,
     title: module.label,
     description: module.description,
     ownerId: module.ownerId,
