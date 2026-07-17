@@ -9,6 +9,7 @@ import {
   type RetrievalOptions,
 } from '@/lib/retrieval/query';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { migrateLegacyQdrantPayloads } from '@/lib/qdrant-migration';
 
 // Superuser roles that bypass server-side ACL narrowing (the post-filter also passes them).
 const SUPERUSER_ROLES = ['admin'];
@@ -50,11 +51,21 @@ async function ensureCollection(): Promise<void> {
   if (ready) return ready;
   ready = (async () => {
     const head = await qfetch(`/collections/${COLLECTION}`, 'GET');
-    if (head.ok) return;
-    await qfetch(`/collections/${COLLECTION}`, 'PUT', {
-      vectors: { size: EMBED_DIM, distance: 'Cosine' },
-    });
-  })();
+    if (!head.ok) {
+      const created = await qfetch(`/collections/${COLLECTION}`, 'PUT', {
+        vectors: { size: EMBED_DIM, distance: 'Cosine' },
+      });
+      if (!created.ok) throw new Error(`Qdrant collection create failed (${created.status})`);
+    }
+    // Pre-tenancy points had no org_id. Assign those once to the historic default tenant before
+    // any tenant-scoped list/search can proceed; a failed migration fails closed.
+    await migrateLegacyQdrantPayloads(COLLECTION, DEFAULT_ORG, (path, method, body) =>
+      qfetch(path, method, body),
+    );
+  })().catch((error) => {
+    ready = null;
+    throw error;
+  });
   return ready;
 }
 
