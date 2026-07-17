@@ -11,6 +11,7 @@ export type CanonicalOwnerId =
   | 'artifacts'
   | 'files'
   | 'apps'
+  | 'agents'
   | 'reviews'
   | 'tools'
   | 'quality-definitions'
@@ -92,7 +93,8 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'solutions',
     label: 'Solutions',
     purpose: 'Build and operate high-value business use cases.',
-    ownershipRule: 'The App is the product center; an agent is an App kind.',
+    ownershipRule:
+      'Apps own authored use cases; Agents owns the read-only catalog of built-in capabilities.',
   },
   {
     id: 'data',
@@ -190,6 +192,14 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     route: '/solutions/apps',
     gate: 'studio',
     primary: true,
+  },
+  {
+    id: 'agents',
+    section: 'solutions',
+    label: 'Agents',
+    description: 'Built-in AI capabilities available to run inside governed pipelines.',
+    route: '/solutions/agents',
+    gate: 'agents',
   },
   {
     id: 'reviews',

@@ -89,7 +89,9 @@ function CitationsCard({ run }: Readonly<{ run: AgentRun }>) {
               <span className="truncate text-sm text-foreground">{c.title}</span>
               <Badge
                 variant="secondary"
-                className={c.supported ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}
+                className={
+                  c.supported ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }
               >
                 {c.supported ? 'supported' : 'weak'} · {c.score}
               </Badge>
@@ -113,7 +115,8 @@ function ProvenanceCard({ run }: Readonly<{ run: AgentRun }>) {
           Provenance
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {p.algorithm} signature over the answer + citations — tamper-evident, signed {p.signedAt.slice(0, 19).replace('T', ' ')}.
+          {p.algorithm} signature over the answer + citations — tamper-evident, signed{' '}
+          {p.signedAt.slice(0, 19).replace('T', ' ')}.
         </p>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -143,7 +146,7 @@ export default async function RunTracePage({
   return (
     <div className="space-y-6">
       <Link
-        href={`/build/agents/${id}/runs`}
+        href={`/solutions/agents/${id}/runs`}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
@@ -155,7 +158,9 @@ export default async function RunTracePage({
         <Badge variant="secondary" className={STATUS_COLOR[run.status] ?? ''}>
           {run.status}
         </Badge>
-        {run.provenance ? <Badge variant="outline">signed · {run.provenance.algorithm}</Badge> : null}
+        {run.provenance ? (
+          <Badge variant="outline">signed · {run.provenance.algorithm}</Badge>
+        ) : null}
         <span className="text-xs text-muted-foreground">
           {run.startedAt.slice(0, 19).replace('T', ' ')}
         </span>

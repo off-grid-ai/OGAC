@@ -182,7 +182,7 @@ export const MODULES: readonly ModuleDef[] = [
     id: 'agents',
     label: 'Agents',
     description: 'Pre-built AI agent use cases.',
-    route: '/solutions/apps',
+    route: '/solutions/agents',
     service: 'agents',
   },
   {

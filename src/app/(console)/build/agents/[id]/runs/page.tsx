@@ -24,7 +24,9 @@ const STATUS_COLOR: Record<string, string> = {
   denied: 'bg-destructive/10 text-destructive',
 };
 
-export default async function AgentRunsPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function AgentRunsPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -36,7 +38,7 @@ export default async function AgentRunsPage({ params }: Readonly<{ params: Promi
   return (
     <div className="space-y-6">
       <Link
-        href={`/build/agents/${id}`}
+        href={`/solutions/agents/${id}`}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
@@ -67,12 +69,18 @@ export default async function AgentRunsPage({ params }: Readonly<{ params: Promi
                 {runs.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      <Link href={`/build/agents/${id}/runs/${r.id}`} className="hover:text-primary">
+                      <Link
+                        href={`/solutions/agents/${id}/runs/${r.id}`}
+                        className="hover:text-primary"
+                      >
                         {r.startedAt.slice(0, 16).replace('T', ' ')}
                       </Link>
                     </TableCell>
                     <TableCell className="max-w-sm truncate text-foreground">
-                      <Link href={`/build/agents/${id}/runs/${r.id}`} className="hover:text-primary">
+                      <Link
+                        href={`/solutions/agents/${id}/runs/${r.id}`}
+                        className="hover:text-primary"
+                      >
                         {r.query}
                       </Link>
                     </TableCell>

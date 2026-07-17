@@ -46,6 +46,7 @@ test('every canonical entity has exactly one owner and one canonical route', () 
 test('entity collision decisions are represented in canonical ownership', () => {
   const byId = new Map(CANONICAL_OWNERS.map((owner) => [owner.id, owner]));
   assert.equal(byId.get('apps')?.route, '/solutions/apps');
+  assert.equal(byId.get('agents')?.route, '/solutions/agents');
   assert.equal(byId.get('runs')?.route, '/operations/runs');
   assert.equal(byId.get('runtime-pipelines')?.route, '/runtime/pipelines');
   assert.equal(byId.get('data-flows')?.route, '/data/flows');
@@ -101,6 +102,7 @@ test('secondary routes highlight their declared sidebar parent and dynamic route
     'runtime-pipelines',
   );
   assert.equal(sidebarActiveIdForPath('/solutions/apps/app-42/runs'), 'apps');
+  assert.equal(sidebarActiveIdForPath('/solutions/agents/fnol-intake'), 'apps');
   assert.equal(sidebarActiveIdForPath('/nowhere'), undefined);
 });
 

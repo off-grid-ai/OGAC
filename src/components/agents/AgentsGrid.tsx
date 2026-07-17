@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
-import { accentHue, initials } from '@/lib/workspace-grid';
+import { initials } from '@/lib/workspace-grid';
 
 export interface AgentCardModel {
   id: string;
@@ -25,16 +25,7 @@ export interface AgentCardModel {
   pipeline?: PipelineChipData;
 }
 
-const TRIGGER: Record<string, string> = {
-  'on-call': 'bg-blue-500/10 text-blue-600',
-  'on-message': 'bg-blue-500/10 text-blue-600',
-  observed: 'bg-primary/10 text-primary',
-  scheduled: 'bg-amber-500/10 text-amber-600',
-  'on-demand': 'bg-muted text-muted-foreground',
-};
-
 function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
-  const hue = accentHue(a.id || a.name);
   const disabled = a.custom && a.enabled === false;
   return (
     <div
@@ -45,13 +36,15 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
         <span
-          className="flex size-7 shrink-0 items-center justify-center rounded font-mono text-[11px] font-medium"
-          style={{ background: `hsl(${hue} 60% 45% / 0.15)`, color: `hsl(${hue} 60% 45%)` }}
+          className="flex size-7 shrink-0 items-center justify-center rounded bg-primary/10 font-mono text-[11px] font-medium text-primary"
           aria-hidden
         >
           {a.custom ? initials(a.name) : <Robot className="size-4" />}
         </span>
-        <Link href={`/build/agents/${a.id}`} className="min-w-0 flex-1 truncate hover:text-primary">
+        <Link
+          href={`/solutions/agents/${a.id}`}
+          className="min-w-0 flex-1 truncate hover:text-primary"
+        >
           <span className="truncate font-mono text-sm font-medium">{a.name}</span>
         </Link>
         {disabled ? (
@@ -69,7 +62,7 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
           <Badge variant="secondary" className="text-[10px]">
             {a.role}
           </Badge>
-          <Badge variant="secondary" className={`text-[10px] ${TRIGGER[a.trigger] ?? ''}`}>
+          <Badge variant="outline" className="text-[10px]">
             {a.trigger}
           </Badge>
           {a.grounded ? (

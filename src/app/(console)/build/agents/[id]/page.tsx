@@ -67,7 +67,7 @@ function RecentRunsTable({ agentId, runs }: Readonly<{ agentId: string; runs: Ag
               </TableCell>
               <TableCell>
                 <Link
-                  href={`/build/agents/${agentId}/runs/${r.id}`}
+                  href={`/solutions/agents/${agentId}/runs/${r.id}`}
                   className="text-xs text-primary hover:underline"
                 >
                   trace →
@@ -92,7 +92,8 @@ export default async function AgentDetailPage({
   // AppSpec is the canonical owner of every authored agent. Preserve the old runtime-agent deep
   // link by resolving it to the owning app lifecycle; orphaned legacy rows remain readable below.
   const owningApp = agent.custom ? await findAppByAgentId(id, orgId) : null;
-  if (owningApp) redirect(`/build/apps/${encodeURIComponent(owningApp.id)}`);
+  if (owningApp) redirect(`/solutions/apps/${encodeURIComponent(owningApp.id)}`);
+  if (agent.custom) notFound();
   // Agent bindings are explicit. Null is honestly rendered as "No pipeline" and never resolved via
   // the chat default.
   const boundPipeline = agent.pipelineId
@@ -107,7 +108,7 @@ export default async function AgentDetailPage({
   return (
     <div className="space-y-6">
       <Link
-        href="/build/agents"
+        href="/solutions/agents"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
@@ -133,23 +134,6 @@ export default async function AgentDetailPage({
         </div>
         <AgentCardActions agentId={agent.id} />
       </div>
-
-      {agent.custom ? (
-        <Card className="border-amber-500/30 bg-amber-500/5 shadow-sm">
-          <CardContent className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center">
-            <p className="text-sm text-muted-foreground">
-              This is a legacy runtime definition with no owning app. It remains runnable and
-              readable, but new authoring and edits belong to the App lifecycle.
-            </p>
-            <Link
-              href="/build/studio/new"
-              className="shrink-0 text-sm font-medium text-primary hover:underline"
-            >
-              Build the canonical app →
-            </Link>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="shadow-sm lg:col-span-2">
@@ -228,7 +212,7 @@ export default async function AgentDetailPage({
             </p>
           </div>
           <Link
-            href={`/build/agents/${agent.id}/runs`}
+            href={`/solutions/agents/${agent.id}/runs`}
             className="text-xs text-primary hover:underline"
           >
             View all runs →

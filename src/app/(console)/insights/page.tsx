@@ -77,7 +77,9 @@ function EvalRunsCard({ evals }: Readonly<{ evals: Eval[] }>) {
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-sm">Eval runs</CardTitle>
-        <p className="text-xs text-muted-foreground">Golden-set runs — click for per-case results.</p>
+        <p className="text-xs text-muted-foreground">
+          Golden-set runs — click for per-case results.
+        </p>
       </CardHeader>
       <CardContent>
         {evals.length ? (
@@ -175,7 +177,7 @@ function RunTracesTable({ runs }: Readonly<{ runs: Trace[] }>) {
             </TableCell>
             <TableCell>
               <Link
-                href={`/build/agents/${r.agentId}/runs/${r.id}`}
+                href={`/solutions/agents/${r.agentId}/runs/${r.id}`}
                 className="text-xs text-primary hover:underline"
               >
                 trace →
@@ -203,8 +205,11 @@ export default async function ObservabilityPage({
   // Pipeline facet — eval-run history filters server-side (eval_runs carry pipeline_id, PA-12); the
   // other probes aren't pipeline-aware yet, so the note by the control is explicit about the scope.
   const pipelines = await listPipelines(org).catch(() => []);
-  const facet = resolvePipelineFacet(sp.pipeline, pipelines.map((p) => p.id));
-  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facet = resolvePipelineFacet(
+    sp.pipeline,
+    pipelines.map((p) => p.id),
+  );
+  const facetName = facet ? (pipelines.find((p) => p.id === facet)?.name ?? facet) : null;
   // Every probe runs in parallel AND under a wall-clock ceiling: the observability page fans out to
   // eval history, the drift engine (Evidently), durable runs, feature flags, and three Langfuse
   // calls. The Langfuse trio already degrade gracefully; here we also cap eval/drift/runs/flag reads

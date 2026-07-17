@@ -22,7 +22,16 @@ export const FEATURES: FeatureEntry[] = [
     subtitle: 'Control',
     href: '/governance',
     moduleId: 'control',
-    keywords: ['routing', 'egress', 'leash', 'cloud', 'local', 'block', 'route', 'where requests run'],
+    keywords: [
+      'routing',
+      'egress',
+      'leash',
+      'cloud',
+      'local',
+      'block',
+      'route',
+      'where requests run',
+    ],
   },
   {
     id: 'audit-log',
@@ -67,9 +76,9 @@ export const FEATURES: FeatureEntry[] = [
   {
     id: 'agent-create',
     title: 'Create an agent (with tools)',
-    subtitle: 'Agents',
-    href: '/build/agents',
-    moduleId: 'agents',
+    subtitle: 'Apps',
+    href: '/solutions/apps/new',
+    moduleId: 'studio',
     keywords: ['create agent', 'new agent', 'agent tools', 'capabilities', 'author agent'],
   },
   {
