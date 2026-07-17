@@ -3,10 +3,18 @@
 // tool/service. Each destination is a pluggable RetrievalSource; the router is source-agnostic,
 // so a buyer can run it over the Brain alone, or wire in DB/tool sources, or all of them.
 import type { RetrievalOptions } from './query';
+import type { DataDomain } from '@/lib/data-domains';
 
 export type { RetrievalOptions } from './query';
 
 export type SourceKind = 'kb' | 'database' | 'tool';
+
+/** Request-scoped I/O context. Optional for backwards compatibility; production agent runs pass it. */
+export interface RetrievalContext {
+  orgId?: string;
+  /** Preloaded, org-scoped domains keep authorization and connector routing on one snapshot. */
+  dataDomains?: DataDomain[];
+}
 
 // One result with its provenance — `ref` points back to the origin (doc id, dataset, connector).
 export interface RetrievalHit {
@@ -25,7 +33,12 @@ export interface RetrievalSource {
   describe: string;
   // opts is optional (metadata filter + vector/hybrid mode). Sources that can't honour it ignore
   // it; the KB source threads it down into the vector store. Absent opts === today's behaviour.
-  search(query: string, k: number, opts?: RetrievalOptions): Promise<RetrievalHit[]>;
+  search(
+    query: string,
+    k: number,
+    opts?: RetrievalOptions,
+    context?: RetrievalContext,
+  ): Promise<RetrievalHit[]>;
 }
 
 export interface RouteDecision {

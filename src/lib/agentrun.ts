@@ -21,11 +21,7 @@ import {
   parseAgentAction,
   runAgentLoop,
 } from '@/lib/agent-loop';
-import {
-  effectiveRunId,
-  type RunContext,
-  resolveRunAttribution,
-} from '@/lib/agent-run-context';
+import { effectiveRunId, type RunContext, resolveRunAttribution } from '@/lib/agent-run-context';
 import { buildAgentToolCatalog, isAutonomousAgent } from '@/lib/agent-tools-catalog';
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { outcomeFromStatus } from '@/lib/audit-event';
@@ -39,7 +35,8 @@ import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { screenGuardrail } from '@/lib/guardrail-seam';
 import { emitSpan } from '@/lib/otel';
 import { auditEnforcement } from '@/lib/pipeline-contract';
-import { enforceDataAccess, enforceModelCall } from '@/lib/pipeline-enforcement';
+import { enforceModelCall } from '@/lib/pipeline-enforcement';
+import { retrieveAgentSources } from '@/lib/agent-retrieval';
 import { scoreInteraction } from '@/lib/qa/scoring';
 import { shipRunAudit } from '@/lib/siem';
 import { recordAudit } from '@/lib/store';
@@ -325,7 +322,10 @@ function recordTrajectory(trajectory: LoopStep[], mark: Mark): void {
   }
 }
 
-function toRun(row: { id: string; startedAt: Date | string }, v: Omit<AgentRun, 'id' | 'startedAt'>): AgentRun {
+function toRun(
+  row: { id: string; startedAt: Date | string },
+  v: Omit<AgentRun, 'id' | 'startedAt'>,
+): AgentRun {
   return {
     ...v,
     id: row.id,
@@ -398,7 +398,10 @@ export async function listAgentRunsByAgent(
 
 // A single run by id (the trace deep-dive page). ORG-SCOPED (tenant-isolation): the lookup filters
 // BOTH id AND org, so tenant A can never read tenant B's run by guessing its id (cross-tenant IDOR).
-export async function getAgentRun(id: string, orgId: string = DEFAULT_ORG): Promise<AgentRun | null> {
+export async function getAgentRun(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AgentRun | null> {
   const [row] = await db
     .select()
     .from(agentRuns)
@@ -422,7 +425,10 @@ export async function deleteAgentRun(id: string, orgId: string = DEFAULT_ORG): P
 // withheld. Returns the updated run, or null if the run doesn't exist. The caller (route) enforces
 // the state-machine via lib/agent-run-actions before invoking this. ORG-SCOPED: a cross-tenant
 // cancel-by-id matches no row (id AND org), so tenant A can never cancel tenant B's run.
-export async function cancelAgentRun(id: string, orgId: string = DEFAULT_ORG): Promise<AgentRun | null> {
+export async function cancelAgentRun(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AgentRun | null> {
   const [row] = await db
     .update(agentRuns)
     .set({ status: 'cancelled', answer: '' })
@@ -519,10 +525,20 @@ export async function runAgent(
   mark('policy', decision.engine, `${explicitDeny ? 'deny' : 'allow'} — ${decision.reason}`, [], t);
   if (explicitDeny) {
     auditRun('denied');
-    return persist(runId, {
-      agentId, query, answer: '', status: 'denied', steps, citations: [],
-      checks: [{ name: 'policy', verdict: 'blocked' as const, detail: decision.reason }], provenance: null,
-    }, attribution.org);
+    return persist(
+      runId,
+      {
+        agentId,
+        query,
+        answer: '',
+        status: 'denied',
+        steps,
+        citations: [],
+        checks: [{ name: 'policy', verdict: 'blocked' as const, detail: decision.reason }],
+        provenance: null,
+      },
+      attribution.org,
+    );
   }
 
   mark('plan', agent.name, query, [], Date.now());
@@ -532,15 +548,29 @@ export async function runAgent(
   // BLOCK, never a swallowed error that lets the raw query through. orgId is threaded so the PII deep
   // config resolves on the worker path (gap #121).
   t = Date.now();
-  const preScreen = await screenGuardrail('pre', { input: query, model: ANSWER_MODEL, orgId: attribution.org });
+  const preScreen = await screenGuardrail('pre', {
+    input: query,
+    model: ANSWER_MODEL,
+    orgId: attribution.org,
+  });
   const preChecks = preScreen.checks;
   mark('guard', 'pre', preScreen.detail, [], t);
   if (preScreen.outcome === 'blocked') {
     auditRun('blocked');
-    return persist(runId, {
-      agentId, query, answer: '', status: 'blocked', steps, citations: [],
-      checks: preChecks, provenance: null,
-    }, attribution.org);
+    return persist(
+      runId,
+      {
+        agentId,
+        query,
+        answer: '',
+        status: 'blocked',
+        steps,
+        citations: [],
+        checks: preChecks,
+        provenance: null,
+      },
+      attribution.org,
+    );
   }
 
   // 2b. Budget GATE — the hard stop before this run incurs cost (retrieve → compose → gateway).
@@ -552,7 +582,13 @@ export async function runAgent(
   const runCost = costForTokens(runModel, estRunTokens);
   const budget = await projectBudget(attribution.project ?? null, runCost, attribution.org);
   if (!budget.ok) {
-    mark('budget', 'deny', `over budget — spent $${budget.spent.toFixed(4)} of $${budget.limit}`, [], Date.now());
+    mark(
+      'budget',
+      'deny',
+      `over budget — spent $${budget.spent.toFixed(4)} of $${budget.limit}`,
+      [],
+      Date.now(),
+    );
     recordAudit({
       actor: attribution.actor,
       org: attribution.org,
@@ -564,11 +600,26 @@ export async function runAgent(
       outcome: 'blocked',
       runId,
     });
-    return persist(runId, {
-      agentId, query, answer: '', status: 'denied', steps, citations: [],
-      checks: [{ name: 'budget', verdict: 'blocked' as const, detail: `project budget exceeded ($${budget.spent.toFixed(4)}/$${budget.limit})` }],
-      provenance: null,
-    }, attribution.org);
+    return persist(
+      runId,
+      {
+        agentId,
+        query,
+        answer: '',
+        status: 'denied',
+        steps,
+        citations: [],
+        checks: [
+          {
+            name: 'budget',
+            verdict: 'blocked' as const,
+            detail: `project budget exceeded ($${budget.spent.toFixed(4)}/$${budget.limit})`,
+          },
+        ],
+        provenance: null,
+      },
+      attribution.org,
+    );
   }
 
   // PA-16b — bound-pipeline enforcement (ADDITIVE, mirrors the app-run reference path). The
@@ -580,35 +631,61 @@ export async function runAgent(
   const enforceCtx = { orgId: attribution.org, actor: caller, runId, contract };
   const dataClass = agent.grounded === false ? 'none' : 'general';
 
-  // 2c. Data-access gate — the HARD allowlist ceiling BEFORE retrieval touches the knowledge base.
-  // A grounded run reads org knowledge (the 'retrieval' data-domain); if the bound pipeline's
-  // allowlist doesn't cover it, deny + audit and short-circuit (no data is read). Ungrounded runs
-  // retrieve nothing, so there is nothing to gate.
-  if (agent.grounded !== false) {
-    const dataVerdict = enforceDataAccess(contract, 'retrieval');
-    if (!dataVerdict.allow) {
-      mark('data', 'deny', dataVerdict.reason, [], Date.now());
-      auditEnforcement(enforceCtx, 'pipeline.data.deny', 'data:retrieval', 'blocked', dataVerdict.reason);
-      auditRun('denied');
-      return persist(runId, {
-        agentId, query, answer: '', status: 'denied', steps, citations: [],
-        checks: [{ name: 'pipeline-data', verdict: 'blocked' as const, detail: dataVerdict.reason }],
-        provenance: null,
-      }, attribution.org);
-    }
-  }
-
-  // 3. Retrieve — provenance refs come straight off the router's hits. Skipped for a non-grounded
-  // agent (it answers from the model, so there are no sources to retrieve or cite).
+  // 3. Resolve + authorize + retrieve. The helper reads the org's declared domain metadata, resolves
+  // this query to the REAL domain id, checks that id against the pipeline, and only then calls the
+  // router. A denial therefore cannot touch the connector/retrieval boundary. KB-only queries have no
+  // declared-domain id and keep their legacy behavior; ungrounded agents still retrieve nothing.
   t = Date.now();
-  const routed =
-    agent.grounded === false
-      ? { hits: [] as RetrievalHit[], decision: { intent: ['ungrounded'] as string[] } }
-      : await route(query, 6);
+  let routed: Awaited<ReturnType<typeof route>>;
+  if (agent.grounded === false) {
+    routed = {
+      query,
+      hits: [] as RetrievalHit[],
+      decision: { intent: [], reason: 'ungrounded agent' },
+    };
+  } else {
+    const retrieval = await retrieveAgentSources({
+      query,
+      k: 6,
+      orgId: attribution.org,
+      contract,
+    });
+    if (!retrieval.allow) {
+      const dataVerdict = retrieval.denied;
+      mark('data', 'deny', dataVerdict.reason, [], t);
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.data.deny',
+        `data:${dataVerdict.requested}`,
+        'blocked',
+        dataVerdict.reason,
+      );
+      auditRun('denied');
+      return persist(
+        runId,
+        {
+          agentId,
+          query,
+          answer: '',
+          status: 'denied',
+          steps,
+          citations: [],
+          checks: [
+            { name: 'pipeline-data', verdict: 'blocked' as const, detail: dataVerdict.reason },
+          ],
+          provenance: null,
+        },
+        attribution.org,
+      );
+    }
+    routed = retrieval.routed;
+  }
   mark(
     'retrieve',
     'router',
-    agent.grounded === false ? 'skipped (ungrounded agent)' : `intent ${routed.decision.intent.join(', ')}`,
+    agent.grounded === false
+      ? 'skipped (ungrounded agent)'
+      : `intent ${routed.decision.intent.join(', ')}`,
     routed.hits.map((h) => h.ref),
     t,
   );
@@ -624,13 +701,30 @@ export async function runAgent(
   const modelVerdict = enforceModelCall(contract, dataClass);
   if (!modelVerdict.allow) {
     mark('egress', 'block', modelVerdict.reason, [], Date.now());
-    auditEnforcement(enforceCtx, 'pipeline.egress.block', `model:agent:${agentId}`, 'blocked', modelVerdict.reason);
+    auditEnforcement(
+      enforceCtx,
+      'pipeline.egress.block',
+      `model:agent:${agentId}`,
+      'blocked',
+      modelVerdict.reason,
+    );
     auditRun('blocked');
-    return persist(runId, {
-      agentId, query, answer: '', status: 'blocked', steps, citations: [],
-      checks: [{ name: 'pipeline-egress', verdict: 'blocked' as const, detail: modelVerdict.reason }],
-      provenance: null,
-    }, attribution.org);
+    return persist(
+      runId,
+      {
+        agentId,
+        query,
+        answer: '',
+        status: 'blocked',
+        steps,
+        citations: [],
+        checks: [
+          { name: 'pipeline-egress', verdict: 'blocked' as const, detail: modelVerdict.reason },
+        ],
+        provenance: null,
+      },
+      attribution.org,
+    );
   }
   // The egress the pipeline permits for this run's data-class — threaded into every tool dispatch so
   // an internet-reaching primitive (web_search) is refused under a local-only/blocked leash.
@@ -667,7 +761,9 @@ export async function runAgent(
   const requireMasking = effectivePiiMasking(false, modelVerdict);
   if (requireMasking) {
     t = Date.now();
-    let scanResult: { ok: true; scan: Awaited<ReturnType<ReturnType<typeof getPii>['scan']>> } | { ok: false; error: unknown };
+    let scanResult:
+      | { ok: true; scan: Awaited<ReturnType<ReturnType<typeof getPii>['scan']>> }
+      | { ok: false; error: unknown };
     try {
       scanResult = { ok: true, scan: await getPii().scan(query, attribution.org) };
     } catch (err) {
@@ -676,17 +772,41 @@ export async function runAgent(
     const decision = maskOrBlock(requireMasking, query, scanResult);
     if (decision.block) {
       mark('mask', 'block', decision.reason ?? 'PII masking failed', [], t);
-      auditEnforcement(enforceCtx, 'pipeline.pii.mask', `model:agent:${agentId}`, 'error', decision.reason ?? 'PII masking failed');
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.pii.mask',
+        `model:agent:${agentId}`,
+        'error',
+        decision.reason ?? 'PII masking failed',
+      );
       auditRun('blocked');
-      return persist(runId, {
-        agentId, query, answer: '', status: 'blocked', steps, citations: [],
-        checks: [...preChecks, { name: 'pii-mask', verdict: 'blocked' as const, detail: decision.reason ?? undefined }],
-        provenance: null,
-      }, attribution.org);
+      return persist(
+        runId,
+        {
+          agentId,
+          query,
+          answer: '',
+          status: 'blocked',
+          steps,
+          citations: [],
+          checks: [
+            ...preChecks,
+            { name: 'pii-mask', verdict: 'blocked' as const, detail: decision.reason ?? undefined },
+          ],
+          provenance: null,
+        },
+        attribution.org,
+      );
     }
     modelQuery = decision.text;
     if (decision.masked && scanResult.ok) {
-      mark('mask', scanResult.scan.engine, `masked ${scanResult.scan.entities.join(', ')} before model`, [], t);
+      mark(
+        'mask',
+        scanResult.scan.engine,
+        `masked ${scanResult.scan.entities.join(', ')} before model`,
+        [],
+        t,
+      );
       auditEnforcement(
         enforceCtx,
         'pipeline.pii.mask',
@@ -745,24 +865,48 @@ export async function runAgent(
     routed.hits.map((h) => ({ id: h.ref, text: h.snippet })),
   );
   const citations: Citation[] = routed.hits.map((h) => ({
-    ref: h.ref, title: h.title, snippet: h.snippet, score: h.score, supported: grounded.score >= 50,
+    ref: h.ref,
+    title: h.title,
+    snippet: h.snippet,
+    score: h.score,
+    supported: grounded.score >= 50,
   }));
-  mark('ground', 'grounding', `${grounded.verdicts.filter((v) => v.supported).length}/${grounded.verdicts.length} claims grounded (${grounded.score}%)`, citations.map((c) => c.ref), t);
+  mark(
+    'ground',
+    'grounding',
+    `${grounded.verdicts.filter((v) => v.supported).length}/${grounded.verdicts.length} claims grounded (${grounded.score}%)`,
+    citations.map((c) => c.ref),
+    t,
+  );
 
   // 6. Guardrails (output) — scan the answer before it leaves. Routed through the SHARED fail-CLOSED
   // seam (G-ADV-GOV-3) so a throw/timeout records an HONEST 'blocked' verdict, never an empty screen
   // that reads as "screened, nothing found". A failed outbound screen holds the answer (status
   // 'blocked'): a broken egress DLP screen must not let unscanned output leave.
   t = Date.now();
-  const postScreen = await screenGuardrail('post', { output: answer, model: ANSWER_MODEL, orgId: attribution.org });
+  const postScreen = await screenGuardrail('post', {
+    output: answer,
+    model: ANSWER_MODEL,
+    orgId: attribution.org,
+  });
   const postChecks = postScreen.checks;
   mark('guard', 'post', postScreen.detail, [], t);
   if (postScreen.outcome === 'blocked') {
     auditRun('blocked');
-    return persist(runId, {
-      agentId, query, answer: '', status: 'blocked', steps, citations,
-      checks: [...preChecks, ...postChecks], provenance: null,
-    }, attribution.org);
+    return persist(
+      runId,
+      {
+        agentId,
+        query,
+        answer: '',
+        status: 'blocked',
+        steps,
+        citations,
+        checks: [...preChecks, ...postChecks],
+        provenance: null,
+      },
+      attribution.org,
+    );
   }
 
   // 7. Provenance — sign the answer (ed25519 by default): tamper-evident, offline-verifiable.
@@ -787,10 +931,20 @@ export async function runAgent(
   // Human-in-the-loop (S4): when the workflow has a Human block, the answer is HELD server-side
   // as pending_review (persisted, not delivered) until an approver releases it via the approve
   // endpoint. This is a real governance checkpoint, not a client toggle.
-  const run = await persist(runId, {
-    agentId, query, answer, status: requireReview ? 'pending_review' : 'done', steps, citations,
-    checks: [...preChecks, ...postChecks], provenance,
-  }, attribution.org);
+  const run = await persist(
+    runId,
+    {
+      agentId,
+      query,
+      answer,
+      status: requireReview ? 'pending_review' : 'done',
+      steps,
+      citations,
+      checks: [...preChecks, ...postChecks],
+      provenance,
+    },
+    attribution.org,
+  );
 
   // 8. Observability fan-out — the SAME runId lands in all four planes, correlated by one key (C2).
   //    Every emission is best-effort / fire-and-forget: a plane being down never fails the run.

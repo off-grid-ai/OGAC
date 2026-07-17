@@ -5,11 +5,12 @@ import {
   enforceDataAccess,
   enforceModelCall,
 } from '@/lib/pipeline-enforcement';
+import { authorizeAgentDomains } from '@/lib/agent-retrieval-policy';
 import { ORG_GUARDRAIL_DEFAULTS, ORG_POLICY_DEFAULTS } from '@/lib/pipeline-governance';
 
 // PA-16b — call-site enforcement tests. They assert the EXACT decisions the agent-run and chat-run
 // paths make at their gate points, using the REAL pure decisions with no mocks:
-//   • agent path: data key 'retrieval' (grounded run) + data-class 'general'/'none'.
+//   • agent path: actual resolved data-domain ids + data-class 'general'/'none'.
 //   • chat path : data keys <projectId> / 'org-knowledge' + the request's data_class.
 // These prove the gate fires (deny/block) under a restrictive contract and is fully permissive under
 // a null contract (the ADDITIVE, no-regression guarantee) — the same invariant runAgent/chat rely on.
@@ -29,8 +30,9 @@ function contract(over: Partial<PipelineContract> = {}): PipelineContract {
 
 // ─── the ADDITIVE guarantee: a null contract never gates anything (legacy behaviour) ───────────────
 test('NULL contract ⇒ agent retrieval + model call both permissive (no regression)', () => {
-  assert.equal(enforceDataAccess(null, 'retrieval').allow, true);
-  assert.equal(enforceDataAccess(null, 'retrieval').noPipeline, true);
+  const access = authorizeAgentDomains(null, ['dom_hr']);
+  assert.equal(access.allow, true);
+  assert.equal(access.verdicts[0]?.noPipeline, true);
   const m = enforceModelCall(null, 'general');
   assert.equal(m.allow, true);
   assert.equal(m.noPipeline, true);
@@ -43,14 +45,14 @@ test('NULL contract ⇒ chat retrieval + model call both permissive (no regressi
 });
 
 // ─── agent path: the HARD data ceiling at retrieval ────────────────────────────────────────────────
-test('agent grounded run — retrieval DENIED when the allowlist excludes it', () => {
-  const v = enforceDataAccess(contract({ dataAllowlist: ['dom_hr'] }), 'retrieval');
+test('agent grounded run — actual domain DENIED when the allowlist excludes it', () => {
+  const v = authorizeAgentDomains(contract({ dataAllowlist: ['dom_other'] }), ['dom_hr']);
   assert.equal(v.allow, false);
-  assert.match(v.reason, /OUTSIDE the pipeline data allowlist/);
+  assert.match(v.denied?.reason ?? '', /OUTSIDE the pipeline data allowlist/);
 });
 
-test('agent grounded run — retrieval ALLOWED when the allowlist covers it', () => {
-  const v = enforceDataAccess(contract({ dataAllowlist: ['retrieval'] }), 'retrieval');
+test('agent grounded run — actual domain ALLOWED when the allowlist covers it', () => {
+  const v = authorizeAgentDomains(contract({ dataAllowlist: ['dom_hr'] }), ['dom_hr']);
   assert.equal(v.allow, true);
 });
 

@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  enforceDataAccess,
-  enforceModelCall,
-  type PipelineContract,
-} from '../src/lib/pipeline-enforcement.ts';
+import { enforceModelCall, type PipelineContract } from '../src/lib/pipeline-enforcement.ts';
+import { authorizeAgentDomains } from '../src/lib/agent-retrieval-policy.ts';
 import { ORG_GUARDRAIL_DEFAULTS, ORG_POLICY_DEFAULTS } from '../src/lib/pipeline-governance.ts';
 import type { AgentPipelineDeps } from '../src/worker/agent-run.activities.ts';
 import { runAgentPipeline } from '../src/worker/agent-run.activities.ts';
@@ -29,7 +26,7 @@ import type { RunContext } from '../src/lib/agent-run-context.ts';
 //
 // To prove the contract actually gates the WORKER path — not merely that it's attached — the injected
 // runAgent reproduces runAgent's exact gate ORDER against the REAL pure decisions on ctx.contract
-// (the same enforceDataAccess/enforceModelCall runAgent itself calls). So a WORKER run whose context
+// (actual-domain authorization then enforceModelCall). So a WORKER run whose context
 // carries an out-of-allowlist contract is DENIED, and one under a local-only leash with a cloud rule
 // is BLOCKED — identically to the sync path. Null contract ⇒ legacy allow (unchanged).
 
@@ -49,8 +46,8 @@ function fakeRun(id: string, status: string): AgentRun {
 }
 
 // A runAgent stand-in that gates via the SAME pure decisions the real runAgent runs, over the
-// contract the WORKER attached to the context. A GROUNDED agent (default) retrieves org data
-// ('retrieval' domain, data-class 'general') — so both the data ceiling and the egress leash apply.
+// contract the WORKER attached to the context. A GROUNDED agent resolves `dom_hr` from its org before
+// retrieval, so both the data ceiling and the egress leash apply.
 function gatingRunAgent(): {
   fn: AgentPipelineDeps['runAgent'];
   seen: RunContext[];
@@ -60,7 +57,7 @@ function gatingRunAgent(): {
     seen.push(context);
     const contract = context.contract ?? null;
     // 1. data-access ceiling (before retrieval).
-    const data = enforceDataAccess(contract, 'retrieval');
+    const data = authorizeAgentDomains(contract, ['dom_hr']);
     if (!data.allow) return fakeRun(context.runId ?? 'r', 'denied');
     // 2. egress leash (before the model call).
     const model = enforceModelCall(contract, 'general');
@@ -109,10 +106,10 @@ test('durable worker (agent): NO pipeline ⇒ resolver returns null ⇒ run proc
 
 // ── the data-allowlist ceiling on the WORKER path ─────────────────────────────────────────────────
 
-test('durable worker (agent): contract WITH retrieval allowed ⇒ run proceeds', async () => {
+test('durable worker (agent): contract WITH resolved domain allowed ⇒ run proceeds', async () => {
   const { fn, seen } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_allow', 'pl_test'), {
-    resolveContract: fakeResolve(contract({ dataAllowlist: ['retrieval'] })),
+    resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
     runAgent: fn,
   });
   assert.equal(res.status, 'done');
@@ -121,7 +118,7 @@ test('durable worker (agent): contract WITH retrieval allowed ⇒ run proceeds',
   assert.equal(seen[0]!.pipelineId, 'pl_test');
 });
 
-test('durable worker (agent): contract WITHOUT retrieval ⇒ data access DENIED (ceiling enforced)', async () => {
+test('durable worker (agent): contract WITHOUT resolved domain ⇒ data access DENIED', async () => {
   const { fn } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_deny', 'pl_test'), {
     resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_other'] })),
@@ -140,7 +137,7 @@ test('durable worker (agent): egress OFF + cloud rule for the run data-class ⇒
   const res = await runAgentPipeline(wfInput('r_egress', 'pl_test'), {
     resolveContract: fakeResolve(
       contract({
-        dataAllowlist: ['retrieval'],
+        dataAllowlist: ['dom_hr'],
         routing: {
           egressAllowed: false,
           rules: [
@@ -162,13 +159,17 @@ test('durable worker (agent): egress OFF + cloud rule for the run data-class ⇒
     runAgent: fn,
   });
   assert.equal(res.found, true);
-  assert.equal(res.status, 'blocked', 'a cloud call under a local-only leash must be blocked on the WORKER path');
+  assert.equal(
+    res.status,
+    'blocked',
+    'a cloud call under a local-only leash must be blocked on the WORKER path',
+  );
 });
 
 test('durable worker (agent): default (local) routing ⇒ model runs on-prem, run completes', async () => {
   const { fn } = gatingRunAgent();
   const res = await runAgentPipeline(wfInput('r_local', 'pl_test'), {
-    resolveContract: fakeResolve(contract({ dataAllowlist: ['retrieval'] })),
+    resolveContract: fakeResolve(contract({ dataAllowlist: ['dom_hr'] })),
     runAgent: fn,
   });
   assert.equal(res.status, 'done');
