@@ -38,7 +38,10 @@ async function runAppOwnershipBackfill(execute: (query: SQL) => Promise<unknown>
         SELECT step->>'agentId'
         FROM apps a
         CROSS JOIN LATERAL jsonb_array_elements(COALESCE(a.steps, '[]'::jsonb)) step
-        WHERE step->>'kind' = 'agent' AND COALESCE(step->>'agentId', '') <> ''
+        WHERE step->>'kind' = 'agent'
+          AND COALESCE(step->>'agentId', '') <> ''
+          AND step->'inlineAgent' IS NOT NULL
+          AND step->'inlineAgent' <> 'null'::jsonb
         GROUP BY a.org_id, step->>'agentId'
         HAVING COUNT(DISTINCT a.id) > 1
       ) THEN
@@ -56,7 +59,10 @@ async function runAppOwnershipBackfill(execute: (query: SQL) => Promise<unknown>
       AND EXISTS (
         SELECT 1
         FROM jsonb_array_elements(COALESCE(a.steps, '[]'::jsonb)) step
-        WHERE step->>'kind' = 'agent' AND step->>'agentId' = ca.id
+        WHERE step->>'kind' = 'agent'
+          AND step->>'agentId' = ca.id
+          AND step->'inlineAgent' IS NOT NULL
+          AND step->'inlineAgent' <> 'null'::jsonb
       )
       AND (ca.owner_app_id IS NULL OR ca.owner_app_id = a.id)
       AND (ca.owner_app_id, ca.pipeline_id) IS DISTINCT FROM (a.id, a.pipeline_id);
