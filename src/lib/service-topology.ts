@@ -104,4 +104,3 @@ export function summarizeReadiness(topology: LogicalServiceTopology): ReadinessS
 export function countInstances(topology: LogicalServiceTopology): number {
   return topology.components.reduce((total, component) => total + component.instances.length, 0);
 }
-

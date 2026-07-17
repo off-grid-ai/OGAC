@@ -137,9 +137,7 @@ export function toServiceTopologyDetailEntry(
 ): ServiceTopologyDetailEntry {
   return {
     ...toServiceTopologyDirectoryEntry(topology),
-    ...(topology.service.management === 'redpanda'
-      ? { management: 'redpanda' as const }
-      : {}),
+    ...(topology.service.management === 'redpanda' ? { management: 'redpanda' as const } : {}),
     components: topology.components.map((component) => ({
       id: component.id,
       label: component.label,
