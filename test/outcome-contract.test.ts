@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { summarizeOutcome, validateOutcomeContract, type OutcomeContract } from '../src/lib/outcome-contract.ts';
+import {
+  summarizeOutcome,
+  validateOutcomeContract,
+  type OutcomeContract,
+} from '../src/lib/outcome-contract.ts';
 
 const contract = (patch: Partial<OutcomeContract> = {}): OutcomeContract => ({
   metricName: 'Cases processed per day',
@@ -37,7 +41,13 @@ test('summarizeOutcome handles decrease contracts and zero-cost hypotheses', () 
       baseline: { value: 12, label: 'Baseline delinquency' },
       target: { value: 8, label: 'Target delinquency' },
       measured: { value: 10, label: 'Current delinquency' },
-      roi: { currency: 'USD', annualBenefit: 20, implementationCost: 0, annualOperatingCost: 0, rationale: 'Avoided loss' },
+      roi: {
+        currency: 'USD',
+        annualBenefit: 20,
+        implementationCost: 0,
+        annualOperatingCost: 0,
+        rationale: 'Avoided loss',
+      },
     }),
   );
   assert.equal(result.targetChangePct, 33.33);
@@ -52,7 +62,13 @@ test('summarizeOutcome returns honest nulls when percentages or payback are unde
       baseline: { value: 0, label: 'No current capacity' },
       target: { value: 5, label: 'Target' },
       measured: null,
-      roi: { currency: 'USD', annualBenefit: 5, implementationCost: 10, annualOperatingCost: 10, rationale: 'Capability unlock' },
+      roi: {
+        currency: 'USD',
+        annualBenefit: 5,
+        implementationCost: 10,
+        annualOperatingCost: 10,
+        rationale: 'Capability unlock',
+      },
     }),
   );
   assert.equal(result.targetChangePct, null);
@@ -69,7 +85,13 @@ test('validateOutcomeContract rejects missing fields, impossible direction and u
     baseline: { value: Number.NaN, label: '' },
     target: { value: 1, label: '' },
     measured: { value: Infinity, label: '' },
-    roi: { currency: '', annualBenefit: -1, implementationCost: Number.NaN, annualOperatingCost: 0, rationale: '' },
+    roi: {
+      currency: '',
+      annualBenefit: -1,
+      implementationCost: Number.NaN,
+      annualOperatingCost: 0,
+      rationale: '',
+    },
   });
   assert.deepEqual(validateOutcomeContract(invalid), [
     'metric name is required',
