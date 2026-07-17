@@ -22,6 +22,7 @@ import { computeReportMetrics } from '@/lib/app-reports';
 import { toAppRunView } from '@/lib/app-runs-view';
 import {
   evaluateSolutionCompatibility,
+  normalizeCompatibilityApp,
   type SolutionBlueprint,
   type SolutionBlueprintInput,
   type SolutionBlueprintVersion,
@@ -401,11 +402,7 @@ export async function listSolutionDeploymentCandidates(
   ]);
   return Promise.all(
     appRows.map(async (app) => {
-      const appSpec = {
-        pipelineId: app.pipelineId,
-        published: app.published,
-        steps: app.steps as never,
-      };
+      const appSpec = normalizeCompatibilityApp(app);
       const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
       const evaluated = blueprints.map((blueprint) => ({
         blueprint,
@@ -450,11 +447,7 @@ async function compatibleBinding(orgId: string, input: SolutionDeploymentInput) 
   ]);
   if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
   if (!app[0]) throw new SolutionValidationError(['unknown app']);
-  const appSpec = {
-    pipelineId: app[0].pipelineId,
-    published: app[0].published,
-    steps: app[0].steps as never,
-  };
+  const appSpec = normalizeCompatibilityApp(app[0]);
   const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
   const compatibility = evaluateSolutionCompatibility(blueprint, appSpec, pipeline);
   if (!compatibility.compatible || !compatibility.pipelineId) {
@@ -592,8 +585,9 @@ export async function assertSolutionRuntimeBinding(
   try {
     const blueprint = await getSolutionBlueprint(row.blueprintId, orgId, row.blueprintVersion);
     if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
-    const pipeline = app.pipelineId ? await getPipeline(app.pipelineId, orgId) : null;
-    const compatibility = evaluateSolutionCompatibility(blueprint, app, pipeline);
+    const appSpec = normalizeCompatibilityApp(app);
+    const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
+    const compatibility = evaluateSolutionCompatibility(blueprint, appSpec, pipeline);
     if (!compatibility.compatible || compatibility.pipelineId !== row.pipelineId) {
       throw new SolutionConflictError(
         'App is not compatible with the pinned solution deployment',

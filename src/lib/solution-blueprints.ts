@@ -59,6 +59,67 @@ export interface CompatibilityResult {
   pipelineId: string | null;
 }
 
+/**
+ * Persisted Apps predate the current flat AppStep contract: production seed rows keep step-specific
+ * fields under `config`. Normalize that untyped JSONB at the solution boundary so compatibility is
+ * fail-closed and deterministic instead of trusting a TypeScript cast over legacy data.
+ */
+export function normalizeCompatibilityApp(
+  value: unknown,
+): Pick<AppSpec, 'pipelineId' | 'published' | 'steps'> {
+  const app = record(value);
+  const rawSteps = Array.isArray(app.steps) ? app.steps : [];
+  const steps = rawSteps.flatMap((value, index): AppStep[] => {
+    const step = record(value);
+    const config = record(step.config);
+    const kind = text(step.kind);
+    const id = text(step.id) || `legacy-step-${index + 1}`;
+    const label = text(step.label);
+    if (kind === 'connector-query') {
+      return [{ id, label, kind, domain: text(step.domain) || text(config.domain) }];
+    }
+    if (kind === 'agent') {
+      const inline = record(step.inlineAgent ?? config.inlineAgent);
+      const inlineAgent = Object.keys(inline).length
+        ? {
+            systemPrompt: text(inline.systemPrompt),
+            grounded: inline.grounded === true,
+          }
+        : undefined;
+      return [{ id, label, kind, agentId: text(step.agentId) || undefined, inlineAgent }];
+    }
+    if (kind === 'human') return [{ id, label, kind }];
+    if (kind === 'guardrail') return [{ id, label, kind }];
+    if (kind === 'output') {
+      const sink = text(step.sink) || text(config.sink);
+      return [
+        {
+          id,
+          label,
+          kind,
+          sink: sink === 'report' || sink === 'email' || sink === 'whatsapp' ? sink : 'console',
+        },
+      ];
+    }
+    return [];
+  });
+  return {
+    pipelineId: text(app.pipelineId) || null,
+    published: app.published === true,
+    steps,
+  };
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export interface SolutionDeployment {
   id: string;
   orgId: string;
@@ -214,8 +275,8 @@ export function validateObservation(
   return errors;
 }
 
-function canonical(value: string): string {
-  return value.trim().toLocaleLowerCase();
+function canonical(value: unknown): string {
+  return text(value).toLocaleLowerCase();
 }
 
 export function capabilitiesForSteps(steps: AppStep[]): Set<BlueprintCapability> {

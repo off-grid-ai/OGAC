@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   evaluateSolutionCompatibility,
+  normalizeCompatibilityApp,
   splitList,
   validateBlueprint,
   validateDeployment,
@@ -109,6 +110,44 @@ test('compatibility binds the published App graph to the exact governed pipeline
     errors: [],
     pipelineId: 'pl_collections',
   });
+});
+
+test('legacy seeded App JSONB is normalized before solution compatibility evaluation', () => {
+  const legacy = normalizeCompatibilityApp({
+    pipelineId: 'pl_collections',
+    published: true,
+    steps: [
+      {
+        id: 'read',
+        kind: 'connector-query',
+        label: 'Read loans',
+        config: { domain: 'loan accounts', op: 'read' },
+      },
+      {
+        id: 'assess',
+        kind: 'agent',
+        label: 'Assess',
+        config: { inlineAgent: { systemPrompt: 'Assess delinquency.', grounded: true } },
+      },
+      { id: 'approve', kind: 'human', label: 'Approve', config: {} },
+      { id: 'report', kind: 'output', label: 'Report', config: { sink: 'report' } },
+    ],
+  });
+
+  assert.deepEqual(
+    evaluateSolutionCompatibility({ ...validBlueprint(), tombstonedAt: null }, legacy, pipeline),
+    { compatible: true, errors: [], pipelineId: 'pl_collections' },
+  );
+  assert.doesNotThrow(() =>
+    evaluateSolutionCompatibility(
+      { ...validBlueprint(), tombstonedAt: null },
+      normalizeCompatibilityApp({
+        published: true,
+        steps: [{ id: 'read', kind: 'connector-query', config: {} }],
+      }),
+      null,
+    ),
+  );
 });
 
 test('compatibility fails closed when publication, graph, domains or pipeline drift', () => {
