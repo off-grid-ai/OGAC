@@ -110,6 +110,10 @@ test('a secondary sidebar parent is a primary owner in the same section', () => 
     if (!owner.sidebarParent) continue;
     const parent = byId.get(owner.sidebarParent);
     assert.ok(parent?.primary, `${owner.id} sidebar parent must be primary`);
-    assert.equal(parent.section, owner.section, `${owner.id} sidebar parent must share its section`);
+    assert.equal(
+      parent.section,
+      owner.section,
+      `${owner.id} sidebar parent must share its section`,
+    );
   }
 });
