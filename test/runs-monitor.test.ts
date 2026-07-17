@@ -6,6 +6,7 @@ import {
   type ChatRunSource,
   type RunRow,
   computeDurationMs,
+  deduplicateRuns,
   describeDuration,
   filterRuns,
   fromAgentRun,
@@ -18,6 +19,7 @@ import {
   paginate,
   parseKind,
   parseStatus,
+  runKey,
   sortRuns,
   statusLabel,
   sumStepMs,
@@ -112,9 +114,19 @@ test('fromAppRun: title missing → appId; a step awaiting_human forces paused e
 });
 
 test('fromAppRun: a failed/cancelled top status is NOT overridden by a stale awaiting step', () => {
-  const failed = fromAppRun({ id: 'r', appId: 'a', status: 'error', steps: [{ status: 'awaiting_human' }] });
+  const failed = fromAppRun({
+    id: 'r',
+    appId: 'a',
+    status: 'error',
+    steps: [{ status: 'awaiting_human' }],
+  });
   assert.equal(failed.status, 'failed');
-  const cancelled = fromAppRun({ id: 'r', appId: 'a', status: 'cancelled', steps: [{ status: 'awaiting_human' }] });
+  const cancelled = fromAppRun({
+    id: 'r',
+    appId: 'a',
+    status: 'cancelled',
+    steps: [{ status: 'awaiting_human' }],
+  });
   assert.equal(cancelled.status, 'cancelled');
 });
 
@@ -174,6 +186,72 @@ test('mergeRuns: combines three planes, newest-first; null-start rows sink', () 
   );
 });
 
+test('runKey: namespaces source ids by run kind', () => {
+  assert.equal(runKey('app', 'provider-42'), 'app:provider-42');
+  assert.equal(runKey('agent', 'provider-42'), 'agent:provider-42');
+  assert.equal(runKey('chat', 'provider-42'), 'chat:provider-42');
+});
+
+test('mergeRuns: repeated observations of one chat execution collapse to the newest row', () => {
+  const rows = mergeRuns({
+    chat: [
+      {
+        runId: 'shared-run',
+        outcome: 'error',
+        ts: '2026-01-01T00:00:00Z',
+        model: 'old-model',
+      },
+      {
+        runId: 'shared-run',
+        outcome: 'ok',
+        ts: '2026-01-01T00:00:02Z',
+        model: 'current-model',
+      },
+    ],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.key, 'chat:shared-run');
+  assert.equal(rows[0]?.status, 'succeeded');
+  assert.equal(rows[0]?.pipeline, 'current-model');
+});
+
+test('mergeRuns: colliding provider ids remain distinct across app, agent, and chat executions', () => {
+  const id = 'provider-42';
+  const rows = mergeRuns({
+    app: [{ id, appId: 'claims', status: 'done' }],
+    agent: [{ id, agentId: 'claim-agent', status: 'done' }],
+    chat: [{ runId: id, outcome: 'ok' }],
+  });
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map((row) => row.key).sort(), [
+    'agent:provider-42',
+    'app:provider-42',
+    'chat:provider-42',
+  ]);
+  assert.equal(new Set(rows.map((row) => row.href)).size, 3, 'each owner keeps its detail route');
+});
+
+test('deduplicateRuns: canonicalizes stale keys without mutating the caller row', () => {
+  const original: RunRow = {
+    id: 'run-1',
+    key: 'legacy-run-1',
+    kind: 'agent',
+    name: 'Agent',
+    status: 'succeeded',
+    rawStatus: 'done',
+    startedAt: null,
+    finishedAt: null,
+    durationMs: null,
+    pipeline: 'agent-1',
+    actor: '',
+    href: '/operations/runs/agent%3Arun-1',
+  };
+  const rows = deduplicateRuns([original, { ...original, key: 'another-stale-key' }]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.key, 'agent:run-1');
+  assert.equal(original.key, 'legacy-run-1');
+});
+
 test('sortRuns: stable tiebreak by key on equal timestamps', () => {
   const mk = (key: string): RunRow => ({
     id: key,
@@ -190,18 +268,43 @@ test('sortRuns: stable tiebreak by key on equal timestamps', () => {
     href: '',
   });
   const sorted = sortRuns([mk('app:z'), mk('app:a'), mk('app:m')]);
-  assert.deepEqual(sorted.map((r) => r.key), ['app:a', 'app:m', 'app:z']);
+  assert.deepEqual(
+    sorted.map((r) => r.key),
+    ['app:a', 'app:m', 'app:z'],
+  );
 });
 
 // ─── filter ──────────────────────────────────────────────────────────────────────────────────────
 function sample(): RunRow[] {
   return mergeRuns({
     app: [
-      { id: 'a1', appId: 'invoices', status: 'done', title: 'Invoice triage', startedAt: '2026-01-05T00:00:00Z', actor: 'anita@ex.com' },
-      { id: 'a2', appId: 'invoices', status: 'awaiting_human', steps: [{ status: 'awaiting_human' }], title: 'Invoice triage', startedAt: '2026-01-04T00:00:00Z' },
+      {
+        id: 'a1',
+        appId: 'invoices',
+        status: 'done',
+        title: 'Invoice triage',
+        startedAt: '2026-01-05T00:00:00Z',
+        actor: 'anita@ex.com',
+      },
+      {
+        id: 'a2',
+        appId: 'invoices',
+        status: 'awaiting_human',
+        steps: [{ status: 'awaiting_human' }],
+        title: 'Invoice triage',
+        startedAt: '2026-01-04T00:00:00Z',
+      },
     ],
     agent: [{ id: 'g1', agentId: 'kyc-check', status: 'error', startedAt: '2026-01-03T00:00:00Z' }],
-    chat: [{ runId: 'ch1', outcome: 'ok', conversation: 'Chat conv_9', ts: '2026-01-02T00:00:00Z', model: 'onprem/llama' }],
+    chat: [
+      {
+        runId: 'ch1',
+        outcome: 'ok',
+        conversation: 'Chat conv_9',
+        ts: '2026-01-02T00:00:00Z',
+        model: 'onprem/llama',
+      },
+    ],
   });
 }
 
