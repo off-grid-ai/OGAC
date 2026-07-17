@@ -41,11 +41,14 @@ export function validateOutcomeContract(contract: OutcomeContract): string[] {
   if (!contract.measurementWindow.trim()) errors.push('measurement window is required');
   if (!contract.baseline.label.trim()) errors.push('baseline label is required');
   if (!contract.target.label.trim()) errors.push('target label is required');
-  if (contract.measured && !contract.measured.label.trim()) errors.push('measured label is required');
+  if (contract.measured && !contract.measured.label.trim())
+    errors.push('measured label is required');
 
-  const readings = [contract.baseline.value, contract.target.value, contract.measured?.value].filter(
-    (value): value is number => value !== undefined,
-  );
+  const readings = [
+    contract.baseline.value,
+    contract.target.value,
+    contract.measured?.value,
+  ].filter((value): value is number => value !== undefined);
   if (readings.some((value) => !Number.isFinite(value))) errors.push('KPI values must be finite');
 
   const money = [
@@ -86,9 +89,7 @@ export function summarizeOutcome(contract: OutcomeContract): OutcomeSummary {
     measuredProgressPct = round2((measuredDelta / desiredDelta) * 100);
   }
 
-  const annualNetBenefit = round2(
-    contract.roi.annualBenefit - contract.roi.annualOperatingCost,
-  );
+  const annualNetBenefit = round2(contract.roi.annualBenefit - contract.roi.annualOperatingCost);
   const firstYearCost = contract.roi.implementationCost + contract.roi.annualOperatingCost;
   const roiMultiple = firstYearCost > 0 ? round2(contract.roi.annualBenefit / firstYearCost) : null;
   const monthlyNetBenefit = annualNetBenefit / 12;

@@ -1,4 +1,15 @@
-import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -271,13 +282,12 @@ export const agentRuns = pgTable('agent_runs', {
     jsonb('checks').$type<
       { name: string; verdict: string; score?: number; ms?: number; detail?: string }[]
     >(),
-  provenance:
-    jsonb('provenance').$type<{
-      signature: string;
-      algorithm: string;
-      publicKey: string | null;
-      signedAt: string;
-    }>(),
+  provenance: jsonb('provenance').$type<{
+    signature: string;
+    algorithm: string;
+    publicKey: string | null;
+    signedAt: string;
+  }>(),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -683,23 +693,31 @@ export const gatewayClientTokens = pgTable('gateway_client_tokens', {
   preview: text('preview').notNull(),
   kind: text('kind').notNull().default('bearer'), // bearer | x-api-key
   // Best-effort inferred provider/type from token shape (Anthropic, OpenAI, JWT, …).
-  inferred: jsonb('inferred').$type<{
-    provider?: string;
-    tokenType?: string;
-    jwt?: { header: Record<string, unknown>; payload: Record<string, unknown> };
-    notes?: string;
-  }>().notNull().default({}),
+  inferred: jsonb('inferred')
+    .$type<{
+      provider?: string;
+      tokenType?: string;
+      jwt?: { header: Record<string, unknown>; payload: Record<string, unknown> };
+      notes?: string;
+    }>()
+    .notNull()
+    .default({}),
   // Map of { [ip]: useCount } — all distinct source IPs seen with this token.
   ips: jsonb('ips').$type<Record<string, number>>().notNull().default({}),
   // Operator-defined routing overrides: when a request arrives from `sourceIp`,
   // route it as if it came from `targetIp` (or target a specific named node).
   // The exact match/condition logic is supplied later; the shape is fixed here.
-  routingOverrides: jsonb('routing_overrides').$type<{
-    sourceIp: string;
-    targetIp?: string;
-    targetNode?: string;
-    note?: string;
-  }[]>().notNull().default([]),
+  routingOverrides: jsonb('routing_overrides')
+    .$type<
+      {
+        sourceIp: string;
+        targetIp?: string;
+        targetNode?: string;
+        note?: string;
+      }[]
+    >()
+    .notNull()
+    .default([]),
   // Free-form operator metadata: tenant id, labels, rate-limit tier, etc.
   meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
   uses: integer('uses').notNull().default(0),
@@ -810,62 +828,84 @@ export const configSettings = pgTable('config_settings', {
 // demo pushes visibility='public' (the PUBLIC LIBRARY, visible to all); authenticated team runs
 // push visibility='org' scoped to their org, or 'private' for owner-only. RBAC gates the module;
 // ABAC (abac_rules, resource='provit') refines per-attribute.
-export const provitRepos = pgTable('provit_repos', {
-  id: text('id').primaryKey(),                 // owner-repo slug
-  orgId: text('org_id').notNull().default('default'),
-  ownerId: text('owner_id').notNull().default(''),
-  visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
-  url: text('url').notNull(),                  // canonical github url
-  features: integer('features').notNull().default(0),
-  testFiles: integer('test_files').notNull().default(0),
-  screens: integer('screens').notNull().default(0),
-  cases: integer('cases').notNull().default(0),
-  plan: jsonb('plan'),                         // full feature map incl. per-feature test cases
-  mappedBy: text('mapped_by'),                 // principal (email / client id)
-  mappedAt: timestamp('mapped_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ orgIdx: index('provit_repos_org_idx').on(t.orgId), visIdx: index('provit_repos_vis_idx').on(t.visibility) }));
+export const provitRepos = pgTable(
+  'provit_repos',
+  {
+    id: text('id').primaryKey(), // owner-repo slug
+    orgId: text('org_id').notNull().default('default'),
+    ownerId: text('owner_id').notNull().default(''),
+    visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
+    url: text('url').notNull(), // canonical github url
+    features: integer('features').notNull().default(0),
+    testFiles: integer('test_files').notNull().default(0),
+    screens: integer('screens').notNull().default(0),
+    cases: integer('cases').notNull().default(0),
+    plan: jsonb('plan'), // full feature map incl. per-feature test cases
+    mappedBy: text('mapped_by'), // principal (email / client id)
+    mappedAt: timestamp('mapped_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index('provit_repos_org_idx').on(t.orgId),
+    visIdx: index('provit_repos_vis_idx').on(t.visibility),
+  }),
+);
 
-export const provitRuns = pgTable('provit_runs', {
-  id: text('id').primaryKey(),                 // run id
-  orgId: text('org_id').notNull().default('default'),
-  ownerId: text('owner_id').notNull().default(''),
-  visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
-  repoId: text('repo_id'),                     // provit_repos.id (nullable — some runs are ad-hoc)
-  surface: text('surface'),                    // web | desktop | ios | android
-  model: text('model'),
-  direction: text('direction'),               // on-track | partial | off-track | unknown
-  headline: text('headline'),
-  frames: integer('frames').notNull().default(0),
-  flagged: integer('flagged').notNull().default(0),
-  video: text('video'),
-  narrative: text('narrative'),
-  payload: jsonb('payload'),                   // full run record
-  ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ repoIdx: index('provit_runs_repo_idx').on(t.repoId), orgIdx: index('provit_runs_org_idx').on(t.orgId) }));
+export const provitRuns = pgTable(
+  'provit_runs',
+  {
+    id: text('id').primaryKey(), // run id
+    orgId: text('org_id').notNull().default('default'),
+    ownerId: text('owner_id').notNull().default(''),
+    visibility: text('visibility').notNull().default('public'), // 'private' | 'org' | 'public'
+    repoId: text('repo_id'), // provit_repos.id (nullable — some runs are ad-hoc)
+    surface: text('surface'), // web | desktop | ios | android
+    model: text('model'),
+    direction: text('direction'), // on-track | partial | off-track | unknown
+    headline: text('headline'),
+    frames: integer('frames').notNull().default(0),
+    flagged: integer('flagged').notNull().default(0),
+    video: text('video'),
+    narrative: text('narrative'),
+    payload: jsonb('payload'), // full run record
+    ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    repoIdx: index('provit_runs_repo_idx').on(t.repoId),
+    orgIdx: index('provit_runs_org_idx').on(t.orgId),
+  }),
+);
 
 // Integration tokens: a user mints one in the console (bound to their org + identity), gives it
 // to their Provit instance, and Provit's pushes are attributed to that org (visibility='org').
 // Only the SHA-256 hash is stored; the plaintext is shown once at creation.
-export const provitTokens = pgTable('provit_tokens', {
-  id: text('id').primaryKey(),
-  tokenHash: text('token_hash').notNull().unique(),
-  orgId: text('org_id').notNull().default('default'),
-  ownerId: text('owner_id').notNull(),         // user email who issued it
-  label: text('label').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
-  revoked: boolean('revoked').notNull().default(false),
-}, (t) => ({ hashIdx: index('provit_tokens_hash_idx').on(t.tokenHash) }));
+export const provitTokens = pgTable(
+  'provit_tokens',
+  {
+    id: text('id').primaryKey(),
+    tokenHash: text('token_hash').notNull().unique(),
+    orgId: text('org_id').notNull().default('default'),
+    ownerId: text('owner_id').notNull(), // user email who issued it
+    label: text('label').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revoked: boolean('revoked').notNull().default(false),
+  },
+  (t) => ({ hashIdx: index('provit_tokens_hash_idx').on(t.tokenHash) }),
+);
 
 // Merged output of the judge API — one row per judged frame-batch (window).
-export const provitVerdicts = pgTable('provit_verdicts', {
-  id: text('id').primaryKey(),                 // `${runId}:${idx}`
-  runId: text('run_id').notNull(),
-  idx: integer('idx').notNull(),
-  frameRange: text('frame_range'),             // e.g. "10-14"
-  bad: boolean('bad').notNull().default(false),
-  note: text('note'),
-}, (t) => ({ runIdx: index('provit_verdicts_run_idx').on(t.runId) }));
+export const provitVerdicts = pgTable(
+  'provit_verdicts',
+  {
+    id: text('id').primaryKey(), // `${runId}:${idx}`
+    runId: text('run_id').notNull(),
+    idx: integer('idx').notNull(),
+    frameRange: text('frame_range'), // e.g. "10-14"
+    bad: boolean('bad').notNull().default(false),
+    note: text('note'),
+  },
+  (t) => ({ runIdx: index('provit_verdicts_run_idx').on(t.runId) }),
+);
 
 // ─── Unified App model (Builder Epic #108) — the one "app" entity ─────────────
 // AppSpec supersedes customAgent + studioTemplate as the single build artifact: an app is a
@@ -876,76 +916,89 @@ export const provitVerdicts = pgTable('provit_verdicts', {
 //   inputForm — optional FormField[] collected before the run (null = no form).
 //   steps     — AppStep[]: agent | connector-query | guardrail | human | output nodes.
 //   edges     — {from,to,when?}[]: the directed graph wiring steps together.
-export const apps = pgTable('apps', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  ownerId: text('owner_id').notNull(),
-  title: text('title').notNull(),
-  summary: text('summary').notNull().default(''),
-  visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
-  // The GOVERNED pipeline this app/agent runs on (CONSUMERS-BIND #166). null ⇒ resolve to the org
-  // default at run time. Every run resolves + is tagged with the bound pipeline (pipeline:<id>) so
-  // policy/guardrails/telemetry lenses light up. Set on the "Runs on" selector in the builder.
-  pipelineId: text('pipeline_id'),
-  // Deployed-app slug: when published, the app is served at /app/<slug>.
-  slug: text('slug'),
-  published: boolean('published').notNull().default(false),
-  // How the app is triggered — TriggerSpec envelope, shape owned by lib/triggers.ts (Phase 2B).
-  trigger: jsonb('trigger')
-    .$type<{ kind: string; config?: Record<string, unknown> }>()
-    .notNull()
-    .default({ kind: 'on-demand' }),
-  // Optional input form collected before the run starts (null = no form).
-  inputForm: jsonb('input_form').$type<
-    { id: string; label: string; type: string; required?: boolean; options?: string[] }[]
-  >(),
-  // The workflow steps. Shape owned by lib/app-model.ts (Phase 1A); jsonb here keeps it flexible.
-  steps: jsonb('steps')
-    .$type<{ id: string; kind: string; label: string; config: Record<string, unknown> }[]>()
-    .notNull()
-    .default([]),
-  // Directed edges wiring steps; `when` is an optional guard expression on the transition.
-  edges: jsonb('edges')
-    .$type<{ from: string; to: string; when?: string }[]>()
-    .notNull()
-    .default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)]);
+export const apps = pgTable(
+  'apps',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    ownerId: text('owner_id').notNull(),
+    title: text('title').notNull(),
+    summary: text('summary').notNull().default(''),
+    visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+    // The GOVERNED pipeline this app/agent runs on (CONSUMERS-BIND #166). null ⇒ resolve to the org
+    // default at run time. Every run resolves + is tagged with the bound pipeline (pipeline:<id>) so
+    // policy/guardrails/telemetry lenses light up. Set on the "Runs on" selector in the builder.
+    pipelineId: text('pipeline_id'),
+    // Deployed-app slug: when published, the app is served at /app/<slug>.
+    slug: text('slug'),
+    published: boolean('published').notNull().default(false),
+    // How the app is triggered — TriggerSpec envelope, shape owned by lib/triggers.ts (Phase 2B).
+    trigger: jsonb('trigger')
+      .$type<{ kind: string; config?: Record<string, unknown> }>()
+      .notNull()
+      .default({ kind: 'on-demand' }),
+    // Optional input form collected before the run starts (null = no form).
+    inputForm:
+      jsonb('input_form').$type<
+        { id: string; label: string; type: string; required?: boolean; options?: string[] }[]
+      >(),
+    // The workflow steps. Shape owned by lib/app-model.ts (Phase 1A); jsonb here keeps it flexible.
+    steps: jsonb('steps')
+      .$type<{ id: string; kind: string; label: string; config: Record<string, unknown> }[]>()
+      .notNull()
+      .default([]),
+    // Directed edges wiring steps; `when` is an optional guard expression on the transition.
+    edges: jsonb('edges')
+      .$type<{ from: string; to: string; when?: string }[]>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)],
+);
 
 // Reusable, proven business outcomes are distinct from tenant App deployments. A blueprint owns
 // requirements + proof; solution_deployments binds it to the existing canonical apps table.
-export const solutionBlueprints = pgTable('solution_blueprints', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  title: text('title').notNull(),
-  summary: text('summary').notNull(),
-  industry: text('industry').notNull(),
-  process: text('process').notNull(),
-  businessOwner: text('business_owner').notNull(),
-  requiredDataDomains: jsonb('required_data_domains').$type<string[]>().notNull().default([]),
-  requiredTools: jsonb('required_tools').$type<string[]>().notNull().default([]),
-  governedPipeline: text('governed_pipeline').notNull(),
-  sourceTemplateKey: text('source_template_key').notNull(),
-  outcome: jsonb('outcome').$type<Record<string, unknown>>().notNull(),
-  proof: jsonb('proof').$type<Record<string, unknown>>().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('solution_blueprints_org_idx').on(t.orgId)]);
+export const solutionBlueprints = pgTable(
+  'solution_blueprints',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    industry: text('industry').notNull(),
+    process: text('process').notNull(),
+    businessOwner: text('business_owner').notNull(),
+    requiredDataDomains: jsonb('required_data_domains').$type<string[]>().notNull().default([]),
+    requiredTools: jsonb('required_tools').$type<string[]>().notNull().default([]),
+    governedPipeline: text('governed_pipeline').notNull(),
+    sourceTemplateKey: text('source_template_key').notNull(),
+    outcome: jsonb('outcome').$type<Record<string, unknown>>().notNull(),
+    proof: jsonb('proof').$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('solution_blueprints_org_idx').on(t.orgId)],
+);
 
-export const solutionDeployments = pgTable('solution_deployments', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  blueprintId: text('blueprint_id').notNull(),
-  appId: text('app_id').notNull(),
-  status: text('status').notNull().default('active'),
-  evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('solution_deployments_org_idx').on(t.orgId),
-  uniqueIndex('solution_deployments_binding_idx').on(t.orgId, t.blueprintId, t.appId),
-]);
+export const solutionDeployments = pgTable(
+  'solution_deployments',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    blueprintId: text('blueprint_id').notNull(),
+    appId: text('app_id').notNull(),
+    status: text('status').notNull().default('active'),
+    evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('solution_deployments_org_idx').on(t.orgId),
+    uniqueIndex('solution_deployments_binding_idx').on(t.orgId, t.blueprintId, t.appId),
+  ],
+);
 
 export type SolutionBlueprintRow = typeof solutionBlueprints.$inferSelect;
 export type SolutionDeploymentRow = typeof solutionDeployments.$inferSelect;
@@ -960,52 +1013,59 @@ export type SolutionDeploymentRow = typeof solutionDeployments.$inferSelect;
 //   input   — resolved input-form values / trigger payload for this run.
 //   steps   — per-step results: {id,kind,status,outcome,refs,startedAt,finishedAt,detail}.
 //   outcome — the aggregated final output/answer of the app run.
-export const appRuns = pgTable('app_runs', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  appId: text('app_id').notNull(),
-  status: text('status').notNull().default('queued'), // queued|running|awaiting_human|done|error|cancelled
-  // How this run was fired + a snapshot of the trigger payload.
-  trigger: jsonb('trigger')
-    .$type<{ kind: string; payload?: Record<string, unknown> }>()
-    .notNull()
-    .default({ kind: 'on-demand' }),
-  // Resolved input-form values / trigger input for this run.
-  input: jsonb('input').$type<Record<string, unknown>>().notNull().default({}),
-  // Per-step results/status — the multi-step trace, incl. mid-workflow 'awaiting_human'.
-  steps: jsonb('steps').$type<
-    {
-      id: string;
-      kind: string;
-      label: string;
-      status: string; // pending | running | awaiting_human | done | error | skipped
-      outcome?: string;
-      refs?: string[];
-      detail?: string;
-      childRunId?: string; // agent-step child agentRuns.id, for lineage
-      // SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered).
-      wouldPerform?: {
-        sink: string;
-        recipient?: string;
-        subject?: string;
-        payloadPreview: string;
-      };
-      startedAt?: string;
-      finishedAt?: string;
-    }[]
-  >().notNull().default([]),
-  // Aggregated final output of the app run.
-  outcome: text('outcome').notNull().default(''),
-  // Detached provenance signature over the outcome — same shape as agentRuns.provenance.
-  provenance: jsonb('provenance').$type<{
-    signature: string;
-    algorithm: string;
-    publicKey: string | null;
-    signedAt: string;
-  }>(),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-  finishedAt: timestamp('finished_at', { withTimezone: true }),
-}, (t) => [index('app_runs_app_idx').on(t.appId), index('app_runs_org_idx').on(t.orgId)]);
+export const appRuns = pgTable(
+  'app_runs',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    appId: text('app_id').notNull(),
+    status: text('status').notNull().default('queued'), // queued|running|awaiting_human|done|error|cancelled
+    // How this run was fired + a snapshot of the trigger payload.
+    trigger: jsonb('trigger')
+      .$type<{ kind: string; payload?: Record<string, unknown> }>()
+      .notNull()
+      .default({ kind: 'on-demand' }),
+    // Resolved input-form values / trigger input for this run.
+    input: jsonb('input').$type<Record<string, unknown>>().notNull().default({}),
+    // Per-step results/status — the multi-step trace, incl. mid-workflow 'awaiting_human'.
+    steps: jsonb('steps')
+      .$type<
+        {
+          id: string;
+          kind: string;
+          label: string;
+          status: string; // pending | running | awaiting_human | done | error | skipped
+          outcome?: string;
+          refs?: string[];
+          detail?: string;
+          childRunId?: string; // agent-step child agentRuns.id, for lineage
+          // SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered).
+          wouldPerform?: {
+            sink: string;
+            recipient?: string;
+            subject?: string;
+            payloadPreview: string;
+          };
+          startedAt?: string;
+          finishedAt?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    // Aggregated final output of the app run.
+    outcome: text('outcome').notNull().default(''),
+    // Detached provenance signature over the outcome — same shape as agentRuns.provenance.
+    provenance: jsonb('provenance').$type<{
+      signature: string;
+      algorithm: string;
+      publicKey: string | null;
+      signedAt: string;
+    }>(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [index('app_runs_app_idx').on(t.appId), index('app_runs_org_idx').on(t.orgId)],
+);
 
 // ─── Data domains (Builder Epic #107) — the connector rule-engine binding ──────
 // A semantic map: a human phrase (e.g. "reimbursement quota") → a specific connector + resource
@@ -1015,17 +1075,24 @@ export const appRuns = pgTable('app_runs', {
 //   aliases  — alternate phrases that resolve to this domain.
 //   resource — the table/path/object within the connector to read.
 //   opHints  — optional query hints (default columns, filters, limits) for the resolver.
-export const dataDomains = pgTable('data_domains', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  label: text('label').notNull(),
-  aliases: jsonb('aliases').$type<string[]>().notNull().default([]),
-  connectorId: text('connector_id').notNull(),
-  resource: text('resource').notNull(), // table / path / object within the connector
-  opHints: jsonb('op_hints').$type<Record<string, unknown>>(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);
+export const dataDomains = pgTable(
+  'data_domains',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    label: text('label').notNull(),
+    aliases: jsonb('aliases').$type<string[]>().notNull().default([]),
+    connectorId: text('connector_id').notNull(),
+    resource: text('resource').notNull(), // table / path / object within the connector
+    opHints: jsonb('op_hints').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('data_domains_org_idx').on(t.orgId),
+    index('data_domains_connector_idx').on(t.connectorId),
+  ],
+);
 
 // ─── App run controls (SHADOW MODE + BLAST-RADIUS) — the BFSI trust dials ──────
 // Per-app safety controls a cautious operator sets so an autonomous app/agent can be trusted to act:
@@ -1037,16 +1104,20 @@ export const dataDomains = pgTable('data_domains', {
 // A sibling row to `apps` (one-to-one by appId), self-migrated by app-run-controls-store.ts. Absent
 // row ⇒ DEFAULT_CONTROLS (enabled, live, no caps) — the app behaves EXACTLY as before (additive).
 // The pure decision layer is app-run-controls.ts (evaluateBlastRadius / resolveRunMode / shadow-intercept).
-export const appRunControls = pgTable('app_run_controls', {
-  appId: text('app_id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  enabled: boolean('enabled').notNull().default(true),
-  shadowDefault: boolean('shadow_default').notNull().default(false),
-  maxRunsPerDay: integer('max_runs_per_day'),
-  spendCapUsd: doublePrecision('spend_cap_usd'),
-  spendCapScope: text('spend_cap_scope').notNull().default('day'), // 'day' | 'run'
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('app_run_controls_org_idx').on(t.orgId)]);
+export const appRunControls = pgTable(
+  'app_run_controls',
+  {
+    appId: text('app_id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    enabled: boolean('enabled').notNull().default(true),
+    shadowDefault: boolean('shadow_default').notNull().default(false),
+    maxRunsPerDay: integer('max_runs_per_day'),
+    spendCapUsd: doublePrecision('spend_cap_usd'),
+    spendCapScope: text('spend_cap_scope').notNull().default('day'), // 'day' | 'run'
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('app_run_controls_org_idx').on(t.orgId)],
+);
 
 export type AppRunControlsRow = typeof appRunControls.$inferSelect;
 export type NewAppRunControlsRow = typeof appRunControls.$inferInsert;
@@ -1065,22 +1136,22 @@ export type NewDataDomain = typeof dataDomains.$inferInsert;
 // pool and pushes model/restart changes to the node over SSH. See src/lib/fleet.ts
 // (pure derivePool) and scripts/gateway-aggregator.mjs (consumer + executor).
 export const fleetNodes = pgTable('fleet_nodes', {
-  name: text('name').primaryKey(),                       // 'g1', 's1', 'g6', …
-  host: text('host').notNull(),                          // 'offgrid-g1.local'
-  port: integer('port').notNull().default(7878),         // llama-server / gateway port
-  role: text('role').notNull().default('gateway'),       // gateway | server | image | spare
-  kind: text('kind').notNull().default('chat'),          // chat | grounding | image (aggregator routing)
-  model: text('model').notNull().default(''),            // routing tag, e.g. 'qwythos-9b'
-  primaryGguf: text('primary_gguf').notNull().default(''),// active-model.json "primary"
-  mmprojGguf: text('mmproj_gguf').notNull().default(''),  // active-model.json "mmproj" (vision)
-  modelId: text('model_id').notNull().default(''),        // active-model.json "id" (HF repo id)
-  contextSize: integer('context_size'),                   // n_ctx override (null = node default)
+  name: text('name').primaryKey(), // 'g1', 's1', 'g6', …
+  host: text('host').notNull(), // 'offgrid-g1.local'
+  port: integer('port').notNull().default(7878), // llama-server / gateway port
+  role: text('role').notNull().default('gateway'), // gateway | server | image | spare
+  kind: text('kind').notNull().default('chat'), // chat | grounding | image (aggregator routing)
+  model: text('model').notNull().default(''), // routing tag, e.g. 'qwythos-9b'
+  primaryGguf: text('primary_gguf').notNull().default(''), // active-model.json "primary"
+  mmprojGguf: text('mmproj_gguf').notNull().default(''), // active-model.json "mmproj" (vision)
+  modelId: text('model_id').notNull().default(''), // active-model.json "id" (HF repo id)
+  contextSize: integer('context_size'), // n_ctx override (null = node default)
   // Distributed inference (llama.cpp RPC): a WORKER names the head it's bonded to; the head's
   // `port` is the cluster's serving port. Both null ⇒ an ordinary standalone node. See src/lib/fleet.ts.
-  clusterHead: text('cluster_head'),                       // head node name this worker is bonded to
-  rpcPort: integer('rpc_port'),                            // worker's ggml-rpc-server port (null = 50052)
+  clusterHead: text('cluster_head'), // head node name this worker is bonded to
+  rpcPort: integer('rpc_port'), // worker's ggml-rpc-server port (null = 50052)
   vision: boolean('vision').notNull().default(true),
-  enabled: boolean('enabled').notNull().default(true),    // in the routing pool?
+  enabled: boolean('enabled').notNull().default(true), // in the routing pool?
   notes: text('notes').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1097,22 +1168,26 @@ export const fleetNodes = pgTable('fleet_nodes', {
 //   kind        — on-prem | openai | anthropic | compat (OpenAI-compatible proxy, e.g. OpenRouter)
 //   egressClass — 'on-prem' | 'cloud' — DERIVED from kind (on-prem⇒on-prem, else cloud); stored so a
 //                 query can filter without recomputing, but always kept consistent with kind on write.
-export const gateways = pgTable('gateways', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  name: text('name').notNull(),
-  kind: text('kind').notNull(),                                  // on-prem | openai | anthropic | compat
-  baseUrl: text('base_url').notNull().default(''),
-  defaultModel: text('default_model').notNull().default(''),
-  egressClass: text('egress_class').notNull().default('cloud'),  // on-prem | cloud (derived from kind)
-  // PA-15: the per-tenant PROVISIONED gateway HOST ("<slug5><rand5>-gateway.<apex>"), minted from
-  // the tenant slug + a random suffix (tenantGatewayHost). Nullable — most gateways use the shared
-  // "gateway.<apex>"; only a provisioned per-tenant gateway carries its own unguessable host. The
-  // aggregator/edge resolves the tenant from the inbound Host by matching gatewayFromHost() ↔ this.
-  hostname: text('hostname'),
-  enabled: boolean('enabled').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('gateways_org_idx').on(t.orgId)]);
+export const gateways = pgTable(
+  'gateways',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(), // on-prem | openai | anthropic | compat
+    baseUrl: text('base_url').notNull().default(''),
+    defaultModel: text('default_model').notNull().default(''),
+    egressClass: text('egress_class').notNull().default('cloud'), // on-prem | cloud (derived from kind)
+    // PA-15: the per-tenant PROVISIONED gateway HOST ("<slug5><rand5>-gateway.<apex>"), minted from
+    // the tenant slug + a random suffix (tenantGatewayHost). Nullable — most gateways use the shared
+    // "gateway.<apex>"; only a provisioned per-tenant gateway carries its own unguessable host. The
+    // aggregator/edge resolves the tenant from the inbound Host by matching gatewayFromHost() ↔ this.
+    hostname: text('hostname'),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('gateways_org_idx').on(t.orgId)],
+);
 
 export type Gateway = typeof gateways.$inferSelect;
 export type NewGateway = typeof gateways.$inferInsert;
@@ -1129,71 +1204,82 @@ export type NewGateway = typeof gateways.$inferInsert;
 //   • version + status         — immutable version snapshots live in `pipeline_versions`; every edit
 //                                bumps `version` and writes a snapshot. status: draft|published|archived.
 // Evals/golden/drift + telemetry lenses attach later (a fan-out phase fills those detail tabs).
-export const pipelines = pgTable('pipelines', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  ownerId: text('owner_id').notNull(),
-  name: text('name').notNull(),
-  description: text('description').notNull().default(''),
-  visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
-  // M2 lifecycle & ownership: the TEAM/BU this pipeline belongs to (null ⇒ no team; only the owner +
-  // org admins have access). Team members get delegated access to their team's pipelines.
-  teamId: text('team_id'),
-  // The gateway binding — which gateway this pipeline runs on (null ⇒ org default gateway).
-  gatewayId: text('gateway_id'),
-  // Default model on that gateway (null ⇒ the gateway's own default).
-  defaultModel: text('default_model'),
-  // Routing: fallback chain + egress leash. Shape owned by pipelines-policy.ts; jsonb keeps it flexible.
-  routing: jsonb('routing')
-    .$type<{
-      egressAllowed?: boolean;
-      rules?: {
-        name: string;
-        priority: number;
-        attribute: string;
-        operator: string;
-        value: string;
-        action: string;
-        model: string;
-        fallback: string;
-        enabled: boolean;
-      }[];
-    }>()
-    .notNull()
-    .default({}),
-  // The HARD data ceiling — data-domain/class ids this pipeline may touch.
-  dataAllowlist: jsonb('data_allowlist').$type<string[]>().notNull().default([]),
-  // Pipeline-scoped policy overlay (inherits org defaults; may only tighten locked controls).
-  policyOverlay: jsonb('policy_overlay').$type<Record<string, unknown>>().notNull().default({}),
-  // Pipeline-scoped guardrail overlay (inherits org defaults; may only tighten locked controls).
-  guardrailOverlay: jsonb('guardrail_overlay').$type<Record<string, unknown>>().notNull().default({}),
-  // M2 lifecycle: draft → in_review → published → deprecated (+ legacy `archived`). Vocabulary owned
-  // by pipeline-lifecycle-model.ts; kept as text so the enum can widen without a DB type migration.
-  status: text('status').notNull().default('draft'),
-  version: integer('version').notNull().default(1),
-  isTemplate: boolean('is_template').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('pipelines_org_idx').on(t.orgId),
-  index('pipelines_gateway_idx').on(t.gatewayId),
-  index('pipelines_team_idx').on(t.teamId),
-]);
+export const pipelines = pgTable(
+  'pipelines',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    ownerId: text('owner_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    visibility: text('visibility').notNull().default('private'), // 'private' | 'org' | 'public'
+    // M2 lifecycle & ownership: the TEAM/BU this pipeline belongs to (null ⇒ no team; only the owner +
+    // org admins have access). Team members get delegated access to their team's pipelines.
+    teamId: text('team_id'),
+    // The gateway binding — which gateway this pipeline runs on (null ⇒ org default gateway).
+    gatewayId: text('gateway_id'),
+    // Default model on that gateway (null ⇒ the gateway's own default).
+    defaultModel: text('default_model'),
+    // Routing: fallback chain + egress leash. Shape owned by pipelines-policy.ts; jsonb keeps it flexible.
+    routing: jsonb('routing')
+      .$type<{
+        egressAllowed?: boolean;
+        rules?: {
+          name: string;
+          priority: number;
+          attribute: string;
+          operator: string;
+          value: string;
+          action: string;
+          model: string;
+          fallback: string;
+          enabled: boolean;
+        }[];
+      }>()
+      .notNull()
+      .default({}),
+    // The HARD data ceiling — data-domain/class ids this pipeline may touch.
+    dataAllowlist: jsonb('data_allowlist').$type<string[]>().notNull().default([]),
+    // Pipeline-scoped policy overlay (inherits org defaults; may only tighten locked controls).
+    policyOverlay: jsonb('policy_overlay').$type<Record<string, unknown>>().notNull().default({}),
+    // Pipeline-scoped guardrail overlay (inherits org defaults; may only tighten locked controls).
+    guardrailOverlay: jsonb('guardrail_overlay')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    // M2 lifecycle: draft → in_review → published → deprecated (+ legacy `archived`). Vocabulary owned
+    // by pipeline-lifecycle-model.ts; kept as text so the enum can widen without a DB type migration.
+    status: text('status').notNull().default('draft'),
+    version: integer('version').notNull().default(1),
+    isTemplate: boolean('is_template').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('pipelines_org_idx').on(t.orgId),
+    index('pipelines_gateway_idx').on(t.gatewayId),
+    index('pipelines_team_idx').on(t.teamId),
+  ],
+);
 
 // ─── Pipeline versions — immutable config snapshots ────────────────────────────
 // One row per publish/edit: the FULL pipeline config at that version, frozen. Consumers will later
 // PIN a version; this table is the source of truth for what a pinned version was. Append-only.
-export const pipelineVersions = pgTable('pipeline_versions', {
-  id: text('id').primaryKey(),
-  pipelineId: text('pipeline_id').notNull(),
-  orgId: text('org_id').notNull().default('default'),
-  version: integer('version').notNull(),
-  // The full config snapshot at this version (name, binding, routing, allowlist, overlays, …).
-  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull().default({}),
-  note: text('note').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: text('created_by').notNull().default(''),
-}, (t) => [index('pipeline_versions_pipeline_idx').on(t.pipelineId)]);
+export const pipelineVersions = pgTable(
+  'pipeline_versions',
+  {
+    id: text('id').primaryKey(),
+    pipelineId: text('pipeline_id').notNull(),
+    orgId: text('org_id').notNull().default('default'),
+    version: integer('version').notNull(),
+    // The full config snapshot at this version (name, binding, routing, allowlist, overlays, …).
+    snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull().default({}),
+    note: text('note').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text('created_by').notNull().default(''),
+  },
+  (t) => [index('pipeline_versions_pipeline_idx').on(t.pipelineId)],
+);
 
 export type Pipeline = typeof pipelines.$inferSelect;
 export type NewPipeline = typeof pipelines.$inferInsert;
@@ -1205,20 +1291,24 @@ export type NewPipelineVersion = typeof pipelineVersions.$inferInsert;
 // immediately, the evals run in the background, and the gate is applied on completion (publish or
 // leave draft). The poll route reads this row. `decision` (jsonb) is null while gating and carries
 // the ReleaseGateDecision + overridden/version once resolved. Org-scoped like everything else.
-export const publishJobs = pgTable('publish_jobs', {
-  id: text('id').primaryKey(),
-  pipelineId: text('pipeline_id').notNull(),
-  orgId: text('org_id').notNull().default('default'),
-  // gating → published | blocked (see publish-job.ts for the pure transition model).
-  status: text('status').notNull().default('gating'),
-  // Whether an override was requested on kickoff (applied to a failing gate on resolve).
-  override: boolean('override').notNull().default(false),
-  createdBy: text('created_by').notNull().default(''),
-  // The PublishJobDecision once resolved (decision + overridden + version); null while gating.
-  decision: jsonb('decision').$type<Record<string, unknown>>(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('publish_jobs_pipeline_idx').on(t.pipelineId)]);
+export const publishJobs = pgTable(
+  'publish_jobs',
+  {
+    id: text('id').primaryKey(),
+    pipelineId: text('pipeline_id').notNull(),
+    orgId: text('org_id').notNull().default('default'),
+    // gating → published | blocked (see publish-job.ts for the pure transition model).
+    status: text('status').notNull().default('gating'),
+    // Whether an override was requested on kickoff (applied to a failing gate on resolve).
+    override: boolean('override').notNull().default(false),
+    createdBy: text('created_by').notNull().default(''),
+    // The PublishJobDecision once resolved (decision + overridden + version); null while gating.
+    decision: jsonb('decision').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('publish_jobs_pipeline_idx').on(t.pipelineId)],
+);
 
 export type PublishJob = typeof publishJobs.$inferSelect;
 export type NewPublishJob = typeof publishJobs.$inferInsert;
@@ -1227,31 +1317,36 @@ export type NewPublishJob = typeof publishJobs.$inferInsert;
 // A TEAM/BU sits between the org and the pipeline. A pipeline may belong to a team (pipelines.team_id);
 // a team's members get DELEGATED access to their team's pipelines (RBAC scoped by membership). Pure
 // rules in teams-policy.ts; the store + self-migrate in teams.ts. Org-scoped like everything else.
-export const teams = pgTable('teams', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  name: text('name').notNull(),
-  description: text('description').notNull().default(''),
-  // Optional DEPARTMENT this team belongs to (e.g. "Risk", "Operations", "Finance"). Nullable +
-  // additive: a team with no department reads as "Unassigned" in the org-chart view. M2-a (#189).
-  department: text('department'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('teams_org_idx').on(t.orgId)]);
+export const teams = pgTable(
+  'teams',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    // Optional DEPARTMENT this team belongs to (e.g. "Risk", "Operations", "Finance"). Nullable +
+    // additive: a team with no department reads as "Unassigned" in the org-chart view. M2-a (#189).
+    department: text('department'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('teams_org_idx').on(t.orgId)],
+);
 
 // One row per (team, user). `userId` is the user's email/id. `role` is 'lead' (delegated edit +
 // promote) or 'member' (delegated read + deprecate) — vocabulary owned by teams-policy.ts.
-export const teamMembers = pgTable('team_members', {
-  id: text('id').primaryKey(),
-  teamId: text('team_id').notNull(),
-  orgId: text('org_id').notNull().default('default'),
-  userId: text('user_id').notNull(),
-  role: text('role').notNull().default('member'), // 'lead' | 'member'
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('team_members_team_idx').on(t.teamId),
-  index('team_members_user_idx').on(t.userId),
-]);
+export const teamMembers = pgTable(
+  'team_members',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('team_id').notNull(),
+    orgId: text('org_id').notNull().default('default'),
+    userId: text('user_id').notNull(),
+    role: text('role').notNull().default('member'), // 'lead' | 'member'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('team_members_team_idx').on(t.teamId), index('team_members_user_idx').on(t.userId)],
+);
 
 export type Team = typeof teams.$inferSelect;
 export type NewTeam = typeof teams.$inferInsert;
@@ -1261,20 +1356,24 @@ export type NewTeamMember = typeof teamMembers.$inferInsert;
 // Per-pipeline provisioned API keys — the pipeline is callable as its own governed endpoint by
 // apps/agents/external third-parties (analogous to tenant provisioning). Only the hash is stored;
 // the plaintext key is shown ONCE at mint time. `prefix` is the non-secret display stub (og_pl_…).
-export const pipelineApiKeys = pgTable('pipeline_api_keys', {
-  id: text('id').primaryKey(),
-  pipelineId: text('pipeline_id').notNull(),
-  orgId: text('org_id').notNull().default('default'),
-  name: text('name').notNull().default(''),
-  hashedKey: text('hashed_key').notNull(),
-  prefix: text('prefix').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: text('created_by').notNull().default(''),
-  revokedAt: timestamp('revoked_at', { withTimezone: true }),
-}, (t) => [
-  index('pipeline_api_keys_pipeline_idx').on(t.pipelineId),
-  index('pipeline_api_keys_org_idx').on(t.orgId),
-]);
+export const pipelineApiKeys = pgTable(
+  'pipeline_api_keys',
+  {
+    id: text('id').primaryKey(),
+    pipelineId: text('pipeline_id').notNull(),
+    orgId: text('org_id').notNull().default('default'),
+    name: text('name').notNull().default(''),
+    hashedKey: text('hashed_key').notNull(),
+    prefix: text('prefix').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text('created_by').notNull().default(''),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('pipeline_api_keys_pipeline_idx').on(t.pipelineId),
+    index('pipeline_api_keys_org_idx').on(t.orgId),
+  ],
+);
 
 export type PipelineApiKey = typeof pipelineApiKeys.$inferSelect;
 export type NewPipelineApiKey = typeof pipelineApiKeys.$inferInsert;
@@ -1284,21 +1383,23 @@ export type NewPipelineApiKey = typeof pipelineApiKeys.$inferInsert;
 // (Splunk, Purview/Collibra, Grafana/Prometheus). Org-scoped. `secretRef` NAMES an OpenBao key — the
 // raw auth token is NEVER stored here; it's resolved at export time via the existing secret path.
 // `lastStatus`/`lastAt` are the HONEST result of the most recent real test()/export() call.
-export const exportTargets = pgTable('export_targets', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  kind: text('kind').notNull(), // 'audit' | 'lineage' | 'metrics'
-  endpoint: text('endpoint').notNull().default(''),
-  enabled: boolean('enabled').notNull().default(true),
-  secretRef: text('secret_ref'), // OpenBao key path, never a value
-  lastStatus: text('last_status'), // 'ok' | 'fail' | null (never tested)
-  lastDetail: text('last_detail'), // human detail of the last test/export
-  lastAt: timestamp('last_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('export_targets_org_idx').on(t.orgId),
-]);
+export const exportTargets = pgTable(
+  'export_targets',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    kind: text('kind').notNull(), // 'audit' | 'lineage' | 'metrics'
+    endpoint: text('endpoint').notNull().default(''),
+    enabled: boolean('enabled').notNull().default(true),
+    secretRef: text('secret_ref'), // OpenBao key path, never a value
+    lastStatus: text('last_status'), // 'ok' | 'fail' | null (never tested)
+    lastDetail: text('last_detail'), // human detail of the last test/export
+    lastAt: timestamp('last_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('export_targets_org_idx').on(t.orgId)],
+);
 
 export type ExportTarget = typeof exportTargets.$inferSelect;
 export type NewExportTarget = typeof exportTargets.$inferInsert;
@@ -1312,70 +1413,82 @@ export type NewExportTarget = typeof exportTargets.$inferInsert;
 // `data_assets` — the CATALOG: "what data do I have". One row per dataset/table the org holds. Seeded
 // from connectors/data-domains, and designed so a sync can register its output here (source +
 // external ref + row count + last-refresh). Classification/retention hang off the asset by fk.
-export const dataAssets = pgTable('data_assets', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  name: text('name').notNull(),
-  // Where this asset physically lives — a free-text source label ("Warehouse", "Salesforce"), and
-  // optional structured refs to the console entities it derives from (connector/data-domain).
-  source: text('source').notNull().default(''),
-  connectorId: text('connector_id'), // fk-ish to connectors.id (soft — connectors is org-scoped too)
-  domainId: text('domain_id'), // fk-ish to data_domains.id
-  kind: text('kind').notNull().default('table'), // table | view | stream | file | collection
-  owner: text('owner').notNull().default(''), // steward email / team
-  description: text('description').notNull().default(''),
-  rowCount: integer('row_count').notNull().default(0),
-  // Freshness: the SLA (max staleness allowed, in hours; 0 = no SLA) and the last observed refresh.
-  freshnessSlaHours: integer('freshness_sla_hours').notNull().default(0),
-  lastRefreshAt: timestamp('last_refresh_at', { withTimezone: true }),
-  // Sync health as last reported by a pipeline/connector sync — drives broken-sync alerting.
-  syncStatus: text('sync_status').notNull().default('unknown'), // ok | failed | unknown
-  syncError: text('sync_error').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('data_assets_org_idx').on(t.orgId),
-  index('data_assets_connector_idx').on(t.connectorId),
-]);
+export const dataAssets = pgTable(
+  'data_assets',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    name: text('name').notNull(),
+    // Where this asset physically lives — a free-text source label ("Warehouse", "Salesforce"), and
+    // optional structured refs to the console entities it derives from (connector/data-domain).
+    source: text('source').notNull().default(''),
+    connectorId: text('connector_id'), // fk-ish to connectors.id (soft — connectors is org-scoped too)
+    domainId: text('domain_id'), // fk-ish to data_domains.id
+    kind: text('kind').notNull().default('table'), // table | view | stream | file | collection
+    owner: text('owner').notNull().default(''), // steward email / team
+    description: text('description').notNull().default(''),
+    rowCount: integer('row_count').notNull().default(0),
+    // Freshness: the SLA (max staleness allowed, in hours; 0 = no SLA) and the last observed refresh.
+    freshnessSlaHours: integer('freshness_sla_hours').notNull().default(0),
+    lastRefreshAt: timestamp('last_refresh_at', { withTimezone: true }),
+    // Sync health as last reported by a pipeline/connector sync — drives broken-sync alerting.
+    syncStatus: text('sync_status').notNull().default('unknown'), // ok | failed | unknown
+    syncError: text('sync_error').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('data_assets_org_idx').on(t.orgId),
+    index('data_assets_connector_idx').on(t.connectorId),
+  ],
+);
 
 // `data_classifications` — per-asset (and optionally per-column) classification + PII tags. One row
 // per (asset, column); column NULL = the asset-level default classification. Drives policy: a
 // `restricted` asset with PII tags is what retention/RTBF/masking key off.
-export const dataClassifications = pgTable('data_classifications', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  assetId: text('asset_id').notNull(), // fk → data_assets.id
-  column: text('column'), // NULL = asset-level default; else a specific column
-  // public | internal | confidential | restricted (ascending sensitivity — see data-classification.ts).
-  level: text('level').notNull().default('internal'),
-  // PII entity tags on this asset/column — e.g. ['EMAIL','PAN','AADHAAR','PHONE']. Vocabulary is the
-  // guardrails/Presidio entity set; kept as free strings so a new recognizer needs no schema change.
-  piiTags: jsonb('pii_tags').$type<string[]>().notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('data_classifications_org_idx').on(t.orgId),
-  index('data_classifications_asset_idx').on(t.assetId),
-]);
+export const dataClassifications = pgTable(
+  'data_classifications',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    assetId: text('asset_id').notNull(), // fk → data_assets.id
+    column: text('column'), // NULL = asset-level default; else a specific column
+    // public | internal | confidential | restricted (ascending sensitivity — see data-classification.ts).
+    level: text('level').notNull().default('internal'),
+    // PII entity tags on this asset/column — e.g. ['EMAIL','PAN','AADHAAR','PHONE']. Vocabulary is the
+    // guardrails/Presidio entity set; kept as free strings so a new recognizer needs no schema change.
+    piiTags: jsonb('pii_tags').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('data_classifications_org_idx').on(t.orgId),
+    index('data_classifications_asset_idx').on(t.assetId),
+  ],
+);
 
 // `retention_policies` — per-asset retention rule. `retainDays` = how long data is kept before it is
 // due for purge (0 = keep indefinitely). Evaluated against the asset's lastRefreshAt (data-retention.ts)
 // to surface assets that are OVER retention and due for disposal.
-export const retentionPolicies = pgTable('retention_policies', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  assetId: text('asset_id').notNull(), // fk → data_assets.id (one policy per asset)
-  retainDays: integer('retain_days').notNull().default(0), // 0 = indefinite
-  // What happens at expiry: delete (purge rows) | anonymize (strip PII) | archive (cold-store).
-  action: text('action').notNull().default('delete'),
-  legalHold: boolean('legal_hold').notNull().default(false), // if set, never auto-purge
-  note: text('note').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-  index('retention_policies_org_idx').on(t.orgId),
-  index('retention_policies_asset_idx').on(t.assetId),
-]);
+export const retentionPolicies = pgTable(
+  'retention_policies',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    assetId: text('asset_id').notNull(), // fk → data_assets.id (one policy per asset)
+    retainDays: integer('retain_days').notNull().default(0), // 0 = indefinite
+    // What happens at expiry: delete (purge rows) | anonymize (strip PII) | archive (cold-store).
+    action: text('action').notNull().default('delete'),
+    legalHold: boolean('legal_hold').notNull().default(false), // if set, never auto-purge
+    note: text('note').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('retention_policies_org_idx').on(t.orgId),
+    index('retention_policies_asset_idx').on(t.assetId),
+  ],
+);
 
 // `erasure_requests` — RTBF / subject-erasure request records. The existing DSAR path
 // (src/lib/erasure.ts + /api/v1/admin/erasure) EXECUTES an erasure immediately against console tables;
@@ -1383,24 +1496,28 @@ export const retentionPolicies = pgTable('retention_policies', {
 // SCOPE (which data assets across warehouse + vector store + lineage reference the subject). Actual
 // warehouse purge wires when the S2 data engine is live — until then the request honestly records
 // status `recorded` with the planned scope.
-export const erasureRequests = pgTable('erasure_requests', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id').notNull().default('default'),
-  subject: text('subject').notNull(), // the data-subject email/id to erase
-  // recorded | executing | completed | partial | failed — lifecycle of the request.
-  status: text('status').notNull().default('recorded'),
-  // The resolved erasure SCOPE at request time: the console-owned steps that ran (from planErasure)
-  // plus the cross-plane assets/stores that reference the subject and would be purged when the engine
-  // is live. Auditable snapshot — what this erasure DID + WOULD touch.
-  scope: jsonb('scope').$type<Record<string, unknown>>().notNull().default({}),
-  erasedRows: integer('erased_rows').notNull().default(0), // rows actually deleted in the console plane
-  requestedBy: text('requested_by').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  completedAt: timestamp('completed_at', { withTimezone: true }),
-}, (t) => [
-  index('erasure_requests_org_idx').on(t.orgId),
-  index('erasure_requests_subject_idx').on(t.subject),
-]);
+export const erasureRequests = pgTable(
+  'erasure_requests',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    subject: text('subject').notNull(), // the data-subject email/id to erase
+    // recorded | executing | completed | partial | failed — lifecycle of the request.
+    status: text('status').notNull().default('recorded'),
+    // The resolved erasure SCOPE at request time: the console-owned steps that ran (from planErasure)
+    // plus the cross-plane assets/stores that reference the subject and would be purged when the engine
+    // is live. Auditable snapshot — what this erasure DID + WOULD touch.
+    scope: jsonb('scope').$type<Record<string, unknown>>().notNull().default({}),
+    erasedRows: integer('erased_rows').notNull().default(0), // rows actually deleted in the console plane
+    requestedBy: text('requested_by').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('erasure_requests_org_idx').on(t.orgId),
+    index('erasure_requests_subject_idx').on(t.subject),
+  ],
+);
 
 export type DataAsset = typeof dataAssets.$inferSelect;
 export type NewDataAsset = typeof dataAssets.$inferInsert;

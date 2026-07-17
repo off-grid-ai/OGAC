@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { parseBlueprintInput } from '@/lib/solution-blueprint-request';
-import { createSolutionBlueprint, listSolutionBlueprints, SolutionValidationError } from '@/lib/solution-blueprints-store';
+import {
+  createSolutionBlueprint,
+  listSolutionBlueprints,
+  SolutionValidationError,
+} from '@/lib/solution-blueprints-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +14,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listSolutionBlueprints(await currentOrgId()) });
+  return NextResponse.json({
+    object: 'list',
+    data: await listSolutionBlueprints(await currentOrgId()),
+  });
 }
 
 export async function POST(req: Request) {
@@ -21,10 +28,18 @@ export async function POST(req: Request) {
   const orgId = await currentOrgId();
   try {
     const created = await createSolutionBlueprint(orgId, input);
-    auditFromSession(gate, orgId, { action: 'solution-blueprint.create', resource: `solution-blueprint:${created.id}`, outcome: 'ok' });
+    auditFromSession(gate, orgId, {
+      action: 'solution-blueprint.create',
+      resource: `solution-blueprint:${created.id}`,
+      outcome: 'ok',
+    });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    if (error instanceof SolutionValidationError) return NextResponse.json({ error: 'invalid blueprint', errors: error.errors }, { status: 422 });
+    if (error instanceof SolutionValidationError)
+      return NextResponse.json(
+        { error: 'invalid blueprint', errors: error.errors },
+        { status: 422 },
+      );
     throw error;
   }
 }

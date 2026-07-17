@@ -64,20 +64,43 @@ test('sidebar is derived from explicit placements and never invents a More group
     sections.map((section) => section.id),
     NAV_GROUPS.map((group) => group.id),
   );
-  assert.ok(sections.every((section) => section.items.every((item) => item.placement === 'sidebar')));
+  assert.ok(
+    sections.every((section) => section.items.every((item) => item.placement === 'sidebar')),
+  );
 });
 
 test('every standalone collection is in the sidebar and contextual resources declare a parent', () => {
   const sidebar = sidebarSections(MODULES).flatMap((section) => section.items);
   const required = [
-    'prompts', 'artifacts', 'domains', 'warehouse', 'catalog', 'lineage', 'teams', 'guardrails',
-    'secrets', 'trust', 'usage', 'quality-results', 'edge', 'managed-devices', 'configuration',
-    'backups', 'admin',
+    'prompts',
+    'artifacts',
+    'domains',
+    'warehouse',
+    'catalog',
+    'lineage',
+    'teams',
+    'guardrails',
+    'secrets',
+    'trust',
+    'usage',
+    'quality-results',
+    'edge',
+    'managed-devices',
+    'configuration',
+    'backups',
+    'admin',
   ];
-  for (const id of required) assert.ok(sidebar.some((owner) => owner.id === id), `${id} missing`);
+  for (const id of required)
+    assert.ok(
+      sidebar.some((owner) => owner.id === id),
+      `${id} missing`,
+    );
 
   const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
-  assert.deepEqual(contextual.map((owner) => owner.id), ['clusters']);
+  assert.deepEqual(
+    contextual.map((owner) => owner.id),
+    ['clusters'],
+  );
   assert.equal(contextual[0].sidebarParent, 'nodes');
 });
 

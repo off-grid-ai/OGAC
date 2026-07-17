@@ -94,7 +94,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'solutions',
     label: 'Solutions',
     purpose: 'Build and operate high-value business use cases.',
-  ownershipRule: 'Blueprints prove reusable value; Apps are tenant deployments of use cases.',
+    ownershipRule: 'Blueprints prove reusable value; Apps are tenant deployments of use cases.',
   },
   {
     id: 'data',

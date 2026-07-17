@@ -5,11 +5,12 @@ import { validateBlueprint } from '../src/lib/solution-blueprints.ts';
 import { BANK_APPS, INSURER_APPS } from '../src/lib/tour-demo-seed.ts';
 
 test('founder-priority BFSI examples are valid and derive execution requirements from app templates', () => {
-  assert.deepEqual(SEEDED_SOLUTION_BLUEPRINTS.map((seed) => seed.key), [
-    'lending-delinquency-intervention',
-    'insurance-indemnity-fast-track',
-  ]);
-  for (const seed of SEEDED_SOLUTION_BLUEPRINTS) assert.deepEqual(validateBlueprint(seed.input), []);
+  assert.deepEqual(
+    SEEDED_SOLUTION_BLUEPRINTS.map((seed) => seed.key),
+    ['lending-delinquency-intervention', 'insurance-indemnity-fast-track'],
+  );
+  for (const seed of SEEDED_SOLUTION_BLUEPRINTS)
+    assert.deepEqual(validateBlueprint(seed.input), []);
 
   const lending = BANK_APPS.find((app) => app.key === 'loan-underwriting')!;
   const insurance = INSURER_APPS.find((app) => app.key === 'claims-triage')!;
