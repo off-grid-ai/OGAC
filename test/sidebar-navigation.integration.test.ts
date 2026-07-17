@@ -25,7 +25,8 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
 
   assert.match(html, /aria-label="Primary navigation"/);
   assert.match(html, /aria-controls="nav-section-solutions"/);
-  assert.match(html, /id="nav-section-solutions" hidden=""/);
+  assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 8);
+  assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 8);
   assert.doesNotMatch(html, /href="\/operations\/clusters"/);
 });
 

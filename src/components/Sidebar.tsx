@@ -4,7 +4,7 @@ import { BookOpen, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getEnabledModules } from '@/lib/modules';
 import { cn } from '@/lib/utils';
 import {
@@ -23,19 +23,14 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   const modules = getEnabledModules();
   const sections = sidebarSections(modules);
 
-  // Resolve which sidebar row the current URL should light (longest-matching route wins so /agents/x
-  // beats /a), then highlight that module's group landing — so being on a secondary route (e.g.
-  // /policy) keeps its section's primary row (Control) active, and the builder's /apps/* surfaces
-  // (which have no module of their own) keep the Build → Apps row lit. Pure resolution in groups.ts.
+  // Resolve which sidebar row the current URL should light (longest-matching route wins), including
+  // contextual resources that deliberately highlight their owning collection. Pure resolution lives
+  // in groups.ts so the desktop rail and mobile drawer cannot drift.
   const activeId = sidebarActiveIdForPath(pathname);
   const activeSectionId = sidebarSectionIdForActiveId(sections, activeId);
-  const [openSectionId, setOpenSectionId] = useState<string | null>(activeSectionId ?? null);
-
-  // Keep one compact branch open when navigation crosses areas. The user can still collapse the
-  // current branch; this only runs when the route resolves to a different canonical section.
-  useEffect(() => {
-    setOpenSectionId(activeSectionId ?? null);
-  }, [activeSectionId]);
+  // Every branch starts collapsed, including on a deep link. The active section is still marked on
+  // its parent button, so operators keep their bearings without paying the vertical-space cost.
+  const [openSectionId, setOpenSectionId] = useState<string | null>(null);
 
   return (
     <>
@@ -54,90 +49,97 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Primary navigation">
-        {sections.map((section) => (
-          <div key={section.id} className="mb-1 last:mb-0">
-            <button
-              type="button"
-              aria-expanded={openSectionId === section.id}
-              aria-controls={`nav-section-${section.id}`}
-              onClick={() =>
-                setOpenSectionId((current) => (current === section.id ? null : section.id))
-              }
-              className={cn(
-                'group flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
-                openSectionId === section.id
-                  ? 'bg-muted/70 text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-              )}
-            >
-              <span
+        {sections.map((section) => {
+          const expanded = openSectionId === section.id;
+          const containsActiveItem = activeSectionId === section.id;
+          const SectionIcon = MODULE_ICONS[section.items[0].gate];
+
+          return (
+            <div key={section.id} className="mb-1 last:mb-0">
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={`nav-section-${section.id}`}
+                data-current-section={containsActiveItem || undefined}
+                onClick={() =>
+                  setOpenSectionId((current) => (current === section.id ? null : section.id))
+                }
                 className={cn(
-                  'grid size-7 shrink-0 place-items-center rounded-md border bg-background transition-colors',
-                  openSectionId === section.id
-                    ? 'border-primary/40 text-primary'
-                    : 'border-border/80 text-muted-foreground group-hover:text-foreground',
+                  'group flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                  expanded
+                    ? 'bg-muted/70 text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
-                {(() => {
-                  const SectionIcon = MODULE_ICONS[section.items[0].gate];
-                  return <SectionIcon className="size-3.5" />;
-                })()}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{section.label}</span>
-              <CaretRight
-                className={cn(
-                  'size-3.5 shrink-0 transition-transform duration-150',
-                  openSectionId === section.id && 'rotate-90 text-foreground',
-                )}
-              />
-            </button>
+                <span
+                  className={cn(
+                    'grid size-7 shrink-0 place-items-center rounded-md border bg-background transition-colors',
+                    expanded || containsActiveItem
+                      ? 'border-primary/40 text-primary'
+                      : 'border-border/80 text-muted-foreground group-hover:text-foreground',
+                  )}
+                >
+                  <SectionIcon className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                {containsActiveItem && !expanded ? (
+                  <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                ) : null}
+                <CaretRight
+                  className={cn(
+                    'size-3.5 shrink-0 transition-transform duration-150',
+                    expanded && 'rotate-90 text-foreground',
+                  )}
+                />
+              </button>
 
-            <div
-              id={`nav-section-${section.id}`}
-              hidden={openSectionId !== section.id}
-              className="relative ml-6 mt-1 space-y-0.5 border-l border-border/80 pl-3"
-            >
-              {section.items.map((m) => {
-                const active = activeId === m.id;
-                return (
-                  <Link
-                    key={m.id}
-                    href={m.route}
-                    onClick={onNavigate}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'group relative flex min-h-9 items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
-                      active
-                        ? 'bg-foreground font-medium text-background'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                    )}
-                  >
-                    <span
+              <div
+                id={`nav-section-${section.id}`}
+                hidden={!expanded}
+                className="relative ml-6 mt-1 space-y-0.5 border-l border-border/80 pl-3"
+              >
+                {section.items.map((item) => {
+                  const active = activeId === item.id;
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.route}
+                      onClick={onNavigate}
+                      aria-current={active ? 'page' : undefined}
                       className={cn(
-                        'absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2',
-                        active ? 'bg-primary' : 'bg-border',
+                        'group relative flex min-h-9 items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
+                        active
+                          ? 'bg-foreground font-medium text-background'
+                          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                       )}
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1 truncate">{m.label}</span>
-                    {m.comingSoon ? (
+                    >
                       <span
                         className={cn(
-                          'rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em]',
-                          active
-                            ? 'border-background/20 text-background/70'
-                            : 'border-border text-muted-foreground',
+                          'absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2',
+                          active ? 'bg-primary' : 'bg-border',
                         )}
-                      >
-                        Soon
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.comingSoon ? (
+                        <span
+                          className={cn(
+                            'rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em]',
+                            active
+                              ? 'border-background/20 text-background/70'
+                              : 'border-border text-muted-foreground',
+                          )}
+                        >
+                          Soon
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-border/80 p-3">
