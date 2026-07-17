@@ -33,6 +33,64 @@ export interface FleetNode {
   rpcPort?: number | null;
 }
 
+/**
+ * Persistence/boundary row accepted by the canonical DB → domain mapper. Drizzle returns camelCase
+ * properties, while raw SQL/serialized registry rows may retain their snake_case column names.
+ * Keeping both spellings at this one boundary prevents every route from reimplementing the map.
+ */
+export interface FleetNodeStorageRow {
+  name: string;
+  host: string;
+  port: number;
+  role: string;
+  kind: string;
+  model: string;
+  primaryGguf?: string;
+  primary_gguf?: string;
+  mmprojGguf?: string;
+  mmproj_gguf?: string;
+  modelId?: string;
+  model_id?: string;
+  contextSize?: number | null;
+  context_size?: number | null;
+  clusterHead?: string | null;
+  cluster_head?: string | null;
+  rpcPort?: number | null;
+  rpc_port?: number | null;
+  vision: boolean;
+  enabled: boolean;
+  notes?: string;
+}
+
+function alias<T>(
+  row: FleetNodeStorageRow,
+  camel: keyof FleetNodeStorageRow,
+  snake: keyof FleetNodeStorageRow,
+): T | undefined {
+  return (row[camel] !== undefined ? row[camel] : row[snake]) as T | undefined;
+}
+
+/** Canonical persistence-row → FleetNode mapping. Pure and shared by every derived topology. */
+export function mapFleetNodeRow(row: FleetNodeStorageRow): FleetNode {
+  return {
+    name: row.name,
+    host: row.host,
+    port: row.port,
+    role: row.role as NodeRole,
+    kind: row.kind as NodeKind,
+    model: row.model,
+    primaryGguf: alias<string>(row, 'primaryGguf', 'primary_gguf') ?? '',
+    mmprojGguf: alias<string>(row, 'mmprojGguf', 'mmproj_gguf') ?? '',
+    modelId: alias<string>(row, 'modelId', 'model_id') ?? '',
+    contextSize: alias<number | null>(row, 'contextSize', 'context_size') ?? null,
+    clusterHead: alias<string | null>(row, 'clusterHead', 'cluster_head') ?? null,
+    rpcPort: alias<number | null>(row, 'rpcPort', 'rpc_port') ?? null,
+    vision: row.vision,
+    enabled: row.enabled,
+    notes: row.notes ?? '',
+  };
+}
+
 /** A routing-pool entry in the shape the aggregator's `POOL` expects. */
 export interface PoolEntry {
   name: string;
@@ -72,7 +130,13 @@ export function derivePool(nodes: FleetNode[]): { pool: PoolEntry[]; imagePool: 
     // routable endpoint, so a worker never appears in the pool on its own.
     if (n.clusterHead) continue;
     if (n.role === 'image' || n.kind === 'image') {
-      imagePool.push({ name: n.name, host: n.host, port: n.port, model: n.model, enabled: n.enabled });
+      imagePool.push({
+        name: n.name,
+        host: n.host,
+        port: n.port,
+        model: n.model,
+        enabled: n.enabled,
+      });
       continue;
     }
     pool.push({
@@ -126,7 +190,9 @@ export function deriveClusters<T extends { name: string; clusterHead?: string | 
 }
 
 /** The active-model.json a node's gateway reads. Omits empty optional fields. */
-export function activeModelConfig(n: Pick<FleetNode, 'modelId' | 'primaryGguf' | 'mmprojGguf' | 'contextSize'>): Record<string, unknown> {
+export function activeModelConfig(
+  n: Pick<FleetNode, 'modelId' | 'primaryGguf' | 'mmprojGguf' | 'contextSize'>,
+): Record<string, unknown> {
   const cfg: Record<string, unknown> = { id: n.modelId, primary: n.primaryGguf };
   if (n.mmprojGguf) cfg.mmproj = n.mmprojGguf;
   if (typeof n.contextSize === 'number' && n.contextSize > 0) cfg.ctx = n.contextSize;
@@ -138,24 +204,30 @@ export type FleetValidation = { ok: true } | { ok: false; reason: string };
 /** Validate a fleet-node config before it's written to the SSOT. Pure. */
 export function validateFleetNode(n: Partial<FleetNode>): FleetValidation {
   const name = (n.name ?? '').trim();
-  if (!/^[a-z0-9-]{1,32}$/.test(name)) return { ok: false, reason: 'name must be 1–32 chars of [a-z0-9-]' };
+  if (!/^[a-z0-9-]{1,32}$/.test(name))
+    return { ok: false, reason: 'name must be 1–32 chars of [a-z0-9-]' };
   if (!(n.host ?? '').trim()) return { ok: false, reason: 'host is required' };
   if (!Number.isInteger(n.port) || (n.port as number) < 1 || (n.port as number) > 65535)
     return { ok: false, reason: 'port must be 1–65535' };
-  if (!n.role || !ROLES.has(n.role)) return { ok: false, reason: `role must be one of ${[...ROLES].join('|')}` };
-  if (!n.kind || !KINDS.has(n.kind)) return { ok: false, reason: `kind must be one of ${[...KINDS].join('|')}` };
+  if (!n.role || !ROLES.has(n.role))
+    return { ok: false, reason: `role must be one of ${[...ROLES].join('|')}` };
+  if (!n.kind || !KINDS.has(n.kind))
+    return { ok: false, reason: `kind must be one of ${[...KINDS].join('|')}` };
   // An RPC worker is bonded into a head's process — it has no routing tag or model file of
   // its own (the head owns those), so it's exempt from the serving-node requirements below.
   const isWorker = !!(n.clusterHead ?? '').trim();
   if (isWorker) {
     if (!/^[a-z0-9-]{1,32}$/.test(n.clusterHead as string))
       return { ok: false, reason: 'clusterHead must be a valid node name ([a-z0-9-], 1–32)' };
-    if (n.clusterHead === name) return { ok: false, reason: 'a node cannot be its own cluster head' };
+    if (n.clusterHead === name)
+      return { ok: false, reason: 'a node cannot be its own cluster head' };
   }
   // Serving nodes need a routing tag + a model file; servers and RPC workers don't.
   if (n.role !== 'server' && !isWorker) {
-    if (!(n.model ?? '').trim()) return { ok: false, reason: 'model (routing tag) is required for a serving node' };
-    if (!(n.primaryGguf ?? '').trim()) return { ok: false, reason: 'primaryGguf is required for a serving node' };
+    if (!(n.model ?? '').trim())
+      return { ok: false, reason: 'model (routing tag) is required for a serving node' };
+    if (!(n.primaryGguf ?? '').trim())
+      return { ok: false, reason: 'primaryGguf is required for a serving node' };
   }
   if (n.rpcPort != null) {
     if (!Number.isInteger(n.rpcPort) || n.rpcPort < 1 || n.rpcPort > 65535)
@@ -163,7 +235,10 @@ export function validateFleetNode(n: Partial<FleetNode>): FleetValidation {
   }
   if (n.contextSize != null) {
     if (!Number.isInteger(n.contextSize) || n.contextSize < 512 || n.contextSize > 1_000_000)
-      return { ok: false, reason: 'contextSize must be an integer 512–1000000, or empty for node default' };
+      return {
+        ok: false,
+        reason: 'contextSize must be an integer 512–1000000, or empty for node default',
+      };
   }
   return { ok: true };
 }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
-import { derivePool, type FleetNode } from '@/lib/fleet';
+import { derivePool, mapFleetNodeRow } from '@/lib/fleet';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,21 +17,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(_req: NextRequest) {
   try {
     const rows = await db.select().from(fleetNodes);
-    const nodes: FleetNode[] = rows.map((r) => ({
-      name: r.name,
-      host: r.host,
-      port: r.port,
-      role: r.role as FleetNode['role'],
-      kind: r.kind as FleetNode['kind'],
-      model: r.model,
-      primaryGguf: r.primaryGguf,
-      mmprojGguf: r.mmprojGguf,
-      modelId: r.modelId,
-      contextSize: r.contextSize,
-      vision: r.vision,
-      enabled: r.enabled,
-      notes: r.notes,
-    }));
+    const nodes = rows.map(mapFleetNodeRow);
     return NextResponse.json({ ...derivePool(nodes), count: nodes.length });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
