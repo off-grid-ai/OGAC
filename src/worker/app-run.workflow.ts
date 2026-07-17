@@ -106,8 +106,8 @@ export async function AppRunWorkflow(
 
   // PA-16 — resolve the bound-pipeline CONTRACT ONCE (via the I/O activity, using the SAME resolver
   // the inline route uses), then thread it into every step below so the WORKER path enforces the
-  // data-allowlist ceiling + egress leash + governance overlay identically to inline. No bound
-  // pipeline ⇒ null ⇒ legacy allow (additive-only). This closes the durable governance hole.
+  // data-allowlist ceiling + egress leash + governance overlay identically to inline. A deliberately
+  // unbound app resolves to null; a stale explicit binding throws before step execution.
   const contract: PipelineContract | null = await act.resolveContractActivity(
     input.pipelineId,
     input.orgId,

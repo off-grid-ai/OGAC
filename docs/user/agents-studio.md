@@ -1,15 +1,15 @@
 # Agents & Studio
 
-_Documented + verified 2026-07-17._ Surface: **Build → Agents (`/build/agents`) and Studio (`/build/studio`)**.
+_Documented + verified 2026-07-17._ Surface: **Solutions → Apps (`/solutions/apps`)**.
 
 ## What it is
 
-**Agents** is your catalog of AI workers — reusable built-ins plus every single-step app your org has
-built. An agent is the _simplest app_: one governed step that reads a question, (optionally) retrieves from
-your Brain, decides, and answers — with the whole [Policy](policy.md) → [Guardrails](guardrails.md) →
-grounding → provenance-signing pipeline wrapped around it, and every run recorded.
+**Apps** is your catalog of repeatable AI work. An agent is the _simplest app_: one governed step that
+reads a question, (optionally) retrieves from your Brain, decides, and answers — with the whole
+[Policy](policy.md) → [Guardrails](guardrails.md) → grounding → provenance-signing pipeline wrapped
+around it, and every run recorded.
 
-**Studio** is where you _build_ one. It's the same unified builder documented in
+The **New app** flow is where you build one. It's the unified builder documented in
 [Building an app (plain language)](app-builder.md): describe the work in plain language, get an ordered set
 of governed steps, wire them to your connectors/data/tools, and save. A one-step build is an agent; a
 multi-step build is an app. Studio owns the canonical AppSpec and its full lifecycle. Materialized runtime
@@ -29,21 +29,20 @@ agent rows are execution details, so they never appear as a second roster or edi
 
 ## When to use it
 
-- **Run from Agents** when a ready use case fits — you just want the outcome now.
-- **Build in Studio** when a repeatable job needs AI + your data + (optionally) a human gate: approvals,
+- **Run from Apps** when an existing use case fits — you just want the outcome now.
+- **Build a new app** when a repeatable job needs AI + your data + (optionally) a human gate: approvals,
   triage, drafting-with-review, scheduled digests.
 - Reach for a **single-step agent** when one decision/answer is all you need; reach for a **multi-step app**
   (same builder) when the job is read-data → decide → have-a-person-approve → emit.
 
 ## How to use it
 
-### Browse and run a pre-built agent (Agents)
+### Browse and run an app
 
-Open **Agents** (`/build/agents`). Each built-in shows as a card: name, a **role** badge (Operations, Claims,
-Distribution…), a **trigger** badge (on-demand, on-call, observed, scheduled), a green **grounded** badge if
-it answers from the Brain, its description, and its tools/needs. Click a card to open its **detail page**
-(`/build/agents/[id]`) — the instructions, the model, the grounded flag, the tools, and its recent runs.
-Your authored agents appear separately and open their canonical App lifecycle at `/build/apps/[id]`.
+Open **Apps** (`/solutions/apps`). Every single-step agent and multi-step workflow appears once, as the
+AppSpec that owns its configuration and lifecycle. A card shows its step count, trigger, visibility,
+governing pipeline, summary, and shared link when published. Click **Open** for its dedicated detail page
+(`/solutions/apps/[id]`) with Build, Input, Runs, Review, and Reports.
 
 - **Run** it — click **Run**, type your query, submit. The run executes through the governed pipeline and
   returns a full trace (policy → plan → retrieval → answer → grounding → signing). A blocked/denied run says
@@ -51,10 +50,10 @@ Your authored agents appear separately and open their canonical App lifecycle at
 - **View all runs →** opens the agent's paginated run history; click any run for the full trace, its checks,
   its citations, and its signature. See [Agent Runs & Jobs](agent-runs-jobs.md).
 
-### Build your own (Studio → New app)
+### Build your own (Apps → New app)
 
-From **Agents** or **Studio**, click **New app** (or **New agent** — same builder) to open the guided builder
-at `/build/studio/new`. This is the full flow documented in [app-builder.md](app-builder.md); the short version:
+From **Apps**, click **New app** to open the guided builder at `/solutions/apps/new`. This is the full flow
+documented in [app-builder.md](app-builder.md); the short version:
 
 1. **Describe** — write the outcome in plain language, or pick a starter (Reimbursement approval, Support
    triage, Simple assistant). **Infer** proposes a title/tools/grounding from your text.
@@ -71,7 +70,7 @@ at `/build/studio/new`. This is the full flow documented in [app-builder.md](app
 
 ### Manage the ones you own (full CRUD)
 
-Authored agents and multi-step apps both live at `/build/apps/[id]` with the lifecycle tabs (**Build ·
+Authored agents and multi-step apps both live at `/solutions/apps/[id]` with the lifecycle tabs (**Build ·
 Input · Runs · Review · Reports**). Edit the instructions, tools, grounding and `Runs on` pipeline under
 **Build**; run and review from the adjacent tabs; delete from the catalog with confirmation. There is no
 parallel custom-agent editor. Every create / edit / delete / run / review is written to
@@ -102,7 +101,8 @@ check failed (a policy rule, a guardrail, a budget gate). If a _grounded_ agent 
 all, its Brain corpus is empty for that query — ingest the source doc first (see [Brain](brain.md)).
 
 Inline agent steps materialize automatically on first run and retain the owning app's pipeline binding.
-Direct, scheduled, and Temporal-worker runs revalidate that binding before retrieval or model I/O; a
+App dispatch, direct/scheduled agent runs, and Temporal workers revalidate that binding before retrieval
+or model I/O; a
 deleted, deprecated, cross-org, or changed binding stops the run rather than silently running ungoverned.
 Human-in-the-loop resumption requires the durable run path — see [app-builder.md](app-builder.md).
 

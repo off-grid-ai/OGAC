@@ -37,16 +37,19 @@ export async function loadAppSpec(appId: string, orgId?: string): Promise<AppSpe
  * step's executeStepActivity, so the WORKER path enforces the identical data-allowlist ceiling + egress
  * leash + policy/guardrail overlay the inline path does.
  *
- * Never throws / degrades to null: no bound pipeline (null id) or an unresolvable/deleted pipeline ⇒
- * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as before).
+ * A deliberately unbound app returns null. An explicit id that is missing, deprecated, or cannot be
+ * resolved throws before any step activity runs. This is intentionally fail-closed: otherwise a
+ * pipeline deleted between dispatch and worker execution would silently become an ungoverned run.
  */
 export async function resolveContractActivity(
   pipelineId: string | null | undefined,
   orgId?: string,
 ): Promise<PipelineContract | null> {
-  if (!pipelineId) return null;
-  const { resolveContract } = await import('../lib/pipeline-contract');
-  return resolveContract(pipelineId, orgId ?? 'default');
+  const { requireRunnablePipelineBinding, resolveExplicitPipelineBinding } =
+    await import('../lib/pipeline-run-glue');
+  return requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(pipelineId, orgId ?? 'default'),
+  ).contract;
 }
 
 /**

@@ -117,10 +117,10 @@ export interface AppRunWorkflowInput {
   /**
    * PA-16 — the bound-pipeline id this durable run must enforce (data-allowlist ceiling + egress
    * leash + policy/guardrail overlay). The dispatch site resolves it with the SAME resolver the
-   * inline route uses (resolveConsumerPipeline) and threads the plain id here; the workflow resolves
-   * the full contract ONCE via an activity (the I/O boundary) and passes it into each step's
-   * executeStepActivity — so the WORKER path enforces the identical contract the inline path does.
-   * Null/absent ⇒ no bound pipeline ⇒ legacy allow (the additive guarantee), unchanged.
+   * inline route uses (resolveExplicitPipelineBinding) and threads the plain id here; the workflow
+   * re-resolves the full contract ONCE via an activity (the I/O boundary) and passes it into each
+   * step's executeStepActivity — so the WORKER path enforces the identical contract the inline path
+   * does. Null/absent means deliberately unbound; a stale explicit id fails closed in the activity.
    */
   pipelineId?: string | null;
   /**

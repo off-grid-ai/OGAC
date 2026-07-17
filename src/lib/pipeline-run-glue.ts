@@ -48,14 +48,31 @@ export interface ResolvedChatPipelineBinding {
   contract: PipelineContract | null;
 }
 
-export class AgentPipelineBindingError extends Error {
+/** Generic explicit-consumer binding failure (apps and future governed consumers). */
+export class PipelineBindingError extends Error {
   readonly binding: Extract<AgentPipelineBinding, { state: 'invalid' | 'unavailable' }>;
 
   constructor(binding: Extract<AgentPipelineBinding, { state: 'invalid' | 'unavailable' }>) {
     super(binding.reason);
-    this.name = 'AgentPipelineBindingError';
+    this.name = 'PipelineBindingError';
     this.binding = binding;
   }
+}
+
+/** Agent-specific error name retained for direct-agent API compatibility. */
+export class AgentPipelineBindingError extends PipelineBindingError {
+  constructor(binding: Extract<AgentPipelineBinding, { state: 'invalid' | 'unavailable' }>) {
+    super(binding);
+    this.name = 'AgentPipelineBindingError';
+  }
+}
+
+/** Narrow an explicit consumer binding to the only states permitted to execute. */
+export function requireRunnablePipelineBinding(
+  binding: AgentPipelineBinding,
+): Extract<AgentPipelineBinding, { state: 'bound' | 'unbound' }> {
+  if (binding.state === 'bound' || binding.state === 'unbound') return binding;
+  throw new PipelineBindingError(binding);
 }
 
 /** Narrow a resolved binding to the only two states permitted to execute. */
@@ -76,12 +93,12 @@ export type PipelineContractResolver = (
   orgId: string,
 ) => Promise<PipelineContract | null>;
 
-export async function resolveAgentBinding(
-  agentPipelineId: string | null | undefined,
+export async function resolveExplicitPipelineBinding(
+  consumerPipelineId: string | null | undefined,
   orgId: string,
   loadContract: PipelineContractResolver = resolveContract,
 ): Promise<AgentPipelineBinding> {
-  const pipelineId = resolveAgentPipeline(agentPipelineId);
+  const pipelineId = resolveAgentPipeline(consumerPipelineId);
   if (!pipelineId) return { state: 'unbound', pipelineId: null, contract: null };
   try {
     const contract = await loadContract(pipelineId, orgId);
@@ -104,6 +121,15 @@ export async function resolveAgentBinding(
       reason: `Agent binding resolver is unavailable for pipeline '${pipelineId}'.`,
     };
   }
+}
+
+/** Agent-specific public name retained for callers; semantics are the shared explicit binding rule. */
+export function resolveAgentBinding(
+  agentPipelineId: string | null | undefined,
+  orgId: string,
+  loadContract: PipelineContractResolver = resolveContract,
+): Promise<AgentPipelineBinding> {
+  return resolveExplicitPipelineBinding(agentPipelineId, orgId, loadContract);
 }
 
 export type AgentDefinitionLookup = (

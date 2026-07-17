@@ -123,8 +123,9 @@ async function trySubmitDurable(
     asker: ctx.asker,
     // PA-16 — thread the bound-pipeline id onto the durable path so the WORKER enforces the same
     // contract the inline route does. The route already resolved the contract into ctx.contract
-    // (resolveConsumerPipeline → resolveContract); carry its pipelineId so the workflow re-resolves
-    // the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy allow.
+    // (resolveExplicitPipelineBinding); carry its pipelineId so the workflow re-resolves the full
+    // contract via an activity (the I/O boundary). Null means deliberately unbound; a stale explicit
+    // id fails closed before any step runs.
     pipelineId: ctx.pipelineId ?? ctx.contract?.pipelineId ?? null,
     // BFSI blast-radius — carry the resolved run mode so the WORKER intercepts side-effecting sinks
     // on a shadow run identically to the inline path. Default 'live' (additive).
