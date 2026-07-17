@@ -1,4 +1,4 @@
-import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -912,6 +912,43 @@ export const apps = pgTable('apps', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)]);
+
+// Reusable, proven business outcomes are distinct from tenant App deployments. A blueprint owns
+// requirements + proof; solution_deployments binds it to the existing canonical apps table.
+export const solutionBlueprints = pgTable('solution_blueprints', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  title: text('title').notNull(),
+  summary: text('summary').notNull(),
+  industry: text('industry').notNull(),
+  process: text('process').notNull(),
+  businessOwner: text('business_owner').notNull(),
+  requiredDataDomains: jsonb('required_data_domains').$type<string[]>().notNull().default([]),
+  requiredTools: jsonb('required_tools').$type<string[]>().notNull().default([]),
+  governedPipeline: text('governed_pipeline').notNull(),
+  sourceTemplateKey: text('source_template_key').notNull(),
+  outcome: jsonb('outcome').$type<Record<string, unknown>>().notNull(),
+  proof: jsonb('proof').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('solution_blueprints_org_idx').on(t.orgId)]);
+
+export const solutionDeployments = pgTable('solution_deployments', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  blueprintId: text('blueprint_id').notNull(),
+  appId: text('app_id').notNull(),
+  status: text('status').notNull().default('active'),
+  evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('solution_deployments_org_idx').on(t.orgId),
+  uniqueIndex('solution_deployments_binding_idx').on(t.orgId, t.blueprintId, t.appId),
+]);
+
+export type SolutionBlueprintRow = typeof solutionBlueprints.$inferSelect;
+export type SolutionDeploymentRow = typeof solutionDeployments.$inferSelect;
 
 // ─── App runs (Builder Epic #106) — a run of an app, parallel to agentRuns ─────
 // Mirrors agentRuns (org-scope, status, provenance, timestamps) so the lineage/audit/trace
