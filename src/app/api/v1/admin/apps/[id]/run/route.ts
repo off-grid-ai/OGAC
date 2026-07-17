@@ -11,6 +11,7 @@ import { requireAdmin } from '@/lib/authz';
 import { pipelineRunTag } from '@/lib/chat-pipeline-policy';
 import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
 import { askerFrom } from '@/lib/retrieval/acl';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       mode: runMode,
     });
   } catch (error) {
+    const solutionFailure = solutionErrorResponse(error);
+    if (solutionFailure) {
+      auditFromSession(gate, orgId, {
+        action: 'solution-deployment.runtime-denied',
+        resource: `app:${id}`,
+        outcome: 'blocked',
+      });
+      return solutionFailure;
+    }
     const failure = pipelineBindingHttpFailure(error);
     if (!failure) throw error;
     auditFromSession(gate, orgId, {

@@ -57,7 +57,9 @@ async function fromToken(token: string): Promise<AuthzSession | null> {
 // Any authenticated principal (session, service-account JWT, or break-glass token).
 export async function requireUser(req?: Request): Promise<AuthzSession | NextResponse> {
   const token = bearer(req);
-  const viaToken = (await fromToken(token)) ?? breakGlass(token);
+  // An exact, explicitly configured break-glass token is locally decidable. Avoid loading the JWKS
+  // verifier (and potentially contacting the IdP) before accepting that emergency/CI credential.
+  const viaToken = breakGlass(token) ?? (await fromToken(token));
   if (viaToken) return viaToken;
   const session = (await auth()) as AuthzSession | null;
   if (!session?.user?.email) {

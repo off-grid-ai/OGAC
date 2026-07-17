@@ -33,6 +33,7 @@
     "coverage:check": "c8 --config .c8rc.json --check-coverage node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "verify:reports": "node --import ./test/support/register-alias.mjs scripts/verify-report-pdfs.mjs",
     "verify:vendor": "node scripts/verify-vendor-artifacts.mjs",
+    "verify:solutions-ui": "node scripts/verify-solutions-ui.mjs",
     "depcruise": "depcruise src scripts --config .dependency-cruiser.js",
     "depcruise:report": "depcruise src scripts --config .dependency-cruiser.js --output-type err-long",
     "depcruise:graph": "depcruise src --config .dependency-cruiser.js --output-type dot | dot -T svg -o docs/dependency-graph.svg",

@@ -1,4 +1,5 @@
-import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -918,6 +919,119 @@ export const apps = pgTable('apps', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)]);
+
+// Stable catalog identity. User edits append an immutable solution_blueprint_versions row; tenant
+// deployments pin that exact version so later library edits cannot rewrite deployed contracts.
+export const solutionBlueprints = pgTable(
+  'solution_blueprints',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    currentVersion: integer('current_version').notNull().default(1),
+    sourceCatalogKey: text('source_catalog_key'),
+    catalogVersion: integer('catalog_version'),
+    tombstonedAt: timestamp('tombstoned_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('solution_blueprints_org_idx').on(t.orgId),
+    uniqueIndex('solution_blueprints_catalog_key_idx').on(t.orgId, t.sourceCatalogKey),
+  ],
+);
+
+export const solutionBlueprintVersions = pgTable(
+  'solution_blueprint_versions',
+  {
+    id: text('id').primaryKey(),
+    blueprintId: text('blueprint_id').notNull(),
+    orgId: text('org_id').notNull().default('default'),
+    version: integer('version').notNull(),
+    snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('solution_blueprint_versions_identity_idx').on(t.orgId, t.blueprintId, t.version),
+    foreignKey({ columns: [t.blueprintId], foreignColumns: [solutionBlueprints.id] }).onDelete(
+      'restrict',
+    ),
+  ],
+);
+
+// Records that the default blueprint library has been initialised for an organisation. Keeping
+// this state separate means a user can delete or replace the defaults without them reappearing on
+// the next read (or after a process restart).
+export const solutionBlueprintSeedState = pgTable('solution_blueprint_seed_state', {
+  orgId: text('org_id').primaryKey(),
+  catalogVersion: integer('catalog_version').notNull().default(0),
+  seededAt: timestamp('seeded_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const solutionDeployments = pgTable(
+  'solution_deployments',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    blueprintId: text('blueprint_id').notNull(),
+    blueprintVersion: integer('blueprint_version').notNull(),
+    appId: text('app_id').notNull(),
+    pipelineId: text('pipeline_id').notNull(),
+    status: text('status').notNull().default('active'),
+    activatedAt: timestamp('activated_at', { withTimezone: true }).notNull().defaultNow(),
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
+    retiredAt: timestamp('retired_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('solution_deployments_org_idx').on(t.orgId),
+    uniqueIndex('solution_deployments_live_app_binding_idx')
+      .on(t.orgId, t.appId)
+      .where(sql`${t.status} <> 'retired'`),
+    foreignKey({
+      columns: [t.orgId, t.blueprintId, t.blueprintVersion],
+      foreignColumns: [
+        solutionBlueprintVersions.orgId,
+        solutionBlueprintVersions.blueprintId,
+        solutionBlueprintVersions.version,
+      ],
+    }).onDelete('restrict'),
+    foreignKey({ columns: [t.appId], foreignColumns: [apps.id] }).onDelete('restrict'),
+  ],
+);
+
+export const solutionObservations = pgTable(
+  'solution_observations',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull().default('default'),
+    deploymentId: text('deployment_id').notNull(),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+    claimedMetricValue: doublePrecision('claimed_metric_value').notNull(),
+    claimLabel: text('claim_label').notNull(),
+    runIds: jsonb('run_ids').$type<string[]>().notNull().default([]),
+    runsCompleted: integer('runs_completed').notNull(),
+    estimatedMinutesSavedPerRun: doublePrecision('estimated_minutes_saved_per_run').notNull(),
+    estimatedLoadedCostPerHour: doublePrecision('estimated_loaded_cost_per_hour').notNull(),
+    actualAiCost: doublePrecision('actual_ai_cost').notNull(),
+    evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull().default([]),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('solution_observations_deployment_idx').on(t.orgId, t.deploymentId),
+    foreignKey({ columns: [t.deploymentId], foreignColumns: [solutionDeployments.id] }).onDelete(
+      'restrict',
+    ),
+  ],
+);
+
+export type SolutionBlueprintRow = typeof solutionBlueprints.$inferSelect;
+export type SolutionBlueprintVersionRow = typeof solutionBlueprintVersions.$inferSelect;
+export type SolutionDeploymentRow = typeof solutionDeployments.$inferSelect;
+export type SolutionObservationRow = typeof solutionObservations.$inferSelect;
 
 // ─── App runs (Builder Epic #106) — a run of an app, parallel to agentRuns ─────
 // Mirrors agentRuns (org-scope, status, provenance, timestamps) so the lineage/audit/trace

@@ -10,6 +10,8 @@ import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { getApp } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { assertSolutionRuntimeBinding } from '@/lib/solution-blueprints-store';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 import { captureHitlCorrection } from '@/lib/feedback-store';
 
@@ -54,6 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const run = await getAppRunView(id, orgId);
   if (!run) return NextResponse.json({ error: 'run not found' }, { status: 404 });
+  const app = await getApp(run.appId, orgId);
+  if (!app) return NextResponse.json({ error: 'App not found' }, { status: 404 });
 
   if (!canReview(run)) {
     return NextResponse.json(
@@ -68,7 +72,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // on an approve. Only the `approve` decision is gated here; a `reject` needs no authority (anyone
   // reviewing may halt a run). Denied → 403 + reason, audited access.denied.
   if (body.decision === 'approve') {
-    const app = await getApp(run.appId, orgId);
     const runInput = run.input ?? {};
     const caller = await callerFromSession(gate, orgId);
     const access = await enforceAppAccessWithSharing({
@@ -86,6 +89,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         outcome: 'blocked',
       });
       return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
+    }
+    try {
+      await assertSolutionRuntimeBinding(app, orgId);
+    } catch (error) {
+      const response = solutionErrorResponse(error);
+      if (response) {
+        auditFromSession(gate, orgId, {
+          action: 'solution-deployment.runtime-denied',
+          resource: `app_run:${id} approve`,
+          outcome: 'blocked',
+        });
+        return response;
+      }
+      throw error;
     }
   }
 
@@ -109,19 +126,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // steps to completion (or the next human pause), persisting per-step state as runApp does. This
     // is what makes Approve JUST WORK for a non-technical reviewer without the durable runtime.
     if (signal.reason === 'not_configured' || signal.reason === 'not_found') {
-      const app = await getApp(run.appId, orgId);
-      if (!app) {
-        auditFromSession(gate, orgId, {
-          action: 'app.run.review',
-          resource: `app_run:${id}`,
-          outcome: 'error',
-        });
-        // Plain, user-facing — never leaks that the app definition couldn't be loaded internally.
-        return NextResponse.json(
-          { error: "This run couldn't be resumed right now. Please try again in a moment." },
-          { status: 502 },
-        );
-      }
       const paused = rebuildAppRunState(run.id, run.appId, run.status, run.steps);
       await resumeAppRun(
         app,
@@ -161,8 +165,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const app = await getApp(run.appId, orgId);
     const pipelineId = app?.pipelineId ?? null;
-    const query =
-      typeof run.input === 'string' ? run.input : JSON.stringify(run.input ?? '');
+    const query = typeof run.input === 'string' ? run.input : JSON.stringify(run.input ?? '');
     const res = await captureHitlCorrection(
       { input: query, correctedOutput: body.output, note: body.note, decision: body.decision },
       pipelineId,

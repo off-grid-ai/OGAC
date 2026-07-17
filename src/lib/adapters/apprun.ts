@@ -105,6 +105,10 @@ export async function submitAppRun(
       reason: `App '${spec.id}' does not belong to org '${ctx.orgId}'.`,
     });
   }
+  // Adopted Solutions add a second fail-closed runtime contract at the shared dispatch chokepoint.
+  // Keeping this beside pipeline binding prevents any ingress from opting out of either contract.
+  const { assertSolutionRuntimeBinding } = await import('@/lib/solution-blueprints-store');
+  await assertSolutionRuntimeBinding(spec, ctx.orgId);
   // This is the mandatory App dispatch chokepoint. The saved AppSpec is the only binding authority:
   // caller-supplied pipelineId/contract values are ignored and cannot make an invalid App runnable.
   const binding = requireRunnablePipelineBinding(

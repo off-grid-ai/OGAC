@@ -9,6 +9,8 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
   const html = renderToStaticMarkup(createElement(SidebarNav));
 
   for (const [label, href] of [
+    ['Library', '/solutions/library'],
+    ['Deployed', '/solutions/deployed'],
     ['Prompts', '/work/prompts'],
     ['Artifacts', '/work/artifacts'],
     ['Domains', '/data/domains'],
