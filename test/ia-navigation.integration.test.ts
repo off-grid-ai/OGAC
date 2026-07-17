@@ -46,3 +46,14 @@ test('fleet route shells consume the registry and never encode deployment member
   assert.match(source, /\/operations\/nodes\/\$\{encodeURIComponent\(node\.name\)\}/);
   assert.match(source, /\/operations\/clusters\/\$\{encodeURIComponent\(cluster\.head\.name\)\}/);
 });
+
+test('chat keeps its conversation rail off-canvas until the thread has desktop room', () => {
+  const source = readFileSync(`${ROOT}src/components/chat/ChatWorkspace.tsx`, 'utf8');
+  assert.match(source, /lg:static lg:z-auto lg:translate-x-0 lg:transition-none/);
+  assert.equal(
+    (source.match(/lg:hidden/g) ?? []).length,
+    2,
+    'the narrow-layout backdrop and chats-menu trigger must switch together',
+  );
+  assert.doesNotMatch(source, /md:static md:z-auto md:translate-x-0/);
+});
