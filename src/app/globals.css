@@ -1,3 +1,4 @@
+@import '@offgrid/ui/styles.css';
 @import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));

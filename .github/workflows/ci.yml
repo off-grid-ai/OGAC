@@ -37,6 +37,10 @@ jobs:
         working-directory: console
         run: npm ci
 
+      - name: Verify pinned shared UI artifacts
+        working-directory: console
+        run: npm run verify:vendor
+
       - name: Typecheck
         working-directory: console
         run: npm run typecheck
