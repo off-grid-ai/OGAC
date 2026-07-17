@@ -136,3 +136,28 @@ test('no pipeline contract keeps the additive path and still scopes retrieval to
   assert.equal(out.allow, true);
   assert.deepEqual(calls, { list: 0, retrieve: 1 });
 });
+
+test('bound database intent with no declared-domain match disables every structured source', async () => {
+  let structuredAccess: unknown;
+  const deps: AgentRetrievalDeps = {
+    async listDomains() {
+      return [A];
+    },
+    async retrieve(query, _k, _opts, context) {
+      structuredAccess = context?.structuredAccess;
+      return { query, decision: { intent: ['database'], reason: 'test' }, hits: [] };
+    },
+  };
+  const out = await retrieveAgentSources(
+    {
+      query: 'count mortgage arrears records',
+      k: 6,
+      orgId: 'org_a',
+      contract: contract([]),
+    },
+    deps,
+  );
+  assert.equal(out.allow, true);
+  assert.deepEqual(out.requestedDomainIds, []);
+  assert.deepEqual(structuredAccess, { state: 'disabled', reason: 'no authorized domain matched' });
+});

@@ -186,3 +186,37 @@ test('durable worker (agent): unknown agent ⇒ found:false (unchanged)', async 
   assert.equal(res.status, 'not_found');
   assert.equal(res.runId, 'r_missing');
 });
+
+test('durable worker: explicit pipeline resolving null fails closed before runAgent', async () => {
+  let ran = false;
+  await assert.rejects(
+    () =>
+      runAgentPipeline(wfInput('r_deleted', 'pl_deleted'), {
+        resolveContract: async () => null,
+        runAgent: async () => {
+          ran = true;
+          return fakeRun('r_deleted', 'done');
+        },
+      }),
+    /pipeline.*unavailable|binding.*invalid/i,
+  );
+  assert.equal(ran, false);
+});
+
+test('durable worker: resolver/DB failure fails closed before runAgent', async () => {
+  let ran = false;
+  await assert.rejects(
+    () =>
+      runAgentPipeline(wfInput('r_db_down', 'pl_live'), {
+        resolveContract: async () => {
+          throw new Error('postgres unavailable');
+        },
+        runAgent: async () => {
+          ran = true;
+          return fakeRun('r_db_down', 'done');
+        },
+      }),
+    /postgres unavailable|binding.*unavailable/i,
+  );
+  assert.equal(ran, false);
+});

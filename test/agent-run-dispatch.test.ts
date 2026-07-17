@@ -227,6 +227,36 @@ test('dispatch resolves the explicit agent binding once and threads it to sync +
   assert.equal(durable.calls.submit[0]?.pipelineId, 'pl_agent');
 });
 
+test('invalid explicit binding fails closed before durable submit or synchronous run', async () => {
+  const { deps, calls } = makeDeps({
+    durable: true,
+    resolveBinding: async () => ({
+      state: 'invalid',
+      pipelineId: 'pl_deleted',
+      contract: null,
+      reason: 'bound pipeline is deleted',
+    }),
+  });
+  await assert.rejects(() => dispatchAgentRun(ARGS, deps), /pipeline.*deleted|binding.*invalid/i);
+  assert.equal(calls.submit.length, 0);
+  assert.equal(calls.runAgent.length, 0);
+});
+
+test('binding resolver failure fails closed before durable submit or synchronous run', async () => {
+  const { deps, calls } = makeDeps({
+    durable: true,
+    resolveBinding: async () => ({
+      state: 'unavailable',
+      pipelineId: 'pl_live',
+      contract: null,
+      reason: 'binding resolver unavailable',
+    }),
+  });
+  await assert.rejects(() => dispatchAgentRun(ARGS, deps), /resolver unavailable/i);
+  assert.equal(calls.submit.length, 0);
+  assert.equal(calls.runAgent.length, 0);
+});
+
 test('getRun rejection on the pending path is swallowed → still reports pending (never throws)', async () => {
   const { deps } = makeDeps({
     durable: true,

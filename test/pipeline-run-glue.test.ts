@@ -20,18 +20,42 @@ test('resolveAgentBinding — no agent binding means no contract (never inherits
     assert.equal(orgId, 'org_a');
     return null;
   });
-  assert.equal(r.pipelineId, null);
-  assert.equal(r.contract, null);
-  assert.equal(requested, null);
+  assert.deepEqual(r, { state: 'unbound', pipelineId: null, contract: null });
+  assert.equal(requested, 'not-called', 'an unbound agent does not call the contract resolver');
 });
 
 test('resolveAgentBinding — explicit agent binding is loaded within the run org', async () => {
+  const expected = {
+    pipelineId: 'pl_agent',
+    dataAllowlist: [],
+    routing: {},
+    orgPolicyDefaults: {},
+    orgGuardrailDefaults: {},
+    policyOverlay: {},
+    guardrailOverlay: {},
+  } as never;
   const r = await resolveAgentBinding('pl_agent', 'org_a', async (pipelineId, orgId) => {
     assert.equal(pipelineId, 'pl_agent');
     assert.equal(orgId, 'org_a');
-    return null;
+    return expected;
   });
-  assert.equal(r.pipelineId, 'pl_agent');
+  assert.deepEqual(r, { state: 'bound', pipelineId: 'pl_agent', contract: expected });
+});
+
+test('resolveAgentBinding — explicit id resolving null is invalid, never silently unbound', async () => {
+  const r = await resolveAgentBinding('pl_deleted', 'org_a', async () => null);
+  assert.equal(r.state, 'invalid');
+  assert.equal(r.pipelineId, 'pl_deleted');
+  assert.match(r.reason, /unavailable|published/i);
+});
+
+test('resolveAgentBinding — resolver/DB failure is unavailable and fail-closed', async () => {
+  const r = await resolveAgentBinding('pl_live', 'org_a', async () => {
+    throw new Error('postgres unavailable');
+  });
+  assert.equal(r.state, 'unavailable');
+  assert.equal(r.pipelineId, 'pl_live');
+  assert.match(r.reason, /resolve|unavailable/i);
 });
 
 test('agent binding validation is org-scoped and null is deliberately valid', async () => {
