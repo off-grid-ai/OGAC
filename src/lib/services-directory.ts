@@ -47,6 +47,8 @@ export interface ServiceEntry {
    * used instead), rendered instead of a scary 'down'.
    */
   fallbackLabel?: string;
+  /** Optional management surface rendered inside the existing service detail route. */
+  management?: 'redpanda';
 }
 
 const DEFAULT_SERVICES: ServiceEntry[] = [
@@ -348,6 +350,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     healthPath: '/v1/cluster/health_overview', // Redpanda admin API → {"is_healthy":true}
     auth: 'api-key',
     kind: 'api',
+    management: 'redpanda',
   },
   {
     id: 'data-quality',

@@ -331,6 +331,39 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     description:
       'Canonical OTLP/HTTP collector base URL. OFFGRID_OTLP_URL remains a backwards-compatible alias.',
   },
+  {
+    key: 'OFFGRID_REDPANDA_ADMIN_URL',
+    group: 'Services',
+    label: 'Redpanda Admin API URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    default: 'http://offgrid-s2.local:9644',
+    description: 'Cluster health, broker, partition, and topic inspection boundary.',
+  },
+  {
+    key: 'OFFGRID_REDPANDA_SCHEMA_URL',
+    group: 'Services',
+    label: 'Redpanda Schema Registry URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    default: 'http://offgrid-s2.local:18083',
+    description: 'Optional Schema Registry HTTP boundary for subject and version management.',
+  },
+  {
+    key: 'OFFGRID_REDPANDA_REST_URL',
+    group: 'Services',
+    label: 'Redpanda REST Proxy URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    description:
+      'Optional Pandaproxy HTTP boundary for representative produce and consumer operations.',
+  },
 
   // ── Adapters ──
   {
