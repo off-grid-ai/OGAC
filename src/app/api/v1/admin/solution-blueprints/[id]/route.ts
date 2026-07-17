@@ -5,9 +5,9 @@ import { parseBlueprintPatch } from '@/lib/solution-blueprint-request';
 import {
   deleteSolutionBlueprint,
   getSolutionBlueprint,
-  SolutionValidationError,
   updateSolutionBlueprint,
 } from '@/lib/solution-blueprints-store';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 type Context = { params: Promise<{ id: string }> };
@@ -29,7 +29,12 @@ export async function PATCH(req: Request, { params }: Context) {
   const { id } = await params;
   const orgId = await currentOrgId();
   try {
-    const updated = await updateSolutionBlueprint(id, orgId, patch);
+    const updated = await updateSolutionBlueprint(
+      id,
+      orgId,
+      patch,
+      gate.user.email ?? 'unknown-admin',
+    );
     if (!updated) return NextResponse.json({ error: 'unknown blueprint' }, { status: 404 });
     auditFromSession(gate, orgId, {
       action: 'solution-blueprint.update',
@@ -38,11 +43,8 @@ export async function PATCH(req: Request, { params }: Context) {
     });
     return NextResponse.json(updated);
   } catch (error) {
-    if (error instanceof SolutionValidationError)
-      return NextResponse.json(
-        { error: 'invalid blueprint', errors: error.errors },
-        { status: 422 },
-      );
+    const response = solutionErrorResponse(error);
+    if (response) return response;
     throw error;
   }
 }

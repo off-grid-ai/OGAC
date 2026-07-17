@@ -64,7 +64,7 @@ export default async function SolutionLibraryPage() {
                 <div>
                   <p className="text-muted-foreground">Proof</p>
                   <p className="mt-1 font-medium">
-                    v{blueprint.proof.version} · {blueprint.proof.provenDeployments}×
+                    v{blueprint.currentVersion} · {blueprint.proof.status}
                   </p>
                 </div>
               </div>

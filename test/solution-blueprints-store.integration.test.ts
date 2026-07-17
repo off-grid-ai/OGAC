@@ -1,94 +1,193 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Pool } from 'pg';
 import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 
 const ORG_A = 'test-int-solution-blueprints-a';
 const ORG_B = 'test-int-solution-blueprints-b';
 const dbUp = await dbReachable();
+async function solutionSchemaReady(): Promise<boolean> {
+  if (!dbUp) return false;
+  const pool = new Pool({
+    connectionString:
+      process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
+  });
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'solution_blueprints' AND column_name = 'current_version'`,
+    );
+    return result.rowCount === 1;
+  } finally {
+    await pool.end();
+  }
+}
+const schemaReady = await solutionSchemaReady();
 
 test(
-  'solution library and deployment bindings are CRUD-capable and org isolated',
+  'versioned adoption enforces the real runtime and retains scoped ROI evidence',
   {
-    skip: dbUp ? false : SKIP_MESSAGE,
+    skip: schemaReady
+      ? false
+      : dbUp
+        ? 'Solution Blueprint migration 0010 is not applied to the local integration database'
+        : SKIP_MESSAGE,
   },
   async (t) => {
     const store = await import('@/lib/solution-blueprints-store');
-    const { createApp, deleteApp } = await import('@/lib/apps-store');
+    const { createApp, publishApp, updateApp } = await import('@/lib/apps-store');
+    const { createPipeline } = await import('@/lib/pipelines');
     const { db } = await import('@/db');
     const { sql } = await import('drizzle-orm');
 
+    const pipelineId = `pl_solution_${Date.now()}`;
     let appId = '';
     t.after(async () => {
-      if (appId) await deleteApp(appId, ORG_A).catch(() => {});
       for (const org of [ORG_A, ORG_B]) {
+        await db.execute(sql`DELETE FROM solution_observations WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_deployments WHERE org_id = ${org}`);
+        await db.execute(sql`DELETE FROM solution_blueprint_versions WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${org}`);
       }
+      if (appId) await db.execute(sql`DELETE FROM apps WHERE id = ${appId}`);
+      await db.execute(sql`DELETE FROM pipeline_versions WHERE pipeline_id = ${pipelineId}`);
+      await db.execute(sql`DELETE FROM pipelines WHERE id = ${pipelineId}`);
     });
 
     const seedsA = await store.listSolutionBlueprints(ORG_A);
     const seedsB = await store.listSolutionBlueprints(ORG_B);
     assert.equal(seedsA.length, 2);
     assert.equal(seedsB.length, 2);
-    assert.ok(seedsA.every((blueprint) => blueprint.orgId === ORG_A));
-    assert.ok(seedsB.every((blueprint) => blueprint.orgId === ORG_B));
-    assert.ok(!seedsB.some((blueprint) => blueprint.id === seedsA[0].id));
-
+    assert.ok(seedsA.every((item) => item.proof.status === 'unverified'));
+    assert.ok(!seedsB.some((item) => item.id === seedsA[0].id));
     assert.equal(await store.deleteSolutionBlueprint(seedsA[1].id, ORG_A), true);
-    assert.deepEqual(
-      (await store.listSolutionBlueprints(ORG_A)).map((blueprint) => blueprint.id),
-      [seedsA[0].id],
-      'a deleted default must not be recreated by a later read',
+    assert.equal((await store.listSolutionBlueprints(ORG_A)).length, 1);
+    assert.equal(
+      (await store.listSolutionBlueprints(ORG_A, true)).filter((item) => item.tombstonedAt).length,
+      1,
+      'retired catalog entries remain durable and are not recreated by reads',
     );
 
-    const input = {
-      ...seedsA[0],
-      title: 'Collections cure-rate accelerator',
-      proof: { ...seedsA[0].proof, version: 'test-1' },
-    };
-    const created = await store.createSolutionBlueprint(ORG_A, input);
-    assert.match(created.id, /^sbp_/);
-    assert.equal(await store.getSolutionBlueprint(created.id, ORG_B), null);
-
-    const updated = await store.updateSolutionBlueprint(created.id, ORG_A, {
-      businessOwner: 'Chief Risk Officer',
-    });
-    assert.equal(updated?.businessOwner, 'Chief Risk Officer');
-    assert.equal(await store.updateSolutionBlueprint(created.id, ORG_B, { title: 'leak' }), null);
-
+    await createPipeline(
+      {
+        id: pipelineId,
+        name: 'Collections intervention',
+        status: 'published',
+        dataAllowlist: ['loan accounts'],
+      },
+      'owner@test.local',
+      ORG_A,
+    );
     const app = await createApp(ORG_A, 'owner@test.local', {
-      title: 'Collections deployment',
-      summary: 'Tenant app',
+      title: 'Collections intervention',
+      summary: 'Tenant implementation',
       visibility: 'private',
+      pipelineId,
+      published: false,
       trigger: { kind: 'on-demand' },
       steps: [
+        { id: 'read', kind: 'connector-query', label: 'Read loans', domain: 'loan accounts' },
         {
-          id: 's1',
+          id: 'assess',
           kind: 'agent',
-          label: 'Prioritise',
-          inlineAgent: { systemPrompt: 'Prioritise delinquency cases.' },
+          label: 'Assess',
+          inlineAgent: { systemPrompt: 'Assess delinquency.', grounded: true },
         },
+        { id: 'approve', kind: 'human', label: 'Approve' },
+        { id: 'report', kind: 'output', label: 'Report', sink: 'report' },
       ],
-      edges: [],
+      edges: [
+        { from: 'read', to: 'assess' },
+        { from: 'assess', to: 'approve' },
+        { from: 'approve', to: 'report' },
+      ],
     });
     appId = app.id;
+    await publishApp(app.id, ORG_A);
+
+    const input = {
+      title: 'Collections cure-rate accelerator',
+      summary: 'Intervene before accounts roll forward.',
+      industry: 'Lending',
+      process: 'Collections',
+      businessOwner: 'Head of Collections',
+      requiredDataDomains: ['loan accounts'],
+      requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'] as const,
+      requiredPipelineName: 'Collections intervention',
+      sourceTemplateKey: 'collections-intervention',
+      outcome: {
+        metricName: '30+ DPD',
+        metricUnit: '%',
+        direction: 'decrease' as const,
+        measurementWindow: '30 days',
+        baseline: { value: 12, label: 'Approved baseline' },
+        target: { value: 9, label: 'Approved target' },
+        measured: null,
+        roi: {
+          currency: 'USD',
+          annualBenefit: 100,
+          implementationCost: 20,
+          annualOperatingCost: 10,
+          rationale: 'Avoided loss.',
+        },
+      },
+      proof: { status: 'unverified' as const, summary: '', evidenceLinks: [] },
+    };
+    const created = await store.createSolutionBlueprint(ORG_A, input, 'author@test.local');
+    assert.equal(created.currentVersion, 1);
 
     const deployment = await store.createSolutionDeployment(ORG_A, {
       blueprintId: created.id,
+      blueprintVersion: 1,
       appId,
       status: 'active',
-      evidenceLinks: ['/governance/evidence'],
     });
-    assert.match(deployment.id, /^sdp_/);
-    assert.equal(await store.getSolutionDeployment(deployment.id, ORG_B), null);
-    assert.equal((await store.listSolutionDeployments(ORG_A)).length, 1);
+    assert.equal(deployment.pipelineId, pipelineId);
+    await store.assertSolutionRuntimeBinding(appId, ORG_A);
 
-    const paused = await store.updateSolutionDeployment(deployment.id, ORG_A, { status: 'paused' });
-    assert.equal(paused?.status, 'paused');
-    assert.equal(await store.deleteSolutionDeployment(deployment.id, ORG_B), false);
-    assert.equal(await store.deleteSolutionDeployment(deployment.id, ORG_A), true);
-    assert.equal(await store.deleteSolutionBlueprint(created.id, ORG_B), false);
+    const updated = await store.updateSolutionBlueprint(
+      created.id,
+      ORG_A,
+      { businessOwner: 'Chief Risk Officer' },
+      'editor@test.local',
+    );
+    assert.equal(updated?.currentVersion, 2);
+    assert.equal(deployment.blueprintVersion, 1, 'active deployment stays pinned to v1');
+    assert.deepEqual(
+      (await store.listSolutionBlueprintVersions(created.id, ORG_A)).map((item) => item.version),
+      [2, 1],
+    );
+
+    const start = new Date(deployment.activatedAt.valueOf() + 1_000);
+    const observation = await store.createSolutionObservation(
+      deployment.id,
+      ORG_A,
+      {
+        windowStart: start,
+        windowEnd: new Date(start.valueOf() + 86_400_000),
+        metricValue: 10,
+        metricLabel: '30+ DPD',
+        runsCompleted: 20,
+        minutesSavedPerRun: 30,
+        loadedCostPerHour: 50,
+        actualAiCost: 25,
+        evidenceLinks: ['/governance/evidence/window-1'],
+      },
+      'analyst@test.local',
+    );
+    assert.equal(observation.realizedRoi.netValue, 475);
+    assert.equal((await store.listSolutionObservations(deployment.id, ORG_B)).length, 0);
+
+    await updateApp(appId, ORG_A, { pipelineId: null });
+    await assert.rejects(
+      store.assertSolutionRuntimeBinding(appId, ORG_A),
+      (error: unknown) => (error as { code?: string }).code === 'runtime-drift',
+    );
+    assert.equal(await store.hasSolutionDeploymentsForApp(appId, ORG_A), true);
     assert.equal(await store.deleteSolutionBlueprint(created.id, ORG_A), true);
+    assert.equal((await store.listSolutionObservations(deployment.id, ORG_A)).length, 1);
+    assert.equal(await store.deleteSolutionDeployment(deployment.id, ORG_A), true);
+    assert.equal((await store.getSolutionDeployment(deployment.id, ORG_A))?.status, 'retired');
   },
 );

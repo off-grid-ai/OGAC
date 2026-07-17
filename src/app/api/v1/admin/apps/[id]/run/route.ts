@@ -10,6 +10,8 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
+import { solutionErrorResponse } from '@/lib/solution-http';
+import { assertSolutionRuntimeBinding } from '@/lib/solution-blueprints-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const orgId = await currentOrgId();
   const app = await getApp(id, orgId);
   if (!app) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // An adopted solution is a runtime contract, not a label. Re-check its pinned Blueprint version,
+  // exact pipeline and current App graph before any access, budget or model side effect occurs.
+  try {
+    await assertSolutionRuntimeBinding(id, orgId);
+  } catch (error) {
+    const response = solutionErrorResponse(error);
+    if (response) {
+      auditFromSession(gate, orgId, {
+        action: 'solution-deployment.runtime-denied',
+        resource: `app:${id}`,
+        outcome: 'blocked',
+      });
+      return response;
+    }
+    throw error;
+  }
 
   const body = (await req.json().catch(() => ({}))) as {
     input?: Record<string, unknown>;

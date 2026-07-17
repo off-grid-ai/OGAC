@@ -4,70 +4,59 @@ import {
   parseBlueprintInput,
   parseBlueprintPatch,
   parseDeploymentInput,
+  parseObservationInput,
 } from '../src/lib/solution-blueprint-request.ts';
 
-test('blueprint request parser shapes nested KPI, ROI and proof inputs without trusting JSON', () => {
+test('blueprint request parser preserves invalid enums for fail-closed validation', () => {
   const parsed = parseBlueprintInput({
     title: 'Claims',
-    summary: 'Fast',
-    industry: 'Insurance',
-    process: 'Claims',
-    businessOwner: 'CCO',
-    requiredDataDomains: ['claims', 1],
-    requiredTools: ['approval'],
-    governedPipeline: 'Claims',
-    sourceTemplateKey: 'claims',
+    requiredDataDomains: ['claims', 2],
+    requiredCapabilities: ['grounded-inference'],
+    requiredPipelineName: 'Claims',
     outcome: {
-      metricName: 'Throughput',
-      metricUnit: 'day',
-      direction: 'increase',
-      measurementWindow: '30d',
-      baseline: { value: '5', label: 'before' },
-      target: { value: 50, label: 'after' },
-      measured: null,
-      roi: {
-        currency: 'USD',
-        annualBenefit: '100',
-        implementationCost: 10,
-        annualOperatingCost: 5,
-        rationale: 'capacity',
-      },
+      direction: 'sideways',
+      baseline: { value: '10', label: 'Before' },
+      target: { value: 12, label: 'After' },
+      roi: { annualBenefit: '20' },
     },
-    proof: {
-      version: '1',
-      provenDeployments: '3',
-      summary: 'proven',
-      evidenceLinks: ['/evidence', 2],
-    },
+    proof: { status: 'invented', evidenceLinks: ['/evidence', 2] },
   });
-  assert.equal(parsed?.outcome.baseline.value, 5);
+  assert.equal(parsed?.outcome.direction, 'sideways');
+  assert.equal(parsed?.outcome.baseline.value, 10);
   assert.deepEqual(parsed?.requiredDataDomains, ['claims']);
-  assert.equal(parsed?.proof.provenDeployments, 3);
+  assert.equal(parsed?.proof.status, 'invented');
   assert.deepEqual(parsed?.proof.evidenceLinks, ['/evidence']);
   assert.equal(parseBlueprintInput(null), null);
 });
 
-test('patch parser includes only present mutable fields', () => {
-  assert.deepEqual(parseBlueprintPatch({ title: 'New', requiredTools: ['tool'] }), {
-    title: 'New',
-    requiredTools: ['tool'],
-  });
+test('blueprint patch only includes explicitly supplied fields', () => {
+  assert.deepEqual(
+    parseBlueprintPatch({ title: 'New', requiredCapabilities: ['human-approval'] }),
+    { title: 'New', requiredCapabilities: ['human-approval'] },
+  );
   assert.deepEqual(parseBlueprintPatch([]), null);
 });
 
-test('deployment parser normalizes status and rejects non-object bodies', () => {
+test('deployment parser never defaults an invalid status to active', () => {
   assert.deepEqual(
-    parseDeploymentInput({
-      blueprintId: 'bp',
-      appId: 'app',
-      status: 'paused',
-      evidenceLinks: ['/e'],
-    }),
-    { blueprintId: 'bp', appId: 'app', status: 'paused', evidenceLinks: ['/e'] },
+    parseDeploymentInput({ blueprintId: 'bp', blueprintVersion: '3', appId: 'app', status: 'bad' }),
+    { blueprintId: 'bp', blueprintVersion: 3, appId: 'app', status: 'bad' },
   );
-  assert.equal(parseDeploymentInput('bad'), null);
-  assert.equal(
-    parseDeploymentInput({ blueprintId: 'bp', appId: 'app', status: 'unknown' })?.status,
-    'active',
-  );
+});
+
+test('observation parser scopes dated evidence and realized-value inputs', () => {
+  const parsed = parseObservationInput({
+    windowStart: '2026-01-01T00:00:00Z',
+    windowEnd: '2026-02-01T00:00:00Z',
+    metricValue: '9.4',
+    metricLabel: '30+ DPD',
+    runsCompleted: '100',
+    minutesSavedPerRun: '15',
+    loadedCostPerHour: 50,
+    actualAiCost: 12,
+    evidenceLinks: ['/e'],
+  });
+  assert.equal(parsed?.metricValue, 9.4);
+  assert.equal(parsed?.runsCompleted, 100);
+  assert.equal(parsed?.windowStart.toISOString(), '2026-01-01T00:00:00.000Z');
 });

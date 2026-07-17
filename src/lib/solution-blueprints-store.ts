@@ -1,25 +1,38 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNull, lt } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   apps,
+  appRuns,
   solutionBlueprintSeedState,
   solutionBlueprints,
+  solutionBlueprintVersions,
   solutionDeployments,
+  solutionObservations,
   type SolutionBlueprintRow,
+  type SolutionBlueprintVersionRow,
   type SolutionDeploymentRow,
+  type SolutionObservationRow,
 } from '@/db/schema';
-import { SEEDED_SOLUTION_BLUEPRINTS } from '@/lib/solution-blueprint-seeds';
 import {
-  type BlueprintProof,
+  SEEDED_SOLUTION_BLUEPRINTS,
+  SOLUTION_BLUEPRINT_CATALOG_VERSION,
+} from '@/lib/solution-blueprint-seeds';
+import {
+  evaluateSolutionCompatibility,
   type SolutionBlueprint,
   type SolutionBlueprintInput,
+  type SolutionBlueprintVersion,
   type SolutionDeployment,
   type SolutionDeploymentInput,
+  type SolutionObservation,
+  type SolutionObservationInput,
   validateBlueprint,
   validateDeployment,
+  validateObservation,
+  withRealizedRoi,
 } from '@/lib/solution-blueprints';
-import type { OutcomeContract } from '@/lib/outcome-contract';
+import { getPipeline } from '@/lib/pipelines';
 import { hash12 } from '@/lib/tour-demo-seed';
 
 export class SolutionValidationError extends Error {
@@ -32,173 +45,294 @@ export class SolutionValidationError extends Error {
   }
 }
 
-let ensurePromise: Promise<void> | null = null;
-export async function ensureSolutionBlueprintSchema(): Promise<void> {
-  if (ensurePromise) return ensurePromise;
-  ensurePromise = (async () => {
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_blueprints (
-      id text PRIMARY KEY, org_id text NOT NULL DEFAULT 'default', title text NOT NULL,
-      summary text NOT NULL, industry text NOT NULL, process text NOT NULL,
-      business_owner text NOT NULL, required_data_domains jsonb NOT NULL DEFAULT '[]'::jsonb,
-      required_tools jsonb NOT NULL DEFAULT '[]'::jsonb, governed_pipeline text NOT NULL,
-      source_template_key text NOT NULL, outcome jsonb NOT NULL, proof jsonb NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
-    await db.execute(
-      sql`CREATE INDEX IF NOT EXISTS solution_blueprints_org_idx ON solution_blueprints (org_id)`,
-    );
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_blueprint_seed_state (
-      org_id text PRIMARY KEY, seeded_at timestamptz NOT NULL DEFAULT now())`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_deployments (
-      id text PRIMARY KEY, org_id text NOT NULL DEFAULT 'default', blueprint_id text NOT NULL,
-      app_id text NOT NULL, status text NOT NULL DEFAULT 'active', evidence_links jsonb NOT NULL DEFAULT '[]'::jsonb,
-      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
-    await db.execute(
-      sql`CREATE INDEX IF NOT EXISTS solution_deployments_org_idx ON solution_deployments (org_id)`,
-    );
-    await db.execute(
-      sql`CREATE UNIQUE INDEX IF NOT EXISTS solution_deployments_binding_idx ON solution_deployments (org_id, blueprint_id, app_id)`,
-    );
-  })().catch((error) => {
-    ensurePromise = null;
-    throw error;
-  });
-  return ensurePromise;
+export class SolutionConflictError extends Error {
+  readonly code: 'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'runtime-drift';
+  readonly errors: string[];
+
+  constructor(
+    message: string,
+    code: 'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'runtime-drift',
+    errors: string[] = [],
+  ) {
+    super(message);
+    this.name = 'SolutionConflictError';
+    this.code = code;
+    this.errors = errors;
+  }
 }
 
-const toBlueprint = (row: SolutionBlueprintRow): SolutionBlueprint => ({
-  ...row,
-  requiredDataDomains: row.requiredDataDomains ?? [],
-  requiredTools: row.requiredTools ?? [],
-  outcome: row.outcome as unknown as OutcomeContract,
-  proof: row.proof as unknown as BlueprintProof,
-});
+type BlueprintSnapshot = SolutionBlueprintInput;
 
-const toDeployment = (row: SolutionDeploymentRow): SolutionDeployment => ({
-  ...row,
-  status: row.status === 'paused' || row.status === 'retired' ? row.status : 'active',
-  evidenceLinks: row.evidenceLinks ?? [],
-});
+function snapshot(row: SolutionBlueprintVersionRow): BlueprintSnapshot {
+  return row.snapshot as unknown as BlueprintSnapshot;
+}
+
+function toVersion(row: SolutionBlueprintVersionRow): SolutionBlueprintVersion {
+  return {
+    ...snapshot(row),
+    blueprintId: row.blueprintId,
+    orgId: row.orgId,
+    version: row.version,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+  };
+}
+
+function toBlueprint(
+  catalog: SolutionBlueprintRow,
+  version: SolutionBlueprintVersionRow,
+): SolutionBlueprint {
+  const definition = toVersion(version);
+  return {
+    ...definition,
+    id: catalog.id,
+    currentVersion: catalog.currentVersion,
+    sourceCatalogKey: catalog.sourceCatalogKey,
+    catalogVersion: catalog.catalogVersion,
+    tombstonedAt: catalog.tombstonedAt,
+    createdAt: catalog.createdAt,
+    updatedAt: catalog.updatedAt,
+  };
+}
+
+function toDeployment(row: SolutionDeploymentRow): SolutionDeployment {
+  if (row.status !== 'active' && row.status !== 'paused' && row.status !== 'retired') {
+    throw new Error(`invalid persisted solution deployment status: ${row.status}`);
+  }
+  return { ...row, status: row.status };
+}
+
+function toObservation(row: SolutionObservationRow): SolutionObservation {
+  return withRealizedRoi({
+    ...row,
+    evidenceLinks: row.evidenceLinks ?? [],
+  });
+}
 
 async function seedBlueprints(orgId: string): Promise<void> {
   await db.transaction(async (tx) => {
-    const inserted = await tx
-      .insert(solutionBlueprintSeedState)
-      .values({ orgId })
-      .onConflictDoNothing()
-      .returning({ orgId: solutionBlueprintSeedState.orgId });
-    if (!inserted.length) return;
+    const [state] = await tx
+      .select()
+      .from(solutionBlueprintSeedState)
+      .where(eq(solutionBlueprintSeedState.orgId, orgId))
+      .limit(1);
+    if ((state?.catalogVersion ?? 0) >= SOLUTION_BLUEPRINT_CATALOG_VERSION) return;
 
-    const now = new Date();
-    await tx
-      .insert(solutionBlueprints)
-      .values(
-        SEEDED_SOLUTION_BLUEPRINTS.map((seed) => ({
-          id: `sbp_${hash12(`${orgId}:${seed.key}`)}`,
+    for (const seed of SEEDED_SOLUTION_BLUEPRINTS) {
+      const id = `sbp_${hash12(`${orgId}:${seed.key}`)}`;
+      await tx
+        .insert(solutionBlueprints)
+        .values({
+          id,
           orgId,
-          ...seed.input,
-          outcome: seed.input.outcome as unknown as Record<string, unknown>,
-          proof: seed.input.proof as unknown as Record<string, unknown>,
-          createdAt: now,
-          updatedAt: now,
-        })),
-      )
-      .onConflictDoNothing();
+          currentVersion: 1,
+          sourceCatalogKey: seed.key,
+          catalogVersion: null,
+        })
+        .onConflictDoNothing();
+      const [catalog] = await tx
+        .select()
+        .from(solutionBlueprints)
+        .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
+        .limit(1);
+      if (!catalog || catalog.tombstonedAt) continue;
+
+      const next = catalog.catalogVersion ? catalog.currentVersion + 1 : 1;
+      if ((catalog.catalogVersion ?? 0) < SOLUTION_BLUEPRINT_CATALOG_VERSION) {
+        await tx.insert(solutionBlueprintVersions).values({
+          id: `sbv_${randomUUID().slice(0, 12)}`,
+          blueprintId: id,
+          orgId,
+          version: next,
+          snapshot: seed.input as unknown as Record<string, unknown>,
+          createdBy: 'system:solution-catalog',
+        });
+        await tx
+          .update(solutionBlueprints)
+          .set({
+            currentVersion: next,
+            catalogVersion: SOLUTION_BLUEPRINT_CATALOG_VERSION,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)));
+      }
+    }
+    await tx
+      .insert(solutionBlueprintSeedState)
+      .values({ orgId, catalogVersion: SOLUTION_BLUEPRINT_CATALOG_VERSION, seededAt: new Date() })
+      .onConflictDoUpdate({
+        target: solutionBlueprintSeedState.orgId,
+        set: { catalogVersion: SOLUTION_BLUEPRINT_CATALOG_VERSION, seededAt: new Date() },
+      });
   });
 }
 
-export async function listSolutionBlueprints(orgId: string): Promise<SolutionBlueprint[]> {
-  await ensureSolutionBlueprintSchema();
+async function catalogWithVersion(
+  id: string,
+  orgId: string,
+  version?: number,
+): Promise<{ catalog: SolutionBlueprintRow; version: SolutionBlueprintVersionRow } | null> {
+  const [catalog] = await db
+    .select()
+    .from(solutionBlueprints)
+    .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
+    .limit(1);
+  if (!catalog) return null;
+  const [definition] = await db
+    .select()
+    .from(solutionBlueprintVersions)
+    .where(
+      and(
+        eq(solutionBlueprintVersions.blueprintId, id),
+        eq(solutionBlueprintVersions.orgId, orgId),
+        eq(solutionBlueprintVersions.version, version ?? catalog.currentVersion),
+      ),
+    )
+    .limit(1);
+  return definition ? { catalog, version: definition } : null;
+}
+
+export async function listSolutionBlueprints(
+  orgId: string,
+  includeRetired = false,
+): Promise<SolutionBlueprint[]> {
   await seedBlueprints(orgId);
-  return (
-    await db
-      .select()
-      .from(solutionBlueprints)
-      .where(eq(solutionBlueprints.orgId, orgId))
-      .orderBy(asc(solutionBlueprints.industry), asc(solutionBlueprints.title))
-  ).map(toBlueprint);
+  const catalogs = await db
+    .select()
+    .from(solutionBlueprints)
+    .where(
+      includeRetired
+        ? eq(solutionBlueprints.orgId, orgId)
+        : and(eq(solutionBlueprints.orgId, orgId), isNull(solutionBlueprints.tombstonedAt)),
+    )
+    .orderBy(asc(solutionBlueprints.createdAt));
+  const results = await Promise.all(
+    catalogs.map((catalog) => catalogWithVersion(catalog.id, orgId)),
+  );
+  return results
+    .filter((value) => value !== null)
+    .map(({ catalog, version }) => toBlueprint(catalog, version));
 }
 
 export async function getSolutionBlueprint(
   id: string,
   orgId: string,
+  version?: number,
 ): Promise<SolutionBlueprint | null> {
-  await ensureSolutionBlueprintSchema();
   await seedBlueprints(orgId);
-  const [row] = await db
-    .select()
-    .from(solutionBlueprints)
-    .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-    .limit(1);
-  return row ? toBlueprint(row) : null;
+  const result = await catalogWithVersion(id, orgId, version);
+  return result ? toBlueprint(result.catalog, result.version) : null;
+}
+
+export async function listSolutionBlueprintVersions(
+  id: string,
+  orgId: string,
+): Promise<SolutionBlueprintVersion[]> {
+  return (
+    await db
+      .select()
+      .from(solutionBlueprintVersions)
+      .where(
+        and(
+          eq(solutionBlueprintVersions.blueprintId, id),
+          eq(solutionBlueprintVersions.orgId, orgId),
+        ),
+      )
+      .orderBy(desc(solutionBlueprintVersions.version))
+  ).map(toVersion);
 }
 
 export async function createSolutionBlueprint(
   orgId: string,
   input: SolutionBlueprintInput,
+  createdBy: string,
 ): Promise<SolutionBlueprint> {
-  await ensureSolutionBlueprintSchema();
   const errors = validateBlueprint(input);
   if (errors.length) throw new SolutionValidationError(errors);
-  const [row] = await db
-    .insert(solutionBlueprints)
-    .values({
-      ...input,
-      id: `sbp_${randomUUID().slice(0, 12)}`,
+  const id = `sbp_${randomUUID().slice(0, 12)}`;
+  await db.transaction(async (tx) => {
+    await tx.insert(solutionBlueprints).values({ id, orgId, currentVersion: 1 });
+    await tx.insert(solutionBlueprintVersions).values({
+      id: `sbv_${randomUUID().slice(0, 12)}`,
+      blueprintId: id,
       orgId,
-      outcome: input.outcome as unknown as Record<string, unknown>,
-      proof: input.proof as unknown as Record<string, unknown>,
-    })
-    .returning();
-  return toBlueprint(row);
+      version: 1,
+      snapshot: input as unknown as Record<string, unknown>,
+      createdBy,
+    });
+  });
+  return (await getSolutionBlueprint(id, orgId))!;
 }
 
 export async function updateSolutionBlueprint(
   id: string,
   orgId: string,
   patch: Partial<SolutionBlueprintInput>,
+  createdBy: string,
 ): Promise<SolutionBlueprint | null> {
   const current = await getSolutionBlueprint(id, orgId);
   if (!current) return null;
-  const merged: SolutionBlueprintInput = { ...current, ...patch };
+  if (current.tombstonedAt) throw new SolutionConflictError('blueprint is retired', 'retired');
+  const merged: SolutionBlueprintInput = {
+    title: current.title,
+    summary: current.summary,
+    industry: current.industry,
+    process: current.process,
+    businessOwner: current.businessOwner,
+    requiredDataDomains: current.requiredDataDomains,
+    requiredCapabilities: current.requiredCapabilities,
+    requiredPipelineName: current.requiredPipelineName,
+    sourceTemplateKey: current.sourceTemplateKey,
+    outcome: current.outcome,
+    proof: current.proof,
+    ...patch,
+  };
   const errors = validateBlueprint(merged);
   if (errors.length) throw new SolutionValidationError(errors);
-  const [row] = await db
-    .update(solutionBlueprints)
-    .set({
-      title: merged.title,
-      summary: merged.summary,
-      industry: merged.industry,
-      process: merged.process,
-      businessOwner: merged.businessOwner,
-      requiredDataDomains: merged.requiredDataDomains,
-      requiredTools: merged.requiredTools,
-      governedPipeline: merged.governedPipeline,
-      sourceTemplateKey: merged.sourceTemplateKey,
-      outcome: merged.outcome as unknown as Record<string, unknown>,
-      proof: merged.proof as unknown as Record<string, unknown>,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-    .returning();
-  return row ? toBlueprint(row) : null;
+  const next = current.currentVersion + 1;
+  await db.transaction(async (tx) => {
+    const advanced = await tx
+      .update(solutionBlueprints)
+      .set({ currentVersion: next, updatedAt: new Date() })
+      .where(
+        and(
+          eq(solutionBlueprints.id, id),
+          eq(solutionBlueprints.orgId, orgId),
+          eq(solutionBlueprints.currentVersion, current.currentVersion),
+        ),
+      )
+      .returning({ id: solutionBlueprints.id });
+    if (!advanced.length)
+      throw new SolutionConflictError('blueprint changed; reload and retry', 'duplicate');
+    await tx.insert(solutionBlueprintVersions).values({
+      id: `sbv_${randomUUID().slice(0, 12)}`,
+      blueprintId: id,
+      orgId,
+      version: next,
+      snapshot: merged as unknown as Record<string, unknown>,
+      createdBy,
+    });
+  });
+  return getSolutionBlueprint(id, orgId);
 }
 
+/** Retire the catalog entry; immutable versions and deployment evidence remain readable forever. */
 export async function deleteSolutionBlueprint(id: string, orgId: string): Promise<boolean> {
-  await ensureSolutionBlueprintSchema();
-  return db.transaction(async (tx) => {
-    await tx
-      .delete(solutionDeployments)
-      .where(and(eq(solutionDeployments.blueprintId, id), eq(solutionDeployments.orgId, orgId)));
-    const deleted = await tx
-      .delete(solutionBlueprints)
-      .where(and(eq(solutionBlueprints.id, id), eq(solutionBlueprints.orgId, orgId)))
-      .returning({ id: solutionBlueprints.id });
-    return deleted.length > 0;
-  });
+  const retired = await db
+    .update(solutionBlueprints)
+    .set({ tombstonedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(solutionBlueprints.id, id),
+        eq(solutionBlueprints.orgId, orgId),
+        isNull(solutionBlueprints.tombstonedAt),
+      ),
+    )
+    .returning({ id: solutionBlueprints.id });
+  return retired.length > 0;
 }
 
 export async function listSolutionDeployments(orgId: string): Promise<SolutionDeployment[]> {
-  await ensureSolutionBlueprintSchema();
   return (
     await db
       .select()
@@ -208,11 +342,53 @@ export async function listSolutionDeployments(orgId: string): Promise<SolutionDe
   ).map(toDeployment);
 }
 
+export interface SolutionDeploymentCandidate {
+  appId: string;
+  appTitle: string;
+  compatibleBlueprintIds: string[];
+  incompatibilities: Record<string, string[]>;
+}
+
+/** Server-derived adoption choices; the UI never guesses compatibility from labels. */
+export async function listSolutionDeploymentCandidates(
+  orgId: string,
+): Promise<SolutionDeploymentCandidate[]> {
+  const [blueprints, appRows] = await Promise.all([
+    listSolutionBlueprints(orgId),
+    db.select().from(apps).where(eq(apps.orgId, orgId)).orderBy(asc(apps.title)),
+  ]);
+  return Promise.all(
+    appRows.map(async (app) => {
+      const appSpec = {
+        pipelineId: app.pipelineId,
+        published: app.published,
+        steps: app.steps as never,
+      };
+      const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
+      const evaluated = blueprints.map((blueprint) => ({
+        blueprint,
+        result: evaluateSolutionCompatibility(blueprint, appSpec, pipeline),
+      }));
+      return {
+        appId: app.id,
+        appTitle: app.title,
+        compatibleBlueprintIds: evaluated
+          .filter(({ result }) => result.compatible)
+          .map(({ blueprint }) => blueprint.id),
+        incompatibilities: Object.fromEntries(
+          evaluated
+            .filter(({ result }) => !result.compatible)
+            .map(({ blueprint, result }) => [blueprint.id, result.errors]),
+        ),
+      };
+    }),
+  );
+}
+
 export async function getSolutionDeployment(
   id: string,
   orgId: string,
 ): Promise<SolutionDeployment | null> {
-  await ensureSolutionBlueprintSchema();
   const [row] = await db
     .select()
     .from(solutionDeployments)
@@ -221,53 +397,205 @@ export async function getSolutionDeployment(
   return row ? toDeployment(row) : null;
 }
 
-export async function createSolutionDeployment(
-  orgId: string,
-  input: SolutionDeploymentInput,
-): Promise<SolutionDeployment> {
-  await ensureSolutionBlueprintSchema();
-  const errors = validateDeployment(input);
-  if (errors.length) throw new SolutionValidationError(errors);
+async function compatibleBinding(orgId: string, input: SolutionDeploymentInput) {
   const [blueprint, app] = await Promise.all([
-    getSolutionBlueprint(input.blueprintId, orgId),
+    getSolutionBlueprint(input.blueprintId, orgId, input.blueprintVersion),
     db
-      .select({ id: apps.id })
+      .select()
       .from(apps)
       .where(and(eq(apps.id, input.appId), eq(apps.orgId, orgId)))
       .limit(1),
   ]);
-  if (!blueprint) throw new SolutionValidationError(['unknown blueprint']);
+  if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
   if (!app[0]) throw new SolutionValidationError(['unknown app']);
-  const [row] = await db
-    .insert(solutionDeployments)
-    .values({ id: `sdp_${randomUUID().slice(0, 12)}`, orgId, ...input })
-    .returning();
-  return toDeployment(row);
+  const appSpec = {
+    pipelineId: app[0].pipelineId,
+    published: app[0].published,
+    steps: app[0].steps as never,
+  };
+  const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
+  const compatibility = evaluateSolutionCompatibility(blueprint, appSpec, pipeline);
+  if (!compatibility.compatible || !compatibility.pipelineId) {
+    throw new SolutionConflictError(
+      'App is not compatible with the selected blueprint version',
+      'incompatible',
+      compatibility.errors,
+    );
+  }
+  return { blueprint, app: appSpec, pipelineId: compatibility.pipelineId };
+}
+
+export async function createSolutionDeployment(
+  orgId: string,
+  input: SolutionDeploymentInput,
+): Promise<SolutionDeployment> {
+  const errors = validateDeployment(input);
+  if (input.status === 'retired') errors.push('a new deployment cannot start retired');
+  if (errors.length) throw new SolutionValidationError(errors);
+  const binding = await compatibleBinding(orgId, input);
+  try {
+    const [row] = await db
+      .insert(solutionDeployments)
+      .values({
+        id: `sdp_${randomUUID().slice(0, 12)}`,
+        orgId,
+        ...input,
+        pipelineId: binding.pipelineId,
+      })
+      .returning();
+    return toDeployment(row);
+  } catch (error) {
+    if ((error as { code?: string }).code === '23505') {
+      throw new SolutionConflictError('App already has a solution deployment', 'duplicate');
+    }
+    throw error;
+  }
 }
 
 export async function updateSolutionDeployment(
   id: string,
   orgId: string,
-  patch: Partial<Pick<SolutionDeploymentInput, 'status' | 'evidenceLinks'>>,
+  patch: Partial<Pick<SolutionDeploymentInput, 'status'>>,
 ): Promise<SolutionDeployment | null> {
   const current = await getSolutionDeployment(id, orgId);
   if (!current) return null;
-  const merged = { ...current, ...patch };
+  if (patch.status === undefined) throw new SolutionValidationError(['status is required']);
+  const merged = { ...current, status: patch.status };
   const errors = validateDeployment(merged);
   if (errors.length) throw new SolutionValidationError(errors);
+  if (current.status === 'retired' && patch.status !== 'retired') {
+    throw new SolutionConflictError('retired deployments cannot be reactivated', 'retired');
+  }
+  if (patch.status === 'active') {
+    await compatibleBinding(orgId, merged);
+  }
   const [row] = await db
     .update(solutionDeployments)
-    .set({ status: merged.status, evidenceLinks: merged.evidenceLinks, updatedAt: new Date() })
+    .set({
+      status: patch.status,
+      retiredAt: patch.status === 'retired' ? new Date() : null,
+      updatedAt: new Date(),
+    })
     .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
     .returning();
   return row ? toDeployment(row) : null;
 }
 
+/** Deployment history is retired, never hard-deleted. */
 export async function deleteSolutionDeployment(id: string, orgId: string): Promise<boolean> {
-  await ensureSolutionBlueprintSchema();
-  const deleted = await db
-    .delete(solutionDeployments)
-    .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
-    .returning({ id: solutionDeployments.id });
-  return deleted.length > 0;
+  const current = await getSolutionDeployment(id, orgId);
+  if (!current) return false;
+  await updateSolutionDeployment(id, orgId, { status: 'retired' });
+  return true;
+}
+
+export async function hasSolutionDeploymentsForApp(appId: string, orgId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: solutionDeployments.id })
+    .from(solutionDeployments)
+    .where(and(eq(solutionDeployments.appId, appId), eq(solutionDeployments.orgId, orgId)))
+    .limit(1);
+  return Boolean(row);
+}
+
+export async function assertSolutionRuntimeBinding(appId: string, orgId: string): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(solutionDeployments)
+    .where(
+      and(
+        eq(solutionDeployments.appId, appId),
+        eq(solutionDeployments.orgId, orgId),
+        eq(solutionDeployments.status, 'active'),
+      ),
+    )
+    .limit(1);
+  if (!row) return;
+  try {
+    await compatibleBinding(orgId, toDeployment(row));
+  } catch (error) {
+    if (error instanceof SolutionConflictError || error instanceof SolutionValidationError) {
+      throw new SolutionConflictError(
+        'Active solution deployment drifted from its governed runtime contract',
+        'runtime-drift',
+        error instanceof SolutionConflictError ? error.errors : error.errors,
+      );
+    }
+    throw error;
+  }
+}
+
+export async function listSolutionObservations(
+  deploymentId: string,
+  orgId: string,
+): Promise<SolutionObservation[]> {
+  return (
+    await db
+      .select()
+      .from(solutionObservations)
+      .where(
+        and(
+          eq(solutionObservations.deploymentId, deploymentId),
+          eq(solutionObservations.orgId, orgId),
+        ),
+      )
+      .orderBy(desc(solutionObservations.windowEnd))
+  ).map(toObservation);
+}
+
+/** Run evidence is scoped to this binding's activation boundary; pre-adoption App history is out. */
+export async function listSolutionDeploymentRuns(deploymentId: string, orgId: string) {
+  const deployment = await getSolutionDeployment(deploymentId, orgId);
+  if (!deployment) return [];
+  return db
+    .select()
+    .from(appRuns)
+    .where(
+      and(
+        eq(appRuns.orgId, orgId),
+        eq(appRuns.appId, deployment.appId),
+        gte(appRuns.startedAt, deployment.activatedAt),
+      ),
+    )
+    .orderBy(desc(appRuns.startedAt));
+}
+
+export async function createSolutionObservation(
+  deploymentId: string,
+  orgId: string,
+  input: SolutionObservationInput,
+  createdBy: string,
+): Promise<SolutionObservation> {
+  const errors = validateObservation(input);
+  if (errors.length) throw new SolutionValidationError(errors);
+  const deployment = await getSolutionDeployment(deploymentId, orgId);
+  if (!deployment) throw new SolutionValidationError(['unknown deployment']);
+  if (input.windowStart < deployment.activatedAt) {
+    throw new SolutionValidationError(['measurement window cannot predate deployment activation']);
+  }
+  const overlap = await db
+    .select({ id: solutionObservations.id })
+    .from(solutionObservations)
+    .where(
+      and(
+        eq(solutionObservations.deploymentId, deploymentId),
+        eq(solutionObservations.orgId, orgId),
+        lt(solutionObservations.windowStart, input.windowEnd),
+        gt(solutionObservations.windowEnd, input.windowStart),
+      ),
+    );
+  if (overlap.length) {
+    throw new SolutionConflictError('measurement window overlaps existing evidence', 'duplicate');
+  }
+  const [row] = await db
+    .insert(solutionObservations)
+    .values({
+      id: `sob_${randomUUID().slice(0, 12)}`,
+      orgId,
+      deploymentId,
+      ...input,
+      createdBy,
+    })
+    .returning();
+  return toObservation(row);
 }

@@ -1,12 +1,13 @@
 import type { OutcomeContract } from '@/lib/outcome-contract';
 import type {
+  BlueprintCapability,
   BlueprintProof,
   SolutionBlueprintInput,
   SolutionDeploymentInput,
+  SolutionObservationInput,
 } from '@/lib/solution-blueprints';
 
 type JsonObject = Record<string, unknown>;
-
 const object = (value: unknown): JsonObject | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as JsonObject)
@@ -25,16 +26,15 @@ function reading(value: unknown): { value: number; label: string } {
 function outcome(value: unknown): OutcomeContract {
   const row = object(value) ?? {};
   const roi = object(row.roi) ?? {};
-  const measured =
-    row.measured === null || row.measured === undefined ? null : reading(row.measured);
   return {
     metricName: text(row.metricName),
     metricUnit: text(row.metricUnit),
-    direction: row.direction === 'decrease' ? 'decrease' : 'increase',
+    // Preserve invalid input so validation rejects it. Never default a typo to an active meaning.
+    direction: text(row.direction) as OutcomeContract['direction'],
     measurementWindow: text(row.measurementWindow),
     baseline: reading(row.baseline),
     target: reading(row.target),
-    measured,
+    measured: row.measured == null ? null : reading(row.measured),
     roi: {
       currency: text(roi.currency),
       annualBenefit: number(roi.annualBenefit),
@@ -48,8 +48,7 @@ function outcome(value: unknown): OutcomeContract {
 function proof(value: unknown): BlueprintProof {
   const row = object(value) ?? {};
   return {
-    version: text(row.version),
-    provenDeployments: number(row.provenDeployments),
+    status: text(row.status) as BlueprintProof['status'],
     summary: text(row.summary),
     evidenceLinks: list(row.evidenceLinks),
   };
@@ -65,8 +64,8 @@ export function parseBlueprintInput(value: unknown): SolutionBlueprintInput | nu
     process: text(body.process),
     businessOwner: text(body.businessOwner),
     requiredDataDomains: list(body.requiredDataDomains),
-    requiredTools: list(body.requiredTools),
-    governedPipeline: text(body.governedPipeline),
+    requiredCapabilities: list(body.requiredCapabilities) as BlueprintCapability[],
+    requiredPipelineName: text(body.requiredPipelineName),
     sourceTemplateKey: text(body.sourceTemplateKey),
     outcome: outcome(body.outcome),
     proof: proof(body.proof),
@@ -83,13 +82,15 @@ export function parseBlueprintPatch(value: unknown): Partial<SolutionBlueprintIn
     'industry',
     'process',
     'businessOwner',
-    'governedPipeline',
+    'requiredPipelineName',
     'sourceTemplateKey',
   ] as const) {
     if (key in body) patch[key] = text(body[key]);
   }
   if ('requiredDataDomains' in body) patch.requiredDataDomains = list(body.requiredDataDomains);
-  if ('requiredTools' in body) patch.requiredTools = list(body.requiredTools);
+  if ('requiredCapabilities' in body) {
+    patch.requiredCapabilities = list(body.requiredCapabilities) as BlueprintCapability[];
+  }
   if ('outcome' in body) patch.outcome = outcome(body.outcome);
   if ('proof' in body) patch.proof = proof(body.proof);
   return patch;
@@ -98,11 +99,26 @@ export function parseBlueprintPatch(value: unknown): Partial<SolutionBlueprintIn
 export function parseDeploymentInput(value: unknown): SolutionDeploymentInput | null {
   const body = object(value);
   if (!body) return null;
-  const status = body.status === 'paused' || body.status === 'retired' ? body.status : 'active';
   return {
     blueprintId: text(body.blueprintId),
+    blueprintVersion: number(body.blueprintVersion),
     appId: text(body.appId),
-    status,
+    status: text(body.status) as SolutionDeploymentInput['status'],
+  };
+}
+
+export function parseObservationInput(value: unknown): SolutionObservationInput | null {
+  const body = object(value);
+  if (!body) return null;
+  return {
+    windowStart: new Date(text(body.windowStart)),
+    windowEnd: new Date(text(body.windowEnd)),
+    metricValue: number(body.metricValue),
+    metricLabel: text(body.metricLabel),
+    runsCompleted: number(body.runsCompleted),
+    minutesSavedPerRun: number(body.minutesSavedPerRun),
+    loadedCostPerHour: number(body.loadedCostPerHour),
+    actualAiCost: number(body.actualAiCost),
     evidenceLinks: list(body.evidenceLinks),
   };
 }

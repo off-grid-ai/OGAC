@@ -2,18 +2,26 @@ import { ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { DeploymentForm } from '@/components/solutions/DeploymentForm';
 import { listApps } from '@/lib/apps-store';
-import { listSolutionBlueprints, listSolutionDeployments } from '@/lib/solution-blueprints-store';
+import {
+  listSolutionBlueprints,
+  listSolutionDeploymentCandidates,
+  listSolutionDeployments,
+} from '@/lib/solution-blueprints-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DeployedSolutionsPage() {
+export default async function DeployedSolutionsPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ blueprint?: string }> }>) {
   const orgId = await currentOrgId();
-  const [blueprints, deployments, apps] = await Promise.all([
+  const [blueprints, deployments, apps, candidates] = await Promise.all([
     listSolutionBlueprints(orgId),
     listSolutionDeployments(orgId),
     listApps(orgId),
+    listSolutionDeploymentCandidates(orgId),
   ]);
+  const selectedBlueprintId = (await searchParams).blueprint;
   const blueprintById = new Map(blueprints.map((blueprint) => [blueprint.id, blueprint]));
   const appById = new Map(apps.map((app) => [app.id, app]));
   return (
@@ -33,8 +41,21 @@ export default async function DeployedSolutionsPage() {
         <div className="border-t p-4">
           {apps.length ? (
             <DeploymentForm
-              blueprints={blueprints.map((item) => ({ id: item.id, label: item.title }))}
-              apps={apps.map((item) => ({ id: item.id, label: item.title }))}
+              selectedBlueprintId={
+                blueprints.some((item) => item.id === selectedBlueprintId)
+                  ? selectedBlueprintId
+                  : undefined
+              }
+              blueprints={blueprints.map((item) => ({
+                id: item.id,
+                label: `${item.title} · v${item.currentVersion}`,
+                version: item.currentVersion,
+              }))}
+              apps={candidates.map((item) => ({
+                id: item.appId,
+                label: item.appTitle,
+                compatibleBlueprintIds: item.compatibleBlueprintIds,
+              }))}
             />
           ) : (
             <p className="text-sm text-muted-foreground">

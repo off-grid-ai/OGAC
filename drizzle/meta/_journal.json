@@ -71,6 +71,13 @@
       "when": 1783327434609,
       "tag": "0009_misty_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784283498285,
+      "tag": "0010_solution_blueprint_contracts",
+      "breakpoints": true
     }
   ]
 }

@@ -38,7 +38,7 @@ export default async function BlueprintDetailPage({
             <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{blueprint.summary}</p>
           </div>
           <Link
-            href="/solutions/deployed"
+            href={`/solutions/deployed?blueprint=${encodeURIComponent(blueprint.id)}`}
             className="inline-flex items-center gap-2 text-sm text-primary"
           >
             Deploy through an existing App <ArrowRight />
@@ -55,12 +55,7 @@ export default async function BlueprintDetailPage({
             'Target',
             `${blueprint.outcome.target.value.toLocaleString()} ${blueprint.outcome.metricUnit}`,
           ],
-          [
-            'Measured',
-            blueprint.outcome.measured
-              ? `${blueprint.outcome.measured.value.toLocaleString()} ${blueprint.outcome.metricUnit}`
-              : 'Not measured yet',
-          ],
+          ['Definition version', `v${blueprint.currentVersion}`],
           [
             '1Y net value',
             `${blueprint.outcome.roi.currency} ${outcome.firstYearNetValue.toLocaleString()}`,
@@ -89,21 +84,24 @@ export default async function BlueprintDetailPage({
               <dd className="mt-1">{blueprint.requiredDataDomains.join(' · ')}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Tools</dt>
-              <dd className="mt-1">{blueprint.requiredTools.join(' · ')}</dd>
+              <dt className="text-muted-foreground">Capabilities</dt>
+              <dd className="mt-1">{blueprint.requiredCapabilities.join(' · ')}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Governed pipeline</dt>
-              <dd className="mt-1">{blueprint.governedPipeline}</dd>
+              <dd className="mt-1">{blueprint.requiredPipelineName}</dd>
             </div>
           </dl>
         </section>
         <section className="rounded-lg border bg-card p-5">
           <h2 className="text-sm font-medium">Benchmark & proof</h2>
-          <p className="mt-3 text-sm text-muted-foreground">{blueprint.proof.summary}</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {blueprint.proof.status === 'verified'
+              ? blueprint.proof.summary
+              : 'Unverified starter hypothesis — no production proof is claimed.'}
+          </p>
           <p className="mt-4 text-xs">
-            Version {blueprint.proof.version} · repeated across {blueprint.proof.provenDeployments}{' '}
-            deployments
+            Definition v{blueprint.currentVersion} · evidence {blueprint.proof.status}
           </p>
           {blueprint.proof.evidenceLinks.map((href) => (
             <Link key={href} href={href} className="mt-3 block text-xs text-primary">

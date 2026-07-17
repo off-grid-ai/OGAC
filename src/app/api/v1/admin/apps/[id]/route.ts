@@ -11,6 +11,7 @@ import {
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
+import { hasSolutionDeploymentsForApp } from '@/lib/solution-blueprints-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,6 +86,16 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
+  if (await hasSolutionDeploymentsForApp(id, orgId)) {
+    return NextResponse.json(
+      {
+        error: 'App is retained by solution deployment history',
+        code: 'referenced',
+        action: 'retire the deployment instead',
+      },
+      { status: 409 },
+    );
+  }
   await deleteApp(id, orgId);
   // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
   await unscheduleApp(id);

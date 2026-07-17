@@ -4,28 +4,35 @@ import { Plus, Trash } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { SolutionDeployment } from '@/lib/solution-blueprints';
-import { splitList } from '@/lib/solution-blueprints';
 
 interface Option {
   id: string;
   label: string;
+  version?: number;
+  compatibleBlueprintIds?: string[];
 }
 
 export function DeploymentForm({
   deployment,
   blueprints = [],
   apps = [],
-}: Readonly<{ deployment?: SolutionDeployment; blueprints?: Option[]; apps?: Option[] }>) {
+  selectedBlueprintId,
+}: Readonly<{
+  deployment?: SolutionDeployment;
+  blueprints?: Option[];
+  apps?: Option[];
+  selectedBlueprintId?: string;
+}>) {
   const router = useRouter();
   const [blueprintId, setBlueprintId] = useState(
-    deployment?.blueprintId ?? blueprints[0]?.id ?? '',
+    deployment?.blueprintId ?? selectedBlueprintId ?? blueprints[0]?.id ?? '',
   );
-  const [appId, setAppId] = useState(deployment?.appId ?? apps[0]?.id ?? '');
+  const compatibleApps = apps.filter((app) => app.compatibleBlueprintIds?.includes(blueprintId));
+  const [appId, setAppId] = useState(deployment?.appId ?? '');
   const [status, setStatus] = useState(deployment?.status ?? 'active');
-  const [evidence, setEvidence] = useState((deployment?.evidenceLinks ?? []).join(', '));
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const endpoint = deployment
     ? `/api/v1/admin/solution-deployments/${deployment.id}`
     : '/api/v1/admin/solution-deployments';
@@ -33,18 +40,28 @@ export function DeploymentForm({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
-    const response = await fetch(endpoint, {
-      method: deployment ? 'PATCH' : 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ blueprintId, appId, status, evidenceLinks: splitList(evidence) }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError((result.errors ?? [result.error ?? 'Unable to save']).join(' · '));
-      return;
+    setSaving(true);
+    try {
+      const blueprintVersion = blueprints.find((item) => item.id === blueprintId)?.version;
+      const response = await fetch(endpoint, {
+        method: deployment ? 'PATCH' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(
+          deployment ? { status } : { blueprintId, blueprintVersion, appId, status },
+        ),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError((result.errors ?? [result.error ?? 'Unable to save']).join(' · '));
+        return;
+      }
+      if (deployment) router.refresh();
+      else router.push(`/solutions/deployed/${result.id}`);
+    } catch {
+      setError('Unable to reach the control plane. Try again.');
+    } finally {
+      setSaving(false);
     }
-    if (deployment) router.refresh();
-    else router.push(`/solutions/deployed/${result.id}`);
   }
 
   async function remove() {
@@ -53,9 +70,17 @@ export function DeploymentForm({
       !window.confirm('Remove this deployment binding? The App and its runs will remain intact.')
     )
       return;
-    if ((await fetch(endpoint, { method: 'DELETE' })).ok) {
+    try {
+      const response = await fetch(endpoint, { method: 'DELETE' });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        setError(result.error ?? 'Unable to retire deployment');
+        return;
+      }
       router.push('/solutions/deployed');
       router.refresh();
+    } catch {
+      setError('Unable to reach the control plane. Try again.');
     }
   }
 
@@ -70,7 +95,10 @@ export function DeploymentForm({
               required
               className={selectClass}
               value={blueprintId}
-              onChange={(e) => setBlueprintId(e.target.value)}
+              onChange={(e) => {
+                setBlueprintId(e.target.value);
+                setAppId('');
+              }}
             >
               {blueprints.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -87,7 +115,8 @@ export function DeploymentForm({
               value={appId}
               onChange={(e) => setAppId(e.target.value)}
             >
-              {apps.map((option) => (
+              <option value="">Select a compatible App</option>
+              {compatibleApps.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
                 </option>
@@ -108,10 +137,12 @@ export function DeploymentForm({
           <option value="retired">Retired</option>
         </select>
       </label>
-      <label className="space-y-1 text-xs text-muted-foreground">
-        Evidence links
-        <Input value={evidence} onChange={(e) => setEvidence(e.target.value)} />
-      </label>
+      {!deployment && blueprintId && compatibleApps.length === 0 ? (
+        <p role="status" className="text-xs text-amber-600 lg:col-span-2">
+          No published App currently satisfies this Blueprint version&apos;s pipeline, domain, and
+          capability contract.
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-xs text-destructive lg:col-span-4">
           {error}
@@ -125,9 +156,9 @@ export function DeploymentForm({
         ) : (
           <span />
         )}
-        <Button disabled={!blueprintId || !appId}>
+        <Button disabled={saving || (!deployment && (!blueprintId || !appId))}>
           <Plus />
-          {deployment ? 'Save deployment' : 'Bind existing App'}
+          {saving ? 'Saving…' : deployment ? 'Save deployment' : 'Adopt Blueprint'}
         </Button>
       </div>
     </form>

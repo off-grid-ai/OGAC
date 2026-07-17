@@ -5,9 +5,9 @@ import type { SolutionDeploymentInput } from '@/lib/solution-blueprints';
 import {
   deleteSolutionDeployment,
   getSolutionDeployment,
-  SolutionValidationError,
   updateSolutionDeployment,
 } from '@/lib/solution-blueprints-store';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 type Context = { params: Promise<{ id: string }> };
@@ -28,14 +28,9 @@ export async function PATCH(req: Request, { params }: Context) {
   if (!body) return NextResponse.json({ error: 'a JSON patch is required' }, { status: 400 });
   const { id } = await params;
   const orgId = await currentOrgId();
-  const patch: Partial<Pick<SolutionDeploymentInput, 'status' | 'evidenceLinks'>> = {};
+  const patch: Partial<Pick<SolutionDeploymentInput, 'status'>> = {};
   if (body.status === 'active' || body.status === 'paused' || body.status === 'retired') {
     patch.status = body.status;
-  }
-  if (Array.isArray(body.evidenceLinks)) {
-    patch.evidenceLinks = body.evidenceLinks.filter(
-      (link): link is string => typeof link === 'string',
-    );
   }
   try {
     const updated = await updateSolutionDeployment(id, orgId, patch);
@@ -47,11 +42,8 @@ export async function PATCH(req: Request, { params }: Context) {
     });
     return NextResponse.json(updated);
   } catch (error) {
-    if (error instanceof SolutionValidationError)
-      return NextResponse.json(
-        { error: 'invalid deployment', errors: error.errors },
-        { status: 422 },
-      );
+    const response = solutionErrorResponse(error);
+    if (response) return response;
     throw error;
   }
 }

@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { parseDeploymentInput } from '@/lib/solution-blueprint-request';
-import {
-  createSolutionDeployment,
-  listSolutionDeployments,
-  SolutionValidationError,
-} from '@/lib/solution-blueprints-store';
+import { createSolutionDeployment, listSolutionDeployments } from '@/lib/solution-blueprints-store';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 export async function GET(req: Request) {
@@ -33,11 +30,8 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    if (error instanceof SolutionValidationError)
-      return NextResponse.json(
-        { error: 'invalid deployment', errors: error.errors },
-        { status: 422 },
-      );
+    const response = solutionErrorResponse(error);
+    if (response) return response;
     throw error;
   }
 }

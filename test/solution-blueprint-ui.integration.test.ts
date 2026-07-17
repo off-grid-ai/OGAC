@@ -11,16 +11,14 @@ test('the rendered blueprint create journey exposes requirements, outcome, ROI a
     'Blueprint name',
     'Business owner',
     'Required data domains',
-    'Governed pipeline',
+    'Required governed pipeline',
     'Outcome contract',
     'Baseline',
     'Target',
-    'Measured',
     'Justifiable ROI',
     'Annual benefit',
     'Implementation cost',
-    'Proof version',
-    'Proven deployments',
+    'Evidence status',
   ])
     assert.match(html, new RegExp(label));
   assert.match(html, /Create blueprint/);
@@ -29,13 +27,19 @@ test('the rendered blueprint create journey exposes requirements, outcome, ROI a
 test('deployment creation visibly binds a blueprint to a canonical App', () => {
   const html = renderToStaticMarkup(
     createElement(DeploymentForm, {
-      blueprints: [{ id: 'bp-1', label: 'Delinquency Intervention' }],
-      apps: [{ id: 'app-1', label: 'Collections App' }],
+      blueprints: [{ id: 'bp-1', label: 'Delinquency Intervention', version: 2 }],
+      apps: [
+        {
+          id: 'app-1',
+          label: 'Collections App',
+          compatibleBlueprintIds: ['bp-1'],
+        },
+      ],
     }),
   );
   assert.match(html, />Blueprint</);
   assert.match(html, />Canonical App</);
   assert.match(html, /Delinquency Intervention/);
   assert.match(html, /Collections App/);
-  assert.match(html, /Bind existing App/);
+  assert.match(html, /Adopt Blueprint/);
 });

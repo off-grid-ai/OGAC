@@ -6,10 +6,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { SolutionBlueprint } from '@/lib/solution-blueprints';
+import type { SolutionBlueprint, SolutionBlueprintInput } from '@/lib/solution-blueprints';
 import { splitList } from '@/lib/solution-blueprints';
 
-type EditableBlueprint = Omit<SolutionBlueprint, 'id' | 'orgId' | 'createdAt' | 'updatedAt'>;
+type EditableBlueprint = SolutionBlueprintInput;
 
 const EMPTY: EditableBlueprint = {
   title: '',
@@ -18,8 +18,8 @@ const EMPTY: EditableBlueprint = {
   process: '',
   businessOwner: '',
   requiredDataDomains: [],
-  requiredTools: [],
-  governedPipeline: '',
+  requiredCapabilities: ['grounded-inference'],
+  requiredPipelineName: '',
   sourceTemplateKey: '',
   outcome: {
     metricName: '',
@@ -37,8 +37,24 @@ const EMPTY: EditableBlueprint = {
       rationale: '',
     },
   },
-  proof: { version: '', provenDeployments: 0, summary: '', evidenceLinks: [] },
+  proof: { status: 'unverified', summary: '', evidenceLinks: [] },
 };
+
+function editable(blueprint: SolutionBlueprint): EditableBlueprint {
+  return {
+    title: blueprint.title,
+    summary: blueprint.summary,
+    industry: blueprint.industry,
+    process: blueprint.process,
+    businessOwner: blueprint.businessOwner,
+    requiredDataDomains: blueprint.requiredDataDomains,
+    requiredCapabilities: blueprint.requiredCapabilities,
+    requiredPipelineName: blueprint.requiredPipelineName,
+    sourceTemplateKey: blueprint.sourceTemplateKey,
+    outcome: blueprint.outcome,
+    proof: blueprint.proof,
+  };
+}
 
 function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
@@ -51,7 +67,7 @@ function Field({ label, children }: Readonly<{ label: string; children: React.Re
 
 export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlueprint }>) {
   const router = useRouter();
-  const [model, setModel] = useState<EditableBlueprint>(blueprint ?? EMPTY);
+  const [model, setModel] = useState<EditableBlueprint>(blueprint ? editable(blueprint) : EMPTY);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const endpoint = blueprint
@@ -82,7 +98,9 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
   async function remove() {
     if (
       !blueprint ||
-      !window.confirm(`Delete ${blueprint.title}? Deployed bindings will also be removed.`)
+      !window.confirm(
+        `Retire ${blueprint.title}? Existing versions, deployments, and evidence remain.`,
+      )
     )
       return;
     const response = await fetch(endpoint, { method: 'DELETE' });
@@ -137,18 +155,23 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
             onChange={(e) => set('requiredDataDomains', splitList(e.target.value))}
           />
         </Field>
-        <Field label="Required tools">
+        <Field label="Required capabilities">
           <Input
             required
-            value={model.requiredTools.join(', ')}
-            onChange={(e) => set('requiredTools', splitList(e.target.value))}
+            value={model.requiredCapabilities.join(', ')}
+            onChange={(e) =>
+              set(
+                'requiredCapabilities',
+                splitList(e.target.value) as EditableBlueprint['requiredCapabilities'],
+              )
+            }
           />
         </Field>
-        <Field label="Governed pipeline">
+        <Field label="Required governed pipeline">
           <Input
             required
-            value={model.governedPipeline}
-            onChange={(e) => set('governedPipeline', e.target.value)}
+            value={model.requiredPipelineName}
+            onChange={(e) => set('requiredPipelineName', e.target.value)}
           />
         </Field>
         <Field label="Source app template">
@@ -164,7 +187,8 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
         <div>
           <h3 className="text-sm font-medium">Outcome contract</h3>
           <p className="text-xs text-muted-foreground">
-            Baseline, target, measurement window, and current production result.
+            Reusable baseline, target, and measurement protocol. Tenant results are recorded on the
+            deployed solution.
           </p>
         </div>
         <div className="grid gap-4 lg:grid-cols-4">
@@ -247,34 +271,6 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
               />
             </div>
           </Field>
-          <Field label="Measured (optional)">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Label"
-                value={model.outcome.measured?.label ?? ''}
-                onChange={(e) =>
-                  updateOutcome({
-                    measured: { label: e.target.value, value: model.outcome.measured?.value ?? 0 },
-                  })
-                }
-              />
-              <Input
-                type="number"
-                value={model.outcome.measured?.value ?? ''}
-                onChange={(e) =>
-                  updateOutcome({
-                    measured:
-                      e.target.value === ''
-                        ? null
-                        : {
-                            label: model.outcome.measured?.label ?? 'Measured',
-                            value: Number(e.target.value),
-                          },
-                  })
-                }
-              />
-            </div>
-          </Field>
         </div>
       </section>
 
@@ -330,23 +326,18 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
         </Field>
       </section>
 
-      <section className="grid gap-4 border-t pt-4 lg:grid-cols-4">
-        <Field label="Proof version">
-          <Input
-            required
-            value={model.proof.version}
-            onChange={(e) => updateProof({ version: e.target.value })}
-          />
-        </Field>
-        <Field label="Proven deployments">
-          <Input
-            required
-            type="number"
-            min="0"
-            step="1"
-            value={model.proof.provenDeployments}
-            onChange={(e) => updateProof({ provenDeployments: Number(e.target.value) })}
-          />
+      <section className="grid gap-4 border-t pt-4 lg:grid-cols-3">
+        <Field label="Evidence status">
+          <select
+            className="h-9 w-full rounded-md border bg-background px-3"
+            value={model.proof.status}
+            onChange={(e) =>
+              updateProof({ status: e.target.value as EditableBlueprint['proof']['status'] })
+            }
+          >
+            <option value="unverified">Unverified</option>
+            <option value="verified">Verified</option>
+          </select>
         </Field>
         <Field label="Proof summary">
           <Input
@@ -378,7 +369,7 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
         )}
         <Button disabled={saving}>
           {blueprint ? <FloppyDisk /> : <Plus />}
-          {saving ? 'Saving…' : blueprint ? 'Save blueprint' : 'Create blueprint'}
+          {saving ? 'Saving…' : blueprint ? 'Create new version' : 'Create blueprint'}
         </Button>
       </div>
     </form>

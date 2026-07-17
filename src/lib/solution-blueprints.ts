@@ -122,6 +122,14 @@ export function validateBlueprint(input: SolutionBlueprintInput): string[] {
   for (const [label, value] of required) if (!value.trim()) errors.push(`${label} is required`);
   if (!nonEmptyList(input.requiredDataDomains)) errors.push('at least one data domain is required');
   if (!nonEmptyList(input.requiredCapabilities)) errors.push('at least one capability is required');
+  if (
+    input.requiredCapabilities.some(
+      (capability) =>
+        !['grounded-inference', 'human-approval', 'report-output'].includes(capability),
+    )
+  ) {
+    errors.push('invalid required capability');
+  }
   if (!['unverified', 'verified'].includes(input.proof.status)) errors.push('invalid proof status');
   if (input.proof.status === 'verified' && !input.proof.summary.trim()) {
     errors.push('verified proof requires a summary');

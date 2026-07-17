@@ -38,6 +38,9 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 export function validateOutcomeContract(contract: OutcomeContract): string[] {
   const errors: string[] = [];
+  if (contract.direction !== 'increase' && contract.direction !== 'decrease') {
+    errors.push('direction must be increase or decrease');
+  }
   if (!contract.metricName.trim()) errors.push('metric name is required');
   if (!contract.metricUnit.trim()) errors.push('metric unit is required');
   if (!contract.measurementWindow.trim()) errors.push('measurement window is required');
