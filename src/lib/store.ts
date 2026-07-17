@@ -36,18 +36,10 @@ import type { ChatBindingGovernance } from '@/lib/chat-pipeline-policy';
 import type { CheckResult } from '@/lib/checks';
 // The live connector query path lives in connector-exec.ts (Builder Epic Phase 0). `recordCount`
 // backs realRecordCount below; execConnectorQuery is re-exported so callers keep one import site.
-import type {
-  ActivityQuery,
-  ActivityRow,
-  ProvenanceCoverage,
-} from '@/lib/compliance-activity';
+import type { ActivityQuery, ActivityRow, ProvenanceCoverage } from '@/lib/compliance-activity';
 import { recordCount } from '@/lib/connector-exec';
 export { execConnectorQuery, recordCount } from '@/lib/connector-exec';
-export type {
-  ConnectorTarget,
-  ConnectorQuery,
-  ConnectorQueryResult,
-} from '@/lib/connector-exec';
+export type { ConnectorTarget, ConnectorQuery, ConnectorQueryResult } from '@/lib/connector-exec';
 import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
 import { emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
@@ -61,16 +53,28 @@ let orgEnsure: Promise<void> | null = null;
 export async function ensureOrgSchema(): Promise<void> {
   if (orgEnsure) return orgEnsure;
   orgEnsure = (async (): Promise<void> => {
-    await db.execute(sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS policy text NOT NULL DEFAULT 'approval';`);
-    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS endpoint text NOT NULL DEFAULT '';`);
-    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`);
-    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`);
-    await db.execute(sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`);
+    await db.execute(
+      sql`ALTER TABLE tools ADD COLUMN IF NOT EXISTS policy text NOT NULL DEFAULT 'approval';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS endpoint text NOT NULL DEFAULT '';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS auth text NOT NULL DEFAULT 'none';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE connectors ADD COLUMN IF NOT EXISTS custom boolean NOT NULL DEFAULT false;`,
+    );
     // Agent-owned pipeline binding. Existing rows remain deliberately unbound; they must not start
     // inheriting chat governance merely because this column was introduced.
     await db.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS pipeline_id text;`);
     // Wave-2 hardening: ingest jobs get a tenant scope, devices get a random data-plane secret.
-    await db.execute(sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`);
+    await db.execute(
+      sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
     await db.execute(sql`ALTER TABLE devices ADD COLUMN IF NOT EXISTS token text;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS org_settings (
@@ -78,7 +82,9 @@ export async function ensureOrgSchema(): Promise<void> {
         updated_at timestamptz NOT NULL DEFAULT now(), updated_by text NOT NULL DEFAULT '');
     `);
     // Governed chat binding (CONSUMERS-BIND #166): org-default chat pipeline + available-for-chat set.
-    await db.execute(sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS default_chat_pipeline_id text;`);
+    await db.execute(
+      sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS default_chat_pipeline_id text;`,
+    );
     await db.execute(
       sql`ALTER TABLE org_settings ADD COLUMN IF NOT EXISTS chat_pipeline_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb;`,
     );
@@ -91,7 +97,9 @@ export async function ensureOrgSchema(): Promise<void> {
     // Re-home the legacy singleton onto DEFAULT_ORG. If a 'default' row already exists (a partially
     // migrated DB), the bare UPDATE would collide on the PK — so drop the stale 'org' row in that
     // case and only rename it when no 'default' row is present yet. Idempotent + safe to re-run.
-    await db.execute(sql`DELETE FROM org_settings WHERE id = 'org' AND EXISTS (SELECT 1 FROM org_settings WHERE id = 'default');`);
+    await db.execute(
+      sql`DELETE FROM org_settings WHERE id = 'org' AND EXISTS (SELECT 1 FROM org_settings WHERE id = 'default');`,
+    );
     await db.execute(sql`UPDATE org_settings SET id = 'default' WHERE id = 'org';`);
     // ─── SECURITY WAVE 1 — tenant-scope columns on the shared tables (Job A) ────────────────────
     // Each is idempotent (ADD COLUMN IF NOT EXISTS) so it self-migrates on first use + can be applied
@@ -551,8 +559,12 @@ async function ensureAuditV2(): Promise<void> {
       );
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_ts_idx ON audit_events_v2 (ts DESC);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_actor_idx ON audit_events_v2 (actor_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_action_idx ON audit_events_v2 (action);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS audit_v2_actor_idx ON audit_events_v2 (actor_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS audit_v2_action_idx ON audit_events_v2 (action);`,
+    );
     await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_v2_org_idx ON audit_events_v2 (org);`);
   })();
   return auditV2Ensure;
@@ -970,7 +982,11 @@ export async function listIngestJobs(
 }
 
 export async function listMaskingRules(orgId: string = DEFAULT_ORG): Promise<MaskingRule[]> {
-  const rows = await db.select().from(maskingRules).where(eq(maskingRules.orgId, orgId)).orderBy(desc(maskingRules.createdAt));
+  const rows = await db
+    .select()
+    .from(maskingRules)
+    .where(eq(maskingRules.orgId, orgId))
+    .orderBy(desc(maskingRules.createdAt));
   return rows.map((r) => ({ id: r.id, kind: r.kind, action: r.action, enabled: r.enabled }));
 }
 
@@ -1002,7 +1018,11 @@ export async function setMaskingRuleEnabled(
 }
 
 export async function listDatasets(orgId: string = DEFAULT_ORG): Promise<Dataset[]> {
-  const rows = await db.select().from(datasets).where(eq(datasets.orgId, orgId)).orderBy(desc(datasets.updatedAt));
+  const rows = await db
+    .select()
+    .from(datasets)
+    .where(eq(datasets.orgId, orgId))
+    .orderBy(desc(datasets.updatedAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -1189,7 +1209,11 @@ function toRoutingRule(r: typeof routingRules.$inferSelect): RoutingRule {
 }
 
 export async function listRoutingRules(orgId: string = DEFAULT_ORG): Promise<RoutingRule[]> {
-  const rows = await db.select().from(routingRules).where(eq(routingRules.orgId, orgId)).orderBy(routingRules.priority);
+  const rows = await db
+    .select()
+    .from(routingRules)
+    .where(eq(routingRules.orgId, orgId))
+    .orderBy(routingRules.priority);
   return rows.map(toRoutingRule);
 }
 
@@ -1494,7 +1518,11 @@ function toGovernance(r: typeof governanceItems.$inferSelect): GovernanceItem {
 }
 
 export async function listGovernance(orgId: string = DEFAULT_ORG): Promise<GovernanceItem[]> {
-  const rows = await db.select().from(governanceItems).where(eq(governanceItems.orgId, orgId)).orderBy(governanceItems.kind);
+  const rows = await db
+    .select()
+    .from(governanceItems)
+    .where(eq(governanceItems.orgId, orgId))
+    .orderBy(governanceItems.kind);
   return rows.map(toGovernance);
 }
 
@@ -1601,7 +1629,10 @@ export async function setApiKeyEnabled(
   enabled: boolean,
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
-  await db.update(apiKeys).set({ enabled }).where(and(eq(apiKeys.id, id), eq(apiKeys.orgId, orgId)));
+  await db
+    .update(apiKeys)
+    .set({ enabled })
+    .where(and(eq(apiKeys.id, id), eq(apiKeys.orgId, orgId)));
 }
 
 // Tenant-scoped: org A cannot delete org B's API key via a guessed id (P1 IDOR).
@@ -1624,7 +1655,11 @@ export interface Tool {
 
 export async function listTools(orgId: string = DEFAULT_ORG): Promise<Tool[]> {
   await ensureOrgSchema();
-  const rows = await db.select().from(tools).where(eq(tools.orgId, orgId)).orderBy(desc(tools.createdAt));
+  const rows = await db
+    .select()
+    .from(tools)
+    .where(eq(tools.orgId, orgId))
+    .orderBy(desc(tools.createdAt));
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -1646,7 +1681,11 @@ export async function createTool(input: {
   await ensureOrgSchema();
   const [row] = await db
     .insert(tools)
-    .values({ id: `tool_${randomUUID().slice(0, 8)}`, policy: input.policy ?? 'approval', ...input })
+    .values({
+      id: `tool_${randomUUID().slice(0, 8)}`,
+      policy: input.policy ?? 'approval',
+      ...input,
+    })
     .returning();
   return {
     id: row.id,
@@ -1878,6 +1917,20 @@ export async function listCustomAgents(orgId: string = DEFAULT_ORG): Promise<Cus
     .select()
     .from(customAgents)
     .where(eq(customAgents.orgId, orgId))
+    .orderBy(desc(customAgents.createdAt));
+  return rows.map(toCustomAgent);
+}
+
+/** Runtime/legacy agents explicitly bound to a pipeline, org-scoped for lifecycle safety. */
+export async function listCustomAgentsByPipeline(
+  pipelineId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<CustomAgent[]> {
+  await ensureOrgSchema();
+  const rows = await db
+    .select()
+    .from(customAgents)
+    .where(and(eq(customAgents.pipelineId, pipelineId), eq(customAgents.orgId, orgId)))
     .orderBy(desc(customAgents.createdAt));
   return rows.map(toCustomAgent);
 }
