@@ -163,7 +163,7 @@ export function ServicesDirectory({
                   : 'text-amber-500'
               }
             >
-              {upCount}/{checkedCount} healthy
+              {upCount}/{checkedCount} probes non-failing
             </span>
             <div className="text-[10px] text-muted-foreground">
               checked {new Date(checkedAt).toLocaleTimeString()}
