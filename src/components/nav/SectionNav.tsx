@@ -23,7 +23,10 @@ export function SectionNav({ section }: Readonly<{ section: IaSectionId }>) {
 
   return (
     <SubNav>
-      <nav className="flex flex-wrap items-center gap-1" aria-label={`${definition.label} navigation`}>
+      <nav
+        className="flex flex-wrap items-center gap-1"
+        aria-label={`${definition.label} navigation`}
+      >
         <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
           {definition.label}
         </span>

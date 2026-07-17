@@ -33,17 +33,41 @@ export interface PipelineTabDef {
 
 // The tabs in reading order. `overview` is the landing (/pipelines/<id>); the rest hang off it.
 const TAB_META: { tab: PipelineTab; label: string; hint: string }[] = [
-  { tab: 'overview', label: 'Overview', hint: 'What this pipeline is, its binding, and its data ceiling' },
-  { tab: 'routing', label: 'Gateway & Routing', hint: 'The gateway it runs on + the routing/egress leash' },
-  { tab: 'policy', label: 'Policy', hint: 'ABAC policy overlay — inherits org defaults, tightens locked controls' },
-  { tab: 'guardrails', label: 'Guardrails', hint: 'PII masking, injection, grounding — scoped to this pipeline' },
+  {
+    tab: 'overview',
+    label: 'Overview',
+    hint: 'What this pipeline is, its binding, and its data ceiling',
+  },
+  {
+    tab: 'routing',
+    label: 'Gateway & Routing',
+    hint: 'The gateway it runs on + the routing/egress leash',
+  },
+  {
+    tab: 'policy',
+    label: 'Policy',
+    hint: 'ABAC policy overlay — inherits org defaults, tightens locked controls',
+  },
+  {
+    tab: 'guardrails',
+    label: 'Guardrails',
+    hint: 'PII masking, injection, grounding — scoped to this pipeline',
+  },
   { tab: 'quality', label: 'Quality', hint: 'Evals + golden set run in this pipeline’s context' },
   { tab: 'drift', label: 'Drift', hint: 'Quality drift over this pipeline’s run history' },
-  { tab: 'observability', label: 'Observability', hint: 'Traces, latency, and tokens for this pipeline’s runs' },
+  {
+    tab: 'observability',
+    label: 'Observability',
+    hint: 'Traces, latency, and tokens for this pipeline’s runs',
+  },
   { tab: 'audit', label: 'Audit', hint: 'Every governed decision this pipeline made' },
   { tab: 'cost', label: 'Cost', hint: 'Spend attributed to this pipeline → its gateway/model' },
   { tab: 'api', label: 'API', hint: 'Provisioned endpoint + key to consume this pipeline' },
-  { tab: 'versions', label: 'Versions', hint: 'Immutable version history — every publish and edit' },
+  {
+    tab: 'versions',
+    label: 'Versions',
+    hint: 'Immutable version history — every publish and edit',
+  },
 ];
 
 const KNOWN: PipelineTab[] = TAB_META.map((m) => m.tab);
@@ -96,16 +120,36 @@ export function pipelineTransitions(status: string): PipelineTransition[] {
   switch (status) {
     case 'draft':
       return [
-        { action: 'publish', to: 'published', label: 'Publish', hint: 'Freeze this version and make it consumable' },
-        { action: 'archive', to: 'archived', label: 'Archive', hint: 'Retire this pipeline — consumers fall back to the org default' },
+        {
+          action: 'publish',
+          to: 'published',
+          label: 'Publish',
+          hint: 'Freeze this version and make it consumable',
+        },
+        {
+          action: 'archive',
+          to: 'archived',
+          label: 'Archive',
+          hint: 'Retire this pipeline — consumers fall back to the org default',
+        },
       ];
     case 'published':
       return [
-        { action: 'archive', to: 'archived', label: 'Archive', hint: 'Retire this pipeline — consumers fall back to the org default' },
+        {
+          action: 'archive',
+          to: 'archived',
+          label: 'Archive',
+          hint: 'Retire this pipeline — consumers fall back to the org default',
+        },
       ];
     case 'archived':
       return [
-        { action: 'unarchive', to: 'draft', label: 'Restore', hint: 'Bring this pipeline back as a draft to edit and re-publish' },
+        {
+          action: 'unarchive',
+          to: 'draft',
+          label: 'Restore',
+          hint: 'Bring this pipeline back as a draft to edit and re-publish',
+        },
       ];
     default:
       return [];

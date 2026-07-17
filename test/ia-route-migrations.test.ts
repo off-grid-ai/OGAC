@@ -16,10 +16,7 @@ test('IA migrations have one owner for every legacy prefix', () => {
 });
 
 test('old deep links resolve directly to canonical entity owners', () => {
-  assert.equal(
-    canonicalPath('/build/apps/app-42/runs/run-7'),
-    '/solutions/apps/app-42/runs/run-7',
-  );
+  assert.equal(canonicalPath('/build/apps/app-42/runs/run-7'), '/solutions/apps/app-42/runs/run-7');
   assert.equal(
     canonicalPath('/build/pipelines/credit-risk/policy'),
     '/runtime/pipelines/credit-risk/policy',

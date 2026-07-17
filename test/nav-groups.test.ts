@@ -24,7 +24,10 @@ test('the console has exactly the eight accepted top-level jobs in order', () =>
       { id: 'operations', label: 'Operations' },
     ],
   );
-  assert.deepEqual(NAV_GROUPS.map((group) => group.id), IA_SECTIONS.map((section) => section.id));
+  assert.deepEqual(
+    NAV_GROUPS.map((group) => group.id),
+    IA_SECTIONS.map((section) => section.id),
+  );
 });
 
 test('every canonical entity has exactly one owner and one canonical route', () => {
@@ -54,7 +57,10 @@ test('entity collision decisions are represented in canonical ownership', () => 
 test('sidebar is derived from explicit primaries and never invents a More group', () => {
   const sections = sidebarSections(MODULES);
   assert.ok(sections.every((section) => section.label !== 'More'));
-  assert.deepEqual(sections.map((section) => section.id), NAV_GROUPS.map((group) => group.id));
+  assert.deepEqual(
+    sections.map((section) => section.id),
+    NAV_GROUPS.map((group) => group.id),
+  );
   for (const section of sections) {
     assert.ok(section.items.length <= 4, `${section.label} has too many primary rows`);
     assert.ok(section.items.every((item) => item.primary));
@@ -82,7 +88,10 @@ test('secondary routes highlight their section primary and dynamic routes keep o
   assert.equal(sidebarActiveIdFor('quality-results'), 'outcomes');
   assert.equal(sidebarActiveIdForPath('/operations/clusters/from-registry'), 'runs');
   assert.equal(sidebarActiveIdForPath('/operations/services/langfuse'), 'services');
-  assert.equal(sidebarActiveIdForPath('/runtime/pipelines/credit-risk/policy'), 'runtime-pipelines');
+  assert.equal(
+    sidebarActiveIdForPath('/runtime/pipelines/credit-risk/policy'),
+    'runtime-pipelines',
+  );
   assert.equal(sidebarActiveIdForPath('/solutions/apps/app-42/runs'), 'apps');
   assert.equal(sidebarActiveIdForPath('/nowhere'), undefined);
 });

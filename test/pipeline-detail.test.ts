@@ -14,9 +14,24 @@ test('pipelineTabs: the tabs in reading order, each with a hint', () => {
   const tabs = pipelineTabs('pl_42');
   assert.deepEqual(
     tabs.map((t) => t.tab),
-    ['overview', 'routing', 'policy', 'guardrails', 'quality', 'drift', 'observability', 'audit', 'cost', 'api', 'versions'],
+    [
+      'overview',
+      'routing',
+      'policy',
+      'guardrails',
+      'quality',
+      'drift',
+      'observability',
+      'audit',
+      'cost',
+      'api',
+      'versions',
+    ],
   );
-  assert.ok(tabs.every((t) => t.hint.length > 0), 'every tab carries a helper hint');
+  assert.ok(
+    tabs.every((t) => t.hint.length > 0),
+    'every tab carries a helper hint',
+  );
 });
 
 test('pipelineTabHref: overview is the bare pipeline path; others hang off it', () => {
@@ -37,7 +52,10 @@ test('activeTabForPath: a named sub-segment selects that tab', () => {
   assert.equal(activeTabForPath('/runtime/pipelines/pl_42/routing', 'pl_42'), 'routing');
   assert.equal(activeTabForPath('/runtime/pipelines/pl_42/guardrails', 'pl_42'), 'guardrails');
   assert.equal(activeTabForPath('/runtime/pipelines/pl_42/versions', 'pl_42'), 'versions');
-  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/observability', 'pl_42'), 'observability');
+  assert.equal(
+    activeTabForPath('/runtime/pipelines/pl_42/observability', 'pl_42'),
+    'observability',
+  );
 });
 
 test('activeTabForPath: a deep sub-path still resolves to its tab', () => {

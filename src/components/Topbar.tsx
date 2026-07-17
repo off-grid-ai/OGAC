@@ -50,7 +50,9 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
         </Sheet>
 
         <div className="min-w-0 leading-tight">
-          <h1 className="truncate text-sm font-medium text-foreground">{owner?.label ?? 'Console'}</h1>
+          <h1 className="truncate text-sm font-medium text-foreground">
+            {owner?.label ?? 'Console'}
+          </h1>
           {owner ? (
             <p className="hidden truncate text-xs text-muted-foreground sm:block">
               {owner.description}

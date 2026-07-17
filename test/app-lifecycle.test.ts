@@ -11,7 +11,10 @@ test('lifecycleTabs: the lifecycle in flow order (+ Quality, Access, Schedule, S
     tabs.map((t) => t.tab),
     ['build', 'input', 'runs', 'review', 'reports', 'quality', 'access', 'schedule', 'controls'],
   );
-  assert.ok(tabs.every((t) => t.hint.length > 0), 'every tab carries a helper hint');
+  assert.ok(
+    tabs.every((t) => t.hint.length > 0),
+    'every tab carries a helper hint',
+  );
 });
 
 test('activeTabForPath: the schedule tab resolves from its sub-path', () => {

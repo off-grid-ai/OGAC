@@ -90,14 +90,17 @@ export const IA_ROUTE_MIGRATIONS = Object.freeze([
 export function nextRedirects(migrations = IA_ROUTE_MIGRATIONS) {
   return migrations.flatMap(({ from, to, children }) => {
     const rules = [{ source: from, destination: to, permanent: true }];
-    if (children) rules.push({ source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true });
+    if (children)
+      rules.push({ source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true });
     return rules;
   });
 }
 
 export function canonicalPath(pathname, migrations = IA_ROUTE_MIGRATIONS) {
   const match = migrations
-    .filter(({ from, children }) => pathname === from || (children && pathname.startsWith(`${from}/`)))
+    .filter(
+      ({ from, children }) => pathname === from || (children && pathname.startsWith(`${from}/`)),
+    )
     .sort((a, b) => b.from.length - a.from.length)[0];
   return match ? `${match.to}${pathname.slice(match.from.length)}` : pathname;
 }

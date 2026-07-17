@@ -14,55 +14,55 @@ sidebar and scoped section navigation derive from the registry.
 
 ## Top-level jobs
 
-| Section | Job | Ownership rule |
-| --- | --- | --- |
-| Home | See attention, value, active work, and platform posture | Owns lenses and shortcuts only |
-| Work | Use AI without platform knowledge | Owns conversations and human work objects |
-| Solutions | Build and operate business use cases | App is the product center; Agent is an App kind |
-| Data | Turn enterprise systems into governed context | Owns enterprise data resources, not vendor products |
-| AI Runtime | Control available AI and governed access | Owns logical models and access contracts |
-| Governance | Define, enforce, and prove controls | Owns global rules and evidence |
-| Insights | Measure effectiveness, reliability, adoption, and economics | Owns measured results |
-| Operations | Run the execution plane, fleet, services, and recovery | Owns runtime and infrastructure instances |
+| Section    | Job                                                         | Ownership rule                                      |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| Home       | See attention, value, active work, and platform posture     | Owns lenses and shortcuts only                      |
+| Work       | Use AI without platform knowledge                           | Owns conversations and human work objects           |
+| Solutions  | Build and operate business use cases                        | App is the product center; Agent is an App kind     |
+| Data       | Turn enterprise systems into governed context               | Owns enterprise data resources, not vendor products |
+| AI Runtime | Control available AI and governed access                    | Owns logical models and access contracts            |
+| Governance | Define, enforce, and prove controls                         | Owns global rules and evidence                      |
+| Insights   | Measure effectiveness, reliability, adoption, and economics | Owns measured results                               |
+| Operations | Run the execution plane, fleet, services, and recovery      | Owns runtime and infrastructure instances           |
 
 ## Canonical owners
 
-| Entity/result | Canonical route | Notes |
-| --- | --- | --- |
-| Conversation | `/work/chat` | Project context and knowledge references are lenses |
-| Project | `/work/projects` | Owns its instructions, members, chats, and activity |
-| Prompt | `/work/prompts` | Versions, partials, and assignments stay here |
-| Artifact | `/work/artifacts` | Generated output and its provenance/share state |
-| File | `/work/files` | Files and folders; not enterprise Knowledge |
-| App / solution | `/solutions/apps` | Agents are filtered/specialized Apps, not a second registry |
-| Review task | `/solutions/reviews` | App detail shows a scoped lens |
-| Tool | `/solutions/tools` | HTTP, MCP, and built-ins have one catalog |
-| Quality definition | `/solutions/quality` | Evaluators, golden sets, and gates |
-| Source | `/data/sources` | Systems, connectors, credentials, and tests |
-| Data domain | `/data/domains` | Business mappings, owners, policies, and SLAs |
-| Data flow | `/data/flows` | Replication (Airbyte) and orchestration (Kestra) are explicit flow types |
-| Warehouse resource | `/data/warehouse` | Tables, columns, queries, profiles, freshness |
-| Catalog asset | `/data/catalog` | Ownership, classification, freshness, and impact |
-| Knowledge collection | `/data/knowledge` | Collections, documents, indexes, permissions, bindings |
-| Lineage edge/event | `/data/lineage` | Source-to-answer trace and impact |
-| Logical model | `/runtime/models` | Physical machines never live here |
-| Model gateway | `/runtime/gateways` | Endpoints, providers, egress class, availability |
-| Model-access pipeline | `/runtime/pipelines` | Governed routing/access contract, not a data sync |
-| API key/budget | `/runtime/api-budgets` | Spend results link to Insights Cost |
-| Policy/control evidence | `/governance/*` | Global controls, assignments, and proof |
-| Audit/security/provenance | `/governance/evidence` | Evidence is not general analytics |
-| Outcome | `/insights/outcomes` | Business KPIs and ROI |
-| AI behavior | `/insights/ai` | Traces, latency, errors, routing behavior |
-| Usage | `/insights/usage` | Requests, tokens, users, apps, adoption |
-| Quality result | `/insights/quality` | Eval runs, drift, scorecards, trends |
-| Cost result | `/insights/cost` | Spend, attribution, unit cost, savings |
-| Execution run | `/operations/runs` | Canonical for app, agent, and chat runs |
-| Physical node | `/operations/nodes/[nodeId]` | Instance comes from the fleet registry |
-| Compute cluster | `/operations/clusters/[clusterId]` | Derived from fleet registry relationships |
-| Service | `/operations/services/[serviceId]` | Instance comes from the deployment registry |
-| Platform telemetry | `/operations/health` | Infrastructure metrics, logs, traces, alerts |
-| Managed employee device | `/operations/devices/[id]` | Separate from physical serving nodes; currently marked Soon |
-| Configuration | `/operations/configuration` | Adapters, flags, auth, and environment references |
+| Entity/result             | Canonical route                    | Notes                                                                    |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| Conversation              | `/work/chat`                       | Project context and knowledge references are lenses                      |
+| Project                   | `/work/projects`                   | Owns its instructions, members, chats, and activity                      |
+| Prompt                    | `/work/prompts`                    | Versions, partials, and assignments stay here                            |
+| Artifact                  | `/work/artifacts`                  | Generated output and its provenance/share state                          |
+| File                      | `/work/files`                      | Files and folders; not enterprise Knowledge                              |
+| App / solution            | `/solutions/apps`                  | Agents are filtered/specialized Apps, not a second registry              |
+| Review task               | `/solutions/reviews`               | App detail shows a scoped lens                                           |
+| Tool                      | `/solutions/tools`                 | HTTP, MCP, and built-ins have one catalog                                |
+| Quality definition        | `/solutions/quality`               | Evaluators, golden sets, and gates                                       |
+| Source                    | `/data/sources`                    | Systems, connectors, credentials, and tests                              |
+| Data domain               | `/data/domains`                    | Business mappings, owners, policies, and SLAs                            |
+| Data flow                 | `/data/flows`                      | Replication (Airbyte) and orchestration (Kestra) are explicit flow types |
+| Warehouse resource        | `/data/warehouse`                  | Tables, columns, queries, profiles, freshness                            |
+| Catalog asset             | `/data/catalog`                    | Ownership, classification, freshness, and impact                         |
+| Knowledge collection      | `/data/knowledge`                  | Collections, documents, indexes, permissions, bindings                   |
+| Lineage edge/event        | `/data/lineage`                    | Source-to-answer trace and impact                                        |
+| Logical model             | `/runtime/models`                  | Physical machines never live here                                        |
+| Model gateway             | `/runtime/gateways`                | Endpoints, providers, egress class, availability                         |
+| Model-access pipeline     | `/runtime/pipelines`               | Governed routing/access contract, not a data sync                        |
+| API key/budget            | `/runtime/api-budgets`             | Spend results link to Insights Cost                                      |
+| Policy/control evidence   | `/governance/*`                    | Global controls, assignments, and proof                                  |
+| Audit/security/provenance | `/governance/evidence`             | Evidence is not general analytics                                        |
+| Outcome                   | `/insights/outcomes`               | Business KPIs and ROI                                                    |
+| AI behavior               | `/insights/ai`                     | Traces, latency, errors, routing behavior                                |
+| Usage                     | `/insights/usage`                  | Requests, tokens, users, apps, adoption                                  |
+| Quality result            | `/insights/quality`                | Eval runs, drift, scorecards, trends                                     |
+| Cost result               | `/insights/cost`                   | Spend, attribution, unit cost, savings                                   |
+| Execution run             | `/operations/runs`                 | Canonical for app, agent, and chat runs                                  |
+| Physical node             | `/operations/nodes/[nodeId]`       | Instance comes from the fleet registry                                   |
+| Compute cluster           | `/operations/clusters/[clusterId]` | Derived from fleet registry relationships                                |
+| Service                   | `/operations/services/[serviceId]` | Instance comes from the deployment registry                              |
+| Platform telemetry        | `/operations/health`               | Infrastructure metrics, logs, traces, alerts                             |
+| Managed employee device   | `/operations/devices/[id]`         | Separate from physical serving nodes; currently marked Soon              |
+| Configuration             | `/operations/configuration`        | Adapters, flags, auth, and environment references                        |
 
 ## Collision decisions
 
@@ -100,21 +100,21 @@ are retained by Next.js.
 
 Representative migrations:
 
-| Old | Canonical |
-| --- | --- |
-| `/workspace/chat/:path*` | `/work/chat/:path*` |
-| `/build/apps/:path*` | `/solutions/apps/:path*` |
-| `/build/agents/:path*` | `/solutions/apps/:path*` |
-| `/build/agent-runs/:path*` | `/operations/runs/:path*` |
-| `/build/pipelines/:path*` | `/runtime/pipelines/:path*` |
-| `/data/pipelines/:path*` | `/data/flows/replication/:path*` |
-| `/data/etl/:path*` | `/data/flows/orchestration/:path*` |
-| `/gateway/services/:path*` | `/operations/services/:path*` |
-| `/gateway/fleet/:path*` | `/operations/devices/:path*` |
-| `/insights/platform/:path*` | `/operations/health/:path*` |
-| `/insights/audit/:path*` | `/governance/evidence/audit/:path*` |
-| `/insights/siem/:path*` | `/governance/evidence/security/:path*` |
-| `/insights/roi/:path*` | `/insights/outcomes/:path*` |
+| Old                         | Canonical                              |
+| --------------------------- | -------------------------------------- |
+| `/workspace/chat/:path*`    | `/work/chat/:path*`                    |
+| `/build/apps/:path*`        | `/solutions/apps/:path*`               |
+| `/build/agents/:path*`      | `/solutions/apps/:path*`               |
+| `/build/agent-runs/:path*`  | `/operations/runs/:path*`              |
+| `/build/pipelines/:path*`   | `/runtime/pipelines/:path*`            |
+| `/data/pipelines/:path*`    | `/data/flows/replication/:path*`       |
+| `/data/etl/:path*`          | `/data/flows/orchestration/:path*`     |
+| `/gateway/services/:path*`  | `/operations/services/:path*`          |
+| `/gateway/fleet/:path*`     | `/operations/devices/:path*`           |
+| `/insights/platform/:path*` | `/operations/health/:path*`            |
+| `/insights/audit/:path*`    | `/governance/evidence/audit/:path*`    |
+| `/insights/siem/:path*`     | `/governance/evidence/security/:path*` |
+| `/insights/roi/:path*`      | `/insights/outcomes/:path*`            |
 
 ## Deliberate follow-up work
 

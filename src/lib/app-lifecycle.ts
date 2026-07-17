@@ -33,8 +33,16 @@ const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
   { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step' },
   { tab: 'review', label: 'Review', hint: 'Approve or reject runs paused for a human' },
   { tab: 'reports', label: 'Reports', hint: 'Outcomes over time' },
-  { tab: 'quality', label: 'Quality', hint: "This pipeline's evals, golden set, and drift — run and gate on them" },
-  { tab: 'access', label: 'Access', hint: 'Who may run, trigger, and approve this — and to what limit' },
+  {
+    tab: 'quality',
+    label: 'Quality',
+    hint: "This pipeline's evals, golden set, and drift — run and gate on them",
+  },
+  {
+    tab: 'access',
+    label: 'Access',
+    hint: 'Who may run, trigger, and approve this — and to what limit',
+  },
   {
     tab: 'schedule',
     label: 'Schedule',

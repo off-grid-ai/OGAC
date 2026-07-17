@@ -44,7 +44,12 @@ const nextConfig = {
     staleTimes: { dynamic: 30, static: 180 },
     // Tree-shake big barrel packages so a page ships only the icons/components it uses, not the whole
     // library. @phosphor-icons/react especially is thousands of modules imported by nearly every page.
-    optimizePackageImports: ['@phosphor-icons/react', '@phosphor-icons/react/dist/ssr', 'recharts', 'date-fns'],
+    optimizePackageImports: [
+      '@phosphor-icons/react',
+      '@phosphor-icons/react/dist/ssr',
+      'recharts',
+      'date-fns',
+    ],
   },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
