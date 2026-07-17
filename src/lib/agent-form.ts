@@ -2,6 +2,8 @@
 // (client validation + shaping the request body) and the admin routes (normalizing the untrusted
 // body). No React, no DB — unit-testable in isolation. See test/agent-form.test.ts.
 
+import { parseAgentPipelineId } from '@/lib/agent-pipeline-policy';
+
 export const AGENT_TRIGGERS = [
   'on-demand',
   'on-call',
@@ -21,6 +23,7 @@ export interface AgentFormInput {
   tools: string[];
   grounded: boolean;
   trigger: AgentTriggerValue;
+  pipelineId: string | null;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -34,10 +37,10 @@ export function normalizeTrigger(v: unknown): AgentTriggerValue {
 }
 
 /** Validation messages for the required fields, keyed by field. Empty object = valid. */
-export function validateAgentForm(input: {
-  name?: unknown;
-  systemPrompt?: unknown;
-}): { name?: string; systemPrompt?: string } {
+export function validateAgentForm(input: { name?: unknown; systemPrompt?: unknown }): {
+  name?: string;
+  systemPrompt?: string;
+} {
   const errors: { name?: string; systemPrompt?: string } = {};
   if (!str(input.name)) errors.name = 'A name is required.';
   if (!str(input.systemPrompt)) errors.systemPrompt = 'Instructions are required.';
@@ -52,7 +55,8 @@ export function parseCreateInput(b: Record<string, unknown> | null): AgentFormIn
   const o = b ?? {};
   const name = str(o.name);
   const systemPrompt = str(o.systemPrompt);
-  if (!name || !systemPrompt) return null;
+  const pipeline = parseAgentPipelineId(o.pipelineId);
+  if (!name || !systemPrompt || !pipeline.ok) return null;
   return {
     name,
     systemPrompt,
@@ -62,6 +66,7 @@ export function parseCreateInput(b: Record<string, unknown> | null): AgentFormIn
     tools: strList(o.tools),
     grounded: o.grounded !== false,
     trigger: normalizeTrigger(o.trigger),
+    pipelineId: pipeline.pipelineId,
   };
 }
 
@@ -70,9 +75,7 @@ export function parseCreateInput(b: Record<string, unknown> | null): AgentFormIn
  * are included, so an edit that omits a field leaves it untouched. Required fields, when present,
  * must be non-empty — returns null if `name` or `systemPrompt` is present but blank.
  */
-export function parseEditPatch(
-  b: Record<string, unknown> | null,
-): Partial<AgentFormInput> | null {
+export function parseEditPatch(b: Record<string, unknown> | null): Partial<AgentFormInput> | null {
   const o = b ?? {};
   const patch: Partial<AgentFormInput> = {};
   if ('name' in o) {
@@ -91,5 +94,10 @@ export function parseEditPatch(
   if ('tools' in o) patch.tools = strList(o.tools);
   if ('grounded' in o) patch.grounded = o.grounded !== false;
   if ('trigger' in o) patch.trigger = normalizeTrigger(o.trigger);
+  if ('pipelineId' in o) {
+    const pipeline = parseAgentPipelineId(o.pipelineId);
+    if (!pipeline.ok) return null;
+    patch.pipelineId = pipeline.pipelineId;
+  }
   return patch;
 }

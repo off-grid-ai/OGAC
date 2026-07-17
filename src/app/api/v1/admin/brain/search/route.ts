@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/authz';
 import { searchDocuments } from '@/lib/brain';
 import { askerFrom } from '@/lib/retrieval/acl';
 import { normalizeFilter, normalizeMode, type RetrievalOptions } from '@/lib/retrieval/query';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Semantic retrieval over the Brain — returns scored hits (the citation set).
 //
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     }
   }
   const asker = askerFrom({ email: gate.user.email, role: gate.user.role });
-  const data = await searchDocuments(q, 5, { mode, filter, asker });
+  const data = await searchDocuments(q, 5, { mode, filter, asker }, await currentOrgId());
   return NextResponse.json({ object: 'list', query: q, mode, data });
 }
 
@@ -50,6 +51,6 @@ export async function POST(req: Request) {
   const mode = normalizeMode(b.mode);
   const filter = normalizeFilter(b.filter) ?? undefined;
   const asker = askerFrom({ email: gate.user.email, role: gate.user.role });
-  const data = await searchDocuments(b.query, k, { mode, filter, asker });
+  const data = await searchDocuments(b.query, k, { mode, filter, asker }, await currentOrgId());
   return NextResponse.json({ object: 'list', query: b.query, mode, data });
 }

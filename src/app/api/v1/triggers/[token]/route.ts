@@ -6,8 +6,7 @@ import { newAppRunId } from '@/lib/app-run';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { getApp } from '@/lib/apps-store';
 import { machineActor } from '@/lib/audit-event';
-import { resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
-import { resolveContract } from '@/lib/pipeline-contract';
+import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
 import { getCustomAgent, recordAudit } from '@/lib/store';
 import { buildTriggerInput } from '@/lib/trigger-dispatch';
 import { verifyWebhook } from '@/lib/webhook-trigger-policy';
@@ -100,10 +99,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       });
       return NextResponse.json({ error: 'access denied', reason: access.reason }, { status: 403 });
     }
-    // Governed exactly like the admin run route: resolve the bound-pipeline contract for THIS org.
-    const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
-    const contract = await resolveContract(pipelineId, orgId);
-    const handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId, contract });
+    let handle: Awaited<ReturnType<typeof submitAppRun>>;
+    try {
+      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId });
+    } catch (error) {
+      const failure = pipelineBindingHttpFailure(error, {
+        ingress: `webhook:${trigger.id}`,
+        target: `app:${trigger.targetId}`,
+      });
+      if (!failure) throw error;
+      recordAudit({ actor, org: orgId, ...failure.audit });
+      return NextResponse.json(failure.body, { status: failure.status });
+    }
     await markWebhookFired(token);
     recordAudit({
       actor,
@@ -138,16 +145,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       resource: `webhook:${trigger.id} agent:${trigger.targetId} trigger`,
       outcome: 'blocked',
     });
-    return NextResponse.json({ error: 'access denied', reason: agentAccess.reason }, { status: 403 });
+    return NextResponse.json(
+      { error: 'access denied', reason: agentAccess.reason },
+      { status: 403 },
+    );
   }
   const query = typeof input.input === 'string' && input.input.trim() ? input.input : rawBody;
-  const dispatch = await dispatchAgentRun({
-    agentId: trigger.targetId,
-    query,
-    orgId,
-    actor,
-    caller: 'webhook',
-  });
+  let dispatch: Awaited<ReturnType<typeof dispatchAgentRun>>;
+  try {
+    dispatch = await dispatchAgentRun({
+      agentId: trigger.targetId,
+      query,
+      orgId,
+      actor,
+      caller: 'webhook',
+    });
+  } catch (error) {
+    const failure = pipelineBindingHttpFailure(error, {
+      ingress: `webhook:${trigger.id}`,
+      target: `agent:${trigger.targetId}`,
+    });
+    if (!failure) throw error;
+    recordAudit({ actor, org: orgId, ...failure.audit });
+    return NextResponse.json(failure.body, { status: failure.status });
+  }
   await markWebhookFired(token);
   recordAudit({
     actor,

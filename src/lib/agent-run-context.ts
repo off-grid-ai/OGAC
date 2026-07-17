@@ -17,6 +17,7 @@
 import type { Actor } from '@/lib/audit-event';
 import { actorFrom } from '@/lib/audit-event';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
+import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * The caller context for a governed agent run. Resolved AT SUBMIT TIME from the request (same source
@@ -38,6 +39,8 @@ export interface RunContext {
   org?: string;
   /** Owning project, if any. Attributed onto the canonical audit event's `project`. */
   project?: string;
+  /** Document-level ACL identity, resolved from the request and carried through Temporal. */
+  asker?: Asker;
   /**
    * PA-16b — the resolved bound-pipeline contract this agent run enforces (data allowlist + egress
    * leash + policy/guardrail overlay). OPTIONAL + ADDITIVE: absent/null ⇒ legacy behaviour (no extra

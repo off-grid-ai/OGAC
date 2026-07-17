@@ -79,6 +79,8 @@ export function workflowIdFor(agentId: string, runId: string): string {
 // Type-only import (erased at compile) so this module stays safe to reference from the deterministic
 // Temporal workflow bundle — it carries no runtime code, only the Actor shape the input embeds.
 import type { Actor } from '@/lib/audit-event';
+import type { AgentPipelineBinding } from '@/lib/pipeline-run-glue';
+import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * Input handed to AgentRunWorkflow (and through it to the pipeline activity).
@@ -93,6 +95,8 @@ export interface AgentRunWorkflowInput {
   agentId: string;
   query: string;
   runId: string;
+  /** True only for a recurring Schedule action; the workflow derives a unique id per fire. */
+  scheduled?: boolean;
   caller?: string;
   requireReview?: boolean;
   orgId?: string;
@@ -100,16 +104,19 @@ export interface AgentRunWorkflowInput {
   actor?: Actor;
   /** Owning project (C4), attributed onto the run's audit event. */
   project?: string;
+  asker?: Asker;
   /**
    * PA-16a-durable — the bound-pipeline id this durable agent run must enforce (data-allowlist
    * ceiling + egress leash + policy/guardrail overlay). The dispatch site resolves the binding with
-   * the SAME resolver the inline route uses (resolveAgentBinding → resolveConsumerPipeline) and
-   * threads the plain id here; the WORKER (runAgentPipeline activity) re-resolves the full contract
+   * the SAME dispatch-level explicit-agent resolver every caller uses and threads the plain id here;
+   * the WORKER (runAgentPipeline activity) re-resolves the full contract
    * ONCE via resolveContract (the I/O boundary) and attaches it to the run context — so the durable
    * path enforces the identical contract the sync path does. Null/absent ⇒ no bound pipeline ⇒
    * legacy allow (the ADDITIVE guarantee), unchanged.
    */
-  pipelineId?: string | null;
+  /** Dispatch-time binding decision. The worker re-resolves and verifies it before running.
+   * Optional only for persisted pre-migration Temporal histories; every current caller supplies it. */
+  binding?: AgentPipelineBinding;
 }
 
 /**
@@ -145,7 +152,8 @@ export function toWorkflowInput(raw: {
   orgId?: unknown;
   actor?: unknown;
   project?: unknown;
-  pipelineId?: unknown;
+  binding?: unknown;
+  asker?: unknown;
 }): AgentRunWorkflowInput {
   if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) {
     throw new Error('agentId required');
@@ -165,10 +173,37 @@ export function toWorkflowInput(raw: {
     orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
     actor: normalizeActor(raw.actor),
     project: typeof raw.project === 'string' && raw.project.trim() ? raw.project.trim() : undefined,
-    // PA-16a-durable — carry the bound-pipeline id (blank → null: no binding ⇒ legacy allow).
-    pipelineId:
-      typeof raw.pipelineId === 'string' && raw.pipelineId.trim() ? raw.pipelineId.trim() : null,
+    asker: normalizeAsker(raw.asker),
+    binding: normalizeWorkflowBinding(raw.binding),
   };
+}
+
+function normalizeAsker(raw: unknown): Asker | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as { subject?: unknown; roles?: unknown };
+  const subject =
+    typeof value.subject === 'string' && value.subject.trim() ? value.subject.trim() : undefined;
+  const roles = Array.isArray(value.roles)
+    ? value.roles.filter((role): role is string => typeof role === 'string' && Boolean(role.trim()))
+    : [];
+  return subject || roles.length > 0 ? { subject, roles } : undefined;
+}
+
+function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object') throw new Error('valid agent binding required');
+  const binding = raw as Partial<AgentPipelineBinding>;
+  if (binding.state === 'unbound') return { state: 'unbound', pipelineId: null, contract: null };
+  if (
+    binding.state === 'bound' &&
+    typeof binding.pipelineId === 'string' &&
+    binding.pipelineId.trim() &&
+    binding.contract &&
+    binding.contract.pipelineId === binding.pipelineId
+  ) {
+    return binding as Extract<AgentPipelineBinding, { state: 'bound' }>;
+  }
+  throw new Error('valid agent binding required');
 }
 
 // ── Status mapping ──────────────────────────────────────────────────────────────────────────

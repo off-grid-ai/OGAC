@@ -17,6 +17,7 @@ import {
 import { messagesUpToInclusive } from '@/lib/chat-policy';
 import { skillVisibleTo } from '@/lib/chat-skill-policy';
 import { getObjectText, putObject } from '@/lib/files';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Chat workspace server logic — ports Off Grid AI Desktop's project/thread/message store to the
 // console, backed by the on-prem gateway for inference. Tables are created idempotently on first
@@ -26,137 +27,141 @@ let ensurePromise: Promise<void> | null = null;
 export async function ensureChatSchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
   ensurePromise = (async (): Promise<void> => {
-  await db.execute(sql`
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_projects (
       id text PRIMARY KEY, user_id text NOT NULL, name text NOT NULL,
       description text NOT NULL DEFAULT '', system_prompt text NOT NULL DEFAULT '', icon text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_conversations (
       id text PRIMARY KEY, user_id text NOT NULL, project_id text,
       title text NOT NULL DEFAULT 'New chat', model text NOT NULL DEFAULT '',
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id text PRIMARY KEY, conversation_id text NOT NULL, role text NOT NULL,
       content text NOT NULL DEFAULT '', reasoning text, images jsonb, citations jsonb,
       created_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS chat_messages_conv_idx ON chat_messages (conversation_id, created_at);`,
-  );
-  // Edit & branch (Wave 2): parent-pointer tree columns (added post-hoc for existing tables).
-  await db.execute(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_id text;`);
-  await db.execute(
-    sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;`,
-  );
-  await db.execute(sql`
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS chat_messages_conv_idx ON chat_messages (conversation_id, created_at);`,
+    );
+    // Edit & branch (Wave 2): parent-pointer tree columns (added post-hoc for existing tables).
+    await db.execute(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_id text;`);
+    await db.execute(
+      sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;`,
+    );
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_settings (
       user_id text PRIMARY KEY, custom_instructions text NOT NULL DEFAULT '',
       updated_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_skills (
       id text PRIMARY KEY, name text NOT NULL, description text NOT NULL DEFAULT '',
       system_prompt text NOT NULL DEFAULT '', model text NOT NULL DEFAULT '', project_id text,
       allowed_roles jsonb NOT NULL DEFAULT '[]', icon text, enabled boolean NOT NULL DEFAULT true,
       created_by text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now());
   `);
-  // Assistant-builder fields on skills (added post-hoc for existing tables).
-  await db.execute(
-    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS conversation_starters jsonb NOT NULL DEFAULT '[]';`,
-  );
-  await db.execute(
-    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS capabilities jsonb NOT NULL DEFAULT '{}';`,
-  );
-  await db.execute(
-    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS actions_schema text NOT NULL DEFAULT '';`,
-  );
-  await db.execute(
-    sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'org';`,
-  );
-  // Project sharing + per-project memory (added post-hoc for existing tables).
-  await db.execute(
-    sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'private';`,
-  );
-  // Per-project pipeline binding (CONSUMERS-BIND #166) — null ⇒ inherit the org-default chat pipeline.
-  await db.execute(sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS pipeline_id text;`);
-  await db.execute(sql`
+    // Assistant-builder fields on skills (added post-hoc for existing tables).
+    await db.execute(
+      sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS conversation_starters jsonb NOT NULL DEFAULT '[]';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS capabilities jsonb NOT NULL DEFAULT '{}';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS actions_schema text NOT NULL DEFAULT '';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_skills ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'org';`,
+    );
+    // Project sharing + per-project memory (added post-hoc for existing tables).
+    await db.execute(
+      sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'private';`,
+    );
+    // Per-project pipeline binding (CONSUMERS-BIND #166) — null ⇒ inherit the org-default chat pipeline.
+    await db.execute(sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_project_members (
       project_id text NOT NULL, user_id text NOT NULL,
       can_edit boolean NOT NULL DEFAULT false, added_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (project_id, user_id));
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_project_memory (
       id text PRIMARY KEY, project_id text NOT NULL, fact text NOT NULL,
       source text NOT NULL DEFAULT 'chat', created_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS chat_project_memory_idx ON chat_project_memory (project_id);`,
-  );
-  // conversations can be bound to a skill (added post-hoc for existing tables)
-  await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
-  // Tenant scope (host-bound org) — makes Workspace chat/projects tenant-isolated. Self-healing so
-  // fresh/legacy DBs get it with no migration step; pre-tenant rows default to 'default'.
-  await db.execute(
-    sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
-  );
-  await db.execute(
-    sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
-  );
-  await db.execute(sql`
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS chat_project_memory_idx ON chat_project_memory (project_id);`,
+    );
+    // conversations can be bound to a skill (added post-hoc for existing tables)
+    await db.execute(sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS skill_id text;`);
+    // Tenant scope (host-bound org) — makes Workspace chat/projects tenant-isolated. Self-healing so
+    // fresh/legacy DBs get it with no migration step; pre-tenant rows default to 'default'.
+    await db.execute(
+      sql`ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_projects ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
+    );
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_memory (
       id text PRIMARY KEY, user_id text NOT NULL, fact text NOT NULL,
       source text NOT NULL DEFAULT 'chat', created_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_memory_user_idx ON chat_memory (user_id);`);
-  await db.execute(sql`
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS chat_memory_user_idx ON chat_memory (user_id);`,
+    );
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_artifacts (
       id text PRIMARY KEY, user_id text NOT NULL, kind text NOT NULL,
       code text NOT NULL DEFAULT '', language text, title text NOT NULL DEFAULT 'Untitled artifact',
       conversation_id text, created_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS chat_artifacts_user_idx ON chat_artifacts (user_id, created_at);`,
-  );
-  // Wave 1 additive columns: versioning head pointer + publish/share + org scope.
-  await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS org_id text;`);
-  // Wave 2 (tenant isolation): the artifacts library was scoped by user only — a user saw the
-  // SAME library on every tenant subdomain. Bind each artifact to its org. Backfill legacy NULLs
-  // to 'default', then pin NOT NULL DEFAULT so the read filter is total and self-heals on deploy.
-  await db.execute(sql`UPDATE chat_artifacts SET org_id = 'default' WHERE org_id IS NULL;`);
-  await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET DEFAULT 'default';`);
-  await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET NOT NULL;`);
-  await db.execute(
-    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false;`,
-  );
-  await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published_at timestamptz;`);
-  await db.execute(
-    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS current_version integer NOT NULL DEFAULT 1;`,
-  );
-  await db.execute(
-    sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`,
-  );
-  await db.execute(sql`
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS chat_artifacts_user_idx ON chat_artifacts (user_id, created_at);`,
+    );
+    // Wave 1 additive columns: versioning head pointer + publish/share + org scope.
+    await db.execute(sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS org_id text;`);
+    // Wave 2 (tenant isolation): the artifacts library was scoped by user only — a user saw the
+    // SAME library on every tenant subdomain. Bind each artifact to its org. Backfill legacy NULLs
+    // to 'default', then pin NOT NULL DEFAULT so the read filter is total and self-heals on deploy.
+    await db.execute(sql`UPDATE chat_artifacts SET org_id = 'default' WHERE org_id IS NULL;`);
+    await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET DEFAULT 'default';`);
+    await db.execute(sql`ALTER TABLE chat_artifacts ALTER COLUMN org_id SET NOT NULL;`);
+    await db.execute(
+      sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false;`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS published_at timestamptz;`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS current_version integer NOT NULL DEFAULT 1;`,
+    );
+    await db.execute(
+      sql`ALTER TABLE chat_artifacts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();`,
+    );
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_artifact_versions (
       id text PRIMARY KEY, artifact_id text NOT NULL, version integer NOT NULL,
       kind text NOT NULL, code text NOT NULL DEFAULT '', language text,
       created_at timestamptz NOT NULL DEFAULT now());
   `);
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS chat_artifact_versions_idx ON chat_artifact_versions (artifact_id, version);`,
-  );
-  // Artifact bodies live in SeaweedFS; self-migrate the key/hash columns and relax the legacy
-  // NOT NULL on `code` (new writes leave it empty). ADD COLUMN IF NOT EXISTS = no migration step.
-  for (const t of ['chat_artifacts', 'chat_artifact_versions']) {
-    await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_key text;`));
-    await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_hash text;`));
-    await db.execute(sql.raw(`ALTER TABLE ${t} ALTER COLUMN code DROP NOT NULL;`));
-  }
-  await db.execute(sql`
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS chat_artifact_versions_idx ON chat_artifact_versions (artifact_id, version);`,
+    );
+    // Artifact bodies live in SeaweedFS; self-migrate the key/hash columns and relax the legacy
+    // NOT NULL on `code` (new writes leave it empty). ADD COLUMN IF NOT EXISTS = no migration step.
+    for (const t of ['chat_artifacts', 'chat_artifact_versions']) {
+      await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_key text;`));
+      await db.execute(sql.raw(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS code_hash text;`));
+      await db.execute(sql.raw(`ALTER TABLE ${t} ALTER COLUMN code DROP NOT NULL;`));
+    }
+    await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_prefs (
       user_id text PRIMARY KEY, prefs jsonb NOT NULL DEFAULT '{}',
       updated_at timestamptz NOT NULL DEFAULT now());
@@ -204,14 +209,24 @@ export async function deleteMemory(userId: string, orgId: string, id: string) {
 // Resolve a set of memory fact ids → their text, SCOPED to the owning (user, org) — an @-mention can
 // only reference the caller's own memories in their CURRENT tenant (the WHERE guard prevents
 // referencing another user's OR another tenant's facts by id). Unknown/foreign ids are dropped.
-export async function memoryFactsByIds(userId: string, orgId: string, ids: string[]): Promise<string[]> {
+export async function memoryFactsByIds(
+  userId: string,
+  orgId: string,
+  ids: string[],
+): Promise<string[]> {
   const clean = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.length > 0)));
   if (!clean.length) return [];
   await ensureChatSchema();
   const rows = await db
     .select({ fact: chatMemory.fact })
     .from(chatMemory)
-    .where(and(eq(chatMemory.userId, userId), eq(chatMemory.orgId, orgId), inArray(chatMemory.id, clean)));
+    .where(
+      and(
+        eq(chatMemory.userId, userId),
+        eq(chatMemory.orgId, orgId),
+        inArray(chatMemory.id, clean),
+      ),
+    );
   return rows.map((r) => r.fact);
 }
 
@@ -417,7 +432,10 @@ export async function listMessages(conversationId: string): Promise<ThreadMessag
   for (;;) {
     const siblings = byParent.get(parentKey);
     if (!siblings?.length) break;
-    const idx = Math.max(0, siblings.findIndex((s) => s.active));
+    const idx = Math.max(
+      0,
+      siblings.findIndex((s) => s.active),
+    );
     const chosen = siblings[idx] ?? siblings.at(-1);
     out.push({ ...chosen, branchIndex: idx, branchCount: siblings.length });
     parentKey = chosen.id;
@@ -444,8 +462,7 @@ export async function addMessage(m: {
   await ensureChatSchema();
   const id = rid();
   // Default the parent to the current active leaf so appended turns extend the shown branch.
-  const parentId =
-    m.parentId !== undefined ? m.parentId : await activeLeafId(m.conversationId);
+  const parentId = m.parentId !== undefined ? m.parentId : await activeLeafId(m.conversationId);
   await db.insert(chatMessages).values({
     id,
     conversationId: m.conversationId,
@@ -568,10 +585,7 @@ export async function switchBranch(
 async function deactivateSiblings(conversationId: string, parentKey: string) {
   const cond = parentKey
     ? and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.parentId, parentKey))
-    : and(
-        eq(chatMessages.conversationId, conversationId),
-        sql`${chatMessages.parentId} IS NULL`,
-      );
+    : and(eq(chatMessages.conversationId, conversationId), sql`${chatMessages.parentId} IS NULL`);
   await db.update(chatMessages).set({ active: false }).where(cond);
 }
 
@@ -668,19 +682,22 @@ export async function getProjectBinding(
 // List the projects BOUND to a given pipeline (Overview "Consumers"). Read-only, stable order.
 export async function listProjectsByPipeline(
   pipelineId: string,
+  orgId: string = DEFAULT_ORG,
 ): Promise<{ id: string; name: string; userId: string }[]> {
   await ensureChatSchema();
   const rows = await db
     .select({ id: chatProjects.id, name: chatProjects.name, userId: chatProjects.userId })
     .from(chatProjects)
-    .where(eq(chatProjects.pipelineId, pipelineId))
+    .where(and(eq(chatProjects.pipelineId, pipelineId), eq(chatProjects.orgId, orgId)))
     .orderBy(desc(chatProjects.updatedAt));
   return rows;
 }
 
 export async function deleteProject(userId: string, id: string) {
   await ensureChatSchema();
-  await db.delete(chatProjects).where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
+  await db
+    .delete(chatProjects)
+    .where(and(eq(chatProjects.id, id), eq(chatProjects.userId, userId)));
   // Detach its conversations (keep the chats, just un-project them).
   await db
     .update(chatConversations)
@@ -814,11 +831,23 @@ export async function projectMemoryBlock(projectId: string | null): Promise<stri
 // Bodies live in SeaweedFS (the single file-storage layer) at codeKey; Postgres holds metadata
 // + a sha256 (codeHash) for dedupe. Reads hydrate `code` from SeaweedFS so every caller/route/
 // component keeps the same shape (SeaweedFS is on the same host, so reads are ~loopback-fast).
-const ARTIFACT_EXT: Record<string, string> = { svg: 'svg', html: 'html', mermaid: 'mmd', react: 'jsx', code: 'txt', text: 'txt' };
+const ARTIFACT_EXT: Record<string, string> = {
+  svg: 'svg',
+  html: 'html',
+  mermaid: 'mmd',
+  react: 'jsx',
+  code: 'txt',
+  text: 'txt',
+};
 function hashCode(code: string): string {
   return createHash('sha256').update(code).digest('hex');
 }
-async function putArtifactBody(artifactId: string, version: number, kind: string, code: string): Promise<{ key: string; hash: string }> {
+async function putArtifactBody(
+  artifactId: string,
+  version: number,
+  kind: string,
+  code: string,
+): Promise<{ key: string; hash: string }> {
   const key = `artifacts/${artifactId}/v${version}.${ARTIFACT_EXT[kind] ?? 'txt'}`;
   await putObject(key, code, 'text/plain; charset=utf-8');
   return { key, hash: hashCode(code) };
@@ -946,7 +975,13 @@ export async function deleteArtifact(userId: string, orgId: string, id: string) 
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
+    .where(
+      and(
+        eq(chatArtifacts.id, id),
+        eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.orgId, orgId),
+      ),
+    )
     .limit(1);
   if (!owned) return;
   await db.delete(chatArtifactVersions).where(eq(chatArtifactVersions.artifactId, id));
@@ -959,7 +994,13 @@ export async function listArtifactVersions(userId: string, orgId: string, id: st
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
+    .where(
+      and(
+        eq(chatArtifacts.id, id),
+        eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.orgId, orgId),
+      ),
+    )
     .limit(1);
   if (!owned) return null;
   const rows = await db
@@ -976,7 +1017,13 @@ export async function revertArtifact(userId: string, orgId: string, id: string, 
   const [art] = await db
     .select()
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
+    .where(
+      and(
+        eq(chatArtifacts.id, id),
+        eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.orgId, orgId),
+      ),
+    )
     .limit(1);
   if (!art) return null;
   const [target] = await db
@@ -1015,12 +1062,23 @@ export async function revertArtifact(userId: string, orgId: string, id: string, 
 }
 
 // Toggle publish state. Published artifacts render at the read-only /artifacts/[id]/view route.
-export async function setArtifactPublished(userId: string, orgId: string, id: string, published: boolean) {
+export async function setArtifactPublished(
+  userId: string,
+  orgId: string,
+  id: string,
+  published: boolean,
+) {
   await ensureChatSchema();
   const [owned] = await db
     .select({ id: chatArtifacts.id })
     .from(chatArtifacts)
-    .where(and(eq(chatArtifacts.id, id), eq(chatArtifacts.userId, userId), eq(chatArtifacts.orgId, orgId)))
+    .where(
+      and(
+        eq(chatArtifacts.id, id),
+        eq(chatArtifacts.userId, userId),
+        eq(chatArtifacts.orgId, orgId),
+      ),
+    )
     .limit(1);
   if (!owned) return false;
   await db

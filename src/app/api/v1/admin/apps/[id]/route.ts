@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
 import {
+  AppAgentOwnershipError,
   AppValidationError,
   deleteApp,
   getApp,
@@ -75,6 +76,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (err instanceof AppValidationError) {
       return NextResponse.json({ error: err.message, errors: err.errors }, { status: 422 });
     }
+    if (err instanceof AppAgentOwnershipError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     throw err;
   }
 }
@@ -87,7 +91,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const orgId = await currentOrgId();
   await deleteApp(id, orgId);
   // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
-  await unscheduleApp(id);
+  await unscheduleApp(id, orgId);
   auditFromSession(gate, orgId, {
     action: 'app.delete',
     resource: `app:${id}`,

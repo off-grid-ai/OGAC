@@ -108,7 +108,7 @@ const STATUS_TRANSITIONS: Record<LifecycleStatus, LifecycleTransition[]> = {
       action: 'deprecate',
       to: 'deprecated',
       label: 'Deprecate',
-      hint: 'Retire this pipeline — consumers fall back to the org default',
+      hint: 'Retire this pipeline after every consumer has been explicitly rebound or removed',
       gated: false,
     },
   ],
@@ -140,7 +140,7 @@ const STATUS_TRANSITIONS: Record<LifecycleStatus, LifecycleTransition[]> = {
       action: 'deprecate',
       to: 'deprecated',
       label: 'Deprecate',
-      hint: 'Retire this published pipeline — consumers fall back to the org default',
+      hint: 'Retire this published pipeline after every consumer has been explicitly rebound or removed',
       gated: false,
     },
   ],
@@ -242,10 +242,10 @@ export function normalizeLifecycleStatus(v: unknown): LifecycleStatus {
 // ─── consumability gate (PURE) — the SINGLE authority for "may this pipeline govern a run?" ─────────
 // A pipeline is enforceable on a CONSUMER (chat / agent / app / trigger / the public provisioned API)
 // ONLY when it is `published` — approved and gate-passed. Every other lifecycle state must NOT govern:
-//   • draft / in_review — never approved, never eval-gate-passed → running it bypasses the release gate
-//     (G-ADV-PIPE-3). A consumer bound to it falls back to the org default instead.
-//   • deprecated / archived — retired; the lifecycle promise on deprecate is "consumers fall back to the
-//     org default" (G-ADV-PIPE-2). A stale contract must not keep enforcing.
+//   • draft / in_review — never approved, never eval-gate-passed → running it bypasses the release gate.
+//   • deprecated / archived — retired; lifecycle actions block while known consumers remain bound.
+// A stale/corrupt explicit agent binding fails closed at the agent-binding seam; it never degrades to
+// an org default or an unbound run.
 // This mirrors the public run route's `status !== 'published'` 409 — ONE rule, so every internal
 // consumer resolver (resolveContract) and the public route agree. An unknown/legacy status normalises
 // to 'draft' (not consumable) — fail-safe: an un-recognisable status never silently governs a run.

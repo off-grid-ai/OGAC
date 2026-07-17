@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { addDocument, BrainWriteError, listDocuments } from '@/lib/brain';
 import { normalizeAcl } from '@/lib/retrieval/acl';
+import { currentOrgId } from '@/lib/tenancy';
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listDocuments() });
+  return NextResponse.json({ object: 'list', data: await listDocuments(await currentOrgId()) });
 }
 
 export async function POST(req: Request) {
@@ -21,8 +22,9 @@ export async function POST(req: Request) {
   }
   // Optional per-document ACL for permissions-aware retrieval. Absent/empty → un-ACL'd (visible).
   const acl = normalizeAcl(body?.acl) ?? undefined;
+  const orgId = await currentOrgId();
   try {
-    return NextResponse.json(await addDocument(title, source, text, acl), { status: 201 });
+    return NextResponse.json(await addDocument(title, source, text, acl, orgId), { status: 201 });
   } catch (e) {
     if (e instanceof BrainWriteError) {
       return NextResponse.json({ error: e.message }, { status: e.status });

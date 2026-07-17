@@ -46,6 +46,7 @@ test('every canonical entity has exactly one owner and one canonical route', () 
 test('entity collision decisions are represented in canonical ownership', () => {
   const byId = new Map(CANONICAL_OWNERS.map((owner) => [owner.id, owner]));
   assert.equal(byId.get('apps')?.route, '/solutions/apps');
+  assert.equal(byId.get('agents')?.route, '/solutions/agents');
   assert.equal(byId.get('runs')?.route, '/operations/runs');
   assert.equal(byId.get('runtime-pipelines')?.route, '/runtime/pipelines');
   assert.equal(byId.get('data-flows')?.route, '/data/flows');
@@ -97,9 +98,10 @@ test('every standalone collection is in the sidebar and contextual resources dec
   const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
   assert.deepEqual(
     contextual.map((owner) => owner.id),
-    ['clusters'],
+    ['agents', 'clusters'],
   );
-  assert.equal(contextual[0].sidebarParent, 'nodes');
+  assert.equal(contextual.find((owner) => owner.id === 'agents')?.sidebarParent, 'apps');
+  assert.equal(contextual.find((owner) => owner.id === 'clusters')?.sidebarParent, 'nodes');
 });
 
 test('all canonical owners remain registered for global or contextual discovery', () => {
@@ -135,6 +137,7 @@ test('contextual routes highlight their declared sidebar parent and dynamic rout
     'runtime-pipelines',
   );
   assert.equal(sidebarActiveIdForPath('/solutions/apps/app-42/runs'), 'apps');
+  assert.equal(sidebarActiveIdForPath('/solutions/agents/fnol-intake'), 'apps');
   assert.equal(sidebarActiveIdForPath('/nowhere'), undefined);
 });
 

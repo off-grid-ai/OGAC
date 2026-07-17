@@ -97,7 +97,7 @@ function AppCard({
         <div className="mt-auto flex items-center gap-1.5 border-t border-border pt-2.5">
           {app.agentId ? (
             <Button asChild size="xs" variant="outline">
-              <Link href={`/build/agents/${app.agentId}`}>Open &amp; try</Link>
+              <Link href={`/solutions/agents/${app.agentId}`}>Open &amp; try</Link>
             </Button>
           ) : null}
           <button

@@ -1,34 +1,84 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { PipelineView } from '@/lib/pipelines';
 import {
   type ChatBindingIO,
+  isAgentPipelineBindingValid,
   resolveAgentBinding,
   resolveChatBinding,
 } from '@/lib/pipeline-run-glue';
 
 // PA-16b — the I/O glue that resolves the enforceable contract for the agent + chat run paths. These
-// exercise the REAL pure binding resolution (resolveConsumerPipeline / resolveChatPipeline) and the
-// REAL resolveContract loader; only the DB reads are injected (chat) / naturally null (agent, since
-// resolveContract fails open to null when it can't load — no DB in node:test). The point they prove:
-// the binding is resolved most-specific-wins and a NO-binding run degrades to a null contract
-// (legacy behaviour — the ADDITIVE guarantee).
+// exercise the REAL pure binding resolution (explicit agent binding / resolveChatPipeline). DB reads
+// are injected only at their external boundary. The point they prove: an agent never inherits chat,
+// contract lookup remains org-scoped, and a no-binding run degrades to a null contract.
 
-test('resolveAgentBinding — no agent binding + no org default ⇒ pipelineId null, contract null (legacy)', async () => {
-  const r = await resolveAgentBinding(null, null, 'default');
-  assert.equal(r.pipelineId, null);
-  assert.equal(r.contract, null);
+test('resolveAgentBinding — no agent binding means no contract (never inherits chat default)', async () => {
+  let requested: string | null | undefined = 'not-called';
+  const r = await resolveAgentBinding(null, 'org_a', async (pipelineId, orgId) => {
+    requested = pipelineId;
+    assert.equal(orgId, 'org_a');
+    return null;
+  });
+  assert.deepEqual(r, { state: 'unbound', pipelineId: null, contract: null });
+  assert.equal(requested, 'not-called', 'an unbound agent does not call the contract resolver');
 });
 
-test('resolveAgentBinding — org default wins when the agent has no own binding', async () => {
-  // resolveConsumerPipeline(null, 'pl_org') === 'pl_org'; resolveContract fails open to null with no
-  // DB, but the RESOLVED pipeline id proves the most-specific-wins fallback picked the org default.
-  const r = await resolveAgentBinding(null, 'pl_org', 'default');
-  assert.equal(r.pipelineId, 'pl_org');
+test('resolveAgentBinding — explicit agent binding is loaded within the run org', async () => {
+  const expected = {
+    pipelineId: 'pl_agent',
+    dataAllowlist: [],
+    routing: {},
+    orgPolicyDefaults: {},
+    orgGuardrailDefaults: {},
+    policyOverlay: {},
+    guardrailOverlay: {},
+  } as never;
+  const r = await resolveAgentBinding('pl_agent', 'org_a', async (pipelineId, orgId) => {
+    assert.equal(pipelineId, 'pl_agent');
+    assert.equal(orgId, 'org_a');
+    return expected;
+  });
+  assert.deepEqual(r, { state: 'bound', pipelineId: 'pl_agent', contract: expected });
 });
 
-test('resolveAgentBinding — the agent own binding beats the org default', async () => {
-  const r = await resolveAgentBinding('pl_agent', 'pl_org', 'default');
-  assert.equal(r.pipelineId, 'pl_agent');
+test('resolveAgentBinding — explicit id resolving null is invalid, never silently unbound', async () => {
+  const r = await resolveAgentBinding('pl_deleted', 'org_a', async () => null);
+  assert.equal(r.state, 'invalid');
+  assert.equal(r.pipelineId, 'pl_deleted');
+  assert.match(r.reason, /unavailable|published/i);
+});
+
+test('resolveAgentBinding — resolver/DB failure is unavailable and fail-closed', async () => {
+  const r = await resolveAgentBinding('pl_live', 'org_a', async () => {
+    throw new Error('postgres unavailable');
+  });
+  assert.equal(r.state, 'unavailable');
+  assert.equal(r.pipelineId, 'pl_live');
+  assert.match(r.reason, /resolve|unavailable/i);
+});
+
+test('agent binding validation is org-scoped and null is deliberately valid', async () => {
+  let lookups = 0;
+  const lookup = async (id: string, orgId: string) => {
+    lookups += 1;
+    assert.equal(id, 'pl_a');
+    assert.equal(orgId, 'org_a');
+    return { id, status: 'published' } as PipelineView;
+  };
+  assert.equal(await isAgentPipelineBindingValid(null, 'org_a', lookup), true);
+  assert.equal(lookups, 0);
+  assert.equal(await isAgentPipelineBindingValid('pl_a', 'org_a', lookup), true);
+  assert.equal(lookups, 1);
+  assert.equal(await isAgentPipelineBindingValid('pl_b', 'org_a', async () => null), false);
+  assert.equal(
+    await isAgentPipelineBindingValid(
+      'pl_draft',
+      'org_a',
+      async () => ({ id: 'pl_draft', status: 'draft' }) as PipelineView,
+    ),
+    false,
+  );
 });
 
 function chatIO(over: Partial<ChatBindingIO> = {}): ChatBindingIO {

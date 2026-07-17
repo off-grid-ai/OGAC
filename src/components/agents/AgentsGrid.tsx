@@ -3,9 +3,9 @@
 import { Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
-import { AgentFormPanel, type EditableAgent, type ToolOption } from '@/components/agents/AgentFormPanel';
+import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
-import { accentHue, initials } from '@/lib/workspace-grid';
+import { initials } from '@/lib/workspace-grid';
 
 export interface AgentCardModel {
   id: string;
@@ -21,18 +21,11 @@ export interface AgentCardModel {
   trigger: string;
   custom?: boolean;
   enabled?: boolean;
+  pipelineId?: string | null;
+  pipeline?: PipelineChipData;
 }
 
-const TRIGGER: Record<string, string> = {
-  'on-call': 'bg-blue-500/10 text-blue-600',
-  'on-message': 'bg-blue-500/10 text-blue-600',
-  observed: 'bg-primary/10 text-primary',
-  scheduled: 'bg-amber-500/10 text-amber-600',
-  'on-demand': 'bg-muted text-muted-foreground',
-};
-
 function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
-  const hue = accentHue(a.id || a.name);
   const disabled = a.custom && a.enabled === false;
   return (
     <div
@@ -43,13 +36,15 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
         <span
-          className="flex size-7 shrink-0 items-center justify-center rounded font-mono text-[11px] font-medium"
-          style={{ background: `hsl(${hue} 60% 45% / 0.15)`, color: `hsl(${hue} 60% 45%)` }}
+          className="flex size-7 shrink-0 items-center justify-center rounded bg-primary/10 font-mono text-[11px] font-medium text-primary"
           aria-hidden
         >
           {a.custom ? initials(a.name) : <Robot className="size-4" />}
         </span>
-        <Link href={`/build/agents/${a.id}`} className="min-w-0 flex-1 truncate hover:text-primary">
+        <Link
+          href={`/solutions/agents/${a.id}`}
+          className="min-w-0 flex-1 truncate hover:text-primary"
+        >
           <span className="truncate font-mono text-sm font-medium">{a.name}</span>
         </Link>
         {disabled ? (
@@ -67,7 +62,7 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
           <Badge variant="secondary" className="text-[10px]">
             {a.role}
           </Badge>
-          <Badge variant="secondary" className={`text-[10px] ${TRIGGER[a.trigger] ?? ''}`}>
+          <Badge variant="outline" className="text-[10px]">
             {a.trigger}
           </Badge>
           {a.grounded ? (
@@ -75,6 +70,7 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
               grounded
             </Badge>
           ) : null}
+          <PipelineChip pipeline={a.pipeline} size="xs" />
         </div>
         <p className="line-clamp-3 min-h-[3rem] text-xs leading-relaxed text-muted-foreground">
           {a.description || a.systemPrompt || 'No description.'}
@@ -95,7 +91,11 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
             </span>
             {a.planeLabels.length ? (
               a.planeLabels.map((p) => (
-                <Badge key={p} variant="secondary" className="bg-primary/10 text-[10px] text-primary">
+                <Badge
+                  key={p}
+                  variant="secondary"
+                  className="bg-primary/10 text-[10px] text-primary"
+                >
                   {p}
                 </Badge>
               ))
@@ -103,44 +103,21 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
               <span className="text-xs text-muted-foreground">—</span>
             )}
           </div>
-          <AgentCardActions agentId={a.id} custom={a.custom} enabled={a.enabled !== false} />
+          <AgentCardActions agentId={a.id} />
         </div>
       </div>
     </div>
   );
 }
 
-// The Agents management grid: a responsive card grid (fills wide screens) with per-card run /
-// edit / enable-disable / delete, plus the shared URL-driven create/edit panel. A thin presenter
-// over server-provided data.
-export function AgentsGrid({
-  agents,
-  tools,
-}: Readonly<{
-  agents: AgentCardModel[];
-  tools: ToolOption[];
-}>) {
-  const editable: EditableAgent[] = agents
-    .filter((a) => a.custom)
-    .map((a) => ({
-      id: a.id,
-      name: a.name,
-      role: a.role,
-      systemPrompt: a.systemPrompt,
-      model: a.model,
-      grounded: a.grounded,
-      trigger: a.trigger,
-      tools: a.tools,
-    }));
-
+// Built-in runtime agents are reusable platform capabilities. User-authored agents are AppSpecs
+// and render through AppsList instead, so there is one editor and one lifecycle owner.
+export function AgentsGrid({ agents }: Readonly<{ agents: AgentCardModel[] }>) {
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {agents.map((a) => (
-          <AgentCard key={a.id} a={a} />
-        ))}
-      </div>
-      <AgentFormPanel tools={tools} editable={editable} />
-    </>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {agents.map((a) => (
+        <AgentCard key={a.id} a={a} />
+      ))}
+    </div>
   );
 }

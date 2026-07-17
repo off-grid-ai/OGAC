@@ -297,7 +297,11 @@ export function PipelinesManager({ pipelines }: Readonly<{ pipelines: PipelineCa
 
   const onDelete = useCallback(
     async (p: PipelineCardData) => {
-      if (!confirm(`Delete pipeline "${p.name}"? Its version history is removed too. Consumers bound to it will fall back to the org default.`)) {
+      if (
+        !confirm(
+          `Delete pipeline "${p.name}"? Its version history is removed too. Deletion is refused while any app, agent, or chat consumer is still bound.`,
+        )
+      ) {
         return;
       }
       const res = await fetch(`/api/v1/admin/pipelines/${p.id}`, { method: 'DELETE' });

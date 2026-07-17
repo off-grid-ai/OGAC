@@ -49,7 +49,7 @@ export default async function DataPage() {
     listIngestJobs(org),
     listMaskingRules(org),
     listDatasets(org),
-    listDocuments(),
+    listDocuments(org),
     qdrantCount(),
   ]);
 

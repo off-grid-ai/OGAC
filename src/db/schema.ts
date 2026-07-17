@@ -308,6 +308,12 @@ export const routingRules = pgTable('routing_rules', {
 export const customAgents = pgTable('custom_agents', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull().default('default'),
+  // Runtime agents materialized from an App inline step have one canonical owner. The self-migration
+  // adds the composite FK (owner_app_id, org_id) → apps(id, org_id) with ON DELETE CASCADE.
+  ownerAppId: text('owner_app_id'),
+  // An agent is an independent consumer: null means deliberately unbound. It never inherits the
+  // org's chat default (see agent-pipeline-policy.ts).
+  pipelineId: text('pipeline_id'),
   name: text('name').notNull(),
   role: text('role').notNull().default('Custom'),
   description: text('description').notNull().default(''),

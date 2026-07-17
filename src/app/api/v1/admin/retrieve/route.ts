@@ -30,10 +30,11 @@ export async function POST(req: Request) {
   const opts = hasOpts
     ? { mode: normalizeMode(b.mode), filter: normalizeFilter(b.filter) ?? undefined, asker }
     : { asker };
-  const result = await route(b.query, k, opts);
+  const orgId = await currentOrgId();
+  const result = await route(b.query, k, opts, { orgId, asker });
   // Data action (Phase 4.11): who queried what. Resource is the detected intent(s) — never the raw
   // query text (which may carry sensitive terms). Best-effort.
-  auditFromSession(gate, await currentOrgId(), {
+  auditFromSession(gate, orgId, {
     action: 'retrieval.query',
     resource: `retrieval:${result.decision?.intent?.join(',') || 'query'}`,
     outcome: 'ok',

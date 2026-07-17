@@ -1,52 +1,30 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { BrainWriteError } from '@/lib/brain';
-import { ingestDatabase, ingestFile, ingestImage, ingestText } from '@/lib/ingest';
+import { dispatchBrainIngest, type BrainIngestBody } from '@/lib/brain-ingest';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Ingest a source into the Brain. Body is discriminated by `kind`:
 //   text     { title, text, source? }
 //   file     { name, text }            (client reads the file's text)
 //   image    { title, dataUrl }        (base64 data URL; captioned via the gateway)
 //   database { datasetId }             (indexes a data-plane dataset record)
-interface Body {
-  kind?: string;
-  title?: string;
-  name?: string;
-  text?: string;
-  source?: string;
-  dataUrl?: string;
-  datasetId?: string;
-}
-
 function bad(msg: string) {
   return NextResponse.json({ error: msg }, { status: 400 });
-}
-
-type Handler = (b: Body) => Promise<{ id: string } | null> | undefined;
-
-const HANDLERS: Record<string, Handler> = {
-  text: (b) => (b.title && b.text ? ingestText(b.title, b.text, b.source) : undefined),
-  file: (b) => (b.name && b.text ? ingestFile(b.name, b.text) : undefined),
-  image: (b) => (b.title && b.dataUrl ? ingestImage(b.title, b.dataUrl) : undefined),
-  database: (b) => (b.datasetId ? ingestDatabase(b.datasetId) : undefined),
-};
-
-function dispatch(b: Body) {
-  const handler = HANDLERS[b.kind ?? ''];
-  return handler ? handler(b) : undefined;
 }
 
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const b = (await req.json().catch(() => null)) as Body | null;
+  const b = (await req.json().catch(() => null)) as BrainIngestBody | null;
   if (!b || typeof b.kind !== 'string') return bad('kind required');
   let result: { id: string } | null | undefined;
   try {
-    result = await dispatch(b);
+    result = await dispatchBrainIngest(b, await currentOrgId());
   } catch (e) {
     // The Brain's store rejected the write — return a clear error, never a bare empty-body 500.
-    if (e instanceof BrainWriteError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof BrainWriteError)
+      return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
   if (result === undefined) return bad('missing fields for this kind');

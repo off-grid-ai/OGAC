@@ -21,6 +21,11 @@ import { durableEnabled } from '@/lib/agent-run-durable';
 import type { AppSpec } from '@/lib/app-model';
 import type { AppRunContext, AppRunOutcome } from '@/lib/app-run';
 import {
+  PipelineBindingError,
+  requireRunnablePipelineBinding,
+  resolveExplicitPipelineBinding,
+} from '@/lib/pipeline-run-glue';
+import {
   type AppDurableConfig,
   appDurableConfigFromEnv,
   appWorkflowIdFor,
@@ -91,15 +96,39 @@ export async function submitAppRun(
   input: Record<string, unknown>,
   ctx: AppRunContext,
 ): Promise<AppRunHandle> {
+  if (spec.orgId !== ctx.orgId) {
+    throw new PipelineBindingError({
+      state: 'invalid',
+      pipelineId: spec.pipelineId ?? null,
+      contract: null,
+      code: 'binding_changed',
+      reason: `App '${spec.id}' does not belong to org '${ctx.orgId}'.`,
+    });
+  }
+  // This is the mandatory App dispatch chokepoint. The saved AppSpec is the only binding authority:
+  // caller-supplied pipelineId/contract values are ignored and cannot make an invalid App runnable.
+  const binding = requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(spec.pipelineId, ctx.orgId),
+  );
+  const governedCtx: AppRunContext = {
+    ...ctx,
+    pipelineId: binding.pipelineId,
+    contract: binding.contract,
+  };
   const wantDurable = shouldRunDurably(spec) && appDurableEnabled();
 
   if (wantDurable) {
-    const handle = await trySubmitDurable(spec, input, ctx);
+    const handle = await trySubmitDurable(spec, input, governedCtx);
     if (handle) return handle;
     // Durable requested but Temporal unreachable — fall through to inline (graceful degrade).
   }
 
-  return runInline(spec, input, ctx, wantDurable ? 'durable requested but Temporal unreachable' : undefined);
+  return runInline(
+    spec,
+    input,
+    governedCtx,
+    wantDurable ? 'durable requested but Temporal unreachable' : undefined,
+  );
 }
 
 async function trySubmitDurable(
@@ -115,11 +144,13 @@ async function trySubmitDurable(
     input,
     orgId: ctx.orgId,
     caller: ctx.actor,
+    asker: ctx.asker,
     // PA-16 — thread the bound-pipeline id onto the durable path so the WORKER enforces the same
     // contract the inline route does. The route already resolved the contract into ctx.contract
-    // (resolveConsumerPipeline → resolveContract); carry its pipelineId so the workflow re-resolves
-    // the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy allow.
-    pipelineId: ctx.contract?.pipelineId ?? null,
+    // (resolveExplicitPipelineBinding); carry its pipelineId so the workflow re-resolves the full
+    // contract via an activity (the I/O boundary). Null means deliberately unbound; a stale explicit
+    // id fails closed before any step runs.
+    pipelineId: ctx.pipelineId ?? ctx.contract?.pipelineId ?? null,
     // BFSI blast-radius — carry the resolved run mode so the WORKER intercepts side-effecting sinks
     // on a shadow run identically to the inline path. Default 'live' (additive).
     mode: ctx.mode ?? 'live',
@@ -221,7 +252,8 @@ export async function describeAppRun(appId: string, runId: string): Promise<AppR
     const desc = await handle.describe();
     let status = mapWorkflowStatus(desc.status?.name);
     if (desc.status?.name === 'COMPLETED') {
-      const result = (await handle.result().catch(() => undefined)) as AppRunWorkflowResult | undefined;
+      const result = (await handle.result().catch(() => undefined)) as
+        AppRunWorkflowResult | undefined;
       if (result) status = result.found ? result.status : 'not_found';
     }
     return { configured: true, reachable: true, workflowId, status };

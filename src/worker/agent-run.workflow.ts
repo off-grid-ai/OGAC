@@ -11,7 +11,8 @@
 // ONLY from @temporalio/workflow and type-only from the pure src/lib contract. It is deliberately
 // excluded from the Next build (see next.config.mjs serverExternalPackages + worker alias).
 
-import { proxyActivities } from '@temporalio/workflow';
+import { proxyActivities, workflowInfo } from '@temporalio/workflow';
+import { runInputForExecution } from '../lib/scheduled-run-id';
 import type { AgentRunWorkflowInput, AgentRunWorkflowResult } from '../lib/agent-run-durable';
 import type * as activities from './agent-run.activities';
 // Type-only + relative: erased at compile, so the sandbox bundle stays clean and self-contained.
@@ -36,5 +37,5 @@ export async function AgentRunWorkflow(
   maxAttempts = 3,
 ): Promise<AgentRunWorkflowResult> {
   const runAgentPipeline = pipeline(maxAttempts);
-  return runAgentPipeline(input);
+  return runAgentPipeline(runInputForExecution(input, workflowInfo().runId));
 }

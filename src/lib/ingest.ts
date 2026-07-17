@@ -4,6 +4,7 @@ import { addDocument, type BrainDoc } from '@/lib/brain';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import type { DocAcl } from '@/lib/retrieval/acl';
 import { listDatasets } from '@/lib/store';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // The Brain's ingestion layer: turn a source (text, file, image, database) into an indexed,
 // provenance-tagged document. Files/text are stored directly; images are captioned via the
@@ -87,26 +88,47 @@ export async function ingestText(
   text: string,
   source = 'Text',
   acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
 ): Promise<BrainDoc> {
-  return recordIngest(source, await addDocument(title, source, text, acl));
+  return recordIngest(source, await addDocument(title, source, text, acl, orgId));
 }
 
-export async function ingestFile(name: string, text: string, acl?: DocAcl): Promise<BrainDoc> {
-  return recordIngest(`File · ${name}`, await addDocument(name, `File · ${name}`, text, acl));
+export async function ingestFile(
+  name: string,
+  text: string,
+  acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
+): Promise<BrainDoc> {
+  return recordIngest(
+    `File · ${name}`,
+    await addDocument(name, `File · ${name}`, text, acl, orgId),
+  );
 }
 
-export async function ingestImage(title: string, dataUrl: string, acl?: DocAcl): Promise<BrainDoc> {
+export async function ingestImage(
+  title: string,
+  dataUrl: string,
+  acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
+): Promise<BrainDoc> {
   const caption = await captionImage(dataUrl);
   const text = caption || `Image: ${title} (no caption — vision model unavailable).`;
-  return recordIngest(`Image · ${title}`, await addDocument(title, `Image · ${title}`, text, acl));
+  return recordIngest(
+    `Image · ${title}`,
+    await addDocument(title, `Image · ${title}`, text, acl, orgId),
+  );
 }
 
-export async function ingestDatabase(datasetId: string, acl?: DocAcl): Promise<BrainDoc | null> {
-  const dataset = (await listDatasets()).find((d) => d.id === datasetId);
+export async function ingestDatabase(
+  datasetId: string,
+  acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
+): Promise<BrainDoc | null> {
+  const dataset = (await listDatasets(orgId)).find((d) => d.id === datasetId);
   if (!dataset) return null;
   const text =
     `Dataset "${dataset.name}" from ${dataset.source}: ${dataset.rows.toLocaleString()} rows, ` +
     `classification ${dataset.classification}. Structured records available for query.`;
   const source = `Database · ${dataset.source}`;
-  return recordIngest(source, await addDocument(dataset.name, source, text, acl));
+  return recordIngest(source, await addDocument(dataset.name, source, text, acl, orgId));
 }

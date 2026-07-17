@@ -18,6 +18,10 @@ test('IA migrations have one owner for every legacy prefix', () => {
 test('old deep links resolve directly to canonical entity owners', () => {
   assert.equal(canonicalPath('/build/apps/app-42/runs/run-7'), '/solutions/apps/app-42/runs/run-7');
   assert.equal(
+    canonicalPath('/build/agents/fnol-intake/runs/run-7'),
+    '/solutions/agents/fnol-intake/runs/run-7',
+  );
+  assert.equal(
     canonicalPath('/build/pipelines/credit-risk/policy'),
     '/runtime/pipelines/credit-risk/policy',
   );
@@ -35,6 +39,7 @@ test('canonical paths are stable and never redirected back to legacy URLs', () =
   for (const path of [
     '/work/chat/conversation-1',
     '/solutions/apps/app-42',
+    '/solutions/agents/fnol-intake',
     '/runtime/pipelines/credit-risk',
     '/operations/nodes/node-from-registry',
     '/operations/clusters/cluster-from-registry',

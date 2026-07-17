@@ -4,6 +4,7 @@ import { SOURCES } from './sources';
 import type {
   RetrievalHit,
   RetrievalOptions,
+  RetrievalContext,
   RouteDecision,
   RouteResult,
   SourceKind,
@@ -49,10 +50,22 @@ function fuse(lists: RetrievalHit[][], k: number): RetrievalHit[] {
     .map(({ fused, ...hit }) => ({ ...hit, score: Number(fused.toFixed(4)) }));
 }
 
-export async function route(query: string, k = 8, opts?: RetrievalOptions): Promise<RouteResult> {
+export async function route(
+  query: string,
+  k = 8,
+  opts?: RetrievalOptions,
+  context?: RetrievalContext,
+): Promise<RouteResult> {
   const decision = classify(query);
-  const selected = SOURCES.filter((s) => decision.intent.includes(s.kind));
-  const lists = await Promise.all(selected.map((s) => s.search(query, k, opts)));
+  const selected = SOURCES.filter((source) => {
+    if (!decision.intent.includes(source.kind)) return false;
+    if (source.kind !== 'database' || !context?.structuredAccess) return true;
+    if (context.structuredAccess.state === 'disabled') return false;
+    // A bound agent may use only the connector source because it carries the authorized domain id
+    // through to the live query. Generic dataset metadata has no domain identity and is excluded.
+    return source.id === 'connector';
+  });
+  const lists = await Promise.all(selected.map((s) => s.search(query, k, opts, context)));
   const hits = fuse(lists, k);
   // Record which sources fed this retrieval through the lineage port (no-op unless configured).
   await getLineage().emit({

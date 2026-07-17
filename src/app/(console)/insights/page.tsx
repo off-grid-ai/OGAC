@@ -178,7 +178,7 @@ function RunTracesTable({ runs }: Readonly<{ runs: Trace[] }>) {
             </TableCell>
             <TableCell>
               <Link
-                href={`/build/agents/${r.agentId}/runs/${r.id}`}
+                href={`/solutions/agents/${r.agentId}/runs/${r.id}`}
                 className="text-xs text-primary hover:underline"
               >
                 trace →
