@@ -36,7 +36,7 @@ function indirect(
 
 export function getOperationalServices(env: Env = process.env): OperationalServiceEntry[] {
   const gatewayControl =
-    env.OFFGRID_GATEWAY_CONTROL_URL ?? env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:8800';
+    env.OFFGRID_GATEWAY_CONTROL_URL ?? env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
   return [
     {
       id: 'gateway-control',

@@ -57,14 +57,14 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
   {
     key: 'OFFGRID_GATEWAY_URL',
     group: 'AI Gateway',
-    label: 'Gateway URL',
+    label: 'Legacy gateway URL',
     type: 'url',
     secret: false,
     restartRequired: true,
     hostValue: true,
     default: 'http://offgrid-s1.local:4000',
     description:
-      'The OpenAI-compatible gateway the console calls for all inference (the LiteLLM proxy).',
+      'Backwards-compatible default for both inference and control until their explicit URLs are set.',
   },
   {
     key: 'OFFGRID_GATEWAY_API_KEY',
@@ -73,7 +73,78 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     type: 'string',
     secret: true,
     restartRequired: true,
-    description: 'Static key sent as x-api-key to the gateway. Must match the LiteLLM proxy key.',
+    description:
+      'Backwards-compatible static x-api-key for the aggregator control and legacy inference door.',
+  },
+  {
+    key: 'OFFGRID_GATEWAY_CONTROL_URL',
+    group: 'AI Gateway',
+    label: 'Gateway control URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    description:
+      'Aggregator inventory and node-control endpoint; independent from the model inference door.',
+  },
+  {
+    key: 'OFFGRID_GATEWAY_CONTROL_API_KEY',
+    group: 'AI Gateway',
+    label: 'Gateway control API key',
+    type: 'string',
+    secret: true,
+    restartRequired: true,
+    description: 'Optional dedicated x-api-key for aggregator inventory and node control.',
+  },
+  {
+    key: 'OFFGRID_INFERENCE_PROVIDER',
+    group: 'AI Gateway',
+    label: 'Inference provider',
+    type: 'string',
+    secret: false,
+    restartRequired: true,
+    description:
+      'Set to litellm for an explicit LiteLLM model-door cutover; unset preserves legacy gateway behavior.',
+  },
+  {
+    key: 'OFFGRID_INFERENCE_URL',
+    group: 'AI Gateway',
+    label: 'Inference URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    description:
+      'Optional explicit OpenAI-compatible model door. Does not affect node-control calls.',
+  },
+  {
+    key: 'OFFGRID_INFERENCE_API_KEY',
+    group: 'AI Gateway',
+    label: 'Inference API key',
+    type: 'string',
+    secret: true,
+    restartRequired: true,
+    description:
+      'Bearer credential for an explicit inference door; LiteLLM otherwise uses its master key.',
+  },
+  {
+    key: 'OFFGRID_LITELLM_URL',
+    group: 'AI Gateway',
+    label: 'LiteLLM URL',
+    type: 'url',
+    secret: false,
+    restartRequired: true,
+    hostValue: true,
+    description: 'LiteLLM management URL and model door when OFFGRID_INFERENCE_PROVIDER=litellm.',
+  },
+  {
+    key: 'OFFGRID_LITELLM_MASTER_KEY',
+    group: 'AI Gateway',
+    label: 'LiteLLM master key',
+    type: 'string',
+    secret: true,
+    restartRequired: true,
+    description: 'Bearer credential for LiteLLM inference and management APIs.',
   },
 
   // ── Database ──

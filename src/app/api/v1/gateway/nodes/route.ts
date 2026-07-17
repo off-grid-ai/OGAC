@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { GATEWAY_URL, gatewayHeaders, mapAggregatorNode, nodeActionSupport, type AggregatorNode, type NodeAction } from '@/lib/gateway';
+import {
+  gatewayControlFetch,
+  mapAggregatorNode,
+  nodeActionSupport,
+  type AggregatorNode,
+  type NodeAction,
+} from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +24,8 @@ const ACTIONS: NodeAction[] = ['model', 'restart', 'enable', 'disable'];
 
 export async function GET() {
   try {
-    const r = await fetch(`${GATEWAY_URL}/nodes`, {
+    const r = await gatewayControlFetch('/nodes', {
       cache: 'no-store',
-      headers: gatewayHeaders(),
       signal: AbortSignal.timeout(15000),
     });
     if (!r.ok) return NextResponse.json({ available: false, nodes: [], support: actionSupport() });

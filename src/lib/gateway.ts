@@ -9,8 +9,14 @@
 // unit-tested `chooseGatewayAuth`.
 import { getServiceCredential, invalidateServiceCredential } from './service-credentials';
 import { chooseGatewayAuth, NO_CREDENTIAL } from './service-credentials-lib';
+import { resolveGatewayEndpoints } from './gateway-endpoints';
 
-export const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
+const ENDPOINTS = resolveGatewayEndpoints();
+
+/** OpenAI-compatible model door. This may be LiteLLM while control remains on the aggregator. */
+export const GATEWAY_URL = ENDPOINTS.inferenceUrl;
+/** Aggregator inventory/control door. Never follows an inference-only LiteLLM cutover. */
+export const GATEWAY_CONTROL_URL = ENDPOINTS.controlUrl;
 
 const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
 
@@ -20,6 +26,8 @@ const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
  * can't await; `gatewayHeadersAsync` is the broker-preferring path for calls that can.
  */
 export function gatewayHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  if (ENDPOINTS.inferenceApiKey)
+    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...extra };
   // NO_CREDENTIAL → chooseGatewayAuth falls straight through to the legacy x-api-key branch.
   return { ...chooseGatewayAuth(NO_CREDENTIAL, GATEWAY_API_KEY || undefined), ...extra };
 }
@@ -32,8 +40,21 @@ export function gatewayHeaders(extra: Record<string, string> = {}): Record<strin
 export async function gatewayHeadersAsync(
   extra: Record<string, string> = {},
 ): Promise<Record<string, string>> {
+  if (ENDPOINTS.inferenceApiKey)
+    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...extra };
   const cred = await getServiceCredential('gateway');
   return { ...chooseGatewayAuth(cred, GATEWAY_API_KEY || undefined), ...extra };
+}
+
+export function gatewayControlHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { ...chooseGatewayAuth(NO_CREDENTIAL, ENDPOINTS.controlApiKey ?? undefined), ...extra };
+}
+
+async function gatewayControlHeadersAsync(
+  extra: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const cred = await getServiceCredential('gateway');
+  return { ...chooseGatewayAuth(cred, ENDPOINTS.controlApiKey ?? undefined), ...extra };
 }
 
 /**
@@ -45,10 +66,22 @@ export async function gatewayFetch(path: string, init: RequestInit = {}): Promis
   const extra = (init.headers as Record<string, string>) ?? {};
   const headers = await gatewayHeadersAsync(extra);
   const res = await fetch(`${GATEWAY_URL}${path}`, { ...init, headers });
-  if (res.status === 401 && headers.authorization) {
+  if (res.status === 401 && headers.authorization && !ENDPOINTS.inferenceApiKey) {
     invalidateServiceCredential('gateway');
     const retryHeaders = await gatewayHeadersAsync(extra);
     return fetch(`${GATEWAY_URL}${path}`, { ...init, headers: retryHeaders });
+  }
+  return res;
+}
+
+export async function gatewayControlFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const extra = (init.headers as Record<string, string>) ?? {};
+  const headers = await gatewayControlHeadersAsync(extra);
+  const res = await fetch(`${GATEWAY_CONTROL_URL}${path}`, { ...init, headers });
+  if (res.status === 401 && headers.authorization) {
+    invalidateServiceCredential('gateway');
+    const retryHeaders = await gatewayControlHeadersAsync(extra);
+    return fetch(`${GATEWAY_CONTROL_URL}${path}`, { ...init, headers: retryHeaders });
   }
   return res;
 }
@@ -113,7 +146,9 @@ const HEALTHS = new Set(['up', 'degraded', 'down', 'unknown']);
 export function mapAggregatorNode(n: AggregatorNode): NodeView {
   const health = (HEALTHS.has(String(n.health)) ? n.health : 'unknown') as NodeView['health'];
   const installed = Array.isArray(n.installedModels)
-    ? n.installedModels.map((m) => m?.id).filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ? n.installedModels
+        .map((m) => m?.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
     : [];
   return {
     name: n.name,
@@ -241,40 +276,151 @@ export function shapeGatewayTuning(cfg: AggregatorConfig | null): GatewayTuningV
     {
       group: 'Routing',
       rows: [
-        { key: 'liveNodes', label: 'Live nodes', value: `${tuneNum(r.liveNodes)} of ${tuneNum(r.poolNodes)}`, changeVia: CHANGE_SSOT, description: 'Enabled nodes currently in the routing pool.' },
-        { key: 'imageLiveNodes', label: 'Image nodes', value: tuneNum(r.imageLiveNodes), changeVia: CHANGE_SSOT, description: 'Enabled image-generation gateways.' },
-        { key: 'poolRefreshMs', label: 'Pool refresh interval', value: tuneMs(r.poolRefreshMs), changeVia: CHANGE_RESTART, description: 'How often the router re-pulls the fleet SSOT pool.' },
-        { key: 'poolPinned', label: 'Pool pinned (OFFGRID_POOL)', value: tuneBool(r.poolPinned), changeVia: CHANGE_RESTART, description: 'When on, an env-pinned pool overrides the SSOT (dev/manual).' },
-        { key: 'fallbackPoolNodes', label: 'Hardcoded fallback pool', value: `${tuneNum(r.fallbackPoolNodes)} nodes`, changeVia: CHANGE_RESTART, description: 'Last-known-good pool the router serves from if the SSOT is unreachable — routing never drops.' },
+        {
+          key: 'liveNodes',
+          label: 'Live nodes',
+          value: `${tuneNum(r.liveNodes)} of ${tuneNum(r.poolNodes)}`,
+          changeVia: CHANGE_SSOT,
+          description: 'Enabled nodes currently in the routing pool.',
+        },
+        {
+          key: 'imageLiveNodes',
+          label: 'Image nodes',
+          value: tuneNum(r.imageLiveNodes),
+          changeVia: CHANGE_SSOT,
+          description: 'Enabled image-generation gateways.',
+        },
+        {
+          key: 'poolRefreshMs',
+          label: 'Pool refresh interval',
+          value: tuneMs(r.poolRefreshMs),
+          changeVia: CHANGE_RESTART,
+          description: 'How often the router re-pulls the fleet SSOT pool.',
+        },
+        {
+          key: 'poolPinned',
+          label: 'Pool pinned (OFFGRID_POOL)',
+          value: tuneBool(r.poolPinned),
+          changeVia: CHANGE_RESTART,
+          description: 'When on, an env-pinned pool overrides the SSOT (dev/manual).',
+        },
+        {
+          key: 'fallbackPoolNodes',
+          label: 'Hardcoded fallback pool',
+          value: `${tuneNum(r.fallbackPoolNodes)} nodes`,
+          changeVia: CHANGE_RESTART,
+          description:
+            'Last-known-good pool the router serves from if the SSOT is unreachable — routing never drops.',
+        },
       ],
     },
     {
       group: 'Health detection',
       rows: [
-        { key: 'probeEnabled', label: 'Synthetic probe', value: tuneBool(h.probeEnabled), changeVia: CHANGE_RESTART, description: '1-token generation probe that catches jams with no live traffic.' },
-        { key: 'windowMs', label: 'Recent window', value: tuneMs(h.windowMs), changeVia: CHANGE_RESTART, description: 'How far back error-rate/latency signals are measured.' },
-        { key: 'slowMs', label: 'Degraded latency', value: tuneMs(h.slowMs), changeVia: CHANGE_RESTART, description: 'Avg latency above this marks a node degraded.' },
-        { key: 'jamMs', label: 'Jammed latency', value: tuneMs(h.jamMs), changeVia: CHANGE_RESTART, description: 'Avg latency above this marks a node down (jammed).' },
-        { key: 'degradedErrRate', label: 'Degraded error rate', value: tunePct(h.degradedErrRate), changeVia: CHANGE_RESTART, description: 'Recent error rate above this marks a node degraded.' },
-        { key: 'downErrRate', label: 'Down error rate', value: tunePct(h.downErrRate), changeVia: CHANGE_RESTART, description: 'Recent error rate above this marks a node down.' },
-        { key: 'probeEveryMs', label: 'Probe interval', value: tuneMs(h.probeEveryMs), changeVia: CHANGE_RESTART, description: 'How often each node is probed.' },
-        { key: 'probeTimeoutMs', label: 'Probe timeout', value: tuneMs(h.probeTimeoutMs), changeVia: CHANGE_RESTART, description: 'Bound on the synthetic probe generation.' },
+        {
+          key: 'probeEnabled',
+          label: 'Synthetic probe',
+          value: tuneBool(h.probeEnabled),
+          changeVia: CHANGE_RESTART,
+          description: '1-token generation probe that catches jams with no live traffic.',
+        },
+        {
+          key: 'windowMs',
+          label: 'Recent window',
+          value: tuneMs(h.windowMs),
+          changeVia: CHANGE_RESTART,
+          description: 'How far back error-rate/latency signals are measured.',
+        },
+        {
+          key: 'slowMs',
+          label: 'Degraded latency',
+          value: tuneMs(h.slowMs),
+          changeVia: CHANGE_RESTART,
+          description: 'Avg latency above this marks a node degraded.',
+        },
+        {
+          key: 'jamMs',
+          label: 'Jammed latency',
+          value: tuneMs(h.jamMs),
+          changeVia: CHANGE_RESTART,
+          description: 'Avg latency above this marks a node down (jammed).',
+        },
+        {
+          key: 'degradedErrRate',
+          label: 'Degraded error rate',
+          value: tunePct(h.degradedErrRate),
+          changeVia: CHANGE_RESTART,
+          description: 'Recent error rate above this marks a node degraded.',
+        },
+        {
+          key: 'downErrRate',
+          label: 'Down error rate',
+          value: tunePct(h.downErrRate),
+          changeVia: CHANGE_RESTART,
+          description: 'Recent error rate above this marks a node down.',
+        },
+        {
+          key: 'probeEveryMs',
+          label: 'Probe interval',
+          value: tuneMs(h.probeEveryMs),
+          changeVia: CHANGE_RESTART,
+          description: 'How often each node is probed.',
+        },
+        {
+          key: 'probeTimeoutMs',
+          label: 'Probe timeout',
+          value: tuneMs(h.probeTimeoutMs),
+          changeVia: CHANGE_RESTART,
+          description: 'Bound on the synthetic probe generation.',
+        },
       ],
     },
     {
       group: 'Upstream timeouts',
       rows: [
-        { key: 'chatUpstreamMs', label: 'Chat / vision timeout', value: tuneMs(t.chatUpstreamMs), changeVia: CHANGE_RESTART, description: 'Per-request timeout proxying to a chat/vision node.' },
-        { key: 'imageUpstreamMs', label: 'Image timeout', value: tuneMs(t.imageUpstreamMs), changeVia: CHANGE_RESTART, description: 'Per-request timeout proxying to an image node.' },
+        {
+          key: 'chatUpstreamMs',
+          label: 'Chat / vision timeout',
+          value: tuneMs(t.chatUpstreamMs),
+          changeVia: CHANGE_RESTART,
+          description: 'Per-request timeout proxying to a chat/vision node.',
+        },
+        {
+          key: 'imageUpstreamMs',
+          label: 'Image timeout',
+          value: tuneMs(t.imageUpstreamMs),
+          changeVia: CHANGE_RESTART,
+          description: 'Per-request timeout proxying to an image node.',
+        },
       ],
     },
   ];
 
   const capabilities: TuningCapability[] = [
-    { key: 'responseCache', label: 'Response cache', present: cap.responseCache === true, note: 'The router does not cache responses. There is no cache TTL to tune.' },
-    { key: 'perRequestFallbackChain', label: 'Per-request fallback chain', present: cap.perRequestFallbackChain === true, note: 'No model→model fallback. Resilience comes from the multi-node pool + the hardcoded fallback pool, both above.' },
-    { key: 'rateLimit', label: 'Rate limiting / WAF', present: cap.rateLimit === true, note: 'Enforced at the Caddy edge (gateway.getoffgridai.co) plus a 60 req/min per-IP layer in the console middleware — by design, not here.' },
-    { key: 'liveReconfigure', label: 'Live reconfigure', present: cap.liveReconfigure === true, note: 'Tuning knobs are env-set in the aggregator launchd plist on S1; restart the aggregator to apply changes.' },
+    {
+      key: 'responseCache',
+      label: 'Response cache',
+      present: cap.responseCache === true,
+      note: 'The router does not cache responses. There is no cache TTL to tune.',
+    },
+    {
+      key: 'perRequestFallbackChain',
+      label: 'Per-request fallback chain',
+      present: cap.perRequestFallbackChain === true,
+      note: 'No model→model fallback. Resilience comes from the multi-node pool + the hardcoded fallback pool, both above.',
+    },
+    {
+      key: 'rateLimit',
+      label: 'Rate limiting / WAF',
+      present: cap.rateLimit === true,
+      note: 'Enforced at the Caddy edge (gateway.getoffgridai.co) plus a 60 req/min per-IP layer in the console middleware — by design, not here.',
+    },
+    {
+      key: 'liveReconfigure',
+      label: 'Live reconfigure',
+      present: cap.liveReconfigure === true,
+      note: 'Tuning knobs are env-set in the aggregator launchd plist on S1; restart the aggregator to apply changes.',
+    },
   ];
 
   return { readonly: cfg?.readonly !== false, groups, capabilities };
@@ -291,12 +437,22 @@ export function nodeActionSupport(action: NodeAction): {
 } {
   switch (action) {
     case 'model':
-      return { needs: "activates the model on the node (writes active-model.json + restart, via the aggregator)", backed: true };
+      return {
+        needs:
+          'activates the model on the node (writes active-model.json + restart, via the aggregator)',
+        backed: true,
+      };
     case 'restart':
-      return { needs: "restarts the node's gateway process (launchctl kickstart, via the aggregator)", backed: true };
+      return {
+        needs: "restarts the node's gateway process (launchctl kickstart, via the aggregator)",
+        backed: true,
+      };
     case 'enable':
     case 'disable':
-      return { needs: 're-adopts the node in/out of the routing pool (via the aggregator)', backed: true };
+      return {
+        needs: 're-adopts the node in/out of the routing pool (via the aggregator)',
+        backed: true,
+      };
   }
 }
 
@@ -307,8 +463,7 @@ export interface NodeActionRequest {
 }
 
 export type ActionValidation =
-  | { ok: true; body: Record<string, unknown> }
-  | { ok: false; reason: string; blocked?: boolean };
+  { ok: true; body: Record<string, unknown> } | { ok: false; reason: string; blocked?: boolean };
 
 /**
  * Validate a requested node action against the node's state, and shape the body
@@ -331,20 +486,26 @@ export function validateNodeAction(node: NodeView, req: NodeActionRequest): Acti
       if (model === node.activeModel) {
         return { ok: false, reason: `${node.name} already serves "${model}"` };
       }
-      if (!support.backed) return { ok: false, blocked: true, reason: `Model swap needs ${support.needs}.` };
+      if (!support.backed)
+        return { ok: false, blocked: true, reason: `Model swap needs ${support.needs}.` };
       return { ok: true, body: { action: 'activate', id: model, kind: 'text' } };
     }
     case 'restart': {
-      if (!support.backed) return { ok: false, blocked: true, reason: `Restart needs ${support.needs}.` };
+      if (!support.backed)
+        return { ok: false, blocked: true, reason: `Restart needs ${support.needs}.` };
       return { ok: true, body: { action: 'restart' } };
     }
     case 'enable':
     case 'disable': {
       const wantEnabled = req.action === 'enable';
       if (node.enabled === wantEnabled) {
-        return { ok: false, reason: `${node.name} is already ${wantEnabled ? 'enabled' : 'disabled'}` };
+        return {
+          ok: false,
+          reason: `${node.name} is already ${wantEnabled ? 'enabled' : 'disabled'}`,
+        };
       }
-      if (!support.backed) return { ok: false, blocked: true, reason: `Enable/disable needs ${support.needs}.` };
+      if (!support.backed)
+        return { ok: false, blocked: true, reason: `Enable/disable needs ${support.needs}.` };
       return { ok: true, body: { action: wantEnabled ? 'enable' : 'disable' } };
     }
   }
