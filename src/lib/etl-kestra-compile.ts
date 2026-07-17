@@ -1,35 +1,11 @@
 // ─── ETL DAG → orchestration flow compiler — PURE, zero-IO (SOLID: no fetch/env/db) ────────────
-// Our visual ETL DAG (EtlDagSpec: source → transform chain → destination) compiles here to a valid
-// Kestra flow (YAML). The adapter (src/lib/adapters/kestra.ts) then POSTs the YAML to the engine and
-// triggers/monitors executions. This module NEVER talks to the network — it's a pure mapper, so it's
-// unit-tested against expected YAML with no live box (mirrors etl-job.ts's ClickHouse SQL builders).
-//
-// UI/product language never leaks the engine name; this internal module maps to Kestra's real flow
-// schema, which is the on-disk contract with the executor:
-//
-//   MAPPING (our DAG → Kestra flow):
-//     • flow id/namespace          ← job id, fixed namespace "offgrid.etl"
-//     • trigger: schedule + cron    → a `io.kestra.plugin.core.trigger.Schedule` trigger
-//     • source node (connector+res) → a script task that extracts rows (the console injects the real
-//                                      credentialed pull at run time via inputs; the task shape is
-//                                      `io.kestra.plugin.scripts.python.Script` — the Docker/script
-//                                      task that is the lambda-equivalent for custom code)
-//     • transform nodes             → one script task each, in topological order, piped stdin→stdout,
-//                                      carrying the declarative op as an env/arg (filter/select/…/derive)
-//     • derive node                 → the SAME script task shape carrying the safe expression = the
-//                                      lambda/custom-code equivalent
-//     • destination node            → a script task that loads the final rows into the warehouse
-//   Every task runs in a Docker task-runner (io.kestra.plugin.core.runner.Process is the fallback);
-//   we emit `taskRunner: {type: io.kestra.plugin.core.runner.Process}` so an OSS box with no Docker
-//   still runs it, and a `containerImage` the operator can switch to Docker later.
-//
-// The emitted YAML is intentionally self-describing but SAFE: identifiers and expressions are already
-// validated upstream (validateDagSpec) and re-escaped here; nothing raw is interpolated.
+// Managed ETL blueprints compile here to valid Kestra YAML. Generic visual DAGs retain their pure
+// step compiler for validation/export, but deliberately do not compile to a fake remote executor:
+// the store runs those through its real governed direct-copy engine until every node kind has a real
+// Kestra implementation. This module is pure and never talks to the network.
 
 import {
   topoOrder,
-  sourceNodes,
-  destinationNodes,
   type EtlDagSpec,
   type EtlNode,
   type EtlTriggerMode,
@@ -116,10 +92,9 @@ export function kestraFlowId(jobId: string): string {
   return cleaned || 'etl_job';
 }
 
-// ── per-node → the JSON step the console's run helper interprets ─────────────────────────────────
-// Each transform is emitted as a declarative step in a single JSON pipeline the script task reads.
-// (Kestra runs the script; the script applies the ordered steps. This keeps custom code in ONE
-// governed task rather than N brittle inter-task file hand-offs, while still being a real Kestra flow.)
+// ── per-node → portable declarative step ────────────────────────────────────────────────────────
+// The builder/export path keeps this deterministic representation while generic execution remains
+// in the real governed direct-copy engine.
 export interface CompiledStep {
   kind: string;
   [k: string]: unknown;
@@ -169,7 +144,7 @@ export function nodeToStep(n: EtlNode): CompiledStep {
   }
 }
 
-// The ordered pipeline the flow carries — source first, transforms in topo order, destination last.
+// The ordered portable pipeline — source first, transforms in topo order, destination last.
 // Returns null when the DAG can't be linearized (validateDagSpec catches this first).
 export function compileSteps(spec: EtlDagSpec): CompiledStep[] | null {
   const order = topoOrder(spec);
@@ -280,73 +255,4 @@ export function compileManagedBlueprintToKestraFlow(
     ];
   }
   return { flowId, namespace: KESTRA_NAMESPACE, yaml: toYaml(flow), steps: [] };
-}
-
-// ── the compiler ────────────────────────────────────────────────────────────────────────────────
-// Produce a valid Kestra flow (YAML) for a DAG spec. The flow:
-//   • declares an input `steps` (the compiled pipeline JSON) + `pipeline_token` (governance handle)
-//   • has ONE script task (`run_pipeline`, python) = the Docker/script task that executes the ordered
-//     steps — the lambda-equivalent for custom code (derive expressions run here)
-//   • carries a Schedule trigger when the job is scheduled
-// The console injects the real credentialed source pull + warehouse load config at execution time via
-// the `steps` input; the flow shape is stable and deploy-once.
-export function compileToKestraFlow(spec: EtlDagSpec, jobId: string, jobName?: string): CompiledFlow {
-  const flowId = kestraFlowId(jobId);
-  const steps = compileSteps(spec) ?? [];
-  const src = sourceNodes(spec)[0];
-  const dest = destinationNodes(spec)[0];
-
-  // The script that runs the ordered pipeline. It reads the `steps` input (JSON) and the console-
-  // provided extract/load config, then applies each step. Kept small + declarative; the console's
-  // governed run path (redaction, credentials, warehouse write) is driven by the injected inputs.
-  const script = [
-    'import json, os, sys',
-    'steps = json.loads("""{{ inputs.steps }}""")',
-    'print(f"offgrid-etl: executing {len(steps)} step(s) for job {{ inputs.job_id }}", flush=True)',
-    'for i, step in enumerate(steps):',
-    '    print(f"  step {i+1}/{len(steps)}: {step.get(\'kind\')}", flush=True)',
-    '# The console orchestrates the real credentialed extract → governed transform/redact → warehouse',
-    '# load out-of-band and reports rows via the execution outputs; this task is the governed executor',
-    '# hook the engine schedules and monitors. Exit 0 = the pipeline plan is valid and dispatched.',
-    'print("offgrid-etl: pipeline dispatched", flush=True)',
-  ].join('\n');
-
-  const tasks: Yaml[] = [
-    {
-      id: 'run_pipeline',
-      type: 'io.kestra.plugin.scripts.python.Script',
-      taskRunner: { type: 'io.kestra.plugin.core.runner.Process' },
-      script,
-    },
-  ];
-
-  const inputs: Yaml[] = [
-    { id: 'steps', type: 'JSON', defaults: JSON.stringify(steps) },
-    { id: 'job_id', type: 'STRING', defaults: flowId },
-    { id: 'pipeline_token', type: 'STRING', required: false },
-  ];
-
-  const flow: { [k: string]: Yaml } = {
-    id: flowId,
-    namespace: KESTRA_NAMESPACE,
-    description:
-      `Off Grid AI data-movement job${jobName ? `: ${jobName}` : ''} — ` +
-      `${src?.config.resource ?? 'source'} → ${dest?.config.database ?? 'db'}.${dest?.config.table ?? 'table'} ` +
-      `(${steps.length} step(s)).`,
-    labels: { 'offgrid.managed': 'true', 'offgrid.job_id': flowId },
-    inputs,
-    tasks,
-  };
-
-  if (spec.trigger === 'schedule' && spec.cron) {
-    flow.triggers = [
-      {
-        id: 'schedule',
-        type: 'io.kestra.plugin.core.trigger.Schedule',
-        cron: spec.cron,
-      },
-    ];
-  }
-
-  return { flowId, namespace: KESTRA_NAMESPACE, yaml: toYaml(flow), steps };
 }

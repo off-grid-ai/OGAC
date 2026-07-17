@@ -37,10 +37,7 @@ import {
   type EtlRunView,
   type ManagedEtlBlueprint,
 } from '@/lib/etl-job';
-import {
-  compileManagedBlueprintToKestraFlow,
-  compileToKestraFlow,
-} from '@/lib/etl-kestra-compile';
+import { compileManagedBlueprintToKestraFlow } from '@/lib/etl-kestra-compile';
 import { managedEtlBlueprint } from '@/lib/etl-blueprints';
 import type { EtlJobStatus } from '@/lib/etl-model';
 import { listConnectors } from '@/lib/store';
@@ -417,17 +414,15 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
 }
 
 // ── the orchestrated run path (Kestra) ───────────────────────────────────────────────────────────
-// Compile the job's DAG → an orchestration flow (YAML), deploy it to the engine (upsert), and trigger
-// an execution. Records an etl_runs row with path='kestra' + the engine's execution id. HONEST: when
-// the engine is unreachable/unconfigured the run is recorded FAILED with a clear message — we never
-// fake a success. Falls back to the governed direct-copy when the job has no DAG (older jobs) so
-// "Run now" always does something real. Never throws.
+// Compile a reviewed managed blueprint → orchestration YAML, upsert it and trigger an execution.
+// Records path='kestra' + the engine execution id. Generic jobs fall back to the real governed
+// direct-copy path. An unreachable engine records an honest failed run. Never throws.
 export async function runJobViaKestra(
   job: EtlJobSpec,
   orgId: string = DEFAULT_ORG,
 ): Promise<EtlRunView> {
-  // Older jobs authored before the visual builder have no DAG → run the governed direct-copy.
-  if (!job.managedBlueprint && !job.dag) return runJob(job, orgId);
+  // Generic jobs use the real governed direct-copy path; only reviewed blueprints claim Kestra.
+  if (!job.managedBlueprint) return runJob(job, orgId);
 
   await ensureEtlJobsSchema();
   const { sql } = await import('drizzle-orm');
@@ -441,15 +436,13 @@ export async function runJobViaKestra(
   let executionId: string | null = null;
 
   try {
-    const compiled = job.managedBlueprint
-      ? compileManagedBlueprintToKestraFlow(
-          job.managedBlueprint,
-          job.id,
-          job.name,
-          job.trigger,
-          job.cron,
-        )
-      : compileToKestraFlow(job.dag!, job.id, job.name);
+    const compiled = compileManagedBlueprintToKestraFlow(
+      job.managedBlueprint,
+      job.id,
+      job.name,
+      job.trigger,
+      job.cron,
+    );
     const up = await kestraOrchestration.upsertFlow(compiled.yaml, compiled.namespace, compiled.flowId);
     if (!up.ok) {
       message = up.configured
@@ -457,9 +450,7 @@ export async function runJobViaKestra(
         : `Orchestration engine not configured or unreachable: ${up.error}`;
       throw new Error(message);
     }
-    const inputs: Record<string, string> = job.managedBlueprint
-      ? { console_job_id: job.id, console_run_id: runId }
-      : { steps: JSON.stringify(compiled.steps), job_id: compiled.flowId };
+    const inputs: Record<string, string> = { console_job_id: job.id, console_run_id: runId };
     const exec = await kestraOrchestration.execute(compiled.namespace, compiled.flowId, inputs);
     if (!exec.ok) {
       message = `Deployed the flow but could not start an execution: ${exec.error}`;

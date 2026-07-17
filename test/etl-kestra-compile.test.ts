@@ -12,7 +12,6 @@ import {
   type EtlDagSpec,
 } from '../src/lib/etl-job.ts';
 import {
-  compileToKestraFlow,
   compileSteps,
   nodeToStep,
   toYaml,
@@ -133,34 +132,6 @@ test('compileSteps returns the ordered pipeline', () => {
   const steps = compileSteps(sampleDag());
   assert.ok(steps);
   assert.deepEqual(steps!.map((s) => s.kind), ['source', 'redact', 'filter', 'destination']);
-});
-
-// ── the compiler → a valid Kestra flow YAML ──────────────────────────────────────────────────────
-test('compileToKestraFlow produces a valid flow with the right id/namespace/tasks', () => {
-  const { flowId, namespace, yaml, steps } = compileToKestraFlow(sampleDag(), 'etl_abc123', 'Nightly CRM');
-  assert.equal(flowId, 'etl_abc123');
-  assert.equal(namespace, KESTRA_NAMESPACE);
-  assert.equal(steps.length, 4);
-  // Structural assertions on the emitted YAML (a real Kestra flow needs id/namespace/tasks).
-  assert.match(yaml, /^id: etl_abc123$/m);
-  assert.match(yaml, /^namespace: offgrid\.etl$/m);
-  assert.match(yaml, /io\.kestra\.plugin\.scripts\.python\.Script/);
-  assert.match(yaml, /^tasks:/m);
-  assert.match(yaml, /id: run_pipeline/);
-  // The steps input carries the compiled pipeline JSON.
-  assert.match(yaml, /id: steps/);
-  assert.match(yaml, /type: JSON/);
-  // Manual trigger → no Schedule trigger block.
-  assert.doesNotMatch(yaml, /io\.kestra\.plugin\.core\.trigger\.Schedule/);
-});
-
-test('compileToKestraFlow emits a Schedule trigger for a scheduled job', () => {
-  const d = sampleDag();
-  d.trigger = 'schedule';
-  d.cron = '0 3 * * *';
-  const { yaml } = compileToKestraFlow(d, 'etl_sched', 'Sched');
-  assert.match(yaml, /io\.kestra\.plugin\.core\.trigger\.Schedule/);
-  assert.match(yaml, /cron: '0 3 \* \* \*'/);
 });
 
 test('managed delinquency blueprint compiles real least-privilege business work', () => {
