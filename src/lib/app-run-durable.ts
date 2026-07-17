@@ -122,7 +122,7 @@ export interface AppRunWorkflowInput {
    * step's executeStepActivity — so the WORKER path enforces the identical contract the inline path
    * does. Null/absent means deliberately unbound; a stale explicit id fails closed in the activity.
    */
-  pipelineId?: string | null;
+  pipelineId: string | null;
   /**
    * SHADOW / LIVE run mode (BFSI blast-radius). The dispatch site resolves the effective mode
    * (app.shadowDefault ∨ requested) via the pure resolveRunMode and threads it here; the workflow

@@ -110,6 +110,7 @@ export async function syncAppSchedule(
   app: {
     id: string;
     orgId?: string;
+    pipelineId?: string | null;
     published?: boolean;
     trigger?: { kind: string; config?: Record<string, unknown> };
   },
@@ -122,6 +123,7 @@ export async function syncAppSchedule(
     // silently vanishing). This makes "saved but paused" an honest, reversible state.
     return scheduleApp(app.id, cronWithTimezone(cfg.cron, cfg.timezone), {
       orgId: app.orgId,
+      pipelineId: app.pipelineId ?? null,
       caller: opts.caller,
       paused: !cfg.enabled,
     });
@@ -141,11 +143,22 @@ export function appScheduleRunSeed(appId: string): string {
 export async function scheduleApp(
   appId: string,
   cron: string,
-  opts: { orgId?: string; caller?: string; input?: Record<string, unknown>; note?: string; paused?: boolean } = {},
+  opts: {
+    orgId?: string;
+    pipelineId?: string | null;
+    caller?: string;
+    input?: Record<string, unknown>;
+    note?: string;
+    paused?: boolean;
+  } = {},
 ): Promise<AppScheduleResult> {
   if (!appDurableEnabled()) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   if (!isValidCron(cron)) {
-    return { ok: false, reason: 'invalid', error: 'valid cron spec required (5-/6-field cron or an @macro)' };
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: 'valid cron spec required (5-/6-field cron or an @macro)',
+    };
   }
   const cfg = appDurableConfigFromEnv(process.env);
   const scheduleId = appScheduleId(appId);
@@ -155,12 +168,19 @@ export async function scheduleApp(
     input: opts.input ?? {},
     orgId: opts.orgId,
     caller: opts.caller,
+    // Required workflow input: null means deliberately unbound, never "inherit later". The worker
+    // compares this snapshot with the current App before executing, so a schedule cannot keep using
+    // a pipeline after an operator changes or removes the binding.
+    pipelineId: opts.pipelineId ?? null,
   };
   try {
     const client = await temporalClient(cfg);
     // Replace an existing schedule for this app so re-scheduling is idempotent (delete-then-create;
     // a missing prior schedule is fine).
-    await client.schedule.getHandle(scheduleId).delete().catch(() => {});
+    await client.schedule
+      .getHandle(scheduleId)
+      .delete()
+      .catch(() => {});
     await client.schedule.create({
       scheduleId,
       spec: { cronExpressions: [cron.trim()] },
@@ -176,7 +196,11 @@ export async function scheduleApp(
     });
     return { ok: true, scheduleId };
   } catch (e) {
-    return { ok: false, reason: 'unreachable', error: `Temporal unreachable: ${(e as Error).message}` };
+    return {
+      ok: false,
+      reason: 'unreachable',
+      error: `Temporal unreachable: ${(e as Error).message}`,
+    };
   }
 }
 
@@ -202,7 +226,10 @@ export async function unscheduleApp(appId: string): Promise<AppScheduleResult> {
 }
 
 // ─── setAppSchedulePaused — pause/resume an app's schedule ────────────────────────────────────────
-export async function setAppSchedulePaused(appId: string, paused: boolean): Promise<AppScheduleResult> {
+export async function setAppSchedulePaused(
+  appId: string,
+  paused: boolean,
+): Promise<AppScheduleResult> {
   if (!appDurableEnabled()) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   const cfg = appDurableConfigFromEnv(process.env);
   const scheduleId = appScheduleId(appId);
@@ -213,6 +240,11 @@ export async function setAppSchedulePaused(appId: string, paused: boolean): Prom
     else await handle.unpause();
     return { ok: true, scheduleId };
   } catch (e) {
-    return { ok: false, scheduleId, reason: 'unreachable', error: `Temporal unreachable: ${(e as Error).message}` };
+    return {
+      ok: false,
+      scheduleId,
+      reason: 'unreachable',
+      error: `Temporal unreachable: ${(e as Error).message}`,
+    };
   }
 }

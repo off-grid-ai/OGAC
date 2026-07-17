@@ -53,6 +53,40 @@ export async function resolveContractActivity(
 }
 
 /**
+ * Revalidate the durable dispatch snapshot against the current App before any step executes.
+ * Schedules and queued runs may wait for minutes or days, so the serialized pipeline id is evidence
+ * of what was authorized at submission time, not an authority forever. A changed/deleted/cross-org
+ * App or a stale pipeline fails closed here.
+ */
+export async function resolveAppRunContractActivity(
+  appId: string,
+  expectedPipelineId: string | null,
+  orgId?: string,
+): Promise<PipelineContract | null> {
+  const resolvedOrgId = orgId ?? 'default';
+  const { getApp } = await import('../lib/apps-store');
+  const app = await getApp(appId, resolvedOrgId);
+  const { requireRunnablePipelineBinding, resolveExplicitPipelineBinding } =
+    await import('../lib/pipeline-run-glue');
+
+  if (!app || (app.pipelineId ?? null) !== expectedPipelineId) {
+    return requireRunnablePipelineBinding({
+      state: 'invalid',
+      pipelineId: expectedPipelineId,
+      contract: null,
+      code: 'binding_changed',
+      reason: !app
+        ? `App '${appId}' is no longer available in org '${resolvedOrgId}'.`
+        : `App '${appId}' pipeline binding changed after durable submission.`,
+    }).contract;
+  }
+
+  return requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(expectedPipelineId, resolvedOrgId),
+  ).contract;
+}
+
+/**
  * Execute ONE runnable step against the real platform (I/O), reusing executeStep verbatim. The
  * caller context is built from the workflow input so an agent step's child run attributes its
  * audit/trace/lineage identically to an inline run (mirrors runAgentPipeline's context threading).

@@ -108,7 +108,8 @@ export async function AppRunWorkflow(
   // the inline route uses), then thread it into every step below so the WORKER path enforces the
   // data-allowlist ceiling + egress leash + governance overlay identically to inline. A deliberately
   // unbound app resolves to null; a stale explicit binding throws before step execution.
-  const contract: PipelineContract | null = await act.resolveContractActivity(
+  const contract: PipelineContract | null = await act.resolveAppRunContractActivity(
+    input.appId,
     input.pipelineId,
     input.orgId,
   );
