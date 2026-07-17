@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import test from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ConsoleLoading from '../src/app/(console)/loading.tsx';
 
 const routeRoot = join(process.cwd(), 'src/app/(console)');
 
@@ -43,6 +46,13 @@ test('every route loader owns or inherits its presentation frame', async () => {
   }
 
   assert.deepEqual(missing, []);
+});
+
+test('the root loading boundary renders inside the same padded frame as its page', () => {
+  const html = renderToStaticMarkup(createElement(ConsoleLoading));
+
+  assert.match(html, /class="[^"]*overflow-y-auto p-4 md:p-6[^"]*"/);
+  assert.match(html, /aria-busy="true"/);
 });
 
 test('contextual detail loaders inherit one frame instead of nesting a second gutter', async () => {
