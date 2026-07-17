@@ -14,4 +14,3 @@ export function getRuntimeServiceTopologyRegistry(
     listTopologyRecords: () => parseServiceTopologyRecords(env.OFFGRID_SERVICE_TOPOLOGY),
   });
 }
-
