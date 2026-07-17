@@ -91,6 +91,13 @@ export async function submitAppRun(
   input: Record<string, unknown>,
   ctx: AppRunContext,
 ): Promise<AppRunHandle> {
+  // This is the ONE execution chokepoint shared by admin, public-slug, webhook, inbound-email,
+  // token, IMAP, WhatsApp and app-as-tool callers. An adopted solution contract must therefore be
+  // checked here, against the exact AppSpec that is about to execute, before either Temporal or the
+  // inline runner can create a run or perform a step. Callers cannot opt out of this guard.
+  const { assertSolutionRuntimeBinding } = await import('@/lib/solution-blueprints-store');
+  await assertSolutionRuntimeBinding(spec, ctx.orgId);
+
   const wantDurable = shouldRunDurably(spec) && appDurableEnabled();
 
   if (wantDurable) {

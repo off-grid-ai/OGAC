@@ -508,13 +508,16 @@ export async function hasSolutionDeploymentsForApp(appId: string, orgId: string)
   return Boolean(row);
 }
 
-export async function assertSolutionRuntimeBinding(appId: string, orgId: string): Promise<void> {
+export async function assertSolutionRuntimeBinding(
+  app: Pick<import('@/lib/app-model').AppSpec, 'id' | 'pipelineId' | 'published' | 'steps'>,
+  orgId: string,
+): Promise<void> {
   const [row] = await db
     .select()
     .from(solutionDeployments)
     .where(
       and(
-        eq(solutionDeployments.appId, appId),
+        eq(solutionDeployments.appId, app.id),
         eq(solutionDeployments.orgId, orgId),
         eq(solutionDeployments.status, 'active'),
       ),
@@ -522,7 +525,19 @@ export async function assertSolutionRuntimeBinding(appId: string, orgId: string)
     .limit(1);
   if (!row) return;
   try {
-    await compatibleBinding(orgId, toDeployment(row));
+    const blueprint = await getSolutionBlueprint(row.blueprintId, orgId, row.blueprintVersion);
+    if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
+    const pipeline = app.pipelineId ? await getPipeline(app.pipelineId, orgId) : null;
+    const compatibility = evaluateSolutionCompatibility(blueprint, app, pipeline);
+    if (!compatibility.compatible || compatibility.pipelineId !== row.pipelineId) {
+      throw new SolutionConflictError(
+        'App is not compatible with the pinned solution deployment',
+        'incompatible',
+        compatibility.pipelineId !== row.pipelineId
+          ? [...compatibility.errors, 'pinned pipeline changed']
+          : compatibility.errors,
+      );
+    }
   } catch (error) {
     if (error instanceof SolutionConflictError || error instanceof SolutionValidationError) {
       throw new SolutionConflictError(

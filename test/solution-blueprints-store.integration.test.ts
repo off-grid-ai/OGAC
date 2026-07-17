@@ -81,7 +81,7 @@ test(
       'owner@test.local',
       ORG_A,
     );
-    const app = await createApp(ORG_A, 'owner@test.local', {
+    const draftApp = await createApp(ORG_A, 'owner@test.local', {
       title: 'Collections intervention',
       summary: 'Tenant implementation',
       visibility: 'private',
@@ -105,8 +105,9 @@ test(
         { from: 'approve', to: 'report' },
       ],
     });
-    appId = app.id;
-    await publishApp(app.id, ORG_A);
+    appId = draftApp.id;
+    const app = await publishApp(draftApp.id, ORG_A);
+    assert.ok(app);
 
     const input = {
       title: 'Collections cure-rate accelerator',
@@ -146,7 +147,7 @@ test(
       status: 'active',
     });
     assert.equal(deployment.pipelineId, pipelineId);
-    await store.assertSolutionRuntimeBinding(appId, ORG_A);
+    await store.assertSolutionRuntimeBinding(app, ORG_A);
     await assert.rejects(
       store.createSolutionDeployment(ORG_A, {
         blueprintId: created.id,
@@ -190,10 +191,21 @@ test(
     assert.equal(observation.realizedRoi.netValue, 475);
     assert.equal((await store.listSolutionObservations(deployment.id, ORG_B)).length, 0);
 
-    await updateApp(appId, ORG_A, { pipelineId: null });
+    const driftedApp = await updateApp(appId, ORG_A, { pipelineId: null });
+    assert.ok(driftedApp);
     await assert.rejects(
-      store.assertSolutionRuntimeBinding(appId, ORG_A),
+      store.assertSolutionRuntimeBinding(driftedApp, ORG_A),
       (error: unknown) => (error as { code?: string }).code === 'runtime-drift',
+    );
+    const { submitAppRun } = await import('@/lib/adapters/apprun');
+    await assert.rejects(
+      submitAppRun(driftedApp, {}, {
+        orgId: ORG_A,
+        actor: 'integration@test.local',
+        runId: `run_solution_drift_${Date.now()}`,
+      }),
+      (error: unknown) => (error as { code?: string }).code === 'runtime-drift',
+      'the shared dispatch chokepoint blocks drift before every caller can execute',
     );
     assert.equal(await store.hasSolutionDeploymentsForApp(appId, ORG_A), true);
     assert.equal(await store.deleteSolutionBlueprint(created.id, ORG_A), true);
