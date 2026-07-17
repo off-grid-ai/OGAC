@@ -48,6 +48,15 @@ export function sidebarSections(enabledModules: readonly { id: ModuleId }[]): Si
   });
 }
 
+/** Resolve the single accordion branch that owns the active sidebar item. */
+export function sidebarSectionIdForActiveId(
+  sections: readonly SidebarSection[],
+  activeId: CanonicalOwnerId | undefined,
+): IaSectionId | undefined {
+  if (!activeId) return undefined;
+  return sections.find((section) => section.items.some((item) => item.id === activeId))?.id;
+}
+
 /** All enabled canonical owners, including scoped-nav secondaries. */
 export function groupModules(enabledModules: readonly { id: ModuleId }[]): SidebarSection[] {
   const enabled = new Set(enabledModules.map((module) => module.id));

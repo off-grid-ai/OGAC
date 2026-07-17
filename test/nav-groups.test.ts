@@ -5,6 +5,7 @@ import {
   groupModules,
   sidebarActiveIdFor,
   sidebarActiveIdForPath,
+  sidebarSectionIdForActiveId,
   sidebarSections,
 } from '../src/modules/groups.ts';
 import { CANONICAL_OWNERS, IA_SECTIONS } from '../src/modules/ownership.ts';
@@ -81,6 +82,13 @@ test('disabled commercial modules hide their owners without changing IA ownershi
     sections.flatMap((section) => section.items.map((item) => item.id)),
     ['overview', 'chat', 'runs'],
   );
+});
+
+test('the sidebar accordion opens only the branch that owns the active item', () => {
+  const sections = sidebarSections(MODULES);
+  assert.equal(sidebarSectionIdForActiveId(sections, 'reviews'), 'solutions');
+  assert.equal(sidebarSectionIdForActiveId(sections, 'services'), 'operations');
+  assert.equal(sidebarSectionIdForActiveId(sections, undefined), undefined);
 });
 
 test('secondary routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {
