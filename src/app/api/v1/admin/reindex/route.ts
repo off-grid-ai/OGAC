@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { listDocuments } from '@/lib/brain';
 import { qdrantCollectionName, qdrantCount, qdrantReindex } from '@/lib/qdrant';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Qdrant activation: push existing Brain docs' embeddings into the Qdrant collection so switching
 // OFFGRID_ADAPTER_RETRIEVAL=qdrant lands on a populated store. GET reports current count; POST
@@ -10,7 +11,8 @@ import { qdrantCollectionName, qdrantCount, qdrantReindex } from '@/lib/qdrant';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const [count, docs] = await Promise.all([qdrantCount(), listDocuments()]);
+  const orgId = await currentOrgId();
+  const [count, docs] = await Promise.all([qdrantCount(), listDocuments(orgId)]);
   return NextResponse.json({
     collection: qdrantCollectionName(),
     qdrantCount: count,
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   try {
-    const docs = await listDocuments();
+    const docs = await listDocuments(await currentOrgId());
     const written = await qdrantReindex(docs);
     const count = await qdrantCount();
     return NextResponse.json({ ok: true, written, qdrantCount: count });

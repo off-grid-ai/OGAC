@@ -6,13 +6,42 @@
 //
 // SOLID: no matching logic here — just read/write and map rows → the pure `DataDomain` view.
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { dataDomains } from '@/db/schema';
 import type { DataDomain as DataDomainRow } from '@/db/schema';
 import type { DataDomain } from '@/lib/data-domains';
 
 const DEFAULT_ORG = 'default';
+
+let schemaReady: Promise<void> | null = null;
+
+/** Idempotent live-upgrade path for fleets where drizzle-kit migrations cannot run over SSH. */
+export function ensureDataDomainsSchema(): Promise<void> {
+  if (schemaReady) return schemaReady;
+  schemaReady = db
+    .execute(
+      sql`
+      CREATE TABLE IF NOT EXISTS data_domains (
+        id text PRIMARY KEY,
+        org_id text NOT NULL DEFAULT 'default',
+        label text NOT NULL,
+        aliases jsonb NOT NULL DEFAULT '[]'::jsonb,
+        connector_id text NOT NULL,
+        resource text NOT NULL,
+        op_hints jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `,
+    )
+    .then(() => undefined)
+    .catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  return schemaReady;
+}
 
 // Map a DB row → the pure view the resolver consumes. Aliases/opHints default defensively.
 export function toDataDomain(r: DataDomainRow): DataDomain {
@@ -45,6 +74,7 @@ export interface UpdateDomainInput {
 
 // List every declared domain for an org, stable order (label asc) for deterministic resolution.
 export async function listDomains(orgId: string = DEFAULT_ORG): Promise<DataDomain[]> {
+  await ensureDataDomainsSchema();
   const rows = await db
     .select()
     .from(dataDomains)
@@ -54,7 +84,11 @@ export async function listDomains(orgId: string = DEFAULT_ORG): Promise<DataDoma
 }
 
 // One domain by id, org-scoped (never leak another tenant's binding). Null if absent.
-export async function getDomain(id: string, orgId: string = DEFAULT_ORG): Promise<DataDomain | null> {
+export async function getDomain(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<DataDomain | null> {
+  await ensureDataDomainsSchema();
   const rows = await db
     .select()
     .from(dataDomains)
@@ -67,6 +101,7 @@ export async function createDomain(
   input: CreateDomainInput,
   orgId: string = DEFAULT_ORG,
 ): Promise<DataDomain> {
+  await ensureDataDomainsSchema();
   const id = `dom_${randomUUID().slice(0, 12)}`;
   const now = new Date();
   const [row] = await db
@@ -92,6 +127,7 @@ export async function updateDomain(
   patch: UpdateDomainInput,
   orgId: string = DEFAULT_ORG,
 ): Promise<DataDomain | null> {
+  await ensureDataDomainsSchema();
   const set: Partial<DataDomainRow> = { updatedAt: new Date() };
   if (patch.label !== undefined) set.label = patch.label;
   if (patch.connectorId !== undefined) set.connectorId = patch.connectorId;
@@ -109,6 +145,7 @@ export async function updateDomain(
 
 // Delete, org-scoped. Returns true if a row was removed.
 export async function deleteDomain(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
+  await ensureDataDomainsSchema();
   const rows = await db
     .delete(dataDomains)
     .where(and(eq(dataDomains.id, id), eq(dataDomains.orgId, orgId)))

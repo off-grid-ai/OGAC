@@ -116,6 +116,7 @@ export async function runAgentPipeline(
     actor: input.actor,
     org: input.orgId,
     project: input.project,
+    asker: input.asker,
     // The resolved contract + its id ride the context: runAgent enforces the contract and stamps the
     // observability trace with the pipeline tag at the SOURCE, identically to the sync/inline path.
     contract: binding.contract,

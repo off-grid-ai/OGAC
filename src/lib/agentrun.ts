@@ -649,6 +649,7 @@ export async function runAgent(
       k: 6,
       orgId: attribution.org,
       contract,
+      asker: context?.asker ?? { subject: caller, roles: [] },
     });
     if (!retrieval.allow) {
       const dataVerdict = retrieval.denied;

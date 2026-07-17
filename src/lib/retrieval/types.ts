@@ -4,6 +4,7 @@
 // so a buyer can run it over the Brain alone, or wire in DB/tool sources, or all of them.
 import type { RetrievalOptions } from './query';
 import type { DataDomain } from '@/lib/data-domains';
+import type { Asker } from '@/lib/retrieval/acl';
 
 export type { RetrievalOptions } from './query';
 
@@ -12,8 +13,16 @@ export type SourceKind = 'kb' | 'database' | 'tool';
 /** Request-scoped I/O context. Optional for backwards compatibility; production agent runs pass it. */
 export interface RetrievalContext {
   orgId?: string;
-  /** Preloaded, org-scoped domains keep authorization and connector routing on one snapshot. */
-  dataDomains?: DataDomain[];
+  /** The authenticated asker whose document ACL must be enforced by the Brain. */
+  asker?: Asker;
+  /**
+   * Structured-data authorization decided before routing. Missing/legacy preserves non-agent
+   * callers. A bound agent is either disabled (no declared domain matched) or authorized for an
+   * exact org-scoped domain snapshot. The router excludes the generic dataset catalog whenever a
+   * bound decision exists because catalog rows carry no authorized domain identity.
+   */
+  structuredAccess?:
+    { state: 'disabled'; reason: string } | { state: 'authorized'; domains: DataDomain[] };
 }
 
 // One result with its provenance — `ref` points back to the origin (doc id, dataset, connector).

@@ -57,7 +57,14 @@ export async function route(
   context?: RetrievalContext,
 ): Promise<RouteResult> {
   const decision = classify(query);
-  const selected = SOURCES.filter((s) => decision.intent.includes(s.kind));
+  const selected = SOURCES.filter((source) => {
+    if (!decision.intent.includes(source.kind)) return false;
+    if (source.kind !== 'database' || !context?.structuredAccess) return true;
+    if (context.structuredAccess.state === 'disabled') return false;
+    // A bound agent may use only the connector source because it carries the authorized domain id
+    // through to the live query. Generic dataset metadata has no domain identity and is excluded.
+    return source.id === 'connector';
+  });
   const lists = await Promise.all(selected.map((s) => s.search(query, k, opts, context)));
   const hits = fuse(lists, k);
   // Record which sources fed this retrieval through the lineage port (no-op unless configured).

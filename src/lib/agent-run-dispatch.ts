@@ -24,6 +24,7 @@ import type { AgentRun } from '@/lib/agentrun';
 import type { Actor } from '@/lib/audit-event';
 import { type AgentPipelineBinding, requireRunnableAgentBinding } from '@/lib/pipeline-run-glue';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import type { Asker } from '@/lib/retrieval/acl';
 
 // The heavy collaborators (runAgent → gateway/DB chain, the Temporal client adapter) are pulled in
 // via DYNAMIC import inside defaultDispatchDeps so merely loading this module (e.g. under node:test)
@@ -48,6 +49,7 @@ export interface DispatchArgs {
   // whether it executes durably (in the worker, which has no request) or in the sync fallback.
   actor?: Actor;
   project?: string;
+  asker?: Asker;
 }
 
 // The impure collaborators, injected so the orchestration is testable without Temporal/DB.
@@ -130,6 +132,7 @@ export async function dispatchAgentRun(
     orgId,
     actor: args.actor,
     project: args.project,
+    asker: args.asker,
     // PA-16a-durable — thread the bound-pipeline id onto the DURABLE path so the WORKER enforces the
     // same contract the sync path does (mirrors app-run's ctx.contract?.pipelineId ?? null). The
     // route already resolved the binding into args.pipelineId (resolveAgentBinding); the workflow
@@ -167,6 +170,7 @@ export async function dispatchAgentRun(
     actor: args.actor,
     org: orgId,
     project: args.project,
+    asker: args.asker,
     contract: binding.contract,
     pipelineId: binding.pipelineId,
   };

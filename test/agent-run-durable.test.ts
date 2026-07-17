@@ -69,6 +69,7 @@ test('toWorkflowInput: validates required fields, normalizes optionals', () => {
     orgId: undefined,
     actor: undefined,
     project: undefined,
+    asker: undefined,
     binding: undefined,
   });
   const full = toWorkflowInput({

@@ -21,8 +21,8 @@ export const kbSource: RetrievalSource = {
   kind: 'kb',
   label: 'Knowledge base (Brain)',
   describe: 'Vector retrieval over ingested documents/SOPs, with citations.',
-  async search(query, k, opts) {
-    const hits = await searchDocuments(query, k, opts);
+  async search(query, k, opts, context) {
+    const hits = await searchDocuments(query, k, opts, context?.orgId);
     return hits.map((h) => ({
       sourceId: 'kb',
       sourceKind: 'kb',

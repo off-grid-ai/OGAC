@@ -3,6 +3,7 @@ import * as lancedb from '@lancedb/lancedb';
 import { qdrantAdd, qdrantDelete, qdrantList, qdrantSearch } from '@/lib/qdrant';
 import { filterHitsByAcl, type DocAcl } from '@/lib/retrieval/acl';
 import { buildLanceWhere, rrfFuse, type RetrievalOptions } from '@/lib/retrieval/query';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 export type { RetrievalOptions } from '@/lib/retrieval/query';
 export type { DocAcl } from '@/lib/retrieval/acl';
@@ -23,6 +24,7 @@ function qdrantSelected(): boolean {
 
 export interface BrainDoc {
   id: string;
+  orgId: string;
   title: string;
   source: string;
   text: string;
@@ -38,7 +40,12 @@ export interface BrainHit extends BrainDoc {
 // LanceDB has a FIXED schema fixed by the first row. Arrays are awkward across engine versions, so
 // the ACL is persisted as flat columns: owner/data_class as text, the two allowlists as JSON-string
 // columns. Empty string === "no value" so an un-ACL'd doc round-trips to an empty DocAcl (visible).
-interface DocRow extends BrainDoc {
+interface DocRow {
+  id: string;
+  org_id: string;
+  title: string;
+  source: string;
+  text: string;
   vector: number[];
   owner: string;
   allowed_roles: string; // JSON array string, '' when none
@@ -68,9 +75,18 @@ function aclToColumns(acl?: DocAcl): Record<AclColumn, string> {
 // `addColumns` SQL transform that back-fills existing rows with the empty-string sentinel.
 // Returns [] when the table is already current (no migration). This is the fix for the live 500:
 // tables created before the ACL columns existed reject writes with "Found field not in schema".
-export function aclColumnMigration(existing: readonly string[]): Array<{ name: string; valueSql: string }> {
+export function aclColumnMigration(
+  existing: readonly string[],
+): Array<{ name: string; valueSql: string }> {
   const have = new Set(existing);
   return ACL_COLUMNS.filter((c) => !have.has(c)).map((name) => ({ name, valueSql: "''" }));
+}
+
+/** Existing single-tenant indexes are upgraded in place; legacy rows belong only to DEFAULT_ORG. */
+export function orgColumnMigration(
+  existing: readonly string[],
+): Array<{ name: string; valueSql: string }> {
+  return existing.includes('org_id') ? [] : [{ name: 'org_id', valueSql: `'${DEFAULT_ORG}'` }];
 }
 
 function parseJsonArr(s: unknown): string[] | null {
@@ -102,7 +118,7 @@ async function embed(text: string): Promise<number[]> {
   return getInference().embed(text);
 }
 
-const SEED_DOCS: ReadonlyArray<Omit<BrainDoc, 'id'>> = [
+const SEED_DOCS: ReadonlyArray<Omit<BrainDoc, 'id' | 'orgId'>> = [
   {
     title: 'FNOL intake — death claim',
     source: 'SOP · Claims',
@@ -125,9 +141,10 @@ const SEED_DOCS: ReadonlyArray<Omit<BrainDoc, 'id'>> = [
 // rows carrying fields it doesn't know ("Found field not in schema: owner") — so a table created
 // before the ACL columns existed breaks every new ingest. This adds the missing columns in place
 // (back-filling existing rows with the empty-string sentinel), a metadata-cheap operation. Idempotent.
-async function reconcileAclColumns(tbl: lancedb.Table): Promise<void> {
+async function reconcileDocumentColumns(tbl: lancedb.Table): Promise<void> {
   const schema = await tbl.schema();
-  const migration = aclColumnMigration(schema.fields.map((f) => f.name));
+  const existing = schema.fields.map((f) => f.name);
+  const migration = [...aclColumnMigration(existing), ...orgColumnMigration(existing)];
   if (migration.length === 0) return;
   await tbl.addColumns(migration.map((m) => ({ name: m.name, valueSql: m.valueSql })));
 }
@@ -141,7 +158,7 @@ async function getTable(): Promise<lancedb.Table> {
     const names = await db.tableNames();
     if (names.includes(TABLE)) {
       const tbl = await db.openTable(TABLE);
-      await reconcileAclColumns(tbl);
+      await reconcileDocumentColumns(tbl);
       return tbl;
     }
     // Build rows from the sample SOPs (also used to define the table schema).
@@ -149,6 +166,7 @@ async function getTable(): Promise<lancedb.Table> {
     for (const d of SEED_DOCS) {
       rows.push({
         id: randomUUID(),
+        org_id: DEFAULT_ORG,
         ...d,
         vector: await embed(`${d.title}\n${d.text}`),
         ...aclToColumns(undefined), // seed docs are un-ACL'd → the ACL columns fix the schema only
@@ -167,16 +185,34 @@ async function getTable(): Promise<lancedb.Table> {
   return tablePromise;
 }
 
-export async function listDocuments(): Promise<BrainDoc[]> {
-  if (qdrantSelected()) return qdrantList();
+function sqlValue(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export async function listDocuments(orgId: string = DEFAULT_ORG): Promise<BrainDoc[]> {
+  if (qdrantSelected()) return qdrantList(orgId);
   const tbl = await getTable();
-  const rows = (await tbl.query().limit(1000).toArray()) as DocRow[];
-  return rows.map((r) => ({ id: r.id, title: r.title, source: r.source, text: r.text, acl: aclFromRow(r) }));
+  const rows = (await tbl
+    .query()
+    .where(`org_id = ${sqlValue(orgId)}`)
+    .limit(1000)
+    .toArray()) as DocRow[];
+  return rows.map((r) => ({
+    id: r.id,
+    orgId: r.org_id,
+    title: r.title,
+    source: r.source,
+    text: r.text,
+    acl: aclFromRow(r),
+  }));
 }
 
 // A single document by id (the document inspector page).
-export async function getDocument(id: string): Promise<BrainDoc | null> {
-  const docs = await listDocuments();
+export async function getDocument(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<BrainDoc | null> {
+  const docs = await listDocuments(orgId);
   return docs.find((d) => d.id === id) ?? null;
 }
 
@@ -192,8 +228,16 @@ export class BrainWriteError extends Error {
 }
 
 // PURE helper: shape a BrainDoc + embedding into the persisted DocRow. No I/O — unit-testable.
-function toDocRow(id: string, title: string, source: string, text: string, vector: number[], acl?: DocAcl): DocRow {
-  return { id, title, source, text, vector, ...aclToColumns(acl) };
+function toDocRow(
+  id: string,
+  orgId: string,
+  title: string,
+  source: string,
+  text: string,
+  vector: number[],
+  acl?: DocAcl,
+): DocRow {
+  return { id, org_id: orgId, title, source, text, vector, ...aclToColumns(acl) };
 }
 
 export async function addDocument(
@@ -201,17 +245,21 @@ export async function addDocument(
   source: string,
   text: string,
   acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
 ): Promise<BrainDoc> {
-  if (qdrantSelected()) return qdrantAdd(title, source, text, acl);
+  if (qdrantSelected()) return qdrantAdd(title, source, text, acl, orgId);
   let tbl: lancedb.Table;
   let vector: number[];
   try {
     tbl = await getTable();
     vector = await embed(`${title}\n${text}`);
   } catch (e) {
-    throw new BrainWriteError('The knowledge store is unavailable — could not embed or open the index.', e);
+    throw new BrainWriteError(
+      'The knowledge store is unavailable — could not embed or open the index.',
+      e,
+    );
   }
-  const doc = toDocRow(randomUUID(), title, source, text, vector, acl);
+  const doc = toDocRow(randomUUID(), orgId, title, source, text, vector, acl);
   try {
     await tbl.add([doc] as unknown as Record<string, unknown>[]);
   } catch (e) {
@@ -222,24 +270,24 @@ export async function addDocument(
       e,
     );
   }
-  return { id: doc.id, title, source, text, acl };
+  return { id: doc.id, orgId, title, source, text, acl };
 }
 
-export async function deleteDocument(id: string): Promise<boolean> {
+export async function deleteDocument(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
   if (qdrantSelected()) {
-    await qdrantDelete(id);
+    await qdrantDelete(id, orgId);
     return true;
   }
   const tbl = await getTable();
   // id is a server-generated UUID; single-quote-escape defensively before the SQL-ish filter.
-  const safe = id.replaceAll("'", "''");
-  await tbl.delete(`id = '${safe}'`);
+  await tbl.delete(`id = ${sqlValue(id)} AND org_id = ${sqlValue(orgId)}`);
   return true;
 }
 
 function rowToHit(r: DocRow & { _distance: number }): BrainHit {
   return {
     id: r.id,
+    orgId: r.org_id,
     title: r.title,
     source: r.source,
     text: r.text,
@@ -281,11 +329,14 @@ export async function searchDocuments(
   query: string,
   k = 5,
   opts: RetrievalOptions = {},
+  orgId: string = DEFAULT_ORG,
 ): Promise<BrainHit[]> {
-  if (qdrantSelected()) return qdrantSearch(query, k, opts);
+  if (qdrantSelected()) return qdrantSearch(query, k, opts, orgId);
   const tbl = await getTable();
   const vector = await embed(query);
-  const where = buildLanceWhere(opts.filter);
+  const filterWhere = buildLanceWhere(opts.filter);
+  const orgWhere = `org_id = ${sqlValue(orgId)}`;
+  const where = filterWhere ? `${orgWhere} AND (${filterWhere})` : orgWhere;
 
   // ACL post-filter over rows, applied before the top-k cut. When no asker is supplied this is the
   // identity function (byte-identical to today). Over-fetch so filtering still fills k allowed hits.
@@ -295,7 +346,7 @@ export async function searchDocuments(
   const overFetch = opts.mode === 'hybrid' || Boolean(opts.asker);
   const vLimit = overFetch ? Math.max(k * 4, 20) : k;
   let vq = tbl.search(vector).limit(vLimit);
-  if (where) vq = vq.where(where);
+  vq = vq.where(where);
   const vRows = (await vq.toArray()) as Array<DocRow & { _distance: number }>;
 
   if (opts.mode !== 'hybrid') {
@@ -311,7 +362,7 @@ export async function searchDocuments(
   if (await ensureFts(tbl).catch(() => false)) {
     try {
       let fq = tbl.search(query, 'fts', 'text').limit(vLimit);
-      if (where) fq = fq.where(where);
+      fq = fq.where(where);
       const fRows = (await fq.toArray()) as Array<DocRow & { _distance?: number }>;
       kwIds = fRows.map((r) => r.id);
       for (const r of fRows) if (!rowById.has(r.id)) rowById.set(r.id, { ...r, _distance: 1 });

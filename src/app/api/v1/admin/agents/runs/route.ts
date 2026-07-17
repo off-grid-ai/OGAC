@@ -1,6 +1,7 @@
 import { after, NextResponse } from 'next/server';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
 import { AgentPipelineBindingError } from '@/lib/pipeline-run-glue';
+import { askerFrom } from '@/lib/retrieval/acl';
 import { listAgentRuns, scoreRun } from '@/lib/agentrun';
 import { callerFromSession } from '@/lib/app-access-caller';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
       orgId,
       actor: actorFromSession(gate),
       project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
+      asker: askerFrom({ email: gate.user.email, role: gate.user.role }),
     });
   } catch (error) {
     if (!(error instanceof AgentPipelineBindingError)) throw error;

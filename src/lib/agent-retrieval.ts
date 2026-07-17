@@ -8,6 +8,7 @@ import type { DataDomain } from '@/lib/data-domains';
 import type { DataAccessVerdict, PipelineContract } from '@/lib/pipeline-enforcement';
 import { classify, route } from '@/lib/retrieval/router';
 import type { RouteResult } from '@/lib/retrieval/types';
+import type { Asker } from '@/lib/retrieval/acl';
 
 export interface AgentRetrievalDeps {
   listDomains: (orgId: string) => Promise<DataDomain[]>;
@@ -38,6 +39,7 @@ export async function retrieveAgentSources(
     k: number;
     orgId: string;
     contract: PipelineContract | null;
+    asker: Asker;
   },
   deps: AgentRetrievalDeps = DEFAULT_DEPS,
 ): Promise<AgentRetrievalResult> {
@@ -46,10 +48,13 @@ export async function retrieveAgentSources(
 
   // No declared-domain read means there is no domain id to authorize (KB/tool-only retrieval).
   // With no pipeline contract, the additive legacy path also avoids the metadata read entirely.
-  let domains: DataDomain[] | undefined;
+  let structuredAccess:
+    | { state: 'disabled'; reason: string }
+    | { state: 'authorized'; domains: DataDomain[] }
+    | undefined;
   let requestedDomainIds: string[] = [];
   if (input.contract && readsDeclaredDomains) {
-    domains = (await deps.listDomains(input.orgId)).filter(
+    const domains = (await deps.listDomains(input.orgId)).filter(
       (domain) => domain.orgId === input.orgId,
     );
     requestedDomainIds = requestedAgentDomainIds(
@@ -58,15 +63,30 @@ export async function retrieveAgentSources(
       domains,
       readsDeclaredDomains,
     );
-    const access = authorizeAgentDomains(input.contract, requestedDomainIds);
-    if (!access.allow && access.denied) {
-      return { allow: false, requestedDomainIds, denied: access.denied };
+    if (requestedDomainIds.length === 0) {
+      structuredAccess = { state: 'disabled', reason: 'no authorized domain matched' };
+    } else {
+      const access = authorizeAgentDomains(input.contract, requestedDomainIds);
+      if (!access.allow && access.denied) {
+        return { allow: false, requestedDomainIds, denied: access.denied };
+      }
+      const requested = new Set(requestedDomainIds);
+      structuredAccess = {
+        state: 'authorized',
+        domains: domains.filter((domain) => requested.has(domain.id)),
+      };
     }
   }
 
-  const routed = await deps.retrieve(input.query, input.k, undefined, {
-    orgId: input.orgId,
-    dataDomains: domains,
-  });
+  const routed = await deps.retrieve(
+    input.query,
+    input.k,
+    { asker: input.asker },
+    {
+      orgId: input.orgId,
+      asker: input.asker,
+      structuredAccess,
+    },
+  );
   return { allow: true, requestedDomainIds, routed };
 }

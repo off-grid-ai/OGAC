@@ -80,6 +80,7 @@ export function workflowIdFor(agentId: string, runId: string): string {
 // Temporal workflow bundle — it carries no runtime code, only the Actor shape the input embeds.
 import type { Actor } from '@/lib/audit-event';
 import type { AgentPipelineBinding } from '@/lib/pipeline-run-glue';
+import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * Input handed to AgentRunWorkflow (and through it to the pipeline activity).
@@ -101,6 +102,7 @@ export interface AgentRunWorkflowInput {
   actor?: Actor;
   /** Owning project (C4), attributed onto the run's audit event. */
   project?: string;
+  asker?: Asker;
   /**
    * PA-16a-durable — the bound-pipeline id this durable agent run must enforce (data-allowlist
    * ceiling + egress leash + policy/guardrail overlay). The dispatch site resolves the binding with
@@ -148,6 +150,7 @@ export function toWorkflowInput(raw: {
   actor?: unknown;
   project?: unknown;
   binding?: unknown;
+  asker?: unknown;
 }): AgentRunWorkflowInput {
   if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) {
     throw new Error('agentId required');
@@ -167,8 +170,20 @@ export function toWorkflowInput(raw: {
     orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
     actor: normalizeActor(raw.actor),
     project: typeof raw.project === 'string' && raw.project.trim() ? raw.project.trim() : undefined,
+    asker: normalizeAsker(raw.asker),
     binding: normalizeWorkflowBinding(raw.binding),
   };
+}
+
+function normalizeAsker(raw: unknown): Asker | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as { subject?: unknown; roles?: unknown };
+  const subject =
+    typeof value.subject === 'string' && value.subject.trim() ? value.subject.trim() : undefined;
+  const roles = Array.isArray(value.roles)
+    ? value.roles.filter((role): role is string => typeof role === 'string' && Boolean(role.trim()))
+    : [];
+  return subject || roles.length > 0 ? { subject, roles } : undefined;
 }
 
 function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefined {

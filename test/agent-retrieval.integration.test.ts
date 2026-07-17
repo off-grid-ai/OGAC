@@ -39,7 +39,7 @@ function harness(domains: DataDomain[] = [A, B]) {
     async retrieve(query, _k, _opts, context) {
       calls.retrieve += 1;
       assert.equal(context?.orgId, 'org_a');
-      assert.deepEqual(context?.dataDomains, [A]);
+      assert.deepEqual(context?.structuredAccess, { state: 'authorized', domains: [A] });
       return {
         query,
         decision: { intent: ['database'], reason: 'test' },
@@ -67,6 +67,7 @@ test('allowed real domain id proceeds to retrieval with the same org-scoped snap
       k: 6,
       orgId: 'org_a',
       contract: contract(['dom_hr_a']),
+      asker: { subject: 'user@a.test', roles: [] },
     },
     deps,
   );
@@ -84,6 +85,7 @@ test('out-of-allowlist domain denies before retrieval I/O', async () => {
       k: 6,
       orgId: 'org_a',
       contract: contract(['dom_other']),
+      asker: { subject: 'user@a.test', roles: [] },
     },
     deps,
   );
@@ -103,12 +105,18 @@ test('KB-only request preserves behavior without reading domain metadata', async
     async retrieve(query, _k, _opts, context) {
       calls.retrieve += 1;
       assert.equal(context?.orgId, 'org_a');
-      assert.equal(context?.dataDomains, undefined);
+      assert.equal(context?.structuredAccess, undefined);
       return { query, decision: { intent: ['kb'], reason: 'test' }, hits: [] };
     },
   };
   const out = await retrieveAgentSources(
-    { query: 'what is the claims SOP?', k: 6, orgId: 'org_a', contract: contract([]) },
+    {
+      query: 'what is the claims SOP?',
+      k: 6,
+      orgId: 'org_a',
+      contract: contract([]),
+      asker: { subject: 'user@a.test', roles: [] },
+    },
     deps,
   );
   assert.equal(out.allow, true);
@@ -130,7 +138,13 @@ test('no pipeline contract keeps the additive path and still scopes retrieval to
     },
   };
   const out = await retrieveAgentSources(
-    { query: 'count employee quota records', k: 6, orgId: 'org_a', contract: null },
+    {
+      query: 'count employee quota records',
+      k: 6,
+      orgId: 'org_a',
+      contract: null,
+      asker: { subject: 'user@a.test', roles: [] },
+    },
     deps,
   );
   assert.equal(out.allow, true);
@@ -154,6 +168,7 @@ test('bound database intent with no declared-domain match disables every structu
       k: 6,
       orgId: 'org_a',
       contract: contract([]),
+      asker: { subject: 'user@a.test', roles: [] },
     },
     deps,
   );
