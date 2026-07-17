@@ -193,7 +193,13 @@ export async function listApps(orgId: string): Promise<AppSpec[]> {
 // authoring surface. It is deliberately org-scoped and returns only the first owning AppSpec;
 // materialized runtime agents are expected to have exactly one owner.
 export async function findAppByAgentId(agentId: string, orgId: string): Promise<AppSpec | null> {
-  const all = await listApps(orgId);
+  await ensureAppsSchema();
+  const rows = await db
+    .select()
+    .from(apps)
+    .where(eq(apps.orgId, orgId || DEFAULT_ORG))
+    .orderBy(desc(apps.createdAt));
+  const all = rows.map(toAppSpec);
   return (
     all.find((app) =>
       app.steps.some((step) => step.kind === 'agent' && step.agentId === agentId),

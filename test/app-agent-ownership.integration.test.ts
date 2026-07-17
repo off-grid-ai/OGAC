@@ -14,6 +14,7 @@ import {
   updateApp,
 } from '../src/lib/apps-store.ts';
 import { createPipeline, deletePipeline } from '../src/lib/pipelines.ts';
+import { listPipelineConsumers } from '../src/lib/pipeline-consumers.ts';
 import { getCustomAgent } from '../src/lib/store.ts';
 // @ts-expect-error shared JS reachability helper
 import { dbAvailable } from './helpers/db-available.mjs';
@@ -95,6 +96,12 @@ describe('AppSpec owns materialized runtime agents (real Postgres)', { skip }, (
     assert.equal((await getCustomAgent(runtimeAgentId, orgId))?.pipelineId, pipelineA);
     assert.equal((await findAppByAgentId(runtimeAgentId, orgId))?.id, appId);
     assert.equal(await findAppByAgentId(runtimeAgentId, `other_${orgId}`), null);
+    const consumers = await listPipelineConsumers(pipelineA, orgId);
+    assert.deepEqual(
+      consumers.filter((consumer) => ['app', 'runtime_agent'].includes(consumer.kind)),
+      [{ kind: 'app', id: appId, label: 'Claims decision agent' }],
+      'materialized runtime rows do not duplicate their owning app in consumer inventory',
+    );
 
     const rebound = await updateApp(appId, orgId, { pipelineId: pipelineB });
     assert.ok(rebound);
