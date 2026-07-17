@@ -51,7 +51,10 @@ test('every route loader owns or inherits its presentation frame', async () => {
 test('the root loading boundary renders inside the same padded frame as its page', () => {
   const html = renderToStaticMarkup(createElement(ConsoleLoading));
 
-  assert.match(html, /class="[^"]*overflow-y-auto p-4 md:p-6[^"]*"/);
+  const frameClass = html.match(/data-og-shell="page" class="([^"]*)"/)?.[1] ?? '';
+  assert.ok(frameClass.split(' ').includes('overflow-y-auto'));
+  assert.ok(frameClass.split(' ').includes('p-4'));
+  assert.ok(frameClass.split(' ').includes('md:p-6'));
   assert.match(html, /aria-busy="true"/);
 });
 
