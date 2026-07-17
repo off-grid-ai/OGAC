@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHostname } from '@/lib/display-host';
 import type { ServiceTopologyDirectoryEntry } from '@/lib/service-directory-view';
 import { isHealthy, type ServiceHealth } from '@/lib/service-health';
-import { ReadinessStrip } from './ServiceReadiness';
+import { HEALTH_UI, ReadinessStrip } from './ServiceReadiness';
 
 const AUTH_LABEL: Record<ServiceTopologyDirectoryEntry['auth'], string> = {
   session: 'Login',
@@ -23,19 +23,6 @@ const KIND_GROUPS: { kind: ServiceTopologyDirectoryEntry['kind']; label: string 
   { kind: 'product', label: 'Products' },
   { kind: 'site', label: 'Sites' },
 ];
-
-// Presentation for each honest health state. Embedded backends and optional deps on their
-// fallback are healthy (emerald/muted) — never the alarming red reserved for a real outage.
-const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
-  up: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
-  down: { dot: 'bg-red-500', text: 'text-red-500', label: 'Down' },
-  embedded: {
-    dot: 'bg-emerald-500',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    label: 'Embedded',
-  },
-  optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
-};
 
 function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
   if (!h) {

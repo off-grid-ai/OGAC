@@ -13,18 +13,7 @@ import type { ServiceHealth } from '@/lib/service-health';
 import type { ServiceControl } from '@/lib/services-directory';
 import { READINESS_GATES } from '@/lib/service-topology';
 import { RedpandaManager } from './RedpandaManager';
-import { GATE_LABEL, READINESS_UI, withLiveReachability } from './ServiceReadiness';
-
-const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
-  up: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
-  down: { dot: 'bg-red-500', text: 'text-red-500', label: 'Down' },
-  embedded: {
-    dot: 'bg-emerald-500',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    label: 'Embedded',
-  },
-  optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
-};
+import { GATE_LABEL, HEALTH_UI, READINESS_UI, withLiveReachability } from './ServiceReadiness';
 
 interface Sample {
   at: string;
