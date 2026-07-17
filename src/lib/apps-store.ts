@@ -5,7 +5,7 @@
 // It never re-implements a rule that belongs in app-model.ts.
 
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { apps, customAgents, type App } from '@/db/schema';
 import { materializedAgentIds } from '@/lib/app-agent-ownership';
@@ -18,6 +18,8 @@ import {
   validateAppSpec,
 } from '@/lib/app-model';
 import { hideDemoTestArtifact } from '@/lib/demo-test-artifacts';
+import { ensurePipelinesSchema } from '@/lib/pipelines';
+import { ensureOrgSchema } from '@/lib/store';
 
 const DEFAULT_ORG = 'default';
 
@@ -25,13 +27,54 @@ const DEFAULT_ORG = 'default';
 // Deploy is rsync-only (no migration step over SSH), so the store self-provisions the `apps` table +
 // any post-hoc columns (CREATE/ALTER … IF NOT EXISTS). Column names MUST match schema.ts exactly.
 let appsEnsure: Promise<void> | null = null;
+
+async function runAppOwnershipBackfill(
+  execute: (query: SQL) => Promise<unknown>,
+): Promise<void> {
+  // Refuse an ambiguous upgrade rather than assigning one runtime agent to a random App. This is
+  // an actionable data-integrity failure; the normal legacy shape has one step reference per agent.
+  await execute(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT step->>'agentId'
+        FROM apps a
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(a.steps, '[]'::jsonb)) step
+        WHERE step->>'kind' = 'agent' AND COALESCE(step->>'agentId', '') <> ''
+        GROUP BY a.org_id, step->>'agentId'
+        HAVING COUNT(DISTINCT a.id) > 1
+      ) THEN
+        RAISE EXCEPTION 'runtime agent is referenced by multiple Apps in one org';
+      END IF;
+    END $$;
+  `);
+  // Upgrade old App rows that already materialized an agent before owner_app_id existed. Re-running
+  // this statement is a no-op after the first repair and also re-aligns the inherited pipeline.
+  await execute(sql`
+    UPDATE custom_agents ca
+    SET owner_app_id = a.id, pipeline_id = a.pipeline_id
+    FROM apps a
+    WHERE ca.org_id = a.org_id
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(a.steps, '[]'::jsonb)) step
+        WHERE step->>'kind' = 'agent' AND step->>'agentId' = ca.id
+      )
+      AND (ca.owner_app_id IS NULL OR ca.owner_app_id = a.id)
+      AND (ca.owner_app_id, ca.pipeline_id) IS DISTINCT FROM (a.id, a.pipeline_id);
+  `);
+}
+
 export async function ensureAppsSchema(): Promise<void> {
   if (appsEnsure) return appsEnsure;
+  // Establish dependency tables/columns in one order before taking the Apps migration lock.
+  await ensurePipelinesSchema();
+  await ensureOrgSchema();
   appsEnsure = db
     .transaction(async (tx): Promise<void> => {
       // Multiple node:test workers and console processes can cold-start this self-migration together.
       // Serialize the DDL transaction so PostgreSQL's IF NOT EXISTS catalog race cannot surface.
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_apps_schema_v2'));`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_schema_ddl'));`);
       await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS apps (
         id text PRIMARY KEY,
@@ -78,12 +121,93 @@ export async function ensureAppsSchema(): Promise<void> {
         END IF;
       END $$;
     `);
+      await runAppOwnershipBackfill((query) => tx.execute(query));
+
+      // Legacy dangling bindings cannot be granted execution rights. Clear them before installing
+      // the composite tenant-safe FKs; current dispatch already treats them as invalid/fail-closed.
+      await tx.execute(sql`
+        UPDATE apps a SET pipeline_id = NULL
+        WHERE pipeline_id IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM pipelines p WHERE p.id = a.pipeline_id AND p.org_id = a.org_id
+        );
+      `);
+      await tx.execute(sql`
+        UPDATE custom_agents ca SET pipeline_id = NULL
+        WHERE pipeline_id IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM pipelines p WHERE p.id = ca.pipeline_id AND p.org_id = ca.org_id
+        );
+      `);
+      await tx.execute(sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'apps_pipeline_org_fk') THEN
+            ALTER TABLE apps ADD CONSTRAINT apps_pipeline_org_fk
+              FOREIGN KEY (pipeline_id, org_id) REFERENCES pipelines (id, org_id)
+              ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'custom_agents_pipeline_org_fk'
+          ) THEN
+            ALTER TABLE custom_agents ADD CONSTRAINT custom_agents_pipeline_org_fk
+              FOREIGN KEY (pipeline_id, org_id) REFERENCES pipelines (id, org_id)
+              ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+        END $$;
+      `);
+
+      // The database, not each caller, owns the App→runtime binding invariant. Direct SQL writes,
+      // old code paths, schedule workers, and upgrades all converge on the App's pipeline.
+      await tx.execute(sql`
+        CREATE OR REPLACE FUNCTION offgrid_sync_owned_agent_binding()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        DECLARE app_pipeline text;
+        BEGIN
+          IF OLD.owner_app_id IS NOT NULL AND NEW.owner_app_id IS NULL THEN
+            RAISE EXCEPTION 'owned runtime agent cannot be detached from its App';
+          END IF;
+          IF NEW.owner_app_id IS NOT NULL THEN
+            SELECT pipeline_id INTO app_pipeline FROM apps
+            WHERE id = NEW.owner_app_id AND org_id = NEW.org_id;
+            IF NOT FOUND THEN
+              RAISE EXCEPTION 'owner App % is missing from org %', NEW.owner_app_id, NEW.org_id;
+            END IF;
+            NEW.pipeline_id := app_pipeline;
+          END IF;
+          RETURN NEW;
+        END $$;
+        DROP TRIGGER IF EXISTS custom_agents_owned_binding_guard ON custom_agents;
+        CREATE TRIGGER custom_agents_owned_binding_guard
+          BEFORE INSERT OR UPDATE OF owner_app_id, org_id, pipeline_id ON custom_agents
+          FOR EACH ROW EXECUTE FUNCTION offgrid_sync_owned_agent_binding();
+
+        CREATE OR REPLACE FUNCTION offgrid_propagate_app_pipeline_binding()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          UPDATE custom_agents SET pipeline_id = NEW.pipeline_id
+          WHERE owner_app_id = NEW.id AND org_id = NEW.org_id;
+          RETURN NEW;
+        END $$;
+        DROP TRIGGER IF EXISTS apps_pipeline_binding_sync ON apps;
+        CREATE TRIGGER apps_pipeline_binding_sync
+          AFTER UPDATE OF pipeline_id ON apps
+          FOR EACH ROW WHEN (OLD.pipeline_id IS DISTINCT FROM NEW.pipeline_id)
+          EXECUTE FUNCTION offgrid_propagate_app_pipeline_binding();
+      `);
     })
     .catch((e) => {
       appsEnsure = null;
       throw e;
     });
   return appsEnsure;
+}
+
+/** Explicit, idempotent upgrade hook used by deploy verification and the real-Postgres proof. */
+export async function backfillAppOwnedRuntimeAgents(): Promise<void> {
+  await ensureAppsSchema();
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_schema_ddl'));`);
+    await runAppOwnershipBackfill((query) => tx.execute(query));
+  });
 }
 
 // The mutable part of an AppSpec — everything a caller supplies on create (ids/timestamps are

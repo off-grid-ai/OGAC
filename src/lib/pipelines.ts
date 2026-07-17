@@ -39,9 +39,13 @@ const DEFAULT_ORG = 'default';
 let ensurePromise: Promise<void> | null = null;
 export async function ensurePipelinesSchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
-  ensurePromise = (async (): Promise<void> => {
+  ensurePromise = db.transaction(async (tx): Promise<void> => {
     const { sql } = await import('drizzle-orm');
-    await db.execute(sql`
+    // All self-migrating stores share one transaction-scoped lock. PostgreSQL's
+    // `IF NOT EXISTS` does not prevent catalog deadlocks when separate test workers/processes
+    // cold-start Apps and Pipelines in opposite orders.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_schema_ddl'));`);
+    await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS pipelines (
         id text PRIMARY KEY,
         org_id text NOT NULL DEFAULT 'default',
@@ -75,12 +79,13 @@ export async function ensurePipelinesSchema(): Promise<void> {
       "ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1",
       "ADD COLUMN IF NOT EXISTS is_template boolean NOT NULL DEFAULT false",
     ]) {
-      await db.execute(sql.raw(`ALTER TABLE pipelines ${col};`));
+      await tx.execute(sql.raw(`ALTER TABLE pipelines ${col};`));
     }
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_team_idx ON pipelines (team_id);`);
-    await db.execute(sql`
+    await tx.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
+    await tx.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`);
+    await tx.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_team_idx ON pipelines (team_id);`);
+    await tx.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS pipelines_id_org_unique ON pipelines (id, org_id);`);
+    await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS pipeline_versions (
         id text PRIMARY KEY,
         pipeline_id text NOT NULL,
@@ -91,10 +96,10 @@ export async function ensurePipelinesSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now(),
         created_by text NOT NULL DEFAULT '');
     `);
-    await db.execute(
+    await tx.execute(
       sql`CREATE INDEX IF NOT EXISTS pipeline_versions_pipeline_idx ON pipeline_versions (pipeline_id);`,
     );
-  })().catch((e) => {
+  }).catch((e) => {
     ensurePromise = null;
     throw e;
   });

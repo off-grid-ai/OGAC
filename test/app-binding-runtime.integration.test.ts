@@ -96,9 +96,12 @@ describe('canonical App-as-agent binding fails closed (real Postgres)', { skip }
       'the saved App binding wins; a caller-supplied valid contract cannot bypass it',
     );
 
-    await deletePipeline(pipelineId, orgId);
-    const deleted = await resolveExplicitPipelineBinding(pipelineId, orgId);
-    assert.equal(deleted.state, 'invalid');
+    await assert.rejects(
+      () => deletePipeline(pipelineId, orgId),
+      (error) =>
+        (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
+      'the database prevents a direct/legacy caller from retiring a bound pipeline',
+    );
   });
 
   test('deliberately unbound apps remain runnable without a contract', async () => {
