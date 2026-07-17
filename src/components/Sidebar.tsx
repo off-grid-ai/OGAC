@@ -34,7 +34,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
 
   return (
     <>
-      <div className="flex h-16 items-center gap-3 border-b border-border/80 px-4">
+      <div className="flex h-14 items-center gap-3 border-b border-border/80 px-4">
         <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-background">
           <Image src="/logo.png" alt="" width={26} height={26} priority />
         </div>

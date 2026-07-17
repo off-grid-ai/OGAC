@@ -6,12 +6,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ProjectsBrowser } from '../src/components/projects/ProjectsBrowser.tsx';
 
 test('the global utility bar does not claim page title or description ownership', async () => {
-  const source = await readFile(new URL('../src/components/Topbar.tsx', import.meta.url), 'utf8');
+  const [topbarSource, sidebarSource] = await Promise.all([
+    readFile(new URL('../src/components/Topbar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/Sidebar.tsx', import.meta.url), 'utf8'),
+  ]);
 
-  assert.match(source, /aria-label="Console utilities"/);
-  assert.doesNotMatch(source, /ownerForPath/);
-  assert.doesNotMatch(source, /<h1\b/);
-  assert.doesNotMatch(source, /owner\.description/);
+  assert.match(topbarSource, /aria-label="Console utilities"/);
+  assert.doesNotMatch(topbarSource, /ownerForPath/);
+  assert.doesNotMatch(topbarSource, /<h1\b/);
+  assert.doesNotMatch(topbarSource, /owner\.description/);
+
+  // Brand rail and utility rail are one piece of shell chrome: their bottom borders must meet.
+  assert.match(topbarSource, /className="flex h-14 [^"]*border-b/);
+  assert.match(sidebarSource, /className="flex h-14 [^"]*border-b/);
 });
 
 test('a collection surface renders one canonical page heading', () => {
