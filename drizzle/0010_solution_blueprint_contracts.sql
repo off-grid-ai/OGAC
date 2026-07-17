@@ -101,6 +101,11 @@ CREATE TABLE IF NOT EXISTS "solution_deployments" (
   CONSTRAINT "solution_deployments_app_fk" FOREIGN KEY ("app_id") REFERENCES "apps"("id") ON DELETE RESTRICT
 );
 --> statement-breakpoint
+-- CREATE TABLE IF NOT EXISTS does not reconcile a table created by an earlier version of this
+-- migration. paused_at was added with the pause lifecycle, so explicitly upgrade those databases.
+ALTER TABLE "solution_deployments"
+  ADD COLUMN IF NOT EXISTS "paused_at" timestamp with time zone;
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "solution_deployments_org_idx" ON "solution_deployments" ("org_id");
 --> statement-breakpoint
 -- Only a live binding is unique. Retired rows remain immutable audit history and do not prevent the
