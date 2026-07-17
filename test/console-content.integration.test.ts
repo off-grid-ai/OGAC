@@ -29,7 +29,7 @@ test('the rendered route explicitly chooses management-page spacing', () => {
     ),
   );
 
-  assert.match(html, /<main[^>]*><div[^>]*><div class="[^"]*p-4 md:p-6[^"]*">/);
+  assert.match(html, /<main[^>]*><div[^>]*><div[^>]*class="[^"]*p-4 md:p-6[^"]*">/);
   assert.match(html, /data-og-shell="page"/);
   assert.match(html, /Management page/);
 });
