@@ -1,7 +1,7 @@
 # Console shared UI adoption inventory
 
 **Inventory date:** 2026-07-17  
-**Reviewed UI source:** `wednesday-solutions/component-library-animations@06110f0c161c2a20159c149a70d1e9be3d2206c1`
+**Reviewed UI source:** `wednesday-solutions/component-library-animations@959fbf0f39b566d3590f96985cbbff810208a223`
 **Reviewed design source:** `off-grid-ai/shared@698789d4aea406e0d782259de1667c3684ac4e20`
 
 This is the bounded Console adoption backlog, not a claim that the UI is already fully consistent.

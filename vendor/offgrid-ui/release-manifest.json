@@ -8,11 +8,11 @@
   "packages": [
     {
       "name": "@offgrid/ui",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "sourceRepository": "https://github.com/wednesday-solutions/component-library-animations.git",
-      "sourceSha": "06110f0c161c2a20159c149a70d1e9be3d2206c1",
-      "archive": "offgrid-ui-0.2.0.tgz",
-      "sha256": "6651dffa41a0cb6b82c03414137eb37345ccbbb261c836108db3048d12197667",
+      "sourceSha": "959fbf0f39b566d3590f96985cbbff810208a223",
+      "archive": "offgrid-ui-0.2.1.tgz",
+      "sha256": "1022222db834772f02ade8843e97035e08de894e890f4c92aa9ce766bd9b3cae",
       "license": "UNLICENSED",
       "distribution": "private-internal-only"
     },
