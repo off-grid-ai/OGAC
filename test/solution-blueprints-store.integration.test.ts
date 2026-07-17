@@ -23,6 +23,7 @@ test(
       for (const org of [ORG_A, ORG_B]) {
         await db.execute(sql`DELETE FROM solution_deployments WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${org}`);
+        await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${org}`);
       }
     });
 
@@ -33,6 +34,13 @@ test(
     assert.ok(seedsA.every((blueprint) => blueprint.orgId === ORG_A));
     assert.ok(seedsB.every((blueprint) => blueprint.orgId === ORG_B));
     assert.ok(!seedsB.some((blueprint) => blueprint.id === seedsA[0].id));
+
+    assert.equal(await store.deleteSolutionBlueprint(seedsA[1].id, ORG_A), true);
+    assert.deepEqual(
+      (await store.listSolutionBlueprints(ORG_A)).map((blueprint) => blueprint.id),
+      [seedsA[0].id],
+      'a deleted default must not be recreated by a later read',
+    );
 
     const input = {
       ...seedsA[0],

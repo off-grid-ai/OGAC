@@ -3,6 +3,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   apps,
+  solutionBlueprintSeedState,
   solutionBlueprints,
   solutionDeployments,
   type SolutionBlueprintRow,
@@ -45,6 +46,8 @@ export async function ensureSolutionBlueprintSchema(): Promise<void> {
     await db.execute(
       sql`CREATE INDEX IF NOT EXISTS solution_blueprints_org_idx ON solution_blueprints (org_id)`,
     );
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_blueprint_seed_state (
+      org_id text PRIMARY KEY, seeded_at timestamptz NOT NULL DEFAULT now())`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS solution_deployments (
       id text PRIMARY KEY, org_id text NOT NULL DEFAULT 'default', blueprint_id text NOT NULL,
       app_id text NOT NULL, status text NOT NULL DEFAULT 'active', evidence_links jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -77,21 +80,30 @@ const toDeployment = (row: SolutionDeploymentRow): SolutionDeployment => ({
 });
 
 async function seedBlueprints(orgId: string): Promise<void> {
-  for (const seed of SEEDED_SOLUTION_BLUEPRINTS) {
+  await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(solutionBlueprintSeedState)
+      .values({ orgId })
+      .onConflictDoNothing()
+      .returning({ orgId: solutionBlueprintSeedState.orgId });
+    if (!inserted.length) return;
+
     const now = new Date();
-    await db
+    await tx
       .insert(solutionBlueprints)
-      .values({
-        id: `sbp_${hash12(`${orgId}:${seed.key}`)}`,
-        orgId,
-        ...seed.input,
-        outcome: seed.input.outcome as unknown as Record<string, unknown>,
-        proof: seed.input.proof as unknown as Record<string, unknown>,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        SEEDED_SOLUTION_BLUEPRINTS.map((seed) => ({
+          id: `sbp_${hash12(`${orgId}:${seed.key}`)}`,
+          orgId,
+          ...seed.input,
+          outcome: seed.input.outcome as unknown as Record<string, unknown>,
+          proof: seed.input.proof as unknown as Record<string, unknown>,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      )
       .onConflictDoNothing();
-  }
+  });
 }
 
 export async function listSolutionBlueprints(orgId: string): Promise<SolutionBlueprint[]> {

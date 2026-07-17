@@ -933,6 +933,14 @@ export const solutionBlueprints = pgTable('solution_blueprints', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('solution_blueprints_org_idx').on(t.orgId)]);
 
+// Records that the default blueprint library has been initialised for an organisation. Keeping
+// this state separate means a user can delete or replace the defaults without them reappearing on
+// the next read (or after a process restart).
+export const solutionBlueprintSeedState = pgTable('solution_blueprint_seed_state', {
+  orgId: text('org_id').primaryKey(),
+  seededAt: timestamp('seeded_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const solutionDeployments = pgTable('solution_deployments', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull().default('default'),
