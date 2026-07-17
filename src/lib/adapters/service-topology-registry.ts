@@ -26,12 +26,7 @@ export interface ServiceTopologyRegistry {
   find(serviceId: string): LogicalServiceTopology | undefined;
 }
 
-const READINESS_STATES = new Set<ReadinessState>([
-  'pass',
-  'fail',
-  'unknown',
-  'not-applicable',
-]);
+const READINESS_STATES = new Set<ReadinessState>(['pass', 'fail', 'unknown', 'not-applicable']);
 const ENDPOINT_SCOPES = new Set<ServiceEndpoint['scope']>([
   'public',
   'lan',
@@ -161,7 +156,9 @@ function parseRecord(value: unknown): ServiceTopologyRecord | null {
 }
 
 /** Parse the optional deployment-owned topology document. Invalid input fails closed to no rows. */
-export function parseServiceTopologyRecords(serialized: string | undefined): ServiceTopologyRecord[] {
+export function parseServiceTopologyRecords(
+  serialized: string | undefined,
+): ServiceTopologyRecord[] {
   if (!serialized) return [];
   try {
     const value: unknown = JSON.parse(serialized);
@@ -275,7 +272,9 @@ export function createServiceTopologyRegistry(
   source: ServiceTopologySource,
 ): ServiceTopologyRegistry {
   function list(): LogicalServiceTopology[] {
-    const records = new Map(source.listTopologyRecords().map((record) => [record.serviceId, record]));
+    const records = new Map(
+      source.listTopologyRecords().map((record) => [record.serviceId, record]),
+    );
     return source.listServices().map((service) => {
       const record = records.get(service.id);
       if (!record) return defaultTopology(service);
@@ -295,4 +294,3 @@ export function createServiceTopologyRegistry(
     },
   };
 }
-

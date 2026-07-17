@@ -85,18 +85,17 @@ test('registry fallback derives one honest instance without claiming functional 
 
   assert.equal(topology.components[0]?.instances[0]?.nodeId, 'g7');
   assert.equal(topology.components[0]?.instances[0]?.endpoints[0]?.scope, 'lan');
-  assert.equal(
-    topology.readiness.find((item) => item.gate === 'functional')?.state,
-    'unknown',
-  );
-  assert.equal(
-    topology.readiness.find((item) => item.gate === 'console-used')?.state,
-    'unknown',
-  );
+  assert.equal(topology.readiness.find((item) => item.gate === 'functional')?.state, 'unknown');
+  assert.equal(topology.readiness.find((item) => item.gate === 'console-used')?.state, 'unknown');
 });
 
 test('embedded fallback is deployed in-process and non-url targets remain in-process', () => {
-  const embedded = { ...service, id: 'lancedb', url: 'embedded://lancedb', probe: 'embedded' as const };
+  const embedded = {
+    ...service,
+    id: 'lancedb',
+    url: 'embedded://lancedb',
+    probe: 'embedded' as const,
+  };
   const topology = createServiceTopologyRegistry({
     listServices: () => [embedded],
     listTopologyRecords: () => [],
@@ -108,7 +107,9 @@ test('embedded fallback is deployed in-process and non-url targets remain in-pro
 });
 
 test('deployment topology parser accepts complete records and rejects malformed documents atomically', () => {
-  assert.deepEqual(parseServiceTopologyRecords(JSON.stringify([configuredRecord])), [configuredRecord]);
+  assert.deepEqual(parseServiceTopologyRecords(JSON.stringify([configuredRecord])), [
+    configuredRecord,
+  ]);
   assert.deepEqual(parseServiceTopologyRecords(undefined), []);
   assert.deepEqual(parseServiceTopologyRecords('not json'), []);
   assert.deepEqual(parseServiceTopologyRecords('{}'), []);

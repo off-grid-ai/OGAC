@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { toServiceDetailEntry, toServiceDirectoryEntries } from '@/lib/service-directory-view';
+import {
+  toServiceDetailEntry,
+  toServiceDirectoryEntries,
+  toServiceTopologyDetailEntry,
+  toServiceTopologyDirectoryEntries,
+} from '@/lib/service-directory-view';
+import { createServiceTopologyRegistry } from '@/lib/adapters/service-topology-registry';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -64,6 +70,22 @@ test('real registry keeps the Postgres probe URL server-side while client props 
       configuredClientProps,
       /rsc-http-user|rsc-http-password|private|rsc-http-query-secret|rsc-health-secret/,
     );
+
+    const topologyRegistry = createServiceTopologyRegistry({
+      listServices: () => configuredRegistry,
+      listTopologyRecords: () => [],
+    });
+    const topology = topologyRegistry.list()[0]!;
+    const topologyListProps = JSON.stringify({
+      services: toServiceTopologyDirectoryEntries([topology]),
+    });
+    const topologyDetailProps = JSON.stringify({
+      service: toServiceTopologyDetailEntry(topology),
+    });
+    assert.doesNotMatch(
+      `${topologyListProps}${topologyDetailProps}`,
+      /rsc-http-user|rsc-http-password|private|rsc-http-query-secret|rsc-health-secret/,
+    );
   } finally {
     if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousDatabaseUrl;
@@ -81,15 +103,15 @@ test('ServicesPage projects registry entries before passing them across the clie
   );
   const detailClient = readFileSync(`${ROOT}src/components/services/ServiceDetail.tsx`, 'utf8');
 
-  assert.match(page, /services=\{toServiceDirectoryEntries\(getServices\(\)\)\}/);
+  assert.match(page, /services=\{toServiceTopologyDirectoryEntries\(topologies\)\}/);
   assert.doesNotMatch(page, /services=\{getServices\(\)\}/);
-  assert.match(client, /services: ServiceDirectoryEntry\[\]/);
+  assert.match(client, /services: ServiceTopologyDirectoryEntry\[\]/);
   assert.doesNotMatch(client, /services: ServiceEntry\[\]/);
   assert.doesNotMatch(client, /s\.url/);
   assert.doesNotMatch(client, /from '@\/lib\/services-directory'/);
-  assert.match(detailPage, /service=\{toServiceDetailEntry\(service\)\}/);
+  assert.match(detailPage, /service=\{toServiceTopologyDetailEntry\(topology\)\}/);
   assert.doesNotMatch(detailPage, /service=\{service\}/);
-  assert.match(detailClient, /service: ServiceDetailEntry/);
+  assert.match(detailClient, /service: ServiceTopologyDetailEntry/);
   assert.doesNotMatch(detailClient, /service\.(?:url|healthPath)/);
   assert.doesNotMatch(detailClient, /import \{[^}]*\} from '@\/lib\/services-directory'/);
 });
