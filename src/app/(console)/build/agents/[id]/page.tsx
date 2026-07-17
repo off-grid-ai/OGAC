@@ -22,6 +22,7 @@ import { resolveConsumerChip } from '@/lib/pipeline-chip';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,124 +118,128 @@ export default async function AgentDetailPage({
     : [];
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/build/agents"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        All agents
-      </Link>
-
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Robot className="size-6 text-primary" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-foreground">{agent.name}</h1>
-              {agent.custom ? (
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  yours
-                </Badge>
-              ) : null}
-              <Badge variant="secondary">{agent.role}</Badge>
-              <PipelineChip pipeline={pipeline} size="xs" />
-            </div>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agent.description}</p>
-          </div>
-        </div>
-        <AgentCardActions agentId={agent.id} custom={agent.custom} enabled />
-      </div>
-
-      {agent.custom ? <AgentFormPanel tools={tools} editable={editable} /> : null}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="shadow-sm lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm">Instructions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {agent.systemPrompt ? (
-              <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs text-foreground">
-                {agent.systemPrompt}
-              </pre>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Built-in agent — answers from retrieved sources via the shared system prompt. Its
-                governing pipeline (see the &quot;Runs on&quot; chip above) applies policy,
-                guardrails, grounding, and provenance.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Configuration</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <Row label="Trigger" value={agent.trigger} />
-            <Row label="Model" value={agent.model || 'gateway default'} />
-            <Row label="Grounded" value={agent.grounded ? 'yes' : 'no'} />
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                Tools
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {agent.tools.length ? (
-                  agent.tools.map((t) => (
-                    <Badge key={t} variant="outline">
-                      {t}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                Needs
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {agent.planes.length ? (
-                  agent.planes.map((p) => (
-                    <Badge key={p} variant="secondary" className="bg-primary/10 text-primary">
-                      {planeLabel(p)}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <AgentRunner agentId={agent.id} />
-
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-sm">Recent runs</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {runs.length} shown · {done} completed. Each run is traced through the governed
-              pipeline.
-            </p>
-          </div>
+    <PageFrame>
+      {
+        <div className="space-y-6">
           <Link
-            href={`/build/agents/${agent.id}/runs`}
-            className="text-xs text-primary hover:underline"
+            href="/build/agents"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
-            View all runs →
+            <ArrowLeft className="size-3.5" />
+            All agents
           </Link>
-        </CardHeader>
-        <CardContent>
-          <RecentRunsTable agentId={agent.id} runs={runs} />
-        </CardContent>
-      </Card>
-    </div>
+
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Robot className="size-6 text-primary" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold text-foreground">{agent.name}</h1>
+                  {agent.custom ? (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary">
+                      yours
+                    </Badge>
+                  ) : null}
+                  <Badge variant="secondary">{agent.role}</Badge>
+                  <PipelineChip pipeline={pipeline} size="xs" />
+                </div>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agent.description}</p>
+              </div>
+            </div>
+            <AgentCardActions agentId={agent.id} custom={agent.custom} enabled />
+          </div>
+
+          {agent.custom ? <AgentFormPanel tools={tools} editable={editable} /> : null}
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="shadow-sm lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-sm">Instructions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {agent.systemPrompt ? (
+                  <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs text-foreground">
+                    {agent.systemPrompt}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Built-in agent — answers from retrieved sources via the shared system prompt.
+                    Its governing pipeline (see the &quot;Runs on&quot; chip above) applies policy,
+                    guardrails, grounding, and provenance.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <Row label="Trigger" value={agent.trigger} />
+                <Row label="Model" value={agent.model || 'gateway default'} />
+                <Row label="Grounded" value={agent.grounded ? 'yes' : 'no'} />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                    Tools
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {agent.tools.length ? (
+                      agent.tools.map((t) => (
+                        <Badge key={t} variant="outline">
+                          {t}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                    Needs
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {agent.planes.length ? (
+                      agent.planes.map((p) => (
+                        <Badge key={p} variant="secondary" className="bg-primary/10 text-primary">
+                          {planeLabel(p)}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <AgentRunner agentId={agent.id} />
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-sm">Recent runs</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {runs.length} shown · {done} completed. Each run is traced through the governed
+                  pipeline.
+                </p>
+              </div>
+              <Link
+                href={`/build/agents/${agent.id}/runs`}
+                className="text-xs text-primary hover:underline"
+              >
+                View all runs →
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <RecentRunsTable agentId={agent.id} runs={runs} />
+            </CardContent>
+          </Card>
+        </div>
+      }
+    </PageFrame>
   );
 }
 

@@ -2,6 +2,7 @@ import { PipelinesManager, type PipelineCardData } from '@/components/pipelines/
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,5 +23,5 @@ export default async function PipelinesPage() {
     dataAllowlist: p.dataAllowlist,
     gateway: p.gateway ?? null,
   }));
-  return <PipelinesManager pipelines={pipelines} />;
+  return <PageFrame>{<PipelinesManager pipelines={pipelines} />}</PageFrame>;
 }

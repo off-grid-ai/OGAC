@@ -15,6 +15,7 @@ import { listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,9 @@ const STATUS_COLOR: Record<string, string> = {
   denied: 'bg-destructive/10 text-destructive',
 };
 
-export default async function AgentRunsPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function AgentRunsPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('agents');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -34,67 +37,77 @@ export default async function AgentRunsPage({ params }: Readonly<{ params: Promi
   const runs = await listAgentRunsByAgent(id, 100, orgId).catch(() => []);
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={`/build/agents/${id}`}
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        {agent.name}
-      </Link>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <Link
+            href={`/build/agents/${id}`}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            {agent.name}
+          </Link>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Run history — {agent.name}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {runs.length} runs. Click a row for the full pipeline trace.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {runs.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Query</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Steps</TableHead>
-                  <TableHead>Checks</TableHead>
-                  <TableHead>Signed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runs.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      <Link href={`/build/agents/${id}/runs/${r.id}`} className="hover:text-primary">
-                        {r.startedAt.slice(0, 16).replace('T', ' ')}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="max-w-sm truncate text-foreground">
-                      <Link href={`/build/agents/${id}/runs/${r.id}`} className="hover:text-primary">
-                        {r.query}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={STATUS_COLOR[r.status] ?? ''}>
-                        {r.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{r.steps.length}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.checks.length}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.provenance?.algorithm ?? '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">No runs yet.</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Run history — {agent.name}</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {runs.length} runs. Click a row for the full pipeline trace.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {runs.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Started</TableHead>
+                      <TableHead>Query</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Steps</TableHead>
+                      <TableHead>Checks</TableHead>
+                      <TableHead>Signed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {runs.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          <Link
+                            href={`/build/agents/${id}/runs/${r.id}`}
+                            className="hover:text-primary"
+                          >
+                            {r.startedAt.slice(0, 16).replace('T', ' ')}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="max-w-sm truncate text-foreground">
+                          <Link
+                            href={`/build/agents/${id}/runs/${r.id}`}
+                            className="hover:text-primary"
+                          >
+                            {r.query}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={STATUS_COLOR[r.status] ?? ''}>
+                            {r.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{r.steps.length}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.checks.length}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.provenance?.algorithm ?? '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">No runs yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      }
+    </PageFrame>
   );
 }

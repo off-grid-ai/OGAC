@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type AgentRun, getAgentRun } from '@/lib/agentrun';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +90,9 @@ function CitationsCard({ run }: Readonly<{ run: AgentRun }>) {
               <span className="truncate text-sm text-foreground">{c.title}</span>
               <Badge
                 variant="secondary"
-                className={c.supported ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}
+                className={
+                  c.supported ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                }
               >
                 {c.supported ? 'supported' : 'weak'} · {c.score}
               </Badge>
@@ -113,7 +116,8 @@ function ProvenanceCard({ run }: Readonly<{ run: AgentRun }>) {
           Provenance
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {p.algorithm} signature over the answer + citations — tamper-evident, signed {p.signedAt.slice(0, 19).replace('T', ' ')}.
+          {p.algorithm} signature over the answer + citations — tamper-evident, signed{' '}
+          {p.signedAt.slice(0, 19).replace('T', ' ')}.
         </p>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -141,47 +145,53 @@ export default async function RunTracePage({
   if (!run) notFound();
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={`/build/agents/${id}/runs`}
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        Run history
-      </Link>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <Link
+            href={`/build/agents/${id}/runs`}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            Run history
+          </Link>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-semibold text-foreground">Run {run.id}</h1>
-        <Badge variant="secondary" className={STATUS_COLOR[run.status] ?? ''}>
-          {run.status}
-        </Badge>
-        {run.provenance ? <Badge variant="outline">signed · {run.provenance.algorithm}</Badge> : null}
-        <span className="text-xs text-muted-foreground">
-          {run.startedAt.slice(0, 19).replace('T', ' ')}
-        </span>
-      </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-foreground">Run {run.id}</h1>
+            <Badge variant="secondary" className={STATUS_COLOR[run.status] ?? ''}>
+              {run.status}
+            </Badge>
+            {run.provenance ? (
+              <Badge variant="outline">signed · {run.provenance.algorithm}</Badge>
+            ) : null}
+            <span className="text-xs text-muted-foreground">
+              {run.startedAt.slice(0, 19).replace('T', ' ')}
+            </span>
+          </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Query</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-foreground">{run.query}</CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Answer</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-foreground">{run.answer || '—'}</CardContent>
-        </Card>
-      </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Query</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-foreground">{run.query}</CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Answer</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-foreground">{run.answer || '—'}</CardContent>
+            </Card>
+          </div>
 
-      <StepsCard run={run} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ChecksCard run={run} />
-        <CitationsCard run={run} />
-      </div>
-      <ProvenanceCard run={run} />
-    </div>
+          <StepsCard run={run} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChecksCard run={run} />
+            <CitationsCard run={run} />
+          </div>
+          <ProvenanceCard run={run} />
+        </div>
+      }
+    </PageFrame>
   );
 }

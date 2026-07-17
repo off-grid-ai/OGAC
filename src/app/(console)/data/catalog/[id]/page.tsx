@@ -17,6 +17,7 @@ import { evaluateFreshness } from '@/lib/data-freshness';
 import { evaluateRetention } from '@/lib/data-retention';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,9 @@ const FRESH_TONE: Record<string, string> = {
 // Data catalog DETAIL (M4) — the deep, deep-linkable view behind one dataset: its facts, its derived
 // governance posture, and full CRUD over its classification + retention. All actions live here so an
 // operator can run + maintain the dataset from its own page.
-export default async function DataAssetDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function DataAssetDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('catalog');
   const { id } = await params;
   const org = await currentOrgId();
@@ -51,7 +54,11 @@ export default async function DataAssetDetailPage({ params }: Readonly<{ params:
   const posture = deriveAssetPosture(classificationRows.map(toClassification));
   const now = new Date();
   const freshness = evaluateFreshness(
-    { freshnessSlaHours: asset.freshnessSlaHours, lastRefreshAt: asset.lastRefreshAt, syncStatus: asset.syncStatus },
+    {
+      freshnessSlaHours: asset.freshnessSlaHours,
+      lastRefreshAt: asset.lastRefreshAt,
+      syncStatus: asset.syncStatus,
+    },
     now,
   );
   const retentionResult = evaluateRetention(
@@ -65,63 +72,88 @@ export default async function DataAssetDetailPage({ params }: Readonly<{ params:
   );
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <Link href="/data/catalog" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="size-3.5" /> Data catalog
-          </Link>
-          <h1 className="mt-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-foreground">
-            {asset.name}
-            <Badge className={LEVEL_TONE[posture.effectiveLevel]}>{posture.effectiveLevel}</Badge>
-            <Badge className={FRESH_TONE[freshness.state]}>{freshness.state}</Badge>
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {asset.source || '—'} · {asset.kind} · {asset.rowCount.toLocaleString('en-US')} rows
-          </p>
-        </div>
-        <AssetActions asset={asset} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Facts + posture. */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Overview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <Field label="Owner">{asset.owner || 'unowned'}</Field>
-            <Field label="Description">{asset.description || '—'}</Field>
-            <Field label="Governance posture">
-              <div className="flex flex-wrap gap-1.5">
-                <Badge className={LEVEL_TONE[posture.effectiveLevel]}>{posture.effectiveLevel}</Badge>
-                {posture.hasPii ? (
-                  <Badge className="bg-destructive/10 text-destructive">PII: {posture.piiTags.join(', ')}</Badge>
-                ) : (
-                  <Badge className="bg-muted text-muted-foreground">No PII</Badge>
-                )}
-                <Badge className={posture.requiresMasking ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'}>
-                  {posture.requiresMasking ? 'masking required' : 'no masking'}
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <Link
+                href="/data/catalog"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="size-3.5" /> Data catalog
+              </Link>
+              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-foreground">
+                {asset.name}
+                <Badge className={LEVEL_TONE[posture.effectiveLevel]}>
+                  {posture.effectiveLevel}
                 </Badge>
-                <Badge className={posture.egressAllowed ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}>
-                  {posture.egressAllowed ? 'egress allowed' : 'egress blocked'}
-                </Badge>
-              </div>
-            </Field>
-            <Field label="Freshness">{freshness.reason}</Field>
-            <Field label="Retention">{retentionResult.reason}</Field>
-          </CardContent>
-        </Card>
+                <Badge className={FRESH_TONE[freshness.state]}>{freshness.state}</Badge>
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {asset.source || '—'} · {asset.kind} · {asset.rowCount.toLocaleString('en-US')} rows
+              </p>
+            </div>
+            <AssetActions asset={asset} />
+          </div>
 
-        {/* Classification manager. */}
-        <div className="xl:col-span-2">
-          <ClassificationManager assetId={asset.id} initial={classificationRows} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            {/* Facts + posture. */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <Field label="Owner">{asset.owner || 'unowned'}</Field>
+                <Field label="Description">{asset.description || '—'}</Field>
+                <Field label="Governance posture">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge className={LEVEL_TONE[posture.effectiveLevel]}>
+                      {posture.effectiveLevel}
+                    </Badge>
+                    {posture.hasPii ? (
+                      <Badge className="bg-destructive/10 text-destructive">
+                        PII: {posture.piiTags.join(', ')}
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-muted text-muted-foreground">No PII</Badge>
+                    )}
+                    <Badge
+                      className={
+                        posture.requiresMasking
+                          ? 'bg-amber-500/10 text-amber-600'
+                          : 'bg-muted text-muted-foreground'
+                      }
+                    >
+                      {posture.requiresMasking ? 'masking required' : 'no masking'}
+                    </Badge>
+                    <Badge
+                      className={
+                        posture.egressAllowed
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-destructive/10 text-destructive'
+                      }
+                    >
+                      {posture.egressAllowed ? 'egress allowed' : 'egress blocked'}
+                    </Badge>
+                  </div>
+                </Field>
+                <Field label="Freshness">{freshness.reason}</Field>
+                <Field label="Retention">{retentionResult.reason}</Field>
+              </CardContent>
+            </Card>
+
+            {/* Classification manager. */}
+            <div className="xl:col-span-2">
+              <ClassificationManager assetId={asset.id} initial={classificationRows} />
+            </div>
+          </div>
+
+          {/* Retention. */}
+          <RetentionManager assetId={asset.id} initial={retention} />
         </div>
-      </div>
-
-      {/* Retention. */}
-      <RetentionManager assetId={asset.id} initial={retention} />
-    </div>
+      }
+    </PageFrame>
   );
 }
 

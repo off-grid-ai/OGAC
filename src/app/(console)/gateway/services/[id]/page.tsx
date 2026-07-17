@@ -3,6 +3,7 @@ import { ServiceDetail } from '@/components/services/ServiceDetail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { toServiceDetailEntry } from '@/lib/service-directory-view';
 import { findService, getServices, serviceControl } from '@/lib/services-directory';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,14 @@ export default async function ServiceDetailPage({
   const logsHref = '/operations/health';
 
   return (
-    <ServiceDetail service={toServiceDetailEntry(service)} control={control} logsHref={logsHref} />
+    <PageFrame>
+      {
+        <ServiceDetail
+          service={toServiceDetailEntry(service)}
+          control={control}
+          logsHref={logsHref}
+        />
+      }
+    </PageFrame>
   );
 }

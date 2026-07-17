@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { joinUrlPath, toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,21 +63,25 @@ async function fetchGateway(): Promise<GatewayInfo | null> {
 export default async function GatewayPage() {
   await requireModuleForUser('gateway');
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-foreground">AI Gateway</h1>
-        <p className="text-sm text-muted-foreground">
-          The unified inference endpoint — models, modalities, and live node health.
-        </p>
-      </div>
-      <GatewayTabs
-        overview={
-          <Suspense fallback={<GatewayBodySkeleton />}>
-            <GatewayBody />
-          </Suspense>
-        }
-      />
-    </div>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold text-foreground">AI Gateway</h1>
+            <p className="text-sm text-muted-foreground">
+              The unified inference endpoint — models, modalities, and live node health.
+            </p>
+          </div>
+          <GatewayTabs
+            overview={
+              <Suspense fallback={<GatewayBodySkeleton />}>
+                <GatewayBody />
+              </Suspense>
+            }
+          />
+        </div>
+      }
+    </PageFrame>
   );
 }
 

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppLifecycleNav } from '@/components/build/AppLifecycleNav';
+import { PageFrame } from '@/components/PageFrame';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { resolveConsumerChip } from '@/lib/pipeline-chip';
@@ -29,9 +30,9 @@ export default async function AppShellLayout({
   const pipeline = await resolveConsumerChip(app.pipelineId ?? null, orgId).catch(() => null);
 
   return (
-    <div className="w-full space-y-6">
+    <PageFrame className="space-y-6">
       <AppLifecycleNav appId={app.id} title={app.title} pipeline={pipeline} />
       {children}
-    </div>
+    </PageFrame>
   );
 }

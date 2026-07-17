@@ -4,6 +4,7 @@ import { requireModuleForUser } from '@/lib/module-access';
 import { filterRuns, paginate, parseKind, parseStatus, summarizeRuns } from '@/lib/runs-monitor';
 import { listAllRuns } from '@/lib/runs-monitor-reader';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,8 +38,12 @@ export default async function RunsPage({
   };
 
   return (
-    <Suspense fallback={null}>
-      <RunsMonitor initial={initial} />
-    </Suspense>
+    <PageFrame>
+      {
+        <Suspense fallback={null}>
+          <RunsMonitor initial={initial} />
+        </Suspense>
+      }
+    </PageFrame>
   );
 }

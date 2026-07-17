@@ -1,6 +1,7 @@
 import { ReportsManager } from '@/components/reports/ReportsManager';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listReportTemplates } from '@/lib/reports';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,5 +12,5 @@ export default async function ReportsPage() {
   await requireModuleForUser('reports');
   // Degrade gracefully: DB down → empty template list rather than the whole-page error boundary.
   const templates = await listReportTemplates().catch(() => []);
-  return <ReportsManager initial={templates} />;
+  return <PageFrame>{<ReportsManager initial={templates} />}</PageFrame>;
 }

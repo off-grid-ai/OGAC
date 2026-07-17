@@ -19,6 +19,7 @@ import { modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getDevice, listAudit, listDevices, pullPolicyForDevice } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,13 +48,17 @@ function PolicyCard({ policy }: Readonly<{ policy: Policy }>) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Egress</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            Egress
+          </span>
           <Badge variant="secondary" className={egressCls}>
             {egressLabel}
           </Badge>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Guardrails</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            Guardrails
+          </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {guardrails.map((g) => (
               <Badge key={g} variant="outline">
@@ -128,7 +133,9 @@ function ActivityCard({ audit }: Readonly<{ audit: Audit }>) {
   );
 }
 
-export default async function DeviceDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function DeviceDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('fleet');
   const { id } = await params;
   const org = await currentOrgId();
@@ -156,57 +163,61 @@ export default async function DeviceDetailPage({ params }: Readonly<{ params: Pr
   ];
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/gateway/fleet"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        Fleet
-      </Link>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <Link
+            href="/gateway/fleet"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            Fleet
+          </Link>
 
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Cpu className="size-6 text-primary" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-foreground">{device.name}</h1>
-              <Badge variant="secondary" className={statusCls}>
-                {device.status}
-              </Badge>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Cpu className="size-6 text-primary" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold text-foreground">{device.name}</h1>
+                  <Badge variant="secondary" className={statusCls}>
+                    {device.status}
+                  </Badge>
+                </div>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">{device.id}</p>
+              </div>
             </div>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{device.id}</p>
+            <div className="flex items-center gap-2">
+              <ReassignPolicyButton
+                deviceId={device.id}
+                name={device.name}
+                currentRole={device.role}
+                knownRoles={knownRoles}
+              />
+              <DeviceActions deviceId={device.id} name={device.name} fleet={fleetHost} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            {facts.map((f) => (
+              <Card key={f.label} className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    {f.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm font-medium text-foreground">{f.value}</CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <PolicyCard policy={policy} />
+            <ActivityCard audit={audit} />
+            {fleetHost ? <DeviceSoftware hostId={id} /> : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ReassignPolicyButton
-            deviceId={device.id}
-            name={device.name}
-            currentRole={device.role}
-            knownRoles={knownRoles}
-          />
-          <DeviceActions deviceId={device.id} name={device.name} fleet={fleetHost} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        {facts.map((f) => (
-          <Card key={f.label} className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
-                {f.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm font-medium text-foreground">{f.value}</CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <PolicyCard policy={policy} />
-        <ActivityCard audit={audit} />
-        {fleetHost ? <DeviceSoftware hostId={id} /> : null}
-      </div>
-    </div>
+      }
+    </PageFrame>
   );
 }

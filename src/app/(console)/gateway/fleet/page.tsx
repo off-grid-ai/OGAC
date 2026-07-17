@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { getMdm } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,49 +55,53 @@ export default async function FleetPage() {
   const mdm = getMdm().meta;
 
   return (
-    <div className="w-full space-y-6">
-      <Card className="border-primary/20 bg-primary/5 shadow-sm">
-        <CardContent className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Badge variant="secondary" className="mt-0.5 bg-primary/10 text-primary">
-              Coming soon
-            </Badge>
-            <div className="max-w-2xl">
-              <h2 className="text-sm font-semibold text-foreground">Device management</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Enroll, inventory, and govern every device that touches your AI — inventory and
-                health first, then remote lock/wipe, config-profile push, and compliance posture. All
-                under the same policy and audit as the rest of the console.
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-              MDM backend
-            </span>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              {mdm.vendor}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {UPCOMING.map((u) => (
-          <Card key={u.title} className="shadow-sm">
-            <CardContent className="space-y-2 py-5">
-              <u.icon className="size-5 text-primary" />
-              <h3 className="text-sm font-medium text-foreground">{u.title}</h3>
-              <p className="text-xs leading-relaxed text-muted-foreground">{u.body}</p>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <Card className="border-primary/20 bg-primary/5 shadow-sm">
+            <CardContent className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Badge variant="secondary" className="mt-0.5 bg-primary/10 text-primary">
+                  Coming soon
+                </Badge>
+                <div className="max-w-2xl">
+                  <h2 className="text-sm font-semibold text-foreground">Device management</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Enroll, inventory, and govern every device that touches your AI — inventory and
+                    health first, then remote lock/wipe, config-profile push, and compliance
+                    posture. All under the same policy and audit as the rest of the console.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                  MDM backend
+                </span>
+                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  {mdm.vendor}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      <p className="text-xs text-muted-foreground/70">
-        The MDM backend is swappable in Settings (native registry · FleetDM/osquery). Device
-        inventory, enrollment, and commands light up here when the control plane ships.
-      </p>
-    </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {UPCOMING.map((u) => (
+              <Card key={u.title} className="shadow-sm">
+                <CardContent className="space-y-2 py-5">
+                  <u.icon className="size-5 text-primary" />
+                  <h3 className="text-sm font-medium text-foreground">{u.title}</h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{u.body}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground/70">
+            The MDM backend is swappable in Settings (native registry · FleetDM/osquery). Device
+            inventory, enrollment, and commands light up here when the control plane ships.
+          </p>
+        </div>
+      }
+    </PageFrame>
   );
 }

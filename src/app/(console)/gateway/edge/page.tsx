@@ -1,5 +1,6 @@
 import { EdgePanel } from '@/components/edge/EdgePanel';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,5 +8,5 @@ export const dynamic = 'force-dynamic';
 // public hostnames. Live policy + recent blocks, read from Caddy on the same host.
 export default async function EdgePage() {
   await requireModuleForUser('edge');
-  return <EdgePanel />;
+  return <PageFrame>{<EdgePanel />}</PageFrame>;
 }

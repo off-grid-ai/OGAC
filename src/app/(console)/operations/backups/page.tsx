@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { BackupsManager } from '@/components/backups/BackupsManager';
 import { readBackupsView, readScheduleStatus } from '@/lib/backups';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,12 @@ export default async function BackupsPage() {
   const initial = { error, schedule, running: false, ...view };
 
   return (
-    <Suspense fallback={null}>
-      <BackupsManager initial={initial} />
-    </Suspense>
+    <PageFrame>
+      {
+        <Suspense fallback={null}>
+          <BackupsManager initial={initial} />
+        </Suspense>
+      }
+    </PageFrame>
   );
 }

@@ -14,6 +14,7 @@ import { listSuppressions } from '@/lib/siem-suppress';
 import { applySuppressions } from '@/lib/siem-suppress-policy';
 import { filterByOutcome, readSiemView } from '@/lib/siem-view';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +30,11 @@ export default async function SiemPage({
   const { outcome, pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();
   const pipelines = await listPipelines(orgId).catch(() => []);
-  const facet = resolvePipelineFacet(rawPipeline, pipelines.map((p) => p.id));
-  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facet = resolvePipelineFacet(
+    rawPipeline,
+    pipelines.map((p) => p.id),
+  );
+  const facetName = facet ? (pipelines.find((p) => p.id === facet)?.name ?? facet) : null;
   const facetParam = facet ? `&pipeline=${encodeURIComponent(facet)}` : '';
   const [{ configured, data: raw, error }, suppressions] = await Promise.all([
     readSiemView(500, facet ? pipelineTag(facet) : null),
@@ -43,91 +47,98 @@ export default async function SiemPage({
   const active = data.byOutcome.some((o) => o.outcome === outcome) ? outcome : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <ShieldWarning className="size-4" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-lg font-semibold text-foreground">Security Events</h1>
-          <p className="text-sm text-muted-foreground">
-            SIEM read-back — the security/audit event stream indexed in OpenSearch. Actor, action,
-            outcome, and source IP for every event. Read on-prem.
-            {facetName ? (
-              <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
-            ) : null}
-          </p>
-        </div>
-        <PipelineFacetSelect
-          pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
-          resetParams={[]}
-        />
-      </div>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <ShieldWarning className="size-4" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-lg font-semibold text-foreground">Security Events</h1>
+              <p className="text-sm text-muted-foreground">
+                SIEM read-back — the security/audit event stream indexed in OpenSearch. Actor,
+                action, outcome, and source IP for every event. Read on-prem.
+                {facetName ? (
+                  <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
+                ) : null}
+              </p>
+            </div>
+            <PipelineFacetSelect
+              pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+              resetParams={[]}
+            />
+          </div>
 
-      {!configured && (
-        <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          OpenSearch isn&apos;t connected yet — connect it in Settings. No security events to show.
-        </p>
-      )}
-      {error && (
-        <p className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
-          Could not reach the SIEM index: {error}
-        </p>
-      )}
+          {!configured && (
+            <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+              OpenSearch isn&apos;t connected yet — connect it in Settings. No security events to
+              show.
+            </p>
+          )}
+          {error && (
+            <p className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+              Could not reach the SIEM index: {error}
+            </p>
+          )}
 
-      {/* Summary tiles — value-forward stat band shared across the Insights surfaces. */}
-      <StatBand
-        stats={buildSiemStats({
-          total: data.total,
-          blockedDenied: data.blockedDenied,
-          distinctActors: data.topActors.length,
-          distinctOutcomes: data.byOutcome.length,
-        })}
-      />
+          {/* Summary tiles — value-forward stat band shared across the Insights surfaces. */}
+          <StatBand
+            stats={buildSiemStats({
+              total: data.total,
+              blockedDenied: data.blockedDenied,
+              distinctActors: data.topActors.length,
+              distinctOutcomes: data.byOutcome.length,
+            })}
+          />
 
-      {/* Outcome filter — URL driven */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Link
-          href={facet ? `/insights/siem?pipeline=${encodeURIComponent(facet)}` : '/insights/siem'}
-          className={`rounded-md border px-2 py-1 ${!active ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
-        >
-          all ({data.total})
-        </Link>
-        {data.byOutcome.map((o) => (
-          <Link
-            key={o.outcome}
-            href={`/insights/siem?outcome=${encodeURIComponent(o.outcome)}${facetParam}`}
-            className={`rounded-md border px-2 py-1 ${active === o.outcome ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
-          >
-            {o.outcome} ({o.count})
-          </Link>
-        ))}
-      </div>
-
-      {/* Top actors rollup */}
-      {data.topActors.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {data.topActors.map((a) => (
-            <span
-              key={a.actor}
-              className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+          {/* Outcome filter — URL driven */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Link
+              href={
+                facet ? `/insights/siem?pipeline=${encodeURIComponent(facet)}` : '/insights/siem'
+              }
+              className={`rounded-md border px-2 py-1 ${!active ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
             >
-              {a.actor}: {a.count}
-            </span>
-          ))}
-        </div>
-      )}
+              all ({data.total})
+            </Link>
+            {data.byOutcome.map((o) => (
+              <Link
+                key={o.outcome}
+                href={`/insights/siem?outcome=${encodeURIComponent(o.outcome)}${facetParam}`}
+                className={`rounded-md border px-2 py-1 ${active === o.outcome ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
+              >
+                {o.outcome} ({o.count})
+              </Link>
+            ))}
+          </div>
 
-      {/* Recent events — paged client-side over the fetched stream (shared Pagination control). */}
-      <SiemEventsTable events={view.events} />
+          {/* Top actors rollup */}
+          {data.topActors.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {data.topActors.map((a) => (
+                <span
+                  key={a.actor}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+                >
+                  {a.actor}: {a.count}
+                </span>
+              ))}
+            </div>
+          )}
 
-      {/* Management: suppression rules mute known-noise events (a scanner IP, a service account, a
+          {/* Recent events — paged client-side over the fetched stream (shared Pagination control). */}
+          <SiemEventsTable events={view.events} />
+
+          {/* Management: suppression rules mute known-noise events (a scanner IP, a service account, a
           health-probe path) so the feed stays signal. Applied server-side to the whole view. */}
-      <SuppressionManager rules={suppressions} />
+          <SuppressionManager rules={suppressions} />
 
-      {/* Management: OpenSearch alerting monitors (threshold triggers over the audit/gateway
+          {/* Management: OpenSearch alerting monitors (threshold triggers over the audit/gateway
           indices) + the ISM retention/rollover policy. URL-driven (?panel=alerting, ?atab=). */}
-      <AlertingManager />
-    </div>
+          <AlertingManager />
+        </div>
+      }
+    </PageFrame>
   );
 }

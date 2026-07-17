@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { PageFrame } from '@/components/PageFrame';
 import { PipelineDetailNav } from '@/components/pipelines/PipelineDetailNav';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getPipeline } from '@/lib/pipelines';
@@ -24,9 +25,9 @@ export default async function PipelineShellLayout({
   if (!pipeline) notFound();
 
   return (
-    <div className="w-full space-y-6">
+    <PageFrame className="space-y-6">
       <PipelineDetailNav pipelineId={pipeline.id} name={pipeline.name} />
       {children}
-    </div>
+    </PageFrame>
   );
 }

@@ -25,6 +25,7 @@ import {
 import { requireModuleForUser } from '@/lib/module-access';
 import { isSafeIdentifier } from '@/lib/warehouse-model';
 import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,109 +60,115 @@ export default async function WarehouseTableDetailPage({
   const previewSql = `SELECT * FROM ${name} LIMIT 100`;
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <Link
-            href="/data/warehouse"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" /> Warehouse
-          </Link>
-          <h1 className="mt-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-foreground">
-            {bareTableName(name)}
-            {freshness ? (
-              <Badge className={freshnessTone(freshness.label, freshness.ageMs)}>
-                {freshness.label}
-              </Badge>
-            ) : null}
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground">{name}</p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/data/query?sql=${encodeURIComponent(previewSql)}`}>Query this table</Link>
-        </Button>
-      </div>
-
-      {/* Stats band. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Rows" value={formatRows(stats?.rows ?? 0)} />
-        <Stat label="On disk" value={formatBytes(stats?.bytes ?? 0)} />
-        <Stat label="Columns" value={String(columnNames.length)} />
-        <Stat label="Last updated" value={freshness?.label ?? 'unknown'} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Columns. */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Columns</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            {columns.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No column metadata available.</p>
-            ) : (
-              columns.map((c) => (
-                <div
-                  key={c.name}
-                  className="flex items-center justify-between gap-2 border-b border-border/50 pb-1 text-xs last:border-0"
-                >
-                  <span className="font-medium text-foreground">{c.name}</span>
-                  <span className="text-muted-foreground">{c.type}</span>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quality check (action). */}
-        <div className="xl:col-span-2">
-          <TableQualityCheck table={name} columns={columnNames} sampleRows={rows} />
-        </div>
-      </div>
-
-      {/* Sample rows. */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Sample rows</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A live sample of up to 50 rows straight from the warehouse.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {rows.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted-foreground">
-              This table returned no rows.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {columnNames.map((c) => (
-                      <TableHead key={c} className="whitespace-nowrap">
-                        {c}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, i) => (
-                    <TableRow key={i}>
-                      {columnNames.map((c) => (
-                        <TableCell key={c} className="whitespace-nowrap font-mono text-xs">
-                          {formatCell(row[c])}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <Link
+                href="/data/warehouse"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="size-3.5" /> Warehouse
+              </Link>
+              <h1 className="mt-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-foreground">
+                {bareTableName(name)}
+                {freshness ? (
+                  <Badge className={freshnessTone(freshness.label, freshness.ageMs)}>
+                    {freshness.label}
+                  </Badge>
+                ) : null}
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">{name}</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/data/query?sql=${encodeURIComponent(previewSql)}`}>
+                Query this table
+              </Link>
+            </Button>
+          </div>
+
+          {/* Stats band. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Rows" value={formatRows(stats?.rows ?? 0)} />
+            <Stat label="On disk" value={formatBytes(stats?.bytes ?? 0)} />
+            <Stat label="Columns" value={String(columnNames.length)} />
+            <Stat label="Last updated" value={freshness?.label ?? 'unknown'} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            {/* Columns. */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Columns</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {columns.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No column metadata available.</p>
+                ) : (
+                  columns.map((c) => (
+                    <div
+                      key={c.name}
+                      className="flex items-center justify-between gap-2 border-b border-border/50 pb-1 text-xs last:border-0"
+                    >
+                      <span className="font-medium text-foreground">{c.name}</span>
+                      <span className="text-muted-foreground">{c.type}</span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quality check (action). */}
+            <div className="xl:col-span-2">
+              <TableQualityCheck table={name} columns={columnNames} sampleRows={rows} />
+            </div>
+          </div>
+
+          {/* Sample rows. */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Sample rows</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A live sample of up to 50 rows straight from the warehouse.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {rows.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                  This table returned no rows.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {columnNames.map((c) => (
+                          <TableHead key={c} className="whitespace-nowrap">
+                            {c}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row, i) => (
+                        <TableRow key={i}>
+                          {columnNames.map((c) => (
+                            <TableCell key={c} className="whitespace-nowrap font-mono text-xs">
+                              {formatCell(row[c])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      }
+    </PageFrame>
   );
 }
 

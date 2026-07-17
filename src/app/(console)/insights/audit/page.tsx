@@ -4,17 +4,14 @@ import { AuditFilterBar } from '@/components/audit/AuditFilterBar';
 import { StatBand } from '@/components/insights/StatBand';
 import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { readAuditPage } from '@/lib/audit-log-reader';
-import {
-  auditFiltersToQuery,
-  parseAuditFilters,
-  type AuditOutcome,
-} from '@/lib/audit-log-view';
+import { auditFiltersToQuery, parseAuditFilters, type AuditOutcome } from '@/lib/audit-log-view';
 import { buildAuditStats } from '@/lib/insights-stats';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
 import { listPipelines } from '@/lib/pipelines';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,8 +47,11 @@ export default async function AuditLogPage({
   // == pipeline:<id>). Applied client-side over the fetched page window (the audit reader isn't yet
   // pipeline-aware server-side), so the note below is explicit about the scope.
   const pipelines = await listPipelines(orgId).catch(() => []);
-  const facet = resolvePipelineFacet(get('pipeline'), pipelines.map((p) => p.id));
-  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facet = resolvePipelineFacet(
+    get('pipeline'),
+    pipelines.map((p) => p.id),
+  );
+  const facetName = facet ? (pipelines.find((p) => p.id === facet)?.name ?? facet) : null;
   const rows = facet ? filterAuditForPipeline(allRows, facet) : allRows;
 
   const pageCount = Math.max(1, Math.ceil(total / size));
@@ -70,139 +70,148 @@ export default async function AuditLogPage({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <ClipboardText className="size-4" />
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <ClipboardText className="size-4" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
+                <p className="text-sm text-muted-foreground">
+                  Who did what, to what, on which project — every audited action attributed to an
+                  actor, with model, tokens, cost, and outcome. Filter and export for compliance.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <ExportLink href={exportCsv} label="CSV" />
+              <ExportLink href={exportJson} label="JSON" />
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
-            <p className="text-sm text-muted-foreground">
-              Who did what, to what, on which project — every audited action attributed to an actor,
-              with model, tokens, cost, and outcome. Filter and export for compliance.
+
+          {!configured && (
+            <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+              OpenSearch isn&apos;t connected yet — connect it in Settings. No audit events to show.
             </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportLink href={exportCsv} label="CSV" />
-          <ExportLink href={exportJson} label="JSON" />
-        </div>
-      </div>
+          )}
+          {error && (
+            <p className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+              Could not reach the audit index: {error}
+            </p>
+          )}
 
-      {!configured && (
-        <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          OpenSearch isn&apos;t connected yet — connect it in Settings. No audit events to show.
-        </p>
-      )}
-      {error && (
-        <p className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
-          Could not reach the audit index: {error}
-        </p>
-      )}
+          {/* Value-forward summary band — total matches + distinct actors/actions/projects in view. */}
+          <StatBand
+            stats={buildAuditStats({
+              total,
+              distinctActors: facets.actors.length,
+              distinctActions: facets.actions.length,
+              distinctProjects: facets.projects.length,
+            })}
+          />
 
-      {/* Value-forward summary band — total matches + distinct actors/actions/projects in view. */}
-      <StatBand
-        stats={buildAuditStats({
-          total,
-          distinctActors: facets.actors.length,
-          distinctActions: facets.actions.length,
-          distinctProjects: facets.projects.length,
-        })}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <AuditFilterBar
-          actors={facets.actors}
-          actions={facets.actions}
-          projects={facets.projects}
-          outcomes={facets.outcomes}
-        />
-        <PipelineFacetSelect
-          pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
-          resetParams={['page']}
-        />
-      </div>
-
-      {facetName ? (
-        <p className="text-xs text-muted-foreground">
-          Filtered to pipeline “{facetName}” — showing {rows.length} of the {allRows.length} events on
-          this page attributed to it (audit search narrows to this pipeline within the current window).
-        </p>
-      ) : null}
-
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No audit events match these filters.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-2">Time</th>
-                <th className="p-2">Actor</th>
-                <th className="p-2">Action</th>
-                <th className="p-2">Project</th>
-                <th className="p-2">Resource</th>
-                <th className="p-2">Model</th>
-                <th className="p-2 text-right">Tokens</th>
-                <th className="p-2 text-right">Cost</th>
-                <th className="p-2">Outcome</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-border align-top">
-                  <td className="whitespace-nowrap p-2 text-xs text-muted-foreground">
-                    {r.ts ? new Date(r.ts).toLocaleString() : '—'}
-                  </td>
-                  <td className="p-2">
-                    <span className="text-foreground">{r.actor}</span>
-                    {r.actorType !== 'unknown' && (
-                      <span className="ml-1 text-[10px] uppercase text-muted-foreground/60">
-                        {r.actorType}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-2 font-mono text-xs">{r.action}</td>
-                  <td className="p-2 text-muted-foreground">{r.project || '—'}</td>
-                  <td className="max-w-[16rem] truncate p-2 text-muted-foreground">
-                    {r.resource || '—'}
-                  </td>
-                  <td className="p-2 text-muted-foreground">{r.model || '—'}</td>
-                  <td className="p-2 text-right tabular-nums">{r.tokens || '—'}</td>
-                  <td className="p-2 text-right tabular-nums">
-                    {r.costUsd ? `$${r.costUsd.toFixed(4)}` : '—'}
-                  </td>
-                  <td className="p-2">
-                    <OutcomeBadge outcome={r.outcome} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Pagination — URL-driven (?page=N). Back steps to the previous page. */}
-      {total > size && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {(page - 1) * size + 1}–{Math.min(page * size, total)} of {total}
-          </span>
-          <div className="flex items-center gap-1">
-            <PageLink href={pageHref(Math.max(1, page - 1))} disabled={page <= 1} label="Prev" />
-            <span className="px-2">
-              page {page} / {pageCount}
-            </span>
-            <PageLink
-              href={pageHref(Math.min(pageCount, page + 1))}
-              disabled={page >= pageCount}
-              label="Next"
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <AuditFilterBar
+              actors={facets.actors}
+              actions={facets.actions}
+              projects={facets.projects}
+              outcomes={facets.outcomes}
+            />
+            <PipelineFacetSelect
+              pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+              resetParams={['page']}
             />
           </div>
+
+          {facetName ? (
+            <p className="text-xs text-muted-foreground">
+              Filtered to pipeline “{facetName}” — showing {rows.length} of the {allRows.length}{' '}
+              events on this page attributed to it (audit search narrows to this pipeline within the
+              current window).
+            </p>
+          ) : null}
+
+          {rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No audit events match these filters.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="p-2">Time</th>
+                    <th className="p-2">Actor</th>
+                    <th className="p-2">Action</th>
+                    <th className="p-2">Project</th>
+                    <th className="p-2">Resource</th>
+                    <th className="p-2">Model</th>
+                    <th className="p-2 text-right">Tokens</th>
+                    <th className="p-2 text-right">Cost</th>
+                    <th className="p-2">Outcome</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} className="border-t border-border align-top">
+                      <td className="whitespace-nowrap p-2 text-xs text-muted-foreground">
+                        {r.ts ? new Date(r.ts).toLocaleString() : '—'}
+                      </td>
+                      <td className="p-2">
+                        <span className="text-foreground">{r.actor}</span>
+                        {r.actorType !== 'unknown' && (
+                          <span className="ml-1 text-[10px] uppercase text-muted-foreground/60">
+                            {r.actorType}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2 font-mono text-xs">{r.action}</td>
+                      <td className="p-2 text-muted-foreground">{r.project || '—'}</td>
+                      <td className="max-w-[16rem] truncate p-2 text-muted-foreground">
+                        {r.resource || '—'}
+                      </td>
+                      <td className="p-2 text-muted-foreground">{r.model || '—'}</td>
+                      <td className="p-2 text-right tabular-nums">{r.tokens || '—'}</td>
+                      <td className="p-2 text-right tabular-nums">
+                        {r.costUsd ? `$${r.costUsd.toFixed(4)}` : '—'}
+                      </td>
+                      <td className="p-2">
+                        <OutcomeBadge outcome={r.outcome} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination — URL-driven (?page=N). Back steps to the previous page. */}
+          {total > size && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {(page - 1) * size + 1}–{Math.min(page * size, total)} of {total}
+              </span>
+              <div className="flex items-center gap-1">
+                <PageLink
+                  href={pageHref(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  label="Prev"
+                />
+                <span className="px-2">
+                  page {page} / {pageCount}
+                </span>
+                <PageLink
+                  href={pageHref(Math.min(pageCount, page + 1))}
+                  disabled={page >= pageCount}
+                  label="Next"
+                />
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      }
+    </PageFrame>
   );
 }
 
@@ -218,7 +227,11 @@ function ExportLink({ href, label }: Readonly<{ href: string; label: string }>) 
   );
 }
 
-function PageLink({ href, disabled, label }: Readonly<{ href: string; disabled: boolean; label: string }>) {
+function PageLink({
+  href,
+  disabled,
+  label,
+}: Readonly<{ href: string; disabled: boolean; label: string }>) {
   if (disabled) {
     return <span className="rounded-md border border-border px-2 py-1 opacity-40">{label}</span>;
   }

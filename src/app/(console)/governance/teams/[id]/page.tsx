@@ -5,12 +5,15 @@ import { listPipelinesByTeam } from '@/lib/pipelines';
 import { getTeam, listTeamMembers, listTeams } from '@/lib/teams';
 import { distinctDepartments } from '@/lib/teams-policy';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
 // Team detail (M2) — the full entity + its actions: edit/delete, member CRUD, and the pipelines
 // assigned to it. Deep-linkable route (/governance/teams/<id>). 404 for an unknown/cross-org id.
-export default async function TeamDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function TeamDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('teams');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -24,16 +27,20 @@ export default async function TeamDetailPage({ params }: Readonly<{ params: Prom
   ]);
 
   return (
-    <TeamDetail
-      team={{
-        id: team.id,
-        name: team.name,
-        description: team.description,
-        department: team.department,
-        members: members.map((m) => ({ id: m.id, userId: m.userId, role: m.role })),
-        pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, status: p.status })),
-      }}
-      departments={distinctDepartments(allTeams)}
-    />
+    <PageFrame>
+      {
+        <TeamDetail
+          team={{
+            id: team.id,
+            name: team.name,
+            description: team.description,
+            department: team.department,
+            members: members.map((m) => ({ id: m.id, userId: m.userId, role: m.role })),
+            pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, status: p.status })),
+          }}
+          departments={distinctDepartments(allTeams)}
+        />
+      }
+    </PageFrame>
   );
 }

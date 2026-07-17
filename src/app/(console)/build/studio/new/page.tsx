@@ -7,6 +7,7 @@ import { requireModuleForUser } from '@/lib/module-access';
 import { getOrgContext, summarizeOrgContext } from '@/lib/org-context';
 import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,25 +37,29 @@ export default async function StudioNewPage() {
   const connectorOptions = ctx.connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
 
   return (
-    <div className="w-full space-y-5">
-      <div>
-        <Link
-          href="/build/studio"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          Studio
-        </Link>
-      </div>
-      <Suspense fallback={null}>
-        <StudioModes
-          summary={summary}
-          domains={domains}
-          agents={agentOptions}
-          connectors={connectorOptions}
-          pipelines={pipelineOptions}
-        />
-      </Suspense>
-    </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-5">
+          <div>
+            <Link
+              href="/build/studio"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" />
+              Studio
+            </Link>
+          </div>
+          <Suspense fallback={null}>
+            <StudioModes
+              summary={summary}
+              domains={domains}
+              agents={agentOptions}
+              connectors={connectorOptions}
+              pipelines={pipelineOptions}
+            />
+          </Suspense>
+        </div>
+      }
+    </PageFrame>
   );
 }

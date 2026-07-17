@@ -6,6 +6,7 @@ import { MODEL_CATALOG, getModelSpec, type ModelSpec } from '@/lib/model-catalog
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelinesByGateway } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,9 @@ export const dynamic = 'force-dynamic';
 //    in GatewayDetail; the static fleet-served set is passed as the baseline).
 //  • cloud   → the gateway's default model spec if it's a known catalog entry (published specs), else
 //    an honest "spec not in catalog" note. Cloud providers expose thousands of models; we don't guess.
-export default async function GatewayDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function GatewayDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('gateways');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -37,19 +40,23 @@ export default async function GatewayDetailPage({ params }: Readonly<{ params: P
   const tenantSlug = (await headers()).get('x-offgrid-tenant-slug') ?? '';
 
   return (
-    <GatewayDetail
-      gateway={gateway}
-      tenantSlug={tenantSlug}
-      pipelines={pipelines.map((p) => ({
-        id: p.id,
-        name: p.name,
-        status: p.status,
-        visibility: p.visibility,
-        defaultModel: p.defaultModel ?? null,
-      }))}
-      isOnPrem={isOnPrem}
-      fleetModelBaseline={fleetBaseline}
-      defaultModelSpec={defaultSpec}
-    />
+    <PageFrame>
+      {
+        <GatewayDetail
+          gateway={gateway}
+          tenantSlug={tenantSlug}
+          pipelines={pipelines.map((p) => ({
+            id: p.id,
+            name: p.name,
+            status: p.status,
+            visibility: p.visibility,
+            defaultModel: p.defaultModel ?? null,
+          }))}
+          isOnPrem={isOnPrem}
+          fleetModelBaseline={fleetBaseline}
+          defaultModelSpec={defaultSpec}
+        />
+      }
+    </PageFrame>
   );
 }
