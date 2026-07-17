@@ -54,6 +54,14 @@ test('Console pins shared packages to repository-relative archives and verifies 
   assert.match(lock.packages['node_modules/@offgrid/ui'].integrity, /^sha512-/);
 });
 
+test('Tailwind establishes cascade layer order before shared component defaults', async () => {
+  const css = await readFile('src/app/globals.css', 'utf8');
+  const tailwind = css.indexOf("@import 'tailwindcss';");
+  const shared = css.indexOf("@import '@offgrid/ui/styles.css';");
+
+  assert.ok(tailwind >= 0 && shared > tailwind);
+});
+
 test('high-frequency Console adapters preserve one shared visual owner', () => {
   assert.equal(Input, SharedInput);
   assert.equal(Textarea, SharedTextarea);
