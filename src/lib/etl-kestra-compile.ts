@@ -32,6 +32,8 @@ import {
   destinationNodes,
   type EtlDagSpec,
   type EtlNode,
+  type EtlTriggerMode,
+  type ManagedEtlBlueprint,
 } from './etl-job';
 
 export const KESTRA_NAMESPACE = 'offgrid.etl';
@@ -180,6 +182,104 @@ export interface CompiledFlow {
   namespace: string;
   yaml: string;
   steps: CompiledStep[];
+}
+
+// Compile a reviewed, product-owned business workflow. Runtime credentials remain Kestra secrets;
+// the Console supplies only correlation ids. DDL is deliberately absent: the audit table belongs to
+// the fleet migration, while this least-privilege flow can only read source columns and append/read
+// its audit outcome.
+export function compileManagedBlueprintToKestraFlow(
+  blueprint: ManagedEtlBlueprint,
+  jobId: string,
+  jobName: string,
+  trigger: EtlTriggerMode,
+  cron?: string,
+): CompiledFlow {
+  if (blueprint !== 'bfsi-delinquency-snapshot') {
+    throw new Error(`Unsupported managed ETL blueprint: ${blueprint}`);
+  }
+  const flowId = kestraFlowId(jobId);
+  const tasks: Yaml[] = [
+    {
+      id: 'materialize_snapshot',
+      type: 'io.kestra.plugin.jdbc.clickhouse.Query',
+      sql: [
+        'INSERT INTO bfsi.delinquency_orchestration_audit',
+        'SELECT',
+        "  '{{ inputs.console_job_id }}',",
+        "  '{{ inputs.console_run_id }}',",
+        "  '{{ execution.id }}',",
+        '  now64(3),',
+        '  count(),',
+        '  toDecimal128(sum(principal_inr), 2),',
+        "  'bfsi.fact_loan',",
+        "  'bfsi-delinquency-snapshot'",
+        'FROM bfsi.fact_loan',
+        "WHERE dpd > 30 AND status != 'closed'",
+      ].join('\n'),
+    },
+    {
+      id: 'verify_persisted_outcome',
+      type: 'io.kestra.plugin.jdbc.clickhouse.Query',
+      fetchType: 'FETCH_ONE',
+      sql: [
+        'SELECT delinquent_loans, principal_exposure_inr',
+        'FROM bfsi.delinquency_orchestration_audit FINAL',
+        "WHERE console_job_id = '{{ inputs.console_job_id }}'",
+        "  AND console_run_id = '{{ inputs.console_run_id }}'",
+        "  AND execution_id = '{{ execution.id }}'",
+        'LIMIT 1',
+      ].join('\n'),
+    },
+    {
+      id: 'business_audit_log',
+      type: 'io.kestra.plugin.core.log.Log',
+      message:
+        'Delinquency snapshot persisted: run={{ inputs.console_run_id }}, execution={{ execution.id }}, ' +
+        'loans={{ outputs.verify_persisted_outcome.row.delinquent_loans }}, ' +
+        'exposure_inr={{ outputs.verify_persisted_outcome.row.principal_exposure_inr }}.',
+    },
+  ];
+  const flow: { [k: string]: Yaml } = {
+    id: flowId,
+    namespace: KESTRA_NAMESPACE,
+    description: `${jobName} — Console-owned, execution-linked collections outcome.`,
+    labels: {
+      'offgrid.managed': 'true',
+      'offgrid.job_id': flowId,
+      'offgrid.blueprint': blueprint,
+      'business.outcome': 'collections-effectiveness',
+    },
+    inputs: [
+      { id: 'console_job_id', type: 'STRING', defaults: flowId },
+      { id: 'console_run_id', type: 'STRING', required: true },
+    ],
+    tasks,
+    pluginDefaults: [
+      {
+        type: 'io.kestra.plugin.jdbc.clickhouse.Query',
+        values: {
+          url: 'jdbc:clickhouse://host.docker.internal:8124/bfsi',
+          username: '{{ envs.clickhouse_user }}',
+          password: "{{ secret('CLICKHOUSE_PASSWORD') }}",
+          connectionPooling: true,
+          timeZoneId: 'Asia/Kolkata',
+        },
+      },
+    ],
+  };
+  if (trigger === 'schedule' && cron) {
+    flow.triggers = [
+      {
+        id: 'daily_collections_snapshot',
+        type: 'io.kestra.plugin.core.trigger.Schedule',
+        cron,
+        timezone: 'Asia/Kolkata',
+        disabled: false,
+      },
+    ];
+  }
+  return { flowId, namespace: KESTRA_NAMESPACE, yaml: toYaml(flow), steps: [] };
 }
 
 // ── the compiler ────────────────────────────────────────────────────────────────────────────────

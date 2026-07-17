@@ -18,6 +18,7 @@ import {
   toYaml,
   kestraFlowId,
   KESTRA_NAMESPACE,
+  compileManagedBlueprintToKestraFlow,
 } from '../src/lib/etl-kestra-compile.ts';
 
 // PURE unit tests: DAG validation + the DAG→Kestra-flow compiler. No DB, no network, no live box —
@@ -160,6 +161,41 @@ test('compileToKestraFlow emits a Schedule trigger for a scheduled job', () => {
   const { yaml } = compileToKestraFlow(d, 'etl_sched', 'Sched');
   assert.match(yaml, /io\.kestra\.plugin\.core\.trigger\.Schedule/);
   assert.match(yaml, /cron: '0 3 \* \* \*'/);
+});
+
+test('managed delinquency blueprint compiles real least-privilege business work', () => {
+  const { yaml, namespace, flowId } = compileManagedBlueprintToKestraFlow(
+    'bfsi-delinquency-snapshot',
+    'etl_delinquency',
+    'Delinquency exposure snapshot',
+    'schedule',
+    '15 1 * * *',
+  );
+  assert.equal(namespace, 'offgrid.etl');
+  assert.equal(flowId, 'etl_delinquency');
+  assert.match(yaml, /INSERT INTO bfsi\.delinquency_orchestration_audit/);
+  assert.match(yaml, /FROM bfsi\.fact_loan/);
+  assert.match(yaml, /dpd > 30 AND status != 'closed'/);
+  assert.match(yaml, /console_run_id/);
+  assert.match(yaml, /execution\.id/);
+  assert.match(yaml, /disabled: false/);
+  assert.match(yaml, /username: '\{\{ envs\.clickhouse_user \}\}'/);
+  assert.match(yaml, /secret\(''CLICKHOUSE_PASSWORD''\)/);
+  assert.doesNotMatch(yaml, /CREATE TABLE|ALTER TABLE|DROP TABLE/);
+  assert.doesNotMatch(yaml, /offgrid\.production/);
+});
+
+test('managed blueprint rejects unknown workflow keys', () => {
+  assert.throws(
+    () =>
+      compileManagedBlueprintToKestraFlow(
+        'unknown' as 'bfsi-delinquency-snapshot',
+        'etl_bad',
+        'bad',
+        'manual',
+      ),
+    /Unsupported managed ETL blueprint/,
+  );
 });
 
 test('kestraFlowId sanitizes to Kestra id rules', () => {

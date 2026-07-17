@@ -12,6 +12,7 @@ import { normalizeJobStatus, type EtlJobStatus } from './etl-model';
 // ─── The authored spec ─────────────────────────────────────────────────────────
 // How a job is triggered: 'manual' = only run-now; 'schedule' = run on the cron too.
 export type EtlTriggerMode = 'manual' | 'schedule';
+export type ManagedEtlBlueprint = 'bfsi-delinquency-snapshot';
 
 // One column-mapping row: read `source` from the source, write it to `dest` in the warehouse, and
 // apply `action` to its values on the way (reusing the data-redaction vocabulary). `dest` defaults
@@ -50,12 +51,15 @@ export interface EtlJobSpec {
   // compiler consumes; the flat source/dest/mappings fields above are kept in sync (derived from it)
   // so the legacy direct-copy engine + list rendering keep working.
   dag?: EtlDagSpec;
+  // Server-provisioned, product-owned workflow. Operators still manage it through the same ETL
+  // CRUD/detail surface; the key selects a reviewed compiler rather than accepting arbitrary SQL.
+  managedBlueprint?: ManagedEtlBlueprint;
 }
 
 // What the authoring form submits (no server-stamped fields).
 export type EtlJobDraft = Omit<
   EtlJobSpec,
-  'id' | 'orgId' | 'createdAt' | 'updatedAt' | 'lastRunStatus' | 'lastRunAt'
+  'id' | 'orgId' | 'createdAt' | 'updatedAt' | 'lastRunStatus' | 'lastRunAt' | 'managedBlueprint'
 >;
 
 // ─── Identifier + cron validation (pure) ────────────────────────────────────────
