@@ -5,6 +5,8 @@ import {
   toServiceDirectoryEntries,
   toServiceDirectoryEntry,
   toServiceDetailEntry,
+  toServiceTopologyDetailEntry,
+  toServiceTopologyDirectoryEntries,
 } from '@/lib/service-directory-view';
 import type { ServiceEntry } from '@/lib/service-entry';
 
@@ -121,4 +123,57 @@ test('detail projection exposes only the allow-listed management capability', ()
   );
 
   assert.equal(toServiceDetailEntry({ ...raw, management: undefined }).management, undefined);
+});
+
+test('topology projection preserves hierarchy and counts while stripping endpoint credentials', () => {
+  const raw = service('https://service.example.com');
+  const topology = {
+    service: raw,
+    dependencies: [{ serviceId: 'postgres', purpose: 'state', required: true }],
+    readiness: [
+      { gate: 'console-used' as const, state: 'pass' as const, summary: 'used', source: 'test' },
+    ],
+    components: [
+      {
+        id: 'api',
+        label: 'API',
+        role: 'control',
+        readiness: [],
+        instances: [
+          {
+            id: 'api-g6',
+            label: 'API on g6',
+            nodeId: 'g6',
+            readiness: [],
+            endpoints: [
+              {
+                id: 'private',
+                label: 'Private API',
+                purpose: 'Control',
+                scope: 'lan' as const,
+                url: 'https://endpoint-user:endpoint-password@offgrid-g6.local:8443/private?token=endpoint-secret',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const list = toServiceTopologyDirectoryEntries([topology]);
+  const detail = toServiceTopologyDetailEntry(topology);
+
+  assert.equal(list[0]?.componentCount, 1);
+  assert.equal(list[0]?.instanceCount, 1);
+  assert.equal(list[0]?.readiness['console-used'], 'pass');
+  assert.equal(detail.components[0]?.instances[0]?.nodeId, 'g6');
+  assert.equal(
+    detail.components[0]?.instances[0]?.endpoints[0]?.displayUrl,
+    'https://offgrid-g6.local:8443',
+  );
+  assert.deepEqual(detail.dependencies, topology.dependencies);
+  assert.doesNotMatch(
+    JSON.stringify({ list, detail }),
+    /endpoint-user|endpoint-password|private\?|endpoint-secret/,
+  );
 });
