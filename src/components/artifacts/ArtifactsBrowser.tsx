@@ -58,7 +58,10 @@ export function ArtifactsBrowser() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeId = searchParams.get('artifact');
-  const active = useMemo(() => artifacts.find((a) => a.id === activeId) ?? null, [artifacts, activeId]);
+  const active = useMemo(
+    () => artifacts.find((a) => a.id === activeId) ?? null,
+    [artifacts, activeId],
+  );
 
   const load = useCallback(async () => {
     const r = await fetch('/api/v1/chat/artifacts');
@@ -223,11 +226,20 @@ export function ArtifactsBrowser() {
                 <Globe className="size-3" /> {active.published ? 'Published' : 'Publish'}
               </Button>
               {active.published ? (
-                <Button size="xs" variant="outline" className="gap-1" onClick={() => copyLink(active.id)}>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() => copyLink(active.id)}
+                >
                   <LinkSimple className="size-3" /> Link
                 </Button>
               ) : null}
-              <button onClick={close} className="text-muted-foreground hover:text-foreground" aria-label="Close">
+              <button
+                onClick={close}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Close"
+              >
                 <X className="size-4" />
               </button>
             </div>
