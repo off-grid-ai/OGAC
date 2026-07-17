@@ -10,6 +10,8 @@ export type CanonicalOwnerId =
   | 'prompts'
   | 'artifacts'
   | 'files'
+  | 'solution-library'
+  | 'solution-deployments'
   | 'apps'
   | 'reviews'
   | 'tools'
@@ -184,6 +186,24 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     placement: 'sidebar',
   },
 
+  {
+    id: 'solution-library',
+    section: 'solutions',
+    label: 'Library',
+    description: 'Reusable BFSI solution blueprints with requirements, proof, and ROI contracts.',
+    route: '/solutions/library',
+    gate: 'studio',
+    placement: 'sidebar',
+  },
+  {
+    id: 'solution-deployments',
+    section: 'solutions',
+    label: 'Deployed',
+    description: 'Blueprint bindings to tenant Apps, runs, and measured evidence.',
+    route: '/solutions/deployed',
+    gate: 'studio',
+    placement: 'sidebar',
+  },
   {
     id: 'apps',
     section: 'solutions',

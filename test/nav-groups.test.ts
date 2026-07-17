@@ -46,6 +46,8 @@ test('every canonical entity has exactly one owner and one canonical route', () 
 test('entity collision decisions are represented in canonical ownership', () => {
   const byId = new Map(CANONICAL_OWNERS.map((owner) => [owner.id, owner]));
   assert.equal(byId.get('apps')?.route, '/solutions/apps');
+  assert.equal(byId.get('solution-library')?.route, '/solutions/library');
+  assert.equal(byId.get('solution-deployments')?.route, '/solutions/deployed');
   assert.equal(byId.get('runs')?.route, '/operations/runs');
   assert.equal(byId.get('runtime-pipelines')?.route, '/runtime/pipelines');
   assert.equal(byId.get('data-flows')?.route, '/data/flows');
