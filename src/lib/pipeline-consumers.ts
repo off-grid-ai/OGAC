@@ -9,6 +9,25 @@ export type PipelineConsumer =
   | { kind: 'chat_default'; id: 'chat-default'; label: string }
   | { kind: 'chat_allowlist'; id: 'chat-allowlist'; label: string };
 
+/**
+ * Operator-facing projection: an App-owned runtime row is an implementation dependency, not a
+ * second consumer. Lifecycle/retirement keeps the full inventory below; the UI shows the App once.
+ */
+export function operatorPipelineConsumers(
+  consumers: readonly PipelineConsumer[],
+): PipelineConsumer[] {
+  return consumers.filter(
+    (consumer) => consumer.kind !== 'runtime_agent' || consumer.ownerAppId === null,
+  );
+}
+
+export async function listOperatorPipelineConsumers(
+  pipelineId: string,
+  orgId: string,
+): Promise<PipelineConsumer[]> {
+  return operatorPipelineConsumers(await listPipelineConsumers(pipelineId, orgId));
+}
+
 /** One org-scoped inventory used by overview, deprecation, and deletion decisions. */
 export async function listPipelineConsumers(
   pipelineId: string,

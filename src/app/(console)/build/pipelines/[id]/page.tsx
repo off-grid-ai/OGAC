@@ -12,7 +12,7 @@ import {
   stageInfo,
 } from '@/lib/pipeline-lifecycle-model';
 import { getPipeline, listPipelineVersions } from '@/lib/pipelines';
-import { listPipelineConsumers } from '@/lib/pipeline-consumers';
+import { listOperatorPipelineConsumers } from '@/lib/pipeline-consumers';
 import { listPolicyRules } from '@/lib/policy-rules';
 import { getTeam, listTeams } from '@/lib/teams';
 import { currentOrgId } from '@/lib/tenancy';
@@ -43,7 +43,7 @@ export default async function PipelineOverviewPage({
       countOf(listPolicyRules(orgId)),
       countOf(listGuardrailRules(orgId)),
       listPipelineVersions(id, orgId).catch(() => []),
-      listPipelineConsumers(id, orgId).catch(() => []),
+      listOperatorPipelineConsumers(id, orgId).catch(() => []),
     ]);
 
   // ── M2 lifecycle & ownership — resolve THIS user's role on the pipeline + the legal transitions ──

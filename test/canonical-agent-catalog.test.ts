@@ -71,17 +71,17 @@ test('canonical agent catalog excludes runtime rows and keeps one-step AppSpecs 
       'nav',
       null,
       ...catalog.builtIns.map((agent) =>
-        createElement(Link, { key: agent.id, href: `/build/agents/${agent.id}` }, agent.name),
+        createElement(Link, { key: agent.id, href: `/solutions/agents/${agent.id}` }, agent.name),
       ),
       ...catalog.authored.map((spec) =>
-        createElement(Link, { key: spec.id, href: `/build/apps/${spec.id}` }, spec.title),
+        createElement(Link, { key: spec.id, href: `/solutions/apps/${spec.id}` }, spec.title),
       ),
-      createElement(Link, { href: '/build/studio/new' }, 'New agent'),
+      createElement(Link, { href: '/solutions/apps/new' }, 'New agent'),
     ),
   );
 
-  assert.match(markup, /href="\/build\/agents\/builtin_claims"/);
-  assert.match(markup, /href="\/build\/apps\/app_authored"/);
-  assert.match(markup, /href="\/build\/studio\/new"/);
+  assert.match(markup, /href="\/solutions\/agents\/builtin_claims"/);
+  assert.match(markup, /href="\/solutions\/apps\/app_authored"/);
+  assert.match(markup, /href="\/solutions\/apps\/new"/);
   assert.doesNotMatch(markup, /agent_runtime_hidden|app_workflow/);
 });
