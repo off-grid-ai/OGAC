@@ -115,10 +115,15 @@ test('toWorkflowInput: carries only a validated discriminated binding', () => {
     }).binding,
     { state: 'unbound', pipelineId: null, contract: null },
   );
-  assert.equal(
-    toWorkflowInput({ agentId: 'a', query: 'q', runId: 'run_1', binding: { state: 'invalid' } })
-      .binding,
-    undefined,
+  assert.throws(
+    () =>
+      toWorkflowInput({
+        agentId: 'a',
+        query: 'q',
+        runId: 'run_1',
+        binding: { state: 'invalid' },
+      }),
+    /valid agent binding required/,
   );
 });
 

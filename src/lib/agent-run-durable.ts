@@ -112,7 +112,8 @@ export interface AgentRunWorkflowInput {
    * path enforces the identical contract the sync path does. Null/absent ⇒ no bound pipeline ⇒
    * legacy allow (the ADDITIVE guarantee), unchanged.
    */
-  /** Dispatch-time binding decision. The worker re-resolves and verifies it before running. */
+  /** Dispatch-time binding decision. The worker re-resolves and verifies it before running.
+   * Optional only for persisted pre-migration Temporal histories; every current caller supplies it. */
   binding?: AgentPipelineBinding;
 }
 
@@ -187,7 +188,8 @@ function normalizeAsker(raw: unknown): Asker | undefined {
 }
 
 function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object') throw new Error('valid agent binding required');
   const binding = raw as Partial<AgentPipelineBinding>;
   if (binding.state === 'unbound') return { state: 'unbound', pipelineId: null, contract: null };
   if (
@@ -199,7 +201,7 @@ function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefine
   ) {
     return binding as Extract<AgentPipelineBinding, { state: 'bound' }>;
   }
-  return undefined;
+  throw new Error('valid agent binding required');
 }
 
 // ── Status mapping ──────────────────────────────────────────────────────────────────────────

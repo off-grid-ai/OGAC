@@ -24,6 +24,8 @@ describe(
     const orgB = `retrieval_b_${suffix}`;
     const token = `arrears${suffix.replaceAll('_', '')}`;
     const datasetId = `ds_${suffix}`;
+    let connectorA = '';
+    let domainA = '';
     let connectorB = '';
     let domainB = '';
 
@@ -46,6 +48,22 @@ describe(
         rows: 17,
         classification: 'internal',
       });
+      const aConnector = await createConnector({
+        name: `${token} A connector`,
+        type: 'rest',
+        endpoint: 'https://example.invalid/data',
+        orgId: orgA,
+      });
+      connectorA = aConnector.id;
+      const aDomain = await createDomain(
+        {
+          label: `${token} mortgage arrears`,
+          connectorId: connectorA,
+          resource: 'arrears',
+        },
+        orgA,
+      );
+      domainA = aDomain.id;
       const connector = await createConnector({
         name: `${token} B connector`,
         type: 'rest',
@@ -66,13 +84,15 @@ describe(
 
     after(async () => {
       await db.delete(datasets).where(eq(datasets.id, datasetId));
+      if (domainA) await deleteDomain(domainA, orgA);
+      if (connectorA) await deleteConnector(connectorA, orgA);
       if (domainB) await deleteDomain(domainB, orgB);
       if (connectorB) await deleteConnector(connectorB, orgB);
     });
 
-    test('bound database query with no org-domain match cannot fall through to dataset catalog', async () => {
+    test('bound database query with no authorized domain cannot fall through to dataset catalog', async () => {
       const legacy = await retrieveAgentSources({
-        query: `count ${token} records`,
+        query: `count ${token} mortgage arrears records`,
         k: 8,
         orgId: orgA,
         contract: null,
@@ -85,15 +105,28 @@ describe(
       );
 
       const governed = await retrieveAgentSources({
-        query: `count ${token} records`,
+        query: `count ${token} mortgage arrears records`,
         k: 8,
         orgId: orgA,
         contract,
         asker: { subject: 'analyst@a.test', roles: [] },
       });
-      assert.equal(governed.allow, true);
-      assert.deepEqual(governed.requestedDomainIds, []);
-      assert.deepEqual(governed.allow ? governed.routed.hits : [], []);
+      assert.equal(governed.allow, false);
+      assert.deepEqual(governed.requestedDomainIds, [domainA]);
+      assert.equal(governed.allow ? null : governed.denied.requested, domainA);
+    });
+
+    test('bound database query with no matching declared domain returns zero structured hits', async () => {
+      const noMatch = await retrieveAgentSources({
+        query: `count unrelated_${token}x records`,
+        k: 8,
+        orgId: orgA,
+        contract,
+        asker: { subject: 'analyst@a.test', roles: [] },
+      });
+      assert.equal(noMatch.allow, true);
+      assert.deepEqual(noMatch.requestedDomainIds, []);
+      assert.deepEqual(noMatch.allow ? noMatch.routed.hits : [], []);
     });
 
     test('connector source cannot resolve an org B connector from an org A request', async () => {

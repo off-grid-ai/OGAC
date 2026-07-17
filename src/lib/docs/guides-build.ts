@@ -7,7 +7,8 @@ export const buildSection: DocSection = {
     {
       slug: 'guides/chat',
       title: 'Chat',
-      description: 'Your org\'s AI, everywhere - grounded, governed, and inside the rules by default.',
+      description:
+        "Your org's AI, everywhere - grounded, governed, and inside the rules by default.",
       body: `**What you'll get:** a chat that already knows your org's rules. Every answer runs through
 the same governed pipeline your admin set up once, grounded in your knowledge - nothing to configure.
 
@@ -73,7 +74,8 @@ routed through the same gateway and governance as chat, so it inherits your org'
     {
       slug: 'guides/agents',
       title: 'Agents',
-      description: 'Assistants that act - grounded, tool-using, and run through the governed pipeline.',
+      description:
+        'Assistants that act - grounded, tool-using, and run through the governed pipeline.',
       body: `**What you'll get:** an assistant with a job, grounded in your knowledge and able to use
 tools - and every run it does flows through the governed pipeline your org set once.
 
@@ -81,9 +83,10 @@ tools - and every run it does flows through the governed pipeline your org set o
 
 ## Create one
 
-On the **Agents** page, describe the agent in plain language. Ground it in your knowledge (on by
-default, so it cites sources and won't hallucinate) and grant it tools - the connectors your org has
-set up. Each granted tool still obeys its action policy: allow, needs approval, or blocked.
+From **Agents**, choose **New agent**. It opens the same Studio builder used for every app: a
+single-step AppSpec is an agent. Describe the job in plain language, ground it in your knowledge
+(on by default), grant tools, and choose its **Runs on** pipeline. Each granted tool still obeys
+its action policy: allow, needs approval, or blocked.
 Capability never bypasses governance.
 
 ## Run and watch it
@@ -101,10 +104,11 @@ inline. Re-run a past run, cancel one in flight, or send a run through human rev
 - **Open** - answers from the model directly, for drafting or brainstorming assistants that don't
   need your documents.
 
-## No special powers
+## One owner, no special powers
 
-A custom agent carries no special access. It runs the same governed path as the built-ins, so it
-inherits every convention set on your console.
+An authored agent is managed through its App lifecycle, not a second runtime-agent editor. It
+carries no special access and runs the same governed path as the built-ins. Direct, scheduled and
+durable runs revalidate its pipeline binding before retrieval or model I/O.
 
 ## What success looks like
 
@@ -115,7 +119,8 @@ with citations inline - and the run shows up in [Agent runs](/docs/guides/agent-
     {
       slug: 'guides/agent-runs',
       title: 'Agent runs',
-      description: 'Every governed run, with its full pipeline trace - re-run, cancel, or send to review.',
+      description:
+        'Every governed run, with its full pipeline trace - re-run, cancel, or send to review.',
       body: `Agent runs is the history and the microscope for everything the agents did. Each run is a
 governed execution you can open and read stage by stage.
 
@@ -212,7 +217,8 @@ citations are a subset of what the asker could open by hand - grounding is never
     {
       slug: 'guides/provit',
       title: 'Provit',
-      description: 'Point it at a repo; it maps every behavior, runs each end to end, and judges the result with vision.',
+      description:
+        'Point it at a repo; it maps every behavior, runs each end to end, and judges the result with vision.',
       body: `Provit answers a question every team dreads: does the app still do what it's supposed to.
 Point it at a repository and it maps the app into behaviors, runs each one end to end, and judges the
 recording with a vision model - so "it works" becomes evidence, not a hope. Provit is a first-class

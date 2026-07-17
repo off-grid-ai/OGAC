@@ -32,9 +32,8 @@ import { requireRunnableAgentBinding } from '../lib/pipeline-run-glue';
  * only needs to resolve the contract once and attach it to the RunContext — runAgent then gates the
  * WORKER path identically to the sync path.
  *
- * Never throws / degrades to null: no bound pipeline (null id) or an unresolvable/deleted pipeline ⇒
- * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as
- * before this gate existed).
+ * Returns the full discriminated binding. An explicit id that is deleted, deprecated, cross-org,
+ * or unavailable is invalid/unavailable and the activity fails closed before runAgent.
  */
 export async function resolveBindingActivity(
   agentId: string,
@@ -45,9 +44,8 @@ export async function resolveBindingActivity(
 }
 
 /**
- * The two impure collaborators the pipeline activity leans on, injected so the enforcement is
- * unit-testable WITHOUT a live gateway/DB (mirrors app-run's dep-injection seam). Defaults are the
- * real subsystems, as Temporal invokes it.
+ * The two impure collaborators the pipeline activity leans on. Production uses the real subsystems;
+ * narrow boundary injection remains available for adapter tests.
  */
 export interface AgentPipelineDeps {
   /** Resolve the bound-pipeline contract (I/O). Default: resolveContractActivity (real resolver). */
@@ -95,7 +93,7 @@ export async function runAgentPipeline(
   input: AgentRunWorkflowInput,
   deps: AgentPipelineDeps = defaultDeps(),
 ): Promise<AgentRunWorkflowResult> {
-  // Resolve the bound-pipeline contract for this durable run (I/O). Null ⇒ no binding ⇒ legacy allow.
+  // Re-resolve the canonical agent binding (I/O). Invalid/unavailable throws before model/retrieval.
   const binding = requireRunnableAgentBinding(
     await deps.resolveBinding(input.agentId, input.orgId),
   );
