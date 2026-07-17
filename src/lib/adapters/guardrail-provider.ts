@@ -87,7 +87,16 @@ export function normalizeLlmGuardResponse(
   let sanitized = original;
   if (typeof r.sanitized_prompt === 'string') sanitized = r.sanitized_prompt;
   else if (typeof r.sanitized_output === 'string') sanitized = r.sanitized_output;
-  return { hits, entities, redacted: sanitized, engine, configured: true };
+  return {
+    hits,
+    entities,
+    redacted: sanitized,
+    engine,
+    requestedEngine: engine,
+    configured: true,
+    status: 'applied',
+    scope: 'content-guardrail',
+  };
 }
 
 // Flatten an unknown thrown value into a diagnosable one-liner — fetch() hides the useful bit
@@ -145,12 +154,25 @@ export function guardrailUnavailable(reason: string, engine = 'llm-guard'): PiiR
     entities: ['GUARDRAIL_UNAVAILABLE'],
     redacted: `[guardrail unavailable: ${reason}]`,
     engine,
+    requestedEngine: engine,
+    status: 'down',
+    reason,
+    scope: 'content-guardrail',
   };
 }
 
 // The not-configured verdict — no engine URL. The step did NOT screen; it says so honestly. PURE.
 export function guardrailNotConfigured(engine = 'llm-guard'): PiiResult {
-  return { hits: false, configured: false, entities: [], engine };
+  return {
+    hits: false,
+    configured: false,
+    entities: [],
+    engine,
+    requestedEngine: engine,
+    status: 'unconfigured',
+    reason: 'LLM Guard URL is not configured; content was not screened',
+    scope: 'content-guardrail',
+  };
 }
 
 // LLM Guard (Protect AI) as THE guardrails engine behind the PiiPort. Selected by default (registry);
@@ -215,14 +237,16 @@ async function loadScannerConfig(orgId?: string): Promise<LlmGuardScannerConfig>
   let recognizers: NormalizedRecognizer[] = [];
   try {
     const { listRecognizers } = await import('../presidio-recognizers');
-    const resolvedOrg =
-      orgId?.trim()
-        ? orgId.trim()
-        : await (await import('../tenancy')).currentOrgId();
+    const resolvedOrg = orgId?.trim()
+      ? orgId.trim()
+      : await (await import('../tenancy')).currentOrgId();
     const recs = await listRecognizers(resolvedOrg);
     recognizers = recs as unknown as NormalizedRecognizer[];
   } catch (err) {
-    console.warn('[llm-guard] recognizer load failed, using India defaults only:', describeError(err));
+    console.warn(
+      '[llm-guard] recognizer load failed, using India defaults only:',
+      describeError(err),
+    );
   }
   return buildLlmGuardScannerConfig(recognizers);
 }

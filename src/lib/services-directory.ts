@@ -220,7 +220,10 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     description: 'PII detection & anonymisation — data masking for ingest.',
     // On g6 (LAN). The console can't reach it directly; it needs an edge-Caddy loopback proxy
     // (8938 staged in the Caddyfile, pending an edge reload). Env override points at the loopback.
-    url: process.env.OFFGRID_PRESIDIO_URL ?? 'http://127.0.0.1:8938',
+    url:
+      process.env.OFFGRID_PRESIDIO_ANALYZER_URL ??
+      process.env.OFFGRID_PRESIDIO_URL ??
+      'http://127.0.0.1:8938',
     healthPath: '/health',
     auth: 'api-key',
     kind: 'api',
