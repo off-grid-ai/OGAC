@@ -35,8 +35,16 @@ describe('agent pipeline binding persistence + tenant isolation (real Postgres)'
     `);
     assert.equal(column.rows.length, 1, 'ensureOrgSchema must bootstrap custom_agents.pipeline_id');
 
-    await pipelines.createPipeline({ id: pipelineA, name: 'Agent A pipeline' }, 'owner_a', orgA);
-    await pipelines.createPipeline({ id: pipelineB, name: 'Agent B pipeline' }, 'owner_b', orgB);
+    await pipelines.createPipeline(
+      { id: pipelineA, name: 'Agent A pipeline', status: 'published' },
+      'owner_a',
+      orgA,
+    );
+    await pipelines.createPipeline(
+      { id: pipelineB, name: 'Agent B pipeline', status: 'published' },
+      'owner_b',
+      orgB,
+    );
   });
 
   after(async () => {

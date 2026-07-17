@@ -55,6 +55,7 @@ export default async function AgentsPage() {
   const toolOptions = tools
     .filter((t) => t.enabled)
     .map((t) => ({ id: t.id, name: t.name, policy: t.policy }));
+  const bindablePipelines = pipelines.filter((pipeline) => pipeline.status === 'published');
 
   const cards: AgentCardModel[] = agents.map((a) => ({
     id: a.id,
@@ -114,7 +115,7 @@ export default async function AgentsPage() {
         <AgentsGrid
           agents={cards}
           tools={toolOptions}
-          pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
+          pipelines={bindablePipelines.map((p) => ({ id: p.id, name: p.name }))}
         />
       </div>
 

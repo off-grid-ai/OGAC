@@ -15,6 +15,7 @@ import { resolveAgentPipeline } from '@/lib/agent-pipeline-policy';
 import { resolveChatPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
+import { isConsumable } from '@/lib/pipeline-lifecycle-model';
 import { getPipeline } from '@/lib/pipelines';
 
 /** A resolved binding: which pipeline (if any) governs this run, and its enforceable contract. */
@@ -54,7 +55,8 @@ export async function isAgentPipelineBindingValid(
   lookup: AgentPipelineLookup = getPipeline,
 ): Promise<boolean> {
   if (!pipelineId) return true;
-  return (await lookup(pipelineId, orgId)) !== null;
+  const pipeline = await lookup(pipelineId, orgId);
+  return pipeline !== null && isConsumable(pipeline.status);
 }
 
 /**

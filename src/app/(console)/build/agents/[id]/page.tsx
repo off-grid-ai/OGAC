@@ -156,7 +156,9 @@ export default async function AgentDetailPage({
       {agent.custom ? (
         <AgentFormPanel
           tools={tools}
-          pipelines={pipelineRows.map((p) => ({ id: p.id, name: p.name }))}
+          pipelines={pipelineRows
+            .filter((p) => p.status === 'published')
+            .map((p) => ({ id: p.id, name: p.name }))}
           editable={editable}
         />
       ) : null}

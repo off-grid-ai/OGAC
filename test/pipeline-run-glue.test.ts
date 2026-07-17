@@ -40,13 +40,21 @@ test('agent binding validation is org-scoped and null is deliberately valid', as
     lookups += 1;
     assert.equal(id, 'pl_a');
     assert.equal(orgId, 'org_a');
-    return { id } as PipelineView;
+    return { id, status: 'published' } as PipelineView;
   };
   assert.equal(await isAgentPipelineBindingValid(null, 'org_a', lookup), true);
   assert.equal(lookups, 0);
   assert.equal(await isAgentPipelineBindingValid('pl_a', 'org_a', lookup), true);
   assert.equal(lookups, 1);
   assert.equal(await isAgentPipelineBindingValid('pl_b', 'org_a', async () => null), false);
+  assert.equal(
+    await isAgentPipelineBindingValid(
+      'pl_draft',
+      'org_a',
+      async () => ({ id: 'pl_draft', status: 'draft' }) as PipelineView,
+    ),
+    false,
+  );
 });
 
 function chatIO(over: Partial<ChatBindingIO> = {}): ChatBindingIO {
