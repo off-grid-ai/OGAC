@@ -1,4 +1,4 @@
-import type { ServiceEntry } from './services-directory';
+import type { ServiceEntry } from './service-entry';
 
 // Native daemons and public support surfaces are operational dependencies, not product adapters.
 // Keeping their descriptors here gives status/services one maintainable registry and prevents route

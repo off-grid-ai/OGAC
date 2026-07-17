@@ -1,5 +1,8 @@
 import { getOperationalServices } from './operational-services';
 import { resolveOtelConfig } from './otel-config';
+import type { ProbeMode, ServiceEntry } from './service-entry';
+
+export type { ProbeMode, ServiceEntry } from './service-entry';
 
 // The Off Grid AI service/product directory — every public surface in the suite, in one
 // place. Powers the /services page (a health-checked map of what we run) and is the
@@ -25,32 +28,6 @@ import { resolveOtelConfig } from './otel-config';
 //                 reason it isn't deployed) — NEVER a scary 'down'. Examples: Redis (in-process
 //                 cache fallback); the VictoriaMetrics/VictoriaLogs/OTel/Jaeger observability
 //                 plane (this fleet uses OpenSearch + Langfuse for logs/traces instead).
-export type ProbeMode = 'network' | 'embedded' | 'optional';
-
-export interface ServiceEntry {
-  id: string;
-  label: string;
-  description: string;
-  /** Public URL users open. */
-  url: string;
-  /** Path probed for health (server-side). Defaults to '/'. */
-  healthPath?: string;
-  /** How it's protected — shown as a badge. */
-  auth: 'session' | 'api-key' | 'public';
-  /** Grouping for the UI. */
-  kind: 'console' | 'product' | 'api' | 'site' | 'gateway';
-  /** Health-probe strategy. Defaults to 'network'. */
-  probe?: ProbeMode;
-  /**
-   * For an 'optional' service, the state to SHOW when it doesn't answer — the honest name of
-   * the fallback (e.g. 'in-process cache') or the reason it isn't deployed here (e.g. the plane
-   * used instead), rendered instead of a scary 'down'.
-   */
-  fallbackLabel?: string;
-  /** Optional management surface rendered inside the existing service detail route. */
-  management?: 'redpanda';
-}
-
 const DEFAULT_SERVICES: ServiceEntry[] = [
   // ── Public surfaces (through the Cloudflare tunnel) ──────────────────────────
   {
