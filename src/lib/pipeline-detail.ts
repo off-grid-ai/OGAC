@@ -52,7 +52,7 @@ const KNOWN: PipelineTab[] = TAB_META.map((m) => m.tab);
 // `overview` is the pipeline's landing (/pipelines/<id>); the rest hang off it. Keeping the base tab
 // at the bare path means "open a pipeline" lands on Overview without a redirect, URL stays clean.
 export function pipelineTabHref(pipelineId: string, tab: PipelineTab): string {
-  const base = `/build/pipelines/${encodeURIComponent(pipelineId)}`;
+  const base = `/runtime/pipelines/${encodeURIComponent(pipelineId)}`;
   return tab === 'overview' ? base : `${base}/${tab}`;
 }
 
@@ -65,7 +65,7 @@ export function pipelineTabs(pipelineId: string): PipelineTabDef[] {
 // The bare /pipelines/<id> (and any unknown sub-path) is `overview`. A trailing sub-segment that names
 // a tab selects it. Returns null if the path is not under this pipeline at all.
 export function activeTabForPath(pathname: string, pipelineId: string): PipelineTab | null {
-  const base = `/build/pipelines/${pipelineId}`;
+  const base = `/runtime/pipelines/${pipelineId}`;
   if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
   const rest = pathname.slice(base.length).replace(/^\/+/, '');
   const seg = rest.split('/')[0] ?? '';

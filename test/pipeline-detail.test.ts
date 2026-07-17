@@ -20,36 +20,36 @@ test('pipelineTabs: the tabs in reading order, each with a hint', () => {
 });
 
 test('pipelineTabHref: overview is the bare pipeline path; others hang off it', () => {
-  assert.equal(pipelineTabHref('pl_42', 'overview'), '/build/pipelines/pl_42');
-  assert.equal(pipelineTabHref('pl_42', 'routing'), '/build/pipelines/pl_42/routing');
-  assert.equal(pipelineTabHref('pl_42', 'versions'), '/build/pipelines/pl_42/versions');
+  assert.equal(pipelineTabHref('pl_42', 'overview'), '/runtime/pipelines/pl_42');
+  assert.equal(pipelineTabHref('pl_42', 'routing'), '/runtime/pipelines/pl_42/routing');
+  assert.equal(pipelineTabHref('pl_42', 'versions'), '/runtime/pipelines/pl_42/versions');
 });
 
 test('pipelineTabHref: encodes the id', () => {
-  assert.equal(pipelineTabHref('pl a/b', 'overview'), '/build/pipelines/pl%20a%2Fb');
+  assert.equal(pipelineTabHref('pl a/b', 'overview'), '/runtime/pipelines/pl%20a%2Fb');
 });
 
 test('activeTabForPath: bare pipeline path selects overview', () => {
-  assert.equal(activeTabForPath('/build/pipelines/pl_42', 'pl_42'), 'overview');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42', 'pl_42'), 'overview');
 });
 
 test('activeTabForPath: a named sub-segment selects that tab', () => {
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/routing', 'pl_42'), 'routing');
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/guardrails', 'pl_42'), 'guardrails');
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/versions', 'pl_42'), 'versions');
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/observability', 'pl_42'), 'observability');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/routing', 'pl_42'), 'routing');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/guardrails', 'pl_42'), 'guardrails');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/versions', 'pl_42'), 'versions');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/observability', 'pl_42'), 'observability');
 });
 
 test('activeTabForPath: a deep sub-path still resolves to its tab', () => {
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/versions/v3', 'pl_42'), 'versions');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/versions/v3', 'pl_42'), 'versions');
 });
 
 test('activeTabForPath: an unknown sub-segment falls back to overview', () => {
-  assert.equal(activeTabForPath('/build/pipelines/pl_42/nonsense', 'pl_42'), 'overview');
+  assert.equal(activeTabForPath('/runtime/pipelines/pl_42/nonsense', 'pl_42'), 'overview');
 });
 
 test('activeTabForPath: a path for a different pipeline is not claimed', () => {
-  assert.equal(activeTabForPath('/build/pipelines/other', 'pl_42'), null);
+  assert.equal(activeTabForPath('/runtime/pipelines/other', 'pl_42'), null);
   assert.equal(activeTabForPath('/gateway/registry', 'pl_42'), null);
 });
 

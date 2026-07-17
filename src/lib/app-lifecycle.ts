@@ -52,7 +52,7 @@ const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
 // base tab at the bare path (not /apps/<id>/build) means "open an app" lands on Build without a
 // redirect, and the URL stays clean.
 export function appTabHref(appId: string, tab: AppTab): string {
-  const base = `/build/apps/${encodeURIComponent(appId)}`;
+  const base = `/solutions/apps/${encodeURIComponent(appId)}`;
   return tab === 'build' ? base : `${base}/${tab}`;
 }
 
@@ -66,7 +66,7 @@ export function lifecycleTabs(appId: string): LifecycleTab[] {
 // unknown sub-path) is `build`. A trailing sub-segment that names a tab selects it. Returns null if
 // the path is not under this app at all (so a caller can ignore it).
 export function activeTabForPath(pathname: string, appId: string): AppTab | null {
-  const base = `/build/apps/${appId}`;
+  const base = `/solutions/apps/${appId}`;
   if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
   const rest = pathname.slice(base.length).replace(/^\/+/, '');
   const seg = rest.split('/')[0] ?? '';
