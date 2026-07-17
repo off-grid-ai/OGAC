@@ -1,30 +1,55 @@
-# Commercial licensing
+# Off Grid AI commercial terms
 
-The Off Grid AI Console is open source under the **GNU AGPL-3.0** (see [`LICENSE`](LICENSE)). You can
-run the entire platform, on your own infrastructure, at any scale, for free — the whole thing,
-nothing held back. If you modify it and make it available to users over a network, the AGPL requires
-you to make your modified source available to those users under the same license.
+Off Grid AI is **Creating the Intelligent Enterprise**: private, governed intelligence that works
+with an organization's existing people, data, systems, and infrastructure.
 
-That copyleft obligation is a good fit for most teams. It is not always a fit for a commercial
-enterprise that wants to:
+## Product and service options
 
-- modify the platform and keep those modifications private (not publish them),
-- embed or redistribute it inside a proprietary product,
-- or receive a warranty, indemnification, and a support SLA.
+| Option                                                |            Price | What it includes                                                                                                              |
+| ----------------------------------------------------- | ---------------: | ----------------------------------------------------------------------------------------------------------------------------- |
+| Self-installed, up to 25 users                        |             Free | Use Off Grid AI Console for business on your own infrastructure. Your team installs, operates, and supports it.               |
+| Self-installed, more than 25 users                    |       Contact us | A commercial license is required before exceeding the Community Use Limit.                                                    |
+| Off Grid AI installed and managed, up to 50 users     |       $150/month | Installation, ongoing management, and the right to use the managed deployment while subscribed.                               |
+| Off Grid AI installed and managed, more than 50 users | $2.99/user/month | Installation, ongoing management, and the right to use the managed deployment while subscribed.                               |
+| Enterprise                                            |       Contact us | A custom, unlimited-user perpetual commercial license, annual maintenance, and negotiated enterprise support and legal terms. |
 
-For those cases we offer a **commercial license** that removes the AGPL copyleft obligations and adds
-enterprise terms. Same codebase, different license — you choose the one that fits.
+## Enterprise proof of concept
 
-## Get a commercial license
+The initial enterprise proof of concept is provided at no cost. The 14-day delivery clock starts
+when the engagement is signed:
 
-Email **mac@getoffgridai.co** with your company, your intended use, and rough scale (users /
-environments). We will send terms.
+1. The CIO sponsors a focused discovery process.
+2. Together, we select five important, high-ROI use cases tied to efficiency, effectiveness, or new
+   organizational capability.
+3. Off Grid AI deploys five production-grade apps or agents within 14 days.
 
-## Which license do I need?
+The proof of concept is intended to demonstrate measurable operational value before the organization
+commits to a perpetual enterprise license. Enterprise license pricing is not published.
 
-- **Self-hosting and comfortable with AGPL copyleft** (you will publish any modifications you deploy
-  over a network) → the free AGPL-3.0 license. Nothing to buy.
-- **Want to keep your modifications private, redistribute it in a closed-source product, or need a
-  warranty / indemnity / SLA** → a commercial license.
+## Commercial license
 
-If you are not sure, email us and we will help you figure out which applies.
+The enterprise commercial license is designed for organizations that need an unlimited-user,
+perpetual right to use Off Grid AI Console, including the ability to negotiate terms for private
+modifications, proprietary embedding or redistribution, warranty, indemnification, support, and
+maintenance.
+
+Email **mac@getoffgridai.co** with your company, intended use, approximate user count, environments,
+and the executive sponsor for discovery. We will send terms.
+
+## Community license
+
+The public source code is governed by the **Off Grid AI Source-Available License 1.0** (see
+[`LICENSE`](LICENSE)). It permits inspection, modification, redistribution under the same license,
+and commercial self-hosting for up to 25 users across an organization and its affiliates during any
+rolling 30-day period.
+
+A separate written commercial license is required before an organization:
+
+- exceeds 25 users,
+- sells or rents access to the software,
+- operates it as a hosted service for unrelated third parties,
+- embeds it in a proprietary product, or
+- removes Off Grid AI branding or white-labels the product.
+
+The community license is source-available rather than OSI-approved open source. Third-party
+components continue to use their own licenses.

@@ -8,7 +8,7 @@ import './globals.css';
 // social/link unfurl (OG/Twitter) in lockstep with console-landing-page/src/app/layout.tsx.
 const OG_TITLE = 'Off Grid AI Console — AWS for AI';
 const OG_DESCRIPTION =
-  'Make your enterprise intelligent, on one interface that just works. Open source, on your own servers. Set your rules once. Everyone builds governed AI on top.';
+  'Make your enterprise intelligent, on one interface that just works. Source available, on your own servers. Set your rules once. Everyone builds governed AI on top.';
 
 export const metadata: Metadata = {
   title: OG_TITLE,

@@ -2,6 +2,7 @@
   "name": "@offgrid/console",
   "version": "0.0.0",
   "private": true,
+  "license": "LicenseRef-Off-Grid-AI-1.0",
   "description": "Off Grid Console — the org-side UI for the common control plane (modular, API-first).",
   "scripts": {
     "dev": "next dev",

@@ -2,7 +2,7 @@
   <img src="public/logo.png" width="88" alt="Off Grid AI" />
   <h1>Off Grid AI Console</h1>
   <h3>AWS for AI. Make your enterprise intelligent, on one interface that just works.</h3>
-  <p>Open source. Set your rules once. Everyone builds governed AI on top.</p>
+  <p>Source available. Set your rules once. Everyone builds governed AI on top.</p>
   <p>
     <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <img src="https://img.shields.io/badge/coverage-97%25-brightgreen" alt="Coverage: 97% statements &amp; lines" />
@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/functions-97%25-brightgreen" alt="Function coverage: 97%" />
     <img src="https://img.shields.io/badge/gate-%E2%89%A585%25%20enforced-blue" alt="Coverage gate: enforced &#8805;85% on all dimensions in pre-push + CI" />
     <img src="https://img.shields.io/badge/tests-node--test-blue" alt="Tests: node --test" />
-    <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0" />
+    <img src="https://img.shields.io/badge/license-Off_Grid_AI_1.0-blue" alt="License: Off Grid AI Source-Available License 1.0" />
     <img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen" alt="Node 22+" />
   </p>
 </div>
@@ -42,7 +42,7 @@ only run the pieces you want. Run it on your own servers or in your cloud, your 
 
 ## What it is
 
-An open-source platform you run on your own servers that makes your enterprise intelligent.
+A source-available platform you run on your own servers that makes your enterprise intelligent.
 
 It harnesses the data and context already inside your organization, and lets your people and their
 agents put frontier models to work on it, to raise their productivity, output, and quality. Every
@@ -167,24 +167,24 @@ None of that requires an external service. `npm run dev` has it on.
 observability steps, Off Grid AI ships a first-party default and lets you point one environment
 variable at a best-in-class open-source engine. Same governance either way.
 
-| Capability | Default, no setup | Swap in (one env var) | In the console |
-|---|---|---|---|
-| Model gateway | [Off Grid AI Desktop](https://github.com/off-grid-ai/off-grid-ai-desktop) in gateway mode, OpenAI-compatible, local fleet or cloud | — | Gateway |
-| State + audit | [Postgres](https://www.postgresql.org) (append-only audit is always on) | — | everywhere |
-| Identity / SSO | Auth.js (NextAuth) with dev credentials | [Keycloak](https://www.keycloak.org) OIDC (or Google / Microsoft Entra) | Access |
-| Vectors / RAG | [LanceDB](https://lancedb.com) (embedded) | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector) | Knowledge, Retrieval |
-| Policy decisions | first-party ABAC | [Open Policy Agent](https://www.openpolicyagent.org) | Control |
-| Guardrails (screen prompts + responses) | regex PII floor for data-movement redaction (always on, no network) | [LLM Guard](https://github.com/protectai/llm-guard) (Protect AI) for content guardrails — PII/DLP, prompt-injection, toxicity, secrets, language, India recognizers folded in (`OFFGRID_HTTP_GUARDRAIL_URL`) | Control |
-| Evals + drift | first-party golden set + PSI drift | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile) | Observability |
-| Cost + budgets (FinOps) | first-party pricing + budget enforcement | — | Insights |
-| Compliance mapping | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act, article-level) + control-mapped framings (DPDP, GDPR, HIPAA, DORA, RBI, IRDAI) + exports | — | Governance |
-| Response cache | in-process | [Redis](https://redis.io) | — |
-| Feature flags | Postgres | [Unleash](https://www.getunleash.io) (reads) | Admin |
-| Secrets | env vars | [OpenBao](https://openbao.org) (KV) | Control |
-| Audit search / SIEM | Postgres audit | [OpenSearch](https://opensearch.org) (full-text + dashboards, read back into the UI) | Control |
-| LLM traces + scores | first-party run trace | [Langfuse](https://langfuse.com) (span waterfall read back into the UI) | Observability |
-| Lineage | audit-reconstructed | [Marquez](https://marquezproject.ai) (OpenLineage graph read back into the UI) | Lineage |
-| Data plane | connect a source, sync it, warehouse it | [Airbyte](https://airbyte.com) sync, [Kestra](https://kestra.io) orchestration, [ClickHouse](https://clickhouse.com) warehouse | Data |
+| Capability                              | Default, no setup                                                                                                                                          | Swap in (one env var)                                                                                                                                                                                        | In the console       |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| Model gateway                           | [Off Grid AI Desktop](https://github.com/off-grid-ai/off-grid-ai-desktop) in gateway mode, OpenAI-compatible, local fleet or cloud                         | —                                                                                                                                                                                                            | Gateway              |
+| State + audit                           | [Postgres](https://www.postgresql.org) (append-only audit is always on)                                                                                    | —                                                                                                                                                                                                            | everywhere           |
+| Identity / SSO                          | Auth.js (NextAuth) with dev credentials                                                                                                                    | [Keycloak](https://www.keycloak.org) OIDC (or Google / Microsoft Entra)                                                                                                                                      | Access               |
+| Vectors / RAG                           | [LanceDB](https://lancedb.com) (embedded)                                                                                                                  | [Qdrant](https://qdrant.tech) or [pgvector](https://github.com/pgvector/pgvector)                                                                                                                            | Knowledge, Retrieval |
+| Policy decisions                        | first-party ABAC                                                                                                                                           | [Open Policy Agent](https://www.openpolicyagent.org)                                                                                                                                                         | Control              |
+| Guardrails (screen prompts + responses) | regex PII floor for data-movement redaction (always on, no network)                                                                                        | [LLM Guard](https://github.com/protectai/llm-guard) (Protect AI) for content guardrails — PII/DLP, prompt-injection, toxicity, secrets, language, India recognizers folded in (`OFFGRID_HTTP_GUARDRAIL_URL`) | Control              |
+| Evals + drift                           | first-party golden set + PSI drift                                                                                                                         | [Ragas](https://docs.ragas.io), [Evidently](https://www.evidentlyai.com) (`qa` profile)                                                                                                                      | Observability        |
+| Cost + budgets (FinOps)                 | first-party pricing + budget enforcement                                                                                                                   | —                                                                                                                                                                                                            | Insights             |
+| Compliance mapping                      | first-party control catalog (ISO 42001 / NIST AI RMF / EU AI Act, article-level) + control-mapped framings (DPDP, GDPR, HIPAA, DORA, RBI, IRDAI) + exports | —                                                                                                                                                                                                            | Governance           |
+| Response cache                          | in-process                                                                                                                                                 | [Redis](https://redis.io)                                                                                                                                                                                    | —                    |
+| Feature flags                           | Postgres                                                                                                                                                   | [Unleash](https://www.getunleash.io) (reads)                                                                                                                                                                 | Admin                |
+| Secrets                                 | env vars                                                                                                                                                   | [OpenBao](https://openbao.org) (KV)                                                                                                                                                                          | Control              |
+| Audit search / SIEM                     | Postgres audit                                                                                                                                             | [OpenSearch](https://opensearch.org) (full-text + dashboards, read back into the UI)                                                                                                                         | Control              |
+| LLM traces + scores                     | first-party run trace                                                                                                                                      | [Langfuse](https://langfuse.com) (span waterfall read back into the UI)                                                                                                                                      | Observability        |
+| Lineage                                 | audit-reconstructed                                                                                                                                        | [Marquez](https://marquezproject.ai) (OpenLineage graph read back into the UI)                                                                                                                               | Lineage              |
+| Data plane                              | connect a source, sync it, warehouse it                                                                                                                    | [Airbyte](https://airbyte.com) sync, [Kestra](https://kestra.io) orchestration, [ClickHouse](https://clickhouse.com) warehouse                                                                               | Data                 |
 
 **Working, with a caveat we will not hide**
 
@@ -221,16 +221,26 @@ underwriting, reconciliation, reporting), cannot send that data to a hosted AI, 
 auditable, and wants business teams to build these themselves. BFSI is the sharp case. It is not for
 a public consumer chatbot or a throwaway prototype.
 
-## License
+## License and commercial options
 
-Open source under **AGPL-3.0** ([`LICENSE`](LICENSE)) — the entire platform, nothing held back,
-nothing gated. Run it on your own infrastructure at any scale for free. If you modify it and serve
-it to users over a network, AGPL asks you to publish those modifications under the same license.
+Off Grid AI's commercial model is simple:
 
-Need to keep your modifications private, embed it in a closed-source product, or get a warranty,
-indemnity, and support SLA? A **commercial license** (same code, no copyleft obligation) is
-available — see [`COMMERCIAL.md`](COMMERCIAL.md) or email mac@getoffgridai.co.
+- **Self-installed:** use Off Grid AI Console for business at no charge for up to 25 users.
+- **Installed and managed by Off Grid AI:** $150/month for up to 50 users. Organizations with more
+  than 50 users pay $2.99/user/month.
+- **Enterprise:** start with a no-cost proof of concept. Following CIO-sponsored discovery, Off Grid
+  AI will deploy five production-grade apps or agents within 14 days of signing. Continued use is
+  available under a custom, unlimited-user perpetual commercial license with annual maintenance.
+
+Enterprise pricing is not public. Email **mac@getoffgridai.co** or see [`COMMERCIAL.md`](COMMERCIAL.md)
+to discuss terms.
+
+The source code is published under the **Off Grid AI Source-Available License 1.0**
+([`LICENSE`](LICENSE)). You may inspect, self-host, modify, and use it commercially for up to 25
+users. Deployments above 25 users, proprietary embedding, hosted resale, and white-labelling require
+a separate commercial license. This is a source-available license, not an OSI-approved open-source
+license.
 
 ---
 
-*Built by [Wednesday](https://wednesday.is). Developer guide: [`CLAUDE.md`](CLAUDE.md). Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md).*
+_Built by [Wednesday](https://wednesday.is). Developer guide: [`CLAUDE.md`](CLAUDE.md). Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)._

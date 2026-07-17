@@ -1,50 +1,54 @@
-# Contributor License Agreement (CLA)
+# Off Grid AI Contributor License Agreement
 
-Off Grid AI is **open core**: the project is licensed under
-[AGPL-3.0-only](LICENSE), and a Contributor License Agreement covers all
-contributions. **Signing the CLA is required before your first contribution can
-be merged.**
+This Contributor License Agreement ("Agreement") applies to every code, documentation, design,
+test, or other work submitted to Off Grid AI (a "Contribution"). "You" means the individual or
+legal entity submitting the Contribution. "Off Grid AI" means Wednesday Solutions, Inc., doing
+business as Off Grid AI.
 
-## Why a CLA
+By submitting a Contribution, including by opening or updating a pull request, You accept this
+Agreement. If You contribute on behalf of an employer or another organization, You represent that
+You have authority to bind that organization. Do not submit the Contribution if You do not have that
+authority.
 
-The CLA lets the maintainers accept your contribution into the AGPL-licensed
-open core while retaining the right to offer paid features and commercial
-licensing on top of it. In short: you keep the copyright to your work, and you
-grant the project the rights it needs to distribute that work under the
-project's licenses. It protects both you and the project, and keeps the
-open-core model sustainable.
+## 1. Copyright license
 
-## What you agree to
+You grant Off Grid AI and recipients of software distributed by Off Grid AI a perpetual,
+worldwide, non-exclusive, irrevocable, royalty-free copyright license to reproduce, prepare
+derivative works of, publicly display, publicly perform, sublicense, and distribute Your
+Contribution and derivative works of it.
 
-At a high level, the CLA asks you to confirm that:
+This grant allows Off Grid AI to distribute Your Contribution under the Off Grid AI
+Source-Available License, commercial licenses, and other licenses it may adopt. You retain ownership
+of Your Contribution.
 
-- the contribution is your original work (or you have the right to submit it),
-- you grant the project a copyright and patent license to use and redistribute
-  your contribution under the project's licenses, and
-- you are not knowingly submitting anything you are not entitled to.
+## 2. Patent license
 
-The CLA does **not** transfer your copyright — you retain ownership of your
-contribution.
+You grant Off Grid AI and recipients of software distributed by Off Grid AI a perpetual,
+worldwide, non-exclusive, irrevocable, royalty-free patent license to make, have made, use, offer to
+sell, sell, import, and otherwise transfer Your Contribution, limited to patent claims that You can
+license and that are necessarily infringed by Your Contribution alone or by its combination with the
+project to which You submitted it.
 
-> The text above is a plain-language summary, not the agreement itself. The
-> binding terms are in the CLA document referenced below.
+If You institute patent litigation alleging that a Contribution or the project infringes a patent,
+the patent licenses granted to You for that project terminate as of the filing date.
 
-## How to sign
+## 3. Your representations
 
-1. Open a pull request as normal (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-2. On your first PR, the maintainers will point you to the CLA and the signing
-   process (typically an automated CLA-assistant check on the PR, or a signed
-   document — whichever the project currently uses).
-3. Once your signature is recorded, the CLA check passes and your PR becomes
-   eligible to merge. Your signature is remembered for future contributions.
+You represent that:
 
-**CLA text and signing service:** the canonical CLA document and the signing
-mechanism are maintained by the project owners. If a link is not yet published
-in this repository, a maintainer will provide it when you open your first pull
-request. Corporate contributors (contributing on behalf of an employer) should
-ask about the corporate CLA variant.
+- You are legally entitled to grant this Agreement;
+- each Contribution is Your original work, or You have identified its source and have sufficient
+  rights to submit it under this Agreement; and
+- the Contribution is not knowingly subject to obligations that conflict with this Agreement.
 
-## Questions
+You are not expected to provide support for a Contribution unless You separately agree to do so.
+Unless required by law or agreed in writing, Contributions are provided without warranties or
+conditions of any kind.
 
-Open a discussion or ask on your pull request. For anything sensitive, see the
-private contact in [`SECURITY.md`](SECURITY.md).
+## 4. Existing contributions
+
+This Agreement applies to a Contribution when You accept it. It does not automatically change the
+terms governing a contribution submitted before Your acceptance. Off Grid AI may ask existing
+contributors to confirm that this Agreement also covers their earlier contributions.
+
+Questions about this Agreement can be sent to **mac@getoffgridai.co**.

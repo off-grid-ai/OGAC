@@ -2,7 +2,7 @@
   "name": "@offgrid/speech",
   "version": "0.0.1",
   "description": "Engine-agnostic speech client for the Off Grid AI local gateway: pure air-gap target resolution (STT/TTS) + an OpenAI-compatible /v1/audio/* client, plus a selectable speech-model catalog (Parakeet/Whisper STT, Orpheus/Kokoro TTS). Shared by the console and desktop.",
-  "license": "AGPL-3.0-only",
+  "license": "LicenseRef-Off-Grid-AI-1.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
