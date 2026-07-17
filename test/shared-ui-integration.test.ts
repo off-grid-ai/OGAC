@@ -44,7 +44,7 @@ test('Console pins shared packages to repository-relative archives and verifies 
     manifest.dependencies['@offgrid/design'],
     'file:vendor/offgrid-ui/offgrid-design-0.0.1.tgz',
   );
-  assert.equal(manifest.dependencies['@offgrid/ui'], 'file:vendor/offgrid-ui/offgrid-ui-0.2.1.tgz');
+  assert.equal(manifest.dependencies['@offgrid/ui'], 'file:vendor/offgrid-ui/offgrid-ui-0.2.2.tgz');
   assert.match(
     lock.packages['node_modules/@offgrid/design'].resolved,
     /^file:vendor\/offgrid-ui\//,
