@@ -64,12 +64,12 @@ export interface CanonicalOwner {
   route: string;
   /** Existing commercial capability gate. IA does not create a parallel entitlement system. */
   gate: ModuleId;
-  /** Prominent sidebar row; other owners remain reachable from the section's scoped navigation. */
-  primary?: boolean;
+  /** Where this collection is discovered. Contextual owners live inside their declared parent. */
+  placement: 'sidebar' | 'contextual';
   /**
-   * Primary sidebar row that represents this secondary owner. Omit to use the section's first
-   * visible primary. This keeps related secondary resources (for example clusters under physical
-   * topology) highlighted under their real parent instead of an unrelated section default.
+   * Sidebar collection that owns a contextual resource. Required when placement is contextual.
+   * This keeps relationship resources (for example clusters under physical topology) inside their
+   * real journey instead of creating another global sibling.
    */
   sidebarParent?: CanonicalOwnerId;
   comingSoon?: boolean;
@@ -92,7 +92,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'solutions',
     label: 'Solutions',
     purpose: 'Build and operate high-value business use cases.',
-    ownershipRule: 'The App is the product center; an agent is an App kind.',
+  ownershipRule: 'Blueprints prove reusable value; Apps are tenant deployments of use cases.',
   },
   {
     id: 'data',
@@ -135,7 +135,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Attention, value, active work, and platform posture.',
     route: '/overview',
     gate: 'overview',
-    primary: true,
+    placement: 'sidebar',
   },
 
   {
@@ -145,7 +145,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Private conversations grounded in approved company context.',
     route: '/work/chat',
     gate: 'chat',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'projects',
@@ -154,7 +154,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Shared instructions, conversations, apps, and activity.',
     route: '/work/projects',
     gate: 'projects',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'prompts',
@@ -163,6 +163,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Reusable prompts, versions, partials, and assignments.',
     route: '/work/prompts',
     gate: 'prompts',
+    placement: 'sidebar',
   },
   {
     id: 'artifacts',
@@ -171,6 +172,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Generated outputs, provenance, and shares.',
     route: '/work/artifacts',
     gate: 'artifacts',
+    placement: 'sidebar',
   },
   {
     id: 'files',
@@ -179,7 +181,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'On-prem files, folders, visibility, and sharing.',
     route: '/work/files',
     gate: 'storage',
-    primary: true,
+    placement: 'sidebar',
   },
 
   {
@@ -189,7 +191,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Business use cases and agents across their full lifecycle.',
     route: '/solutions/apps',
     gate: 'studio',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'reviews',
@@ -198,7 +200,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Human approvals, exceptions, and decision history.',
     route: '/solutions/reviews',
     gate: 'studio',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'tools',
@@ -207,7 +209,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'HTTP, MCP, and built-in tools available to apps.',
     route: '/solutions/tools',
     gate: 'tools',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'quality-definitions',
@@ -216,7 +218,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Evaluators, golden sets, and reusable quality gates.',
     route: '/solutions/quality',
     gate: 'evals',
-    primary: true,
+    placement: 'sidebar',
   },
 
   {
@@ -226,7 +228,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Enterprise systems, connectors, credentials, and connection tests.',
     route: '/data/sources',
     gate: 'data',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'domains',
@@ -235,6 +237,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Business terms, owners, source mappings, policies, and SLAs.',
     route: '/data/domains',
     gate: 'data-domains',
+    placement: 'sidebar',
   },
   {
     id: 'data-flows',
@@ -243,7 +246,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Replicated syncs and orchestrated data jobs.',
     route: '/data/flows',
     gate: 'data',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'warehouse',
@@ -252,6 +255,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Tables, columns, queries, profiles, and freshness.',
     route: '/data/warehouse',
     gate: 'data',
+    placement: 'sidebar',
   },
   {
     id: 'catalog',
@@ -260,6 +264,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Dataset ownership, classification, freshness, and impact.',
     route: '/data/catalog',
     gate: 'catalog',
+    placement: 'sidebar',
   },
   {
     id: 'knowledge',
@@ -268,7 +273,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Collections, documents, indexes, permissions, and app bindings.',
     route: '/data/knowledge',
     gate: 'knowledge',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'lineage',
@@ -277,6 +282,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Source-to-answer trace and impact analysis.',
     route: '/data/lineage',
     gate: 'lineage',
+    placement: 'sidebar',
   },
 
   {
@@ -286,7 +292,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Logical model capabilities, versions, and availability.',
     route: '/runtime/models',
     gate: 'gateway',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'gateways',
@@ -295,7 +301,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Model endpoints, providers, egress class, and health.',
     route: '/runtime/gateways',
     gate: 'gateways',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'runtime-pipelines',
@@ -304,7 +310,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Governed model-access and routing contracts.',
     route: '/runtime/pipelines',
     gate: 'pipelines',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'api-budgets',
@@ -313,7 +319,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'API keys, clients, rate limits, and budgets.',
     route: '/runtime/api-budgets',
     gate: 'finops',
-    primary: true,
+    placement: 'sidebar',
   },
 
   {
@@ -323,7 +329,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Control status, exceptions, risk, and emergency actions.',
     route: '/governance/posture',
     gate: 'control',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'policies',
@@ -332,7 +338,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Rules, versions, decisions, and assignments.',
     route: '/governance/policies',
     gate: 'policy',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'access',
@@ -341,7 +347,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Users, roles, sessions, MFA, and service accounts.',
     route: '/governance/access',
     gate: 'access',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'teams',
@@ -350,6 +356,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Teams, membership, and delegated access.',
     route: '/governance/teams',
     gate: 'teams',
+    placement: 'sidebar',
   },
   {
     id: 'guardrails',
@@ -358,6 +365,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Safety rules, recognizers, masking, thresholds, and tests.',
     route: '/governance/guardrails',
     gate: 'guardrails',
+    placement: 'sidebar',
   },
   {
     id: 'secrets',
@@ -366,6 +374,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Secrets, mounts, leases, seal state, and rotation.',
     route: '/governance/secrets',
     gate: 'secrets',
+    placement: 'sidebar',
   },
   {
     id: 'evidence',
@@ -374,7 +383,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Audit, security, provenance, and evidence exports.',
     route: '/governance/evidence',
     gate: 'audit',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'trust',
@@ -383,6 +392,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Frameworks, controls, attestations, DPIAs, and reports.',
     route: '/governance/trust',
     gate: 'trust',
+    placement: 'sidebar',
   },
 
   {
@@ -392,7 +402,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Business KPIs, ROI, throughput, and effectiveness.',
     route: '/insights/outcomes',
     gate: 'roi',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'ai-behavior',
@@ -401,7 +411,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Traces, latency, errors, routing, and response behavior.',
     route: '/insights/ai',
     gate: 'observability',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'usage',
@@ -410,6 +420,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Requests, tokens, users, apps, and adoption.',
     route: '/insights/usage',
     gate: 'analytics',
+    placement: 'sidebar',
   },
   {
     id: 'quality-results',
@@ -418,6 +429,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Eval results, drift, scorecards, and quality trends.',
     route: '/insights/quality',
     gate: 'drift',
+    placement: 'sidebar',
   },
   {
     id: 'cost',
@@ -426,7 +438,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Spend, attribution, unit cost, budget consumption, and savings.',
     route: '/insights/cost',
     gate: 'accounting',
-    primary: true,
+    placement: 'sidebar',
   },
 
   {
@@ -436,7 +448,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Every app, agent, and chat execution with retry and cancel.',
     route: '/operations/runs',
     gate: 'runs',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'nodes',
@@ -445,7 +457,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Registry-driven node inventory, roles, health, and capacity.',
     route: '/operations/nodes',
     gate: 'gateway',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'clusters',
@@ -454,6 +466,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Registry-derived cluster head and member relationships.',
     route: '/operations/clusters',
     gate: 'gateway',
+    placement: 'contextual',
     sidebarParent: 'nodes',
   },
   {
@@ -463,7 +476,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Deployment-registry services, health, placement, and dependencies.',
     route: '/operations/services',
     gate: 'services',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'platform-health',
@@ -472,7 +485,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Platform metrics, logs, traces, alerts, and queue health.',
     route: '/operations/health',
     gate: 'platform-health',
-    primary: true,
+    placement: 'sidebar',
   },
   {
     id: 'edge',
@@ -481,6 +494,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Routes, tunnel, WAF, rate limits, and blocked traffic.',
     route: '/operations/edge',
     gate: 'edge',
+    placement: 'sidebar',
   },
   {
     id: 'managed-devices',
@@ -489,6 +503,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Employee device enrollment, inventory, policy, and commands.',
     route: '/operations/devices',
     gate: 'fleet',
+    placement: 'sidebar',
     comingSoon: true,
   },
   {
@@ -498,6 +513,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Adapters, feature flags, auth, and environment references.',
     route: '/operations/configuration',
     gate: 'config',
+    placement: 'sidebar',
   },
   {
     id: 'backups',
@@ -506,6 +522,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Backup jobs, schedules, restore, retention, and replication.',
     route: '/operations/backups',
     gate: 'backups',
+    placement: 'sidebar',
   },
   {
     id: 'admin',
@@ -514,6 +531,7 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Tenants, organization settings, and platform administration.',
     route: '/operations/admin',
     gate: 'admin',
+    placement: 'sidebar',
   },
 ] as const;
 

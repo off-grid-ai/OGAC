@@ -16,12 +16,12 @@ export { BRAIN_VIEWS } from '@/lib/brain-view';
 export { type BrainView, DEFAULT_BRAIN_VIEW, normalizeBrainView };
 
 // Scoped secondary-nav for Brain — the "ingestion → retrieval (RAG)" plane. Brain is ONE page
-// whose long section stack is organised into switchable views, so unlike DataNav (one tab = one
+// whose long section stack is organised into switchable views, unlike global collection navigation
 // route) each tab here is a `?view=` on the same route. State lives in the URL (deep-linkable,
 // Back-coherent — Back steps between views, not off the page), never local state.
 // Ordered by how the pipeline actually flows: route a query → search the RAG index → curate the
 // knowledge feeding it → version prompts → measure quality with evals.
-// Mirrors DataNav / InsightsNav / GovernanceNav: same band + grouped-tab treatment so it reads as
+// Uses the scoped detail-navigation band so it reads as
 // the same nav plane as the rest of the console.
 //
 // IA-nav-dedup: two concepts used to be double-listed across the nav; each now has ONE home.

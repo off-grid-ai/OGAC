@@ -11,8 +11,8 @@ import {
 export interface NavGroup {
   id: IaSectionId;
   label: string;
-  primary: CanonicalOwnerId[];
-  secondary: CanonicalOwnerId[];
+  sidebar: CanonicalOwnerId[];
+  contextual: CanonicalOwnerId[];
 }
 
 /** The eight accepted top-level jobs, derived from the canonical ownership registry. */
@@ -21,8 +21,8 @@ export const NAV_GROUPS: readonly NavGroup[] = IA_SECTIONS.map((section) => {
   return {
     id: section.id,
     label: section.label,
-    primary: owners.filter((owner) => owner.primary).map((owner) => owner.id),
-    secondary: owners.filter((owner) => !owner.primary).map((owner) => owner.id),
+    sidebar: owners.filter((owner) => owner.placement === 'sidebar').map((owner) => owner.id),
+    contextual: owners.filter((owner) => owner.placement === 'contextual').map((owner) => owner.id),
   };
 });
 
@@ -33,16 +33,15 @@ export interface SidebarSection {
 }
 
 /**
- * Build the sidebar from canonical owners and existing module entitlements. There is deliberately
- * no `More` fallback: every owner must be declared under one of the eight sections, and tests reject
- * missing/duplicate ownership instead of silently inventing a ninth group.
+ * Build the only global navigation from explicit sidebar placements and existing entitlements.
+ * Contextual resources stay inside their declared parent journey.
  */
 export function sidebarSections(enabledModules: readonly { id: ModuleId }[]): SidebarSection[] {
   const enabled = new Set(enabledModules.map((module) => module.id));
   return NAV_GROUPS.flatMap((group) => {
-    const primaryIds = new Set(group.primary);
+    const sidebarIds = new Set(group.sidebar);
     const items = CANONICAL_OWNERS.filter(
-      (owner) => owner.section === group.id && primaryIds.has(owner.id) && enabled.has(owner.gate),
+      (owner) => owner.section === group.id && sidebarIds.has(owner.id) && enabled.has(owner.gate),
     );
     return items.length ? [{ id: group.id, label: group.label, items }] : [];
   });
@@ -57,7 +56,7 @@ export function sidebarSectionIdForActiveId(
   return sections.find((section) => section.items.some((item) => item.id === activeId))?.id;
 }
 
-/** All enabled canonical owners, including scoped-nav secondaries. */
+/** All enabled canonical owners, including contextual resources. */
 export function groupModules(enabledModules: readonly { id: ModuleId }[]): SidebarSection[] {
   const enabled = new Set(enabledModules.map((module) => module.id));
   return NAV_GROUPS.flatMap((group) => {
@@ -68,18 +67,16 @@ export function groupModules(enabledModules: readonly { id: ModuleId }[]): Sideb
   });
 }
 
-/** A secondary owner highlights its section's first visible primary row. */
+/** A contextual owner highlights its declared sidebar parent. */
 export function sidebarActiveIdFor(id: CanonicalOwnerId): CanonicalOwnerId | undefined {
   const owner = CANONICAL_OWNERS.find((candidate) => candidate.id === id);
   if (!owner) return undefined;
-  if (owner.primary) return owner.id;
+  if (owner.placement === 'sidebar') return owner.id;
   if (owner.sidebarParent) {
     const parent = CANONICAL_OWNERS.find((candidate) => candidate.id === owner.sidebarParent);
-    if (parent?.section === owner.section && parent.primary) return parent.id;
+    if (parent?.section === owner.section && parent.placement === 'sidebar') return parent.id;
   }
-  return CANONICAL_OWNERS.find(
-    (candidate) => candidate.section === owner.section && candidate.primary,
-  )?.id;
+  return undefined;
 }
 
 export function sidebarActiveIdForPath(pathname: string): CanonicalOwnerId | undefined {

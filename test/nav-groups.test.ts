@@ -55,20 +55,31 @@ test('entity collision decisions are represented in canonical ownership', () => 
   assert.equal(byId.get('cost')?.section, 'insights');
 });
 
-test('sidebar is derived from explicit primaries and never invents a More group', () => {
+test('sidebar is derived from explicit placements and never invents a More group', () => {
   const sections = sidebarSections(MODULES);
   assert.ok(sections.every((section) => section.label !== 'More'));
   assert.deepEqual(
     sections.map((section) => section.id),
     NAV_GROUPS.map((group) => group.id),
   );
-  for (const section of sections) {
-    assert.ok(section.items.length <= 4, `${section.label} has too many primary rows`);
-    assert.ok(section.items.every((item) => item.primary));
-  }
+  assert.ok(sections.every((section) => section.items.every((item) => item.placement === 'sidebar')));
 });
 
-test('all canonical owners remain reachable through sidebar or scoped navigation', () => {
+test('every standalone collection is in the sidebar and contextual resources declare a parent', () => {
+  const sidebar = sidebarSections(MODULES).flatMap((section) => section.items);
+  const required = [
+    'prompts', 'artifacts', 'domains', 'warehouse', 'catalog', 'lineage', 'teams', 'guardrails',
+    'secrets', 'trust', 'usage', 'quality-results', 'edge', 'managed-devices', 'configuration',
+    'backups', 'admin',
+  ];
+  for (const id of required) assert.ok(sidebar.some((owner) => owner.id === id), `${id} missing`);
+
+  const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
+  assert.deepEqual(contextual.map((owner) => owner.id), ['clusters']);
+  assert.equal(contextual[0].sidebarParent, 'nodes');
+});
+
+test('all canonical owners remain registered for global or contextual discovery', () => {
   const grouped = groupModules(MODULES).flatMap((section) => section.items);
   assert.deepEqual(
     new Set(grouped.map((owner) => owner.id)),
@@ -91,9 +102,9 @@ test('the sidebar accordion opens only the branch that owns the active item', ()
   assert.equal(sidebarSectionIdForActiveId(sections, undefined), undefined);
 });
 
-test('secondary routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {
+test('contextual routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {
   assert.equal(sidebarActiveIdFor('clusters'), 'nodes');
-  assert.equal(sidebarActiveIdFor('quality-results'), 'outcomes');
+  assert.equal(sidebarActiveIdFor('quality-results'), 'quality-results');
   assert.equal(sidebarActiveIdForPath('/operations/clusters/from-registry'), 'nodes');
   assert.equal(sidebarActiveIdForPath('/operations/services/langfuse'), 'services');
   assert.equal(
@@ -104,12 +115,12 @@ test('secondary routes highlight their declared sidebar parent and dynamic route
   assert.equal(sidebarActiveIdForPath('/nowhere'), undefined);
 });
 
-test('a secondary sidebar parent is a primary owner in the same section', () => {
+test('a contextual sidebar parent is a sidebar owner in the same section', () => {
   const byId = new Map(CANONICAL_OWNERS.map((owner) => [owner.id, owner]));
   for (const owner of CANONICAL_OWNERS) {
     if (!owner.sidebarParent) continue;
     const parent = byId.get(owner.sidebarParent);
-    assert.ok(parent?.primary, `${owner.id} sidebar parent must be primary`);
+    assert.equal(parent?.placement, 'sidebar', `${owner.id} sidebar parent must be global`);
     assert.equal(
       parent.section,
       owner.section,

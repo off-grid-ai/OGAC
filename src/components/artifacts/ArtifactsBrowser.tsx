@@ -45,7 +45,7 @@ interface VersionRow {
 // Artifacts as a Workspace grid — the library of renderable outputs saved from chats. Cards carry a
 // live thumbnail (for HTML/SVG/React) or a code snippet, kind/version meta, and open into a
 // URL-driven side panel (?artifact=<id>) — a navigational "place", not a modal, so Back closes it
-// and it deep-links. This surface is reached via the Workspace top-tabs (WorkspaceNav) since it has
+// and it deep-links. This surface is reached through the Work sidebar branch, so it has
 // no sidebar row.
 // eslint-disable-next-line complexity
 export function ArtifactsBrowser() {
