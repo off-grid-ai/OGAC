@@ -103,15 +103,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     try {
       handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId });
     } catch (error) {
-      const failure = pipelineBindingHttpFailure(error);
-      if (!failure) throw error;
-      recordAudit({
-        actor,
-        org: orgId,
-        action: 'trigger.denied',
-        resource: `webhook:${trigger.id} app:${trigger.targetId} pipeline-binding:${failure.body.code}`,
-        outcome: 'blocked',
+      const failure = pipelineBindingHttpFailure(error, {
+        ingress: `webhook:${trigger.id}`,
+        target: `app:${trigger.targetId}`,
       });
+      if (!failure) throw error;
+      recordAudit({ actor, org: orgId, ...failure.audit });
       return NextResponse.json(failure.body, { status: failure.status });
     }
     await markWebhookFired(token);
@@ -154,13 +151,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     );
   }
   const query = typeof input.input === 'string' && input.input.trim() ? input.input : rawBody;
-  const dispatch = await dispatchAgentRun({
-    agentId: trigger.targetId,
-    query,
-    orgId,
-    actor,
-    caller: 'webhook',
-  });
+  let dispatch: Awaited<ReturnType<typeof dispatchAgentRun>>;
+  try {
+    dispatch = await dispatchAgentRun({
+      agentId: trigger.targetId,
+      query,
+      orgId,
+      actor,
+      caller: 'webhook',
+    });
+  } catch (error) {
+    const failure = pipelineBindingHttpFailure(error, {
+      ingress: `webhook:${trigger.id}`,
+      target: `agent:${trigger.targetId}`,
+    });
+    if (!failure) throw error;
+    recordAudit({ actor, org: orgId, ...failure.audit });
+    return NextResponse.json(failure.body, { status: failure.status });
+  }
   await markWebhookFired(token);
   recordAudit({
     actor,

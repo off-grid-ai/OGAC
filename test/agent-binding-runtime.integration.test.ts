@@ -44,7 +44,7 @@ describe('real sync dispatch and Temporal activity fail closed on stale bindings
     await deletePipeline(pipelineB, orgId).catch(() => {});
   });
 
-  test('deprecated, changed, and deleted bindings stop before retrieval or model I/O', async () => {
+  test('deprecated and changed bindings stop before retrieval or model I/O; deletion is DB-blocked', async () => {
     const dispatchBinding = await resolveAgentRunBinding(agentId, orgId);
     assert.equal(dispatchBinding.state, 'bound');
 
@@ -91,8 +91,12 @@ describe('real sync dispatch and Temporal activity fail closed on stale bindings
         error instanceof AgentPipelineBindingError && error.binding.code === 'binding_changed',
     );
 
-    // A deleted explicit binding is also invalid on the direct sync entry point.
-    await deletePipeline(pipelineB, orgId);
+    // A direct/legacy delete cannot manufacture a dangling binding anymore: the DB owns retirement.
+    await assert.rejects(
+      () => deletePipeline(pipelineB, orgId),
+      (error) => (error as Error & { cause?: { code?: string } }).cause?.code === '23503',
+    );
+    await updatePipeline(pipelineB, { status: 'deprecated' }, orgId, owner);
     await assert.rejects(
       () => dispatchAgentRun({ agentId, query: 'decide claim 43', caller: owner, orgId }),
       (error) =>
