@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const view = await listSchedules();
+  const view = await listSchedules(await currentOrgId());
   return NextResponse.json(view);
 }
 
@@ -30,11 +30,11 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: 'JSON body required' }, { status: 400 });
   let spec;
   try {
-    spec = toScheduleSpec(body);
+    spec = toScheduleSpec(body, await currentOrgId());
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
-  const orgId = await currentOrgId();
+  const orgId = spec.orgId;
   try {
     // A schedule is another caller of the same agent-run contract, not a bypass. Resolve and freeze
     // the org-scoped binding at creation; every fire re-validates it again in the worker activity.

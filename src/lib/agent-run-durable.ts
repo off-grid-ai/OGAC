@@ -95,6 +95,8 @@ export interface AgentRunWorkflowInput {
   agentId: string;
   query: string;
   runId: string;
+  /** True only for a recurring Schedule action; the workflow derives a unique id per fire. */
+  scheduled?: boolean;
   caller?: string;
   requireReview?: boolean;
   orgId?: string;

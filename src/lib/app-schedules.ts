@@ -21,7 +21,8 @@ import {
   type AppRunWorkflowInput,
 } from '@/lib/app-run-durable';
 import { normalizeScheduleConfig, type ScheduleConfig } from '@/lib/app-schedule';
-import { isValidCron, sanitizeScheduleId } from '@/lib/temporal-schedules';
+import { isValidCron, namespacedScheduleId } from '@/lib/temporal-schedules';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 function appDurableEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return durableEnabled(env) || env.OFFGRID_ADAPTER_APPRUNTIME === 'temporal';
@@ -58,8 +59,8 @@ async function temporalClient(cfg: AppDurableConfig): Promise<import('@temporali
 }
 
 /** Derive the schedule id for an app (stable per app so re-scheduling replaces, not duplicates). */
-export function appScheduleId(appId: string): string {
-  return sanitizeScheduleId(`appsched-${appId}`) || `appsched-app`;
+export function appScheduleId(appId: string, orgId: string = DEFAULT_ORG): string {
+  return namespacedScheduleId(orgId, 'app', `appsched-${appId}`);
 }
 
 // ─── cronFromTrigger — PURE: the cron spec a schedule trigger carries, or null ────────────────────
@@ -128,7 +129,7 @@ export async function syncAppSchedule(
       paused: !cfg.enabled,
     });
   }
-  const res = await unscheduleApp(app.id);
+  const res = await unscheduleApp(app.id, app.orgId ?? DEFAULT_ORG);
   // A teardown that found nothing to remove is a benign success for the caller's purposes.
   if (!res.ok && res.reason === 'not_found') return { ok: true, scheduleId: res.scheduleId };
   return res;
@@ -161,12 +162,14 @@ export async function scheduleApp(
     };
   }
   const cfg = appDurableConfigFromEnv(process.env);
-  const scheduleId = appScheduleId(appId);
+  const orgId = opts.orgId ?? DEFAULT_ORG;
+  const scheduleId = appScheduleId(appId, orgId);
   const wfInput: AppRunWorkflowInput = {
     appId,
     runId: appScheduleRunSeed(appId),
+    scheduled: true,
     input: opts.input ?? {},
-    orgId: opts.orgId,
+    orgId,
     caller: opts.caller,
     // Required workflow input: null means deliberately unbound, never "inherit later". The worker
     // compares this snapshot with the current App before executing, so a schedule cannot keep using
@@ -205,10 +208,13 @@ export async function scheduleApp(
 }
 
 // ─── unscheduleApp — remove an app's cron schedule ────────────────────────────────────────────────
-export async function unscheduleApp(appId: string): Promise<AppScheduleResult> {
+export async function unscheduleApp(
+  appId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AppScheduleResult> {
   if (!appDurableEnabled()) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   const cfg = appDurableConfigFromEnv(process.env);
-  const scheduleId = appScheduleId(appId);
+  const scheduleId = appScheduleId(appId, orgId);
   try {
     const client = await temporalClient(cfg);
     await client.schedule.getHandle(scheduleId).delete();
@@ -229,10 +235,11 @@ export async function unscheduleApp(appId: string): Promise<AppScheduleResult> {
 export async function setAppSchedulePaused(
   appId: string,
   paused: boolean,
+  orgId: string = DEFAULT_ORG,
 ): Promise<AppScheduleResult> {
   if (!appDurableEnabled()) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   const cfg = appDurableConfigFromEnv(process.env);
-  const scheduleId = appScheduleId(appId);
+  const scheduleId = appScheduleId(appId, orgId);
   try {
     const client = await temporalClient(cfg);
     const handle = client.schedule.getHandle(scheduleId);

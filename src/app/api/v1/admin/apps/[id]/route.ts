@@ -91,7 +91,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const orgId = await currentOrgId();
   await deleteApp(id, orgId);
   // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
-  await unscheduleApp(id);
+  await unscheduleApp(id, orgId);
   auditFromSession(gate, orgId, {
     action: 'app.delete',
     resource: `app:${id}`,

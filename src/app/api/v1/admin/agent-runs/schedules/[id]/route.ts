@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { deleteSchedule, setSchedulePaused } from '@/lib/adapters/agentruntime';
 import { requireAdmin } from '@/lib/authz';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof body?.paused !== 'boolean') {
     return NextResponse.json({ error: 'body { paused: boolean } required' }, { status: 400 });
   }
-  const res = await setSchedulePaused(decodeURIComponent(id), body.paused);
+  const res = await setSchedulePaused(decodeURIComponent(id), body.paused, await currentOrgId());
   if (!res.ok) return NextResponse.json({ error: res.error }, { status: 502 });
   return NextResponse.json({ ok: true, scheduleId: res.scheduleId, paused: body.paused });
 }
@@ -23,7 +24,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
-  const res = await deleteSchedule(decodeURIComponent(id));
+  const res = await deleteSchedule(decodeURIComponent(id), await currentOrgId());
   if (!res.ok) return NextResponse.json({ error: res.error }, { status: 502 });
   return NextResponse.json({ ok: true, scheduleId: res.scheduleId });
 }

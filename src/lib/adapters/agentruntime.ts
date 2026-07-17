@@ -12,6 +12,7 @@ import {
   buildSchedulesView,
   type RawScheduleDescription,
   type ScheduleSpec,
+  ownsSchedule,
   scheduleRunIdSeed,
   type SchedulesView,
 } from '@/lib/temporal-schedules';
@@ -319,7 +320,7 @@ export async function cancelWorkflow(
 // Schedules that fire AgentRunWorkflow on a cron spec. All shaping/validation is pure (see
 // temporal-schedules.ts). List NEVER throws; the mutating ops return { ok, error? } for the route.
 
-export async function listSchedules(): Promise<SchedulesView> {
+export async function listSchedules(orgId: string): Promise<SchedulesView> {
   if (!durableEnabled(process.env)) {
     return buildSchedulesView([], { configured: false, reachable: false, note: NOT_CONFIGURED });
   }
@@ -332,6 +333,7 @@ export async function listSchedules(): Promise<SchedulesView> {
       const spec = (s as { spec?: { cronExpressions?: string[] } }).spec;
       const info = (s as { info?: { recentActions?: { takenAt?: Date }[]; nextActionTimes?: Date[] } }).info;
       const action = (s as { action?: { workflowType?: string } }).action;
+      if (!ownsSchedule(s.scheduleId, orgId, 'agent')) continue;
       raws.push({
         scheduleId: s.scheduleId,
         paused: (s as { state?: { paused?: boolean } }).state?.paused,
@@ -374,7 +376,10 @@ export async function createSchedule(spec: ScheduleSpec): Promise<ScheduleMutati
         type: 'startWorkflow',
         workflowType: 'AgentRunWorkflow',
         taskQueue: cfg.taskQueue,
-        args: [{ ...spec.input, runId: scheduleRunIdSeed(spec.scheduleId) }, cfg.maxAttempts],
+        args: [
+          { ...spec.input, runId: scheduleRunIdSeed(spec.scheduleId), scheduled: true },
+          cfg.maxAttempts,
+        ],
       },
       state: {
         paused: spec.paused,
@@ -388,7 +393,12 @@ export async function createSchedule(spec: ScheduleSpec): Promise<ScheduleMutati
 }
 
 /** Pause or resume a schedule. */
-export async function setSchedulePaused(scheduleId: string, paused: boolean): Promise<ScheduleMutationResult> {
+export async function setSchedulePaused(
+  scheduleId: string,
+  paused: boolean,
+  orgId: string,
+): Promise<ScheduleMutationResult> {
+  if (!ownsSchedule(scheduleId, orgId, 'agent')) return { ok: false, error: 'schedule not found' };
   if (!durableEnabled(process.env)) return { ok: false, error: NOT_CONFIGURED };
   const cfg = durableConfigFromEnv(process.env);
   try {
@@ -403,7 +413,11 @@ export async function setSchedulePaused(scheduleId: string, paused: boolean): Pr
 }
 
 /** Delete a schedule. */
-export async function deleteSchedule(scheduleId: string): Promise<ScheduleMutationResult> {
+export async function deleteSchedule(
+  scheduleId: string,
+  orgId: string,
+): Promise<ScheduleMutationResult> {
+  if (!ownsSchedule(scheduleId, orgId, 'agent')) return { ok: false, error: 'schedule not found' };
   if (!durableEnabled(process.env)) return { ok: false, error: NOT_CONFIGURED };
   const cfg = durableConfigFromEnv(process.env);
   try {

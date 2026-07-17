@@ -108,6 +108,8 @@ import type { Asker } from '@/lib/retrieval/acl';
 export interface AppRunWorkflowInput {
   appId: string;
   runId: string;
+  /** True only for a recurring Schedule action; the workflow derives a unique id per fire. */
+  scheduled?: boolean;
   input: Record<string, unknown>;
   orgId?: string;
   actor?: Actor;

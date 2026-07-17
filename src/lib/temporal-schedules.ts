@@ -29,6 +29,7 @@ export interface CreateScheduleRequest {
 /** A validated, normalized schedule creation spec — everything the adapter needs to call create(). */
 export interface ScheduleSpec {
   scheduleId: string;
+  orgId: string;
   cron: string;
   /** The workflow input each fire runs. The per-fire runId is derived at fire time (see runIdSeed). */
   input: Omit<AgentRunWorkflowInput, 'runId'>;
@@ -44,6 +45,36 @@ export function sanitizeScheduleId(raw: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 128);
+}
+
+export type ScheduleKind = 'agent' | 'app';
+
+function stableOrgHash(orgId: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of orgId) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Opaque, stable tenant/kind prefix used for ownership checks before Temporal I/O. */
+export function scheduleNamespace(orgId: string, kind: ScheduleKind): string {
+  return `og-${kind}-${stableOrgHash(orgId.trim() || 'default')}-`;
+}
+
+export function namespacedScheduleId(
+  orgId: string,
+  kind: ScheduleKind,
+  requestedId: string,
+): string {
+  const prefix = scheduleNamespace(orgId, kind);
+  const suffix = sanitizeScheduleId(requestedId) || 'schedule';
+  return `${prefix}${suffix}`.slice(0, 128);
+}
+
+export function ownsSchedule(scheduleId: string, orgId: string, kind: ScheduleKind): boolean {
+  return scheduleId.startsWith(scheduleNamespace(orgId, kind));
 }
 
 /**
@@ -67,26 +98,28 @@ export function isValidCron(spec: string): boolean {
 }
 
 /** Validate + normalize a create request into a ScheduleSpec. Throws on invalid input. */
-export function toScheduleSpec(raw: CreateScheduleRequest): ScheduleSpec {
+export function toScheduleSpec(raw: CreateScheduleRequest, orgId: string): ScheduleSpec {
+  if (!orgId.trim()) throw new Error('orgId required');
   if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) throw new Error('agentId required');
   if (typeof raw.query !== 'string' || !raw.query.trim()) throw new Error('query required');
   if (typeof raw.cron !== 'string' || !isValidCron(raw.cron)) {
     throw new Error('valid cron spec required (5- or 6-field cron, or an @macro)');
   }
-  const rawId =
+  const requestedId =
     typeof raw.scheduleId === 'string' && raw.scheduleId.trim()
       ? sanitizeScheduleId(raw.scheduleId)
       : sanitizeScheduleId(`agentsched-${raw.agentId}-${Date.now().toString(36)}`);
-  if (!rawId) throw new Error('scheduleId resolved empty after sanitization');
+  if (!requestedId) throw new Error('scheduleId resolved empty after sanitization');
   return {
-    scheduleId: rawId,
+    scheduleId: namespacedScheduleId(orgId, 'agent', requestedId),
+    orgId,
     cron: raw.cron.trim(),
     input: {
       agentId: raw.agentId,
       query: raw.query,
       caller: typeof raw.caller === 'string' && raw.caller.trim() ? raw.caller : undefined,
       requireReview: raw.requireReview === true,
-      orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
+      orgId,
     },
     note: typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : undefined,
     paused: raw.paused === true,
