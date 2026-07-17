@@ -35,6 +35,14 @@ interface RouterResponse {
   deployments: Deployment[];
   budgets: Budget[];
   error?: string;
+  wiring: {
+    inferenceProvider: 'gateway' | 'litellm' | 'custom';
+    inferenceUrl: string;
+    controlUrl: string;
+    split: boolean;
+    inferenceAuthConfigured: boolean;
+    controlAuthConfigured: boolean;
+  };
 }
 
 export function GatewayRouter() {
@@ -69,11 +77,15 @@ export function GatewayRouter() {
         <Warning size={13} className="mt-0.5 shrink-0" />
         <div>
           {apiError === 'forbidden' ? (
-            <><span className="font-medium">Admin access required.</span> The router is admin-only.</>
+            <>
+              <span className="font-medium">Admin access required.</span> The router is admin-only.
+            </>
           ) : apiError === 'unreachable' ? (
             <span className="font-medium">Couldn&apos;t reach the console API.</span>
           ) : (
-            <><span className="font-medium">Failed to load the router:</span> {apiError}</>
+            <>
+              <span className="font-medium">Failed to load the router:</span> {apiError}
+            </>
           )}
         </div>
       </div>
@@ -89,10 +101,10 @@ export function GatewayRouter() {
       <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info size={13} className="mt-0.5 shrink-0" />
         <div>
-          <span className="font-medium text-foreground">Router not wired yet.</span> The gateway is
-          still served by the built-in aggregator. Connect a LiteLLM Proxy in Settings to get
-          health-checked load-balancing, automatic failover, and per-key budgets across the fleet +
-          cloud.
+          <span className="font-medium text-foreground">Router not wired yet.</span> Inference is
+          currently configured for {data?.wiring.inferenceProvider ?? 'the legacy gateway'}; node
+          control remains independent. Connect a LiteLLM Proxy in Settings to get health-checked
+          load-balancing, automatic failover, and per-key budgets across the fleet + cloud.
         </div>
       </div>
     );
@@ -100,6 +112,21 @@ export function GatewayRouter() {
 
   return (
     <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-border p-3 text-xs">
+          <p className="font-medium text-foreground">Inference · {data.wiring.inferenceProvider}</p>
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            {toDisplayHost(data.wiring.inferenceUrl)}
+          </p>
+        </div>
+        <div className="rounded-md border border-border p-3 text-xs">
+          <p className="font-medium text-foreground">Node control · aggregator</p>
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            {toDisplayHost(data.wiring.controlUrl)}
+          </p>
+        </div>
+      </div>
+
       {/* Liveness band — the router's own up/down, stated plainly. */}
       <div
         className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
@@ -117,7 +144,9 @@ export function GatewayRouter() {
             const errSuffix = data.error ? ` (${data.error})` : '';
             return data.live
               ? 'It load-balances across the deployments below with automatic failover + retries; per-key budgets and rate limits are enforced.'
-              : `The console is wired to the router but it isn't answering${errSuffix}. Traffic falls back to the built-in aggregator.`;
+              : data.wiring.inferenceProvider === 'litellm'
+                ? `LiteLLM is selected for inference but is not answering${errSuffix}; inference requests will fail until it recovers or configuration is changed. Node control remains on the aggregator.`
+                : `LiteLLM management is wired but not answering${errSuffix}; it is not the selected inference door.`;
           })()}
         </div>
       </div>
@@ -158,7 +187,10 @@ export function GatewayRouter() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-1.5 pt-0 text-xs text-muted-foreground">
-                    <p className="truncate text-[11px] font-medium text-foreground" title={d.modelName}>
+                    <p
+                      className="truncate text-[11px] font-medium text-foreground"
+                      title={d.modelName}
+                    >
                       {modelLabel(d.modelName)}
                     </p>
                     <p className="truncate font-mono text-[11px]" title={toDisplayHost(d.apiBase)}>
@@ -200,8 +232,7 @@ export function GatewayRouter() {
                 </CardHeader>
                 <CardContent className="space-y-1 pt-0 text-xs text-muted-foreground">
                   <p>
-                    Spend:{' '}
-                    <span className="font-mono text-foreground">${b.spend.toFixed(4)}</span>
+                    Spend: <span className="font-mono text-foreground">${b.spend.toFixed(4)}</span>
                     {b.maxBudget !== null && (
                       <>
                         {' '}

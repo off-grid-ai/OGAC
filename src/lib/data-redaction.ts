@@ -39,6 +39,13 @@ export interface RedactionResult {
   report: RedactionReportEntry[];
   /** total values altered across all columns — the number that goes to the audit line. */
   totalRedacted: number;
+  /** Which detector was requested and which engine(s) actually handled detect rules. */
+  detection?: {
+    requestedEngine: string;
+    engines: string[];
+    status: 'applied' | 'fallback' | 'unconfigured' | 'down';
+    reasons: string[];
+  };
 }
 
 // ── pure value transforms ────────────────────────────────────────────────────
@@ -82,7 +89,10 @@ export function applyAction(
     case 'drop':
       return { value: null, changed: value != null };
     case 'mask':
-      return { value: maskValue(value, keepLast), changed: value != null && String(value).length > 0 };
+      return {
+        value: maskValue(value, keepLast),
+        changed: value != null && String(value).length > 0,
+      };
     case 'hash':
       return { value: hashValue(value), changed: value != null };
     case 'tokenize':
@@ -120,7 +130,11 @@ export function applyColumnRules(
     return next;
   });
   const reportArr = [...report.values()];
-  return { rows: out, report: reportArr, totalRedacted: reportArr.reduce((n, e) => n + e.changed, 0) };
+  return {
+    rows: out,
+    report: reportArr,
+    totalRedacted: reportArr.reduce((n, e) => n + e.changed, 0),
+  };
 }
 
 // ── M4 classification → redaction actions (pure) ──────────────────────────────
@@ -151,7 +165,10 @@ export function actionForSensitivity(label: string | undefined): RedactionAction
 export function policyFromClassifications(
   classifications: { column: string; sensitivity?: string }[],
 ): RedactionPolicy {
-  return classifications.map((c) => ({ column: c.column, action: actionForSensitivity(c.sensitivity) }));
+  return classifications.map((c) => ({
+    column: c.column,
+    action: actionForSensitivity(c.sensitivity),
+  }));
 }
 
 // ── the full batch redaction (pure rules + async PII detect) ──────────────────
@@ -171,22 +188,46 @@ export async function redactBatch(
   if (!pii || detectCols.length === 0) return base;
 
   const report = new Map(base.report.map((e) => [e.column, e]));
+  const engines = new Set<string>();
+  const reasons = new Set<string>();
+  let detectionStatus: NonNullable<RedactionResult['detection']>['status'] = 'applied';
   for (const row of base.rows) {
     for (const col of detectCols) {
       if (!(col in row)) continue;
       const raw = row[col];
       if (raw == null || String(raw).length === 0) continue;
       const scan = await pii.scan(String(raw), orgId);
+      engines.add(scan.engine);
+      if (scan.reason) reasons.add(scan.reason);
+      if (scan.status === 'down') detectionStatus = 'down';
+      else if (scan.status === 'unconfigured' && detectionStatus !== 'down')
+        detectionStatus = 'unconfigured';
+      else if (scan.status === 'fallback' && detectionStatus === 'applied')
+        detectionStatus = 'fallback';
       if (scan.hits) {
         row[col] = scan.redacted ?? '[REDACTED]';
-        const e = report.get(col) ?? { column: col, action: 'detect' as RedactionAction, changed: 0 };
+        const e = report.get(col) ?? {
+          column: col,
+          action: 'detect' as RedactionAction,
+          changed: 0,
+        };
         e.changed++;
         report.set(col, e);
       }
     }
   }
   const reportArr = [...report.values()];
-  return { rows: base.rows, report: reportArr, totalRedacted: reportArr.reduce((n, e) => n + e.changed, 0) };
+  return {
+    rows: base.rows,
+    report: reportArr,
+    totalRedacted: reportArr.reduce((n, e) => n + e.changed, 0),
+    detection: {
+      requestedEngine: pii.meta.id,
+      engines: [...engines],
+      status: detectionStatus,
+      reasons: [...reasons],
+    },
+  };
 }
 
 /**
@@ -197,6 +238,6 @@ export async function redactBatch(
  * LLM Guard. Content screening on the model-access path is LLM Guard (the sole guardrail engine).
  */
 export async function activePiiPort(): Promise<PiiPort> {
-  const { regexPii } = await import('./adapters/pii');
-  return regexPii;
+  const { getDataRedactionPii } = await import('./adapters/pii');
+  return getDataRedactionPii();
 }

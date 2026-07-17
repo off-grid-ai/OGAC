@@ -9,11 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
 import type { ServiceControl, ServiceEntry, ServiceHealth } from '@/lib/services-directory';
+import { RedpandaManager } from './RedpandaManager';
 
 const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
   up: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
   down: { dot: 'bg-red-500', text: 'text-red-500', label: 'Down' },
-  embedded: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Embedded' },
+  embedded: {
+    dot: 'bg-emerald-500',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    label: 'Embedded',
+  },
   optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
 };
 
@@ -52,10 +57,15 @@ export function ServiceDetail({
       if (h) {
         setHealth(h);
         setHistory((prev) =>
-          [...prev, { at: data.checkedAt, status: h.status, ms: h.ms, httpStatus: h.httpStatus }].slice(-60),
+          [
+            ...prev,
+            { at: data.checkedAt, status: h.status, ms: h.ms, httpStatus: h.httpStatus },
+          ].slice(-60),
         );
       }
-    } catch { /* keep last */ } finally {
+    } catch {
+      /* keep last */
+    } finally {
       setProbing(false);
     }
   }, [service.id]);
@@ -136,13 +146,16 @@ export function ServiceDetail({
           <CardHeader>
             <CardTitle className="text-sm">Health history</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Sampled every 15s while this page is open ({history.length} sample{history.length === 1 ? '' : 's'}).
-              The console keeps no long-term health store — this is the live session.
+              Sampled every 15s while this page is open ({history.length} sample
+              {history.length === 1 ? '' : 's'}). The console keeps no long-term health store — this
+              is the live session.
             </p>
           </CardHeader>
           <CardContent>
             {history.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">Collecting first sample…</p>
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Collecting first sample…
+              </p>
             ) : (
               <div className="flex items-end gap-0.5 overflow-x-auto">
                 {history.map((s, i) => {
@@ -176,7 +189,11 @@ export function ServiceDetail({
             <dl className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">Auth</dt>
-                <dd><Badge variant="outline" className="text-[10px] uppercase">{service.auth}</Badge></dd>
+                <dd>
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {service.auth}
+                  </Badge>
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-muted-foreground">Endpoint</dt>
@@ -192,13 +209,18 @@ export function ServiceDetail({
               )}
             </dl>
             {logsHref && (
-              <Link href={logsHref} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+              <Link
+                href={logsHref}
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
                 View logs & telemetry <ArrowSquareOut className="size-3" />
               </Link>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {service.management === 'redpanda' && <RedpandaManager />}
     </div>
   );
 }

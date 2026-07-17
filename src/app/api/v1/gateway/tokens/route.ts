@@ -3,10 +3,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { gatewayClientTokens } from '@/db/schema';
 import { requireAdmin } from '@/lib/authz';
+import { gatewayControlFetch } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
-
-const GATEWAY_URL = process.env.OFFGRID_GATEWAY_URL ?? 'http://127.0.0.1:7878';
 
 // ── GET /api/v1/gateway/tokens ────────────────────────────────────────────────
 // Returns the merged view: DB rows (meta + routing overrides) merged with the
@@ -20,9 +19,8 @@ export async function GET(req: Request) {
   // Fetch live token snapshot from gateway
   let live: GatewayTokenSnapshot[] = [];
   try {
-    const r = await fetch(`${GATEWAY_URL}/tokens`, {
+    const r = await gatewayControlFetch('/tokens', {
       cache: 'no-store',
-      headers: { 'x-api-key': process.env.OFFGRID_GATEWAY_API_KEY ?? '' },
       signal: AbortSignal.timeout(2500),
     });
     if (r.ok) live = (await r.json()) as GatewayTokenSnapshot[];
@@ -65,7 +63,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ available: true, tokens: rows.reverse() });
   } catch (e) {
     return NextResponse.json(
-      { available: false, tokens: [], error: e instanceof Error ? e.message : 'token store unavailable' },
+      {
+        available: false,
+        tokens: [],
+        error: e instanceof Error ? e.message : 'token store unavailable',
+      },
       { status: 503 },
     );
   }
@@ -80,7 +82,12 @@ export async function PATCH(req: Request) {
   const body = (await req.json().catch(() => null)) as {
     fingerprint?: string;
     meta?: Record<string, unknown>;
-    routingOverrides?: { sourceIp: string; targetIp?: string; targetNode?: string; note?: string }[];
+    routingOverrides?: {
+      sourceIp: string;
+      targetIp?: string;
+      targetNode?: string;
+      note?: string;
+    }[];
   } | null;
 
   if (!body?.fingerprint) {

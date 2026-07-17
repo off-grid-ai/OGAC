@@ -18,7 +18,7 @@ import { db } from '@/db';
 import { gateways } from '@/db/schema';
 import type { Gateway as GatewayRowDb } from '@/db/schema';
 import { cloudProviderStatuses } from '@/lib/cloud-providers';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { gatewayControlFetch } from '@/lib/gateway';
 import {
   type EgressClass,
   type GatewayHealthSignal,
@@ -109,7 +109,10 @@ export async function listGatewayRows(orgId: string = DEFAULT_ORG): Promise<Gate
 }
 
 /** One gateway row by id, org-scoped. Null if absent for this org. */
-export async function getGatewayRow(id: string, orgId: string = DEFAULT_ORG): Promise<GatewayRow | null> {
+export async function getGatewayRow(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<GatewayRow | null> {
   await ensureGatewaysSchema();
   const rows = await db
     .select()
@@ -286,16 +289,22 @@ function rollupNodeStatus(up: number, total: number): GatewayHealthSignal['statu
 
 async function onPremSignal(): Promise<GatewayHealthSignal> {
   try {
-    const r = await fetch(`${GATEWAY_URL}/nodes`, {
+    const r = await gatewayControlFetch('/nodes', {
       cache: 'no-store',
-      headers: gatewayHeaders(),
       signal: AbortSignal.timeout(4000),
     });
-    if (!r.ok) return { configured: true, reachable: false, status: 'down', detail: `aggregator ${r.status}` };
+    if (!r.ok)
+      return {
+        configured: true,
+        reachable: false,
+        status: 'down',
+        detail: `aggregator ${r.status}`,
+      };
     const d = (await r.json()) as { nodes?: Array<{ health?: string }> };
     const nodes = Array.isArray(d.nodes) ? d.nodes : [];
     const up = nodes.filter((n) => n.health === 'up' || n.health === 'degraded').length;
-    if (nodes.length === 0) return { configured: false, reachable: false, status: 'unconfigured', detail: 'no nodes' };
+    if (nodes.length === 0)
+      return { configured: false, reachable: false, status: 'unconfigured', detail: 'no nodes' };
     return {
       configured: true,
       reachable: up > 0,
@@ -303,7 +312,12 @@ async function onPremSignal(): Promise<GatewayHealthSignal> {
       detail: `${up} of ${nodes.length} nodes up`,
     };
   } catch {
-    return { configured: false, reachable: false, status: 'down', detail: 'aggregator unreachable' };
+    return {
+      configured: false,
+      reachable: false,
+      status: 'down',
+      detail: 'aggregator unreachable',
+    };
   }
 }
 
@@ -330,7 +344,12 @@ async function cloudSignal(kind: string): Promise<GatewayHealthSignal> {
   const providerId = gatewayKindToProviderId(kind) ?? 'compat';
   const s = statuses.find((p) => p.id === providerId);
   if (!s?.configured) {
-    return { configured: false, reachable: false, status: 'unconfigured', detail: 'not configured' };
+    return {
+      configured: false,
+      reachable: false,
+      status: 'unconfigured',
+      detail: 'not configured',
+    };
   }
   const reachable = await probeCloud(s.baseUrl);
   return {
@@ -358,7 +377,8 @@ export async function listGatewaysWithHealth(orgId: string = DEFAULT_ORG): Promi
   const onPrem = hasOnPrem ? await onPremSignal() : null;
   return Promise.all(
     rows.map(async (row) => {
-      const signal = row.kind === 'on-prem' ? (onPrem as GatewayHealthSignal) : await signalFor(row);
+      const signal =
+        row.kind === 'on-prem' ? (onPrem as GatewayHealthSignal) : await signalFor(row);
       return mergeGatewayHealth(row, signal);
     }),
   );
