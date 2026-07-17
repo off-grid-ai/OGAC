@@ -12,6 +12,10 @@ test('the global utility bar does not claim page title or description ownership'
   ]);
 
   assert.match(topbarSource, /aria-label="Console utilities"/);
+  assert.match(topbarSource, /data-og-shell="topbar"/);
+  assert.match(topbarSource, /data-og-surface="raised"/);
+  assert.match(sidebarSource, /data-og-shell="sidebar"/);
+  assert.match(sidebarSource, /data-og-surface="raised"/);
   assert.doesNotMatch(topbarSource, /ownerForPath/);
   assert.doesNotMatch(topbarSource, /<h1\b/);
   assert.doesNotMatch(topbarSource, /owner\.description/);

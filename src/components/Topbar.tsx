@@ -33,12 +33,15 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   return (
     <header
       aria-label="Console utilities"
+      data-og-shell="topbar"
+      data-og-surface="raised"
       className="flex h-14 shrink-0 items-center justify-end gap-2 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6"
     >
       {/* Hamburger — mobile only; opens the slide-in nav drawer (same nav as the desktop aside). */}
       <Sheet open={drawerOpen} onOpenChange={(o) => dispatch({ type: o ? 'open' : 'close' })}>
         <SheetTrigger
           aria-label="Open navigation menu"
+          data-og-interactive
           className="mr-auto flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
         >
           <List className="size-5" />
@@ -54,6 +57,7 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
         <button
           onClick={openSearch}
           aria-label="Search"
+          data-og-interactive
           className="flex min-h-11 items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
         >
           <MagnifyingGlass className="size-3.5" />

@@ -8,7 +8,13 @@ export function PageFrame({
   className,
 }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
-    <div className={cn('h-full min-h-0 w-full min-w-0 overflow-y-auto p-4 md:p-6', className)}>
+    <div
+      data-og-shell="page"
+      className={cn(
+        'h-full min-h-0 w-full min-w-0 overflow-y-auto bg-background p-4 md:p-6',
+        className,
+      )}
+    >
       {children}
     </div>
   );

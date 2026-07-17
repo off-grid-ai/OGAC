@@ -18,7 +18,11 @@ export function PageTransition({ children }: Readonly<{ children: ReactNode }>) 
   // (Chat, etc.) rely on h-full resolving against <main>; without it the wrapper collapses
   // to content height and leaves a void below. The animation is opacity-only (no transform).
   return (
-    <div key={pathname} className="og-page-enter h-full min-h-0 w-full min-w-0">
+    <div
+      key={pathname}
+      data-og-shell="route"
+      className="og-page-enter h-full min-h-0 w-full min-w-0"
+    >
       {children}
     </div>
   );

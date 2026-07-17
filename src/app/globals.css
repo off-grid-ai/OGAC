@@ -290,6 +290,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Console shell composition. Shared @offgrid/ui owns surface elevation and interactive motion;
+   this product layer only establishes the full-width background -> chrome -> route hierarchy. */
+[data-og-shell='content'],
+[data-og-shell='route'],
+[data-og-shell='page'] {
+  background: var(--og-background);
+}
+
+[data-og-shell='content'] {
+  isolation: isolate;
+}
+
+[data-og-shell='sidebar'] {
+  z-index: 2;
+  background: var(--og-surface);
+}
+
+[data-og-shell='topbar'] {
+  z-index: 1;
+  background: color-mix(in srgb, var(--og-surface) 92%, transparent);
+}
+
+[data-og-shell='brand'] {
+  background: var(--og-surface);
+}
+
 @theme inline {
   --animate-shiny-text: shiny-text 8s infinite;
   @keyframes shiny-text {

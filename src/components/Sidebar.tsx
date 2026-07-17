@@ -34,8 +34,14 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
 
   return (
     <>
-      <div className="flex h-14 items-center gap-3 border-b border-border/80 px-4">
-        <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-background">
+      <div
+        data-og-shell="brand"
+        className="flex h-14 items-center gap-3 border-b border-border/80 px-4"
+      >
+        <div
+          data-og-surface="raised"
+          className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-background"
+        >
           <Image src="/logo.png" alt="" width={26} height={26} priority />
         </div>
         <div className="min-w-0 leading-tight">
@@ -58,6 +64,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
             <div key={section.id} className="mb-1 last:mb-0">
               <button
                 type="button"
+                data-og-interactive
                 aria-expanded={expanded}
                 aria-controls={`nav-section-${section.id}`}
                 data-current-section={containsActiveItem || undefined}
@@ -104,6 +111,8 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                     <Link
                       key={item.id}
                       href={item.route}
+                      data-og-interactive
+                      data-active={active || undefined}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
@@ -145,6 +154,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
       <div className="border-t border-border/80 p-3">
         <a
           href="/docs"
+          data-og-interactive
           target="_blank"
           rel="noopener noreferrer"
           onClick={onNavigate}
@@ -168,7 +178,11 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
 // Topbar's slide-in drawer) so desktop (md+) is byte-for-byte unchanged.
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border/80 bg-card md:flex">
+    <aside
+      data-og-shell="sidebar"
+      data-og-surface="raised"
+      className="hidden w-64 shrink-0 flex-col border-r border-border/80 bg-card md:flex"
+    >
       <SidebarNav />
     </aside>
   );
