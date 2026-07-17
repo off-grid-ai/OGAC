@@ -103,8 +103,8 @@ export interface AgentRunWorkflowInput {
   /**
    * PA-16a-durable — the bound-pipeline id this durable agent run must enforce (data-allowlist
    * ceiling + egress leash + policy/guardrail overlay). The dispatch site resolves the binding with
-   * the SAME resolver the inline route uses (resolveAgentBinding → resolveConsumerPipeline) and
-   * threads the plain id here; the WORKER (runAgentPipeline activity) re-resolves the full contract
+   * the SAME dispatch-level explicit-agent resolver every caller uses and threads the plain id here;
+   * the WORKER (runAgentPipeline activity) re-resolves the full contract
    * ONCE via resolveContract (the I/O boundary) and attaches it to the run context — so the durable
    * path enforces the identical contract the sync path does. Null/absent ⇒ no bound pipeline ⇒
    * legacy allow (the ADDITIVE guarantee), unchanged.

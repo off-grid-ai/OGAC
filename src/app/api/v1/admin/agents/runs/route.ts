@@ -5,7 +5,6 @@ import { callerFromSession } from '@/lib/app-access-caller';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
 import { getCustomAgent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -24,9 +23,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const b = (await req.json().catch(() => null)) as
-    | { agentId?: unknown; query?: unknown; project?: unknown }
-    | null;
+  const b = (await req.json().catch(() => null)) as {
+    agentId?: unknown;
+    query?: unknown;
+    project?: unknown;
+  } | null;
   if (!b || typeof b.agentId !== 'string' || typeof b.query !== 'string' || !b.query.trim()) {
     return NextResponse.json({ error: 'agentId and query required' }, { status: 400 });
   }
@@ -58,11 +59,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Resolve only the agent's OWN pipeline. An unbound agent deliberately has no pipeline contract;
-  // it never inherits chat's default (changing chat governance must not silently retarget agents).
-  // Built-ins have no persisted binding and therefore remain explicitly unbound.
-  const { contract, pipelineId } = await resolveAgentBinding(agent?.pipelineId ?? null, orgId);
-
   // C4: resolve the caller CONTEXT here — the request is the only place identity/org/project exist.
   // Pass the fully-resolved actor (machine vs user + label preserved, not just the email) so a
   // durable run in the worker attributes its four-plane fan-out exactly as an inline run would.
@@ -73,9 +69,6 @@ export async function POST(req: Request) {
     orgId,
     actor: actorFromSession(gate),
     project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
-    contract,
-    // PA-12: thread the resolved pipeline id so the run's observability trace is tagged at the source.
-    pipelineId,
   });
 
   // Durable submit accepted but the pipeline is still executing in the worker — 202 with the
