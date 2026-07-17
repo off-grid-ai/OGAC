@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+  deleteMaterializedAgents,
+  syncMaterializedAgentOwnership,
+} from '@/lib/app-agent-ownership';
 import { syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
 import {
   AppValidationError,
@@ -59,9 +63,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
     }
 
     // A plain field patch. Strip the publish flag; pass the rest through as an AppPatch.
+    const previous = await getApp(id, orgId);
+    if (!previous) return NextResponse.json({ error: 'not found' }, { status: 404 });
     const { publish: _publish, ...patch } = body;
     const updated = await updateApp(id, orgId, patch);
     if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    await syncMaterializedAgentOwnership(previous, updated, orgId);
     // Reconcile the schedule after every update so editing the cron / trigger / published flag takes
     // effect immediately (published+schedule+cron → register/replace; otherwise → tear down).
     await syncAppSchedule(updated, { caller: 'app.update' });
@@ -85,7 +92,9 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
+  const current = await getApp(id, orgId);
   await deleteApp(id, orgId);
+  if (current) await deleteMaterializedAgents(current, orgId);
   // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
   await unscheduleApp(id);
   auditFromSession(gate, orgId, {

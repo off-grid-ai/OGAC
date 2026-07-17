@@ -10,6 +10,7 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
 import { resolveContract } from '@/lib/pipeline-contract';
+import { askerFrom } from '@/lib/retrieval/acl';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -101,6 +102,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     actor: gate.user.email ?? undefined,
     runId,
     contract,
+    pipelineId,
+    asker: askerFrom(gate.user),
     mode: runMode,
   });
 

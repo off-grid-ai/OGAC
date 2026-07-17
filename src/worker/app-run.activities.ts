@@ -80,6 +80,8 @@ export async function executeStepActivity(
     actor: input.actor?.id ?? input.caller,
     runId: input.runId,
     contract,
+    pipelineId: input.pipelineId ?? contract?.pipelineId ?? null,
+    asker: input.asker,
     // Thread the run mode so a SHADOW durable run's side-effecting sinks NO-OP on the worker path
     // identically to the inline path (executeStep applies the pure shouldIntercept per step).
     mode: input.mode ?? 'live',

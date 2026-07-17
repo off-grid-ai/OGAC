@@ -1,8 +1,7 @@
 import { ArrowLeft, Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
-import { AgentFormPanel } from '@/components/agents/AgentFormPanel';
 import { AgentRunner } from '@/components/agents/AgentRunner';
 import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
@@ -17,9 +16,9 @@ import {
 } from '@/components/ui/table';
 import { type AgentRun, listAgentRunsByAgent } from '@/lib/agentrun';
 import { resolveAgent } from '@/lib/agents';
+import { findAppByAgentId } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
-import { getPipeline, listPipelines } from '@/lib/pipelines';
-import { listTools } from '@/lib/store';
+import { getPipeline } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
 
@@ -90,6 +89,10 @@ export default async function AgentDetailPage({
   const orgId = await currentOrgId();
   const agent = await resolveAgent(id, orgId);
   if (!agent) notFound();
+  // AppSpec is the canonical owner of every authored agent. Preserve the old runtime-agent deep
+  // link by resolving it to the owning app lifecycle; orphaned legacy rows remain readable below.
+  const owningApp = agent.custom ? await findAppByAgentId(id, orgId) : null;
+  if (owningApp) redirect(`/build/apps/${encodeURIComponent(owningApp.id)}`);
   // Agent bindings are explicit. Null is honestly rendered as "No pipeline" and never resolved via
   // the chat default.
   const boundPipeline = agent.pipelineId
@@ -101,28 +104,6 @@ export default async function AgentDetailPage({
   // Degrade gracefully (matches the sibling listTools().catch below): DB down → no runs, page still renders.
   const runs = await listAgentRunsByAgent(id, 8, orgId).catch(() => []);
   const done = runs.filter((r) => r.status === 'done').length;
-  const [toolRows, pipelineRows] = agent.custom
-    ? await Promise.all([listTools(orgId).catch(() => []), listPipelines(orgId).catch(() => [])])
-    : [[], []];
-  const tools = agent.custom
-    ? toolRows.filter((t) => t.enabled).map((t) => ({ id: t.id, name: t.name, policy: t.policy }))
-    : [];
-  const editable = agent.custom
-    ? [
-        {
-          id: agent.id,
-          name: agent.name,
-          role: agent.role,
-          systemPrompt: agent.systemPrompt,
-          model: agent.model,
-          grounded: agent.grounded,
-          trigger: agent.trigger,
-          tools: agent.tools,
-          pipelineId: agent.pipelineId ?? null,
-        },
-      ]
-    : [];
-
   return (
     <div className="space-y-6">
       <Link
@@ -141,7 +122,7 @@ export default async function AgentDetailPage({
               <h1 className="text-lg font-semibold text-foreground">{agent.name}</h1>
               {agent.custom ? (
                 <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  yours
+                  legacy runtime
                 </Badge>
               ) : null}
               <Badge variant="secondary">{agent.role}</Badge>
@@ -150,17 +131,24 @@ export default async function AgentDetailPage({
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{agent.description}</p>
           </div>
         </div>
-        <AgentCardActions agentId={agent.id} custom={agent.custom} enabled />
+        <AgentCardActions agentId={agent.id} />
       </div>
 
       {agent.custom ? (
-        <AgentFormPanel
-          tools={tools}
-          pipelines={pipelineRows
-            .filter((p) => p.status === 'published')
-            .map((p) => ({ id: p.id, name: p.name }))}
-          editable={editable}
-        />
+        <Card className="border-amber-500/30 bg-amber-500/5 shadow-sm">
+          <CardContent className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center">
+            <p className="text-sm text-muted-foreground">
+              This is a legacy runtime definition with no owning app. It remains runnable and
+              readable, but new authoring and edits belong to the App lifecycle.
+            </p>
+            <Link
+              href="/build/studio/new"
+              className="shrink-0 text-sm font-medium text-primary hover:underline"
+            >
+              Build the canonical app →
+            </Link>
+          </CardContent>
+        </Card>
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

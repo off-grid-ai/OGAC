@@ -98,6 +98,7 @@ export function appWorkflowIdFor(appId: string, runId: string): string {
 // ── Workflow I/O contract (2B implements the workflow against this shape) ────────────────────────
 
 import type { Actor } from '@/lib/audit-event';
+import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * Input handed to AppRunWorkflow (Phase 2B). Carries the resolved caller context (like
@@ -112,6 +113,7 @@ export interface AppRunWorkflowInput {
   actor?: Actor;
   caller?: string;
   project?: string;
+  asker?: Asker;
   /**
    * PA-16 — the bound-pipeline id this durable run must enforce (data-allowlist ceiling + egress
    * leash + policy/guardrail overlay). The dispatch site resolves it with the SAME resolver the

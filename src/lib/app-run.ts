@@ -53,6 +53,7 @@ import {
   enforceDataAccess,
   enforceModelCall,
 } from '@/lib/pipeline-enforcement';
+import type { Asker } from '@/lib/retrieval/acl';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 
@@ -67,6 +68,10 @@ export interface AppRunContext {
    * enforcement decisions (enforceDataAccess / enforceModelCall) and perform the deny/route/audit I/O.
    */
   contract?: PipelineContract | null;
+  /** Canonical resolved pipeline id for child-agent attribution and durable dispatch. */
+  pipelineId?: string | null;
+  /** Document-level retrieval identity carried into inline and Temporal child-agent runs. */
+  asker?: Asker;
   /**
    * SHADOW / LIVE run mode (BFSI blast-radius). In 'shadow' any SIDE-EFFECTING step (an output sink
    * that leaves the box — email/report/whatsapp) is INTERCEPTED: it records what it WOULD have done
@@ -140,6 +145,7 @@ export interface AppRunDeps {
     caller: string | undefined,
     requireReview: boolean,
     orgId: string,
+    context?: import('@/lib/agent-run-context').RunContext,
   ) => Promise<AgentRunLike | null>;
   /** Org's declared data domains (the rule engine's inputs). */
   listDomains: (orgId: string) => Promise<DomainLike[]>;
@@ -150,17 +156,17 @@ export interface AppRunDeps {
     domain: DomainLike,
     connector: ConnectorLike,
     opts: { op?: 'read' | 'count'; limit?: number; params?: Record<string, unknown> },
-  ) => Promise<{ result: { rows: unknown[]; count: number; dialect: string } | null; detail: string }>;
+  ) => Promise<{
+    result: { rows: unknown[]; count: number; dialect: string } | null;
+    detail: string;
+  }>;
   /**
    * Guardrail check path (reuse of the existing runChecks + outcomeFromChecks). `orgId` is threaded
    * EXPLICITLY (gap #121) so the PII deep config (org custom recognizers + thresholds) resolves on
    * the durable worker path, which has no request scope for `headers()`-based org resolution — the
    * worker then behaves identically to a request. Optional (2nd arg) keeps the seam back-compat.
    */
-  runGuardrail: (
-    text: string,
-    orgId?: string,
-  ) => Promise<{ blocked: boolean; detail: string }>;
+  runGuardrail: (text: string, orgId?: string) => Promise<{ blocked: boolean; detail: string }>;
   /**
    * PII scan (the guardrails port) → a redacted form of the text, for the mask-before-model
    * substitution on an agent step when the bound pipeline's overlay ESCALATES masking on (PA-16c).
@@ -184,7 +190,11 @@ export interface AppRunDeps {
    * (GAP #113) so a freshly-compiled multi-step app's decision step can run through runAgent. The
    * created agent id is cached back onto the step + persisted to the app so re-runs don't duplicate.
    */
-  materializeAgent: (spec: AppSpec, step: Extract<AppStep, { kind: 'agent' }>, orgId: string) => Promise<string>;
+  materializeAgent: (
+    spec: AppSpec,
+    step: Extract<AppStep, { kind: 'agent' }>,
+    orgId: string,
+  ) => Promise<string>;
   /**
    * OUTPUT SINK — render a signed, auditable report artifact for the run (Phase 4B). Injected so the
    * executor is unit-testable without the PDF/crypto layers. Production wires renderAppRunReport; the
@@ -223,9 +233,9 @@ export interface AppRunDeps {
 // binds a connector-query step to a DECLARED domain (a rule), never a fuzzy guess at runtime.
 export function defaultDeps(): AppRunDeps {
   return {
-    async runAgent(agentId, query, caller, requireReview, orgId) {
+    async runAgent(agentId, query, caller, requireReview, orgId, context) {
       const { runAgent } = await import('@/lib/agentrun');
-      return runAgent(agentId, query, caller, requireReview, orgId);
+      return runAgent(agentId, query, caller, requireReview, orgId, context);
     },
     async listDomains(orgId) {
       const { listDomains } = await import('@/lib/data-domains-store');
@@ -256,9 +266,7 @@ export function defaultDeps(): AppRunDeps {
         opts,
       );
       return {
-        result: result
-          ? { rows: result.rows, count: result.count, dialect: result.dialect }
-          : null,
+        result: result ? { rows: result.rows, count: result.count, dialect: result.dialect } : null,
         detail: describeDecision(decision),
       };
     },
@@ -296,17 +304,23 @@ export function defaultDeps(): AppRunDeps {
       // return the fresh id so the run proceeds — only the cross-run dedup is best-effort.
       const inline = step.inlineAgent!;
       const { createCustomAgent } = await import('@/lib/store');
-      const created = await createCustomAgent({
-        name: `${spec.title || 'App'} · ${step.label || step.id}`,
-        role: 'App step',
-        description: `Inline agent materialized for app "${spec.title}" step "${step.id}".`,
-        systemPrompt: inline.systemPrompt,
-        model: inline.model,
-        tools: inline.tools,
-        grounded: inline.grounded,
-        // Materialize into the RUN's org — else the agent lands in DEFAULT_ORG and the org-scoped
-        // runAgent(…, ctx.orgId) can't resolve it ("unknown agent") on any non-default tenant.
-      }, orgId);
+      const created = await createCustomAgent(
+        {
+          name: `${spec.title || 'App'} · ${step.label || step.id}`,
+          role: 'App step',
+          description: `Inline agent materialized for app "${spec.title}" step "${step.id}".`,
+          systemPrompt: inline.systemPrompt,
+          model: inline.model,
+          tools: inline.tools,
+          grounded: inline.grounded,
+          // The runtime row is an execution detail, but it still preserves its owning AppSpec's
+          // explicit binding. A null binding remains null; run context carries a resolved org default.
+          pipelineId: spec.pipelineId ?? null,
+          // Materialize into the RUN's org — else the agent lands in DEFAULT_ORG and the org-scoped
+          // runAgent(…, ctx.orgId) can't resolve it ("unknown agent") on any non-default tenant.
+        },
+        orgId,
+      );
       // Cache back in-memory (this-run reuse) and persist (cross-run dedup).
       step.agentId = created.id;
       if (spec.id) {
@@ -370,7 +384,16 @@ export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): stri
 export function resolveDomainByIdOrLabel(
   domainRef: string,
   domains: DomainLike[],
-  resolveByPhrase: (phrase: string, doms: never) => { id: string; label: string; connectorId: string; resource: string; opHints?: Record<string, unknown> } | null,
+  resolveByPhrase: (
+    phrase: string,
+    doms: never,
+  ) => {
+    id: string;
+    label: string;
+    connectorId: string;
+    resource: string;
+    opHints?: Record<string, unknown>;
+  } | null,
 ): DomainLike | null {
   const ref = (domainRef ?? '').trim();
   if (!ref) return null;
@@ -488,7 +511,9 @@ async function executeAgentStep(
     // must BLOCK the step — the raw (unmasked) query must NEVER reach the model. The pure maskOrBlock
     // is the ONE authority: on a scan throw it returns { block:true }; only a successful scan yields
     // forwardable (redacted) text. The old `catch { /* send unmasked */ }` was a fail-open PII leak.
-    let scanResult: { ok: true; scan: Awaited<ReturnType<AppRunDeps['scanPii']>> } | { ok: false; error: unknown };
+    let scanResult:
+      | { ok: true; scan: Awaited<ReturnType<AppRunDeps['scanPii']>> }
+      | { ok: false; error: unknown };
     try {
       scanResult = { ok: true, scan: await deps.scanPii(query, ctx.orgId) };
     } catch (err) {
@@ -516,7 +541,12 @@ async function executeAgentStep(
       );
     }
   }
-  const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId);
+  const run = await deps.runAgent(agentId, query, ctx.actor, false, ctx.orgId, {
+    org: ctx.orgId,
+    contract: ctx.contract ?? null,
+    pipelineId: ctx.pipelineId ?? ctx.contract?.pipelineId ?? null,
+    asker: ctx.asker,
+  });
   if (!run) return errorResult(step, `unknown agent: ${agentId}`);
   if (run.status === 'denied' || run.status === 'blocked') {
     return {
@@ -568,7 +598,10 @@ async function executeConnectorStep(
   }
   const connector = await deps.getConnector(resolved.connectorId, ctx.orgId);
   if (!connector) {
-    return errorResult(step, `domain "${resolved.label}" binds connector ${resolved.connectorId} which is missing`);
+    return errorResult(
+      step,
+      `domain "${resolved.label}" binds connector ${resolved.connectorId} which is missing`,
+    );
   }
   const { result, detail } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
@@ -611,7 +644,12 @@ async function executeGuardrailStep(
     .join('\n');
   const { blocked, detail } = await deps.runGuardrail(text || step.label, ctx.orgId);
   if (blocked) {
-    return { stepId: step.id, kind: 'guardrail', status: 'error', detail: `guardrail blocked: ${detail}` };
+    return {
+      stepId: step.id,
+      kind: 'guardrail',
+      status: 'error',
+      detail: `guardrail blocked: ${detail}`,
+    };
   }
   return { stepId: step.id, kind: 'guardrail', status: 'done', detail: `guardrail ok: ${detail}` };
 }
@@ -667,7 +705,13 @@ async function executeOutputStep(
   const outcome = aggregateOutcome(priorResults);
 
   if (step.sink === 'console') {
-    return { stepId: step.id, kind: 'output', status: 'done', output: outcome, detail: 'sink: console' };
+    return {
+      stepId: step.id,
+      kind: 'output',
+      status: 'done',
+      output: outcome,
+      detail: 'sink: console',
+    };
   }
 
   if (step.sink === 'report') {
@@ -709,7 +753,13 @@ async function executeOutputStep(
     // third-party mailer. SMTP is air-gapped → always allowed. A block ⇒ audited deny, honest step.
     const egress = emailEgressVerdict(contract, provider);
     if (!egress.allow) {
-      auditEnforcement(enforceCtx, 'pipeline.egress.block', `sink:email:${provider}`, 'blocked', egress.reason);
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.egress.block',
+        `sink:email:${provider}`,
+        'blocked',
+        egress.reason,
+      );
       return errorResult(step, `email delivery blocked by pipeline egress leash: ${egress.reason}`);
     }
 
@@ -740,8 +790,17 @@ async function executeOutputStep(
       } catch (e) {
         if (provider === 'resend') {
           // Refuse to leak unmasked PII to a cloud mailer when the detector is down — honest deny.
-          auditEnforcement(enforceCtx, 'pipeline.pii.mask', `sink:email:${provider}`, 'error', 'PII detector unavailable — cloud send held');
-          return errorResult(step, `email send held: PII masking required but the detector is unavailable (${(e as Error).message})`);
+          auditEnforcement(
+            enforceCtx,
+            'pipeline.pii.mask',
+            `sink:email:${provider}`,
+            'error',
+            'PII detector unavailable — cloud send held',
+          );
+          return errorResult(
+            step,
+            `email send held: PII masking required but the detector is unavailable (${(e as Error).message})`,
+          );
         }
         /* SMTP (air-gapped): the body stays on-prem — proceed unmasked (leash guarantee holds) */
       }
@@ -752,7 +811,9 @@ async function executeOutputStep(
     if (step.config?.attachReport === true) {
       try {
         const report = await deps.renderReport(buildInRunView(spec, priorResults, ctx, {}), 'pdf');
-        attachments = [{ filename: report.filename, contentType: report.contentType, bytes: report.bytes }];
+        attachments = [
+          { filename: report.filename, contentType: report.contentType, bytes: report.bytes },
+        ];
       } catch {
         /* report render failed — send the text body without the attachment (honest degrade) */
       }

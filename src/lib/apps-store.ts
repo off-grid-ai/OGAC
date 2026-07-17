@@ -91,12 +91,7 @@ function normalizeVisibility(v: string): 'private' | 'org' | 'public' {
 }
 
 // Build the full spec that validation runs against (store-managed fields filled in).
-function specFor(
-  id: string,
-  orgId: string,
-  ownerId: string,
-  input: AppSpecInput,
-): AppSpec {
+function specFor(id: string, orgId: string, ownerId: string, input: AppSpecInput): AppSpec {
   return {
     id,
     orgId,
@@ -190,6 +185,20 @@ export async function listApps(orgId: string): Promise<AppSpec[]> {
   return rows
     .map(toAppSpec)
     .filter((a) => !hideDemoTestArtifact(orgId, { title: a.title, ownerId: a.ownerId }));
+}
+
+// ─── findAppByAgentId — canonical authored-agent ownership lookup ─────────────
+// Runtime custom-agent rows are an execution detail of an AppSpec. This lookup lets legacy
+// /build/agents/:id deep links resolve to the owning app lifecycle without exposing a second
+// authoring surface. It is deliberately org-scoped and returns only the first owning AppSpec;
+// materialized runtime agents are expected to have exactly one owner.
+export async function findAppByAgentId(agentId: string, orgId: string): Promise<AppSpec | null> {
+  const all = await listApps(orgId);
+  return (
+    all.find((app) =>
+      app.steps.some((step) => step.kind === 'agent' && step.agentId === agentId),
+    ) ?? null
+  );
 }
 
 // ─── listAppsByPipeline — apps/agents BOUND to a pipeline (Overview "Consumers") ─

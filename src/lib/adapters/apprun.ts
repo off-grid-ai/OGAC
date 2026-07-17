@@ -99,7 +99,12 @@ export async function submitAppRun(
     // Durable requested but Temporal unreachable — fall through to inline (graceful degrade).
   }
 
-  return runInline(spec, input, ctx, wantDurable ? 'durable requested but Temporal unreachable' : undefined);
+  return runInline(
+    spec,
+    input,
+    ctx,
+    wantDurable ? 'durable requested but Temporal unreachable' : undefined,
+  );
 }
 
 async function trySubmitDurable(
@@ -115,11 +120,12 @@ async function trySubmitDurable(
     input,
     orgId: ctx.orgId,
     caller: ctx.actor,
+    asker: ctx.asker,
     // PA-16 — thread the bound-pipeline id onto the durable path so the WORKER enforces the same
     // contract the inline route does. The route already resolved the contract into ctx.contract
     // (resolveConsumerPipeline → resolveContract); carry its pipelineId so the workflow re-resolves
     // the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy allow.
-    pipelineId: ctx.contract?.pipelineId ?? null,
+    pipelineId: ctx.pipelineId ?? ctx.contract?.pipelineId ?? null,
     // BFSI blast-radius — carry the resolved run mode so the WORKER intercepts side-effecting sinks
     // on a shadow run identically to the inline path. Default 'live' (additive).
     mode: ctx.mode ?? 'live',
@@ -221,7 +227,8 @@ export async function describeAppRun(appId: string, runId: string): Promise<AppR
     const desc = await handle.describe();
     let status = mapWorkflowStatus(desc.status?.name);
     if (desc.status?.name === 'COMPLETED') {
-      const result = (await handle.result().catch(() => undefined)) as AppRunWorkflowResult | undefined;
+      const result = (await handle.result().catch(() => undefined)) as
+        AppRunWorkflowResult | undefined;
       if (result) status = result.found ? result.status : 'not_found';
     }
     return { configured: true, reachable: true, workflowId, status };

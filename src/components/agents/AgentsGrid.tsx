@@ -3,11 +3,6 @@
 import { Robot } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
-import {
-  AgentFormPanel,
-  type EditableAgent,
-  type ToolOption,
-} from '@/components/agents/AgentFormPanel';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
 import { accentHue, initials } from '@/lib/workspace-grid';
@@ -115,47 +110,21 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
               <span className="text-xs text-muted-foreground">—</span>
             )}
           </div>
-          <AgentCardActions agentId={a.id} custom={a.custom} enabled={a.enabled !== false} />
+          <AgentCardActions agentId={a.id} />
         </div>
       </div>
     </div>
   );
 }
 
-// The Agents management grid: a responsive card grid (fills wide screens) with per-card run /
-// edit / enable-disable / delete, plus the shared URL-driven create/edit panel. A thin presenter
-// over server-provided data.
-export function AgentsGrid({
-  agents,
-  tools,
-  pipelines = [],
-}: Readonly<{
-  agents: AgentCardModel[];
-  tools: ToolOption[];
-  pipelines?: { id: string; name: string }[];
-}>) {
-  const editable: EditableAgent[] = agents
-    .filter((a) => a.custom)
-    .map((a) => ({
-      id: a.id,
-      name: a.name,
-      role: a.role,
-      systemPrompt: a.systemPrompt,
-      model: a.model,
-      grounded: a.grounded,
-      trigger: a.trigger,
-      tools: a.tools,
-      pipelineId: a.pipelineId ?? null,
-    }));
-
+// Built-in runtime agents are reusable platform capabilities. User-authored agents are AppSpecs
+// and render through AppsList instead, so there is one editor and one lifecycle owner.
+export function AgentsGrid({ agents }: Readonly<{ agents: AgentCardModel[] }>) {
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {agents.map((a) => (
-          <AgentCard key={a.id} a={a} />
-        ))}
-      </div>
-      <AgentFormPanel tools={tools} pipelines={pipelines} editable={editable} />
-    </>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {agents.map((a) => (
+        <AgentCard key={a.id} a={a} />
+      ))}
+    </div>
   );
 }
