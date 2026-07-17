@@ -6,11 +6,13 @@ Solution Blueprints capture a reusable BFSI outcome hypothesis: the business own
 runtime capabilities, governed pipeline, KPI baseline and target, economic assumptions, and any
 auditable benchmark evidence. They do not contain a tenant's measured result.
 
-Use **Solutions › Library** to inspect a Blueprint. The two starter contracts — delinquency
-intervention and indemnity claim fast-track — are intentionally marked **unverified**. Their example
-baselines and targets are prompts for customer discovery, not claims that Off Grid has already
-proved those values. Mark a Blueprint verified only after attaching evidence that another operator
-can open and audit.
+Use **Solutions › Library** to inspect a Blueprint. The two starter entries — delinquency
+intervention and indemnity claim fast-track — are intentionally marked **Hypothesis only** and
+**unverified**. They do not point to a real App/template/pipeline asset, so the Console will not offer
+them for adoption. Their example baselines and targets are prompts for customer discovery, not
+claims that Off Grid has already proved those values. Make a Blueprint adoptable only when its
+runtime contract names assets that really exist; mark it verified only after attaching evidence that
+another operator can open and audit.
 
 ## Adopt a Blueprint
 
@@ -29,31 +31,40 @@ can open and audit.
 If no App is compatible, fix or publish the App and pipeline first. The Console will not create a
 nominal “active” deployment that cannot execute the advertised contract.
 
-## Record measured value
+## Record an operator KPI claim
 
 Open **Solutions › Deployed** and choose a deployment. Record one bounded production window at a
 time:
 
 - start and end timestamps;
-- observed KPI value and label;
-- completed runs;
-- estimated minutes saved per run and loaded hourly cost;
-- actual AI cost; and
-- links to supporting evidence.
+- claimed KPI value and label;
+- estimated minutes saved per run and loaded hourly cost; and
+- one or more links to supporting evidence.
 
-Realized ROI is calculated by the same canonical rule used throughout the Console:
+The operator cannot enter or override completed-run count or AI cost. The Console selects completed
+`app_runs` for the deployment's App whose finish time falls inside the evidence window and derives
+cost from the same run/FinOps fields used by App Reports. It stores the selected run IDs with the
+observation so the calculation remains auditable.
+
+Estimated ROI is calculated over those measured run facts and the explicitly labelled labor
+assumptions:
 
 - estimated hours saved = completed runs × minutes saved per run ÷ 60;
 - estimated gross value = estimated hours saved × loaded hourly cost;
-- realized net value = estimated gross value − actual AI cost.
+- estimated net value = estimated gross value − actual AI cost.
 
-The page shows only App runs after the deployment's activation timestamp. Pre-adoption history and
-App-wide reports are not counted as proof for this deployment.
+The Console rejects future windows, overlapping windows, windows before activation, and windows that
+end after deployment retirement. Pre-adoption or post-retirement App activity is never counted as
+evidence for the deployment. The KPI itself remains an operator claim linked to evidence; a completed
+run count does not prove that KPI.
 
 ## Lifecycle and audit
 
 - Editing a Blueprint appends a version; existing deployments remain pinned.
-- Retiring a Blueprint hides it from new adoption but retains every version and deployment.
-- Removing a deployment retires it; observations remain.
+- A Blueprint with an active or paused deployment cannot be retired. Retire every deployment first;
+  this prevents a library action from silently invalidating a live runtime contract.
+- Removing a deployment retires its binding; observations and run evidence remain immutable.
+- Once the live binding is retired, the same App can adopt a newer Blueprint version or another
+  Blueprint. Retired deployment history does not block re-adoption.
 - An App referenced by deployment history cannot be deleted. Retire the deployment instead.
 - Create, edit, retire, adopt, measure, and runtime-denial actions are admin-gated and audited.

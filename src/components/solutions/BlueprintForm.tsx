@@ -81,21 +81,27 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError('');
-    const response = await fetch(endpoint, {
-      method: blueprint ? 'PATCH' : 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(model),
-    });
-    const result = await response.json().catch(() => ({}));
-    setSaving(false);
-    if (!response.ok) {
-      setError((result.errors ?? [result.error ?? 'Unable to save']).join(' · '));
-      return;
+    try {
+      const response = await fetch(endpoint, {
+        method: blueprint ? 'PATCH' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(model),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError((result.errors ?? [result.error ?? 'Unable to save']).join(' · '));
+        return;
+      }
+      if (blueprint) router.refresh();
+      else router.push(`/solutions/library/${result.id}`);
+    } catch {
+      setError('Unable to reach the control plane. Try again.');
+    } finally {
+      setSaving(false);
     }
-    if (blueprint) router.refresh();
-    else router.push(`/solutions/library/${result.id}`);
   }
 
   async function remove() {
@@ -106,13 +112,22 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
       )
     )
       return;
-    const response = await fetch(endpoint, { method: 'DELETE' });
-    if (!response.ok) {
-      setError('Unable to delete blueprint');
-      return;
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch(endpoint, { method: 'DELETE' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError((result.errors ?? [result.error ?? 'Unable to retire Blueprint']).join(' · '));
+        return;
+      }
+      router.push('/solutions/library');
+      router.refresh();
+    } catch {
+      setError('Unable to reach the control plane. Try again.');
+    } finally {
+      setSaving(false);
     }
-    router.push('/solutions/library');
-    router.refresh();
   }
 
   const updateOutcome = (patch: Partial<EditableBlueprint['outcome']>) =>
@@ -358,13 +373,14 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
         </Field>
         <Field label="Proof summary">
           <Input
-            required
+            required={model.proof.status === 'verified'}
             value={model.proof.summary}
             onChange={(e) => updateProof({ summary: e.target.value })}
           />
         </Field>
         <Field label="Evidence links">
           <Input
+            required={model.proof.status === 'verified'}
             value={model.proof.evidenceLinks.join(', ')}
             onChange={(e) => updateProof({ evidenceLinks: splitList(e.target.value) })}
           />
@@ -378,7 +394,7 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
       ) : null}
       <div className="flex justify-between gap-3">
         {blueprint ? (
-          <Button type="button" variant="destructive" onClick={remove}>
+          <Button type="button" variant="destructive" disabled={saving} onClick={remove}>
             <Trash /> Retire Blueprint
           </Button>
         ) : (

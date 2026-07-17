@@ -42,10 +42,13 @@ subtracts both implementation cost and annual operating cost from annual benefit
 benefit-to-cost multiple divides gross benefit by all first-year costs; the UI does not label that
 ratio as a measured ROI result.
 
-**Solutions › Deployed** owns measured KPI windows and realized value. Each deployment pins an
-immutable Blueprint version and excludes App runs from before adoption. The operator records a
-bounded evidence window, estimated time/cost assumptions, actual AI cost, and supporting evidence.
-The Console then calls the same canonical ROI calculation described above. See
+**Solutions › Deployed** owns bounded KPI claims and deployment-specific value estimates. Each
+deployment pins an immutable Blueprint version. The operator records the claimed KPI, labor
+assumptions, and supporting evidence; they cannot enter completed-run count or AI cost. The Console
+derives those two facts from completed canonical App runs within the post-adoption, pre-retirement
+window, then calls the same ROI calculation described above. The selected run IDs are retained for
+audit. This is labelled **estimated ROI**, because the labor inputs and KPI remain operator claims,
+not measured system facts. See
 [Solution Blueprints](./solutions.md) for the adoption and evidence workflow.
 
 ## Setting the estimates

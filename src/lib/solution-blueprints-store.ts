@@ -312,6 +312,7 @@ export async function updateSolutionBlueprint(
           eq(solutionBlueprints.id, id),
           eq(solutionBlueprints.orgId, orgId),
           eq(solutionBlueprints.currentVersion, current.currentVersion),
+          isNull(solutionBlueprints.tombstonedAt),
         ),
       )
       .returning({ id: solutionBlueprints.id });
@@ -642,54 +643,68 @@ export async function createSolutionObservation(
 ): Promise<SolutionObservation> {
   const errors = validateObservation(input);
   if (errors.length) throw new SolutionValidationError(errors);
-  const deployment = await getSolutionDeployment(deploymentId, orgId);
-  if (!deployment) throw new SolutionValidationError(['unknown deployment']);
-  if (input.windowStart < deployment.activatedAt) {
-    throw new SolutionValidationError(['measurement window cannot predate deployment activation']);
-  }
-  if (deployment.retiredAt && input.windowEnd > deployment.retiredAt) {
-    throw new SolutionValidationError(['measurement window cannot end after deployment retirement']);
-  }
-  const overlap = await db
-    .select({ id: solutionObservations.id })
-    .from(solutionObservations)
-    .where(
-      and(
-        eq(solutionObservations.deploymentId, deploymentId),
-        eq(solutionObservations.orgId, orgId),
-        lt(solutionObservations.windowStart, input.windowEnd),
-        gt(solutionObservations.windowEnd, input.windowStart),
-      ),
-    );
-  if (overlap.length) {
-    throw new SolutionConflictError('measurement window overlaps existing evidence', 'duplicate');
-  }
-  const runRows = await db
-    .select()
-    .from(appRuns)
-    .where(
-      and(
-        eq(appRuns.orgId, orgId),
-        eq(appRuns.appId, deployment.appId),
-        eq(appRuns.status, 'done'),
-        gte(appRuns.finishedAt, input.windowStart),
-        lt(appRuns.finishedAt, input.windowEnd),
-      ),
-    )
-    .orderBy(asc(appRuns.finishedAt));
-  const runFacts = computeReportMetrics(runRows.map(toAppRunView));
-  const [row] = await db
-    .insert(solutionObservations)
-    .values({
-      id: `sob_${randomUUID().slice(0, 12)}`,
-      orgId,
-      deploymentId,
-      ...input,
-      runIds: runRows.map((run) => run.id),
-      runsCompleted: runFacts.completed,
-      actualAiCost: runFacts.totalCostUsd,
-      createdBy,
-    })
-    .returning();
-  return toObservation(row);
+  return db.transaction(async (tx) => {
+    // One observation decision at a time per deployment. This closes the overlap race and
+    // serializes the evidence window against retirement of the same binding.
+    const [deploymentRow] = await tx
+      .select()
+      .from(solutionDeployments)
+      .where(
+        and(eq(solutionDeployments.id, deploymentId), eq(solutionDeployments.orgId, orgId)),
+      )
+      .for('update')
+      .limit(1);
+    if (!deploymentRow) throw new SolutionValidationError(['unknown deployment']);
+    const deployment = toDeployment(deploymentRow);
+    if (input.windowStart < deployment.activatedAt) {
+      throw new SolutionValidationError(['measurement window cannot predate deployment activation']);
+    }
+    if (deployment.retiredAt && input.windowEnd > deployment.retiredAt) {
+      throw new SolutionValidationError([
+        'measurement window cannot end after deployment retirement',
+      ]);
+    }
+    const overlap = await tx
+      .select({ id: solutionObservations.id })
+      .from(solutionObservations)
+      .where(
+        and(
+          eq(solutionObservations.deploymentId, deploymentId),
+          eq(solutionObservations.orgId, orgId),
+          lt(solutionObservations.windowStart, input.windowEnd),
+          gt(solutionObservations.windowEnd, input.windowStart),
+        ),
+      );
+    if (overlap.length) {
+      throw new SolutionConflictError('measurement window overlaps existing evidence', 'duplicate');
+    }
+    const runRows = await tx
+      .select()
+      .from(appRuns)
+      .where(
+        and(
+          eq(appRuns.orgId, orgId),
+          eq(appRuns.appId, deployment.appId),
+          eq(appRuns.status, 'done'),
+          gte(appRuns.finishedAt, input.windowStart),
+          lt(appRuns.finishedAt, input.windowEnd),
+        ),
+      )
+      .orderBy(asc(appRuns.finishedAt));
+    const runFacts = computeReportMetrics(runRows.map(toAppRunView));
+    const [row] = await tx
+      .insert(solutionObservations)
+      .values({
+        id: `sob_${randomUUID().slice(0, 12)}`,
+        orgId,
+        deploymentId,
+        ...input,
+        runIds: runRows.map((run) => run.id),
+        runsCompleted: runFacts.completed,
+        actualAiCost: runFacts.totalCostUsd,
+        createdBy,
+      })
+      .returning();
+    return toObservation(row);
+  });
 }

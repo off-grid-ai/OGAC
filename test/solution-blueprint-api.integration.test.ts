@@ -27,6 +27,7 @@ const body = {
   requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
   requiredPipelineName: 'Collections intervention',
   sourceTemplateKey: 'collections-intervention',
+  adoptable: true,
   outcome: {
     metricName: '30+ DPD',
     metricUnit: '%',
@@ -59,6 +60,10 @@ test('solution API enforces authentication and rejects invalid enums instead of 
     );
     assert.equal(invalid.status, 422);
     assert.match(JSON.stringify(await invalid.json()), /direction must be increase or decrease/);
+
+    const invalidAdoptability = await POST(request('POST', { ...body, adoptable: 'yes' }));
+    assert.equal(invalidAdoptability.status, 422);
+    assert.match(JSON.stringify(await invalidAdoptability.json()), /adoptable must be true or false/);
   } finally {
     if (previous === undefined) delete process.env.OFFGRID_ADMIN_TOKEN;
     else process.env.OFFGRID_ADMIN_TOKEN = previous;
