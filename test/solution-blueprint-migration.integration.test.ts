@@ -8,6 +8,11 @@ const migration = readFileSync(
   new URL('../drizzle/0010_solution_blueprint_contracts.sql', import.meta.url),
   'utf8',
 );
+const prePauseVersionedMigration = migration
+  .replace('  "paused_at" timestamp with time zone,\n', '')
+  .split('--> statement-breakpoint')
+  .filter((statement) => !statement.includes('ADD COLUMN IF NOT EXISTS "paused_at"'))
+  .join('--> statement-breakpoint');
 const dbUp = await dbReachable();
 
 function schemaName(label: string): string {
@@ -176,6 +181,62 @@ test(
           AND table_name = 'solution_deployments'
           AND column_name = 'paused_at'`);
       assert.equal(deploymentColumns.rowCount, 1);
+    }),
+);
+
+test(
+  '0010 reconciles an already-versioned deployment table created before paused_at',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  () =>
+    withSchema('pre_pause', async (client) => {
+      assert.notEqual(
+        prePauseVersionedMigration,
+        migration,
+        'historical fixture removes paused_at',
+      );
+      await createAppsBoundary(client);
+      await client.query(prePauseVersionedMigration);
+      const beforeUpgrade = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'solution_deployments'
+          AND column_name = 'paused_at'`);
+      assert.equal(beforeUpgrade.rowCount, 0, 'historical versioned schema predates paused_at');
+      await client.query(`INSERT INTO apps (id, org_id) VALUES ('app-1', 'bank')`);
+      await client.query(`INSERT INTO solution_blueprints (
+        id, org_id, current_version, created_at, updated_at
+      ) VALUES ('bp-1', 'bank', 1, now(), now())`);
+      await client.query(`INSERT INTO solution_blueprint_versions (
+        id, blueprint_id, org_id, version, snapshot, created_by
+      ) VALUES ('bpv-1', 'bp-1', 'bank', 1, '{}'::jsonb, 'test')`);
+      await client.query(`INSERT INTO solution_deployments (
+        id, org_id, blueprint_id, blueprint_version, app_id, pipeline_id, status
+      ) VALUES ('dep-1', 'bank', 'bp-1', 1, 'app-1', 'pipeline-1', 'active')`);
+
+      await client.query(migration);
+      await client.query(migration);
+
+      const columns = await client.query<{
+        column_name: string;
+        data_type: string;
+        is_nullable: string;
+      }>(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'solution_deployments'
+          AND column_name = 'paused_at'`);
+      assert.deepEqual(columns.rows, [
+        {
+          column_name: 'paused_at',
+          data_type: 'timestamp with time zone',
+          is_nullable: 'YES',
+        },
+      ]);
+      const deployment = await client.query<{ id: string; status: string; paused_at: Date | null }>(
+        `SELECT id, status, paused_at FROM solution_deployments WHERE id = 'dep-1'`,
+      );
+      assert.deepEqual(deployment.rows[0], { id: 'dep-1', status: 'active', paused_at: null });
     }),
 );
 
