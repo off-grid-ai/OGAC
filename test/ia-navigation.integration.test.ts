@@ -57,3 +57,24 @@ test('chat keeps its conversation rail off-canvas until the thread has desktop r
   );
   assert.doesNotMatch(source, /md:static md:z-auto md:translate-x-0/);
 });
+
+test('canonical service journeys do not emit legacy navigation links', () => {
+  const directory = readFileSync(`${ROOT}src/components/services/ServicesDirectory.tsx`, 'utf8');
+  const detail = readFileSync(`${ROOT}src/components/services/ServiceDetail.tsx`, 'utf8');
+  const detailPage = readFileSync(
+    `${ROOT}src/app/(console)/gateway/services/[id]/page.tsx`,
+    'utf8',
+  );
+  assert.match(directory, /`\/operations\/services\/\$\{s\.id\}`/);
+  assert.match(detail, /href="\/operations\/services"/);
+  assert.match(detailPage, /const logsHref = '\/operations\/health'/);
+  assert.doesNotMatch(`${directory}\n${detail}`, /\/gateway\/services/);
+});
+
+test('gateway management tabs remain available without the legacy aggregator and own history', () => {
+  const page = readFileSync(`${ROOT}src/app/(console)/gateway/ai/page.tsx`, 'utf8');
+  const tabs = readFileSync(`${ROOT}src/components/gateway/GatewayTabs.tsx`, 'utf8');
+  assert.match(page, /<GatewayTabs[\s\S]*overview=[\s\S]*<Suspense/);
+  assert.match(tabs, /window\.history\.pushState/);
+  assert.doesNotMatch(tabs, /window\.history\.replaceState/);
+});

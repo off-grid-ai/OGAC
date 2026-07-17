@@ -69,9 +69,13 @@ export default async function GatewayPage() {
           The unified inference endpoint — models, modalities, and live node health.
         </p>
       </div>
-      <Suspense fallback={<GatewayBodySkeleton />}>
-        <GatewayBody />
-      </Suspense>
+      <GatewayTabs
+        overview={
+          <Suspense fallback={<GatewayBodySkeleton />}>
+            <GatewayBody />
+          </Suspense>
+        }
+      />
     </div>
   );
 }
@@ -117,7 +121,9 @@ async function GatewayBody() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
             <CardTitle className="text-sm">{info.name}</CardTitle>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{joinUrlPath(toDisplayHost(GATEWAY_URL), 'v1')}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              {joinUrlPath(toDisplayHost(GATEWAY_URL), 'v1')}
+            </p>
           </div>
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             <Plug className="size-3" />
@@ -125,74 +131,74 @@ async function GatewayBody() {
           </Badge>
         </CardHeader>
         <CardContent className="flex gap-4 text-xs text-muted-foreground">
-          <a href={toDisplayHost(info.docs)} className="flex items-center gap-1.5 hover:text-primary">
+          <a
+            href={toDisplayHost(info.docs)}
+            className="flex items-center gap-1.5 hover:text-primary"
+          >
             <BookOpen className="size-3.5" />
             API docs
           </a>
-          <a href={toDisplayHost(info.mcp)} className="flex items-center gap-1.5 hover:text-primary">
+          <a
+            href={toDisplayHost(info.mcp)}
+            className="flex items-center gap-1.5 hover:text-primary"
+          >
             MCP endpoint
           </a>
         </CardContent>
       </Card>
 
-      <GatewayTabs
-        overview={
-          <>
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm">Modalities</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-4">
-              {modalities.map(([name, status]) => {
-                const ready = status === 'ready';
-                return (
-                  <div
-                    key={name}
-                    className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-                  >
-                    <span className="text-sm text-foreground">{name.replaceAll('_', ' ')}</span>
-                    {ready ? (
-                      <span className="flex items-center gap-1 text-xs text-primary">
-                        <CircleCheck className="size-3.5" />
-                        ready
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <CircleSlash className="size-3.5" />
-                        {status}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Modalities</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-4">
+          {modalities.map(([name, status]) => {
+            const ready = status === 'ready';
+            return (
+              <div
+                key={name}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+              >
+                <span className="text-sm text-foreground">{name.replaceAll('_', ' ')}</span>
+                {ready ? (
+                  <span className="flex items-center gap-1 text-xs text-primary">
+                    <CircleCheck className="size-3.5" />
+                    ready
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <CircleSlash className="size-3.5" />
+                    {status}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
-          <GatewayModels />
+      <GatewayModels />
 
-          {info.gateways?.length ? <GatewayNodesCard initial={info.gateways} /> : null}
+      {info.gateways?.length ? <GatewayNodesCard initial={info.gateways} /> : null}
 
-          {info.image_models?.length ? (
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm">Image models</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-1.5">
-                {info.image_models.map((m) => {
-                  // The aggregator may return image_models as strings OR {id, gateways} objects.
-                  const id = typeof m === 'string' ? m : m.id;
-                  return (
-                    <Badge key={id} variant="secondary" className="font-mono">
-                      {id}
-                    </Badge>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ) : null}
-          </>
-        }
-      />
+      {info.image_models?.length ? (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm">Image models</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-1.5">
+            {info.image_models.map((m) => {
+              // The aggregator may return image_models as strings OR {id, gateways} objects.
+              const id = typeof m === 'string' ? m : m.id;
+              return (
+                <Badge key={id} variant="secondary" className="font-mono">
+                  {id}
+                </Badge>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
