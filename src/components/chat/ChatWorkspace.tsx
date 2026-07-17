@@ -190,7 +190,11 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
   }, [reasoning, open, state.phase]);
   if (!state.hasReasoning) return null;
   return (
-    <div className="mb-2 rounded-md border border-border/60 bg-muted/40">
+    <div
+      data-ai-state={state.phase === 'streaming' ? 'streaming' : 'complete'}
+      aria-busy={state.phase === 'streaming'}
+      className="mb-2 rounded-md border border-border/60 bg-muted/40"
+    >
       <button
         type="button"
         onClick={() => setOverride(!open)}
