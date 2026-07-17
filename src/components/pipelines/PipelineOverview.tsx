@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { pipelineTabHref } from '@/lib/pipeline-detail';
+import type { PipelineConsumer } from '@/lib/pipeline-consumers';
 import { PipelineActions } from './PipelineActions';
 import { PipelineEditSheet } from './PipelineEditSheet';
 import { PipelineLifecycle, type PipelineLifecycleData } from './PipelineLifecycle';
@@ -53,14 +54,15 @@ export interface PipelineOverviewData {
     goldenCases: number;
   };
   /** Consumers bound to this pipeline (apps/agents + chat projects) + chat-default/allowlist flags. */
-  consumers: {
-    apps: { id: string; title: string; published: boolean }[];
-    projects: { id: string; name: string }[];
-    isOrgDefaultChat: boolean;
-    inChatAllowlist: boolean;
-  };
+  consumers: PipelineConsumer[];
   /** Recent version history (newest first, capped). */
-  recentVersions: { id: string; version: number; note: string; createdAt: string | null; createdBy: string }[];
+  recentVersions: {
+    id: string;
+    version: number;
+    note: string;
+    createdAt: string | null;
+    createdBy: string;
+  }[];
   /** M2 lifecycle & ownership (server-resolved for THIS user's role). */
   lifecycle: PipelineLifecycleData;
 }
@@ -75,7 +77,7 @@ function egressBadge(egressClass: string | undefined) {
   }
   if (egressClass === 'cloud') {
     return (
-      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+      <Badge variant="outline">
         <Cloud className="size-3" /> cloud
       </Badge>
     );
@@ -85,19 +87,23 @@ function egressBadge(egressClass: string | undefined) {
 
 function statusBadge(status: string) {
   if (status === 'published') {
-    return <Badge variant="secondary" className="bg-primary/10 text-primary">published</Badge>;
-  }
-  if (status === 'in_review') {
     return (
-      <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400">
-        in review
+      <Badge variant="secondary" className="bg-primary/10 text-primary">
+        published
       </Badge>
     );
   }
-  if (status === 'archived' || status === 'deprecated') {
-    return <Badge variant="outline" className="text-muted-foreground">{status}</Badge>;
+  if (status === 'in_review') {
+    return <Badge variant="outline">in review</Badge>;
   }
-  return <Badge variant="outline" className="text-amber-600 dark:text-amber-400">draft</Badge>;
+  if (status === 'archived' || status === 'deprecated') {
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        {status}
+      </Badge>
+    );
+  }
+  return <Badge variant="outline">draft</Badge>;
 }
 
 // A section card with a title, an optional icon, and a "manage on the X tab" link in the header.
@@ -170,14 +176,23 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-medium text-foreground">{p.name}</h2>
             {statusBadge(p.status)}
-            <Badge variant="outline" className="text-xs">v{p.version}</Badge>
+            <Badge variant="outline" className="text-xs">
+              v{p.version}
+            </Badge>
             {p.isTemplate ? (
-              <Badge variant="secondary" className="bg-primary/10 text-primary">template</Badge>
+              <Badge variant="secondary" className="bg-primary/10 text-primary">
+                template
+              </Badge>
             ) : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{p.description || 'No description.'}</p>
         </div>
-        <PipelineActions pipelineId={p.id} status={p.status} name={p.name} showTransitions={false} />
+        <PipelineActions
+          pipelineId={p.id}
+          status={p.status}
+          name={p.name}
+          showTransitions={false}
+        />
       </div>
 
       {/* ── M2 lifecycle & ownership band ── */}
@@ -219,17 +234,17 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           <div className="space-y-2">
             <Field label="Cloud egress">
               {p.routing.egressAllowed ? (
-                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  allowed
-                </Badge>
+                <Badge variant="outline">allowed</Badge>
               ) : (
-                <Badge variant="secondary" className="bg-primary/10 text-primary">leashed to on-prem</Badge>
+                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  leashed to on-prem
+                </Badge>
               )}
             </Field>
             {p.routing.rules.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No data_class rules — everything defaults to local. Add rules on Gateway &amp; Routing to
-                steer PII/sensitive classes to block or on-prem.
+                No data_class rules — everything defaults to local. Add rules on Gateway &amp;
+                Routing to steer PII/sensitive classes to block or on-prem.
               </p>
             ) : (
               <ul className="space-y-1 text-xs">
@@ -253,8 +268,8 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
         >
           {p.dataAllowlist.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No data domains allowed — this pipeline touches no data (deny-by-default). Add domains via
-              Edit to let consumers reach them.
+              No data domains allowed — this pipeline touches no data (deny-by-default). Add domains
+              via Edit to let consumers reach them.
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
@@ -279,8 +294,8 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
             <Field label="Org policy rules">{p.governance.orgPolicyRules}</Field>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Effective policy = org defaults, tightened by this pipeline&apos;s overrides. Configure on the
-            Policy tab.
+            Effective policy = org defaults, tightened by this pipeline&apos;s overrides. Configure
+            on the Policy tab.
           </p>
         </SectionCard>
 
@@ -291,12 +306,14 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           linkLabel="Guardrails tab"
         >
           <div className="divide-y">
-            <Field label="This pipeline">{overrideSummary(p.governance.guardrailOverlayKeys)}</Field>
+            <Field label="This pipeline">
+              {overrideSummary(p.governance.guardrailOverlayKeys)}
+            </Field>
             <Field label="Org guardrail rules">{p.governance.orgGuardrailRules}</Field>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            PII masking, injection, and grounding checks. Scoped to this pipeline; inherits org. Configure
-            on the Guardrails tab.
+            PII masking, injection, and grounding checks. Scoped to this pipeline; inherits org.
+            Configure on the Guardrails tab.
           </p>
         </SectionCard>
 
@@ -313,8 +330,8 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           </div>
           {p.quality.evalsAttached === 0 && p.quality.goldenCases === 0 ? (
             <p className="mt-2 text-xs text-muted-foreground">
-              No quality bar configured yet — attach evals and a golden set on the Quality tab, then run
-              them in this pipeline&apos;s context to gate releases.
+              No quality bar configured yet — attach evals and a golden set on the Quality tab, then
+              run them in this pipeline&apos;s context to gate releases.
             </p>
           ) : (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -331,67 +348,73 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           linkLabel="API tab"
         >
           {(() => {
-            const { apps, projects, isOrgDefaultChat, inChatAllowlist } = p.consumers;
-            const total =
-              apps.length + projects.length + (isOrgDefaultChat || inChatAllowlist ? 1 : 0);
-            if (total === 0) {
+            if (p.consumers.length === 0) {
               return (
                 <p className="text-xs text-muted-foreground">
-                  Nothing consumes this pipeline yet. Bind it from an app/agent&apos;s &quot;Runs on&quot;
-                  selector, pin it on a chat project, or make it the org-default chat pipeline in Admin.
-                  External callers use a provisioned key from the API tab.
+                  Nothing consumes this pipeline yet. Bind it from an app/agent&apos;s &quot;Runs
+                  on&quot; selector, pin it on a chat project, or make it the org-default chat
+                  pipeline in Admin. External callers use a provisioned key from the API tab.
                 </p>
               );
             }
+            const groups = [
+              {
+                key: 'apps',
+                label: 'Apps',
+                items: p.consumers.filter((consumer) => consumer.kind === 'app'),
+              },
+              {
+                key: 'runtime',
+                label: 'Runtime agents',
+                items: p.consumers.filter((consumer) => consumer.kind === 'runtime_agent'),
+              },
+              {
+                key: 'projects',
+                label: 'Chat projects',
+                items: p.consumers.filter((consumer) => consumer.kind === 'chat_project'),
+              },
+              {
+                key: 'chat',
+                label: 'Chat governance',
+                items: p.consumers.filter(
+                  (consumer) =>
+                    consumer.kind === 'chat_default' || consumer.kind === 'chat_allowlist',
+                ),
+              },
+            ].filter((group) => group.items.length > 0);
             return (
               <div className="space-y-3 text-xs">
-                {(isOrgDefaultChat || inChatAllowlist) && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {isOrgDefaultChat ? (
-                      <Badge variant="secondary" className="bg-primary/10 text-primary">
-                        org-default chat
-                      </Badge>
-                    ) : null}
-                    {inChatAllowlist ? (
-                      <Badge variant="outline">available for chat</Badge>
-                    ) : null}
-                  </div>
-                )}
-                {apps.length > 0 && (
-                  <div>
+                {groups.map((group) => (
+                  <div key={group.key}>
                     <div className="mb-1 uppercase tracking-wide text-muted-foreground">
-                      Apps &amp; agents ({apps.length})
+                      {group.label} ({group.items.length})
                     </div>
                     <ul className="space-y-1">
-                      {apps.map((a) => (
-                        <li key={a.id} className="flex items-center justify-between gap-2">
-                          <Link href={`/build/apps/${a.id}`} className="truncate text-primary hover:underline">
-                            {a.title || a.id}
-                          </Link>
-                          {a.published ? (
-                            <Badge variant="outline" className="shrink-0">live</Badge>
-                          ) : (
-                            <Badge variant="outline" className="shrink-0 text-muted-foreground">draft</Badge>
-                          )}
-                        </li>
-                      ))}
+                      {group.items.map((consumer) => {
+                        const consumerHref =
+                          consumer.kind === 'app'
+                            ? `/solutions/apps/${consumer.id}`
+                            : consumer.kind === 'runtime_agent'
+                              ? consumer.ownerAppId
+                                ? `/solutions/apps/${consumer.ownerAppId}`
+                                : `/solutions/agents/${consumer.id}`
+                              : consumer.kind === 'chat_project'
+                                ? `/work/projects/${consumer.id}`
+                                : '/work/chat';
+                        return (
+                          <li key={`${consumer.kind}:${consumer.id}`}>
+                            <Link
+                              href={consumerHref}
+                              className="truncate text-primary hover:underline"
+                            >
+                              {consumer.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
-                )}
-                {projects.length > 0 && (
-                  <div>
-                    <div className="mb-1 uppercase tracking-wide text-muted-foreground">
-                      Chat projects ({projects.length})
-                    </div>
-                    <ul className="space-y-1">
-                      {projects.map((pr) => (
-                        <li key={pr.id} className="truncate text-foreground">
-                          {pr.name || pr.id}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                ))}
               </div>
             );
           })()}
@@ -418,7 +441,10 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm">Recent versions</CardTitle>
-          <Link href={href('versions')} className="flex items-center gap-1 text-xs text-primary hover:underline">
+          <Link
+            href={href('versions')}
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
             All versions <ArrowRight className="size-3" />
           </Link>
         </CardHeader>
@@ -428,7 +454,10 @@ export function PipelineOverview({ pipeline: p }: Readonly<{ pipeline: PipelineO
           ) : (
             <ul className="divide-y">
               {p.recentVersions.map((v) => (
-                <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <li
+                  key={v.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                >
                   <span className="flex items-center gap-2">
                     <Badge variant="outline">v{v.version}</Badge>
                     <span className="capitalize text-muted-foreground">{v.note}</span>
