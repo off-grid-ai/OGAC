@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 // Streamed fallback for the Insights family (observability / analytics / drift / finops / reports /
 // security events / audit / accounting). These are metric + chart surfaces. The group layout paints
-// the InsightsNav instantly; this fills the body with a header, a KPI band, and two large chart-
+// the global sidebar instantly; this fills the body with a header, a KPI band, and two large chart-
 // panel placeholders while the per-request analytics streams in.
 export default function InsightsLoading() {
   return (

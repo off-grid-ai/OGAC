@@ -25,6 +25,12 @@ const NEXT_SERVER_STUB = pathToFileURL(
 const NEXT_HEADERS_STUB = pathToFileURL(
   pathResolve(process.cwd(), 'test/support/next-headers-stub.mjs'),
 ).href;
+const NEXT_IMAGE_STUB = pathToFileURL(
+  pathResolve(process.cwd(), 'test/support/next-image-stub.mjs'),
+).href;
+const NEXT_LINK_STUB = pathToFileURL(
+  pathResolve(process.cwd(), 'test/support/next-link-stub.mjs'),
+).href;
 
 function isFile(p) {
   try {
@@ -69,6 +75,8 @@ export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/navigation') return nextResolve(NEXT_NAV_STUB, context);
   if (specifier === 'next/server') return nextResolve(NEXT_SERVER_STUB, context);
   if (specifier === 'next/headers') return nextResolve(NEXT_HEADERS_STUB, context);
+  if (specifier === 'next/image') return nextResolve(NEXT_IMAGE_STUB, context);
+  if (specifier === 'next/link') return nextResolve(NEXT_LINK_STUB, context);
   // "@/..." alias -> src/..., with .ts / index.ts probing.
   if (specifier === '@' || specifier.startsWith('@/')) {
     const rest = specifier === '@' ? '' : specifier.slice(2);
