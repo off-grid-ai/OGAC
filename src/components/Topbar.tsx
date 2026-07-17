@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/UserMenu';
 import { drawerReducer } from '@/lib/mobile-nav';
+import { routeIdentityForPath, type RouteIdentity } from '@/modules/route-identity';
 
 interface SessionUser {
   name?: string | null;
@@ -15,8 +16,35 @@ interface SessionUser {
   role?: string;
 }
 
+export function TopbarIdentity({ identity }: Readonly<{ identity: RouteIdentity }>) {
+  const titleClassName = 'truncate text-sm font-medium text-foreground';
+
+  return (
+    <div
+      data-og-route-identity={identity.ownerId}
+      data-og-heading-owner={identity.headingOwner}
+      className="mr-auto min-w-0 leading-tight"
+    >
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="hidden shrink-0 text-[9px] uppercase tracking-[0.12em] text-muted-foreground sm:inline">
+          {identity.eyebrow}
+        </span>
+        {identity.headingOwner === 'shell' ? (
+          <h1 className={titleClassName}>{identity.title}</h1>
+        ) : (
+          <span className={titleClassName}>{identity.title}</span>
+        )}
+      </div>
+      <p className="mt-1 hidden max-w-[min(54vw,52rem)] truncate text-[10px] text-muted-foreground sm:block">
+        {identity.description}
+      </p>
+    </div>
+  );
+}
+
 export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   const pathname = usePathname();
+  const identity = routeIdentityForPath(pathname);
 
   // Mobile nav drawer state — owned by the pure reducer so the close-on-nav invariant is
   // unit-tested (see src/lib/mobile-nav.ts). Radix already closes on esc/backdrop; the effect below
@@ -32,17 +60,17 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
 
   return (
     <header
-      aria-label="Console utilities"
+      aria-label="Console header"
       data-og-shell="topbar"
       data-og-surface="raised"
-      className="flex h-14 shrink-0 items-center justify-end gap-2 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6"
+      className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6"
     >
       {/* Hamburger — mobile only; opens the slide-in nav drawer (same nav as the desktop aside). */}
       <Sheet open={drawerOpen} onOpenChange={(o) => dispatch({ type: o ? 'open' : 'close' })}>
         <SheetTrigger
           aria-label="Open navigation menu"
           data-og-interactive
-          className="mr-auto flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+          className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
         >
           <List className="size-5" />
         </SheetTrigger>
@@ -51,6 +79,8 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
           <SidebarNav onNavigate={() => dispatch({ type: 'close' })} />
         </SheetContent>
       </Sheet>
+
+      {identity ? <TopbarIdentity identity={identity} /> : <div className="mr-auto" />}
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {/* Search trigger — icon-only on mobile (label + ⌘K hint appear from `sm`). */}
