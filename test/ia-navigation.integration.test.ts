@@ -38,6 +38,31 @@ test('registry-driven operation resources have list and dynamic detail routes', 
   }
 });
 
+test('canonical operations service routes reuse the topology-backed list and detail views', () => {
+  const canonicalList = readFileSync(
+    `${ROOT}src/app/(console)/operations/services/page.tsx`,
+    'utf8',
+  );
+  const canonicalDetail = readFileSync(
+    `${ROOT}src/app/(console)/operations/services/[serviceId]/page.tsx`,
+    'utf8',
+  );
+  const topologyList = readFileSync(`${ROOT}src/app/(console)/gateway/services/page.tsx`, 'utf8');
+  const topologyDetail = readFileSync(
+    `${ROOT}src/app/(console)/gateway/services/[id]/page.tsx`,
+    'utf8',
+  );
+
+  assert.match(
+    canonicalList,
+    /export \{ default \} from '@\/app\/\(console\)\/gateway\/services\/page'/,
+  );
+  assert.match(canonicalDetail, /LegacyServiceDetailPage/);
+  assert.match(canonicalDetail, /serviceId.*id/s);
+  assert.match(topologyList, /getRuntimeServiceTopologyRegistry\(\)\.list\(\)/);
+  assert.match(topologyDetail, /getRuntimeServiceTopologyRegistry\(\)\.find\(id\)/);
+});
+
 test('fleet route shells consume the registry and never encode deployment membership', () => {
   const source = readFileSync(`${ROOT}src/components/operations/FleetTopology.tsx`, 'utf8');
   assert.match(source, /fetch\('\/api\/v1\/gateway\/fleet'/);

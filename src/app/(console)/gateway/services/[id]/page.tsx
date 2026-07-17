@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import { ServiceDetail } from '@/components/services/ServiceDetail';
 import { requireModuleForUser } from '@/lib/module-access';
-import { toServiceDetailEntry } from '@/lib/service-directory-view';
-import { findService, getServices, serviceControl } from '@/lib/services-directory';
 import { PageFrame } from '@/components/PageFrame';
+import { toServiceTopologyDetailEntry } from '@/lib/service-directory-view';
+import { getRuntimeServiceTopologyRegistry } from '@/lib/runtime-service-topology';
+import { serviceControl } from '@/lib/services-directory';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +16,10 @@ export default async function ServiceDetailPage({
 }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('services');
   const { id } = await params;
-  const service = findService(getServices(), id);
-  if (!service) notFound();
+  const topology = getRuntimeServiceTopologyRegistry().find(id);
+  if (!topology) notFound();
 
-  const control = serviceControl(service);
+  const control = serviceControl(topology.service);
   // Where an operator jumps to see this service's logs/telemetry. OpenSearch/Langfuse power the
   // SIEM + observability views; everything else points at the SIEM search.
   // Platform health owns service telemetry in the canonical IA. Keep this jump canonical even when
@@ -27,13 +28,11 @@ export default async function ServiceDetailPage({
 
   return (
     <PageFrame>
-      {
-        <ServiceDetail
-          service={toServiceDetailEntry(service)}
-          control={control}
-          logsHref={logsHref}
-        />
-      }
+      <ServiceDetail
+        service={toServiceTopologyDetailEntry(topology)}
+        control={control}
+        logsHref={logsHref}
+      />
     </PageFrame>
   );
 }
