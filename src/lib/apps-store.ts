@@ -5,9 +5,10 @@
 // It never re-implements a rule that belongs in app-model.ts.
 
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { apps, type App } from '@/db/schema';
+import { apps, customAgents, type App } from '@/db/schema';
+import { materializedAgentIds } from '@/lib/app-agent-ownership';
 import {
   type AppSpec,
   type AppStep,
@@ -26,8 +27,12 @@ const DEFAULT_ORG = 'default';
 let appsEnsure: Promise<void> | null = null;
 export async function ensureAppsSchema(): Promise<void> {
   if (appsEnsure) return appsEnsure;
-  appsEnsure = (async (): Promise<void> => {
-    await db.execute(sql`
+  appsEnsure = db
+    .transaction(async (tx): Promise<void> => {
+      // Multiple node:test workers and console processes can cold-start this self-migration together.
+      // Serialize the DDL transaction so PostgreSQL's IF NOT EXISTS catalog race cannot surface.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_apps_schema_v2'));`);
+      await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS apps (
         id text PRIMARY KEY,
         org_id text NOT NULL DEFAULT 'default',
@@ -45,15 +50,39 @@ export async function ensureAppsSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now());
     `);
-    // Post-hoc column for the pipeline binding (CONSUMERS-BIND #166) on a pre-existing apps table.
-    await db.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS pipeline_id text;`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_org_idx ON apps (org_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_slug_idx ON apps (slug);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS apps_pipeline_idx ON apps (pipeline_id);`);
-  })().catch((e) => {
-    appsEnsure = null;
-    throw e;
-  });
+      // Post-hoc column for the pipeline binding (CONSUMERS-BIND #166) on a pre-existing apps table.
+      await tx.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_org_idx ON apps (org_id);`);
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_slug_idx ON apps (slug);`);
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_pipeline_idx ON apps (pipeline_id);`);
+      // Runtime-agent ownership is database-enforced and tenant-safe. The composite target prevents
+      // an owner id from pointing at an App in another org; CASCADE makes App deletion atomic.
+      await tx.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS owner_app_id text;`);
+      await tx.execute(
+        sql`CREATE UNIQUE INDEX IF NOT EXISTS apps_id_org_unique ON apps (id, org_id);`,
+      );
+      await tx.execute(
+        sql`CREATE INDEX IF NOT EXISTS custom_agents_owner_app_idx ON custom_agents (owner_app_id);`,
+      );
+      await tx.execute(sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'custom_agents_owner_app_org_fk'
+        ) THEN
+          ALTER TABLE custom_agents
+            ADD CONSTRAINT custom_agents_owner_app_org_fk
+            FOREIGN KEY (owner_app_id, org_id)
+            REFERENCES apps (id, org_id)
+            ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+    })
+    .catch((e) => {
+      appsEnsure = null;
+      throw e;
+    });
   return appsEnsure;
 }
 
@@ -118,6 +147,13 @@ class AppValidationError extends Error {
   }
 }
 export { AppValidationError };
+
+export class AppAgentOwnershipError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AppAgentOwnershipError';
+  }
+}
 
 // ─── createApp ─────────────────────────────────────────────────────────────────
 export async function createApp(
@@ -228,52 +264,194 @@ export async function updateApp(
   orgId: string,
   patch: AppPatch,
 ): Promise<AppSpec | null> {
-  const current = await getApp(id, orgId);
-  if (!current) return null;
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  return db.transaction(async (tx) => {
+    const [currentRow] = await tx
+      .select()
+      .from(apps)
+      .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
+      .for('update')
+      .limit(1);
+    if (!currentRow) return null;
+    const current = toAppSpec(currentRow);
 
-  // Merge patch onto the current spec, then validate the resulting whole spec.
-  const merged: AppSpec = {
-    ...current,
-    ...(patch.title !== undefined ? { title: patch.title } : {}),
-    ...(patch.summary !== undefined ? { summary: patch.summary } : {}),
-    ...(patch.visibility !== undefined
-      ? { visibility: normalizeVisibility(patch.visibility) }
-      : {}),
-    ...(patch.pipelineId !== undefined ? { pipelineId: patch.pipelineId ?? null } : {}),
-    ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
-    ...(patch.published !== undefined ? { published: patch.published } : {}),
-    ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
-    ...(patch.inputForm !== undefined ? { inputForm: patch.inputForm } : {}),
-    ...(patch.steps !== undefined ? { steps: patch.steps } : {}),
-    ...(patch.edges !== undefined ? { edges: patch.edges } : {}),
-  };
-  const check = validateAppSpec(merged);
-  if (!check.ok) throw new AppValidationError(check.errors);
+    const merged: AppSpec = {
+      ...current,
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.summary !== undefined ? { summary: patch.summary } : {}),
+      ...(patch.visibility !== undefined
+        ? { visibility: normalizeVisibility(patch.visibility) }
+        : {}),
+      ...(patch.pipelineId !== undefined ? { pipelineId: patch.pipelineId ?? null } : {}),
+      ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
+      ...(patch.published !== undefined ? { published: patch.published } : {}),
+      ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
+      ...(patch.inputForm !== undefined ? { inputForm: patch.inputForm } : {}),
+      ...(patch.steps !== undefined ? { steps: patch.steps } : {}),
+      ...(patch.edges !== undefined ? { edges: patch.edges } : {}),
+    };
+    const check = validateAppSpec(merged);
+    if (!check.ok) throw new AppValidationError(check.errors);
 
-  const [row] = await db
-    .update(apps)
-    .set({
-      title: merged.title,
-      summary: merged.summary,
-      visibility: merged.visibility,
-      pipelineId: merged.pipelineId ?? null,
-      slug: merged.slug ?? null,
-      published: merged.published,
-      trigger: merged.trigger,
-      inputForm: (merged.inputForm ?? null) as never,
-      steps: merged.steps as never,
-      edges: merged.edges,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
-    .returning();
-  return row ? toAppSpec(row) : null;
+    const previousOwnedIds = new Set(materializedAgentIds(current));
+    const nextOwnedIds = new Set(materializedAgentIds(merged));
+    for (const agentId of nextOwnedIds) {
+      const [agent] = await tx
+        .select({ id: customAgents.id, ownerAppId: customAgents.ownerAppId })
+        .from(customAgents)
+        .where(and(eq(customAgents.id, agentId), eq(customAgents.orgId, scopedOrgId)))
+        .for('update')
+        .limit(1);
+      if (!agent) {
+        throw new AppAgentOwnershipError(
+          `Runtime agent '${agentId}' is missing from org '${scopedOrgId}'.`,
+        );
+      }
+      if (agent.ownerAppId && agent.ownerAppId !== id) {
+        throw new AppAgentOwnershipError(
+          `Runtime agent '${agentId}' is already owned by App '${agent.ownerAppId}'.`,
+        );
+      }
+      await tx
+        .update(customAgents)
+        .set({ ownerAppId: id, pipelineId: merged.pipelineId ?? null })
+        .where(and(eq(customAgents.id, agentId), eq(customAgents.orgId, scopedOrgId)));
+    }
+    const removedIds = [...previousOwnedIds].filter((agentId) => !nextOwnedIds.has(agentId));
+    if (removedIds.length) {
+      await tx
+        .delete(customAgents)
+        .where(
+          and(
+            eq(customAgents.orgId, scopedOrgId),
+            eq(customAgents.ownerAppId, id),
+            inArray(customAgents.id, removedIds),
+          ),
+        );
+    }
+
+    const [row] = await tx
+      .update(apps)
+      .set({
+        title: merged.title,
+        summary: merged.summary,
+        visibility: merged.visibility,
+        pipelineId: merged.pipelineId ?? null,
+        slug: merged.slug ?? null,
+        published: merged.published,
+        trigger: merged.trigger,
+        inputForm: (merged.inputForm ?? null) as never,
+        steps: merged.steps as never,
+        edges: merged.edges,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
+      .returning();
+    return row ? toAppSpec(row) : null;
+  });
+}
+
+/**
+ * Materialize one inline App agent exactly once. The App row lock serializes concurrent first runs;
+ * the runtime insert and step.agentId patch are committed as one ownership aggregate.
+ */
+export async function materializeAppAgent(
+  appId: string,
+  stepId: string,
+  orgId: string,
+): Promise<string> {
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(apps)
+      .where(and(eq(apps.id, appId), eq(apps.orgId, scopedOrgId)))
+      .for('update')
+      .limit(1);
+    if (!row) throw new AppAgentOwnershipError(`App '${appId}' was not found.`);
+    const spec = toAppSpec(row);
+    const step = spec.steps.find((candidate) => candidate.id === stepId);
+    if (!step || step.kind !== 'agent' || !step.inlineAgent) {
+      throw new AppAgentOwnershipError(
+        `App '${appId}' step '${stepId}' is not an inline agent step.`,
+      );
+    }
+    if (step.agentId) {
+      const [owned] = await tx
+        .select({ id: customAgents.id, ownerAppId: customAgents.ownerAppId })
+        .from(customAgents)
+        .where(and(eq(customAgents.id, step.agentId), eq(customAgents.orgId, scopedOrgId)))
+        .for('update')
+        .limit(1);
+      if (!owned) {
+        throw new AppAgentOwnershipError(`Runtime agent '${step.agentId}' is missing.`);
+      }
+      if (owned.ownerAppId && owned.ownerAppId !== appId) {
+        throw new AppAgentOwnershipError(
+          `Runtime agent '${step.agentId}' is already owned by App '${owned.ownerAppId}'.`,
+        );
+      }
+      if (!owned.ownerAppId) {
+        await tx
+          .update(customAgents)
+          .set({ ownerAppId: appId, pipelineId: spec.pipelineId ?? null })
+          .where(and(eq(customAgents.id, step.agentId), eq(customAgents.orgId, scopedOrgId)));
+      }
+      return step.agentId;
+    }
+
+    const agentId = `agent_${randomUUID().slice(0, 8)}`;
+    await tx.insert(customAgents).values({
+      id: agentId,
+      orgId: scopedOrgId,
+      ownerAppId: appId,
+      pipelineId: spec.pipelineId ?? null,
+      name: `${spec.title || 'App'} · ${step.label || step.id}`,
+      role: 'App step',
+      description: `Inline agent materialized for app "${spec.title}" step "${step.id}".`,
+      systemPrompt: step.inlineAgent.systemPrompt,
+      model: step.inlineAgent.model ?? '',
+      tools: step.inlineAgent.tools ?? [],
+      grounded: step.inlineAgent.grounded ?? true,
+      trigger: 'on-demand',
+    });
+    step.agentId = agentId;
+    await tx
+      .update(apps)
+      .set({ steps: spec.steps as never, updatedAt: new Date() })
+      .where(and(eq(apps.id, appId), eq(apps.orgId, scopedOrgId)));
+    return agentId;
+  });
 }
 
 // ─── deleteApp — org-scoped ──────────────────────────────────────────────────────
 export async function deleteApp(id: string, orgId: string): Promise<void> {
   await ensureAppsSchema();
-  await db.delete(apps).where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)));
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(apps)
+      .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
+      .for('update')
+      .limit(1);
+    if (!row) return;
+    const legacyIds = materializedAgentIds(toAppSpec(row));
+    if (legacyIds.length) {
+      await tx
+        .delete(customAgents)
+        .where(
+          and(
+            eq(customAgents.orgId, scopedOrgId),
+            inArray(customAgents.id, legacyIds),
+            or(isNull(customAgents.ownerAppId), eq(customAgents.ownerAppId, id)),
+          ),
+        );
+    }
+    await tx.delete(apps).where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)));
+  });
 }
 
 // ─── publishApp — mint a slug + mark published, org-scoped ─────────────────────

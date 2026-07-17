@@ -298,40 +298,12 @@ export function defaultDeps(): AppRunDeps {
       }
     },
     async materializeAgent(spec, step, orgId) {
-      // Create a real customAgent from the inline def, then cache its id back onto the step + persist
-      // it to the app so a re-run reuses the SAME agent (idempotent — no duplicates). Lazy imports
-      // keep this off the default bundle. If persistence fails (unsaved/draft spec, DB down) we still
-      // return the fresh id so the run proceeds — only the cross-run dedup is best-effort.
-      const inline = step.inlineAgent!;
-      const { createCustomAgent } = await import('@/lib/store');
-      const created = await createCustomAgent(
-        {
-          name: `${spec.title || 'App'} · ${step.label || step.id}`,
-          role: 'App step',
-          description: `Inline agent materialized for app "${spec.title}" step "${step.id}".`,
-          systemPrompt: inline.systemPrompt,
-          model: inline.model,
-          tools: inline.tools,
-          grounded: inline.grounded,
-          // The runtime row is an execution detail, but it still preserves its owning AppSpec's
-          // explicit binding. A null binding remains null; run context carries a resolved org default.
-          pipelineId: spec.pipelineId ?? null,
-          // Materialize into the RUN's org — else the agent lands in DEFAULT_ORG and the org-scoped
-          // runAgent(…, ctx.orgId) can't resolve it ("unknown agent") on any non-default tenant.
-        },
-        orgId,
-      );
-      // Cache back in-memory (this-run reuse) and persist (cross-run dedup).
-      step.agentId = created.id;
-      if (spec.id) {
-        try {
-          const { updateApp } = await import('@/lib/apps-store');
-          await updateApp(spec.id, orgId, { steps: spec.steps });
-        } catch {
-          /* draft/unsaved spec or DB down — the in-memory agentId still serves this run */
-        }
-      }
-      return created.id;
+      // The App row and runtime-agent row are one ownership aggregate. A row lock serializes two
+      // simultaneous first runs; insert + App step update commit or roll back together.
+      const { materializeAppAgent } = await import('@/lib/apps-store');
+      const agentId = await materializeAppAgent(spec.id, step.id, orgId);
+      step.agentId = agentId;
+      return agentId;
     },
     async renderReport(view, format) {
       const { renderAppRunReport } = await import('@/lib/adapters/sinks/report');

@@ -71,6 +71,7 @@ export async function ensureOrgSchema(): Promise<void> {
     // Agent-owned pipeline binding. Existing rows remain deliberately unbound; they must not start
     // inheriting chat governance merely because this column was introduced.
     await db.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+    await db.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS owner_app_id text;`);
     // Wave-2 hardening: ingest jobs get a tenant scope, devices get a random data-plane secret.
     await db.execute(
       sql`ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
@@ -1881,6 +1882,7 @@ export async function deleteCustomRole(id: string, orgId: string = DEFAULT_ORG):
 // ─── User-authored agents ─────────────────────────────────────────────────────
 export interface CustomAgent {
   id: string;
+  ownerAppId: string | null;
   pipelineId: string | null;
   name: string;
   role: string;
@@ -1896,6 +1898,7 @@ export interface CustomAgent {
 function toCustomAgent(r: typeof customAgents.$inferSelect): CustomAgent {
   return {
     id: r.id,
+    ownerAppId: r.ownerAppId ?? null,
     pipelineId: r.pipelineId,
     name: r.name,
     role: r.role,
