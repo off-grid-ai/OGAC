@@ -1,3 +1,5 @@
+import { nextRedirects } from './src/modules/route-migrations.mjs';
+
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -30,87 +32,6 @@ const securityHeaders = [
   },
 ];
 
-// ─── T6 RESTful URL hierarchy (task #177) ─────────────────────────────────────────────────────────
-// Every route now lives under its section segment (workspace/build/gateway/data/governance/insights/
-// operations). URLs are a contract — bookmarks, deep-links, and doc screenshots must keep working —
-// so every OLD flat path 301-redirects to its new nested home, including the `/:id`/`/:path*` param
-// forms so detail-page deep links survive. Pure config; the folder moves + registry own the live map.
-//
-// Each entry maps an old top-level segment to its new prefix. We emit two rules per segment: the bare
-// path and a wildcard (`/:path*`) so children (detail ids, tab sub-paths, query strings) carry over.
-const SECTION_REDIRECTS = [
-  // Workspace
-  ['/chat', '/workspace/chat'],
-  ['/knowledge', '/workspace/knowledge'],
-  ['/storage', '/workspace/storage'],
-  ['/projects', '/workspace/projects'],
-  ['/prompts', '/workspace/prompts'],
-  ['/artifacts', '/workspace/artifacts'],
-  // Build
-  ['/studio', '/build/studio'],
-  ['/apps', '/build/apps'],
-  ['/agents', '/build/agents'],
-  ['/agent-runs', '/build/agent-runs'],
-  ['/tools', '/build/tools'],
-  ['/brain', '/build/brain'],
-  ['/evals', '/build/evals'],
-  ['/sandbox', '/build/sandbox'],
-  ['/pipelines', '/build/pipelines'],
-  // Gateway & Fleet (resolves the AI-Gateway / Gateways / Services IA overlap).
-  // NB: `/gateway` (the old aggregator page) had NO children AND `/gateway` is now the SECTION
-  // prefix for the live nested routes (/gateway/services, /gateway/registry, …). A wildcard here
-  // would hijack those live paths, so `/gateway` is bare-only (see bareOnly below).
-  ['/services', '/gateway/services'],
-  ['/gateway', '/gateway/ai', { bareOnly: true }],
-  ['/gateways', '/gateway/registry'],
-  ['/fleet', '/gateway/fleet'],
-  ['/edge', '/gateway/edge'],
-  // Data
-  ['/integrations', '/data/integrations'],
-  ['/connectors', '/data/connectors'],
-  ['/data-domains', '/data/domains'],
-  ['/retrieval', '/data/retrieval'],
-  ['/lineage', '/data/lineage'],
-  ['/tool-catalog', '/data/tool-catalog'],
-  // Governance (landing rename: /control → /governance)
-  ['/control', '/governance'],
-  ['/policy', '/governance/policy'],
-  ['/access', '/governance/access'],
-  ['/guardrails', '/governance/guardrails'],
-  ['/secrets', '/governance/secrets'],
-  ['/regulatory', '/governance/regulatory'],
-  ['/provenance', '/governance/provenance'],
-  // Insights (landing rename: /observability → /insights)
-  ['/observability', '/insights'],
-  ['/analytics', '/insights/analytics'],
-  ['/drift', '/insights/drift'],
-  ['/finops', '/insights/finops'],
-  ['/accounting', '/insights/accounting'],
-  ['/reports', '/insights/reports'],
-  ['/siem', '/insights/siem'],
-  ['/audit', '/insights/audit'],
-  // Operations
-  ['/admin', '/operations/admin'],
-  ['/config', '/operations/config'],
-  ['/backups', '/operations/backups'],
-  ['/api-docs', '/operations/api-docs'],
-];
-
-function urlRedirects() {
-  const rules = [];
-  for (const [from, to, opts] of SECTION_REDIRECTS) {
-    // bare path (e.g. /policy → /governance/policy)
-    rules.push({ source: from, destination: to, permanent: true });
-    // children: detail ids, tab sub-paths, and nested routes (e.g. /gateways/:id →
-    // /gateway/registry/:id, /pipelines/:id/policy → /build/pipelines/:id/policy). Skipped when the
-    // old segment now doubles as a live SECTION prefix (opts.bareOnly), so we never hijack a new route.
-    if (!opts?.bareOnly) {
-      rules.push({ source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true });
-    }
-  }
-  return rules;
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
@@ -123,13 +44,18 @@ const nextConfig = {
     staleTimes: { dynamic: 30, static: 180 },
     // Tree-shake big barrel packages so a page ships only the icons/components it uses, not the whole
     // library. @phosphor-icons/react especially is thousands of modules imported by nearly every page.
-    optimizePackageImports: ['@phosphor-icons/react', '@phosphor-icons/react/dist/ssr', 'recharts', 'date-fns'],
+    optimizePackageImports: [
+      '@phosphor-icons/react',
+      '@phosphor-icons/react/dist/ssr',
+      'recharts',
+      'date-fns',
+    ],
   },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
   async redirects() {
-    return urlRedirects();
+    return nextRedirects();
   },
   // Native / vendored-binary packages — keep them out of the webpack bundle (require at runtime).
   // c2pa-node ships a native binding + a vendored sharp; sigstore is required server-side only.

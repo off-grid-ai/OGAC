@@ -6,12 +6,17 @@ import {
   type ServiceEntry,
   type ServiceHealth,
 } from '@/lib/services-directory';
+import { serviceProbeAdapter } from '@/lib/service-probes';
 
 // Shared service-health probing — one place, used by both the authenticated Services page
 // (/api/v1/services/health, with latency detail) and the public status API (/api/v1/status,
 // up/down only). A gate that answers 401/302 still counts as UP (it's responding); only a
 // 5xx or a network/timeout error counts as DOWN.
-export async function probeService(url: string, healthPath?: string, timeoutMs = 5000): Promise<RawProbe> {
+export async function probeService(
+  url: string,
+  healthPath?: string,
+  timeoutMs = 5000,
+): Promise<RawProbe> {
   const target = new URL(healthPath ?? '/', url).toString();
   const started = Date.now();
   try {
@@ -24,7 +29,12 @@ export async function probeService(url: string, healthPath?: string, timeoutMs =
     const ms = Date.now() - started;
     return { status: res.status >= 500 ? 'down' : 'up', httpStatus: res.status, ms };
   } catch (e) {
-    return { status: 'down', httpStatus: null, ms: null, error: e instanceof Error ? e.message : 'unreachable' };
+    return {
+      status: 'down',
+      httpStatus: null,
+      ms: null,
+      error: e instanceof Error ? e.message : 'unreachable',
+    };
   }
 }
 
@@ -38,6 +48,8 @@ function isHttpProbeable(url: string): boolean {
 // Probe a single service and resolve it to its honest health state (embedded / optional / up /
 // down). Embedded backends and non-HTTP optional deps are never network-probed.
 export async function probeEntry(entry: ServiceEntry): Promise<ServiceHealth> {
+  const custom = serviceProbeAdapter(entry.id);
+  if (custom) return custom(entry);
   if (!needsNetworkProbe(entry) || !isHttpProbeable(entry.url)) {
     return resolveHealth(entry);
   }
@@ -69,7 +81,10 @@ export interface StatusSummary {
 }
 
 // Pure classifiers (extracted from nested ternaries so each branch reads as a rule).
-function ratePerformance(status: string, ms: number | null | undefined): StatusEntry['performance'] {
+function ratePerformance(
+  status: string,
+  ms: number | null | undefined,
+): StatusEntry['performance'] {
   if (status !== 'up') return 'unknown';
   if (ms != null && ms > SLOW_MS) return 'degraded';
   return 'good';

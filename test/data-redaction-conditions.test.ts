@@ -160,7 +160,11 @@ test('redactBatch: no PII port → returns the pure base result unchanged (|| sh
 
 test('redactBatch: a port but zero detect columns → base result (detectCols.length === 0 arm)', async () => {
   const port = await activePiiPort();
-  const res = await redactBatch([{ pan: '4111111111111234' }], [{ column: 'pan', action: 'mask' }], port);
+  const res = await redactBatch(
+    [{ pan: '4111111111111234' }],
+    [{ column: 'pan', action: 'mask' }],
+    port,
+  );
   assert.match(String(res.rows[0].pan), /1234$/);
 });
 
@@ -216,7 +220,8 @@ test('activePiiPort: OFFGRID_PRESIDIO_URL set → selects the presidio port (ter
   process.env.OFFGRID_PRESIDIO_URL = 'http://presidio.invalid:5001';
   try {
     const port = await activePiiPort();
-    // We don't call the network; just prove selection landed on a port with the expected shape.
+    assert.equal(port.meta.id, 'presidio');
+    // We don't call the network here; the boundary integration test exercises analyzer+anonymizer.
     assert.equal(typeof port.scan, 'function');
     assert.equal(typeof port.health, 'function');
   } finally {

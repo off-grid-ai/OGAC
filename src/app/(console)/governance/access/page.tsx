@@ -3,6 +3,7 @@ import { AccessTabs } from '@/components/access/AccessTabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,56 +16,62 @@ export default async function AccessPage() {
   const configured = keycloakAdmin() !== null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage users, roles and machine clients through your identity provider.
-        </p>
-      </div>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage users, roles and machine clients through your identity provider.
+            </p>
+          </div>
 
-      {configured ? (
-        <AccessTabs />
-      ) : (
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Key className="size-4" />
-            </div>
-            <CardTitle className="text-sm">Identity provider not configured</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <p className="text-muted-foreground">
-              Set the following environment variables to connect Off Grid AI to your identity
-              provider.
-            </p>
-            <div className="rounded-md border border-border bg-muted/40 p-4 font-mono text-xs space-y-1">
-              <div>
-                <span className="text-primary">OFFGRID_KEYCLOAK_URL</span>
-                <span className="text-muted-foreground ml-2"># e.g. https://auth.example.com</span>
-              </div>
-              <div>
-                <span className="text-primary">OFFGRID_KEYCLOAK_REALM</span>
-                <span className="text-muted-foreground ml-2"># e.g. offgrid</span>
-              </div>
-              <div>
-                <span className="text-primary">OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID</span>
-                <span className="text-muted-foreground ml-2"># service account client ID</span>
-              </div>
-              <div>
-                <span className="text-primary">OFFGRID_KEYCLOAK_ADMIN_CLIENT_SECRET</span>
-                <span className="text-muted-foreground ml-2"># service account secret</span>
-              </div>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              The service account must be granted the{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">realm-management</code> client
-              role inside your identity provider so it can read and write users, roles, and clients on
-              behalf of the console.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          {configured ? (
+            <AccessTabs />
+          ) : (
+            <Card className="shadow-sm">
+              <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
+                <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Key className="size-4" />
+                </div>
+                <CardTitle className="text-sm">Identity provider not configured</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <p className="text-muted-foreground">
+                  Set the following environment variables to connect Off Grid AI to your identity
+                  provider.
+                </p>
+                <div className="rounded-md border border-border bg-muted/40 p-4 font-mono text-xs space-y-1">
+                  <div>
+                    <span className="text-primary">OFFGRID_KEYCLOAK_URL</span>
+                    <span className="text-muted-foreground ml-2">
+                      # e.g. https://auth.example.com
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-primary">OFFGRID_KEYCLOAK_REALM</span>
+                    <span className="text-muted-foreground ml-2"># e.g. offgrid</span>
+                  </div>
+                  <div>
+                    <span className="text-primary">OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID</span>
+                    <span className="text-muted-foreground ml-2"># service account client ID</span>
+                  </div>
+                  <div>
+                    <span className="text-primary">OFFGRID_KEYCLOAK_ADMIN_CLIENT_SECRET</span>
+                    <span className="text-muted-foreground ml-2"># service account secret</span>
+                  </div>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  The service account must be granted the{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono">realm-management</code>{' '}
+                  client role inside your identity provider so it can read and write users, roles,
+                  and clients on behalf of the console.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      }
+    </PageFrame>
   );
 }

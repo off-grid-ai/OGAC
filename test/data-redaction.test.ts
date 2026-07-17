@@ -53,7 +53,10 @@ test('applyColumnRules changes only ruled columns + reports accurate counts', ()
   assert.equal(res.rows[0].name, 'Neha'); // unruled column passed through
   const panEntry = res.report.find((r) => r.column === 'pan');
   assert.equal(panEntry?.changed, 2);
-  assert.equal(res.report.find((r) => r.column === 'missing'), undefined);
+  assert.equal(
+    res.report.find((r) => r.column === 'missing'),
+    undefined,
+  );
   assert.equal(res.totalRedacted, 2);
 });
 
@@ -99,6 +102,12 @@ test('redactBatch runs PII detection on detect columns via the real regex port',
   const noteEntry = res.report.find((r) => r.column === 'note');
   assert.equal(noteEntry?.changed, 1); // only row 0 had a hit
   assert.ok(res.totalRedacted >= 3); // 1 note + 2 accts
+  assert.deepEqual(res.detection, {
+    requestedEngine: 'regex-floor',
+    engines: ['regex'],
+    status: 'applied',
+    reasons: [],
+  });
 });
 
 test('redactBatch with no PII port applies only the pure rules', async () => {

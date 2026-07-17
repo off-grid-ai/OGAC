@@ -135,6 +135,14 @@ export interface PiiResult {
   entities: string[];
   redacted?: string;
   engine: string;
+  /** Engine the caller selected when `engine` names a fallback that actually handled the text. */
+  requestedEngine?: string;
+  /** Explicit execution outcome; prevents a fallback result being mistaken for the selected engine. */
+  status?: 'applied' | 'fallback' | 'unconfigured' | 'down';
+  /** Operator-readable explanation for a fallback/down state. */
+  reason?: string;
+  /** Presidio is data redaction; LLM Guard is content scanning. Never conflate the two. */
+  scope?: 'data-redaction' | 'content-guardrail';
   /** true ⇒ the engine was configured but unreachable → FAIL CLOSED, the run must be blocked. */
   blocked?: boolean;
   /** false ⇒ no engine is configured → the step did not screen (surfaced, never faked as clean). */

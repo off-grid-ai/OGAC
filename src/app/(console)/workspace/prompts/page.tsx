@@ -1,3 +1,4 @@
+import { PageFrame } from '@/components/PageFrame';
 import { PromptLibrary } from '@/components/prompts/PromptLibrary';
 import { requireModuleForUser } from '@/lib/module-access';
 
@@ -8,5 +9,9 @@ export const dynamic = 'force-dynamic';
 // (assistants): this is plain reusable prompt text. Reuses /api/v1/prompts.
 export default async function PromptsPage() {
   await requireModuleForUser('prompts');
-  return <PromptLibrary />;
+  return (
+    <PageFrame>
+      <PromptLibrary />
+    </PageFrame>
+  );
 }

@@ -2,6 +2,7 @@ import { TeamsManager } from '@/components/teams/TeamsManager';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listTeams } from '@/lib/teams';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,14 +12,18 @@ export default async function TeamsPage() {
   const orgId = await currentOrgId();
   const teams = await listTeams(orgId);
   return (
-    <TeamsManager
-      teams={teams.map((t) => ({
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        department: t.department,
-        memberCount: t.memberCount,
-      }))}
-    />
+    <PageFrame>
+      {
+        <TeamsManager
+          teams={teams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            department: t.department,
+            memberCount: t.memberCount,
+          }))}
+        />
+      }
+    </PageFrame>
   );
 }

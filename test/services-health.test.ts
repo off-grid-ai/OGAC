@@ -20,7 +20,12 @@ const base = (over: Partial<ServiceEntry>): ServiceEntry => ({
 });
 
 const up: RawProbe = { status: 'up', httpStatus: 200, ms: 12 };
-const down: RawProbe = { status: 'down', httpStatus: null, ms: null, error: 'connect ECONNREFUSED' };
+const down: RawProbe = {
+  status: 'down',
+  httpStatus: null,
+  ms: null,
+  error: 'connect ECONNREFUSED',
+};
 
 test('embedded backend is healthy with no network probe', () => {
   const e = base({ id: 'lancedb', probe: 'embedded' });
@@ -51,7 +56,12 @@ test('optional dep that is unreachable reports fallback, NOT down', () => {
 });
 
 test('optional dep with no probe (non-HTTP url skipped) reports fallback', () => {
-  const e = base({ id: 'redis', probe: 'optional', fallbackLabel: 'in-process cache', url: 'redis://x:6379' });
+  const e = base({
+    id: 'redis',
+    probe: 'optional',
+    fallbackLabel: 'in-process cache',
+    url: 'redis://x:6379',
+  });
   const h = resolveHealth(e); // no raw — non-HTTP optional isn't network-probed
   assert.equal(h.status, 'optional');
   assert.equal(h.detail, 'in-process cache (optional)');
@@ -75,7 +85,10 @@ test('canonical-but-not-deployed plane reports its reason as an optional fallbac
   });
   const h = resolveHealth(e); // no raw — non-http optional isn't network-probed
   assert.equal(h.status, 'optional');
-  assert.equal(h.detail, 'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces (optional)');
+  assert.equal(
+    h.detail,
+    'not deployed here — this fleet uses OpenSearch + Langfuse for logs/traces (optional)',
+  );
   assert.equal(h.error, undefined); // no scary error surfaced
   assert.equal(isHealthy(h.status), true); // NOT an outage
 });
@@ -118,4 +131,11 @@ test('data-plane engines are registered on the S1 edge loopbacks (8941–8944)',
     // Real engines — honestly network-probed (never masked as 'optional'): a genuine outage shows.
     assert.equal(needsNetworkProbe(e!), true, `${id} must be network-probed`);
   }
+});
+
+test('OTel directory uses the stable collector config rather than a second endpoint contract', () => {
+  const otel = getServices().find((service) => service.id === 'otel-collector');
+  assert.ok(otel);
+  assert.equal(otel.probe, 'optional');
+  assert.match(otel.fallbackLabel ?? '', /OTLP ingest not configured/);
 });

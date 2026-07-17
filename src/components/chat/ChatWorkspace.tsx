@@ -1302,22 +1302,24 @@ export function ChatWorkspace({
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Mobile backdrop — closes the drawer on tap. Only rendered/interactive below md. */}
+      {/* Narrow-layout backdrop — closes the drawer on tap. The global console rail already uses
+          240px, so the chat rail stays off-canvas until lg; showing both rails at tablet widths
+          leaves the thread toolbar and composer unusably narrow. */}
       {sidebarOpen ? (
         <button
           type="button"
           aria-label="Close chats menu"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm lg:hidden"
         />
       ) : null}
 
-      {/* Rail: projects + conversations. Inline column on md+; off-canvas drawer below md. */}
+      {/* Rail: projects + conversations. Inline column on lg+; off-canvas drawer below lg. */}
       <aside
         className={cn(
           'flex h-full w-64 shrink-0 flex-col border-r border-border bg-card',
           // Mobile: fixed off-canvas drawer, slid in/out by sidebarOpen.
-          'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none',
+          'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 lg:transition-none',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -1469,7 +1471,7 @@ export function ChatWorkspace({
               type="button"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open chats menu"
-              className="-ml-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+              className="-ml-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
             >
               <List className="size-5" />
             </button>

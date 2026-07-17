@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { ConfigManager } from '@/components/config/ConfigManager';
 import { GatewayApiKeys } from '@/components/gateway/GatewayApiKeys';
 import { GatewayControl } from '@/components/gateway/GatewayControl';
@@ -14,7 +14,18 @@ import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { GatewayTuning } from '@/components/gateway/GatewayTuning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TABS = ['overview', 'router', 'traffic', 'logs', 'control', 'providers', 'tuning', 'keys', 'tokens', 'settings'] as const;
+const TABS = [
+  'overview',
+  'router',
+  'traffic',
+  'logs',
+  'control',
+  'providers',
+  'tuning',
+  'keys',
+  'tokens',
+  'settings',
+] as const;
 type TabValue = (typeof TABS)[number];
 
 // The gateway page's tabs, with the active tab reflected in the `?tab=` query string
@@ -23,19 +34,16 @@ type TabValue = (typeof TABS)[number];
 export function GatewayTabs({ overview }: Readonly<{ overview: ReactNode }>) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const initial = (params.get('tab') as TabValue) ?? 'overview';
-  // Local state drives the active tab so switching is INSTANT. router.replace() would
-  // re-navigate this force-dynamic route, re-running the aggregator's live all-nodes health
-  // probe (fans out to every node, up to 8s) on EVERY tab click. Reflect the tab in the URL
-  // via the History API instead — deep-linkable/bookmarkable, but zero server round-trip.
-  const [active, setActive] = useState<TabValue>(TABS.includes(initial) ? initial : 'overview');
+  const requested = (params.get('tab') as TabValue) ?? 'overview';
+  const active: TabValue = TABS.includes(requested) ? requested : 'overview';
 
   const onChange = (value: string): void => {
     const next = value as TabValue;
-    setActive(next);
     const qs = new URLSearchParams(window.location.search);
     qs.set('tab', next);
-    window.history.replaceState(null, '', `${pathname}?${qs.toString()}`);
+    // Next.js integrates native history entries with useSearchParams. This keeps tab switches
+    // instant without re-running the live gateway probe, while Back/Forward remains coherent.
+    window.history.pushState(null, '', `${pathname}?${qs.toString()}`);
   };
 
   return (

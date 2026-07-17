@@ -4,6 +4,7 @@ import { deriveAnomalies } from '@/lib/copilot-gather';
 import { computeFinOps } from '@/lib/finops';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,24 +30,26 @@ export default async function CopilotPage() {
   );
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Sparkle className="size-4" />
-        </div>
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Ops Copilot</h1>
-          <p className="text-sm text-muted-foreground">
-            Ask why a run failed, why cost is up, or what&apos;s drifting. The copilot reads your
-            platform&apos;s own records and answers with citations — it cites real data or says it
-            has none. It never guesses.
-          </p>
-        </div>
-      </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Sparkle className="size-4" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">Ops Copilot</h1>
+              <p className="text-sm text-muted-foreground">
+                Ask why a run failed, why cost is up, or what&apos;s drifting. The copilot reads
+                your platform&apos;s own records and answers with citations — it cites real data or
+                says it has none. It never guesses.
+              </p>
+            </div>
+          </div>
 
-      <CopilotConsole
-        anomalies={flagged}
-      />
-    </div>
+          <CopilotConsole anomalies={flagged} />
+        </div>
+      }
+    </PageFrame>
   );
 }

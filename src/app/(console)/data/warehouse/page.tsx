@@ -19,6 +19,7 @@ import {
 } from '@/lib/dataplane-ui';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentWarehouseDatabase } from '@/lib/warehouse-scope';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,32 +125,39 @@ export default async function WarehousePage({
   }
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Database className="size-4 text-primary" />
-            Warehouse
-          </h2>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Every table in your analytics warehouse — its size, row count, and how fresh it is,
-            grouped by database. Click a table to inspect its columns, sample its rows, and run a
-            data-quality check.
-          </p>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Database className="size-4 text-primary" />
+                Warehouse
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                Every table in your analytics warehouse — its size, row count, and how fresh it is,
+                grouped by database. Click a table to inspect its columns, sample its rows, and run
+                a data-quality check.
+              </p>
+            </div>
+            <WarehouseSearch initial={q} />
+          </div>
+
+          {/* Stat band. */}
+          <StatRail at="sm">
+            <Stat label="Tables" value={String(tables.length)} />
+            <Stat
+              label="Databases"
+              value={String(new Set(tables.map((t) => t.database ?? 'default')).size)}
+            />
+            <Stat label="Total rows" value={formatRows(totalRows)} />
+            <Stat label="On disk" value={formatBytes(totalBytes)} />
+          </StatRail>
+
+          {warehouseBody}
         </div>
-        <WarehouseSearch initial={q} />
-      </div>
-
-      {/* Stat band. */}
-      <StatRail at="sm">
-        <Stat label="Tables" value={String(tables.length)} />
-        <Stat label="Databases" value={String(new Set(tables.map((t) => t.database ?? 'default')).size)} />
-        <Stat label="Total rows" value={formatRows(totalRows)} />
-        <Stat label="On disk" value={formatBytes(totalBytes)} />
-      </StatRail>
-
-      {warehouseBody}
-    </div>
+      }
+    </PageFrame>
   );
 }
 

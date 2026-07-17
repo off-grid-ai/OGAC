@@ -6,6 +6,7 @@ import { UserDetailPanel } from '@/components/access/UserDetailPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { keycloakAdmin } from '@/lib/keycloak-admin';
 import { requireModuleForUser } from '@/lib/module-access';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,32 +56,36 @@ export default async function UserDetailPage({
   }
 
   return (
-    <div className="w-full space-y-6">
-      <Link
-        href="/governance/access?tab=users"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        Users &amp; Access
-      </Link>
-
-      <div className="flex gap-1 border-b border-border">
-        {SUBTABS.map((t) => (
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
           <Link
-            key={t.id}
-            href={`/governance/access/${id}?subtab=${t.id}`}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
-              subtab === t.id
-                ? 'border-primary font-medium text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            href="/governance/access?tab=users"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
-            {t.label}
+            <ArrowLeft className="size-3.5" />
+            Users &amp; Access
           </Link>
-        ))}
-      </div>
 
-      {subtab === 'activity' ? <UserActivityPanel userId={id} /> : identityPanel}
-    </div>
+          <div className="flex gap-1 border-b border-border">
+            {SUBTABS.map((t) => (
+              <Link
+                key={t.id}
+                href={`/governance/access/${id}?subtab=${t.id}`}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
+                  subtab === t.id
+                    ? 'border-primary font-medium text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t.label}
+              </Link>
+            ))}
+          </div>
+
+          {subtab === 'activity' ? <UserActivityPanel userId={id} /> : identityPanel}
+        </div>
+      }
+    </PageFrame>
   );
 }

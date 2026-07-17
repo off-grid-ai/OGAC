@@ -100,19 +100,26 @@ async function readAgentRuns(orgId: string): Promise<AgentRunSource[]> {
 }
 
 // ─── Chat runs → ChatRunSource[] (from the canonical attributed audit ledger) ─────────────────────
-// recordChatRunGovernance writes one audit_events_v2 row per chat turn: action='chat.run',
+// recordChatRunGovernance writes an audit_events_v2 observation for a chat turn: action='chat.run',
 // run_id=<chatrun id>, outcome=ok|blocked|redacted, resource='conversation:<id>', actor_label=user.
-// That row IS the authoritative, org-scoped, queryable chat-run record. Rows without a run_id are
-// legacy/other events and filtered out.
+// The ledger is append-only and the durable activity is at-least-once, so repeated observations of
+// one run id are legal. Select the latest observation per run BEFORE applying the source cap; the
+// pure merge boundary also deduplicates defensively across every source.
 async function readChatRuns(orgId: string): Promise<ChatRunSource[]> {
   try {
     const res = await db.execute(sql`
       SELECT run_id, resource, outcome, ts, actor_label, actor_id, model
-      FROM audit_events_v2
-      WHERE org = ${orgId}
-        AND action = 'chat.run'
-        AND run_id IS NOT NULL
-      ORDER BY ts DESC
+      FROM (
+        SELECT DISTINCT ON (run_id)
+          id, run_id, resource, outcome, ts, actor_label, actor_id, model
+        FROM audit_events_v2
+        WHERE org = ${orgId}
+          AND action = 'chat.run'
+          AND run_id IS NOT NULL
+          AND btrim(run_id) <> ''
+        ORDER BY run_id, ts DESC, id DESC
+      ) latest_chat_runs
+      ORDER BY ts DESC, run_id DESC
       LIMIT ${PER_PLANE}`);
     const list =
       (res as unknown as { rows?: Record<string, unknown>[] }).rows ??

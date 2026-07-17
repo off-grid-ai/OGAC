@@ -17,6 +17,7 @@ import { safeJaegerOverview } from '@/lib/jaeger';
 import { requireModuleForUser } from '@/lib/module-access';
 import { safeSearchLogs } from '@/lib/victoria-logs';
 import { PLATFORM_CHARTS, safePlatformMetrics } from '@/lib/victoria-metrics';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,26 +58,30 @@ export default async function PlatformHealthPage({
   const tab = pickTab(rawTab);
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Pulse className="size-4" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-lg font-semibold text-foreground">Platform Health</h1>
-          <p className="text-sm text-muted-foreground">
-            Live metrics, logs, and traces from the observability stack — read back on-prem from
-            VictoriaMetrics, VictoriaLogs, and Jaeger.
-          </p>
-        </div>
-      </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Pulse className="size-4" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-lg font-semibold text-foreground">Platform Health</h1>
+              <p className="text-sm text-muted-foreground">
+                Live metrics, logs, and traces from the observability stack — read back on-prem from
+                VictoriaMetrics, VictoriaLogs, and Jaeger.
+              </p>
+            </div>
+          </div>
 
-      <TabSwitcher active={tab} />
+          <TabSwitcher active={tab} />
 
-      {tab === 'metrics' && <MetricsTab />}
-      {tab === 'logs' && <LogsTab query={logsq} />}
-      {tab === 'traces' && <TracesTab svc={svc} />}
-    </div>
+          {tab === 'metrics' && <MetricsTab />}
+          {tab === 'logs' && <LogsTab query={logsq} />}
+          {tab === 'traces' && <TracesTab svc={svc} />}
+        </div>
+      }
+    </PageFrame>
   );
 }
 

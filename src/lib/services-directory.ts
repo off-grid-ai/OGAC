@@ -1,3 +1,12 @@
+import { getOperationalServices } from './operational-services';
+import { resolveOtelConfig } from './otel-config';
+import type { ProbeMode, ServiceEntry } from './service-entry';
+import { isHealthy, type HealthStatus, type ServiceHealth } from './service-health';
+
+export type { ProbeMode, ServiceEntry } from './service-entry';
+export { isHealthy } from './service-health';
+export type { HealthStatus, ServiceHealth } from './service-health';
+
 // The Off Grid AI service/product directory — every public surface in the suite, in one
 // place. Powers the /services page (a health-checked map of what we run) and is the
 // single source of truth for "which subdomains exist".
@@ -22,30 +31,6 @@
 //                 reason it isn't deployed) — NEVER a scary 'down'. Examples: Redis (in-process
 //                 cache fallback); the VictoriaMetrics/VictoriaLogs/OTel/Jaeger observability
 //                 plane (this fleet uses OpenSearch + Langfuse for logs/traces instead).
-export type ProbeMode = 'network' | 'embedded' | 'optional';
-
-export interface ServiceEntry {
-  id: string;
-  label: string;
-  description: string;
-  /** Public URL users open. */
-  url: string;
-  /** Path probed for health (server-side). Defaults to '/'. */
-  healthPath?: string;
-  /** How it's protected — shown as a badge. */
-  auth: 'session' | 'api-key' | 'public';
-  /** Grouping for the UI. */
-  kind: 'console' | 'product' | 'api' | 'site' | 'gateway';
-  /** Health-probe strategy. Defaults to 'network'. */
-  probe?: ProbeMode;
-  /**
-   * For an 'optional' service, the state to SHOW when it doesn't answer — the honest name of
-   * the fallback (e.g. 'in-process cache') or the reason it isn't deployed here (e.g. the plane
-   * used instead), rendered instead of a scary 'down'.
-   */
-  fallbackLabel?: string;
-}
-
 const DEFAULT_SERVICES: ServiceEntry[] = [
   // ── Public surfaces (through the Cloudflare tunnel) ──────────────────────────
   {
@@ -78,10 +63,46 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'provit',
     label: 'Provit',
-    description: 'Prove It — visual QA brokered through the console: intelligence engine (map repos, test copilot), gateway (shared), file upload, repos, runs.',
+    description:
+      'Prove It — visual QA brokered through the console: intelligence engine (map repos, test copilot), gateway (shared), file upload, repos, runs.',
     url: process.env.OFFGRID_PROVIT_URL ?? 'https://provit.getoffgridai.co',
     auth: 'session',
     kind: 'product',
+  },
+
+  // ── Control-plane persistence + authoritative integration engines ─────────────────────────────
+  {
+    id: 'postgres',
+    label: 'Console Database',
+    description:
+      'PostgreSQL + pgvector system of record for console configuration, runs, audit, and tenant data.',
+    url: process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'llm-guard',
+    label: 'Content Guardrails',
+    description:
+      'LLM Guard through the sharded guardrail aggregator — authoritative prompt/content scanning.',
+    url: process.env.OFFGRID_HTTP_GUARDRAIL_URL ?? 'not-configured://llm-guard',
+    healthPath: '/healthz',
+    auth: 'api-key',
+    kind: 'api',
+    probe: 'optional',
+    fallbackLabel: 'content guardrails not configured — requests report unscreened',
+  },
+  {
+    id: 'litellm',
+    label: 'LiteLLM Router',
+    description:
+      'Inference router, load balancer, failover, and budget layer; independently wired from gateway node control.',
+    url: process.env.OFFGRID_LITELLM_URL ?? 'not-configured://litellm',
+    healthPath: '/health/liveliness',
+    auth: 'api-key',
+    kind: 'gateway',
+    probe: 'optional',
+    fallbackLabel: 'LiteLLM not selected — inference uses the configured inference door',
   },
 
   // ── Internal fleet services (LAN — probed by their direct IP:port) ───────────
@@ -181,7 +202,10 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     description: 'PII detection & anonymisation — data masking for ingest.',
     // On g6 (LAN). The console can't reach it directly; it needs an edge-Caddy loopback proxy
     // (8938 staged in the Caddyfile, pending an edge reload). Env override points at the loopback.
-    url: process.env.OFFGRID_PRESIDIO_URL ?? 'http://127.0.0.1:8938',
+    url:
+      process.env.OFFGRID_PRESIDIO_ANALYZER_URL ??
+      process.env.OFFGRID_PRESIDIO_URL ??
+      'http://127.0.0.1:8938',
     healthPath: '/health',
     auth: 'api-key',
     kind: 'api',
@@ -189,7 +213,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'lancedb',
     label: 'LanceDB',
-    description: 'Embedded vector store — the default Brain/RAG backend, on-disk inside the console (Qdrant is the server-scale swap-in).',
+    description:
+      'Embedded vector store — the default Brain/RAG backend, on-disk inside the console (Qdrant is the server-scale swap-in).',
     // Embedded: runs in-process (@lancedb/lancedb on-disk). No endpoint to hit — a network probe
     // would always read 'unreachable'. It's healthy whenever the console is, so probe = embedded.
     url: 'embedded://lancedb',
@@ -200,7 +225,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'redis',
     label: 'Redis',
-    description: 'Optional response-cache backend. When absent, the cache falls back to an in-process store — no outage.',
+    description:
+      'Optional response-cache backend. When absent, the cache falls back to an in-process store — no outage.',
     // Optional dependency: the caching port degrades to in-process memory if Redis is unreachable
     // (see src/lib/redis.ts). So "not answering" is the expected fallback, not a failure.
     url: process.env.OFFGRID_REDIS_URL ?? 'redis://127.0.0.1:6379',
@@ -212,7 +238,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'seaweedfs',
     label: 'SeaweedFS',
-    description: 'S3-compatible object store — documents, media, and artifacts. Fronted publicly at gateway.getoffgridai.co/files/* (reads public, writes Keycloak-gated).',
+    description:
+      'S3-compatible object store — documents, media, and artifacts. Fronted publicly at gateway.getoffgridai.co/files/* (reads public, writes Keycloak-gated).',
     // data profile in compose (S3 API on :8333). Runs in the S1 offgrid-services-a stack → loopback.
     url: process.env.OFFGRID_SEAWEEDFS_URL ?? 'http://127.0.0.1:8333',
     // The S3 API answers on '/' (SeaweedFS filer/S3 gateway); a 403/401 from the bucket root still
@@ -247,7 +274,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'evidently',
     label: 'Drift Monitoring',
-    description: 'Drift & data-quality sidecar — the console\'s drift adapter runs PSI/quality suites through it.',
+    description:
+      "Drift & data-quality sidecar — the console's drift adapter runs PSI/quality suites through it.",
     // qa profile in compose (:8001). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
     // Health is the sidecar root '/' (see deploy/sidecars/drift/app.py @app.get("/")).
     url: process.env.OFFGRID_EVIDENTLY_URL ?? 'http://127.0.0.1:8001',
@@ -258,7 +286,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'ragas',
     label: 'RAG Evaluation',
-    description: 'RAG-eval sidecar — the console\'s evals adapter computes retrieval-quality metrics through it.',
+    description:
+      "RAG-eval sidecar — the console's evals adapter computes retrieval-quality metrics through it.",
     // qa profile in compose (:8002). A thin Apache-2.0 Python sidecar; runs on S1 → loopback.
     // Health is the sidecar's /health endpoint (see the compose healthcheck for ragas).
     url: process.env.OFFGRID_RAGAS_URL ?? 'http://127.0.0.1:8002',
@@ -275,7 +304,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'warehouse',
     label: 'Warehouse',
-    description: 'Analytics warehouse — columnar store the BI + dbt models read; the ELT sync target.',
+    description:
+      'Analytics warehouse — columnar store the BI + dbt models read; the ELT sync target.',
     url: process.env.OFFGRID_WAREHOUSE_URL ?? 'http://127.0.0.1:8941',
     healthPath: '/ping', // ClickHouse HTTP /ping → "Ok." (unauthenticated)
     auth: 'api-key',
@@ -284,7 +314,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'airbyte',
     label: 'ETL / Connectors',
-    description: 'Connector sync + change-data-capture engine — moves source data into the warehouse under the pipeline\'s governance.',
+    description:
+      "Connector sync + change-data-capture engine — moves source data into the warehouse under the pipeline's governance.",
     url: process.env.OFFGRID_AIRBYTE_URL ?? 'http://127.0.0.1:8942',
     healthPath: '/api/v1/health',
     auth: 'api-key',
@@ -293,16 +324,19 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'streaming',
     label: 'Streaming',
-    description: 'Kafka-API event broker — the CDC/streaming backbone between sources and the warehouse.',
+    description:
+      'Kafka-API event broker — the CDC/streaming backbone between sources and the warehouse.',
     url: process.env.OFFGRID_REDPANDA_ADMIN_URL ?? 'http://127.0.0.1:8943',
     healthPath: '/v1/cluster/health_overview', // Redpanda admin API → {"is_healthy":true}
     auth: 'api-key',
     kind: 'api',
+    management: 'redpanda',
   },
   {
     id: 'data-quality',
     label: 'Data Quality',
-    description: 'Data-quality checkpoint engine — validates warehouse tables against expectations on the sync path.',
+    description:
+      'Data-quality checkpoint engine — validates warehouse tables against expectations on the sync path.',
     url: process.env.OFFGRID_DATAQUALITY_URL ?? 'http://127.0.0.1:8944',
     healthPath: '/', // sidecar root → {"status":"ok"}
     auth: 'api-key',
@@ -311,7 +345,8 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'kestra',
     label: 'ETL / Orchestration',
-    description: 'Workflow orchestration engine — runs the compiled data-movement jobs (extract → transform → load) under the console\'s governance.',
+    description:
+      "Workflow orchestration engine — runs the compiled data-movement jobs (extract → transform → load) under the console's governance.",
     url: process.env.OFFGRID_KESTRA_URL ?? 'http://127.0.0.1:8945',
     healthPath: '/health', // Kestra management endpoint → 200 when up
     auth: 'api-key',
@@ -343,12 +378,13 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
   {
     id: 'otel-collector',
     label: 'Telemetry Collector',
-    description: 'OpenTelemetry collector — the OTLP ingest that fans spans/metrics/logs to the backends.',
-    url: process.env.OFFGRID_OTEL_URL ?? 'not-deployed://otel-collector',
+    description:
+      'OpenTelemetry collector — the OTLP ingest that fans spans/metrics/logs to the backends.',
+    url: resolveOtelConfig().baseUrl ?? 'not-configured://otel-collector',
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
-    fallbackLabel: 'provisioning — OTLP ingest coming online on the observability node',
+    fallbackLabel: 'OTLP ingest not configured',
   },
   {
     id: 'jaeger',
@@ -359,6 +395,9 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     auth: 'session',
     kind: 'api',
   },
+
+  // Native daemons, workers, forwarders, and public support surfaces have one registry owner.
+  ...getOperationalServices(),
 ];
 
 export function getServices(): ServiceEntry[] {
@@ -379,18 +418,6 @@ export function getServices(): ServiceEntry[] {
 //  · 'optional' — an optional dependency that isn't answering (or a canonical plane not run on
 //                 this fleet); the app is on its documented fallback / alternative. Non-alarming
 //                 — NOT an outage.
-export type HealthStatus = 'up' | 'down' | 'embedded' | 'optional';
-
-export interface ServiceHealth {
-  id: string;
-  status: HealthStatus;
-  httpStatus: number | null;
-  ms: number | null;
-  error?: string;
-  /** Human label for the current state — e.g. the fallback name for an 'optional' service. */
-  detail?: string;
-}
-
 // The raw outcome of a network probe (see src/lib/status.ts#probeService). Split out so the
 // state decision below stays pure and unit-testable without any I/O.
 export interface RawProbe {
@@ -416,7 +443,13 @@ export function resolveHealth(entry: ServiceEntry, raw?: RawProbe): ServiceHealt
   const mode: ProbeMode = entry.probe ?? 'network';
 
   if (mode === 'embedded') {
-    return { id: entry.id, status: 'embedded', httpStatus: null, ms: null, detail: 'embedded / healthy' };
+    return {
+      id: entry.id,
+      status: 'embedded',
+      httpStatus: null,
+      ms: null,
+      detail: 'embedded / healthy',
+    };
   }
 
   if (mode === 'optional') {
@@ -424,7 +457,13 @@ export function resolveHealth(entry: ServiceEntry, raw?: RawProbe): ServiceHealt
       return { id: entry.id, status: 'up', httpStatus: raw.httpStatus, ms: raw.ms };
     }
     const fallback = entry.fallbackLabel ?? 'fallback';
-    return { id: entry.id, status: 'optional', httpStatus: null, ms: null, detail: `${fallback} (optional)` };
+    return {
+      id: entry.id,
+      status: 'optional',
+      httpStatus: null,
+      ms: null,
+      detail: `${fallback} (optional)`,
+    };
   }
 
   // network
@@ -447,10 +486,6 @@ export function needsNetworkProbe(entry: ServiceEntry): boolean {
  * alternative (incl. canonical planes not deployed on this fleet) count as healthy — only
  * 'down' is an outage.
  */
-export function isHealthy(status: HealthStatus): boolean {
-  return status !== 'down';
-}
-
 // ─── Management honesty (Task C3) ──────────────────────────────────────────────────────────────
 // The console does NOT hold a service-control plane — the internal services run as launchd jobs /
 // Docker containers on the on-prem hosts, and there is deliberately no console→host restart path
@@ -468,16 +503,21 @@ export function serviceControl(entry: ServiceEntry): ServiceControl {
   if ((entry.probe ?? 'network') === 'embedded') {
     return {
       restartable: false,
-      managedBy: 'Runs in-process inside the console — its lifecycle IS the console. Restart the console to restart it.',
+      managedBy:
+        'Runs in-process inside the console — its lifecycle IS the console. Restart the console to restart it.',
     };
   }
   if (entry.kind === 'console') {
-    return { restartable: false, managedBy: 'This control plane. Restart via the deploy runbook (next start on the host).' };
+    return {
+      restartable: false,
+      managedBy: 'This control plane. Restart via the deploy runbook (next start on the host).',
+    };
   }
   if (entry.kind === 'gateway' || entry.kind === 'api' || entry.kind === 'product') {
     return {
       restartable: false,
-      managedBy: 'Managed by launchd / Docker on the on-prem host — not console-controllable. Restart it on the host (see the deploy runbook).',
+      managedBy:
+        'Managed by launchd / Docker on the on-prem host — not console-controllable. Restart it on the host (see the deploy runbook).',
     };
   }
   return { restartable: false, managedBy: 'Managed outside the console.' };

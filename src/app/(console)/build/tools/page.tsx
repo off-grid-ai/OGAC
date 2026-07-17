@@ -30,6 +30,7 @@ import { currentOrgId } from '@/lib/tenancy';
 import { primitiveCatalog } from '@/lib/tool-primitives';
 import { filterCatalog, normalizeToolsTab } from '@/lib/tools-view';
 import { ToolsNav } from './ToolsNav';
+import { PageFrame } from '@/components/PageFrame';
 
 // ─── Tools home (Builder Epic #121) — ONE surface for every tool an app can call ──────────────────
 // Unifies the three formerly-scattered tool surfaces under Build:
@@ -71,24 +72,28 @@ export default async function ToolsPage({
   }
 
   return (
-    <div className="w-full space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-lg font-semibold">Tools</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          The one home for every tool your apps can call — your registered HTTP / MCP tools, the
-          curated MCP catalog to add from, and the built-in primitives. The router and the builder&apos;s
-          tool picker both read this same registry.
-        </p>
-      </header>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <header className="space-y-2">
+            <h1 className="text-lg font-semibold">Tools</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              The one home for every tool your apps can call — your registered HTTP / MCP tools, the
+              curated MCP catalog to add from, and the built-in primitives. The router and the
+              builder&apos;s tool picker both read this same registry.
+            </p>
+          </header>
 
-      <Suspense fallback={null}>
-        <ToolsNav />
-      </Suspense>
+          <Suspense fallback={null}>
+            <ToolsNav />
+          </Suspense>
 
-      {tab === 'registered' && <RegisteredTab tools={tools} usedByCount={usedByCount} />}
-      {tab === 'catalog' && <CatalogTab tools={tools} query={q} category={cat ?? null} />}
-      {tab === 'primitives' && <PrimitivesTab />}
-    </div>
+          {tab === 'registered' && <RegisteredTab tools={tools} usedByCount={usedByCount} />}
+          {tab === 'catalog' && <CatalogTab tools={tools} query={q} category={cat ?? null} />}
+          {tab === 'primitives' && <PrimitivesTab />}
+        </div>
+      }
+    </PageFrame>
   );
 }
 
@@ -108,9 +113,13 @@ function RegisteredTab({
           <p className="mt-1 text-xs text-muted-foreground">
             The router&apos;s <code>tool</code> source — HTTP / MCP tools matched to query intent.
             Register, edit, enable, or remove them here; add from the{' '}
-            <a href="/build/tools?tab=catalog" className="text-primary underline-offset-4 hover:underline">
+            <a
+              href="/build/tools?tab=catalog"
+              className="text-primary underline-offset-4 hover:underline"
+            >
               Catalog
-            </a>.
+            </a>
+            .
           </p>
         </div>
         <RegisterToolButton />
@@ -120,9 +129,13 @@ function RegisteredTab({
           <div className="rounded-md border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No tools registered yet. Register one above, or one-click add a server from the{' '}
-              <a href="/build/tools?tab=catalog" className="text-primary underline-offset-4 hover:underline">
+              <a
+                href="/build/tools?tab=catalog"
+                className="text-primary underline-offset-4 hover:underline"
+              >
                 Catalog
-              </a>.
+              </a>
+              .
             </p>
           </div>
         ) : (
@@ -303,10 +316,10 @@ function PrimitivesTab() {
   return (
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-muted-foreground">
-        Built-in first-party tools an app&apos;s agent step can call directly. Each reaches the public
-        internet, so on an air-gapped deployment they are <span className="font-medium">off by default</span>{' '}
-        until the org opts in via an environment flag. These are managed by configuration, not here —
-        the state below is read-only.
+        Built-in first-party tools an app&apos;s agent step can call directly. Each reaches the
+        public internet, so on an air-gapped deployment they are{' '}
+        <span className="font-medium">off by default</span> until the org opts in via an environment
+        flag. These are managed by configuration, not here — the state below is read-only.
       </p>
 
       <Card className="border-emerald-500/30 bg-emerald-500/5">
@@ -319,9 +332,13 @@ function PrimitivesTab() {
               primitive, or a per-tool flag (<code>OFFGRID_TOOL_WEB_SEARCH</code>,{' '}
               <code>OFFGRID_TOOL_READ_URL</code>, <code>OFFGRID_TOOL_HTTP_FETCH</code>) in the
               deployment&apos;s environment (see{' '}
-              <a href="/operations/config" className="text-primary underline-offset-4 hover:underline">
+              <a
+                href="/operations/config"
+                className="text-primary underline-offset-4 hover:underline"
+              >
                 Configuration
-              </a>). Applied on restart.
+              </a>
+              ). Applied on restart.
             </p>
           </div>
         </CardContent>
@@ -336,7 +353,9 @@ function PrimitivesTab() {
                 <Badge
                   variant="secondary"
                   className={
-                    p.enabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'
+                    p.enabled
+                      ? 'bg-emerald-500/10 text-emerald-600'
+                      : 'bg-muted text-muted-foreground'
                   }
                 >
                   {p.enabled ? 'enabled' : 'off (air-gap)'}

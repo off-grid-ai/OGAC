@@ -13,6 +13,7 @@ import { resolveConsumerChips } from '@/lib/pipeline-chip';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,55 +69,60 @@ export default async function StudioPage() {
   }));
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Sparkle className="size-5 text-primary" />
-            Studio
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Build once, run everywhere. An app is anything you describe in plain language — a one-step
-            agent or a multi-step workflow, built the same way. Every app runs through the same
-            governed pipeline: policy gate, guardrails, model routing, retrieval grounding, and
-            tamper-evident provenance. Open an app to build, run, monitor, review, and report on it.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/build/studio/new?mode=chat">
-            <Lightning weight="fill" className="size-4" />
-            New app
-          </Link>
-        </Button>
-      </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Sparkle className="size-5 text-primary" />
+                Studio
+              </h1>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Build once, run everywhere. An app is anything you describe in plain language — a
+                one-step agent or a multi-step workflow, built the same way. Every app runs through
+                the same governed pipeline: policy gate, guardrails, model routing, retrieval
+                grounding, and tamper-evident provenance. Open an app to build, run, monitor,
+                review, and report on it.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/build/studio/new?mode=chat">
+                <Lightning weight="fill" className="size-4" />
+                New app
+              </Link>
+            </Button>
+          </div>
 
-      {/* Stat band */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Apps" value={apps.length} />
-        <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
-        <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
-        <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
-      </div>
+          {/* Stat band */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Stat label="Apps" value={apps.length} />
+            <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
+            <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
+            <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
+          </div>
 
-      {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
+          {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
           workflow. One "New app" front door opens the guided builder for both. */}
-      <div>
-        <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
-        <AppsList apps={apps} chips={appChips} />
-      </div>
+          <div>
+            <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
+            <AppsList apps={apps} chips={appChips} />
+          </div>
 
-      {/* Agents = single-step apps: the built-in roster + your own definitions, still fully editable
+          {/* Agents = single-step apps: the built-in roster + your own definitions, still fully editable
           and runnable. "New app" (top) opens the guided builder; this quick-create adds a bare agent
           definition directly. */}
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Robot className="size-4 text-muted-foreground" />
-          Agents
-        </h2>
-        <CreateAgentButton />
-      </div>
-      <AgentsGrid agents={cards} tools={toolOptions} />
-    </div>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Robot className="size-4 text-muted-foreground" />
+              Agents
+            </h2>
+            <CreateAgentButton />
+          </div>
+          <AgentsGrid agents={cards} tools={toolOptions} />
+        </div>
+      }
+    </PageFrame>
   );
 }
 

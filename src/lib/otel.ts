@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
+import { resolveOtelConfig } from '@/lib/otel-config';
 
 // OpenTelemetry emission seam. When OFFGRID_OTLP_URL is set (e.g. the OTel Collector from
 // deploy/docker-compose.yml), spans are exported as real OTLP/HTTP JSON — one wire, any backend
 // (VictoriaMetrics / SigNoz / Langfuse) ingests it. With no URL it stays a no-op (OTEL_DEBUG echoes).
 type SpanAttrs = Record<string, string | number | boolean | undefined>;
 
-const OTLP_URL = process.env.OFFGRID_OTLP_URL;
+const OTLP_URL = resolveOtelConfig().baseUrl;
 // Langfuse ingests OTLP traces directly (Basic-auth with its key pair). Setting these turns the
 // same span stream into LLM traces in Langfuse — no separate SDK, just a second OTLP target.
 const LANGFUSE_OTLP_URL = process.env.OFFGRID_LANGFUSE_OTLP_URL;

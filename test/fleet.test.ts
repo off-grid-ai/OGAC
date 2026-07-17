@@ -4,6 +4,7 @@ import {
   activeModelConfig,
   derivePool,
   deriveClusters,
+  mapFleetNodeRow,
   validateFleetNode,
   type FleetNode,
 } from '../src/lib/fleet.ts';
@@ -24,6 +25,56 @@ const node = (over: Partial<FleetNode>): FleetNode => ({
   ...over,
 });
 
+// ── persistence row mapping ───────────────────────────────────────────────────
+
+test('mapFleetNodeRow preserves Drizzle camelCase RPC topology', () => {
+  const mapped = mapFleetNodeRow({
+    ...node({ name: 'worker-east', clusterHead: 'cluster-head', rpcPort: 51052 }),
+  });
+  assert.equal(mapped.clusterHead, 'cluster-head');
+  assert.equal(mapped.rpcPort, 51052);
+  assert.equal(mapped.primaryGguf, 'Qwythos-9B-Q4_K_M.gguf');
+});
+
+test('snake_case registry rows map once and keep workers out of the routable pool', () => {
+  const common = {
+    host: 'fleet.local',
+    port: 9000,
+    role: 'gateway',
+    kind: 'chat',
+    primary_gguf: 'model.gguf',
+    mmproj_gguf: '',
+    model_id: 'org/model',
+    context_size: 32768,
+    vision: true,
+    enabled: true,
+    notes: '',
+  };
+  const nodes = [
+    mapFleetNodeRow({
+      ...common,
+      name: 'cluster-head',
+      model: 'cluster-model',
+      cluster_head: null,
+      rpc_port: null,
+    }),
+    mapFleetNodeRow({
+      ...common,
+      name: 'worker-east',
+      model: '',
+      cluster_head: 'cluster-head',
+      rpc_port: 50052,
+    }),
+  ];
+  assert.deepEqual(
+    derivePool(nodes).pool.map((entry) => entry.name),
+    ['cluster-head'],
+  );
+  assert.equal(nodes[1].clusterHead, 'cluster-head');
+  assert.equal(nodes[1].rpcPort, 50052);
+  assert.equal(nodes[1].contextSize, 32768);
+});
+
 // ── derivePool ────────────────────────────────────────────────────────────────
 
 test('gateway nodes go to POOL, image nodes to IMAGE_POOL, servers excluded', () => {
@@ -33,8 +84,14 @@ test('gateway nodes go to POOL, image nodes to IMAGE_POOL, servers excluded', ()
     node({ name: 's1', role: 'server', model: '' }),
     node({ name: 'g6', role: 'server', model: '' }),
   ]);
-  assert.deepEqual(pool.map((p) => p.name), ['g1']);
-  assert.deepEqual(imagePool.map((p) => p.name), ['g3']);
+  assert.deepEqual(
+    pool.map((p) => p.name),
+    ['g1'],
+  );
+  assert.deepEqual(
+    imagePool.map((p) => p.name),
+    ['g3'],
+  );
   assert.equal(imagePool[0].port, 1234);
 });
 
@@ -54,12 +111,20 @@ test('image kind is normalised to chat when it lands in POOL (defensive)', () =>
 // ── activeModelConfig ───────────────────────────────────────────────────────────
 
 test('activeModelConfig omits mmproj/ctx when unset, includes them when set', () => {
-  assert.deepEqual(activeModelConfig({ modelId: 'x/y', primaryGguf: 'a.gguf', mmprojGguf: '', contextSize: null }), {
-    id: 'x/y',
-    primary: 'a.gguf',
-  });
   assert.deepEqual(
-    activeModelConfig({ modelId: 'x/y', primaryGguf: 'a.gguf', mmprojGguf: 'mm.gguf', contextSize: 32768 }),
+    activeModelConfig({ modelId: 'x/y', primaryGguf: 'a.gguf', mmprojGguf: '', contextSize: null }),
+    {
+      id: 'x/y',
+      primary: 'a.gguf',
+    },
+  );
+  assert.deepEqual(
+    activeModelConfig({
+      modelId: 'x/y',
+      primaryGguf: 'a.gguf',
+      mmprojGguf: 'mm.gguf',
+      contextSize: 32768,
+    }),
     { id: 'x/y', primary: 'a.gguf', mmproj: 'mm.gguf', ctx: 32768 },
   );
 });
@@ -81,7 +146,10 @@ test('rejects bad name, port, role, and out-of-range context size', () => {
 test('serving node requires model + primaryGguf; server does not', () => {
   assert.equal(validateFleetNode(node({ role: 'gateway', model: '' })).ok, false);
   assert.equal(validateFleetNode(node({ role: 'gateway', primaryGguf: '' })).ok, false);
-  assert.equal(validateFleetNode(node({ name: 's1', role: 'server', model: '', primaryGguf: '' })).ok, true);
+  assert.equal(
+    validateFleetNode(node({ name: 's1', role: 'server', model: '', primaryGguf: '' })).ok,
+    true,
+  );
 });
 
 // ── RPC cluster (distributed inference) ─────────────────────────────────────────
@@ -116,11 +184,17 @@ test('deriveClusters groups workers under their head; standalone nodes stay sepa
 test('deriveClusters treats a dangling clusterHead as standalone (never drops a node)', () => {
   const { clusters, standalone } = deriveClusters([node({ name: 'g2', clusterHead: 'ghost' })]);
   assert.equal(clusters.length, 0);
-  assert.deepEqual(standalone.map((n) => n.name), ['g2']);
+  assert.deepEqual(
+    standalone.map((n) => n.name),
+    ['g2'],
+  );
 });
 
 test('an RPC worker is exempt from the model/primaryGguf requirement (the head owns those)', () => {
-  assert.equal(validateFleetNode(node({ name: 'g2', clusterHead: 'g7', model: '', primaryGguf: '' })).ok, true);
+  assert.equal(
+    validateFleetNode(node({ name: 'g2', clusterHead: 'g7', model: '', primaryGguf: '' })).ok,
+    true,
+  );
 });
 
 test('validateFleetNode rejects a self-referential head, a bad clusterHead name, and a bad rpcPort', () => {
@@ -139,6 +213,12 @@ test('deriveClusters is generic — groups a minimal {name, clusterHead} view mo
   const { clusters, standalone } = deriveClusters(rows);
   assert.equal(clusters.length, 1);
   assert.equal(clusters[0].head.name, 'g7');
-  assert.deepEqual(clusters[0].workers.map((w) => w.name), ['g2']);
-  assert.deepEqual(standalone.map((n) => n.name), ['x1']);
+  assert.deepEqual(
+    clusters[0].workers.map((w) => w.name),
+    ['g2'],
+  );
+  assert.deepEqual(
+    standalone.map((n) => n.name),
+    ['x1'],
+  );
 });

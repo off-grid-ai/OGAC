@@ -3,6 +3,7 @@ import { starterQueriesFor } from '@/lib/dataplane-ui';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 import { profileForOrg } from '@/lib/tour-demo-seed';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,5 +20,7 @@ export default async function QueryPage({
   await requireModuleForUser('data');
   const { sql = '' } = await searchParams;
   const flavour = profileForOrg(await currentOrgId()).flavour;
-  return <QueryConsole initialSql={sql} starters={starterQueriesFor(flavour)} />;
+  return (
+    <PageFrame>{<QueryConsole initialSql={sql} starters={starterQueriesFor(flavour)} />}</PageFrame>
+  );
 }

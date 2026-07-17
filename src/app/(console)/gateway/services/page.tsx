@@ -1,6 +1,8 @@
 import { ServicesDirectory } from '@/components/services/ServicesDirectory';
 import { requireModuleForUser } from '@/lib/module-access';
+import { toServiceDirectoryEntries } from '@/lib/service-directory-view';
 import { getServices } from '@/lib/services-directory';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,5 +11,9 @@ export const dynamic = 'force-dynamic';
 // we run and reach any of it, all behind the one console login.
 export default async function ServicesPage() {
   await requireModuleForUser('services');
-  return <ServicesDirectory services={getServices()} />;
+  return (
+    <PageFrame>
+      {<ServicesDirectory services={toServiceDirectoryEntries(getServices())} />}
+    </PageFrame>
+  );
 }

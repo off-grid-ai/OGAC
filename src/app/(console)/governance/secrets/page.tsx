@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatRail } from '@/components/ui/StatRail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { readSecretsView } from '@/lib/secrets-view';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,126 +90,132 @@ export default async function SecretsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Vault className="size-4" />
-        </div>
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage the on-prem secrets store — seal state, active adapter, mount paths, and full key
-            CRUD. Secret values are write-only: never read back or shown here.
-          </p>
-        </div>
-      </div>
-
-      {statusBanner}
-
-      {/* Summary tiles — horizontal rail on mobile, restored 4-col grid on desktop. */}
-      <StatRail cols={4}>
-        <SummaryTile
-          icon={<ShieldCheck className="size-4" />}
-          label="Reachable"
-          value={view.reachable ? 'Yes' : 'No'}
-          tone={view.reachable ? 'good' : 'bad'}
-          sub={view.baoUrl ?? (view.configured ? 'no response' : 'not configured')}
-        />
-        <SummaryTile
-          icon={unsealed ? <LockKeyOpen className="size-4" /> : <LockKey className="size-4" />}
-          label="Seal status"
-          value={sealStatusValue}
-          tone={sealStatusTone}
-          sub={
-            view.unsealShares !== null && view.unsealThreshold !== null
-              ? `threshold ${view.unsealThreshold} of ${view.unsealShares}`
-              : 'seal config unknown'
-          }
-        />
-        <SummaryTile
-          icon={<Key className="size-4" />}
-          label="Active adapter"
-          value={view.activeAdapterVendor}
-          tone="muted"
-          sub={view.configured ? 'KMS-backed' : 'fallback'}
-        />
-        <SummaryTile
-          icon={<Cube className="size-4" />}
-          label="Version"
-          value={view.version ?? '—'}
-          tone="muted"
-          sub={view.clusterName ?? (view.standby === true ? 'standby node' : 'active node')}
-        />
-      </StatRail>
-
-      {/* Key management — names only, write-only values, versioning/rotation, delete with confirmation */}
-      <SecretsManagerNav configured={view.configured} sealed={sealed} />
-
-      {/* Operational controls — only meaningful when OpenBao is configured & reachable */}
-      {view.configured && view.reachable && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SealControl
-            sealed={view.sealed}
-            threshold={view.unsealThreshold}
-            shares={view.unsealShares}
-            progress={view.unsealProgress}
-          />
-          <DynamicDbPanel sealed={sealed} />
-          <div className="lg:col-span-2">
-            <LeasesPanel sealed={sealed} />
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Vault className="size-4" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage the on-prem secrets store — seal state, active adapter, mount paths, and full
+                key CRUD. Secret values are write-only: never read back or shown here.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Mount table — paths + types only, never values */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Stack className="size-4 text-muted-foreground" />
-              Mounts
-            </CardTitle>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              {view.mounts.length} mount{view.mounts.length === 1 ? '' : 's'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {view.mounts.length === 0 ? (
-            <p className="py-10 text-center text-xs text-muted-foreground">
-              {view.reachable
-                ? 'No mount table returned (a token with sys/mounts read access is required).'
-                : 'Mount table unavailable — the secrets store did not respond.'}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                  <tr className="border-b border-border">
-                    <th className="py-2 pr-4 font-medium">Path</th>
-                    <th className="py-2 pr-4 font-medium">Type</th>
-                    <th className="py-2 pr-4 font-medium">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.mounts.map((m) => (
-                    <tr key={m.path} className="border-b border-border/50 last:border-0">
-                      <td className="py-2 pr-4 font-mono text-foreground">{m.path}</td>
-                      <td className="py-2 pr-4">
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {m.type}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">{m.description || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {statusBanner}
+
+          {/* Summary tiles — horizontal rail on mobile, restored 4-col grid on desktop. */}
+          <StatRail cols={4}>
+            <SummaryTile
+              icon={<ShieldCheck className="size-4" />}
+              label="Reachable"
+              value={view.reachable ? 'Yes' : 'No'}
+              tone={view.reachable ? 'good' : 'bad'}
+              sub={view.baoUrl ?? (view.configured ? 'no response' : 'not configured')}
+            />
+            <SummaryTile
+              icon={unsealed ? <LockKeyOpen className="size-4" /> : <LockKey className="size-4" />}
+              label="Seal status"
+              value={sealStatusValue}
+              tone={sealStatusTone}
+              sub={
+                view.unsealShares !== null && view.unsealThreshold !== null
+                  ? `threshold ${view.unsealThreshold} of ${view.unsealShares}`
+                  : 'seal config unknown'
+              }
+            />
+            <SummaryTile
+              icon={<Key className="size-4" />}
+              label="Active adapter"
+              value={view.activeAdapterVendor}
+              tone="muted"
+              sub={view.configured ? 'KMS-backed' : 'fallback'}
+            />
+            <SummaryTile
+              icon={<Cube className="size-4" />}
+              label="Version"
+              value={view.version ?? '—'}
+              tone="muted"
+              sub={view.clusterName ?? (view.standby === true ? 'standby node' : 'active node')}
+            />
+          </StatRail>
+
+          {/* Key management — names only, write-only values, versioning/rotation, delete with confirmation */}
+          <SecretsManagerNav configured={view.configured} sealed={sealed} />
+
+          {/* Operational controls — only meaningful when OpenBao is configured & reachable */}
+          {view.configured && view.reachable && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <SealControl
+                sealed={view.sealed}
+                threshold={view.unsealThreshold}
+                shares={view.unsealShares}
+                progress={view.unsealProgress}
+              />
+              <DynamicDbPanel sealed={sealed} />
+              <div className="lg:col-span-2">
+                <LeasesPanel sealed={sealed} />
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* Mount table — paths + types only, never values */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Stack className="size-4 text-muted-foreground" />
+                  Mounts
+                </CardTitle>
+                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  {view.mounts.length} mount{view.mounts.length === 1 ? '' : 's'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {view.mounts.length === 0 ? (
+                <p className="py-10 text-center text-xs text-muted-foreground">
+                  {view.reachable
+                    ? 'No mount table returned (a token with sys/mounts read access is required).'
+                    : 'Mount table unavailable — the secrets store did not respond.'}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                      <tr className="border-b border-border">
+                        <th className="py-2 pr-4 font-medium">Path</th>
+                        <th className="py-2 pr-4 font-medium">Type</th>
+                        <th className="py-2 pr-4 font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {view.mounts.map((m) => (
+                        <tr key={m.path} className="border-b border-border/50 last:border-0">
+                          <td className="py-2 pr-4 font-mono text-foreground">{m.path}</td>
+                          <td className="py-2 pr-4">
+                            <Badge variant="outline" className="text-muted-foreground">
+                              {m.type}
+                            </Badge>
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">
+                            {m.description || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      }
+    </PageFrame>
   );
 }
 

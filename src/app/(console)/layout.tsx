@@ -1,10 +1,10 @@
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { auth } from '@/auth';
+import { ConsoleContent } from '@/components/ConsoleContent';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { Hellobar } from '@/components/Hellobar';
 import { MobileGate } from '@/components/MobileGate';
-import { PageTransition } from '@/components/PageTransition';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 import { Toaster } from '@/components/ui/sonner';
@@ -31,9 +31,7 @@ export default async function ConsoleLayout({ children }: Readonly<{ children: R
             <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <Topbar user={session?.user} />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6">
-                <PageTransition>{children}</PageTransition>
-              </main>
+              <ConsoleContent>{children}</ConsoleContent>
             </div>
           </div>
         </div>

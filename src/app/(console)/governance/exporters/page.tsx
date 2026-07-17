@@ -3,6 +3,7 @@ import { listExportTargets } from '@/lib/exporters/store';
 import { EXPORTER_CATALOG } from '@/lib/exporters/types';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,5 +14,7 @@ export default async function ExportersPage() {
   await requireModuleForUser('exporters');
   const orgId = await currentOrgId();
   const targets = await listExportTargets(orgId).catch(() => []);
-  return <ExportersManager targets={targets} catalog={[...EXPORTER_CATALOG]} />;
+  return (
+    <PageFrame>{<ExportersManager targets={targets} catalog={[...EXPORTER_CATALOG]} />}</PageFrame>
+  );
 }

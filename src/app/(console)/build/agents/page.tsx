@@ -13,6 +13,7 @@ import { resolveConsumerChips } from '@/lib/pipeline-chip';
 import { listTools } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { MODULES } from '@/modules/registry';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,55 +72,63 @@ export default async function AgentsPage() {
   }));
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Robot className="size-5 text-primary" />
-            Agents
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            An agent is the simplest app — a single governed step. This is your agent roster: the
-            built-in agents and your own definitions, plus the single-step apps you&rsquo;ve built.
-            Open one to view, edit, and run it; build multi-step workflows in{' '}
-            <a href="/build/studio" className="text-primary underline-offset-4 hover:underline">
-              Studio
-            </a>.
-          </p>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Robot className="size-5 text-primary" />
+                Agents
+              </h1>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                An agent is the simplest app — a single governed step. This is your agent roster:
+                the built-in agents and your own definitions, plus the single-step apps you&rsquo;ve
+                built. Open one to view, edit, and run it; build multi-step workflows in{' '}
+                <a href="/build/studio" className="text-primary underline-offset-4 hover:underline">
+                  Studio
+                </a>
+                .
+              </p>
+            </div>
+            <CreateAgentButton />
+          </div>
+
+          {/* Stat band — agent-scoped (not the app-wide Studio band). */}
+          <StatRail>
+            <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
+            <Stat label="Single-step apps" value={singleStepApps.length} />
+            <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
+            <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
+          </StatRail>
+
+          {/* The agent roster — each card links to its own detail (/build/agents/[id]). */}
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium text-foreground">Agent roster</h2>
+            <AgentsGrid agents={cards} tools={toolOptions} />
+          </div>
+
+          {/* Single-step apps you built — an agent IS a one-step app; each opens its lifecycle shell. */}
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium text-foreground">Single-step apps you built</h2>
+            {singleStepApps.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No single-step apps yet. Describe an agent in{' '}
+                <a
+                  href="/build/studio/new"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  the builder
+                </a>{' '}
+                and it appears here.
+              </p>
+            ) : (
+              <AppsList apps={singleStepApps} chips={appChips} />
+            )}
+          </div>
         </div>
-        <CreateAgentButton />
-      </div>
-
-      {/* Stat band — agent-scoped (not the app-wide Studio band). */}
-      <StatRail>
-        <Stat label={`Agents (${customCount} yours)`} value={agents.length} />
-        <Stat label="Single-step apps" value={singleStepApps.length} />
-        <Stat label="Fleet runs (audit)" value={activity.totalRuns.toLocaleString()} />
-        <Stat label="Grounded in org knowledge" value={`${activity.groundedShare}%`} />
-      </StatRail>
-
-      {/* The agent roster — each card links to its own detail (/build/agents/[id]). */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-foreground">Agent roster</h2>
-        <AgentsGrid agents={cards} tools={toolOptions} />
-      </div>
-
-      {/* Single-step apps you built — an agent IS a one-step app; each opens its lifecycle shell. */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-foreground">Single-step apps you built</h2>
-        {singleStepApps.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No single-step apps yet. Describe an agent in{' '}
-            <a href="/build/studio/new" className="text-primary underline-offset-4 hover:underline">
-              the builder
-            </a>{' '}
-            and it appears here.
-          </p>
-        ) : (
-          <AppsList apps={singleStepApps} chips={appChips} />
-        )}
-      </div>
-    </div>
+      }
+    </PageFrame>
   );
 }
 
