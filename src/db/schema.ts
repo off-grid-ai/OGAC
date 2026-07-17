@@ -973,6 +973,7 @@ export const solutionDeployments = pgTable(
     pipelineId: text('pipeline_id').notNull(),
     status: text('status').notNull().default('active'),
     activatedAt: timestamp('activated_at', { withTimezone: true }).notNull().defaultNow(),
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
     retiredAt: timestamp('retired_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -63,9 +63,7 @@ async function createLegacySchema(client: PoolClient): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
-  await client.query(
-    'CREATE INDEX solution_blueprints_org_idx ON solution_blueprints (org_id)',
-  );
+  await client.query('CREATE INDEX solution_blueprints_org_idx ON solution_blueprints (org_id)');
   await client.query(`CREATE TABLE solution_blueprint_seed_state (
     org_id text PRIMARY KEY,
     seeded_at timestamptz NOT NULL DEFAULT now()
@@ -80,9 +78,7 @@ async function createLegacySchema(client: PoolClient): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
-  await client.query(
-    'CREATE INDEX solution_deployments_org_idx ON solution_deployments (org_id)',
-  );
+  await client.query('CREATE INDEX solution_deployments_org_idx ON solution_deployments (org_id)');
   await client.query(
     'CREATE UNIQUE INDEX solution_deployments_binding_idx ON solution_deployments (org_id, blueprint_id, app_id)',
   );
@@ -108,13 +104,16 @@ test(
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = current_schema() AND table_name LIKE 'solution_%'
         ORDER BY table_name`);
-      assert.deepEqual(tables.rows.map((row) => row.table_name), [
-        'solution_blueprint_seed_state',
-        'solution_blueprint_versions',
-        'solution_blueprints',
-        'solution_deployments',
-        'solution_observations',
-      ]);
+      assert.deepEqual(
+        tables.rows.map((row) => row.table_name),
+        [
+          'solution_blueprint_seed_state',
+          'solution_blueprint_versions',
+          'solution_blueprints',
+          'solution_deployments',
+          'solution_observations',
+        ],
+      );
     }),
 );
 
@@ -171,6 +170,12 @@ test(
         status: 'retired',
         pipeline_id: 'legacy:unverified',
       });
+      const deploymentColumns = await client.query<{ column_name: string }>(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'solution_deployments'
+          AND column_name = 'paused_at'`);
+      assert.equal(deploymentColumns.rowCount, 1);
     }),
 );
 
@@ -192,6 +197,9 @@ test(
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = '${schema}' AND table_name IN ('solution_blueprints', 'solution_blueprints_legacy')
         ORDER BY table_name`);
-      assert.deepEqual(names.rows.map((row) => row.table_name), ['solution_blueprints']);
+      assert.deepEqual(
+        names.rows.map((row) => row.table_name),
+        ['solution_blueprints'],
+      );
     }),
 );

@@ -5417,6 +5417,12 @@
           "notNull": true,
           "default": "now()"
         },
+        "paused_at": {
+          "name": "paused_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "retired_at": {
           "name": "retired_at",
           "type": "timestamp with time zone",

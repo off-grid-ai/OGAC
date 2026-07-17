@@ -1,39 +1,24 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { Pool } from 'pg';
+import test, { after } from 'node:test';
 import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { prepareSolutionSchema } from './support/solution-schema.mjs';
 
 const ORG_A = 'test-int-solution-blueprints-a';
 const ORG_B = 'test-int-solution-blueprints-b';
 const dbUp = await dbReachable();
-async function solutionSchemaReady(): Promise<boolean> {
-  const pool = new Pool({
-    connectionString:
-      process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
-    connectionTimeoutMillis: 10_000,
-  });
-  try {
-    const result = await pool.query(
-      `SELECT 1 FROM information_schema.columns
-       WHERE table_name = 'solution_blueprints' AND column_name = 'current_version'`,
-    );
-    return result.rowCount === 1;
-  } catch {
-    return false;
-  } finally {
-    await pool.end();
-  }
-}
-const schemaReady = await solutionSchemaReady();
+const previousDatabaseUrl = process.env.DATABASE_URL;
+const prepared = dbUp ? await prepareSolutionSchema('store') : null;
+if (prepared) process.env.DATABASE_URL = prepared.databaseUrl;
+after(async () => {
+  await prepared?.cleanup();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+});
 
 test(
   'versioned adoption enforces the real runtime and retains scoped ROI evidence',
   {
-    skip: schemaReady
-      ? false
-      : dbUp
-        ? 'Solution Blueprint migration 0010 is not applied to the local integration database'
-        : SKIP_MESSAGE,
+    skip: dbUp ? false : SKIP_MESSAGE,
   },
   async (t) => {
     const store = await import('@/lib/solution-blueprints-store');
@@ -44,7 +29,12 @@ test(
 
     const pipelineId = `pl_solution_${Date.now()}`;
     let appId = '';
-    const runIds = [`run_solution_${Date.now()}_1`, `run_solution_${Date.now()}_2`];
+    const runIds = [
+      `run_solution_${Date.now()}_1`,
+      `run_solution_${Date.now()}_2`,
+      `run_solution_${Date.now()}_pre_adoption`,
+      `run_solution_${Date.now()}_paused`,
+    ];
     t.after(async () => {
       for (const org of [ORG_A, ORG_B]) {
         await db.execute(sql`DELETE FROM solution_observations WHERE org_id = ${org}`);
@@ -53,7 +43,9 @@ test(
         await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${org}`);
       }
-      await db.execute(sql`DELETE FROM app_runs WHERE id IN (${runIds[0]}, ${runIds[1]})`);
+      await db.execute(
+        sql`DELETE FROM app_runs WHERE id IN (${runIds[0]}, ${runIds[1]}, ${runIds[2]}, ${runIds[3]})`,
+      );
       if (appId) await db.execute(sql`DELETE FROM apps WHERE id = ${appId}`);
       await db.execute(sql`DELETE FROM pipeline_versions WHERE pipeline_id = ${pipelineId}`);
       await db.execute(sql`DELETE FROM pipelines WHERE id = ${pipelineId}`);
@@ -143,6 +135,10 @@ test(
     };
     const created = await store.createSolutionBlueprint(ORG_A, input, 'author@test.local');
     assert.equal(created.currentVersion, 1);
+    const appBoundary = await db.execute(sql`
+      SELECT id, tableoid::regclass::text AS relation
+      FROM apps WHERE id = ${appId}`);
+    assert.deepEqual(appBoundary.rows[0], { id: appId, relation: 'apps' });
 
     const deployment = await store.createSolutionDeployment(ORG_A, {
       blueprintId: created.id,
@@ -190,7 +186,10 @@ test(
         (${runIds[1]}, ${ORG_A}, ${appId}, 'done', '{"kind":"on-demand"}'::jsonb,
          '{}'::jsonb, '[]'::jsonb, 'complete',
          '{"signature":"test","algorithm":"test","publicKey":null,"signedAt":"2026-01-11T00:01:00Z","costUsd":15}'::jsonb,
-         '2026-01-11T00:00:00Z', '2026-01-11T00:01:00Z')
+         '2026-01-11T00:00:00Z', '2026-01-11T00:01:00Z'),
+        (${runIds[2]}, ${ORG_A}, ${appId}, 'done', '{"kind":"on-demand"}'::jsonb,
+         '{}'::jsonb, '[{"id":"assess","kind":"agent","label":"Assess","status":"done","costUsd":100}]'::jsonb,
+         'complete', NULL, '2025-12-31T23:59:00Z', '2026-01-01T00:01:00Z')
     `);
     const observation = await store.createSolutionObservation(
       deployment.id,
@@ -206,7 +205,11 @@ test(
       },
       'analyst@test.local',
     );
-    assert.deepEqual(observation.runIds, runIds);
+    assert.deepEqual(
+      observation.runIds,
+      runIds.slice(0, 2),
+      'a run that started before activation is never promoted into post-adoption evidence',
+    );
     assert.equal(observation.runsCompleted, 2);
     assert.equal(observation.actualAiCost, 25);
     assert.equal(observation.estimatedRoi.netValue, 25);
@@ -262,17 +265,62 @@ test(
     );
     const { submitAppRun } = await import('@/lib/adapters/apprun');
     await assert.rejects(
-      submitAppRun(driftedApp, {}, {
-        orgId: ORG_A,
-        actor: 'integration@test.local',
-        runId: `run_solution_drift_${Date.now()}`,
-      }),
+      submitAppRun(
+        driftedApp,
+        {},
+        {
+          orgId: ORG_A,
+          actor: 'integration@test.local',
+          runId: `run_solution_drift_${Date.now()}`,
+        },
+      ),
       (error: unknown) => (error as { code?: string }).code === 'runtime-drift',
       'the shared dispatch chokepoint blocks drift before every caller can execute',
     );
     assert.equal(await store.hasSolutionDeploymentsForApp(appId, ORG_A), true);
     const restoredApp = await updateApp(appId, ORG_A, { pipelineId });
     assert.ok(restoredApp);
+    const paused = await store.updateSolutionDeployment(deployment.id, ORG_A, { status: 'paused' });
+    assert.equal(paused?.status, 'paused');
+    assert.ok(paused?.pausedAt);
+    await assert.rejects(
+      submitAppRun(
+        restoredApp,
+        {},
+        {
+          orgId: ORG_A,
+          actor: 'integration@test.local',
+          runId: `run_solution_paused_${Date.now()}`,
+        },
+      ),
+      (error: unknown) => (error as { code?: string }).code === 'paused',
+      'a paused solution deployment is a fail-closed execution state',
+    );
+    const afterPause = new Date((paused?.pausedAt?.valueOf() ?? Date.now()) + 1_000);
+    await db.execute(sql`
+      INSERT INTO app_runs
+        (id, org_id, app_id, status, trigger, input, steps, outcome, started_at, finished_at)
+      VALUES
+        (${runIds[3]}, ${ORG_A}, ${appId}, 'done', '{"kind":"on-demand"}'::jsonb,
+         '{}'::jsonb, '[]'::jsonb, 'should-not-count', ${afterPause}, ${new Date(
+           afterPause.valueOf() + 1_000,
+         )})`);
+    assert.equal(
+      (await store.listSolutionDeploymentRuns(deployment.id, ORG_A)).some(
+        (run) => run.id === runIds[3],
+      ),
+      false,
+      'runs outside the active interval are excluded from solution evidence',
+    );
+    const reactivated = await store.updateSolutionDeployment(deployment.id, ORG_A, {
+      status: 'active',
+    });
+    assert.equal(reactivated?.status, 'active');
+    assert.equal(reactivated?.pausedAt, null);
+    assert.ok(
+      (reactivated?.activatedAt.valueOf() ?? 0) >= (paused?.pausedAt?.valueOf() ?? Infinity),
+      'reactivation opens a new evidence interval',
+    );
     assert.equal(await store.deleteSolutionDeployment(deployment.id, ORG_A), true);
     assert.equal((await store.getSolutionDeployment(deployment.id, ORG_A))?.status, 'retired');
     await assert.rejects(

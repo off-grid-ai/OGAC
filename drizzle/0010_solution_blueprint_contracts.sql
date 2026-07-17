@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS "solution_deployments" (
   "pipeline_id" text NOT NULL,
   "status" text DEFAULT 'active' NOT NULL,
   "activated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "paused_at" timestamp with time zone,
   "retired_at" timestamp with time zone,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -206,7 +207,7 @@ BEGIN
     EXECUTE $migrate$
       INSERT INTO solution_deployments
         (id, org_id, blueprint_id, blueprint_version, app_id, pipeline_id, status,
-         activated_at, retired_at, created_at, updated_at)
+         activated_at, paused_at, retired_at, created_at, updated_at)
       SELECT
         legacy.id,
         legacy.org_id,
@@ -216,6 +217,7 @@ BEGIN
         'legacy:unverified',
         'retired',
         legacy.created_at,
+        NULL,
         COALESCE(legacy.updated_at, legacy.created_at),
         legacy.created_at,
         legacy.updated_at

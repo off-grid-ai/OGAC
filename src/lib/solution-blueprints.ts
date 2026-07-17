@@ -70,6 +70,8 @@ export interface SolutionDeployment {
   pipelineId: string;
   status: 'active' | 'paused' | 'retired';
   activatedAt: Date;
+  /** End of the current evidence interval while paused; null while active or permanently retired. */
+  pausedAt: Date | null;
   retiredAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -195,7 +197,8 @@ export function validateObservation(
   ) {
     errors.push('window end cannot be in the future');
   }
-  if (!Number.isFinite(input.claimedMetricValue)) errors.push('claimed metric value must be finite');
+  if (!Number.isFinite(input.claimedMetricValue))
+    errors.push('claimed metric value must be finite');
   if (!input.claimLabel.trim()) errors.push('claim label is required');
   for (const [label, value] of [
     ['estimated minutes saved per run', input.estimatedMinutesSavedPerRun],
@@ -245,7 +248,8 @@ export function evaluateSolutionCompatibility(
 ): CompatibilityResult {
   const errors: string[] = [];
   if (blueprint.tombstonedAt) errors.push('blueprint is retired');
-  if (!blueprint.adoptable) errors.push('blueprint is a hypothesis and has no adoptable runtime asset');
+  if (!blueprint.adoptable)
+    errors.push('blueprint is a hypothesis and has no adoptable runtime asset');
   if (!app.published) errors.push('App must be published');
   if (!app.pipelineId) errors.push('App has no explicit governed pipeline binding');
   if (!pipeline) errors.push('bound pipeline does not exist');

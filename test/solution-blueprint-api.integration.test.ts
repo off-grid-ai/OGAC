@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { Pool } from 'pg';
+import test, { after } from 'node:test';
 import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { prepareSolutionSchema } from './support/solution-schema.mjs';
 
 const ADMIN_TOKEN = 'solution-api-integration-token';
 const ORG = 'test-int-solution-api';
+const dbUp = await dbReachable();
+const previousDatabaseUrl = process.env.DATABASE_URL;
+const prepared = dbUp ? await prepareSolutionSchema('api') : null;
+if (prepared) process.env.DATABASE_URL = prepared.databaseUrl;
+after(async () => {
+  await prepared?.cleanup();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+});
 
 function request(method: string, body?: unknown, authenticated = true): Request {
   return new Request('http://console.local/api/v1/admin/solution-blueprints', {
@@ -63,41 +72,20 @@ test('solution API enforces authentication and rejects invalid enums instead of 
 
     const invalidAdoptability = await POST(request('POST', { ...body, adoptable: 'yes' }));
     assert.equal(invalidAdoptability.status, 422);
-    assert.match(JSON.stringify(await invalidAdoptability.json()), /adoptable must be true or false/);
+    assert.match(
+      JSON.stringify(await invalidAdoptability.json()),
+      /adoptable must be true or false/,
+    );
   } finally {
     if (previous === undefined) delete process.env.OFFGRID_ADMIN_TOKEN;
     else process.env.OFFGRID_ADMIN_TOKEN = previous;
   }
 });
 
-const dbUp = await dbReachable();
-async function solutionSchemaReady(): Promise<boolean> {
-  const pool = new Pool({
-    connectionString:
-      process.env.DATABASE_URL ?? 'postgresql://offgrid@localhost:5432/offgrid_console',
-    connectionTimeoutMillis: 10_000,
-  });
-  try {
-    const result = await pool.query(
-      `SELECT 1 FROM information_schema.columns
-       WHERE table_name = 'solution_blueprints' AND column_name = 'current_version'`,
-    );
-    return result.rowCount === 1;
-  } catch {
-    return false;
-  } finally {
-    await pool.end();
-  }
-}
-const schemaReady = await solutionSchemaReady();
 test(
   'authorized Blueprint creation persists immutable v1 and emits an attributed audit event',
   {
-    skip: schemaReady
-      ? false
-      : dbUp
-        ? 'Solution Blueprint migration 0010 is not applied to the local integration database'
-        : SKIP_MESSAGE,
+    skip: dbUp ? false : SKIP_MESSAGE,
   },
   async (t) => {
     const priorToken = process.env.OFFGRID_ADMIN_TOKEN;

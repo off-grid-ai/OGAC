@@ -48,12 +48,13 @@ export class SolutionValidationError extends Error {
 }
 
 export class SolutionConflictError extends Error {
-  readonly code: 'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'runtime-drift';
+  readonly code:
+    'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'paused' | 'runtime-drift';
   readonly errors: string[];
 
   constructor(
     message: string,
-    code: 'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'runtime-drift',
+    code: 'incompatible' | 'duplicate' | 'referenced' | 'retired' | 'paused' | 'runtime-drift',
     errors: string[] = [],
   ) {
     super(message);
@@ -482,10 +483,7 @@ export async function createSolutionDeployment(
         .select({ tombstonedAt: solutionBlueprints.tombstonedAt })
         .from(solutionBlueprints)
         .where(
-          and(
-            eq(solutionBlueprints.id, input.blueprintId),
-            eq(solutionBlueprints.orgId, orgId),
-          ),
+          and(eq(solutionBlueprints.id, input.blueprintId), eq(solutionBlueprints.orgId, orgId)),
         )
         .for('update')
         .limit(1);
@@ -528,12 +526,23 @@ export async function updateSolutionDeployment(
   if (patch.status === 'active') {
     await compatibleBinding(orgId, merged);
   }
+  const transitionedAt = new Date();
   const [row] = await db
     .update(solutionDeployments)
     .set({
       status: patch.status,
-      retiredAt: patch.status === 'retired' ? new Date() : null,
-      updatedAt: new Date(),
+      activatedAt:
+        patch.status === 'active' && current.status === 'paused'
+          ? transitionedAt
+          : current.activatedAt,
+      pausedAt:
+        patch.status === 'paused'
+          ? (current.pausedAt ?? transitionedAt)
+          : patch.status === 'retired'
+            ? current.pausedAt
+            : null,
+      retiredAt: patch.status === 'retired' ? transitionedAt : null,
+      updatedAt: transitionedAt,
     })
     .where(and(eq(solutionDeployments.id, id), eq(solutionDeployments.orgId, orgId)))
     .returning();
@@ -568,11 +577,18 @@ export async function assertSolutionRuntimeBinding(
       and(
         eq(solutionDeployments.appId, app.id),
         eq(solutionDeployments.orgId, orgId),
-        eq(solutionDeployments.status, 'active'),
+        ne(solutionDeployments.status, 'retired'),
       ),
     )
     .limit(1);
   if (!row) return;
+  if (row.status === 'paused') {
+    throw new SolutionConflictError(
+      'Solution deployment is paused; reactivate it before running the App',
+      'paused',
+      ['reactivate the deployment or retire the binding'],
+    );
+  }
   try {
     const blueprint = await getSolutionBlueprint(row.blueprintId, orgId, row.blueprintVersion);
     if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
@@ -629,6 +645,7 @@ export async function listSolutionDeploymentRuns(deploymentId: string, orgId: st
         eq(appRuns.orgId, orgId),
         eq(appRuns.appId, deployment.appId),
         gte(appRuns.startedAt, deployment.activatedAt),
+        deployment.pausedAt ? lt(appRuns.startedAt, deployment.pausedAt) : undefined,
         deployment.retiredAt ? lt(appRuns.startedAt, deployment.retiredAt) : undefined,
       ),
     )
@@ -649,15 +666,20 @@ export async function createSolutionObservation(
     const [deploymentRow] = await tx
       .select()
       .from(solutionDeployments)
-      .where(
-        and(eq(solutionDeployments.id, deploymentId), eq(solutionDeployments.orgId, orgId)),
-      )
+      .where(and(eq(solutionDeployments.id, deploymentId), eq(solutionDeployments.orgId, orgId)))
       .for('update')
       .limit(1);
     if (!deploymentRow) throw new SolutionValidationError(['unknown deployment']);
     const deployment = toDeployment(deploymentRow);
     if (input.windowStart < deployment.activatedAt) {
-      throw new SolutionValidationError(['measurement window cannot predate deployment activation']);
+      throw new SolutionValidationError([
+        'measurement window cannot predate deployment activation',
+      ]);
+    }
+    if (deployment.pausedAt && input.windowEnd > deployment.pausedAt) {
+      throw new SolutionValidationError([
+        'measurement window cannot end after deployment was paused',
+      ]);
     }
     if (deployment.retiredAt && input.windowEnd > deployment.retiredAt) {
       throw new SolutionValidationError([
@@ -686,6 +708,7 @@ export async function createSolutionObservation(
           eq(appRuns.orgId, orgId),
           eq(appRuns.appId, deployment.appId),
           eq(appRuns.status, 'done'),
+          gte(appRuns.startedAt, input.windowStart),
           gte(appRuns.finishedAt, input.windowStart),
           lt(appRuns.finishedAt, input.windowEnd),
         ),

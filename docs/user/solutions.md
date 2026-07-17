@@ -24,7 +24,7 @@ another operator can open and audit.
 3. Choose **Adopt Blueprint**. The deployment pins the current immutable Blueprint version and the
    App's exact pipeline. Later Blueprint edits create a new version and never rewrite the adopted
    contract.
-4. Run the App normally. Before each run, the Console rechecks the active deployment. If the App,
+4. Run the App normally. Before each run or approved continuation, the Console rechecks the active deployment. If the App,
    pipeline, publication state, domain ceiling, or capabilities drift, execution stops with a
    conflict and records a blocked audit event.
 
@@ -64,6 +64,8 @@ run count does not prove that KPI.
 - A Blueprint with an active or paused deployment cannot be retired. Retire every deployment first;
   this prevents a library action from silently invalidating a live runtime contract.
 - Removing a deployment retires its binding; observations and run evidence remain immutable.
+- Pausing a deployment blocks new runs and approved HITL continuations. Reactivation opens a new
+  evidence interval; runs outside an active interval never count toward deployment value.
 - Once the live binding is retired, the same App can adopt a newer Blueprint version or another
   Blueprint. Retired deployment history does not block re-adoption.
 - An App referenced by deployment history cannot be deleted. Retire the deployment instead.
