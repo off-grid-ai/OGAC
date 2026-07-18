@@ -8,7 +8,10 @@ export type ContextualModuleId =
   | 'governance-guardrails'
   | 'governance-secrets'
   | 'governance-evidence'
-  | 'governance-trust';
+  | 'governance-trust'
+  | 'data-lineage'
+  | 'runtime-models'
+  | 'runtime-api-budgets';
 export type ContextualDestinationId =
   | 'registered'
   | 'catalog'
@@ -43,7 +46,16 @@ export type ContextualDestinationId =
   | 'provenance'
   | 'export'
   | 'regulatory'
-  | 'reports';
+  | 'reports'
+  | 'graph'
+  | 'datasets'
+  | 'routing'
+  | 'traffic'
+  | 'logs'
+  | 'fleet-control'
+  | 'providers'
+  | 'tuning'
+  | 'budgets';
 
 export interface ContextualDestination {
   id: ContextualDestinationId;
@@ -376,6 +388,114 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Reports',
         description: 'Trust and compliance reports.',
         route: '/governance/trust/reports',
+      },
+    ],
+  },
+  {
+    id: 'data-lineage',
+    ownerId: 'lineage',
+    label: 'Lineage',
+    description: 'Trace datasets, processing jobs, and source-to-answer execution provenance.',
+    baseRoute: '/data/lineage',
+    railDefaultOpen: true,
+    destinations: [
+      {
+        id: 'graph',
+        label: 'Graph',
+        description: 'Dataset and job relationships from the lineage store.',
+        route: '/data/lineage/graph',
+      },
+      {
+        id: 'datasets',
+        label: 'Datasets',
+        description: 'Dataset schema, facets, tags, and curation.',
+        route: '/data/lineage/datasets',
+      },
+      {
+        id: 'runs',
+        label: 'Runs',
+        description: 'Source-to-answer lineage for grounded executions.',
+        route: '/data/lineage/runs',
+      },
+    ],
+  },
+  {
+    id: 'runtime-models',
+    ownerId: 'models',
+    label: 'Models',
+    description: 'Manage model availability, routing, traffic, providers, and tuning.',
+    baseRoute: '/runtime/models',
+    railDefaultOpen: true,
+    destinations: [
+      {
+        id: 'overview',
+        label: 'Overview',
+        description: 'Model catalog and serving posture.',
+        route: '/runtime/models/overview',
+      },
+      {
+        id: 'routing',
+        label: 'Routing',
+        description: 'Model routing policies and fallbacks.',
+        route: '/runtime/models/routing',
+      },
+      {
+        id: 'traffic',
+        label: 'Traffic',
+        description: 'Current model request traffic.',
+        route: '/runtime/models/traffic',
+      },
+      {
+        id: 'logs',
+        label: 'Logs',
+        description: 'Model gateway request logs.',
+        route: '/runtime/models/logs',
+      },
+      {
+        id: 'fleet-control',
+        label: 'Fleet control',
+        description: 'Model serving controls across the fleet.',
+        route: '/runtime/models/fleet-control',
+      },
+      {
+        id: 'providers',
+        label: 'Providers',
+        description: 'Available model providers and endpoints.',
+        route: '/runtime/models/providers',
+      },
+      {
+        id: 'tuning',
+        label: 'Tuning',
+        description: 'Model tuning and runtime parameters.',
+        route: '/runtime/models/tuning',
+      },
+    ],
+  },
+  {
+    id: 'runtime-api-budgets',
+    ownerId: 'api-budgets',
+    label: 'API & budgets',
+    description: 'Manage API keys, machine clients, and enforceable consumption budgets.',
+    baseRoute: '/runtime/api-budgets',
+    railDefaultOpen: true,
+    destinations: [
+      {
+        id: 'keys',
+        label: 'Keys',
+        description: 'API keys and credentials.',
+        route: '/runtime/api-budgets/keys',
+      },
+      {
+        id: 'clients',
+        label: 'Clients',
+        description: 'Machine clients and access scopes.',
+        route: '/runtime/api-budgets/clients',
+      },
+      {
+        id: 'budgets',
+        label: 'Budgets',
+        description: 'Usage ceilings and enforcement state.',
+        route: '/runtime/api-budgets/budgets',
       },
     ],
   },
