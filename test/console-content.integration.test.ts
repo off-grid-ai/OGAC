@@ -33,3 +33,12 @@ test('the rendered route explicitly chooses management-page spacing', () => {
   assert.match(html, /data-og-shell="page"/);
   assert.match(html, /Management page/);
 });
+
+test('an embedded management surface reuses its contextual shell without a nested frame', () => {
+  const html = renderToStaticMarkup(
+    createElement(PageFrame, { embedded: true }, createElement('section', null, 'Embedded surface')),
+  );
+
+  assert.equal(html, '<section>Embedded surface</section>');
+  assert.doesNotMatch(html, /data-og-shell="page"/);
+});
