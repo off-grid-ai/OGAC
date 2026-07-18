@@ -43,7 +43,10 @@ const STATUS_TONE: Record<string, string> = {
 // Data governance (M4) — the org's freshness/broken-sync alerts, retention-due datasets, and the
 // RTBF / subject-erasure flow with its durable request history. Honest empty states until real
 // syncs + a data engine flow.
-export default async function DataGovernancePage() {
+export async function DataGovernanceContent({
+  embedded = false,
+  showHeading = true,
+}: Readonly<{ embedded?: boolean; showHeading?: boolean }> = {}) {
   await requireModuleForUser('governance');
   const org = await currentOrgId();
   const [assets, allClassifications, retentions, requests] = await Promise.all([
@@ -99,19 +102,21 @@ export default async function DataGovernancePage() {
   const piiAssets = evaluated.filter((e) => e.posture.hasPii);
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="w-full space-y-6">
-          <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <ShieldCheck className="size-4 text-primary" />
-              Data governance
-            </h2>
-            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-              Freshness &amp; broken-sync alerts, datasets due for disposal under retention, and the
-              right-to-be-forgotten flow across the warehouse, vector store, and lineage.
-            </p>
-          </div>
+          {showHeading ? (
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ShieldCheck className="size-4 text-primary" />
+                Data governance
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                Freshness &amp; broken-sync alerts, datasets due for disposal under retention, and
+                the right-to-be-forgotten flow across the warehouse, vector store, and lineage.
+              </p>
+            </div>
+          ) : null}
 
           {/* Freshness band. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -289,6 +294,10 @@ export default async function DataGovernancePage() {
       }
     </PageFrame>
   );
+}
+
+export default function DataGovernancePage() {
+  return <DataGovernanceContent />;
 }
 
 function StatCard({

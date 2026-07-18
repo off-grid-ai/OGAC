@@ -90,7 +90,7 @@ function stripUrlDecoration(value: string): string {
  * table, asset, collection, or orchestration-job detail route by accident.
  */
 export function isDataManagementLeaf(
-  destinations: readonly DataDestination[],
+  destinations: readonly { route: string }[],
   url: string,
 ): boolean {
   const pathname = stripUrlDecoration(url);
