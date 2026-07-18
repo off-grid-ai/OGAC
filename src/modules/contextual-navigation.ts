@@ -1,6 +1,7 @@
 import type { CanonicalOwnerId } from './ownership';
-import { GUARDRAILS_DESTINATIONS } from '@/lib/guardrails-destinations';
-import { LINEAGE_DESTINATIONS } from '@/components/lineage/lineage-routes';
+import { LINEAGE_DESTINATIONS } from '../components/lineage/lineage-routes';
+import { GUARDRAILS_DESTINATIONS } from '../lib/guardrails-destinations';
+import { INSIGHTS_AI_DESTINATIONS, INSIGHTS_QUALITY_DESTINATIONS } from '../lib/insights-routes';
 import { API_BUDGET_DESTINATIONS, MODEL_DESTINATIONS } from './runtime-routes';
 
 export type ContextualModuleId =
@@ -14,7 +15,9 @@ export type ContextualModuleId =
   | 'governance-trust'
   | 'data-lineage'
   | 'runtime-models'
-  | 'runtime-api-budgets';
+  | 'runtime-api-budgets'
+  | 'insights-ai'
+  | 'insights-quality';
 export type ContextualDestinationId =
   | 'registered'
   | 'catalog'
@@ -58,7 +61,12 @@ export type ContextualDestinationId =
   | 'fleet-control'
   | 'providers'
   | 'tuning'
-  | 'budgets';
+  | 'budgets'
+  | 'traces'
+  | 'prompt-registry'
+  | 'copilot'
+  | 'scorecards'
+  | 'drift';
 
 export interface ContextualDestination {
   id: ContextualDestinationId;
@@ -383,6 +391,24 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     baseRoute: '/runtime/api-budgets',
     railDefaultOpen: true,
     destinations: API_BUDGET_DESTINATIONS,
+  },
+  {
+    id: 'insights-ai',
+    ownerId: 'ai-behavior',
+    label: 'AI behavior',
+    description: 'Inspect AI traces, prompt behavior, and operator-assisted analysis.',
+    baseRoute: '/insights/ai',
+    railDefaultOpen: true,
+    destinations: INSIGHTS_AI_DESTINATIONS,
+  },
+  {
+    id: 'insights-quality',
+    ownerId: 'quality-results',
+    label: 'Quality',
+    description: 'Monitor scorecards, drift, and quality thresholds across deployed solutions.',
+    baseRoute: '/insights/quality',
+    railDefaultOpen: true,
+    destinations: INSIGHTS_QUALITY_DESTINATIONS,
   },
 ] as const;
 

@@ -10,6 +10,16 @@ const contextualOwners = [
   'solutions/apps/[id]/',
   'build/pipelines/[id]/',
   'runtime/pipelines/[id]/',
+  'solutions/tools/',
+  'solutions/quality/',
+  'governance/access/',
+  'governance/policies/',
+  'governance/secrets/',
+  'governance/evidence/',
+  'governance/trust/',
+  'data/lineage/',
+  'runtime/models/',
+  'runtime/api-budgets/',
 ] as const;
 const canvasPages = new Set([
   'workspace/chat/page.tsx',

@@ -9,7 +9,7 @@ import {
   defaultContextualDestination,
 } from '../src/modules/contextual-navigation.ts';
 
-test('Tools and Quality own a complete canonical level-3 route tree', () => {
+test('contextual modules own complete canonical level-3 route trees', () => {
   assert.deepEqual(
     contextualModule('solutions-tools').destinations.map(({ id, route }) => [id, route]),
     [
@@ -28,9 +28,16 @@ test('Tools and Quality own a complete canonical level-3 route tree', () => {
   );
 
   for (const module of CONTEXTUAL_MODULES) {
-    assert.equal(module.destinations.length, 3);
-    assert.equal(new Set(module.destinations.map((item) => item.route)).size, 3);
-    assert.ok(module.destinations.every((item) => item.route.startsWith(`${module.baseRoute}/`)));
+    assert.ok(module.destinations.length > 1);
+    assert.equal(
+      new Set(module.destinations.map((item) => item.route)).size,
+      module.destinations.length,
+    );
+    assert.ok(
+      module.destinations.every(
+        (item) => item.route === module.baseRoute || item.route.startsWith(`${module.baseRoute}/`),
+      ),
+    );
   }
 });
 
