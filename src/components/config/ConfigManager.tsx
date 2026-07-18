@@ -9,6 +9,7 @@ import {
   MagnifyingGlass,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,11 @@ interface ConfigEntry {
 const SECRET_SENTINEL = '••••••••';
 
 /** The value shown in a field: a pending edit wins; otherwise secrets mask (or reveal), plain values show as-is. */
-function fieldDisplay(entry: ConfigEntry, pending: string | undefined, revealed: string | undefined): string {
+function fieldDisplay(
+  entry: ConfigEntry,
+  pending: string | undefined,
+  revealed: string | undefined,
+): string {
   if (pending !== undefined) return pending;
   if (!entry.secret) return entry.value;
   if (revealed !== undefined) return revealed;
@@ -73,7 +78,9 @@ function Field({
         onClick={() => onChange(entry.key, on ? 'false' : 'true')}
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${on ? 'bg-primary' : 'bg-muted'}`}
       >
-        <span className={`inline-block size-4 rounded-full bg-white transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        <span
+          className={`inline-block size-4 rounded-full bg-white transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`}
+        />
       </button>
     );
   }
@@ -108,23 +115,41 @@ function Field({
 }
 
 export function ConfigManager({ only }: { only?: string[] } = {}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [entries, setEntries] = useState<ConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
+  const search = searchParams.get('q') ?? '';
+
+  const setSearch = (value: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value) next.set('q', value);
+    else next.delete('q');
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const toggleReveal = async (key: string) => {
     if (revealed[key] !== undefined) {
-      setRevealed((r) => { const next = { ...r }; delete next[key]; return next; });
+      setRevealed((r) => {
+        const next = { ...r };
+        delete next[key];
+        return next;
+      });
       return;
     }
     try {
       const res = await fetch(`/api/v1/admin/config/reveal?key=${encodeURIComponent(key)}`);
       const body = (await res.json().catch(() => ({}))) as { value?: string; error?: string };
-      if (!res.ok) { toast.error(body.error ?? 'Reveal failed.'); return; }
+      if (!res.ok) {
+        toast.error(body.error ?? 'Reveal failed.');
+        return;
+      }
       setRevealed((r) => ({ ...r, [key]: body.value ?? '' }));
     } catch {
       toast.error('Reveal failed.');
@@ -136,8 +161,14 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
     setApiError(null);
     try {
       const r = await fetch('/api/v1/admin/config');
-      const body = (await r.json().catch(() => ({}))) as { entries?: ConfigEntry[]; error?: string };
-      if (!r.ok) { setApiError(body.error ?? `HTTP ${r.status}`); return; }
+      const body = (await r.json().catch(() => ({}))) as {
+        entries?: ConfigEntry[];
+        error?: string;
+      };
+      if (!r.ok) {
+        setApiError(body.error ?? `HTTP ${r.status}`);
+        return;
+      }
       setEntries(body.entries ?? []);
     } catch {
       setApiError('unreachable');
@@ -146,7 +177,9 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const onChange = (key: string, value: string | undefined) => {
     setPending((p) => {
@@ -169,8 +202,15 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ settings: pending }),
       });
-      const body = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; restartRequired?: string[] };
-      if (!r.ok || !body.ok) { toast.error(body.error ?? 'Save failed.'); return; }
+      const body = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        restartRequired?: string[];
+      };
+      if (!r.ok || !body.ok) {
+        toast.error(body.error ?? 'Save failed.');
+        return;
+      }
       toast.success(
         body.restartRequired?.length
           ? `Saved. Restart the console to apply ${body.restartRequired.length} setting(s).`
@@ -187,7 +227,12 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
     let base = only?.length ? entries.filter((e) => only.includes(e.group)) : entries;
     if (search.trim()) {
       const q = search.toLowerCase();
-      base = base.filter((e) => e.key.toLowerCase().includes(q) || e.label.toLowerCase().includes(q) || e.group.toLowerCase().includes(q));
+      base = base.filter(
+        (e) =>
+          e.key.toLowerCase().includes(q) ||
+          e.label.toLowerCase().includes(q) ||
+          e.group.toLowerCase().includes(q),
+      );
     }
     return base;
   }, [entries, search, only]);
@@ -200,11 +245,20 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
         <Warning className="mt-0.5 size-4 shrink-0" />
         <div>
           {apiError === 'forbidden' ? (
-            <><span className="font-medium">Admin access required.</span> Configuration is admin-only — your account needs the <code className="rounded bg-muted px-1">admin</code> role (or be listed in OFFGRID_ADMIN_EMAILS).</>
+            <>
+              <span className="font-medium">Admin access required.</span> Configuration is
+              admin-only — your account needs the{' '}
+              <code className="rounded bg-muted px-1">admin</code> role (or be listed in
+              OFFGRID_ADMIN_EMAILS).
+            </>
           ) : apiError === 'unreachable' ? (
-            <><span className="font-medium">Couldn&apos;t reach the config API.</span> Retry.</>
+            <>
+              <span className="font-medium">Couldn&apos;t reach the config API.</span> Retry.
+            </>
           ) : (
-            <><span className="font-medium">Failed to load:</span> {apiError}</>
+            <>
+              <span className="font-medium">Failed to load:</span> {apiError}
+            </>
           )}
         </div>
       </div>
@@ -217,17 +271,32 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-background/80 py-1 backdrop-blur">
         <div className="relative min-w-[200px] flex-1">
           <MagnifyingGlass className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter settings…" className="h-8 pl-7 text-xs" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter settings…"
+            className="h-8 pl-7 text-xs"
+          />
         </div>
         <span className="font-mono text-xs text-muted-foreground">
           {dirtyKeys.length > 0 ? `${dirtyKeys.length} unsaved` : `${entries.length} settings`}
         </span>
         {dirtyKeys.length > 0 && (
-          <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs" onClick={() => setPending({})}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1 text-xs"
+            onClick={() => setPending({})}
+          >
             <ArrowClockwise className="size-3.5" /> Discard
           </Button>
         )}
-        <Button size="sm" className="h-8 gap-1.5" disabled={!dirtyKeys.length || saving} onClick={save}>
+        <Button
+          size="sm"
+          className="h-8 gap-1.5"
+          disabled={!dirtyKeys.length || saving}
+          onClick={save}
+        >
           <FloppyDisk className="size-3.5" />
           {saving ? 'Saving…' : `Save${dirtyCount}`}
         </Button>
@@ -235,8 +304,12 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1"><Lock className="size-3" /> secret (write-only)</span>
-        <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-400" /> unsaved change</span>
+        <span className="flex items-center gap-1">
+          <Lock className="size-3" /> secret (write-only)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="size-2 rounded-full bg-amber-400" /> unsaved change
+        </span>
         <span>changes apply on restart</span>
       </div>
 
@@ -245,33 +318,45 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
       ) : (
         groups.map((group) => (
           <div key={group} className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {group}
+            </span>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.filter((e) => e.group === group).map((entry) => (
-                <div
-                  key={entry.key}
-                  className={`flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-sm transition-colors ${
-                    pending[entry.key] !== undefined ? 'border-amber-400' : 'border-border'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-foreground">{entry.label}</span>
-                      {entry.secret && <Lock className="size-3 shrink-0 text-muted-foreground" />}
-                      {pending[entry.key] !== undefined && <span className="size-2 shrink-0 rounded-full bg-amber-400" />}
+              {filtered
+                .filter((e) => e.group === group)
+                .map((entry) => (
+                  <div
+                    key={entry.key}
+                    className={`flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-sm transition-colors ${
+                      pending[entry.key] !== undefined ? 'border-amber-400' : 'border-border'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {entry.label}
+                        </span>
+                        {entry.secret && <Lock className="size-3 shrink-0 text-muted-foreground" />}
+                        {pending[entry.key] !== undefined && (
+                          <span className="size-2 shrink-0 rounded-full bg-amber-400" />
+                        )}
+                      </div>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {entry.key}
+                      </p>
                     </div>
-                    <p className="truncate font-mono text-[10px] text-muted-foreground">{entry.key}</p>
+                    <Field
+                      entry={entry}
+                      pending={pending[entry.key]}
+                      revealed={revealed[entry.key]}
+                      onChange={onChange}
+                      onReveal={toggleReveal}
+                    />
+                    <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                      {entry.description}
+                    </p>
                   </div>
-                  <Field
-                    entry={entry}
-                    pending={pending[entry.key]}
-                    revealed={revealed[entry.key]}
-                    onChange={onChange}
-                    onReveal={toggleReveal}
-                  />
-                  <p className="line-clamp-2 text-[11px] text-muted-foreground">{entry.description}</p>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         ))
