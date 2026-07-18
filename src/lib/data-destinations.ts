@@ -78,3 +78,21 @@ export function dataDestination<Destination extends DataDestination>(
 ): Destination | undefined {
   return destinations.find((candidate) => candidate.id === rawId);
 }
+
+function stripUrlDecoration(value: string): string {
+  const pathname = value.split(/[?#]/, 1)[0] || '/';
+  return pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+}
+
+/**
+ * Collection entity details keep their existing standalone detail presentation. Only the exact
+ * management leaves enter the contextual shell, so adding level-three IA cannot wrap or rename a
+ * table, asset, collection, or orchestration-job detail route by accident.
+ */
+export function isDataManagementLeaf(
+  destinations: readonly DataDestination[],
+  url: string,
+): boolean {
+  const pathname = stripUrlDecoration(url);
+  return destinations.some((destination) => destination.route === pathname);
+}

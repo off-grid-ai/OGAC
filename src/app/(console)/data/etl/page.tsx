@@ -30,28 +30,38 @@ function whenLabel(iso?: string): string {
 // job here (source connector → destination warehouse table → column mapping + per-column redaction →
 // schedule), saves it, and runs it. Full-width, list→detail (each job opens /data/etl/[id]). Product
 // language throughout — "Data movement / ETL jobs", never the engine name.
-export default async function EtlJobsPage() {
+export async function EtlJobsContent({
+  detailBasePath = '/data/etl',
+  embedded = false,
+  showHeading = true,
+}: Readonly<{
+  detailBasePath?: string;
+  embedded?: boolean;
+  showHeading?: boolean;
+}> = {}) {
   await requireModuleForUser('data');
   const orgId = await currentOrgId();
   const [jobs, connectors] = await Promise.all([listEtlJobs(orgId), listConnectors(orgId)]);
   const connectorOptions = connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="w-full space-y-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <ArrowsLeftRight className="size-4 text-primary" />
-                ETL jobs
-              </h2>
-              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-                Author a data-movement job: pull from a connected source, redact sensitive columns
-                on the way, and land the rows in a warehouse table — on a schedule or on demand.
-                Every run is governed and recorded.
-              </p>
-            </div>
+            {showHeading ? (
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <ArrowsLeftRight className="size-4 text-primary" />
+                  ETL jobs
+                </h2>
+                <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                  Author a data-movement job: pull from a connected source, redact sensitive columns
+                  on the way, and land the rows in a warehouse table — on a schedule or on demand.
+                  Every run is governed and recorded.
+                </p>
+              </div>
+            ) : null}
             <NewEtlJobButton hasConnectors={connectorOptions.length > 0} />
           </div>
 
@@ -81,7 +91,7 @@ export default async function EtlJobsPage() {
                   connectorOptions.find((c) => c.id === job.sourceConnectorId)?.name ??
                   job.sourceConnectorId;
                 return (
-                  <Link key={job.id} href={`/data/etl/${job.id}`} className="block">
+                  <Link key={job.id} href={`${detailBasePath}/${job.id}`} className="block">
                     <Card className="h-full shadow-sm transition-colors hover:border-primary/40">
                       <CardHeader className="space-y-0 pb-2">
                         <div className="flex items-start justify-between gap-2">
@@ -117,4 +127,8 @@ export default async function EtlJobsPage() {
       }
     </PageFrame>
   );
+}
+
+export default function EtlJobsPage() {
+  return <EtlJobsContent />;
 }

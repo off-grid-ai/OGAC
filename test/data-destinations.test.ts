@@ -6,6 +6,7 @@ import {
   KNOWLEDGE_DESTINATIONS,
   WAREHOUSE_DESTINATIONS,
   dataDestination,
+  isDataManagementLeaf,
 } from '../src/lib/data-destinations.ts';
 
 test('Data exposes each existing management place as a stable route', () => {
@@ -45,4 +46,16 @@ test('Data destination lookup accepts known leaves and rejects unknown leaves', 
   assert.equal(dataDestination(WAREHOUSE_DESTINATIONS, 'query'), WAREHOUSE_DESTINATIONS[1]);
   assert.equal(dataDestination(CATALOG_DESTINATIONS, 'missing'), undefined);
   assert.equal(dataDestination(KNOWLEDGE_DESTINATIONS, undefined), undefined);
+});
+
+test('only exact management leaves enter the contextual shell', () => {
+  assert.equal(isDataManagementLeaf(WAREHOUSE_DESTINATIONS, '/data/warehouse'), true);
+  assert.equal(
+    isDataManagementLeaf(WAREHOUSE_DESTINATIONS, '/data/warehouse/query?sql=SELECT+1'),
+    true,
+  );
+  assert.equal(isDataManagementLeaf(CATALOG_DESTINATIONS, '/data/catalog/'), true);
+  assert.equal(isDataManagementLeaf(CATALOG_DESTINATIONS, '/data/catalog/asset-1'), false);
+  assert.equal(isDataManagementLeaf(KNOWLEDGE_DESTINATIONS, '/data/knowledge/collection-1'), false);
+  assert.equal(isDataManagementLeaf(FLOW_DESTINATIONS, '/data/flows/orchestration/job-1'), false);
 });

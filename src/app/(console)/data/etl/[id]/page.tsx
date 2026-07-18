@@ -28,9 +28,10 @@ const JOB_TONE: Record<EtlJobStatus, string> = {
 // below. The job's DAG is the source of truth the pipeline compiles from; older jobs without a DAG
 // are back-filled from their flat fields so they open in the builder too. This is the "place" the
 // list drills into (list→detail IA), never a modal.
-export default async function EtlJobDetailPage({
+export async function EtlJobDetailContent({
   params,
-}: Readonly<{ params: Promise<{ id: string }> }>) {
+  backHref = '/data/etl',
+}: Readonly<{ params: Promise<{ id: string }>; backHref?: string }>) {
   await requireModuleForUser('data');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -50,7 +51,7 @@ export default async function EtlJobDetailPage({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <Link
-                href="/data/etl"
+                href={backHref}
                 className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="size-3.5" />
@@ -82,6 +83,12 @@ export default async function EtlJobDetailPage({
       }
     </PageFrame>
   );
+}
+
+export default function EtlJobDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
+  return <EtlJobDetailContent params={params} />;
 }
 
 // Seed a DAG from a legacy flat job (source → [redact nodes] → destination).

@@ -46,7 +46,10 @@ function whenLabel(epochSeconds?: number): string {
 // move source data into the warehouse, each with its last run status and a "Run sync" action, plus
 // a recent-job history. Consumes the live ETL adapter directly. If no pipelines are configured yet
 // (fresh instance), an HONEST empty state — never fabricated rows.
-export default async function PipelinesPage() {
+export async function PipelinesContent({
+  embedded = false,
+  showHeading = true,
+}: Readonly<{ embedded?: boolean; showHeading?: boolean }> = {}) {
   await requireModuleForUser('data');
 
   const [healthy, connections] = await Promise.all([
@@ -67,21 +70,23 @@ export default async function PipelinesPage() {
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="w-full space-y-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <ArrowsLeftRight className="size-4 text-primary" />
-                Data movement
-              </h2>
-              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-                Pipelines move data from your sources into the warehouse. Trigger a sync on demand
-                and watch each run land — this is how fresh data gets in.
-              </p>
+          {showHeading ? (
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <ArrowsLeftRight className="size-4 text-primary" />
+                  Data movement
+                </h2>
+                <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                  Pipelines move data from your sources into the warehouse. Trigger a sync on demand
+                  and watch each run land — this is how fresh data gets in.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {connections.length === 0 ? (
             <Card>
@@ -190,4 +195,8 @@ export default async function PipelinesPage() {
       }
     </PageFrame>
   );
+}
+
+export default function PipelinesPage() {
+  return <PipelinesContent />;
 }
