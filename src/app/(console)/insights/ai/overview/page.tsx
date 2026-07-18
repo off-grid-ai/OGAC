@@ -99,7 +99,7 @@ function LeafLink({
       href={href}
       className="group rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Card className="h-full shadow-sm transition-colors group-hover:border-primary/50">
+      <Card className="h-full shadow-sm transition-colors group-hover:border-primary/50 motion-reduce:transition-none">
         <CardHeader>
           <CardTitle className="text-sm group-hover:text-primary">{title}</CardTitle>
           <p className="text-xs text-muted-foreground">{description}</p>

@@ -50,6 +50,7 @@ export type InsightsAiDestination = (typeof INSIGHTS_AI_DESTINATIONS)[number];
 export type InsightsAiDestinationId = InsightsAiDestination['id'];
 export type InsightsQualityDestination = (typeof INSIGHTS_QUALITY_DESTINATIONS)[number];
 export type InsightsQualityDestinationId = InsightsQualityDestination['id'];
+export type InsightsSearchParams = Record<string, string | string[] | undefined>;
 
 export function insightsAiDestination(
   rawId: string | null | undefined,
@@ -65,4 +66,28 @@ export function insightsQualityDestination(
 
 export function isInsightsQualityEntityDetailPath(pathname: string): boolean {
   return /^\/insights\/quality\/evals\/[^/]+\/?$/.test(pathname.split(/[?#]/, 1)[0] ?? '');
+}
+
+export function insightsRouteWithSearchParams(
+  route: string,
+  rawParams: InsightsSearchParams,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, rawValue] of Object.entries(rawParams)) {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      if (value !== undefined) params.append(key, value);
+    }
+  }
+  const query = params.toString();
+  return query ? `${route}?${query}` : route;
+}
+
+export function legacyInsightsAiRoute(rawParams: InsightsSearchParams): string {
+  const route = rawParams.lfReg
+    ? INSIGHTS_AI_DESTINATIONS[2].route
+    : rawParams.pipeline
+      ? INSIGHTS_QUALITY_DESTINATIONS[0].route
+      : INSIGHTS_AI_DESTINATIONS[0].route;
+  return insightsRouteWithSearchParams(route, rawParams);
 }

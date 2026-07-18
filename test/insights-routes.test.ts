@@ -5,7 +5,9 @@ import {
   INSIGHTS_QUALITY_DESTINATIONS,
   insightsAiDestination,
   insightsQualityDestination,
+  insightsRouteWithSearchParams,
   isInsightsQualityEntityDetailPath,
+  legacyInsightsAiRoute,
 } from '../src/lib/insights-routes.ts';
 
 test('Insights AI destinations expose the durable level-three places', () => {
@@ -42,4 +44,24 @@ test('eval run entity details are distinguished from Quality leaves', () => {
   assert.equal(isInsightsQualityEntityDetailPath('/insights/quality/scorecards'), false);
   assert.equal(isInsightsQualityEntityDetailPath('/insights/quality/evals'), false);
   assert.equal(isInsightsQualityEntityDetailPath('/insights/quality/evals/run-1/cases'), false);
+});
+
+test('legacy Insights entry routes preserve URL-owned state and rehome pipeline scorecards', () => {
+  assert.equal(legacyInsightsAiRoute({}), '/insights/ai/overview');
+  assert.equal(legacyInsightsAiRoute({ lfRange: '30d' }), '/insights/ai/overview?lfRange=30d');
+  assert.equal(
+    legacyInsightsAiRoute({ lfReg: 'datasets', lfRange: '7d' }),
+    '/insights/ai/prompt-registry?lfReg=datasets&lfRange=7d',
+  );
+  assert.equal(
+    legacyInsightsAiRoute({ pipeline: 'pipe/a' }),
+    '/insights/quality/scorecards?pipeline=pipe%2Fa',
+  );
+  assert.equal(
+    insightsRouteWithSearchParams('/insights/quality/scorecards', {
+      pipeline: ['one', 'two'],
+      empty: undefined,
+    }),
+    '/insights/quality/scorecards?pipeline=one&pipeline=two',
+  );
 });

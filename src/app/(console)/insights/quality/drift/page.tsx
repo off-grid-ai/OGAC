@@ -25,10 +25,8 @@ const STATUS_CLASS: Record<DriftDisplayStatus, string> = {
 
 export default async function QualityDriftPage() {
   await requireModuleForUser('drift');
-  const [{ data, error }, driftMeta] = await Promise.all([
-    readDriftView(),
-    Promise.resolve(getDrift().meta),
-  ]);
+  const { data, error } = await readDriftView();
+  const driftMeta = getDrift().meta;
   const engineStatus = {
     evidentlySelected: driftMeta.id === 'evidently',
     evidentlyConfigured: Boolean(driftMeta.embedUrl),

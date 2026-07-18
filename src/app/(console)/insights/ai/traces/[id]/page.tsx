@@ -43,14 +43,11 @@ export default async function TraceDetailPage({
               No spans were recorded for this trace.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-x-auto">
               {result.spans.map((span) => (
                 <div key={span.id} className="flex min-w-0 items-center gap-3 text-xs">
-                  <span
-                    className="w-52 shrink-0 truncate text-muted-foreground"
-                    style={{ paddingLeft: span.depth * 10 }}
-                    title={span.name}
-                  >
+                  <span className="w-52 shrink-0 truncate text-muted-foreground" title={span.name}>
+                    {'-- '.repeat(span.depth)}
                     {span.name}
                   </span>
                   <div className="relative h-3 min-w-48 flex-1 rounded bg-muted">
