@@ -95,10 +95,12 @@ type Destination =
   | (typeof ADMIN_DESTINATIONS)[number];
 
 export type OperationsDestinationId = Destination['id'];
+export type HealthDestinationId = (typeof HEALTH_DESTINATIONS)[number]['id'];
+export type ConfigurationDestinationId = (typeof CONFIGURATION_DESTINATIONS)[number]['id'];
+export type EdgeDestinationId = (typeof EDGE_DESTINATIONS)[number]['id'];
+export type AdminDestinationId = (typeof ADMIN_DESTINATIONS)[number]['id'];
 
-export type RouteSearchParams = Readonly<
-  Record<string, string | readonly string[] | undefined>
->;
+export type RouteSearchParams = Readonly<Record<string, string | readonly string[] | undefined>>;
 
 export function operationsDestination<Dest extends Destination>(
   destinations: readonly Dest[],
