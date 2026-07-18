@@ -88,17 +88,34 @@ export const ADMIN_DESTINATIONS = [
   },
 ] as const;
 
+export const NODE_DESTINATIONS = [
+  {
+    id: 'nodes',
+    label: 'Nodes',
+    description: 'Inspect and configure every physical instance registered with the fleet.',
+    route: '/operations/nodes',
+  },
+  {
+    id: 'clusters',
+    label: 'Clusters',
+    description: 'Inspect compute clusters derived from registered head and member relationships.',
+    route: '/operations/clusters',
+  },
+] as const;
+
 type Destination =
   | (typeof HEALTH_DESTINATIONS)[number]
   | (typeof CONFIGURATION_DESTINATIONS)[number]
   | (typeof EDGE_DESTINATIONS)[number]
-  | (typeof ADMIN_DESTINATIONS)[number];
+  | (typeof ADMIN_DESTINATIONS)[number]
+  | (typeof NODE_DESTINATIONS)[number];
 
 export type OperationsDestinationId = Destination['id'];
 export type HealthDestinationId = (typeof HEALTH_DESTINATIONS)[number]['id'];
 export type ConfigurationDestinationId = (typeof CONFIGURATION_DESTINATIONS)[number]['id'];
 export type EdgeDestinationId = (typeof EDGE_DESTINATIONS)[number]['id'];
 export type AdminDestinationId = (typeof ADMIN_DESTINATIONS)[number]['id'];
+export type NodeDestinationId = (typeof NODE_DESTINATIONS)[number]['id'];
 
 export type RouteSearchParams = Readonly<Record<string, string | readonly string[] | undefined>>;
 
@@ -107,6 +124,14 @@ export function operationsDestination<Dest extends Destination>(
   rawId: string | null | undefined,
 ): Dest | undefined {
   return destinations.find((candidate) => candidate.id === rawId);
+}
+
+export function topologyResourceHref(kind: NodeDestinationId, resourceId?: string): string {
+  const destination = operationsDestination(NODE_DESTINATIONS, kind);
+  if (!destination) throw new Error(`Unknown topology resource kind: ${kind}`);
+  return resourceId === undefined
+    ? destination.route
+    : `${destination.route}/${encodeURIComponent(resourceId)}`;
 }
 
 export function withRouteSearchParams(route: string, params: RouteSearchParams): string {

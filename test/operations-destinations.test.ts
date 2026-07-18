@@ -5,9 +5,11 @@ import {
   CONFIGURATION_DESTINATIONS,
   EDGE_DESTINATIONS,
   HEALTH_DESTINATIONS,
+  NODE_DESTINATIONS,
   formatRelativeTime,
   legacyHealthHref,
   operationsDestination,
+  topologyResourceHref,
   withRouteSearchParams,
 } from '../src/lib/operations-destinations.ts';
 
@@ -44,6 +46,26 @@ test('Operations exposes each level-three place as a stable route', () => {
       ['organization', '/operations/admin/organization'],
       ['tenants', '/operations/admin/tenants'],
     ],
+  );
+  assert.deepEqual(
+    NODE_DESTINATIONS.map(({ id, route }) => [id, route]),
+    [
+      ['nodes', '/operations/nodes'],
+      ['clusters', '/operations/clusters'],
+    ],
+  );
+});
+
+test('topology resource routes encode registry identifiers and reject unknown kinds', () => {
+  assert.equal(topologyResourceHref('nodes'), '/operations/nodes');
+  assert.equal(topologyResourceHref('nodes', 'edge node/01'), '/operations/nodes/edge%20node%2F01');
+  assert.equal(
+    topologyResourceHref('clusters', 'cluster head'),
+    '/operations/clusters/cluster%20head',
+  );
+  assert.throws(
+    () => topologyResourceHref('unknown' as never),
+    /Unknown topology resource kind: unknown/,
   );
 });
 
