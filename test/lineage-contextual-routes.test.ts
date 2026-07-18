@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canonicalLineagePath } from '../src/components/lineage/lineage-routes.ts';
+import {
+  canonicalLineagePath,
+  LINEAGE_DESTINATIONS,
+} from '../src/components/lineage/lineage-routes.ts';
 import {
   contextualDestination,
   contextualDestinationForPath,
@@ -10,6 +13,7 @@ import {
 
 test('Lineage exposes graph, datasets, and runs as durable destinations', () => {
   const lineage = contextualModule('data-lineage');
+  assert.deepEqual(lineage.destinations, LINEAGE_DESTINATIONS);
   assert.deepEqual(
     lineage.destinations.map(({ id, route }) => [id, route]),
     [
