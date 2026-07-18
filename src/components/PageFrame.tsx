@@ -6,7 +6,12 @@ import { cn } from '@/lib/utils';
 export function PageFrame({
   children,
   className,
-}: Readonly<{ children: ReactNode; className?: string }>) {
+  embedded = false,
+}: Readonly<{ children: ReactNode; className?: string; embedded?: boolean }>) {
+  // A contextual module shell already owns scrolling, padding, and the leaf heading. Reusing a
+  // standalone management surface inside that shell must not create a second inset container.
+  if (embedded) return children;
+
   return (
     <div
       data-og-shell="page"
