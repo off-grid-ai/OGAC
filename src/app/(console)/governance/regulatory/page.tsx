@@ -47,11 +47,20 @@ function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 }
 
-export default async function RegulatoryPage({
-  searchParams,
-}: Readonly<{
+type RegulatoryPageProps = Readonly<{
   searchParams: Promise<{ from?: string; to?: string }>;
-}>) {
+}>;
+
+type RegulatorySurfaceProps = RegulatoryPageProps & Readonly<{ embedded?: boolean }>;
+
+export default function RegulatoryPage(props: RegulatoryPageProps) {
+  return <RegulatorySurface {...props} />;
+}
+
+export async function RegulatorySurface({
+  searchParams,
+  embedded = false,
+}: RegulatorySurfaceProps) {
   await requireModuleForUser('regulatory');
   const org = await currentOrgId();
   const sp = await searchParams;
@@ -71,7 +80,7 @@ export default async function RegulatoryPage({
   const crossMap = buildCrossMap();
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

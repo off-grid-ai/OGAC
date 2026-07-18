@@ -27,7 +27,6 @@ import {
   type PostureStatus,
 } from '@/lib/trust-center';
 import { collectPostureInputs } from '@/lib/trust-center-inputs';
-import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,7 +75,7 @@ export default async function TrustCenterPage() {
   const posturePillars: PillarId[] = PILLARS.filter((p) => p !== 'compliance-artifacts');
 
   return (
-    <PageFrame>
+    <>
       {
         <div className="w-full space-y-6">
           {/* Header + headline posture + export */}
@@ -272,7 +271,7 @@ export default async function TrustCenterPage() {
           </Card>
         </div>
       }
-    </PageFrame>
+    </>
   );
 }
 

@@ -1,1 +1,5 @@
-export { default } from '@/app/(console)/insights/reports/page';
+import { ReportsSurface } from '@/app/(console)/insights/reports/page';
+
+export default function TrustReportsPage() {
+  return <ReportsSurface embedded />;
+}
