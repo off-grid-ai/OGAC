@@ -34,8 +34,13 @@ interface QueryResult {
 // reason. Starter queries run against the live `bfsi` schema.
 export function QueryConsole({
   initialSql = '',
+  showHeading = true,
   starters = STARTER_QUERIES,
-}: Readonly<{ initialSql?: string; starters?: readonly StarterQuery[] }>) {
+}: Readonly<{
+  initialSql?: string;
+  showHeading?: boolean;
+  starters?: readonly StarterQuery[];
+}>) {
   const [sql, setSql] = useState(initialSql);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,16 +85,18 @@ export function QueryConsole({
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Terminal className="size-4 text-primary" />
-          Query
-        </h2>
-        <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-          Explore your warehouse with read-only SQL. Writes and schema changes are blocked — this is
-          a safe, read-only window onto your data.
-        </p>
-      </div>
+      {showHeading ? (
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Terminal className="size-4 text-primary" />
+            Query
+          </h2>
+          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+            Explore your warehouse with read-only SQL. Writes and schema changes are blocked — this
+            is a safe, read-only window onto your data.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Editor — the one legitimately-narrow measure column. */}

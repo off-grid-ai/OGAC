@@ -12,15 +12,31 @@ export const dynamic = 'force-dynamic';
 // `?sql=` param so "Query this table" deep-links land with the statement pre-filled. Starter
 // queries are chosen for the active tenant's flavour (bank vs insurer) so the insurer tenant never
 // sees bank-flavoured examples (transactions/NPA-loans/branches).
-export default async function QueryPage({
+export async function QueryPageContent({
+  embedded = false,
   searchParams,
+  showHeading = true,
 }: Readonly<{
+  embedded?: boolean;
   searchParams: Promise<{ sql?: string }>;
+  showHeading?: boolean;
 }>) {
   await requireModuleForUser('data');
   const { sql = '' } = await searchParams;
   const flavour = profileForOrg(await currentOrgId()).flavour;
   return (
-    <PageFrame>{<QueryConsole initialSql={sql} starters={starterQueriesFor(flavour)} />}</PageFrame>
+    <PageFrame embedded={embedded}>
+      <QueryConsole
+        initialSql={sql}
+        showHeading={showHeading}
+        starters={starterQueriesFor(flavour)}
+      />
+    </PageFrame>
   );
+}
+
+export default function QueryPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ sql?: string }> }>) {
+  return <QueryPageContent searchParams={searchParams} />;
 }
