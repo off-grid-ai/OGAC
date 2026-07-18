@@ -1,4 +1,6 @@
 import type { CanonicalOwnerId } from './ownership';
+import { GUARDRAILS_DESTINATIONS } from '@/lib/guardrails-destinations';
+import { LINEAGE_DESTINATIONS } from '@/components/lineage/lineage-routes';
 
 export type ContextualModuleId =
   | 'solutions-tools'
@@ -244,44 +246,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Configure protections, masking, recognizers, thresholds, and tests.',
     baseRoute: '/governance/guardrails',
     railDefaultOpen: true,
-    destinations: [
-      {
-        id: 'overview',
-        label: 'Overview',
-        description: 'Protection posture and reachability.',
-        route: '/governance/guardrails/overview',
-      },
-      {
-        id: 'protections',
-        label: 'Standard protections',
-        description: 'Built-in protection controls.',
-        route: '/governance/guardrails/protections',
-      },
-      {
-        id: 'masking',
-        label: 'Masking rules',
-        description: 'Masking and redaction behavior.',
-        route: '/governance/guardrails/masking',
-      },
-      {
-        id: 'recognizers',
-        label: 'Recognizers & deny lists',
-        description: 'Custom detection rules.',
-        route: '/governance/guardrails/recognizers',
-      },
-      {
-        id: 'thresholds',
-        label: 'Thresholds',
-        description: 'Enforcement thresholds.',
-        route: '/governance/guardrails/thresholds',
-      },
-      {
-        id: 'test',
-        label: 'Test',
-        description: 'Exercise protections before rollout.',
-        route: '/governance/guardrails/test',
-      },
-    ],
+    destinations: GUARDRAILS_DESTINATIONS,
   },
   {
     id: 'governance-secrets',
@@ -398,26 +363,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Trace datasets, processing jobs, and source-to-answer execution provenance.',
     baseRoute: '/data/lineage',
     railDefaultOpen: true,
-    destinations: [
-      {
-        id: 'graph',
-        label: 'Graph',
-        description: 'Dataset and job relationships from the lineage store.',
-        route: '/data/lineage/graph',
-      },
-      {
-        id: 'datasets',
-        label: 'Datasets',
-        description: 'Dataset schema, facets, tags, and curation.',
-        route: '/data/lineage/datasets',
-      },
-      {
-        id: 'runs',
-        label: 'Runs',
-        description: 'Source-to-answer lineage for grounded executions.',
-        route: '/data/lineage/runs',
-      },
-    ],
+    destinations: LINEAGE_DESTINATIONS,
   },
   {
     id: 'runtime-models',
