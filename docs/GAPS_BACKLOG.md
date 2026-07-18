@@ -1100,3 +1100,21 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   lists + reports + REST APIs + workflows, no code shown, governed by OGAC).** Larger than the current
   workflow/agent builder; a declarative business-app model + generic runtime. Staged build, not a
   one-shot. See the session notes — this is the north-star product, distinct from the shipped unify.
+
+## IA integration sweep (2026-07-18, commit `e8868c44`)
+
+- **[G-IA-LINKS] OPEN (P2) — the canonical-route migration still emits seven retired internal
+  URLs.** User-facing actions/search/citations in `ChatWorkspace`, `FleetTopology`, search features,
+  overview synthesis, copilot context, the overview quick actions, and the pipeline audit lens still
+  point at `/gateway/ai`, query-tab runtime URLs, or `/insights/{audit,siem,reports}`. Redirects keep
+  these links reachable, but the migration is incomplete and adds avoidable redirect hops. Point
+  every producer directly at `/runtime/models/fleet-control`, `/governance/evidence/{audit,security}`,
+  or `/governance/trust/reports`, preserving existing query parameters, and add a repository-wide
+  assertion that canonical UI producers never emit a migrated prefix.
+- **[G-IA-GATES] OPEN (P1) — the landed IA batch is not merge-gate green.** `npm test` fails three
+  navigation/presentation assertions: `contextual-navigation.test.ts` assumes every contextual module
+  has exactly three destinations, `route-presentation-ownership.test.ts` does not recognize
+  `ContextualModuleShell` layouts as the page-frame owner, and `sidebar-navigation.integration.test.ts`
+  still expects collection-root links after those collections became leaf disclosures. Update the
+  tests to prove the intended URL-driven hierarchy and single-frame/single-heading composition; do
+  not delete the coverage. Production build and typecheck pass at this commit.
