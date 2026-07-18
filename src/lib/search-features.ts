@@ -53,7 +53,7 @@ export const FEATURES: FeatureEntry[] = [
     id: 'siem-suppression',
     title: 'Suppression rules',
     subtitle: 'Security Events',
-    href: '/insights/siem',
+    href: '/governance/evidence/security',
     moduleId: 'siem',
     keywords: ['suppress', 'suppression', 'mute', 'noise', 'ignore', 'filter events', 'scanner'],
   },

@@ -131,7 +131,7 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
       push(
         'audit',
         `${r.ts.slice(0, 19)} — ${r.action} by ${r.actor} on ${r.project || 'default'}${r.model ? ` (${r.model})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
-        r.runId ? `/apps` : '/insights/audit',
+        r.runId ? '/solutions/apps' : '/governance/evidence/audit',
       );
     }
   }

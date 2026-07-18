@@ -9,7 +9,7 @@ test('matchFeatures finds a feature by an action keyword, not just its title', (
   // "suppress" isn't in any module name/description, but should surface the SIEM suppression feature.
   const hits = matchFeatures('suppress');
   assert.ok(
-    hits.some((f) => f.href === '/insights/siem'),
+    hits.some((f) => f.href === '/governance/evidence/security'),
     'searching "suppress" surfaces Security Events',
   );
 });

@@ -100,7 +100,7 @@ export default async function PipelineAuditPage({ params }: Readonly<{ params: P
 
   return (
     <div className="w-full space-y-4">
-      <LensLink pipelineName={p.name} surface="Audit" href="/insights/audit" />
+      <LensLink pipelineName={p.name} surface="Audit" href="/governance/evidence/audit" />
 
       <Card className="shadow-sm">
         <CardHeader>

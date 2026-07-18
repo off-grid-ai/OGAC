@@ -149,8 +149,8 @@ test('blocking items are newest-first, timestamped ones before the undated rollu
 test('every blocking item deep-links to its source module', () => {
   const { blocking } = synthesizeOperatorHome(fullInput());
   const byId = new Map(blocking.items.map((i) => [i.id, i.href]));
-  assert.equal(byId.get('audit:a1'), '/insights/siem?outcome=blocked');
-  assert.equal(byId.get('audit:a2'), '/insights/siem?outcome=denied');
+  assert.equal(byId.get('audit:a1'), '/governance/evidence/security?outcome=blocked');
+  assert.equal(byId.get('audit:a2'), '/governance/evidence/security?outcome=denied');
   assert.equal(byId.get('policy:d1'), '/governance/policies/overview');
   assert.equal(byId.get('guardrails:redactions'), '/governance/guardrails');
 });

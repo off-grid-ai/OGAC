@@ -68,7 +68,7 @@ const QUICK_ACTIONS = [
   { label: 'Add data source', href: '/data/integrations', icon: Plus },
   { label: 'Review policy', href: '/governance/policies/overview', icon: ShieldCheck },
   { label: 'Add knowledge', href: '/workspace/knowledge', icon: Database },
-  { label: 'Generate report', href: '/insights/reports', icon: FileText },
+  { label: 'Generate report', href: '/governance/trust/reports', icon: FileText },
 ];
 
 export default async function ConsoleHome() {

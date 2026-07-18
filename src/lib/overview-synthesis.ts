@@ -328,7 +328,7 @@ function synthesizeBlocking(
       title: e.action && e.action !== 'unknown' ? e.action : 'audited request',
       subject: e.detail || e.actor || 'unknown actor',
       ts: e.ts,
-      href: `/insights/siem?outcome=${e.outcome}`,
+      href: `/governance/evidence/security?outcome=${e.outcome}`,
     });
   }
 
