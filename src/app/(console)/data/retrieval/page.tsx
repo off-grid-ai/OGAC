@@ -5,8 +5,25 @@ import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RetrievalPage() {
+export async function RetrievalPageContent({
+  basePath,
+  embedded = false,
+  showHeading = true,
+}: Readonly<{ basePath?: string; embedded?: boolean; showHeading?: boolean }> = {}) {
   await requireModuleForUser('retrieval');
   const { data, error } = await readRetrieval();
-  return <PageFrame>{<RetrievalManager initialView={data!} initialError={error} />}</PageFrame>;
+  return (
+    <PageFrame embedded={embedded}>
+      <RetrievalManager
+        basePath={basePath}
+        initialView={data!}
+        initialError={error}
+        showHeading={showHeading}
+      />
+    </PageFrame>
+  );
+}
+
+export default function RetrievalPage() {
+  return <RetrievalPageContent />;
 }
