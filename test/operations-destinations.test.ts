@@ -5,6 +5,7 @@ import {
   CONFIGURATION_DESTINATIONS,
   EDGE_DESTINATIONS,
   HEALTH_DESTINATIONS,
+  formatRelativeTime,
   legacyHealthHref,
   operationsDestination,
   withRouteSearchParams,
@@ -74,4 +75,15 @@ test('legacy health tabs become durable leaves without losing filters', () => {
     '/operations/health/traces?svc=gateway',
   );
   assert.equal(legacyHealthHref({ tab: 'unknown' }), '/operations/health/metrics');
+});
+
+test('adapter run timestamps use stable relative labels', () => {
+  const now = Date.parse('2026-07-18T12:00:00.000Z');
+  assert.equal(formatRelativeTime(null, now), 'never');
+  assert.equal(formatRelativeTime('invalid', now), 'never');
+  assert.equal(formatRelativeTime('2026-07-18T12:00:10.000Z', now), '0s ago');
+  assert.equal(formatRelativeTime('2026-07-18T11:59:40.000Z', now), '20s ago');
+  assert.equal(formatRelativeTime('2026-07-18T11:30:00.000Z', now), '30m ago');
+  assert.equal(formatRelativeTime('2026-07-18T06:00:00.000Z', now), '6h ago');
+  assert.equal(formatRelativeTime('2026-07-16T12:00:00.000Z', now), '2d ago');
 });

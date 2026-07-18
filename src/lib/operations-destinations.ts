@@ -129,3 +129,14 @@ export function legacyHealthHref(params: RouteSearchParams): string {
   const { tab: _tab, ...rest } = params;
   return withRouteSearchParams(destination.route, rest);
 }
+
+export function formatRelativeTime(iso: string | null, now = Date.now()): string {
+  if (!iso) return 'never';
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return 'never';
+  const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3_600) return `${Math.round(seconds / 60)}m ago`;
+  if (seconds < 86_400) return `${Math.round(seconds / 3_600)}h ago`;
+  return `${Math.round(seconds / 86_400)}d ago`;
+}
