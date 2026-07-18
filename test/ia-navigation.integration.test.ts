@@ -96,10 +96,21 @@ test('canonical service journeys do not emit legacy navigation links', () => {
   assert.doesNotMatch(`${directory}\n${detail}`, /\/gateway\/services/);
 });
 
-test('gateway management tabs remain available without the legacy aggregator and own history', () => {
-  const page = readFileSync(`${ROOT}src/app/(console)/gateway/ai/page.tsx`, 'utf8');
-  const tabs = readFileSync(`${ROOT}src/components/gateway/GatewayTabs.tsx`, 'utf8');
-  assert.match(page, /<GatewayTabs[\s\S]*overview=[\s\S]*<Suspense/);
-  assert.match(tabs, /window\.history\.pushState/);
-  assert.doesNotMatch(tabs, /window\.history\.replaceState/);
+test('gateway model and API management places are durable routes', () => {
+  const legacyPage = readFileSync(`${ROOT}src/app/(console)/gateway/ai/page.tsx`, 'utf8');
+  const modelsPage = readFileSync(
+    `${ROOT}src/app/(console)/runtime/models/[destination]/page.tsx`,
+    'utf8',
+  );
+  const apiBudgetsPage = readFileSync(
+    `${ROOT}src/app/(console)/runtime/api-budgets/[destination]/page.tsx`,
+    'utf8',
+  );
+
+  assert.match(legacyPage, /legacyGatewayRedirect/);
+  assert.match(modelsPage, /contextualModule\('runtime-models'\)/);
+  assert.match(modelsPage, /<GatewayModelDestination/);
+  assert.match(apiBudgetsPage, /contextualModule\('runtime-api-budgets'\)/);
+  assert.match(apiBudgetsPage, /<GatewayApiBudgetDestination/);
+  assert.equal(existsSync(`${ROOT}src/components/gateway/GatewayTabs.tsx`), false);
 });

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function RuntimePage() {
-  redirect('/runtime/models');
+  redirect('/runtime/models/overview');
 }
