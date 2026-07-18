@@ -1,6 +1,7 @@
 import type { CanonicalOwnerId } from './ownership';
 import { GUARDRAILS_DESTINATIONS } from '@/lib/guardrails-destinations';
 import { LINEAGE_DESTINATIONS } from '@/components/lineage/lineage-routes';
+import { API_BUDGET_DESTINATIONS, MODEL_DESTINATIONS } from './runtime-routes';
 
 export type ContextualModuleId =
   | 'solutions-tools'
@@ -372,50 +373,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Manage model availability, routing, traffic, providers, and tuning.',
     baseRoute: '/runtime/models',
     railDefaultOpen: true,
-    destinations: [
-      {
-        id: 'overview',
-        label: 'Overview',
-        description: 'Model catalog and serving posture.',
-        route: '/runtime/models/overview',
-      },
-      {
-        id: 'routing',
-        label: 'Routing',
-        description: 'Model routing policies and fallbacks.',
-        route: '/runtime/models/routing',
-      },
-      {
-        id: 'traffic',
-        label: 'Traffic',
-        description: 'Current model request traffic.',
-        route: '/runtime/models/traffic',
-      },
-      {
-        id: 'logs',
-        label: 'Logs',
-        description: 'Model gateway request logs.',
-        route: '/runtime/models/logs',
-      },
-      {
-        id: 'fleet-control',
-        label: 'Fleet control',
-        description: 'Model serving controls across the fleet.',
-        route: '/runtime/models/fleet-control',
-      },
-      {
-        id: 'providers',
-        label: 'Providers',
-        description: 'Available model providers and endpoints.',
-        route: '/runtime/models/providers',
-      },
-      {
-        id: 'tuning',
-        label: 'Tuning',
-        description: 'Model tuning and runtime parameters.',
-        route: '/runtime/models/tuning',
-      },
-    ],
+    destinations: MODEL_DESTINATIONS,
   },
   {
     id: 'runtime-api-budgets',
@@ -424,26 +382,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Manage API keys, machine clients, and enforceable consumption budgets.',
     baseRoute: '/runtime/api-budgets',
     railDefaultOpen: true,
-    destinations: [
-      {
-        id: 'keys',
-        label: 'Keys',
-        description: 'API keys and credentials.',
-        route: '/runtime/api-budgets/keys',
-      },
-      {
-        id: 'clients',
-        label: 'Clients',
-        description: 'Machine clients and access scopes.',
-        route: '/runtime/api-budgets/clients',
-      },
-      {
-        id: 'budgets',
-        label: 'Budgets',
-        description: 'Usage ceilings and enforcement state.',
-        route: '/runtime/api-budgets/budgets',
-      },
-    ],
+    destinations: API_BUDGET_DESTINATIONS,
   },
 ] as const;
 
