@@ -16,9 +16,9 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
     ['Domains', '/data/domains'],
     ['Warehouse', '/data/warehouse'],
     ['Teams', '/governance/teams'],
-    ['Guardrails', '/governance/guardrails'],
-    ['Quality', '/insights/quality'],
-    ['Configuration', '/operations/configuration'],
+    ['Guardrails', '/governance/guardrails/overview'],
+    ['Quality', '/insights/quality/scorecards'],
+    ['Configuration', '/operations/configuration/settings'],
     ['Backups', '/operations/backups'],
   ]) {
     assert.match(html, new RegExp(`href="${href}"`));

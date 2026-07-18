@@ -5,21 +5,11 @@ import test from 'node:test';
 import ts from 'typescript';
 
 const routeRoot = join(process.cwd(), 'src/app/(console)');
-const contextualOwners = [
+const lifecycleLayoutOwners = [
   'build/apps/[id]/',
   'solutions/apps/[id]/',
   'build/pipelines/[id]/',
   'runtime/pipelines/[id]/',
-  'solutions/tools/',
-  'solutions/quality/',
-  'governance/access/',
-  'governance/policies/',
-  'governance/secrets/',
-  'governance/evidence/',
-  'governance/trust/',
-  'data/lineage/',
-  'runtime/models/',
-  'runtime/api-budgets/',
 ] as const;
 const canvasPages = new Set([
   'workspace/chat/page.tsx',
@@ -57,16 +47,27 @@ test('every rendered route owns a page frame or a deliberate canvas', async () =
   }
 
   const missing: string[] = [];
-  for (const path of (await walk(routeRoot)).filter((candidate) =>
-    candidate.endsWith('/page.tsx'),
-  )) {
+  const routeFiles = await walk(routeRoot);
+  const contextualLayoutOwners = (
+    await Promise.all(
+      routeFiles
+        .filter((candidate) => candidate.endsWith('/layout.tsx'))
+        .map(async (path) => ({ path, source: await readFile(path, 'utf8') })),
+    )
+  )
+    .filter(({ source }) => /(?:ContextualModule|DataContextual)Shell/.test(source))
+    .map(({ path }) => `${relative(routeRoot, path).replace(/layout\.tsx$/, '')}`);
+
+  for (const path of routeFiles.filter((candidate) => candidate.endsWith('/page.tsx'))) {
     const route = relative(routeRoot, path);
     const source = await readFile(path, 'utf8');
     if (
       source.includes("from '@/components/PageFrame'") ||
+      source.includes('EtlJobDetailContent') ||
       /^export \{ default \}/m.test(source) ||
       !containsJsx(source, path) ||
-      contextualOwners.some((owner) => route.startsWith(owner)) ||
+      lifecycleLayoutOwners.some((owner) => route.startsWith(owner)) ||
+      contextualLayoutOwners.some((owner) => route.startsWith(owner)) ||
       canvasPages.has(route)
     ) {
       continue;
