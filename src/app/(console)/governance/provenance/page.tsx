@@ -10,7 +10,13 @@ import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProvenancePage() {
+export default function ProvenancePage() {
+  return <ProvenanceSurface />;
+}
+
+export async function ProvenanceSurface({
+  embedded = false,
+}: Readonly<{ embedded?: boolean }> = {}) {
   await requireModuleForUser('provenance');
   const view = await readProvenanceView(50);
   const signing = getSigning();
@@ -22,21 +28,24 @@ export default async function ProvenancePage() {
   ];
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="w-full space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <SealCheck className="size-4" />
+          {!embedded ? (
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <SealCheck className="size-4" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Provenance</h1>
+                <p className="text-sm text-muted-foreground">
+                  Verifiable, signed provenance for answers &amp; artifacts — each record
+                  re-verified against the active signing key. Tamper-evident, offline-verifiable,
+                  on-prem.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-foreground">Provenance</h1>
-              <p className="text-sm text-muted-foreground">
-                Verifiable, signed provenance for answers &amp; artifacts — each record re-verified
-                against the active signing key. Tamper-evident, offline-verifiable, on-prem.
-              </p>
-            </div>
-          </div>
+          ) : null}
 
           {/* Stat band + signing-key control side by side on wide screens (fill the width). On mobile
           the stat band is a horizontal rail (StatRail), never a tall stack. */}

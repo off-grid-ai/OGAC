@@ -1,6 +1,14 @@
 'use client';
 
-import { Plus, Trash, ArrowSquareOut, CheckCircle, XCircle, CircleNotch, Broadcast } from '@phosphor-icons/react/dist/ssr';
+import {
+  Plus,
+  Trash,
+  ArrowSquareOut,
+  CheckCircle,
+  XCircle,
+  CircleNotch,
+  Broadcast,
+} from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -109,9 +117,7 @@ function ExporterCard({
             </Badge>
           ) : null}
         </div>
-        {t.lastDetail ? (
-          <p className="line-clamp-2 leading-4">{t.lastDetail}</p>
-        ) : null}
+        {t.lastDetail ? <p className="line-clamp-2 leading-4">{t.lastDetail}</p> : null}
         {t.lastAt ? (
           <p className="text-[10px] text-muted-foreground/70">
             {new Date(t.lastAt).toLocaleString()}
@@ -131,7 +137,12 @@ function ExporterCard({
             <Button size="sm" variant="outline" disabled={busy} onClick={() => onTest(t)}>
               {busy ? <CircleNotch className="size-3 animate-spin" /> : 'Test'}
             </Button>
-            <Button size="sm" variant="outline" disabled={busy || !t.runnable} onClick={() => onRun(t)}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || !t.runnable}
+              onClick={() => onRun(t)}
+            >
               Run
             </Button>
             <Button
@@ -241,8 +252,9 @@ function AddExporterSheet({
           />
           {kind === 'metrics' ? (
             <p className="text-[11px] text-muted-foreground">
-              Leave blank to serve metrics at <span className="font-mono">/api/v1/exporters/metrics</span>{' '}
-              for Prometheus to scrape. Set an OTLP collector URL to push instead.
+              Leave blank to serve metrics at{' '}
+              <span className="font-mono">/api/v1/exporters/metrics</span> for Prometheus to scrape.
+              Set an OTLP collector URL to push instead.
             </p>
           ) : null}
         </div>
@@ -257,8 +269,9 @@ function AddExporterSheet({
             onChange={(e) => setSecretRef(e.target.value)}
           />
           <p className="text-[11px] text-muted-foreground">
-            The OpenBao key path holding the auth token (e.g. <span className="font-mono">splunk/hec-token</span>). The
-            raw token is never stored here — write it in Secrets, then reference its key.
+            The OpenBao key path holding the auth token (e.g.{' '}
+            <span className="font-mono">splunk/hec-token</span>). The raw token is never stored here
+            — write it in Secrets, then reference its key.
           </p>
         </div>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
@@ -272,9 +285,11 @@ function AddExporterSheet({
 export function ExportersManager({
   targets,
   catalog,
+  embedded = false,
 }: Readonly<{
   targets: ExporterCardData[];
   catalog: CatalogEntry[];
+  embedded?: boolean;
 }>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -321,9 +336,11 @@ export function ExportersManager({
     async (t: ExporterCardData) => {
       setBusyId(t.id);
       const res = await fetch(`/api/v1/admin/exporters/${t.id}/run`, { method: 'POST' });
-      const body = (await res.json().catch(() => null)) as
-        | { ok?: boolean; detail?: string; count?: number }
-        | null;
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        detail?: string;
+        count?: number;
+      } | null;
       setBusyId(null);
       if (body?.ok) toast.success(body.detail ?? 'Export complete');
       else toast.error(body?.detail ?? 'Export failed');
@@ -348,14 +365,19 @@ export function ExportersManager({
   return (
     <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-medium text-foreground">Export to your stack</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Stream the platform&apos;s audit trail, data lineage, and cost/usage metrics into your own
-            SIEM, data catalog, and observability tools. Bring your own Splunk, Purview/Collibra, and
-            Grafana — the platform is a good citizen of what you already run.
-          </p>
-        </div>
+        {!embedded ? (
+          <div>
+            <h1 className="text-lg font-medium text-foreground">Export to your stack</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Stream the platform&apos;s audit trail, data lineage, and cost/usage metrics into your
+              own SIEM, data catalog, and observability tools. Bring your own Splunk,
+              Purview/Collibra, and Grafana — the platform is a good citizen of what you already
+              run.
+            </p>
+          </div>
+        ) : (
+          <span />
+        )}
         <Button size="sm" onClick={() => setPanel('new-exporter')}>
           <Plus className="size-4" />
           New exporter
@@ -365,8 +387,8 @@ export function ExportersManager({
       {targets.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No exporters yet. Add one to send audit → Splunk, lineage → Purview/Collibra, or metrics →
-            Grafana/Prometheus.
+            No exporters yet. Add one to send audit → Splunk, lineage → Purview/Collibra, or metrics
+            → Grafana/Prometheus.
           </CardContent>
         </Card>
       ) : (

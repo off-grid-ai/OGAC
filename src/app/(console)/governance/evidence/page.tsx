@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageFrame } from '@/components/PageFrame';
 
 const EVIDENCE = [
   {
@@ -27,29 +26,17 @@ const EVIDENCE = [
 
 export default function EvidencePage() {
   return (
-    <PageFrame>
-      {
-        <div className="w-full space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold">Evidence</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Prove what happened, why, and under which controls.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {EVIDENCE.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Card className="h-full transition-colors hover:border-primary/50">
-                  <CardHeader>
-                    <CardTitle className="text-base">{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">{item.body}</CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      }
-    </PageFrame>
+    <div className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {EVIDENCE.map((item) => (
+        <Link key={item.href} href={item.href}>
+          <Card className="h-full transition-colors hover:border-primary/50">
+            <CardHeader>
+              <CardTitle className="text-base">{item.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">{item.body}</CardContent>
+          </Card>
+        </Link>
+      ))}
+    </div>
   );
 }

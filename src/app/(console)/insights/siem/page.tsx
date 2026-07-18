@@ -21,11 +21,25 @@ export const dynamic = 'force-dynamic';
 // Read-back view of the OpenSearch-backed security/audit event stream (SIEM). Outcome filtering is
 // driven by the URL (?outcome=denied) — a server round-trip, no client state — so the view is
 // linkable and history-aware. Best-effort: an unreachable index degrades to zeros + an error note.
-export default async function SiemPage({
-  searchParams,
-}: Readonly<{
+type SiemPageProps = Readonly<{
   searchParams: Promise<{ outcome?: string; pipeline?: string }>;
-}>) {
+}>;
+
+type SiemSurfaceProps = SiemPageProps &
+  Readonly<{
+    embedded?: boolean;
+    basePath?: string;
+  }>;
+
+export default function SiemPage(props: SiemPageProps) {
+  return <SiemSurface {...props} />;
+}
+
+export async function SiemSurface({
+  searchParams,
+  embedded = false,
+  basePath = '/insights/siem',
+}: SiemSurfaceProps) {
   await requireModuleForUser('siem');
   const { outcome, pipeline: rawPipeline } = await searchParams;
   const orgId = await currentOrgId();
@@ -47,23 +61,29 @@ export default async function SiemPage({
   const active = data.byOutcome.some((o) => o.outcome === outcome) ? outcome : undefined;
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <ShieldWarning className="size-4" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold text-foreground">Security Events</h1>
-              <p className="text-sm text-muted-foreground">
-                SIEM read-back — the security/audit event stream indexed in OpenSearch. Actor,
-                action, outcome, and source IP for every event. Read on-prem.
-                {facetName ? (
-                  <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
-                ) : null}
-              </p>
-            </div>
+            {!embedded ? (
+              <>
+                <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <ShieldWarning className="size-4" />
+                </div>
+                <div className="flex-1">
+                  <h1 className="text-lg font-semibold text-foreground">Security Events</h1>
+                  <p className="text-sm text-muted-foreground">
+                    SIEM read-back — the security/audit event stream indexed in OpenSearch. Actor,
+                    action, outcome, and source IP for every event. Read on-prem.
+                    {facetName ? (
+                      <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
+                    ) : null}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <span className="flex-1" />
+            )}
             <PipelineFacetSelect
               pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))}
               resetParams={[]}
@@ -95,9 +115,7 @@ export default async function SiemPage({
           {/* Outcome filter — URL driven */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Link
-              href={
-                facet ? `/insights/siem?pipeline=${encodeURIComponent(facet)}` : '/insights/siem'
-              }
+              href={facet ? `${basePath}?pipeline=${encodeURIComponent(facet)}` : basePath}
               className={`rounded-md border px-2 py-1 ${!active ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
             >
               all ({data.total})
@@ -105,7 +123,7 @@ export default async function SiemPage({
             {data.byOutcome.map((o) => (
               <Link
                 key={o.outcome}
-                href={`/insights/siem?outcome=${encodeURIComponent(o.outcome)}${facetParam}`}
+                href={`${basePath}?outcome=${encodeURIComponent(o.outcome)}${facetParam}`}
                 className={`rounded-md border px-2 py-1 ${active === o.outcome ? 'border-primary text-primary' : 'border-border text-muted-foreground'}`}
               >
                 {o.outcome} ({o.count})

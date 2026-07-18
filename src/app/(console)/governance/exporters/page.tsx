@@ -11,10 +11,18 @@ export const dynamic = 'force-dynamic';
 // Full-width CRUD management surface: add/configure exporters, test connections for real, run an
 // export now, see the honest last-status. Admin module, org-scoped.
 export default async function ExportersPage() {
+  return <ExportersSurface />;
+}
+
+export async function ExportersSurface({
+  embedded = false,
+}: Readonly<{ embedded?: boolean }> = {}) {
   await requireModuleForUser('exporters');
   const orgId = await currentOrgId();
   const targets = await listExportTargets(orgId).catch(() => []);
   return (
-    <PageFrame>{<ExportersManager targets={targets} catalog={[...EXPORTER_CATALOG]} />}</PageFrame>
+    <PageFrame embedded={embedded}>
+      <ExportersManager targets={targets} catalog={[...EXPORTER_CATALOG]} embedded={embedded} />
+    </PageFrame>
   );
 }

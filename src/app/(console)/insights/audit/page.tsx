@@ -20,11 +20,25 @@ export const dynamic = 'force-dynamic';
 // adapter) and the pure audit-log view-model. EVERY filter is URL-driven (searchParams, not local
 // state) per the navigation mandate, so the view is linkable, shareable, and Back-coherent.
 // Best-effort: an unconfigured/unreachable index degrades to an empty table + a note, never a throw.
-export default async function AuditLogPage({
-  searchParams,
-}: Readonly<{
+type AuditLogPageProps = Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}>) {
+}>;
+
+type AuditLogSurfaceProps = AuditLogPageProps &
+  Readonly<{
+    embedded?: boolean;
+    basePath?: string;
+  }>;
+
+export default function AuditLogPage(props: AuditLogPageProps) {
+  return <AuditLogSurface {...props} />;
+}
+
+export async function AuditLogSurface({
+  searchParams,
+  embedded = false,
+  basePath = '/insights/audit',
+}: AuditLogSurfaceProps) {
   await requireModuleForUser('audit');
   const sp = await searchParams;
   const get = (k: string): string | null => {
@@ -66,26 +80,30 @@ export default async function AuditLogPage({
   const pageHref = (p: number) => {
     const q = auditFiltersToQuery({ ...filters, page: p }, { includePaging: true });
     const suffix = q ? `?${q}${pipeQ}` : facetHref;
-    return `/insights/audit${suffix}`;
+    return `${basePath}${suffix}`;
   };
 
   return (
-    <PageFrame>
+    <PageFrame embedded={embedded}>
       {
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <ClipboardText className="size-4" />
+            {!embedded ? (
+              <div className="flex items-center gap-3">
+                <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <ClipboardText className="size-4" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Who did what, to what, on which project — every audited action attributed to an
+                    actor, with model, tokens, cost, and outcome. Filter and export for compliance.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
-                <p className="text-sm text-muted-foreground">
-                  Who did what, to what, on which project — every audited action attributed to an
-                  actor, with model, tokens, cost, and outcome. Filter and export for compliance.
-                </p>
-              </div>
-            </div>
+            ) : (
+              <span />
+            )}
             <div className="flex items-center gap-2">
               <ExportLink href={exportCsv} label="CSV" />
               <ExportLink href={exportJson} label="JSON" />
