@@ -171,9 +171,16 @@ function guardrailPosture(g: { engine: string; reachable: boolean; configured: b
   hint: string;
   tone: HomeTile['tone'];
 } {
-  if (g.reachable && g.configured) return { value: 'ACTIVE', hint: 'blocking PII, prompt injection & unsafe content in-line', tone: 'good' };
-  if (g.engine === 'regex') return { value: 'BASELINE', hint: 'baseline PII floor active', tone: 'muted' };
-  if (g.configured && !g.reachable) return { value: 'OFFLINE', hint: 'guardrail service not responding', tone: 'bad' };
+  if (g.reachable && g.configured)
+    return {
+      value: 'ACTIVE',
+      hint: 'blocking PII, prompt injection & unsafe content in-line',
+      tone: 'good',
+    };
+  if (g.engine === 'regex')
+    return { value: 'BASELINE', hint: 'baseline PII floor active', tone: 'muted' };
+  if (g.configured && !g.reachable)
+    return { value: 'OFFLINE', hint: 'guardrail service not responding', tone: 'bad' };
   return { value: 'NOT SET', hint: 'no guardrail endpoint configured', tone: 'muted' };
 }
 function localShareTone(localShare: number): HomeTile['tone'] {
@@ -217,7 +224,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: policy.engine.toUpperCase(),
       hint: policy.reachable ? 'enforcing every request' : 'unreachable — requests uncovered',
       tone: policy.reachable ? 'good' : 'bad',
-      href: '/governance/policy',
+      href: '/governance/policies/overview',
     });
   }
   if (guardrails) {
@@ -336,7 +343,7 @@ function synthesizeBlocking(
       title: 'Policy denied',
       subject: d.path || d.input || 'policy decision',
       ts: d.timestamp,
-      href: '/governance/policy',
+      href: '/governance/policies/overview',
     });
   }
 
@@ -350,7 +357,9 @@ function synthesizeBlocking(
       source: 'guardrails',
       kind: 'redacted',
       title: `${redactedCount.toLocaleString()} PII redaction${redactedCount === 1 ? '' : 's'}`,
-      subject: guardrails ? `${guardrails.engine} engine masked sensitive data` : 'sensitive data masked',
+      subject: guardrails
+        ? `${guardrails.engine} engine masked sensitive data`
+        : 'sensitive data masked',
       ts: '', // rollup, not a single-event timestamp
       href: '/governance/guardrails',
     });
@@ -393,7 +402,8 @@ function blockingBreakdown(items: BlockingDecision[]): string {
 
 // Outcome-first one-liner for the blocking section header (brand: lead with the result).
 function blockingSummary(items: BlockingDecision[]): string {
-  if (items.length === 0) return 'Nothing was blocked in the last 24 hours — your controls held with no interventions needed.';
+  if (items.length === 0)
+    return 'Nothing was blocked in the last 24 hours — your controls held with no interventions needed.';
   const n = items.length;
   return `Your controls stopped ${n} risky action${n === 1 ? '' : 's'} in the last 24 hours — ${blockingBreakdown(items)}.`;
 }

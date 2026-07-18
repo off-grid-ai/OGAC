@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  type OperatorHomeInput,
-  synthesizeOperatorHome,
-} from '../src/lib/overview-synthesis.ts';
+import { type OperatorHomeInput, synthesizeOperatorHome } from '../src/lib/overview-synthesis.ts';
 
 // Pure operator-home synthesizer. No network, no mocks — representative module snapshots in, the
 // asserted operator-home view-model out. Covers the cross-module blocking feed (audit ∪ policy ∪
@@ -73,8 +70,20 @@ function fullInput(): OperatorHomeInput {
       },
     ],
     decisions: [
-      { id: 'd1', allow: false, path: 'offgrid/authz', input: 'action=delete', timestamp: iso(1 * HOUR) },
-      { id: 'd2', allow: true, path: 'offgrid/authz', input: 'action=read', timestamp: iso(1 * HOUR) },
+      {
+        id: 'd1',
+        allow: false,
+        path: 'offgrid/authz',
+        input: 'action=delete',
+        timestamp: iso(1 * HOUR),
+      },
+      {
+        id: 'd2',
+        allow: true,
+        path: 'offgrid/authz',
+        input: 'action=read',
+        timestamp: iso(1 * HOUR),
+      },
     ],
     services: [
       { id: 'gateway', label: 'AI Gateway', status: 'up', ms: 42 },
@@ -82,8 +91,20 @@ function fullInput(): OperatorHomeInput {
       { id: 'presidio', label: 'Presidio', status: 'down', ms: null },
     ],
     activity: [
-      { id: 'r1', agentId: 'researcher', query: 'summarize Q2', status: 'done', startedAt: iso(HOUR) },
-      { id: 'r2', agentId: 'analyst', query: 'blocked query', status: 'blocked', startedAt: iso(2 * HOUR) },
+      {
+        id: 'r1',
+        agentId: 'researcher',
+        query: 'summarize Q2',
+        status: 'done',
+        startedAt: iso(HOUR),
+      },
+      {
+        id: 'r2',
+        agentId: 'analyst',
+        query: 'blocked query',
+        status: 'blocked',
+        startedAt: iso(2 * HOUR),
+      },
     ],
     now: NOW,
     connectors: [{ status: 'connected' }, { status: 'error' }],
@@ -130,7 +151,7 @@ test('every blocking item deep-links to its source module', () => {
   const byId = new Map(blocking.items.map((i) => [i.id, i.href]));
   assert.equal(byId.get('audit:a1'), '/insights/siem?outcome=blocked');
   assert.equal(byId.get('audit:a2'), '/insights/siem?outcome=denied');
-  assert.equal(byId.get('policy:d1'), '/governance/policy');
+  assert.equal(byId.get('policy:d1'), '/governance/policies/overview');
   assert.equal(byId.get('guardrails:redactions'), '/governance/guardrails');
 });
 
@@ -235,7 +256,10 @@ test('unreachable policy / configured-but-offline guardrails tone bad', () => {
   assert.equal(g.tone, 'bad');
   assert.equal(g.value, 'OFFLINE');
   // NEVER surface the engine/product name on the tile.
-  assert.ok(!/llm.?guard|presidio|regex/i.test(g.value), `guardrail value leaked engine name: ${g.value}`);
+  assert.ok(
+    !/llm.?guard|presidio|regex/i.test(g.value),
+    `guardrail value leaked engine name: ${g.value}`,
+  );
 });
 
 test('guardrails not configured => calm NOT SET (muted), no engine name (the demo state)', () => {

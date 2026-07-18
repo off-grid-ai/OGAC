@@ -109,7 +109,7 @@ export const FEATURES: FeatureEntry[] = [
     id: 'policy-rules',
     title: 'Policy rules (ABAC / OPA)',
     subtitle: 'Policy',
-    href: '/governance/policy',
+    href: '/governance/policies/overview',
     moduleId: 'policy',
     keywords: ['policy', 'abac', 'opa', 'rego', 'deny', 'allow', 'rule'],
   },

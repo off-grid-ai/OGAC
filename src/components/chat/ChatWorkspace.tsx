@@ -132,7 +132,10 @@ function streamErrorReason(status: number): string {
   return `Request failed (${status}).`;
 }
 
-function ArtifactChip({ content, onOpen }: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
+function ArtifactChip({
+  content,
+  onOpen,
+}: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
   const art = parseArtifact(content);
   if (!art) return null;
   return (
@@ -156,13 +159,19 @@ function BranchNav({
   if (!m.branchCount || m.branchCount < 2) return null;
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-      <button onClick={() => onNav(-1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+      <button
+        onClick={() => onNav(-1)}
+        className="rounded p-0.5 hover:bg-muted hover:text-foreground"
+      >
         <CaretLeft className="size-3" />
       </button>
       <span className="tabular-nums">
         {(m.branchIndex ?? 0) + 1}/{m.branchCount}
       </span>
-      <button onClick={() => onNav(1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+      <button
+        onClick={() => onNav(1)}
+        className="rounded p-0.5 hover:bg-muted hover:text-foreground"
+      >
         <CaretRight className="size-3" />
       </button>
     </div>
@@ -174,7 +183,11 @@ function BranchNav({
 // answer starts it collapses to a one-line header the reader can re-open. Presentation state is the
 // pure `thinkingState` decision (task rule: "collapsed by default once the answer starts"); the only
 // local state is the reader's manual open/close override, seeded from that default.
-function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
+function ThinkingBlock({
+  reasoning,
+  content,
+  streaming,
+}: Readonly<{
   reasoning: string;
   content: string;
   streaming: boolean;
@@ -186,7 +199,8 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
   const scrollRef = useRef<HTMLDivElement>(null);
   // Keep the newest reasoning in view while it streams (transform/opacity-only motion elsewhere).
   useEffect(() => {
-    if (open && state.phase === 'streaming') scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    if (open && state.phase === 'streaming')
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [reasoning, open, state.phase]);
   if (!state.hasReasoning) return null;
   return (
@@ -200,9 +214,19 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
         onClick={() => setOverride(!open)}
         className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
       >
-        <Brain className={cn('size-3.5 shrink-0 text-primary', state.phase === 'streaming' && 'animate-pulse')} />
+        <Brain
+          className={cn(
+            'size-3.5 shrink-0 text-primary',
+            state.phase === 'streaming' && 'animate-pulse',
+          )}
+        />
         <span>{thinkingLabel(state.phase)}</span>
-        <CaretRight className={cn('ml-auto size-3 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+        <CaretRight
+          className={cn(
+            'ml-auto size-3 shrink-0 transition-transform duration-200',
+            open && 'rotate-90',
+          )}
+        />
       </button>
       {open ? (
         <div
@@ -219,7 +243,11 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
 // "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
 // [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
 // briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
-function SourcesFooter({ citations, activeIndex, registerRef }: Readonly<{
+function SourcesFooter({
+  citations,
+  activeIndex,
+  registerRef,
+}: Readonly<{
   citations: Citation[];
   activeIndex: number | null;
   registerRef: (index: number, el: HTMLLIElement | null) => void;
@@ -242,9 +270,12 @@ function SourcesFooter({ citations, activeIndex, registerRef }: Readonly<{
             )}
           >
             <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
-            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>{s.name}</span>
+            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>
+              {s.name}
+            </span>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} · {(s.score * 100).toFixed(0)}%
+              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} ·{' '}
+              {(s.score * 100).toFixed(0)}%
             </span>
           </li>
         ))}
@@ -300,7 +331,12 @@ function MessageBubble({
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setActiveSource(null), 1600);
   }, []);
-  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
   if (!isAssistant && editing) {
     return (
       <div className="flex justify-end">
@@ -313,7 +349,14 @@ function MessageBubble({
             className="w-full resize-none bg-transparent text-sm outline-none"
           />
           <div className="mt-2 flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setDraft(m.content); }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditing(false);
+                setDraft(m.content);
+              }}
+            >
               Cancel
             </Button>
             <Button
@@ -361,7 +404,9 @@ function MessageBubble({
         {isAssistant ? (
           m.content ? (
             <>
-              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>{m.content}</Markdown>
+              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>
+                {m.content}
+              </Markdown>
               <ArtifactChip content={m.content} onOpen={onOpenArtifact} />
               {m.citations?.length ? (
                 <SourcesFooter
@@ -415,8 +460,14 @@ function MessageBubble({
         {/* Inline generation error + retry (keeps any partial output above). */}
         {isAssistant && m.error ? (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
-            <span className="flex items-center gap-1.5"><Warning className="size-3.5 shrink-0" />{m.error}</span>
-            <button onClick={onRegenerate} className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10">
+            <span className="flex items-center gap-1.5">
+              <Warning className="size-3.5 shrink-0" />
+              {m.error}
+            </span>
+            <button
+              onClick={onRegenerate}
+              className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10"
+            >
               <ArrowsClockwise className="size-3" /> Retry
             </button>
           </div>
@@ -427,7 +478,10 @@ function MessageBubble({
       {/* Edit affordance on user turns (creates a new branch). */}
       {!isAssistant && canEdit && m.id ? (
         <button
-          onClick={() => { setDraft(m.content); setEditing(true); }}
+          onClick={() => {
+            setDraft(m.content);
+            setEditing(true);
+          }}
           className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
           title="Edit message"
         >
@@ -517,7 +571,9 @@ export function ChatWorkspace({
   const [lightbox, setLightbox] = useState<string | null>(null);
   useEffect(() => {
     if (!lightbox) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [lightbox]);
@@ -531,7 +587,9 @@ export function ChatWorkspace({
   const [toolsOpen, setToolsOpen] = useState(false);
   // Slash styles: RBAC-permitted skills invocable inline via /name. `turnSkill` applies for the
   // next turn only (its system prompt), shown as a chip in the composer.
-  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>([]);
+  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>(
+    [],
+  );
   const [turnSkill, setTurnSkill] = useState<{ id: string; name: string } | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
@@ -591,8 +649,7 @@ export function ChatWorkspace({
   const chatPipelineChip = chatPipelineId
     ? {
         id: chatPipelineId,
-        name:
-          chatBinding.pipelines.find((p) => p.id === chatPipelineId)?.name ?? chatPipelineId,
+        name: chatBinding.pipelines.find((p) => p.id === chatPipelineId)?.name ?? chatPipelineId,
         inherited: !activeProject?.pipelineId,
       }
     : { id: null };
@@ -624,7 +681,11 @@ export function ChatWorkspace({
     void (async () => {
       const r = await fetch('/api/v1/chat/models');
       if (r.ok) {
-        const body = await r.json() as { models?: ModelInfo[]; error?: string; gatewayUrl?: string };
+        const body = (await r.json()) as {
+          models?: ModelInfo[];
+          error?: string;
+          gatewayUrl?: string;
+        };
         const list: ModelInfo[] = body.models ?? [];
         setModels(list);
         if (list[0]) setModel(list[0].id);
@@ -659,7 +720,9 @@ export function ChatWorkspace({
       const r = await fetch(`/api/v1/chat/conversations/${activeId}`);
       if (!cancelled && r.ok) setMessages((await r.json()).messages ?? []);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeId, temporary]);
 
   useEffect(() => {
@@ -691,10 +754,15 @@ export function ChatWorkspace({
           out.push({ kind: 'memory', id: m.id, label: m.fact });
         }
       }
-    } catch { /* memory optional */ }
+    } catch {
+      /* memory optional */
+    }
     const projs = projects.length
       ? projects
-      : await fetch('/api/v1/chat/projects').then((r) => (r.ok ? r.json() : { projects: [] })).then((b) => b.projects ?? []).catch(() => []);
+      : await fetch('/api/v1/chat/projects')
+          .then((r) => (r.ok ? r.json() : { projects: [] }))
+          .then((b) => b.projects ?? [])
+          .catch(() => []);
     for (const p of projs as Project[]) {
       out.push({ kind: 'project', id: p.id, label: p.name, hint: 'Knowledge base' });
       try {
@@ -705,7 +773,9 @@ export function ChatWorkspace({
             out.push({ kind: 'doc', id: d.id, label: d.name, projectId: p.id, hint: p.name });
           }
         }
-      } catch { /* project docs optional */ }
+      } catch {
+        /* project docs optional */
+      }
     }
     setMentionCands(out);
   }, [projects]);
@@ -936,7 +1006,11 @@ export function ChatWorkspace({
 
   // Route dropped/pasted files: images → inline attachments, everything else → text extraction.
   function ingestFiles(list: FileList | File[]) {
-    const toFileList = (fs: File[]) => { const dt = new DataTransfer(); fs.forEach((f) => dt.items.add(f)); return dt.files; };
+    const toFileList = (fs: File[]) => {
+      const dt = new DataTransfer();
+      fs.forEach((f) => dt.items.add(f));
+      return dt.files;
+    };
     const arr = Array.from(list);
     const imgs = arr.filter((f) => f.type.startsWith('image/'));
     const rest = arr.filter((f) => !f.type.startsWith('image/'));
@@ -1000,7 +1074,7 @@ export function ChatWorkspace({
         signal: ac.signal,
       });
       if (!r.ok || !r.body) {
-        const detail = await r.json().catch(() => null) as { error?: string } | null;
+        const detail = (await r.json().catch(() => null)) as { error?: string } | null;
         const reason = detail?.error ?? streamErrorReason(r.status);
         throw new Error(reason);
       }
@@ -1056,8 +1130,9 @@ export function ChatWorkspace({
         setMessages((prev) => {
           const next = [...prev];
           const last = next.at(-1);
-          if (last?.role === 'assistant') { last.error = reason; }
-          else next.push({ role: 'assistant', content: '', error: reason });
+          if (last?.role === 'assistant') {
+            last.error = reason;
+          } else next.push({ role: 'assistant', content: '', error: reason });
           return next;
         });
       }
@@ -1095,7 +1170,11 @@ export function ChatWorkspace({
           if (r.ok && data.url) {
             next[next.length - 1] = { ...last, content: '', images: [data.url] };
           } else {
-            next[next.length - 1] = { ...last, content: '', error: data.error ?? 'Image generation failed' };
+            next[next.length - 1] = {
+              ...last,
+              content: '',
+              error: data.error ?? 'Image generation failed',
+            };
           }
         }
         return next;
@@ -1105,7 +1184,11 @@ export function ChatWorkspace({
         const next = [...prev];
         const last = next.at(-1);
         if (last?.role === 'assistant') {
-          next[next.length - 1] = { ...last, content: '', error: e instanceof Error ? e.message : 'failed' };
+          next[next.length - 1] = {
+            ...last,
+            content: '',
+            error: e instanceof Error ? e.message : 'failed',
+          };
         }
         return next;
       });
@@ -1295,8 +1378,10 @@ export function ChatWorkspace({
   else emptyStateHeading = 'Your own private AI';
   let emptyStateSubtext: string;
   if (temporary)
-    emptyStateSubtext = 'This chat won’t be saved, won’t appear in your history, and won’t update memory.';
-  else if (activeProject) emptyStateSubtext = 'Chats here use this project’s instructions and knowledge.';
+    emptyStateSubtext =
+      'This chat won’t be saved, won’t appear in your history, and won’t update memory.';
+  else if (activeProject)
+    emptyStateSubtext = 'Chats here use this project’s instructions and knowledge.';
   else emptyStateSubtext = 'Answered on-prem by the Off Grid AI gateways. Ask anything.';
   // Mic button tint: recording (destructive, pulsing) → transcribing (primary, pulsing) → idle.
   let micButtonTint: string;
@@ -1366,7 +1451,9 @@ export function ChatWorkspace({
               onClick={() => selectProject(null)}
               className={cn(
                 'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
-                !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                !activeProjectId
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               All chats
@@ -1479,7 +1566,11 @@ export function ChatWorkspace({
             >
               <List className="size-5" />
             </button>
-            {temporary ? <Ghost className="size-4 shrink-0 text-primary" /> : <Sparkle className="size-4 shrink-0 text-primary" />}
+            {temporary ? (
+              <Ghost className="size-4 shrink-0 text-primary" />
+            ) : (
+              <Sparkle className="size-4 shrink-0 text-primary" />
+            )}
             <span className="truncate">{headerTitle}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -1537,7 +1628,7 @@ export function ChatWorkspace({
             <PipelineChip pipeline={chatPipelineChip} size="xs" />
             {gatewayError ? (
               <a
-                href="/gateway/ai"
+                href="/runtime/models/overview"
                 title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — check the gateway connection in Settings`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >
@@ -1562,15 +1653,18 @@ export function ChatWorkspace({
         </div>
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className={cn('space-y-5 px-4 py-6', messages.length === 0 && !temporary && !activeStarters.length ? 'mx-auto max-w-5xl' : 'mx-auto max-w-3xl')}>
+          <div
+            className={cn(
+              'space-y-5 px-4 py-6',
+              messages.length === 0 && !temporary && !activeStarters.length
+                ? 'mx-auto max-w-5xl'
+                : 'mx-auto max-w-3xl',
+            )}
+          >
             {messages.length === 0 ? (
               <div className="pt-16 text-center text-sm text-muted-foreground">
-                <p className="text-base text-foreground">
-                  {emptyStateHeading}
-                </p>
-                <p className="mt-1">
-                  {emptyStateSubtext}
-                </p>
+                <p className="text-base text-foreground">{emptyStateHeading}</p>
+                <p className="mt-1">{emptyStateSubtext}</p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
                     {activeStarters.map((s, i) => (
@@ -1669,12 +1763,27 @@ export function ChatWorkspace({
         {/* Composer */}
         <div
           className={`relative shrink-0 border-t border-border p-3 ${dragging ? 'bg-primary/5' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true); }}
-          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
-          onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!dragging) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files);
+          }}
           onPaste={(e) => {
-            const imgs = Array.from(e.clipboardData.items).filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter((f): f is File => !!f);
-            if (imgs.length) { e.preventDefault(); ingestFiles(imgs); }
+            const imgs = Array.from(e.clipboardData.items)
+              .filter((i) => i.type.startsWith('image/'))
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => !!f);
+            if (imgs.length) {
+              e.preventDefault();
+              ingestFiles(imgs);
+            }
           }}
         >
           {dragging && (
@@ -1688,7 +1797,11 @@ export function ChatWorkspace({
                 {images.map((src, k) => (
                   <div key={k} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="h-14 w-14 rounded border border-border object-cover" />
+                    <img
+                      src={src}
+                      alt=""
+                      className="h-14 w-14 rounded border border-border object-cover"
+                    />
                     <button
                       onClick={() => setImages((p) => p.filter((_, j) => j !== k))}
                       className="absolute -right-1.5 -top-1.5 rounded-full bg-background p-0.5 text-muted-foreground hover:text-destructive"
@@ -1730,7 +1843,9 @@ export function ChatWorkspace({
                     <X className="size-3" />
                   </button>
                 </span>
-                <span className="text-[10px] text-muted-foreground">applied to your next message</span>
+                <span className="text-[10px] text-muted-foreground">
+                  applied to your next message
+                </span>
               </div>
             ) : null}
             {/* @-mention reference chips — memories + KBs/docs pulled into this turn as context. */}
@@ -1751,7 +1866,9 @@ export function ChatWorkspace({
                     )}
                     <span className="max-w-[180px] truncate">{r.label}</span>
                     <button
-                      onClick={() => setRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))}
+                      onClick={() =>
+                        setRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))
+                      }
                       className="hover:text-destructive"
                       aria-label={`Remove reference ${r.label}`}
                     >
@@ -1759,15 +1876,21 @@ export function ChatWorkspace({
                     </button>
                   </span>
                 ))}
-                <span className="text-[10px] text-muted-foreground">referenced for your next message</span>
+                <span className="text-[10px] text-muted-foreground">
+                  referenced for your next message
+                </span>
               </div>
             ) : null}
             {/* @-mention picker — two sections (Memories, Knowledge). Same interaction as slash. */}
             {mentionOpen ? (
               <div className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
                 {(() => {
-                  const memRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind === 'memory');
-                  const kbRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind !== 'memory');
+                  const memRows = mentionMatches
+                    .map((c, gi) => ({ c, gi }))
+                    .filter(({ c }) => c.kind === 'memory');
+                  const kbRows = mentionMatches
+                    .map((c, gi) => ({ c, gi }))
+                    .filter(({ c }) => c.kind !== 'memory');
                   return [
                     { key: 'memory', heading: 'Memories', rows: memRows },
                     { key: 'knowledge', heading: 'Knowledge', rows: kbRows },
@@ -1797,9 +1920,13 @@ export function ChatWorkspace({
                           ) : (
                             <Books className="size-3.5 shrink-0 text-primary" />
                           )}
-                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{c.label}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                            {c.label}
+                          </span>
                           {c.hint ? (
-                            <span className="shrink-0 text-[10px] text-muted-foreground">{c.hint}</span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                              {c.hint}
+                            </span>
                           ) : null}
                         </button>
                       ))}
@@ -1825,7 +1952,9 @@ export function ChatWorkspace({
                       <Sparkle className="size-3.5 text-primary" />/{s.name.replace(/\s+/g, '-')}
                     </span>
                     {s.description ? (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>
+                      <span className="line-clamp-1 text-xs text-muted-foreground">
+                        {s.description}
+                      </span>
                     ) : null}
                   </button>
                 ))}
@@ -1865,10 +1994,7 @@ export function ChatWorkspace({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem
-                    onSelect={() => docRef.current?.click()}
-                    disabled={uploading}
-                  >
+                  <DropdownMenuItem onSelect={() => docRef.current?.click()} disabled={uploading}>
                     <Paperclip className="mr-2 size-4" /> Attach file
                   </DropdownMenuItem>
                   {activeModel?.vision ? (
@@ -1940,9 +2066,16 @@ export function ChatWorkspace({
                     {audio.sttModels.length > 0 && (
                       <>
                         <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup value={audio.sttModel} onValueChange={audio.setSttModel}>
+                        <DropdownMenuRadioGroup
+                          value={audio.sttModel}
+                          onValueChange={audio.setSttModel}
+                        >
                           {audio.sttModels.map((m) => (
-                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
+                            <DropdownMenuRadioItem
+                              key={m.id}
+                              value={m.id}
+                              className="flex-col items-start"
+                            >
                               <span>{m.label}</span>
                               <span className="text-[10px] text-muted-foreground">{m.notes}</span>
                             </DropdownMenuRadioItem>
@@ -1954,9 +2087,16 @@ export function ChatWorkspace({
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup value={audio.ttsModel} onValueChange={audio.setTtsModel}>
+                        <DropdownMenuRadioGroup
+                          value={audio.ttsModel}
+                          onValueChange={audio.setTtsModel}
+                        >
                           {audio.ttsModels.map((m) => (
-                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
+                            <DropdownMenuRadioItem
+                              key={m.id}
+                              value={m.id}
+                              className="flex-col items-start"
+                            >
                               <span>{m.label}</span>
                               <span className="text-[10px] text-muted-foreground">{m.notes}</span>
                             </DropdownMenuRadioItem>
@@ -1966,7 +2106,10 @@ export function ChatWorkspace({
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Voice</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup value={audio.ttsVoice} onValueChange={audio.setTtsVoice}>
+                            <DropdownMenuRadioGroup
+                              value={audio.ttsVoice}
+                              onValueChange={audio.setTtsVoice}
+                            >
                               {audio.ttsVoices.map((v) => (
                                 <DropdownMenuRadioItem key={v.id} value={v.id}>
                                   {v.label}
@@ -1987,8 +2130,12 @@ export function ChatWorkspace({
                   caretRef.current = e.target.selectionStart ?? e.target.value.length;
                   setInput(e.target.value);
                 }}
-                onKeyUp={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
-                onClick={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
+                onKeyUp={(e) => {
+                  caretRef.current = e.currentTarget.selectionStart ?? 0;
+                }}
+                onClick={(e) => {
+                  caretRef.current = e.currentTarget.selectionStart ?? 0;
+                }}
                 onKeyDown={onComposerKey}
                 rows={2}
                 placeholder={
@@ -2015,7 +2162,15 @@ export function ChatWorkspace({
         </div>
       </section>
 
-      {artifact ? <ArtifactView artifact={artifact} onClose={() => setArtifact(null)} title={artifactTitle(artifact)} conversationId={activeId ?? null} onSaved={() => void refreshProjects()} /> : null}
+      {artifact ? (
+        <ArtifactView
+          artifact={artifact}
+          onClose={() => setArtifact(null)}
+          title={artifactTitle(artifact)}
+          conversationId={activeId ?? null}
+          onSaved={() => void refreshProjects()}
+        />
+      ) : null}
       <ProjectDialog
         project={dialogProject}
         open={!!dialogProject}

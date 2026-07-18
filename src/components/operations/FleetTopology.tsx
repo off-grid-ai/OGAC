@@ -85,7 +85,7 @@ export function FleetTopology({
           </div>
           <Button asChild variant="outline">
             <Link
-              href={`/runtime/models?tab=control&panel=configure-node&node=${encodeURIComponent(node.name)}`}
+              href={`/runtime/models/fleet-control?panel=configure-node&node=${encodeURIComponent(node.name)}`}
             >
               Configure node
             </Link>

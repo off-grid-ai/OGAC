@@ -66,7 +66,7 @@ async function probeHomeServices() {
 const QUICK_ACTIONS = [
   { label: 'Open chat', href: '/workspace/chat', icon: ChatCircle },
   { label: 'Add data source', href: '/data/integrations', icon: Plus },
-  { label: 'Review policy', href: '/governance/policy', icon: ShieldCheck },
+  { label: 'Review policy', href: '/governance/policies/overview', icon: ShieldCheck },
   { label: 'Add knowledge', href: '/workspace/knowledge', icon: Database },
   { label: 'Generate report', href: '/insights/reports', icon: FileText },
 ];
