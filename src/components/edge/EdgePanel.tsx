@@ -10,13 +10,14 @@ import {
   MagnifyingGlass,
   Prohibit,
   ShieldCheck,
-  X,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { WafControls } from '@/components/edge/WafControls';
-import { type KindFilter, availableKindFilters } from '@/lib/edge-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -26,445 +27,445 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-interface EdgeEvent {
-  ts: string;
-  status: number;
-  kind: 'waf' | 'rate-limit';
-  ip: string;
-  host: string;
-  method: string;
-  uri: string;
-}
-interface TrafficRow {
-  ts: string;
-  status: number;
-  ip: string;
-  host: string;
-  method: string;
-  uri: string;
-}
-interface Snapshot {
-  configured: boolean;
-  policy: {
-    rateLimit: { events: number; window: string; zone: string } | null;
-    wafEnabled: boolean;
-    wafRules: string[];
-    hosts: string[];
-  };
-  summary: { total: number; waf: number; rateLimited: number; uniqueIps: number };
-  recent: EdgeEvent[];
-  traffic?: { total: number; allowed: number; blocked: number; recent: TrafficRow[] };
-}
-
-// Group identical (ip, host, method, uri, kind) within a 10-second bucket
-interface GroupedEvent {
-  key: string;
-  ts: string;
-  status: number;
-  kind: 'waf' | 'rate-limit';
-  ip: string;
-  host: string;
-  method: string;
-  uri: string;
-  count: number;
-}
-
-function groupEvents(events: EdgeEvent[]): GroupedEvent[] {
-  const map = new Map<string, GroupedEvent>();
-  for (const e of events) {
-    // bucket by 10-second windows
-    const bucket = Math.floor(new Date(e.ts).getTime() / 10_000);
-    const key = `${bucket}|${e.kind}|${e.ip}|${e.host}|${e.method}|${e.uri}`;
-    const existing = map.get(key);
-    if (existing) {
-      existing.count++;
-    } else {
-      map.set(key, { key, ...e, count: 1 });
-    }
-  }
-  return [...map.values()];
-}
-
-type SortField = 'ts' | 'count' | 'ip' | 'host';
-type SortDir = 'asc' | 'desc';
-
-// Sort-direction indicator for a column header. Lifted to module scope (was defined inside EdgePanel)
-// so it isn't re-created each render; the sort state it needs is passed as props. Render-identical:
-// inactive → faint up/down glyph, active → emerald arrow matching the current direction.
-function SortIcon({
-  field,
-  sortField,
-  sortDir,
-}: Readonly<{ field: SortField; sortField: SortField; sortDir: SortDir }>) {
-  if (sortField !== field) return <ArrowsDownUp className="size-3 opacity-30" />;
-  return sortDir === 'desc' ? (
-    <ArrowDown className="size-3 text-primary" />
-  ) : (
-    <ArrowUp className="size-3 text-primary" />
-  );
-}
+import type { EdgeSnapshot } from '@/lib/edge-log';
+import {
+  type EdgeSortDirection,
+  type EdgeSortField,
+  type GroupedEdgeEvent,
+  type KindFilter,
+  availableKindFilters,
+  filterAndSortEdgeEvents,
+  groupEdgeEvents,
+  normalizeEdgeSortDirection,
+  normalizeEdgeSortField,
+  normalizeKindFilter,
+} from '@/lib/edge-view';
+import type { EdgeDestinationId } from '@/lib/operations-destinations';
 
 const KIND_LABELS: Record<KindFilter, string> = { all: 'All', waf: 'WAF', 'rate-limit': '429' };
 
-// Repeat-count badge severity: ≥50 hits is loud (destructive), ≥10 notable (outline), else muted.
 function countBadgeVariant(count: number): 'destructive' | 'outline' | 'secondary' {
   if (count >= 50) return 'destructive';
   if (count >= 10) return 'outline';
   return 'secondary';
 }
 
-export function EdgePanel() {
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  const [search, setSearch] = useState('');
-  const [kindFilter, setKindFilter] = useState<KindFilter>('all');
-  const [sortField, setSortField] = useState<SortField>('ts');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+function SortIcon({
+  field,
+  sortField,
+  direction,
+}: Readonly<{
+  field: EdgeSortField;
+  sortField: EdgeSortField;
+  direction: EdgeSortDirection;
+}>) {
+  if (field !== sortField) return <ArrowsDownUp className="size-3 opacity-30" />;
+  return direction === 'desc' ? (
+    <ArrowDown className="size-3 text-primary" />
+  ) : (
+    <ArrowUp className="size-3 text-primary" />
+  );
+}
+
+function useEdgeSnapshot() {
+  const [snapshot, setSnapshot] = useState<EdgeSnapshot | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        const r = await fetch('/api/v1/edge', { cache: 'no-store' });
-        if (r.ok && alive) setSnap(await r.json());
+        const response = await fetch('/api/v1/edge', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (alive) {
+          setSnapshot((await response.json()) as EdgeSnapshot);
+          setFailed(false);
+        }
       } catch {
-        /* keep last */
+        if (alive) setFailed(true);
       }
     };
-    load();
-    const t = setInterval(load, 15_000);
+    void load();
+    const timer = setInterval(load, 15_000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
 
-  const p = snap?.policy;
+  return { snapshot, failed };
+}
 
-  const grouped = useMemo(() => groupEvents(snap?.recent ?? []), [snap]);
+export function EdgePanel({ destination }: Readonly<{ destination: EdgeDestinationId }>) {
+  const { snapshot, failed } = useEdgeSnapshot();
 
-  // Which kind-filter chips to offer — driven by the ACTUAL events, so a "429"/WAF chip never shows
-  // when the edge is quiet (0 events), which would contradict the "0 blocks / 0 requests" stat band.
-  const kinds = useMemo(() => availableKindFilters(grouped), [grouped]);
+  if (!snapshot) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          {failed
+            ? 'Could not reach the edge status API. Retry after the edge is available.'
+            : 'Loading edge status...'}
+        </CardContent>
+      </Card>
+    );
+  }
 
-  // If the selected filter is no longer available (e.g. 429 was picked, then a refresh emptied the
-  // rate-limit events), fall back to 'all' so the filtered view stays coherent.
-  useEffect(() => {
-    if (!kinds.includes(kindFilter)) setKindFilter('all');
-  }, [kinds, kindFilter]);
+  if (destination === 'overview') return <OverviewDestination snapshot={snapshot} />;
+  if (destination === 'waf') return <WafDestination snapshot={snapshot} />;
+  if (destination === 'traffic') return <TrafficDestination snapshot={snapshot} />;
+  return <BlockedRequestsDestination snapshot={snapshot} />;
+}
 
-  const filtered = useMemo(() => {
-    let rows = grouped;
-    if (kindFilter !== 'all') rows = rows.filter((e) => e.kind === kindFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter(
-        (e) =>
-          e.ip.includes(q) ||
-          e.host.toLowerCase().includes(q) ||
-          e.uri.toLowerCase().includes(q) ||
-          e.method.toLowerCase().includes(q),
-      );
-    }
-    rows = [...rows].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'ts') cmp = new Date(a.ts).getTime() - new Date(b.ts).getTime();
-      else if (sortField === 'count') cmp = a.count - b.count;
-      else if (sortField === 'ip') cmp = a.ip.localeCompare(b.ip);
-      else if (sortField === 'host') cmp = a.host.localeCompare(b.host);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return rows;
-  }, [grouped, kindFilter, search, sortField, sortDir]);
+function StatusBand({ snapshot }: Readonly<{ snapshot: EdgeSnapshot }>) {
+  return (
+    <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <Status icon={GlobeSimple} value={snapshot.traffic.total} label="requests" />
+      <Status icon={ShieldCheck} value={snapshot.traffic.allowed} label="allowed" />
+      <Status icon={Prohibit} value={snapshot.summary.total} label="blocked" />
+      <Status icon={ShieldCheck} value={snapshot.summary.waf} label="WAF blocks" />
+      <Status icon={Gauge} value={snapshot.summary.rateLimited} label="rate-limited" />
+    </div>
+  );
+}
 
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortField(field);
-      setSortDir('desc');
-    }
-  };
+function Status({
+  icon: Icon,
+  value,
+  label,
+}: Readonly<{
+  icon: React.ComponentType<{ className?: string }>;
+  value: number;
+  label: string;
+}>) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className="size-4 text-muted-foreground" />
+      <span className="font-semibold tabular-nums text-foreground">{value}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
 
-  const totalBlocked = snap?.summary.total ?? 0;
-  const uniqueIps = snap?.summary.uniqueIps ?? 0;
-  const wafBlocks = snap?.summary.waf ?? 0;
-  const rateLimited = snap?.summary.rateLimited ?? 0;
-
+function OverviewDestination({ snapshot }: Readonly<{ snapshot: EdgeSnapshot }>) {
+  const policy = snapshot.policy;
   return (
     <div className="space-y-4">
-      {/* ── Header ── */}
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Gateway</h1>
-        <p className="text-sm text-muted-foreground">
-          The network gateway — the public HTTP edge (reverse proxy, WAF, rate limiting) where the
-          internet meets your fleet. Distinct from the AI Gateway, which routes LLM traffic.
-        </p>
-      </div>
-
-      {/* ── Unified status bar ── */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-        {/* Stats inline */}
-        <div className="flex items-center gap-1.5">
-          <Prohibit className="size-3.5 text-destructive" />
-          <span className="font-semibold text-foreground">{totalBlocked}</span>
-          <span className="text-muted-foreground">blocks</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck className="size-3.5 text-primary" />
-          <span className="font-semibold text-foreground">{wafBlocks}</span>
-          <span className="text-muted-foreground">WAF</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Gauge className="size-3.5 text-amber-500" />
-          <span className="font-semibold text-foreground">{rateLimited}</span>
-          <span className="text-muted-foreground">rate-limited</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <GlobeSimple className="size-3.5 text-muted-foreground" />
-          <span className="font-semibold text-foreground">{uniqueIps}</span>
-          <span className="text-muted-foreground">unique IPs</span>
-        </div>
-        {snap?.traffic ? (
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-foreground">{snap.traffic.total}</span>
-            <span className="text-muted-foreground">requests</span>
-            <span className="text-emerald-600 dark:text-emerald-400">
-              · {snap.traffic.allowed} allowed
-            </span>
-          </div>
-        ) : null}
-
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {/* Rate limit policy */}
-          {p?.rateLimit && (
-            <span className="flex items-center gap-1">
-              <Gauge className="size-3" />
-              <span className="font-mono text-foreground">{p.rateLimit.events}</span>
-              {' req / '}
-              <span className="font-mono text-foreground">{p.rateLimit.window}</span>
-              {' · '}zone {p.rateLimit.zone}
-            </span>
-          )}
-          {/* WAF status */}
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="size-3" />
-            WAF
-            <Badge
-              variant={p?.wafEnabled ? 'default' : 'outline'}
-              className="text-[10px] px-1 py-0"
-            >
-              {p?.wafEnabled ? 'on' : 'off'}
-            </Badge>
-            {p?.wafRules.map((r) => (
-              <Badge key={r} variant="secondary" className="text-[10px] px-1 py-0">
-                {r}
+      <StatusBand snapshot={snapshot} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm">Protection posture</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">WAF</span>
+              <Badge variant={policy.wafEnabled ? 'default' : 'outline'}>
+                {policy.wafEnabled ? 'on' : 'off'}
               </Badge>
-            ))}
-          </span>
-        </div>
-      </div>
-
-      {/* ── WAF control (toggle + rule CRUD) ── */}
-      <WafControls liveWafEnabled={p?.wafEnabled ?? false} liveRuleNames={p?.wafRules ?? []} />
-
-      {/* ── Blocks table ── */}
-      <div className="rounded-lg border border-border bg-card shadow-sm">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-          <span className="mr-1 text-sm font-medium text-foreground">Recent blocks</span>
-
-          {/* Kind filter */}
-          <div className="flex items-center rounded-md border border-border bg-muted/40 p-0.5">
-            {kinds.map((k) => (
-              <button
-                key={k}
-                onClick={() => setKindFilter(k)}
-                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                  kindFilter === k
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {KIND_LABELS[k]}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
-            <MagnifyingGlass className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Filter by IP, host, path…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-7 pl-7 text-xs"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter pill */}
-          {(kindFilter !== 'all' || search) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => {
-                setKindFilter('all');
-                setSearch('');
-              }}
-            >
-              <Funnel className="size-3" /> Clear
-            </Button>
-          )}
-
-          <span className="ml-auto font-mono text-xs text-muted-foreground">
-            {filtered.length} group{filtered.length !== 1 ? 's' : ''}
-            {grouped.length !== (snap?.recent ?? []).length && (
-              <span> · {(snap?.recent ?? []).length} raw</span>
-            )}
-          </span>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          {!snap ? (
-            <p className="py-12 text-center text-xs text-muted-foreground">Loading…</p>
-          ) : filtered.length === 0 ? (
-            grouped.length === 0 && snap.traffic?.recent.length ? (
-              <div>
-                <p className="px-4 py-2 text-xs text-muted-foreground">
-                  No blocked requests — the edge is quiet. Showing recent allowed traffic:
-                </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>When</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Client IP</TableHead>
-                      <TableHead>Host</TableHead>
-                      <TableHead>Request</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {snap.traffic.recent.map((e, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                          {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={e.status >= 400 ? 'destructive' : 'secondary'}
-                            className="text-[10px]"
-                          >
-                            {e.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{e.ip}</TableCell>
-                        <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">
-                          {e.host}
-                        </TableCell>
-                        <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">
-                          {e.method} {e.uri}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Rate limit</span>
+              <span className="font-mono text-xs text-foreground">
+                {policy.rateLimit
+                  ? `${policy.rateLimit.events} req / ${policy.rateLimit.window}`
+                  : 'not configured'}
+              </span>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-muted-foreground">Rules</span>
+              <span className="flex flex-wrap justify-end gap-1">
+                {policy.wafRules.length ? (
+                  policy.wafRules.map((rule) => (
+                    <Badge key={rule} variant="secondary">
+                      {rule}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground">none</span>
+                )}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm">Public hosts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {policy.hosts.length ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {policy.hosts.map((host) => (
+                  <code key={host} className="rounded-md border border-border px-3 py-2 text-xs">
+                    {host}
+                  </code>
+                ))}
               </div>
             ) : (
-              <p className="py-12 text-center text-xs text-muted-foreground">
-                {grouped.length === 0
-                  ? 'No requests logged yet. The edge is quiet.'
-                  : 'No results match your filter.'}
+              <p className="text-sm text-muted-foreground">
+                No public hosts were found in the active Caddy configuration.
               </p>
-            )
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer select-none whitespace-nowrap"
-                    onClick={() => toggleSort('ts')}
-                  >
-                    <span className="flex items-center gap-1">
-                      When <SortIcon field="ts" sortField={sortField} sortDir={sortDir} />
-                    </span>
-                  </TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('ip')}
-                  >
-                    <span className="flex items-center gap-1">
-                      Client IP <SortIcon field="ip" sortField={sortField} sortDir={sortDir} />
-                    </span>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('host')}
-                  >
-                    <span className="flex items-center gap-1">
-                      Host <SortIcon field="host" sortField={sortField} sortDir={sortDir} />
-                    </span>
-                  </TableHead>
-                  <TableHead>Request</TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none text-right"
-                    onClick={() => toggleSort('count')}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      Count <SortIcon field="count" sortField={sortField} sortDir={sortDir} />
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((e) => (
-                  <TableRow key={e.key} className={e.count >= 10 ? 'bg-destructive/5' : undefined}>
-                    <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                      {e.ts ? new Date(e.ts).toLocaleTimeString() : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={e.kind === 'waf' ? 'destructive' : 'outline'}
-                        className="text-[10px]"
-                      >
-                        {e.kind === 'waf' ? `WAF ${e.status}` : '429'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{e.ip}</TableCell>
-                    <TableCell className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">
-                      {e.host}
-                    </TableCell>
-                    <TableCell className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground">
-                      {e.method} {e.uri}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {e.count > 1 ? (
-                        <Badge
-                          variant={countBadgeVariant(e.count)}
-                          className="text-[10px] font-mono"
-                        >
-                          ×{e.count}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">1</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
+  );
+}
+
+function WafDestination({ snapshot }: Readonly<{ snapshot: EdgeSnapshot }>) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-3 text-sm">
+        <ShieldCheck className="size-4 text-primary" />
+        <span>Live WAF</span>
+        <Badge variant={snapshot.policy.wafEnabled ? 'default' : 'outline'}>
+          {snapshot.policy.wafEnabled ? 'on' : 'off'}
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          {snapshot.policy.wafRules.length} active rule
+          {snapshot.policy.wafRules.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <WafControls
+        liveWafEnabled={snapshot.policy.wafEnabled}
+        liveRuleNames={snapshot.policy.wafRules}
+      />
+    </div>
+  );
+}
+
+function TrafficDestination({ snapshot }: Readonly<{ snapshot: EdgeSnapshot }>) {
+  return (
+    <div className="space-y-4">
+      <StatusBand snapshot={snapshot} />
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Recent requests</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            The newest allowed and blocked requests in the edge access log.
+          </p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <TrafficTable rows={snapshot.traffic.recent} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function TrafficTable({ rows }: Readonly<{ rows: EdgeSnapshot['traffic']['recent'] }>) {
+  if (!rows.length) {
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">No requests logged yet.</p>
+    );
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>When</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Client IP</TableHead>
+          <TableHead>Host</TableHead>
+          <TableHead>Request</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={`${row.ts}-${row.ip}-${index}`}>
+            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              {row.ts ? new Date(row.ts).toLocaleTimeString() : '-'}
+            </TableCell>
+            <TableCell>
+              <Badge variant={row.status >= 400 ? 'destructive' : 'secondary'}>{row.status}</Badge>
+            </TableCell>
+            <TableCell className="font-mono text-xs">{row.ip}</TableCell>
+            <TableCell className="max-w-56 truncate font-mono text-xs text-muted-foreground">
+              {row.host}
+            </TableCell>
+            <TableCell className="max-w-80 truncate font-mono text-xs text-muted-foreground">
+              {row.method} {row.uri}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function BlockedRequestsDestination({ snapshot }: Readonly<{ snapshot: EdgeSnapshot }>) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const params = useSearchParams();
+  const query = params.get('q') ?? '';
+  const kind = normalizeKindFilter(params.get('kind'));
+  const sort = normalizeEdgeSortField(params.get('sort'));
+  const direction = normalizeEdgeSortDirection(params.get('direction'));
+  const grouped = useMemo(() => groupEdgeEvents(snapshot.recent), [snapshot.recent]);
+  const kinds = useMemo(() => availableKindFilters(grouped), [grouped]);
+  const safeKind = kinds.includes(kind) ? kind : 'all';
+  const rows = useMemo(
+    () => filterAndSortEdgeEvents(grouped, { kind: safeKind, query, sort, direction }),
+    [direction, grouped, query, safeKind, sort],
+  );
+
+  const href = (changes: Readonly<Record<string, string | null>>) => {
+    const next = new URLSearchParams(params.toString());
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    const suffix = next.toString();
+    return suffix ? `${pathname}?${suffix}` : pathname;
+  };
+
+  const toggleSort = (field: EdgeSortField) => {
+    const nextDirection = sort === field && direction === 'desc' ? 'asc' : 'desc';
+    router.push(
+      href({
+        sort: field === 'ts' ? null : field,
+        direction: nextDirection === 'desc' ? null : nextDirection,
+      }),
+      {
+        scroll: false,
+      },
+    );
+  };
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="border-b border-border pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="mr-1 text-sm">Recent blocks</CardTitle>
+          <nav
+            className="flex items-center rounded-md border border-border bg-muted/40 p-0.5"
+            aria-label="Blocked request type"
+          >
+            {kinds.map((candidate) => (
+              <Link
+                key={candidate}
+                href={href({ kind: candidate === 'all' ? null : candidate })}
+                scroll={false}
+                aria-current={safeKind === candidate ? 'page' : undefined}
+                className={
+                  safeKind === candidate
+                    ? 'rounded-sm bg-background px-2 py-1 text-xs font-medium text-foreground'
+                    : 'rounded-sm px-2 py-1 text-xs text-muted-foreground hover:text-foreground'
+                }
+              >
+                {KIND_LABELS[candidate]}
+              </Link>
+            ))}
+          </nav>
+          <form
+            className="relative min-w-48 flex-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const input = event.currentTarget.elements.namedItem('q') as HTMLInputElement | null;
+              router.push(href({ q: input?.value.trim() || null }), { scroll: false });
+            }}
+          >
+            <MagnifyingGlass className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              name="q"
+              type="search"
+              defaultValue={query}
+              placeholder="Filter by IP, host, method, or path"
+              className="h-8 pl-8 text-xs"
+            />
+          </form>
+          {safeKind !== 'all' || query || sort !== 'ts' || direction !== 'desc' ? (
+            <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+              <Link href={pathname} scroll={false}>
+                <Funnel className="size-3" /> Clear
+              </Link>
+            </Button>
+          ) : null}
+          <span className="ml-auto font-mono text-xs text-muted-foreground">
+            {rows.length} group{rows.length === 1 ? '' : 's'}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <BlockedTable rows={rows} sort={sort} direction={direction} onSort={toggleSort} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function BlockedTable({
+  rows,
+  sort,
+  direction,
+  onSort,
+}: Readonly<{
+  rows: GroupedEdgeEvent[];
+  sort: EdgeSortField;
+  direction: EdgeSortDirection;
+  onSort: (field: EdgeSortField) => void;
+}>) {
+  if (!rows.length) {
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">
+        No blocked requests match these filters.
+      </p>
+    );
+  }
+  const SortHead = ({ field, children }: Readonly<{ field: EdgeSortField; children: string }>) => (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        className="flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {children} <SortIcon field={field} sortField={sort} direction={direction} />
+      </button>
+    </TableHead>
+  );
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortHead field="ts">When</SortHead>
+          <TableHead>Type</TableHead>
+          <SortHead field="ip">Client IP</SortHead>
+          <SortHead field="host">Host</SortHead>
+          <TableHead>Request</TableHead>
+          <SortHead field="count">Count</SortHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.key}>
+            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              {row.ts ? new Date(row.ts).toLocaleTimeString() : '-'}
+            </TableCell>
+            <TableCell>
+              <Badge variant={row.kind === 'waf' ? 'destructive' : 'outline'}>
+                {row.kind === 'waf' ? `WAF ${row.status}` : '429'}
+              </Badge>
+            </TableCell>
+            <TableCell className="font-mono text-xs">{row.ip}</TableCell>
+            <TableCell className="max-w-56 truncate font-mono text-xs text-muted-foreground">
+              {row.host}
+            </TableCell>
+            <TableCell className="max-w-80 truncate font-mono text-xs text-muted-foreground">
+              {row.method} {row.uri}
+            </TableCell>
+            <TableCell className="text-right">
+              {row.count > 1 ? (
+                <Badge variant={countBadgeVariant(row.count)} className="font-mono">
+                  x{row.count}
+                </Badge>
+              ) : (
+                <span className="text-xs text-muted-foreground">1</span>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

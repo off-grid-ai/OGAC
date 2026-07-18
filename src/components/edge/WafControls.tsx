@@ -19,7 +19,10 @@ import { panelHref, withPanelParams } from '@/lib/url-panel';
 // (parsed from the Caddyfile) matches. Admin-gated write routes under /api/v1/admin/edge/waf.
 //
 // The edit panel's open state lives in the URL (?panel=waf-rule[&rule=<id>]) per the nav rule.
-export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
+export function WafControls({
+  liveWafEnabled,
+  liveRuleNames,
+}: Readonly<{
   liveWafEnabled: boolean;
   liveRuleNames: string[];
 }>) {
@@ -39,10 +42,14 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
     try {
       const r = await fetch('/api/v1/admin/edge/waf', { cache: 'no-store' });
       if (r.ok) setIntent((await r.json()) as EdgeIntent);
-    } catch { /* keep last */ }
+    } catch {
+      /* keep last */
+    }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // Hydrate the edit form when the panel opens for an existing rule.
   useEffect(() => {
@@ -55,8 +62,11 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
 
   const setPanel = useCallback(
     (panel: string | null, ruleId?: string) => {
-      const qs = withPanelParams(params.toString(), { panel, rule: panel ? (ruleId ?? null) : null });
-      router.replace(panelHref(pathname, qs), { scroll: false });
+      const qs = withPanelParams(params.toString(), {
+        panel,
+        rule: panel ? (ruleId ?? null) : null,
+      });
+      router.push(panelHref(pathname, qs), { scroll: false });
     },
     [params, pathname, router],
   );
@@ -95,10 +105,18 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
       const r = await fetch('/api/v1/admin/edge/waf/rules', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: editId || undefined, name: name.trim(), pattern: pattern.trim(), enabled }),
+        body: JSON.stringify({
+          id: editId || undefined,
+          name: name.trim(),
+          pattern: pattern.trim(),
+          enabled,
+        }),
       });
       const data = (await r.json().catch(() => ({}))) as { error?: string; intent?: EdgeIntent };
-      if (!r.ok) { toast.error(data.error ?? 'Failed to save rule'); return; }
+      if (!r.ok) {
+        toast.error(data.error ?? 'Failed to save rule');
+        return;
+      }
       if (data.intent) setIntent(data.intent);
       toast.success('Rule saved — applies on next edge reload');
       setPanel(null);
@@ -113,7 +131,9 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
     if (!window.confirm(`Delete WAF rule "${rule.name}"?`)) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/v1/admin/edge/waf/rules/${encodeURIComponent(rule.id)}`, { method: 'DELETE' });
+      const r = await fetch(`/api/v1/admin/edge/waf/rules/${encodeURIComponent(rule.id)}`, {
+        method: 'DELETE',
+      });
       if (!r.ok) throw new Error();
       setIntent((await r.json()) as EdgeIntent);
       toast.success('Rule deleted — applies on next edge reload');
@@ -140,12 +160,16 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
               <Warning className="size-3" /> pending — applies on next edge reload
             </Badge>
           ) : intent ? (
-            <Badge variant="secondary" className="bg-primary/10 text-[10px] text-primary">in sync</Badge>
+            <Badge variant="secondary" className="bg-primary/10 text-[10px] text-primary">
+              in sync
+            </Badge>
           ) : null}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Label htmlFor="waf-toggle" className="text-xs text-muted-foreground">WAF</Label>
+            <Label htmlFor="waf-toggle" className="text-xs text-muted-foreground">
+              WAF
+            </Label>
             <Switch
               id="waf-toggle"
               checked={intent?.wafEnabled ?? false}
@@ -153,7 +177,12 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
               onCheckedChange={(v) => void toggleWaf(v)}
             />
           </div>
-          <Button size="sm" variant="outline" disabled={!intent} onClick={() => setPanel('waf-rule')}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!intent}
+            onClick={() => setPanel('waf-rule')}
+          >
             <Plus className="size-4" /> Add rule
           </Button>
         </div>
@@ -164,7 +193,8 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
           <p className="py-4 text-center text-xs text-muted-foreground">Loading WAF intent…</p>
         ) : intent.rules.length === 0 ? (
           <p className="py-4 text-center text-xs text-muted-foreground">
-            No custom rules. The baseline Caddy ruleset still applies. Add a rule to layer on your own.
+            No custom rules. The baseline Caddy ruleset still applies. Add a rule to layer on your
+            own.
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -175,18 +205,36 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm text-foreground">{rule.name}</span>
-                      {!rule.enabled && <Badge variant="outline" className="text-[10px]">disabled</Badge>}
+                      {!rule.enabled && (
+                        <Badge variant="outline" className="text-[10px]">
+                          disabled
+                        </Badge>
+                      )}
                       {rule.enabled && !live && (
-                        <Badge variant="outline" className="text-[10px] text-amber-600">pending</Badge>
+                        <Badge variant="outline" className="text-[10px] text-amber-600">
+                          pending
+                        </Badge>
                       )}
                       {rule.enabled && live && (
-                        <Badge variant="secondary" className="bg-primary/10 text-[10px] text-primary">live</Badge>
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 text-[10px] text-primary"
+                        >
+                          live
+                        </Badge>
                       )}
                     </div>
-                    <p className="truncate font-mono text-[11px] text-muted-foreground">{rule.pattern}</p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">
+                      {rule.pattern}
+                    </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="icon" aria-label="Edit rule" onClick={() => setPanel('waf-rule', rule.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Edit rule"
+                      onClick={() => setPanel('waf-rule', rule.id)}
+                    >
                       <Pencil className="size-4" />
                     </Button>
                     <Button
@@ -221,17 +269,33 @@ export function WafControls({ liveWafEnabled, liveRuleNames }: Readonly<{
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="waf-name">Name</Label>
-            <Input id="waf-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Block admin scanners" />
-            <p className="text-xs text-muted-foreground">Shown as the block reason in the edge log.</p>
+            <Input
+              id="waf-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Block admin scanners"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown as the block reason in the edge log.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="waf-pattern">Pattern</Label>
-            <Input id="waf-pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="e.g. path starts with /wp-admin" />
-            <p className="text-xs text-muted-foreground">What the rule matches (path / user-agent / etc.).</p>
+            <Input
+              id="waf-pattern"
+              value={pattern}
+              onChange={(e) => setPattern(e.target.value)}
+              placeholder="e.g. path starts with /wp-admin"
+            />
+            <p className="text-xs text-muted-foreground">
+              What the rule matches (path / user-agent / etc.).
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Switch id="waf-rule-enabled" checked={enabled} onCheckedChange={setEnabled} />
-            <Label htmlFor="waf-rule-enabled" className="text-sm">Armed</Label>
+            <Label htmlFor="waf-rule-enabled" className="text-sm">
+              Armed
+            </Label>
           </div>
         </div>
       </FormSheet>

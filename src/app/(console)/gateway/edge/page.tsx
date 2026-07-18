@@ -1,12 +1,12 @@
-import { EdgePanel } from '@/components/edge/EdgePanel';
-import { requireModuleForUser } from '@/lib/module-access';
-import { PageFrame } from '@/components/PageFrame';
+import { redirect } from 'next/navigation';
+import {
+  EDGE_DESTINATIONS,
+  type RouteSearchParams,
+  withRouteSearchParams,
+} from '@/lib/operations-destinations';
 
-export const dynamic = 'force-dynamic';
-
-// Edge — the WAF + rate-limit control surface for the Caddy edge that fronts the
-// public hostnames. Live policy + recent blocks, read from Caddy on the same host.
-export default async function EdgePage() {
-  await requireModuleForUser('edge');
-  return <PageFrame>{<EdgePanel />}</PageFrame>;
+export default async function LegacyEdgePage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<RouteSearchParams> }>) {
+  redirect(withRouteSearchParams(EDGE_DESTINATIONS[0].route, await searchParams));
 }
