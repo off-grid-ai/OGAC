@@ -3,6 +3,10 @@ import { LINEAGE_DESTINATIONS } from '../components/lineage/lineage-routes';
 import { GUARDRAILS_DESTINATIONS } from '../lib/guardrails-destinations';
 import { INSIGHTS_AI_DESTINATIONS, INSIGHTS_QUALITY_DESTINATIONS } from '../lib/insights-routes';
 import {
+  INSIGHTS_COST_DESTINATIONS,
+  INSIGHTS_USAGE_DESTINATIONS,
+} from '../lib/insights-usage-cost-routes';
+import {
   CATALOG_DESTINATIONS,
   FLOW_DESTINATIONS,
   KNOWLEDGE_DESTINATIONS,
@@ -37,7 +41,9 @@ export type ContextualModuleId =
   | 'data-flows'
   | 'data-warehouse'
   | 'data-catalog'
-  | 'data-knowledge';
+  | 'data-knowledge'
+  | 'insights-usage'
+  | 'insights-cost';
 export type ContextualDestinationId =
   | 'registered'
   | 'catalog'
@@ -103,7 +109,12 @@ export type ContextualDestinationId =
   | 'assets'
   | 'governance'
   | 'collections'
-  | 'indexes';
+  | 'indexes'
+  | 'latency'
+  | 'adoption'
+  | 'dashboards'
+  | 'projects'
+  | 'models';
 
 export interface ContextualDestination {
   id: ContextualDestinationId;
@@ -518,6 +529,24 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     baseRoute: '/data/knowledge',
     railDefaultOpen: true,
     destinations: KNOWLEDGE_DESTINATIONS,
+  },
+  {
+    id: 'insights-usage',
+    ownerId: 'usage',
+    label: 'Usage',
+    description: 'Inspect request traffic, latency, adoption, and governed dashboards.',
+    baseRoute: '/insights/usage',
+    railDefaultOpen: true,
+    destinations: INSIGHTS_USAGE_DESTINATIONS,
+  },
+  {
+    id: 'insights-cost',
+    ownerId: 'cost',
+    label: 'Cost',
+    description: 'Attribute AI usage and spend across users, projects, and models.',
+    baseRoute: '/insights/cost',
+    railDefaultOpen: true,
+    destinations: INSIGHTS_COST_DESTINATIONS,
   },
 ] as const;
 
