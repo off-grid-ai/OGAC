@@ -646,16 +646,21 @@ services:
       - --overprovisioned
       - --node-id=0
       - --check=false
-      # Kafka API on 9092 (internal) + 19092 (host); admin 9644; schema-registry 8083.
+      # Kafka API on 9092 (internal) + 19092 (host); admin 9644; Schema Registry 8081.
       - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
       - --advertise-kafka-addr=internal://redpanda:9092,external://127.0.0.1:19092
+      - --schema-registry-addr=0.0.0.0:8081
     ports:
       - '19092:19092' # Kafka API (external)
       - '9644:9644' # admin API / metrics
-      - '18083:8083' # schema registry
+      - '18083:8081' # schema registry
     volumes: [redpanda:/var/lib/redpanda/data]
     healthcheck:
-      test: ['CMD-SHELL', 'rpk cluster health | grep -q "Healthy:.*true" || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'rpk cluster health | grep -q "Healthy:.*true" && curl --fail --silent --show-error http://127.0.0.1:8081/subjects >/dev/null',
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
