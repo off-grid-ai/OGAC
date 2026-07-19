@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { canonicalPath } from '../src/modules/route-migrations.mjs';
@@ -7,6 +7,35 @@ import { canonicalPath } from '../src/modules/route-migrations.mjs';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const routeFile = (pathname: string) =>
   `${ROOT}src/app/(console)${pathname.replace(/\[[^\]]+\]/g, (segment) => segment)}/page.tsx`;
+
+function routePageExists(pathname: string): boolean {
+  const segments = pathname.split('/').filter(Boolean);
+
+  function visit(directory: string, index: number): boolean {
+    if (index === segments.length) {
+      if (existsSync(`${directory}/page.tsx`)) return true;
+      return readdirSync(directory, { withFileTypes: true }).some(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name.startsWith('(') &&
+          entry.name.endsWith(')') &&
+          visit(`${directory}/${entry.name}`, index),
+      );
+    }
+
+    return readdirSync(directory, { withFileTypes: true }).some((entry) => {
+      if (!entry.isDirectory()) return false;
+      if (entry.name.startsWith('(') && entry.name.endsWith(')')) {
+        return visit(`${directory}/${entry.name}`, index);
+      }
+      const ownsSegment =
+        entry.name === segments[index] || (entry.name.startsWith('[') && entry.name.endsWith(']'));
+      return ownsSegment && visit(`${directory}/${entry.name}`, index + 1);
+    });
+  }
+
+  return visit(`${ROOT}src/app/(console)`, 0);
+}
 
 test('representative legacy links resolve to checked-in canonical route pages', () => {
   for (const legacy of [
@@ -21,7 +50,7 @@ test('representative legacy links resolve to checked-in canonical route pages', 
     '/operations/messaging',
   ]) {
     const canonical = canonicalPath(legacy);
-    assert.ok(existsSync(routeFile(canonical)), `${legacy} → ${canonical} has no route page`);
+    assert.ok(routePageExists(canonical), `${legacy} → ${canonical} has no route page`);
   }
 });
 

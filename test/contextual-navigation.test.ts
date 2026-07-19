@@ -33,10 +33,9 @@ test('contextual modules own complete canonical level-3 route trees', () => {
       new Set(module.destinations.map((item) => item.route)).size,
       module.destinations.length,
     );
+    assert.ok(module.destinations.every((item) => item.route.startsWith('/')));
     assert.ok(
-      module.destinations.every(
-        (item) => item.route === module.baseRoute || item.route.startsWith(`${module.baseRoute}/`),
-      ),
+      module.destinations.every((item) => contextualModuleForPath(item.route)?.id === module.id),
     );
   }
 });
@@ -57,6 +56,11 @@ test('active destination resolution is URL-driven and ignores query/hash decorat
   );
   assert.equal(contextualModuleForPath('/solutions/quality/')?.id, 'solutions-quality');
   assert.equal(contextualModuleForPath('/solutions/qualities')?.id, undefined);
+  assert.equal(contextualModuleForPath('/operations/clusters')?.id, 'operations-nodes');
+  assert.equal(contextualModuleForPath('/operations/clusters/qwythos'), undefined);
+  assert.equal(contextualModuleForPath('/operations/nodes/S1'), undefined);
+  assert.equal(contextualModuleForPath('/data/flows/orchestration/job-1'), undefined);
+  assert.equal(contextualModuleForPath('/data/catalog/customer-360'), undefined);
 });
 
 test('route ids validate before rendering and defaults are explicit', () => {

@@ -19,6 +19,7 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
     ['Guardrails', '/governance/guardrails/overview'],
     ['Quality', '/insights/quality/scorecards'],
     ['Configuration', '/operations/configuration/settings'],
+    ['Clusters', '/operations/clusters'],
     ['Backups', '/operations/backups'],
   ]) {
     assert.match(html, new RegExp(`href="${href}"`));
@@ -33,7 +34,6 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
   assert.match(html, /aria-controls="nav-section-solutions"/);
   assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 7);
   assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 7);
-  assert.doesNotMatch(html, /href="\/operations\/clusters"/);
 });
 
 test('a canonical collection layout renders content without a competing horizontal nav', () => {

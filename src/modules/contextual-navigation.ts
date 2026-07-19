@@ -17,6 +17,7 @@ import {
   CONFIGURATION_DESTINATIONS,
   EDGE_DESTINATIONS,
   HEALTH_DESTINATIONS,
+  NODE_DESTINATIONS,
 } from '../lib/operations-destinations';
 import { API_BUDGET_DESTINATIONS, MODEL_DESTINATIONS } from './runtime-routes';
 
@@ -43,7 +44,8 @@ export type ContextualModuleId =
   | 'data-catalog'
   | 'data-knowledge'
   | 'insights-usage'
-  | 'insights-cost';
+  | 'insights-cost'
+  | 'operations-nodes';
 export type ContextualDestinationId =
   | 'registered'
   | 'catalog'
@@ -114,7 +116,9 @@ export type ContextualDestinationId =
   | 'adoption'
   | 'dashboards'
   | 'projects'
-  | 'models';
+  | 'models'
+  | 'nodes'
+  | 'clusters';
 
 export interface ContextualDestination {
   id: ContextualDestinationId;
@@ -131,6 +135,8 @@ export interface ContextualModule {
   baseRoute: string;
   /** The active module's destinations stay visible on desktop until the operator collapses them. */
   railDefaultOpen: boolean;
+  /** Exact leaves keep nested entity-detail routes under their own lifecycle presentation. */
+  destinationScope?: 'subtree' | 'exact';
   destinations: readonly ContextualDestination[];
 }
 
@@ -501,6 +507,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Operate replication syncs and orchestrated data movement.',
     baseRoute: '/data/flows',
     railDefaultOpen: true,
+    destinationScope: 'exact',
     destinations: FLOW_DESTINATIONS,
   },
   {
@@ -510,6 +517,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Inspect warehouse tables and run governed read-only queries.',
     baseRoute: '/data/warehouse',
     railDefaultOpen: true,
+    destinationScope: 'exact',
     destinations: WAREHOUSE_DESTINATIONS,
   },
   {
@@ -519,6 +527,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Manage data assets and the governance controls applied to them.',
     baseRoute: '/data/catalog',
     railDefaultOpen: true,
+    destinationScope: 'exact',
     destinations: CATALOG_DESTINATIONS,
   },
   {
@@ -528,6 +537,7 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     description: 'Curate governed knowledge collections and retrieval indexes.',
     baseRoute: '/data/knowledge',
     railDefaultOpen: true,
+    destinationScope: 'exact',
     destinations: KNOWLEDGE_DESTINATIONS,
   },
   {
@@ -548,6 +558,16 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
     railDefaultOpen: true,
     destinations: INSIGHTS_COST_DESTINATIONS,
   },
+  {
+    id: 'operations-nodes',
+    ownerId: 'nodes',
+    label: 'Physical nodes',
+    description: 'Inspect registry-driven physical nodes and their compute-cluster relationships.',
+    baseRoute: '/operations/nodes',
+    railDefaultOpen: true,
+    destinationScope: 'exact',
+    destinations: NODE_DESTINATIONS,
+  },
 ] as const;
 
 function stripUrlDecoration(value: string): string {
@@ -559,6 +579,19 @@ function pathIsWithin(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
+function destinationOwnsPath(
+  module: ContextualModule,
+  destination: ContextualDestination,
+  pathname: string,
+): boolean {
+  // A default leaf may intentionally share the module root. Treat that root as exact so entity
+  // detail routes such as /data/catalog/[id] and /operations/nodes/[id] keep their own lifecycle
+  // shell instead of being mistaken for the collection overview.
+  return module.destinationScope === 'exact' || destination.route === module.baseRoute
+    ? pathname === destination.route
+    : pathIsWithin(pathname, destination.route);
+}
+
 export function contextualModule(id: ContextualModuleId): ContextualModule {
   const module = CONTEXTUAL_MODULES.find((candidate) => candidate.id === id);
   if (!module) throw new Error(`Unknown contextual module: ${id}`);
@@ -567,7 +600,11 @@ export function contextualModule(id: ContextualModuleId): ContextualModule {
 
 export function contextualModuleForPath(url: string): ContextualModule | undefined {
   const pathname = stripUrlDecoration(url);
-  return CONTEXTUAL_MODULES.find((module) => pathIsWithin(pathname, module.baseRoute));
+  return CONTEXTUAL_MODULES.find(
+    (module) =>
+      pathname === module.baseRoute ||
+      module.destinations.some((destination) => destinationOwnsPath(module, destination, pathname)),
+  );
 }
 
 export function contextualModuleForOwner(ownerId: CanonicalOwnerId): ContextualModule | undefined {
@@ -580,7 +617,7 @@ export function contextualDestinationForPath(
 ): ContextualDestination | undefined {
   const pathname = stripUrlDecoration(url);
   return module.destinations
-    .filter((destination) => pathIsWithin(pathname, destination.route))
+    .filter((destination) => destinationOwnsPath(module, destination, pathname))
     .sort((a, b) => b.route.length - a.route.length)[0];
 }
 
