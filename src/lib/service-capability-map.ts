@@ -14,10 +14,10 @@ export type CapabilityGate = (typeof CAPABILITY_GATES)[number];
 export type CapabilityGateStatus = 'yes' | 'partial' | 'no';
 
 export const CAPABILITY_GATE_LABELS: Readonly<Record<CapabilityGate, string>> = {
-  upstream: 'Available upstream',
-  adapter: 'Adapter / API',
+  upstream: 'Available',
+  adapter: 'Integrated',
   ui: 'UI exposed',
-  workflow: 'Production workflow',
+  workflow: 'Used in workflow',
 };
 
 export interface CapabilityGateAssessment {

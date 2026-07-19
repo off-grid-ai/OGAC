@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toDisplayHostname } from '@/lib/display-host';
+import { summarizeServiceCapabilityAudit } from '@/lib/service-capability-map';
 import type { ServiceTopologyDetailEntry } from '@/lib/service-directory-view';
 import type { ServiceHealth } from '@/lib/service-health';
 import type { ServiceControl } from '@/lib/services-directory';
@@ -74,6 +75,7 @@ export function ServiceDetail({
   const isHttp = service.displayUrl !== null;
   const ups = history.filter((s) => s.status !== 'down').length;
   const uptimePct = history.length ? Math.round((ups / history.length) * 100) : null;
+  const capabilityAudit = summarizeServiceCapabilityAudit(service.id);
 
   async function reprobe() {
     await probe();
@@ -103,6 +105,15 @@ export function ServiceDetail({
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{service.description}</p>
         </div>
         <div className="flex items-center gap-2">
+          {capabilityAudit.status === 'audited' && (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/operations/services/capability-map?service=${encodeURIComponent(service.id)}`}
+              >
+                Capability map
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" disabled={probing} onClick={() => void reprobe()}>
             <ArrowClockwise className={`size-4 ${probing ? 'animate-spin' : ''}`} /> Re-check health
           </Button>

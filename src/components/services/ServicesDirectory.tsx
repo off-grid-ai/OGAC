@@ -4,8 +4,10 @@ import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHostname } from '@/lib/display-host';
+import { summarizeServiceCapabilityAudit } from '@/lib/service-capability-map';
 import type { ServiceTopologyDirectoryEntry } from '@/lib/service-directory-view';
 import { isHealthy, type ServiceHealth } from '@/lib/service-health';
 import { HEALTH_UI, ReadinessStrip } from './ServiceReadiness';
@@ -57,6 +59,7 @@ function ServiceCard({
   s,
   h,
 }: Readonly<{ s: ServiceTopologyDirectoryEntry; h: ServiceHealth | undefined }>) {
+  const audit = summarizeServiceCapabilityAudit(s.id);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
@@ -80,6 +83,26 @@ function ServiceCard({
         </span>
       </div>
       <ReadinessStrip readiness={s.readiness} health={h} />
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase text-muted-foreground">
+          Capability audit
+        </span>
+        {audit.status === 'audited' ? (
+          <Badge
+            variant="outline"
+            className="rounded-md px-1.5 py-0 font-mono text-[9px] font-normal"
+          >
+            {audit.productionItems}/{audit.totalItems} in workflow
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="rounded-md px-1.5 py-0 font-mono text-[9px] font-normal"
+          >
+            not audited
+          </Badge>
+        )}
+      </div>
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
         {s.displayUrl ? (
@@ -134,29 +157,34 @@ export function ServicesDirectory({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Services</h1>
           <p className="text-sm text-muted-foreground">
             Every Off Grid AI surface and internal service with live health.
           </p>
         </div>
-        {checkedAt && (
-          <div className="text-right font-mono text-xs text-muted-foreground">
-            <span
-              className={
-                upCount === checkedCount
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-amber-500'
-              }
-            >
-              {upCount}/{checkedCount} probes non-failing
-            </span>
-            <div className="text-[10px] text-muted-foreground">
-              checked {new Date(checkedAt).toLocaleTimeString()}
+        <div className="flex items-center gap-3">
+          {checkedAt && (
+            <div className="text-right font-mono text-xs text-muted-foreground">
+              <span
+                className={
+                  upCount === checkedCount
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-amber-500'
+                }
+              >
+                {upCount}/{checkedCount} probes non-failing
+              </span>
+              <div className="text-[10px] text-muted-foreground">
+                checked {new Date(checkedAt).toLocaleTimeString()}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+          <Button asChild variant="outline" size="sm">
+            <Link href="/operations/services/capability-map">Capability map</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Grouped sections — each group is a quiet header + one consistent responsive grid,
