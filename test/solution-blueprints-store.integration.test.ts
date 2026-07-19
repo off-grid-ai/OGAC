@@ -261,7 +261,11 @@ test(
     assert.ok(driftedApp);
     await assert.rejects(
       store.assertSolutionRuntimeBinding(driftedApp, ORG_A),
-      (error: unknown) => (error as { code?: string }).code === 'runtime-drift',
+      (error: unknown) => {
+        const drift = error as { code?: string; errors?: string[] };
+        return drift.code === 'runtime-drift' && drift.errors?.includes('pinned pipeline changed');
+      },
+      'runtime drift preserves the specific underlying contract evidence',
     );
     const { submitAppRun } = await import('@/lib/adapters/apprun');
     await assert.rejects(

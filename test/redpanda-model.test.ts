@@ -25,6 +25,29 @@ test('normalizes Redpanda partitions and groups topic ownership', () => {
   ]);
 });
 
+test('sorts numeric broker ids numerically and preserves alternate Redpanda field names', () => {
+  const partitions = normalizePartitions([
+    {
+      namespace: 'kafka',
+      topic: 'events',
+      partition: 0,
+      leader_id: 10,
+      replica_ids: [10, 2],
+    },
+    {
+      ns: 'kafka',
+      topic: 'events',
+      partition_id: 1,
+      leader_id: 2,
+      replicas: [{ node_id: 2 }, { node_id: 10 }],
+    },
+  ]);
+
+  assert.deepEqual(groupTopics(partitions), [
+    { namespace: 'kafka', name: 'events', partitions: 2, leaders: [2, 10], replicas: [2, 10] },
+  ]);
+});
+
 test('validates names and schemas at the pure boundary', () => {
   assert.equal(requiredName(' subject ', 'subject'), 'subject');
   assert.deepEqual(parseSchema({ schema: '{}', schemaType: 'json' }), {

@@ -47,24 +47,22 @@ function numberList(value: unknown): number[] {
   return value.filter((item): item is number => typeof item === 'number');
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
 export function normalizePartitions(value: unknown): RedpandaPartition[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
     const row = item as Record<string, unknown>;
-    const namespace =
-      typeof row.ns === 'string'
-        ? row.ns
-        : typeof row.namespace === 'string'
-          ? row.namespace
-          : null;
-    const topic = typeof row.topic === 'string' ? row.topic : null;
-    const partition =
-      typeof row.partition_id === 'number'
-        ? row.partition_id
-        : typeof row.partition === 'number'
-          ? row.partition
-          : null;
+    const namespace = optionalString(row.ns) ?? optionalString(row.namespace);
+    const topic = optionalString(row.topic);
+    const partition = optionalNumber(row.partition_id) ?? optionalNumber(row.partition);
     if (namespace === null || topic === null || partition === null) return [];
     const replicas = Array.isArray(row.replicas)
       ? row.replicas.flatMap((replica) => {
@@ -119,8 +117,8 @@ export function groupTopics(partitions: RedpandaPartition[]): RedpandaTopic[] {
   return [...topics.values()]
     .map((topic) => ({
       ...topic,
-      leaders: [...topic.leaders].sort(),
-      replicas: [...topic.replicas].sort(),
+      leaders: [...topic.leaders].sort((a, b) => a - b),
+      replicas: [...topic.replicas].sort((a, b) => a - b),
     }))
     .sort((a, b) => `${a.namespace}/${a.name}`.localeCompare(`${b.namespace}/${b.name}`));
 }

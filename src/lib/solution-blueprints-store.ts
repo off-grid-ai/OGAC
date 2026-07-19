@@ -133,7 +133,8 @@ async function seedBlueprints(orgId: string): Promise<void> {
     if ((state?.catalogVersion ?? 0) >= SOLUTION_BLUEPRINT_CATALOG_VERSION) return;
 
     for (const seed of SEEDED_SOLUTION_BLUEPRINTS) {
-      const id = `sbp_${hash12(`${orgId}:${seed.key}`)}`;
+      const seedIdentity = `${orgId}:${seed.key}`;
+      const id = `sbp_${hash12(seedIdentity)}`;
       await tx
         .insert(solutionBlueprints)
         .values({
@@ -520,6 +521,9 @@ export async function updateSolutionDeployment(
     await compatibleBinding(orgId, merged);
   }
   const transitionedAt = new Date();
+  let pausedAt = current.pausedAt;
+  if (patch.status === 'paused') pausedAt ??= transitionedAt;
+  if (patch.status === 'active') pausedAt = null;
   const [row] = await db
     .update(solutionDeployments)
     .set({
@@ -528,12 +532,7 @@ export async function updateSolutionDeployment(
         patch.status === 'active' && current.status === 'paused'
           ? transitionedAt
           : current.activatedAt,
-      pausedAt:
-        patch.status === 'paused'
-          ? (current.pausedAt ?? transitionedAt)
-          : patch.status === 'retired'
-            ? current.pausedAt
-            : null,
+      pausedAt,
       retiredAt: patch.status === 'retired' ? transitionedAt : null,
       updatedAt: transitionedAt,
     })
@@ -602,7 +601,7 @@ export async function assertSolutionRuntimeBinding(
       throw new SolutionConflictError(
         'Active solution deployment drifted from its governed runtime contract',
         'runtime-drift',
-        error instanceof SolutionConflictError ? error.errors : error.errors,
+        error.errors,
       );
     }
     throw error;
