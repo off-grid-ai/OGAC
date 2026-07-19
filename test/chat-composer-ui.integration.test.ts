@@ -36,3 +36,15 @@ test('chat composer extends the shared textarea with a complete listbox contract
   assert.match(chatSource, /role="group"/);
   assert.match(chatSource, /aria-labelledby=\{`chat-mention-group-\$\{section\.key\}`\}/);
 });
+
+test('chat actions are non-submitting and mention rendering has a dedicated owner', () => {
+  const nativeButtons = chatSource.match(/<button\b[^>]*>/gs) ?? [];
+  const sharedButtons = chatSource.match(/<Button\b[^>]*>/gs) ?? [];
+
+  assert.ok(nativeButtons.length > 0);
+  assert.ok(sharedButtons.length > 0);
+  assert.ok(nativeButtons.every((button) => /type="button"/.test(button)));
+  assert.ok(sharedButtons.every((button) => /type="button"/.test(button)));
+  assert.match(chatSource, /function MentionSuggestionList\(/);
+  assert.doesNotMatch(chatSource, /\{\(\(\) => \{/);
+});

@@ -130,6 +130,85 @@ function streamErrorReason(status: number): string {
   return `Request failed (${status}).`;
 }
 
+function MentionSuggestionList({
+  matches,
+  activeIndex,
+  onActiveIndexChange,
+  onPick,
+}: Readonly<{
+  matches: MentionCandidate[];
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  onPick: (candidate: MentionCandidate) => void;
+}>) {
+  const indexed = matches.map((candidate, index) => ({ candidate, index }));
+  const sections = [
+    {
+      key: 'memory',
+      heading: 'Memories',
+      rows: indexed.filter(({ candidate }) => candidate.kind === 'memory'),
+    },
+    {
+      key: 'knowledge',
+      heading: 'Knowledge',
+      rows: indexed.filter(({ candidate }) => candidate.kind !== 'memory'),
+    },
+  ];
+
+  return (
+    <div
+      id="chat-mention-suggestions"
+      role="listbox"
+      aria-label="Memory and knowledge suggestions"
+      className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
+    >
+      {sections.map((section) =>
+        section.rows.length ? (
+          <div key={section.key} role="group" aria-labelledby={`chat-mention-group-${section.key}`}>
+            <div
+              id={`chat-mention-group-${section.key}`}
+              className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60"
+            >
+              {section.heading}
+            </div>
+            {section.rows.map(({ candidate, index }) => (
+              <button
+                key={`${candidate.kind}:${candidate.id}`}
+                id={`chat-mention-option-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                onMouseEnter={() => onActiveIndexChange(index)}
+                onClick={() => onPick(candidate)}
+                className={cn(
+                  'flex w-full items-center gap-2 px-3 py-2 text-left',
+                  index === activeIndex ? 'bg-primary/10' : 'hover:bg-muted',
+                )}
+              >
+                {candidate.kind === 'memory' ? (
+                  <Brain className="size-3.5 shrink-0 text-primary" />
+                ) : candidate.kind === 'doc' ? (
+                  <FileText className="size-3.5 shrink-0 text-primary" />
+                ) : (
+                  <Books className="size-3.5 shrink-0 text-primary" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                  {candidate.label}
+                </span>
+                {candidate.hint ? (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {candidate.hint}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
 function ArtifactChip({
   content,
   onOpen,
@@ -138,6 +217,7 @@ function ArtifactChip({
   if (!art) return null;
   return (
     <button
+      type="button"
       onClick={() => onOpen(art)}
       className="mt-2 rounded border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/10"
     >
@@ -158,6 +238,7 @@ function BranchNav({
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
       <button
+        type="button"
         onClick={() => onNav(-1)}
         className="rounded p-0.5 hover:bg-muted hover:text-foreground"
       >
@@ -167,6 +248,7 @@ function BranchNav({
         {(m.branchIndex ?? 0) + 1}/{m.branchCount}
       </span>
       <button
+        type="button"
         onClick={() => onNav(1)}
         className="rounded p-0.5 hover:bg-muted hover:text-foreground"
       >
@@ -339,15 +421,17 @@ function MessageBubble({
     return (
       <div className="flex justify-end">
         <div className="w-[90%] rounded-lg border border-primary/40 bg-primary/5 p-2">
-          <textarea
+          <Textarea
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={Math.min(8, draft.split('\n').length + 1)}
-            className="w-full resize-none bg-transparent text-sm outline-none"
+            aria-label="Edit message"
+            className="w-full resize-none !border-0 !bg-transparent text-sm !shadow-none !outline-none focus-visible:!border-transparent focus-visible:!outline-none"
           />
           <div className="mt-2 flex justify-end gap-2">
             <Button
+              type="button"
               size="sm"
               variant="outline"
               onClick={() => {
@@ -358,6 +442,7 @@ function MessageBubble({
               Cancel
             </Button>
             <Button
+              type="button"
               size="sm"
               onClick={() => {
                 const t = draft.trim();
@@ -418,6 +503,7 @@ function MessageBubble({
               ) : null}
               <div className="mt-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
+                  type="button"
                   onClick={() => onCopy(m.content)}
                   className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   title="Copy"
@@ -425,6 +511,7 @@ function MessageBubble({
                   <Copy className="size-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => m.id && onSpeak(m.id, m.content)}
                   className={cn(
                     'rounded p-1 hover:bg-muted hover:text-foreground',
@@ -440,6 +527,7 @@ function MessageBubble({
                 </button>
                 {canRegenerate ? (
                   <button
+                    type="button"
                     onClick={onRegenerate}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                     title="Regenerate"
@@ -463,6 +551,7 @@ function MessageBubble({
               {m.error}
             </span>
             <button
+              type="button"
               onClick={onRegenerate}
               className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10"
             >
@@ -476,6 +565,7 @@ function MessageBubble({
       {/* Edit affordance on user turns (creates a new branch). */}
       {!isAssistant && canEdit && m.id ? (
         <button
+          type="button"
           onClick={() => {
             setDraft(m.content);
             setEditing(true);
@@ -825,6 +915,20 @@ export function ChatWorkspace({
         caretRef.current = pos;
       }
     });
+  }
+
+  function removeImageAt(index: number) {
+    setImages((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function removeFileAt(index: number) {
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function removeReference(reference: MentionRef) {
+    setRefs((current) =>
+      current.filter((item) => !(item.kind === reference.kind && item.id === reference.id)),
+    );
   }
 
   // Composer keydown: drive the slash picker (arrows/enter/tab/escape) when open, else send.
@@ -1425,6 +1529,7 @@ export function ChatWorkspace({
         {/* Top: primary action + search */}
         <div className="space-y-2 p-2.5">
           <Button
+            type="button"
             onClick={newChat}
             className="w-full justify-start gap-2 transition-transform duration-150 active:scale-[0.98]"
             size="sm"
@@ -1449,6 +1554,7 @@ export function ChatWorkspace({
               Projects
             </span>
             <button
+              type="button"
               onClick={newProject}
               aria-label="New project"
               className="text-muted-foreground transition-colors duration-150 hover:text-primary"
@@ -1458,6 +1564,7 @@ export function ChatWorkspace({
           </div>
           <div className="space-y-0.5">
             <button
+              type="button"
               onClick={() => selectProject(null)}
               className={cn(
                 'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
@@ -1471,6 +1578,7 @@ export function ChatWorkspace({
             {projects.map((p) => (
               <button
                 key={p.id}
+                type="button"
                 onClick={() => selectProject(p.id)}
                 className={cn(
                   'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
@@ -1498,6 +1606,7 @@ export function ChatWorkspace({
             Chats
           </span>
           <button
+            type="button"
             onClick={() => setSkillsOpen(true)}
             className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors duration-150 hover:text-primary"
           >
@@ -1644,6 +1753,7 @@ export function ChatWorkspace({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     className="min-w-0 flex-1 justify-between gap-2 rounded-lg bg-background/80 font-mono text-xs font-normal shadow-sm sm:max-w-[22rem] sm:flex-none"
@@ -1720,6 +1830,7 @@ export function ChatWorkspace({
                     {activeStarters.map((s, i) => (
                       <button
                         key={i}
+                        type="button"
                         onClick={() => sendStarter(s)}
                         className="rounded-lg border border-border p-3 text-left text-xs text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
                       >
@@ -1741,6 +1852,7 @@ export function ChatWorkspace({
                       {visibleConversations.slice(0, 9).map((c) => (
                         <button
                           key={c.id}
+                          type="button"
                           onClick={() => openConversation(c.id)}
                           className="group flex flex-col gap-2 rounded-lg border border-border bg-card p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
                         >
@@ -1799,10 +1911,15 @@ export function ChatWorkspace({
                 </div>
               ))}
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => resolveApprovals(true)}>
+                <Button type="button" size="sm" onClick={() => resolveApprovals(true)}>
                   Approve &amp; run
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => resolveApprovals(false)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resolveApprovals(false)}
+                >
                   Deny
                 </Button>
               </div>
@@ -1853,7 +1970,8 @@ export function ChatWorkspace({
                       className="h-14 w-14 rounded border border-border object-cover"
                     />
                     <button
-                      onClick={() => setImages((p) => p.filter((_, j) => j !== k))}
+                      type="button"
+                      onClick={() => removeImageAt(k)}
                       className="absolute -right-1.5 -top-1.5 rounded-full bg-background p-0.5 text-muted-foreground hover:text-destructive"
                     >
                       <X className="size-3" />
@@ -1875,7 +1993,8 @@ export function ChatWorkspace({
                       {(f.chars / 1000).toFixed(1)}k
                     </span>
                     <button
-                      onClick={() => setFiles((p) => p.filter((_, j) => j !== k))}
+                      type="button"
+                      onClick={() => removeFileAt(k)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="size-3" />
@@ -1889,7 +2008,11 @@ export function ChatWorkspace({
                 <span className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-primary">
                   <Sparkle className="size-3.5" />
                   {turnSkill.name}
-                  <button onClick={() => setTurnSkill(null)} className="hover:text-destructive">
+                  <button
+                    type="button"
+                    onClick={() => setTurnSkill(null)}
+                    className="hover:text-destructive"
+                  >
                     <X className="size-3" />
                   </button>
                 </span>
@@ -1916,9 +2039,8 @@ export function ChatWorkspace({
                     )}
                     <span className="max-w-[180px] truncate">{r.label}</span>
                     <button
-                      onClick={() =>
-                        setRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))
-                      }
+                      type="button"
+                      onClick={() => removeReference(r)}
                       className="hover:text-destructive"
                       aria-label={`Remove reference ${r.label}`}
                     >
@@ -1933,73 +2055,12 @@ export function ChatWorkspace({
             ) : null}
             {/* @-mention picker — two sections (Memories, Knowledge). Same interaction as slash. */}
             {mentionOpen ? (
-              <div
-                id="chat-mention-suggestions"
-                role="listbox"
-                aria-label="Memory and knowledge suggestions"
-                className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
-              >
-                {(() => {
-                  const memRows = mentionMatches
-                    .map((c, gi) => ({ c, gi }))
-                    .filter(({ c }) => c.kind === 'memory');
-                  const kbRows = mentionMatches
-                    .map((c, gi) => ({ c, gi }))
-                    .filter(({ c }) => c.kind !== 'memory');
-                  return [
-                    { key: 'memory', heading: 'Memories', rows: memRows },
-                    { key: 'knowledge', heading: 'Knowledge', rows: kbRows },
-                  ];
-                })().map((section) => {
-                  const rows = section.rows;
-                  if (!rows.length) return null;
-                  return (
-                    <div
-                      key={section.key}
-                      role="group"
-                      aria-labelledby={`chat-mention-group-${section.key}`}
-                    >
-                      <div
-                        id={`chat-mention-group-${section.key}`}
-                        className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60"
-                      >
-                        {section.heading}
-                      </div>
-                      {rows.map(({ c, gi }) => (
-                        <button
-                          key={`${c.kind}:${c.id}`}
-                          id={`chat-mention-option-${gi}`}
-                          type="button"
-                          role="option"
-                          aria-selected={gi === mentionIndex}
-                          onMouseEnter={() => setMentionIndex(gi)}
-                          onClick={() => pickMention(c)}
-                          className={cn(
-                            'flex w-full items-center gap-2 px-3 py-2 text-left',
-                            gi === mentionIndex ? 'bg-primary/10' : 'hover:bg-muted',
-                          )}
-                        >
-                          {c.kind === 'memory' ? (
-                            <Brain className="size-3.5 shrink-0 text-primary" />
-                          ) : c.kind === 'doc' ? (
-                            <FileText className="size-3.5 shrink-0 text-primary" />
-                          ) : (
-                            <Books className="size-3.5 shrink-0 text-primary" />
-                          )}
-                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                            {c.label}
-                          </span>
-                          {c.hint ? (
-                            <span className="shrink-0 text-[10px] text-muted-foreground">
-                              {c.hint}
-                            </span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+              <MentionSuggestionList
+                matches={mentionMatches}
+                activeIndex={mentionIndex}
+                onActiveIndexChange={setMentionIndex}
+                onPick={pickMention}
+              />
             ) : null}
             {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
             {slashOpen ? (
@@ -2095,6 +2156,7 @@ export function ChatWorkspace({
                   <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
                     <DropdownMenuTrigger asChild>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className={cn(
@@ -2158,6 +2220,7 @@ export function ChatWorkspace({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     onClick={audio.toggleRecording}
@@ -2172,6 +2235,7 @@ export function ChatWorkspace({
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="icon"
                           className="size-8 rounded-lg text-muted-foreground"
@@ -2249,6 +2313,7 @@ export function ChatWorkspace({
                 </div>
                 {streaming ? (
                   <Button
+                    type="button"
                     size="icon"
                     variant="outline"
                     className="size-9 rounded-xl"
@@ -2259,6 +2324,7 @@ export function ChatWorkspace({
                   </Button>
                 ) : (
                   <Button
+                    type="button"
                     size="icon"
                     className="size-9 rounded-xl shadow-sm"
                     onClick={send}
