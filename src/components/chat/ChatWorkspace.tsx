@@ -40,6 +40,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -635,6 +636,18 @@ export function ChatWorkspace({
   const mentionMatches = mention
     ? matchMentions(mentionCands, mention.query, { exclude: refs, limit: 8 })
     : [];
+  const suggestionListboxId =
+    mentionOpen && mentionMatches.length
+      ? 'chat-mention-suggestions'
+      : slashOpen && slashMatches.length
+        ? 'chat-skill-suggestions'
+        : undefined;
+  const activeSuggestionId =
+    mentionOpen && mentionMatches.length
+      ? `chat-mention-option-${mentionIndex}`
+      : slashOpen && slashMatches.length
+        ? `chat-skill-option-${slashIndex}`
+        : undefined;
   const activeProject = projects.find((p) => p.id === activeProjectId);
   // The pipeline governing THIS chat: the active project's override (if pinned), else the org default —
   // most-specific-wins, the SAME pure rule the run path uses. Named + linked via the chip by the model
@@ -1552,7 +1565,7 @@ export function ChatWorkspace({
       {/* Thread — min-h-0 so the flex-1 message list can shrink and scroll internally, pinning the
           composer to the bottom instead of letting it float mid-page with dead space below. */}
       <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3 sm:px-4">
+        <div className="grid min-h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 border-b border-border px-3 py-1.5 sm:flex sm:px-4 sm:py-0">
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {/* Mobile-only: open the conversation/project drawer. ≥44px tap target. */}
             <button
@@ -1570,41 +1583,62 @@ export function ChatWorkspace({
             )}
             <span className="truncate">{headerTitle}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <button
-              onClick={toggleTemporary}
-              className={cn(
-                'hover:text-foreground',
-                temporary ? 'text-primary' : 'text-muted-foreground',
-              )}
-              title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
-            >
-              <Ghost className="size-4" />
-            </button>
-            <button
-              onClick={() => setPanel('memory')}
-              className="text-muted-foreground hover:text-foreground"
-              title="Memory"
-            >
-              <Brain className="size-4" />
-            </button>
-            <button
-              onClick={() => setPanel('settings')}
-              className="text-muted-foreground hover:text-foreground"
-              title="Custom instructions"
-            >
-              <SlidersHorizontal className="size-4" />
-            </button>
+          <div className="col-span-2 flex min-w-0 items-center gap-1.5 sm:col-span-1 sm:ml-auto sm:shrink-0 sm:gap-2">
+            <div className="hidden items-center gap-1 sm:flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={toggleTemporary}
+                className={cn(
+                  'size-9 rounded-lg hover:text-foreground',
+                  temporary ? 'text-primary' : 'text-muted-foreground',
+                )}
+                title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
+                aria-label={temporary ? 'Exit temporary chat' : 'Start temporary chat'}
+                aria-pressed={temporary}
+              >
+                <Ghost className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setPanel('memory')}
+                className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
+                title="Memory"
+                aria-label="Open memory"
+              >
+                <Brain className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setPanel('settings')}
+                className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
+                title="Custom instructions"
+                aria-label="Open custom instructions"
+              >
+                <SlidersHorizontal className="size-4" />
+              </Button>
+            </div>
             {/* The pipeline governing this chat (project override → org default). Names + links it so
                 the join-key is legible in chat, right by the model picker. */}
-            <PipelineChip pipeline={chatPipelineChip} size="xs" />
+            <PipelineChip
+              pipeline={chatPipelineChip}
+              size="xs"
+              containerClassName="min-w-0 shrink"
+              className="min-w-0 max-w-[8rem] shrink sm:max-w-none"
+            />
             {gatewayError ? (
               <a
                 href="/runtime/models/overview"
                 title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — check the gateway connection in Settings`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >
-                <span>⚠ gateway offline</span>
+                <Warning className="size-3.5 shrink-0" />
+                <span className="truncate">Gateway offline</span>
               </a>
             ) : (
               <DropdownMenu>
@@ -1612,7 +1646,7 @@ export function ChatWorkspace({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="max-w-[13rem] justify-between gap-2 rounded-lg bg-background/80 font-mono text-xs font-normal shadow-sm sm:max-w-[22rem]"
+                    className="min-w-0 flex-1 justify-between gap-2 rounded-lg bg-background/80 font-mono text-xs font-normal shadow-sm sm:max-w-[22rem] sm:flex-none"
                     aria-label="Choose model"
                     disabled={models.length === 0}
                   >
@@ -1640,6 +1674,31 @@ export function ChatWorkspace({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 shrink-0 rounded-lg text-muted-foreground sm:hidden"
+                  aria-label="Open chat options"
+                >
+                  <GearSix className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 sm:hidden">
+                <DropdownMenuCheckboxItem checked={temporary} onCheckedChange={toggleTemporary}>
+                  <Ghost className="mr-2 size-4" /> Temporary chat
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setPanel('memory')}>
+                  <Brain className="mr-2 size-4" /> Memory
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel('settings')}>
+                  <SlidersHorizontal className="mr-2 size-4" /> Custom instructions
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1874,7 +1933,12 @@ export function ChatWorkspace({
             ) : null}
             {/* @-mention picker — two sections (Memories, Knowledge). Same interaction as slash. */}
             {mentionOpen ? (
-              <div className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              <div
+                id="chat-mention-suggestions"
+                role="listbox"
+                aria-label="Memory and knowledge suggestions"
+                className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
+              >
                 {(() => {
                   const memRows = mentionMatches
                     .map((c, gi) => ({ c, gi }))
@@ -1890,13 +1954,24 @@ export function ChatWorkspace({
                   const rows = section.rows;
                   if (!rows.length) return null;
                   return (
-                    <div key={section.key}>
-                      <div className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+                    <div
+                      key={section.key}
+                      role="group"
+                      aria-labelledby={`chat-mention-group-${section.key}`}
+                    >
+                      <div
+                        id={`chat-mention-group-${section.key}`}
+                        className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60"
+                      >
                         {section.heading}
                       </div>
                       {rows.map(({ c, gi }) => (
                         <button
                           key={`${c.kind}:${c.id}`}
+                          id={`chat-mention-option-${gi}`}
+                          type="button"
+                          role="option"
+                          aria-selected={gi === mentionIndex}
                           onMouseEnter={() => setMentionIndex(gi)}
                           onClick={() => pickMention(c)}
                           className={cn(
@@ -1928,10 +2003,19 @@ export function ChatWorkspace({
             ) : null}
             {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
             {slashOpen ? (
-              <div className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+              <div
+                id="chat-skill-suggestions"
+                role="listbox"
+                aria-label="Skill suggestions"
+                className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+              >
                 {slashMatches.map((s, i) => (
                   <button
                     key={s.id}
+                    id={`chat-skill-option-${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === slashIndex}
                     onMouseEnter={() => setSlashIndex(i)}
                     onClick={() => pickSkill(s)}
                     className={cn(
@@ -1974,7 +2058,9 @@ export function ChatWorkspace({
               data-og-surface="raised"
               className="rounded-2xl border border-border/80 bg-card/95 shadow-[0_10px_30px_-22px_hsl(var(--foreground)/0.45)] transition-[border-color,box-shadow] focus-within:border-primary/45 focus-within:shadow-[0_14px_36px_-24px_hsl(var(--primary)/0.65)]"
             >
-              <textarea
+              {/* The shared Textarea owns the accessible control/ref contract; this composed
+                  raised surface owns only chat-specific layout and suggestion wiring. */}
+              <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => {
@@ -1995,7 +2081,13 @@ export function ChatWorkspace({
                     : 'Ask Off Grid AI… Use / for skills and @ for context'
                 }
                 aria-label="Message Off Grid AI"
-                className="max-h-48 min-h-16 w-full resize-none overflow-y-auto bg-transparent px-4 pb-2 pt-3.5 text-sm leading-6 outline-none placeholder:text-muted-foreground/80"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-expanded={Boolean(suggestionListboxId)}
+                aria-controls={suggestionListboxId}
+                aria-activedescendant={activeSuggestionId}
+                className="max-h-48 min-h-16 w-full resize-none overflow-y-auto !border-0 !bg-transparent px-4 pb-2 pt-3.5 text-sm leading-6 !shadow-none !outline-none placeholder:text-muted-foreground/80 focus-visible:!border-transparent focus-visible:!outline-none"
               />
               <div className="flex items-center justify-between gap-3 px-2 pb-2">
                 <div className="flex min-w-0 items-center gap-0.5">

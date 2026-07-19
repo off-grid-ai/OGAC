@@ -28,10 +28,12 @@ export interface PipelineChipData {
 export function PipelineChip({
   pipeline,
   className,
+  containerClassName,
   size = 'sm',
 }: Readonly<{
   pipeline: PipelineChipData | null | undefined;
   className?: string;
+  containerClassName?: string;
   size?: 'sm' | 'xs';
 }>) {
   const text = size === 'xs' ? 'text-[11px]' : 'text-xs';
@@ -54,7 +56,7 @@ export function PipelineChip({
   return (
     <Link
       href={`/runtime/pipelines/${pipeline.id}`}
-      className="no-underline"
+      className={cn('min-w-0 no-underline', containerClassName)}
       title={
         pipeline.inherited
           ? `Inherits the org-default chat pipeline "${label}" — open it`
@@ -70,10 +72,12 @@ export function PipelineChip({
         )}
       >
         <GitBranch className="size-3" />
-        <span className="text-muted-foreground">Runs on:</span>
-        <span className="max-w-[14rem] truncate font-medium">{label}</span>
+        <span className={cn('text-muted-foreground', size === 'xs' && 'hidden md:inline')}>
+          Runs on:
+        </span>
+        <span className="max-w-[7rem] truncate font-medium sm:max-w-[14rem]">{label}</span>
         {pipeline.inherited ? (
-          <span className="text-muted-foreground">(org default)</span>
+          <span className="hidden text-muted-foreground lg:inline">(org default)</span>
         ) : null}
       </Badge>
     </Link>
