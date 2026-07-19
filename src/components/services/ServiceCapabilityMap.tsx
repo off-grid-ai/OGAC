@@ -468,6 +468,9 @@ export function ServiceCapabilityMap({
     ? audits.filter((audit) => audit.serviceId === selectedServiceId)
     : audits;
   const selectionMissing = selectedServiceId !== null && visibleAudits.length === 0;
+  const selectedInventoryEntry = selectedServiceId
+    ? inventory.entries.find((entry) => entry.id === selectedServiceId)
+    : null;
 
   return (
     <div className="w-full space-y-6">
@@ -539,11 +542,16 @@ export function ServiceCapabilityMap({
       {selectedServiceId && selectionMissing ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">This service has not been audited</CardTitle>
+            <CardTitle className="text-sm">
+              {selectedInventoryEntry
+                ? `${selectedInventoryEntry.label} capability audit pending`
+                : 'Service not found'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            No denominator or coverage percentage is assigned. Choose an audited service above or
-            use the full inventory to open its canonical owner.
+            {selectedInventoryEntry
+              ? 'No denominator or coverage percentage is assigned. Choose an audited service above or use the full inventory to open its canonical owner.'
+              : 'This identifier is not part of the reconciled service inventory. Choose a service from the full inventory below.'}
           </CardContent>
         </Card>
       ) : selectedServiceId ? (

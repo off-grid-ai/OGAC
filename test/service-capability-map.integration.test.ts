@@ -103,6 +103,32 @@ test('full inventory renders the exact 49/5/44 contract without inventing pendin
   assert.match(html, /Six enterprise systems live in Data/);
 });
 
+test('deep links distinguish a pending capability audit from an unknown service id', () => {
+  const pendingHtml = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: inventory(),
+      inventoryFilter: {},
+      selectedServiceId: 'postgres',
+    }),
+  );
+  const unknownHtml = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: inventory(),
+      inventoryFilter: {},
+      selectedServiceId: 'not-a-service',
+    }),
+  );
+
+  assert.match(pendingHtml, /Console Database capability audit pending/);
+  assert.match(pendingHtml, /No denominator or coverage percentage is assigned/);
+  assert.doesNotMatch(pendingHtml, /Service not found/);
+  assert.match(unknownHtml, /Service not found/);
+  assert.match(unknownHtml, /not part of the reconciled service inventory/);
+  assert.doesNotMatch(unknownHtml, /capability audit pending/);
+});
+
 test('inventory filtering is URL-backed, searchable, and preserves an audited selection', () => {
   const html = renderToStaticMarkup(
     createElement(ServiceCapabilityMap, {
