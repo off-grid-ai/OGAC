@@ -1,6 +1,5 @@
 import { ArrowLeft, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +26,7 @@ import {
   filterServiceInventory,
   SERVICE_INVENTORY_FAMILIES,
   SERVICE_INVENTORY_OWNERS,
+  serviceCapabilityMapHref,
   type LogicalServiceInventoryEntry,
   type ServiceInventoryFilter,
   type ServiceInventoryReconciliation,
@@ -77,12 +77,6 @@ function inventoryRouteLabel(entry: LogicalServiceInventoryEntry): string {
   return entry.owner === 'operations-services' ? 'Service detail' : 'Data sources';
 }
 
-function preserveSelectionHref(selectedServiceId: string | null): string {
-  return selectedServiceId
-    ? `/operations/services/capability-map?service=${encodeURIComponent(selectedServiceId)}`
-    : '/operations/services/capability-map';
-}
-
 function GateBadge({ assessment }: Readonly<{ assessment: CapabilityGateAssessment }>) {
   return (
     <Badge
@@ -99,7 +93,12 @@ function GateBadge({ assessment }: Readonly<{ assessment: CapabilityGateAssessme
 function AuditSummaryCard({
   audit,
   active,
-}: Readonly<{ audit: ServiceCapabilityAudit; active: boolean }>) {
+  inventoryFilter,
+}: Readonly<{
+  audit: ServiceCapabilityAudit;
+  active: boolean;
+  inventoryFilter: ServiceInventoryFilter;
+}>) {
   const summary = summarizeServiceCapabilityAudit(audit.serviceId);
   if (summary.status !== 'audited') return null;
   const coverage = capabilityCoveragePercent(summary);
@@ -111,7 +110,7 @@ function AuditSummaryCard({
       }
     >
       <Link
-        href={`/operations/services/capability-map?service=${encodeURIComponent(audit.serviceId)}`}
+        href={serviceCapabilityMapHref({ ...inventoryFilter, serviceId: audit.serviceId })}
         data-og-interactive
         data-capability-summary-card={audit.serviceId}
         aria-current={active ? 'page' : undefined}
@@ -357,7 +356,7 @@ function FullServiceInventory({
             </Button>
             {hasFilter ? (
               <Button asChild variant="outline" size="sm">
-                <Link href={preserveSelectionHref(selectedServiceId)}>Clear</Link>
+                <Link href={serviceCapabilityMapHref({ serviceId: selectedServiceId })}>Clear</Link>
               </Button>
             ) : null}
           </form>
@@ -373,7 +372,9 @@ function FullServiceInventory({
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-foreground">No inventory entry matches these filters.</p>
               <Button asChild variant="link" size="sm" className="mt-1">
-                <Link href={preserveSelectionHref(selectedServiceId)}>Clear filters</Link>
+                <Link href={serviceCapabilityMapHref({ serviceId: selectedServiceId })}>
+                  Clear filters
+                </Link>
               </Button>
             </div>
           ) : (
@@ -484,7 +485,9 @@ export function ServiceCapabilityMap({
         <div className="flex flex-wrap gap-2">
           {selectedServiceId ? (
             <Button asChild variant="outline" size="sm">
-              <Link href="/operations/services/capability-map">Show all audited services</Link>
+              <Link href={serviceCapabilityMapHref(inventoryFilter)}>
+                Show all audited services
+              </Link>
             </Button>
           ) : null}
           <Button asChild variant="outline" size="sm">
@@ -527,6 +530,7 @@ export function ServiceCapabilityMap({
               key={audit.serviceId}
               audit={audit}
               active={selectedServiceId === audit.serviceId}
+              inventoryFilter={inventoryFilter}
             />
           ))}
         </div>

@@ -9,6 +9,7 @@ import {
   isServiceInventoryFamily,
   isServiceInventoryOwner,
   reconcileServiceInventory,
+  serviceCapabilityMapHref,
 } from '../src/lib/service-inventory.ts';
 
 function canonicalServices(): ServiceEntry[] {
@@ -131,4 +132,21 @@ test('inventory filter guards accept only canonical URL values', () => {
   assert.equal(isServiceInventoryFamily('unknown'), false);
   assert.equal(isServiceInventoryOwner('operations-services'), true);
   assert.equal(isServiceInventoryOwner('operations'), false);
+});
+
+test('capability map URLs preserve explicit search, facets, and service selection', () => {
+  assert.equal(serviceCapabilityMapHref(), '/operations/services/capability-map');
+  assert.equal(
+    serviceCapabilityMapHref({
+      serviceId: 'otel collector',
+      query: 'trace id',
+      family: 'observability',
+      owner: 'operations-services',
+    }),
+    '/operations/services/capability-map?service=otel+collector&q=trace+id&family=observability&owner=operations-services',
+  );
+  assert.equal(
+    serviceCapabilityMapHref({ serviceId: 'otel-collector', query: '   ' }),
+    '/operations/services/capability-map?service=otel-collector',
+  );
 });

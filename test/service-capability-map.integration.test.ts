@@ -121,6 +121,18 @@ test('inventory filtering is URL-backed, searchable, and preserves an audited se
   assert.match(html, /name="owner"/);
   assert.match(html, /name="service" value="otel-collector"/);
   assert.match(html, /1\/49 entries/);
+  assert.match(
+    html,
+    /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=observability"[^>]*>Show all audited services/,
+  );
+  assert.match(
+    html,
+    /href="\/operations\/services\/capability-map\?service=evidently&amp;q=telemetry&amp;family=observability"/,
+  );
+  assert.match(
+    html,
+    /href="\/operations\/services\/capability-map\?service=otel-collector"[^>]*>Clear<\/a>/,
+  );
 });
 
 test('every mapped capability links to an existing console route module', () => {
@@ -133,6 +145,31 @@ test('every mapped capability links to an existing console route module', () => 
         `${audit.serviceId}/${item.id} -> ${item.uiHref} (${modulePath})`,
       );
     }
+  }
+});
+
+test('every inventory row links to its existing canonical IA owner route', () => {
+  const reconciled = inventory();
+  const html = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: reconciled,
+      inventoryFilter: {},
+      selectedServiceId: null,
+    }),
+  );
+
+  for (const entry of reconciled.entries) {
+    assert.equal(
+      existsSync(routeModule(entry.routes.management)),
+      true,
+      `${entry.id} -> ${entry.routes.management}`,
+    );
+    assert.match(
+      html,
+      new RegExp(`href="${entry.routes.management.replaceAll('/', '\\/')}"`),
+      `${entry.id} renders its canonical management link`,
+    );
   }
 });
 

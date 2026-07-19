@@ -102,6 +102,10 @@ export interface ServiceInventoryFilter {
   owner?: ServiceInventoryOwner | '';
 }
 
+export interface ServiceCapabilityMapUrlState extends ServiceInventoryFilter {
+  serviceId?: string | null;
+}
+
 type CapabilityAuditLookup = (serviceId: string) => ServiceCapabilityAudit | null;
 type CapabilitySummaryLookup = (serviceId: string) => ServiceCapabilitySummary;
 
@@ -389,4 +393,20 @@ export function isServiceInventoryFamily(value: string): value is ServiceInvento
 
 export function isServiceInventoryOwner(value: string): value is ServiceInventoryOwner {
   return (SERVICE_INVENTORY_OWNERS as readonly string[]).includes(value);
+}
+
+/** Preserve the capability-map navigation state in one canonical, shareable URL. */
+export function serviceCapabilityMapHref({
+  serviceId = null,
+  query = '',
+  family = '',
+  owner = '',
+}: ServiceCapabilityMapUrlState = {}): string {
+  const params = new URLSearchParams();
+  if (serviceId) params.set('service', serviceId);
+  if (query.trim()) params.set('q', query);
+  if (family) params.set('family', family);
+  if (owner) params.set('owner', owner);
+  const search = params.toString();
+  return `/operations/services/capability-map${search ? `?${search}` : ''}`;
 }
