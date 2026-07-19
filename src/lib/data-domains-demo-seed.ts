@@ -31,6 +31,7 @@
 //   (docs/GAPS_BACKLOG.md #106-a) rather than hidden.
 
 import type { AppSpec, AppStep, AppEdge } from '@/lib/app-model';
+import { findEnterpriseSource } from '@/lib/enterprise-source-registry';
 
 // ─── Connector shape the seed declares (subset of store.ts Connector) ────────────────────────────
 // The store mints connector ids itself (con_<random>), so the seed matches an existing connector by
@@ -64,45 +65,26 @@ export interface SeedDomainSpec {
 // host (S1 at 127.0.0.1) where the data-source containers run. NEVER add a connector here that
 // isn't a real container in data-sources.yml.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-const DS_HOST = '127.0.0.1';
+const SEED_SOURCE_KEYS = ['corebank', 'policyadmin', 'erp', 'crm', 'minio'] as const;
 
-export const SEED_CONNECTORS: SeedConnectorSpec[] = [
-  {
-    key: 'corebank',
-    name: 'Core Banking (Postgres)',
-    type: 'postgres',
-    endpoint: `postgres://corebank@${DS_HOST}:5433/corebank`,
-    description: 'Core banking OLTP — customers, policies, claims, transactions.',
-  },
-  {
-    key: 'policyadmin',
-    name: 'Policy Admin (MySQL)',
-    type: 'mysql',
-    endpoint: `mysql://policyadmin@${DS_HOST}:3307/policyadmin`,
-    description: 'Policy administration — branches, agents, commissions, employee reimbursement quota.',
-  },
-  {
-    key: 'erp',
-    name: 'Finance ERP (MSSQL)',
-    type: 'mssql',
-    endpoint: `mssql://sa@${DS_HOST}:1433/master`,
-    description: 'Finance ERP — general ledger and invoices.',
-  },
-  {
-    key: 'crm',
-    name: 'CRM (REST)',
-    type: 'rest',
-    endpoint: `http://${DS_HOST}:8090`,
-    description: 'CRM REST API — accounts, opportunities, contacts.',
-  },
-  {
-    key: 'minio',
-    name: 'Warehouse Object Store (S3/MinIO)',
-    type: 's3',
-    endpoint: `http://${DS_HOST}:9010`,
-    description: 'S3-compatible warehouse / invoice-archive object store.',
-  },
-];
+const SEED_SOURCE_NAMES: Readonly<Record<(typeof SEED_SOURCE_KEYS)[number], string>> = {
+  corebank: 'Core Banking (Postgres)',
+  policyadmin: 'Policy Admin (MySQL)',
+  erp: 'Finance ERP (MSSQL)',
+  crm: 'CRM (REST)',
+  minio: 'Warehouse Object Store (S3/MinIO)',
+};
+
+export const SEED_CONNECTORS: SeedConnectorSpec[] = SEED_SOURCE_KEYS.map((key) => {
+  const source = findEnterpriseSource(key);
+  return {
+    key,
+    name: SEED_SOURCE_NAMES[key],
+    type: source.connectorType,
+    endpoint: source.seedEndpoint,
+    description: source.description,
+  };
+});
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // DEMO data-domains — the org's declarations, each bound to a real connector above. These are what
