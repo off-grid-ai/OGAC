@@ -53,7 +53,7 @@ export default async function CollectionDetailPage({
         </div>
         <div>
           <Link
-            href="/workspace/knowledge"
+            href="/data/knowledge"
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3" /> Organization Knowledge

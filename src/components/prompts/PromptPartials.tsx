@@ -122,7 +122,7 @@ export function PromptPartials() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <Link
-              href="/workspace/prompts"
+              href="/work/prompts"
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3" /> Prompts

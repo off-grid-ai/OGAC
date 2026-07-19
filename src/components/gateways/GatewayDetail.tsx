@@ -480,7 +480,7 @@ export function GatewayDetail({
                       <TableRow key={p.id}>
                         <TableCell>
                           <Link
-                            href={`/build/pipelines/${p.id}`}
+                            href={`/runtime/pipelines/${p.id}`}
                             className="text-foreground hover:text-primary hover:underline"
                           >
                             {p.name}

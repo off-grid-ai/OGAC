@@ -90,7 +90,7 @@ test(
     );
     assert.equal(
       rows.find((row) => row.kind === 'app')?.href,
-      `/build/apps/claims-app/runs/${SHARED_ID}`,
+      `/solutions/apps/claims-app/runs/${SHARED_ID}`,
       'app execution stays owned by its app lifecycle detail and actions',
     );
 

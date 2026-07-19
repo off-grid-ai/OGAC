@@ -33,7 +33,7 @@ export default async function PromptRegistryPage({
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/workspace/prompts">Manage prompts</Link>
+            <Link href="/work/prompts">Manage prompts</Link>
           </Button>
         </CardHeader>
       </Card>

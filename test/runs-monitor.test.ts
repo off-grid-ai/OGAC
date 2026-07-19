@@ -99,7 +99,7 @@ test('fromAppRun: title fallback, key, href, duration, actor from input', () => 
   assert.equal(row.status, 'succeeded');
   assert.equal(row.durationMs, 1000);
   assert.equal(row.actor, 'mohammed@ex.com');
-  assert.equal(row.href, '/build/apps/app_x/runs/apprun_1');
+  assert.equal(row.href, '/solutions/apps/app_x/runs/apprun_1');
 });
 
 test('fromAppRun: title missing → appId; a step awaiting_human forces paused even if top status lags', () => {

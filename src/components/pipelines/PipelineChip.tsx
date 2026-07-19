@@ -53,7 +53,7 @@ export function PipelineChip({
   const label = pipeline.name?.trim() || pipeline.id;
   return (
     <Link
-      href={`/build/pipelines/${pipeline.id}`}
+      href={`/runtime/pipelines/${pipeline.id}`}
       className="no-underline"
       title={
         pipeline.inherited

@@ -224,7 +224,7 @@ export function StudioGallery({ apps }: Readonly<{ apps: StudioApp[] }>) {
           No assistants yet. Describe one in plain language and Studio builds it.
         </p>
         <Button asChild size="sm">
-          <Link href="/build/studio/new">
+          <Link href="/solutions/apps/new">
             <Plus className="size-4" />
             Create your first assistant
           </Link>

@@ -32,7 +32,7 @@ export default async function PhasePage({ params }: Readonly<{ params: Promise<{
             Off Grid AI Console
           </Link>
           <Button asChild size="sm">
-            <Link href="/gateway/fleet">Open console</Link>
+            <Link href="/operations/devices">Open console</Link>
           </Button>
         </div>
       </header>

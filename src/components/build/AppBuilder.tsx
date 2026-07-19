@@ -249,7 +249,7 @@ export function AppBuilder({
       const app = (await res.json()) as { id: string };
       toast.success(`"${spec.title}" saved`);
       if (editing) router.refresh();
-      else router.push(`/build/apps/${app.id}`);
+      else router.push(`/solutions/apps/${app.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {

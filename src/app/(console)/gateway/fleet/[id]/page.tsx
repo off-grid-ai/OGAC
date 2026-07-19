@@ -167,7 +167,7 @@ export default async function DeviceDetailPage({
       {
         <div className="space-y-6">
           <Link
-            href="/gateway/fleet"
+            href="/operations/devices"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />

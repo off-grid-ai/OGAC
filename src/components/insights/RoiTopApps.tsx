@@ -14,7 +14,7 @@ import { type AppRoi, formatHours, formatUsd } from '@/lib/roi';
 import { usePagination } from '@/lib/use-pagination';
 
 // ─── Top apps by value — paginated, URL-driven, drills into each app's Reports (ROI card) ─────────
-// The list → detail rule: a row links to /build/apps/[id]/reports where the per-app ROI card lives.
+// The list → detail rule: a row links to the canonical per-app report where ROI evidence lives.
 export function RoiTopApps({ apps }: Readonly<{ apps: AppRoi[] }>) {
   const p = usePagination(apps, { key: 'app', defaultPageSize: 10 });
   return (
@@ -60,7 +60,7 @@ export function RoiTopApps({ apps }: Readonly<{ apps: AppRoi[] }>) {
                   </TableCell>
                   <TableCell>
                     <Link
-                      href={`/build/apps/${a.appId}/reports`}
+                      href={`/solutions/apps/${a.appId}/reports`}
                       className="text-xs text-primary hover:underline"
                     >
                       detail →

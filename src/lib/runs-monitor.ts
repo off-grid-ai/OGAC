@@ -205,7 +205,7 @@ export function fromAppRun(src: AppRunSource): RunRow {
     durationMs: computeDurationMs(startedAt, finishedAt),
     pipeline: src.appId,
     actor: (src.actor ?? '').trim(),
-    href: `/build/apps/${encodeURIComponent(src.appId)}/runs/${encodeURIComponent(src.id)}`,
+    href: `/solutions/apps/${encodeURIComponent(src.appId)}/runs/${encodeURIComponent(src.id)}`,
   };
 }
 

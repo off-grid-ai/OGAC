@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 export function CreateAgentButton() {
   return (
     <Button asChild size="sm">
-      <Link href="/build/studio/new">
+      <Link href="/solutions/apps/new">
         <Plus className="size-4" />
         New agent
       </Link>
