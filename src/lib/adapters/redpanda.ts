@@ -357,6 +357,31 @@ export async function deleteSchemaSubject(
   });
 }
 
+export async function getSchemaSubject(
+  subjectValue: unknown,
+  config = resolveRedpandaConfig(),
+  fetcher: Fetcher = fetch,
+) {
+  if (!config.schemaUrl) throw new Error('Redpanda Schema Registry is not configured');
+  const subject = requiredName(subjectValue, 'subject');
+  const rawVersions = await jsonRequest(
+    fetcher,
+    `${config.schemaUrl}/subjects/${encodeURIComponent(subject)}/versions`,
+  );
+  const versions = Array.isArray(rawVersions)
+    ? rawVersions.filter((version): version is number => Number.isInteger(version) && version > 0)
+    : [];
+  const details = await Promise.all(
+    versions.map((version) =>
+      jsonRequest(
+        fetcher,
+        `${config.schemaUrl}/subjects/${encodeURIComponent(subject)}/versions/${version}`,
+      ),
+    ),
+  );
+  return { subject, versions, details };
+}
+
 export async function deleteSchemaVersion(
   subjectValue: unknown,
   versionValue: unknown,

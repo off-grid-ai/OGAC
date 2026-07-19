@@ -8,6 +8,7 @@ import {
   deleteSchemaSubject,
   deleteSchemaVersion,
   deleteTopic,
+  getSchemaSubject,
   getRedpandaOverview,
   produceRecord,
   runBfsiStreamJourney,
@@ -52,6 +53,12 @@ test('uses real Admin, Schema Registry, and REST Proxy HTTP boundaries', async (
       return res.end(JSON.stringify({ id: 8 }));
     if (req.url === '/subjects/events-value' && req.method === 'DELETE')
       return res.end(JSON.stringify([1, 2]));
+    if (req.url === '/subjects/events-value/versions' && req.method === 'GET')
+      return res.end(JSON.stringify([1, 2]));
+    if (req.url === '/subjects/events-value/versions/1' && req.method === 'GET')
+      return res.end(JSON.stringify({ subject: 'events-value', version: 1, id: 6, schema: '{}' }));
+    if (req.url === '/subjects/events-value/versions/2' && req.method === 'GET')
+      return res.end(JSON.stringify({ subject: 'events-value', version: 2, id: 7, schema: '{}' }));
     if (req.url === '/subjects/events-value/versions/2' && req.method === 'DELETE')
       return res.end('2');
     if (req.url === '/topics/events' && req.method === 'POST')
@@ -123,6 +130,9 @@ test('uses real Admin, Schema Registry, and REST Proxy HTTP boundaries', async (
   assert.equal(overview.topics[0]?.name, 'events');
   assert.deepEqual(overview.subjects, ['events-value']);
   await createSchemaVersion('events-value', { schema: '{}', schemaType: 'json' }, config);
+  const subject = await getSchemaSubject('events-value', config);
+  assert.deepEqual(subject.versions, [1, 2]);
+  assert.equal((subject.details[1] as { id: number }).id, 7);
   await deleteSchemaVersion('events-value', '2', config);
   await deleteSchemaSubject('events-value', config);
   await createTopic(
