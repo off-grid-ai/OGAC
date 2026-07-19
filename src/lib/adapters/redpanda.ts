@@ -347,11 +347,15 @@ export async function createSchemaVersion(
 
 export async function deleteSchemaSubject(
   subjectValue: unknown,
+  confirmationValue: unknown,
   config = resolveRedpandaConfig(),
   fetcher: Fetcher = fetch,
 ) {
   if (!config.schemaUrl) throw new Error('Redpanda Schema Registry is not configured');
   const subject = requiredName(subjectValue, 'subject');
+  if (confirmationValue !== subject) {
+    throw new Error('confirmation must exactly match the schema subject');
+  }
   return jsonRequest(fetcher, `${config.schemaUrl}/subjects/${encodeURIComponent(subject)}`, {
     method: 'DELETE',
   });

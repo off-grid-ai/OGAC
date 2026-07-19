@@ -19,6 +19,15 @@ OFFGRID_REDPANDA_BROKERS=offgrid-g6.local:19092
 OFFGRID_REDPANDA_CLIENT_ID=offgrid-console
 ```
 
+`OFFGRID_REDPANDA_BROKERS` is required for every native Kafka action. It must name a bootstrap
+listener whose broker metadata is also reachable from the Console host; a reachable bootstrap socket
+alone is insufficient. The current g6 compose listener advertises `127.0.0.1:19092`, so the example
+above is a target contract, not verified S1 runtime configuration: after bootstrap, a client on S1
+would follow metadata back to S1 itself. Before enabling native Kafka in the fleet, update the private
+orchestration record with a reachable advertised listener (or an S1 loopback forward matching the
+advertised address), add both Kafka values to `runtime-env.example` and the server environment, then
+verify a Console-originated metadata request and workflow round-trip.
+
 Do not expose the Kafka listener or Registry publicly. The current fleet boundary is internal-only and
 admin-gated by the Console. TLS/SASL and tenant-scoped Kafka principals are not yet configured; that is
 a release gap for deployments whose internal network is not already trusted.
@@ -47,11 +56,11 @@ stream before it counts as a business production caller.
 
 ## Four-gate evidence for this slice
 
-| Capability                       | Available          | Integrated                                   | UI exposed                           | Used in workflow                                                              |
-| -------------------------------- | ------------------ | -------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
-| Topic list/create/update/delete  | Redpanda Kafka API | Native Kafka adapter                         | Topic list/detail + create sheet     | Seed topics are ensured by each proof; arbitrary lifecycle is operator-driven |
-| Schema subject/version lifecycle | Registry API       | Registry HTTP adapter                        | Subject/version list + create/delete | The proof registers the matching JSON contract                                |
-| JSON produce/consume             | Redpanda Kafka API | Native producer + bounded temporary consumer | Manual producer + proof evidence     | Both seeded BFSI proofs round-trip a correlated event                         |
+| Capability                       | Available          | Integrated                                   | UI exposed                           | Used in workflow                                                   |
+| -------------------------------- | ------------------ | -------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| Topic list/create/update/delete  | Redpanda Kafka API | Native Kafka adapter                         | Topic list/detail + create sheet     | Not live-verified from the Console host                            |
+| Schema subject/version lifecycle | Registry API       | Registry HTTP adapter                        | Subject/version list + create/delete | Proof code registers the matching JSON contract; live run pending  |
+| JSON produce/consume             | Redpanda Kafka API | Native producer + bounded temporary consumer | Manual producer + proof evidence     | Focused boundary test passes; fleet round-trip is not yet verified |
 
 ## Explicit remaining gaps
 
@@ -61,6 +70,10 @@ stream before it counts as a business production caller.
   not exposed yet.
 - Kafka ACL, SCRAM user, quota, and tenant-principal management are not exposed. Do not use this
   operator surface as a multi-tenant security boundary until those controls exist.
+- The current S1 runtime contract has no working native Kafka broker endpoint: the g6 listener
+  advertises loopback metadata, and the fleet runtime example does not yet declare the broker/client
+  values. Topic mutation, produce/consume, and the workflow proof remain unverified live until that
+  private-fleet change lands.
 - Partition reassignment, maintenance mode, rebalancing, tiered storage, transforms, and broker
   configuration stay in the native operational toolchain; they are not silently counted as Console
   coverage.

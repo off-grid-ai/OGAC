@@ -134,13 +134,21 @@ test('uses real Admin, Schema Registry, and REST Proxy HTTP boundaries', async (
   assert.deepEqual(subject.versions, [1, 2]);
   assert.equal((subject.details[1] as { id: number }).id, 7);
   await deleteSchemaVersion('events-value', '2', config);
-  await deleteSchemaSubject('events-value', config);
+  await assert.rejects(
+    () => deleteSchemaSubject('events-value', 'wrong-subject', config),
+    /confirmation must exactly match/,
+  );
+  await deleteSchemaSubject('events-value', 'events-value', config);
   await createTopic(
     { name: 'new-events', partitions: 3, retentionMs: 86_400_000 },
     config,
     kafkaPort,
   );
   await updateTopic('new-events', { partitions: 4, retentionMs: 172_800_000 }, config, kafkaPort);
+  await assert.rejects(
+    () => deleteTopic('new-events', 'wrong-topic', config, kafkaPort),
+    /confirmation must exactly match/,
+  );
   await deleteTopic('new-events', 'new-events', config, kafkaPort);
   await produceRecord(
     { topic: 'events', key: 'record-1', value: { eventId: 'record-1' } },

@@ -50,7 +50,6 @@ export function RedpandaManager() {
   const [loading, setLoading] = useState(true);
   const [topic, setTopic] = useState('');
   const [message, setMessage] = useState('{}');
-  const [group, setGroup] = useState('offgrid-console');
   const [subject, setSubject] = useState('');
   const [schema, setSchema] = useState('{}');
   const [schemaType, setSchemaType] = useState<'AVRO' | 'JSON' | 'PROTOBUF'>('JSON');
@@ -112,15 +111,15 @@ export function RedpandaManager() {
     setParams({ manage: next, topic: null, panel: null });
   }
 
-  async function runAction(action: 'produce' | 'consume') {
+  async function produceJsonRecord() {
     try {
       const parsed = message.trim() ? JSON.parse(message) : null;
       const response = await request('/api/v1/admin/integrations/redpanda', {
         method: 'POST',
-        body: JSON.stringify({ action, topic, group, value: parsed }),
+        body: JSON.stringify({ action: 'produce', topic, value: parsed }),
       });
       setResult(response);
-      toast.success(action === 'produce' ? 'Record produced' : 'Consumer poll completed');
+      toast.success('Record produced');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Action failed');
     }
@@ -140,10 +139,14 @@ export function RedpandaManager() {
   }
 
   async function deleteSubject(name: string) {
-    if (!window.confirm(`Delete every version of schema subject “${name}”?`)) return;
+    const confirmation = window.prompt(
+      `Delete every version of schema subject “${name}”? Type the exact subject name to confirm.`,
+    );
+    if (confirmation !== name) return;
     try {
       await request(`/api/v1/admin/integrations/redpanda/schemas/${encodeURIComponent(name)}`, {
         method: 'DELETE',
+        body: JSON.stringify({ confirmation }),
       });
       toast.success('Schema subject deleted');
       setParams({ subject: null });
@@ -209,11 +212,14 @@ export function RedpandaManager() {
 
   async function deleteKafkaTopic() {
     if (!selectedTopic) return;
-    if (!window.confirm(`Delete topic “${selectedTopic.name}” and every retained event?`)) return;
+    const confirmation = window.prompt(
+      `Delete topic “${selectedTopic.name}” and every retained event? Type the exact topic name to confirm.`,
+    );
+    if (confirmation !== selectedTopic.name) return;
     try {
       await request(
         `/api/v1/admin/integrations/redpanda/topics/${encodeURIComponent(selectedTopic.name)}`,
-        { method: 'DELETE', body: JSON.stringify({ confirmation: selectedTopic.name }) },
+        { method: 'DELETE', body: JSON.stringify({ confirmation }) },
       );
       toast.success('Topic deleted');
       setParams({ topic: null });
@@ -245,8 +251,9 @@ export function RedpandaManager() {
         <div>
           <CardTitle className="text-sm">Redpanda operations</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Admin inspection is always probed. Schema and produce/consume controls appear with their
-            actual HTTP boundary state.
+            Admin, Schema Registry, native Kafka, and optional HTTP Proxy boundaries report their
+            actual runtime state. Manual produce and workflow proof require native Kafka to be
+            ready.
           </p>
         </div>
         <Button variant="outline" size="sm" disabled={loading} onClick={() => void refresh()}>
@@ -367,7 +374,7 @@ export function RedpandaManager() {
                     onChange={(event) => setMessage(event.target.value)}
                     className="min-h-24 font-mono text-xs"
                   />
-                  <Button size="sm" onClick={() => void runAction('produce')}>
+                  <Button size="sm" onClick={() => void produceJsonRecord()}>
                     <PaperPlaneTilt /> Produce
                   </Button>
                 </div>
