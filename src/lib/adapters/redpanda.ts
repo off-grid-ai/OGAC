@@ -1,15 +1,24 @@
+import kafkaJs from 'kafkajs';
 import {
+  buildBfsiStreamContract,
   groupTopics,
   normalizePartitions,
   parseSchema,
+  parseTopicCreate,
+  parseTopicUpdate,
   requiredName,
+  type BfsiStreamJourney,
   type RedpandaBoundary,
+  type RedpandaTopicCreate,
+  type RedpandaTopicUpdate,
 } from '../redpanda-model';
 
 export interface RedpandaConfig {
   adminUrl: string;
   schemaUrl: string | null;
   restUrl: string | null;
+  brokers: string[];
+  clientId: string;
 }
 
 export interface RedpandaOverview {
@@ -21,6 +30,21 @@ export interface RedpandaOverview {
 }
 
 type Fetcher = typeof fetch;
+const { ConfigResourceTypes, Kafka, logLevel } = kafkaJs;
+
+export interface NativeKafkaPort {
+  listTopics(): Promise<string[]>;
+  createTopic(input: RedpandaTopicCreate): Promise<boolean>;
+  updateTopic(name: string, input: RedpandaTopicUpdate): Promise<void>;
+  deleteTopic(name: string): Promise<void>;
+  produce(topic: string, key: string | null, value: Record<string, unknown>): Promise<unknown>;
+  consumeMatching(
+    topic: string,
+    group: string,
+    eventId: string,
+    timeoutMs: number,
+  ): Promise<{ partition: number; offset: string; value: Record<string, unknown> }>;
+}
 
 const cleanUrl = (value: string | undefined): string | null =>
   value?.trim().replace(/\/$/, '') || null;
@@ -30,6 +54,156 @@ export function resolveRedpandaConfig(env: NodeJS.ProcessEnv = process.env): Red
     adminUrl: cleanUrl(env.OFFGRID_REDPANDA_ADMIN_URL) ?? 'http://127.0.0.1:8943',
     schemaUrl: cleanUrl(env.OFFGRID_REDPANDA_SCHEMA_URL),
     restUrl: cleanUrl(env.OFFGRID_REDPANDA_REST_URL),
+    brokers: (env.OFFGRID_REDPANDA_BROKERS ?? '')
+      .split(',')
+      .map((broker) => broker.trim())
+      .filter(Boolean),
+    clientId: env.OFFGRID_REDPANDA_CLIENT_ID?.trim() || 'offgrid-console',
+  };
+}
+
+function requireNativeKafka(config: RedpandaConfig): string[] {
+  if (config.brokers.length === 0) throw new Error('Redpanda Kafka brokers are not configured');
+  return config.brokers;
+}
+
+export function createNativeKafkaPort(config: RedpandaConfig): NativeKafkaPort {
+  const kafka = new Kafka({
+    clientId: config.clientId,
+    brokers: requireNativeKafka(config),
+    connectionTimeout: 5_000,
+    requestTimeout: 10_000,
+    retry: { retries: 2 },
+    logLevel: logLevel.NOTHING,
+  });
+
+  return {
+    async listTopics() {
+      const admin = kafka.admin();
+      await admin.connect();
+      try {
+        return await admin.listTopics();
+      } finally {
+        await admin.disconnect();
+      }
+    },
+    async createTopic(input) {
+      const admin = kafka.admin();
+      await admin.connect();
+      try {
+        return await admin.createTopics({
+          waitForLeaders: true,
+          topics: [
+            {
+              topic: input.name,
+              numPartitions: input.partitions,
+              replicationFactor: input.replicationFactor,
+              configEntries: [{ name: 'retention.ms', value: String(input.retentionMs) }],
+            },
+          ],
+        });
+      } finally {
+        await admin.disconnect();
+      }
+    },
+    async updateTopic(name, input) {
+      const admin = kafka.admin();
+      await admin.connect();
+      try {
+        if (input.partitions !== undefined) {
+          const metadata = await admin.fetchTopicMetadata({ topics: [name] });
+          const current = metadata.topics[0]?.partitions.length ?? 0;
+          if (input.partitions < current) {
+            throw new Error(`partitions cannot be reduced below the current count (${current})`);
+          }
+          if (input.partitions > current) {
+            await admin.createPartitions({
+              topicPartitions: [{ topic: name, count: input.partitions }],
+            });
+          }
+        }
+        if (input.retentionMs !== undefined) {
+          await admin.alterConfigs({
+            validateOnly: false,
+            resources: [
+              {
+                type: ConfigResourceTypes.TOPIC,
+                name,
+                configEntries: [{ name: 'retention.ms', value: String(input.retentionMs) }],
+              },
+            ],
+          });
+        }
+      } finally {
+        await admin.disconnect();
+      }
+    },
+    async deleteTopic(name) {
+      const admin = kafka.admin();
+      await admin.connect();
+      try {
+        await admin.deleteTopics({ topics: [name], timeout: 10_000 });
+      } finally {
+        await admin.disconnect();
+      }
+    },
+    async produce(topic, key, value) {
+      const producer = kafka.producer({ allowAutoTopicCreation: false });
+      await producer.connect();
+      try {
+        return await producer.send({
+          topic,
+          messages: [{ key: key ?? undefined, value: JSON.stringify(value) }],
+        });
+      } finally {
+        await producer.disconnect();
+      }
+    },
+    async consumeMatching(topic, group, eventId, timeoutMs) {
+      const consumer = kafka.consumer({ groupId: group, allowAutoTopicCreation: false });
+      await consumer.connect();
+      await consumer.subscribe({ topic, fromBeginning: true });
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let settle:
+        | ((value: { partition: number; offset: string; value: Record<string, unknown> }) => void)
+        | undefined;
+      let rejectMatch: ((reason: Error) => void) | undefined;
+      const match = new Promise<{
+        partition: number;
+        offset: string;
+        value: Record<string, unknown>;
+      }>((resolve, reject) => {
+        settle = resolve;
+        rejectMatch = reject;
+        timeout = setTimeout(
+          () => reject(new Error(`No matching event arrived within ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      });
+      const run = consumer
+        .run({
+          eachMessage: async ({ partition, message }) => {
+            if (!message.value) return;
+            try {
+              const value = JSON.parse(message.value.toString()) as Record<string, unknown>;
+              if (value.eventId === eventId) settle?.({ partition, offset: message.offset, value });
+            } catch {
+              // Another producer may write non-JSON records; they are irrelevant to this proof.
+            }
+          },
+        })
+        .catch((error) =>
+          rejectMatch?.(error instanceof Error ? error : new Error('consumer failed')),
+        );
+      try {
+        return await match;
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        await consumer.stop().catch(() => undefined);
+        await run.catch(() => undefined);
+        await consumer.disconnect().catch(() => undefined);
+      }
+    },
   };
 }
 
@@ -58,6 +232,7 @@ async function inspectBoundary(
 export async function getRedpandaOverview(
   config: RedpandaConfig = resolveRedpandaConfig(),
   fetcher: Fetcher = fetch,
+  kafkaPort?: NativeKafkaPort,
 ): Promise<RedpandaOverview> {
   let cluster: unknown = null;
   let brokers: unknown[] = [];
@@ -92,7 +267,62 @@ export async function getRedpandaOverview(
   }
 
   const restProxy = await inspectBoundary('restProxy', config.restUrl, fetcher, '/topics');
-  return { boundaries: [admin, schemaRegistry, restProxy], cluster, brokers, topics, subjects };
+  let kafka: RedpandaBoundary;
+  if (config.brokers.length === 0) {
+    kafka = { id: 'kafka', state: 'unconfigured', detail: 'Kafka brokers are not configured' };
+  } else {
+    try {
+      await (kafkaPort ?? createNativeKafkaPort(config)).listTopics();
+      kafka = { id: 'kafka', state: 'ready', detail: 'Native Kafka protocol responded' };
+    } catch (error) {
+      kafka = {
+        id: 'kafka',
+        state: 'down',
+        detail: error instanceof Error ? error.message : 'request failed',
+      };
+    }
+  }
+  return {
+    boundaries: [admin, schemaRegistry, kafka, restProxy],
+    cluster,
+    brokers,
+    topics,
+    subjects,
+  };
+}
+
+export async function createTopic(
+  value: unknown,
+  config = resolveRedpandaConfig(),
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
+) {
+  const topic = parseTopicCreate(value);
+  return { created: await kafkaPort.createTopic(topic), topic };
+}
+
+export async function updateTopic(
+  topicValue: unknown,
+  value: unknown,
+  config = resolveRedpandaConfig(),
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
+) {
+  const topic = requiredName(topicValue, 'topic');
+  const update = parseTopicUpdate(value);
+  await kafkaPort.updateTopic(topic, update);
+  return { topic, update };
+}
+
+export async function deleteTopic(
+  topicValue: unknown,
+  confirmationValue: unknown,
+  config = resolveRedpandaConfig(),
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
+) {
+  const topic = requiredName(topicValue, 'topic');
+  if (confirmationValue !== topic)
+    throw new Error('confirmation must exactly match the topic name');
+  await kafkaPort.deleteTopic(topic);
+  return { deleted: topic };
 }
 
 export async function createSchemaVersion(
@@ -147,58 +377,62 @@ export async function deleteSchemaVersion(
 export async function produceRecord(
   value: unknown,
   config = resolveRedpandaConfig(),
-  fetcher: Fetcher = fetch,
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
 ) {
-  if (!config.restUrl) throw new Error('Redpanda REST Proxy is not configured');
   if (!value || typeof value !== 'object') throw new Error('produce body is required');
   const body = value as Record<string, unknown>;
   const topic = requiredName(body.topic, 'topic');
   if (!Object.hasOwn(body, 'value')) throw new Error('value is required');
-  const record = Object.hasOwn(body, 'key')
-    ? { key: body.key, value: body.value }
-    : { value: body.value };
-  return jsonRequest(fetcher, `${config.restUrl}/topics/${encodeURIComponent(topic)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/vnd.kafka.json.v2+json' },
-    body: JSON.stringify({ records: [record] }),
-  });
+  if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value)) {
+    throw new Error('value must be a JSON object');
+  }
+  const key = typeof body.key === 'string' ? body.key : null;
+  return kafkaPort.produce(topic, key, body.value as Record<string, unknown>);
 }
 
 export async function consumeRecords(
   value: unknown,
   config = resolveRedpandaConfig(),
-  fetcher: Fetcher = fetch,
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
 ) {
-  if (!config.restUrl) throw new Error('Redpanda REST Proxy is not configured');
   if (!value || typeof value !== 'object') throw new Error('consumer body is required');
   const body = value as Record<string, unknown>;
   const group = requiredName(body.group, 'group');
   const topic = requiredName(body.topic, 'topic');
-  const created = (await jsonRequest(
-    fetcher,
-    `${config.restUrl}/consumers/${encodeURIComponent(group)}`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/vnd.kafka.v2+json' },
-      body: JSON.stringify({ format: 'json', 'auto.offset.reset': 'earliest' }),
-    },
-  )) as Record<string, unknown>;
-  const instanceId = requiredName(created.instance_id, 'consumer instance');
-  const baseUri =
-    typeof created.base_uri === 'string'
-      ? created.base_uri
-      : `${config.restUrl}/consumers/${encodeURIComponent(group)}/instances/${encodeURIComponent(instanceId)}`;
-  try {
-    await jsonRequest(fetcher, `${baseUri}/subscription`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/vnd.kafka.v2+json' },
-      body: JSON.stringify({ topics: [topic] }),
+  const eventId = requiredName(body.eventId, 'eventId');
+  return kafkaPort.consumeMatching(topic, group, eventId, 10_000);
+}
+
+export async function runBfsiStreamJourney(
+  journey: BfsiStreamJourney,
+  config = resolveRedpandaConfig(),
+  kafkaPort: NativeKafkaPort = createNativeKafkaPort(config),
+  fetcher: Fetcher = fetch,
+) {
+  const eventId = `offgrid-${journey}-${crypto.randomUUID()}`;
+  const contract = buildBfsiStreamContract(journey, eventId);
+  const topics = await kafkaPort.listTopics();
+  if (!topics.includes(contract.topic)) {
+    await kafkaPort.createTopic({
+      name: contract.topic,
+      partitions: 1,
+      replicationFactor: 1,
+      retentionMs: 7 * 24 * 60 * 60 * 1_000,
     });
-    const records = await jsonRequest(fetcher, `${baseUri}/records`, {
-      headers: { accept: 'application/vnd.kafka.json.v2+json' },
-    });
-    return { instanceId, records };
-  } finally {
-    await fetcher(baseUri, { method: 'DELETE', cache: 'no-store' }).catch(() => undefined);
   }
+  const schema = await createSchemaVersion(contract.subject, contract, config, fetcher);
+  const group = `${config.clientId}-${journey}-${eventId.slice(-12)}`;
+  const consumedPromise = kafkaPort.consumeMatching(contract.topic, group, eventId, 12_000);
+  const produced = await kafkaPort.produce(contract.topic, eventId, contract.sample);
+  const consumed = await consumedPromise;
+  return {
+    journey,
+    eventId,
+    topic: contract.topic,
+    subject: contract.subject,
+    schema,
+    produced,
+    consumed,
+    verifiedAt: new Date().toISOString(),
+  };
 }

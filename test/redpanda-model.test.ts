@@ -62,6 +62,7 @@ test('validates names and schemas at the pure boundary', () => {
   assert.throws(() => requiredName('x'.repeat(250), 'topic'), /249/);
   assert.throws(() => parseSchema(null), /schema body/);
   assert.throws(() => parseSchema({ schema: '{}', schemaType: 'xml' }), /schemaType/);
+  assert.throws(() => parseSchema({ schema: 'x'.repeat(128 * 1024 + 1) }), /128 KB/);
 });
 
 test('ignores malformed partition payloads', () => {

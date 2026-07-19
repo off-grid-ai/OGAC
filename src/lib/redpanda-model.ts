@@ -63,7 +63,11 @@ export function parseSchema(value: unknown): {
 } {
   if (!value || typeof value !== 'object') throw new Error('schema body is required');
   const body = value as Record<string, unknown>;
-  const schema = requiredName(body.schema, 'schema');
+  if (typeof body.schema !== 'string' || !body.schema.trim()) throw new Error('schema is required');
+  const schema = body.schema.trim();
+  if (new TextEncoder().encode(schema).byteLength > 128 * 1024) {
+    throw new Error('schema must be 128 KB or smaller');
+  }
   const rawType = typeof body.schemaType === 'string' ? body.schemaType.toUpperCase() : 'AVRO';
   if (!['AVRO', 'JSON', 'PROTOBUF'].includes(rawType))
     throw new Error('schemaType must be AVRO, JSON, or PROTOBUF');
