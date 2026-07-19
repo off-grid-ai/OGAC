@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   activeTabForPath,
+  pipelineNavGroups,
   pipelineTabHref,
   pipelineTabs,
   pipelineTransitions,
 } from '../src/lib/pipeline-detail.ts';
 
-// The per-pipeline detail tab model (mirrors app-lifecycle). Pure — drives the scoped SubNav and keeps
-// every tab deep-linkable + Back-coherent.
+// The per-pipeline detail model is pure. It drives the entity-local rail and keeps every destination
+// deep-linkable + Back-coherent.
 
 test('pipelineTabs: the tabs in reading order, each with a hint', () => {
   const tabs = pipelineTabs('pl_42');
@@ -17,6 +18,8 @@ test('pipelineTabs: the tabs in reading order, each with a hint', () => {
     [
       'overview',
       'routing',
+      'api',
+      'versions',
       'policy',
       'guardrails',
       'quality',
@@ -24,13 +27,66 @@ test('pipelineTabs: the tabs in reading order, each with a hint', () => {
       'observability',
       'audit',
       'cost',
-      'api',
-      'versions',
     ],
   );
   assert.ok(
     tabs.every((t) => t.hint.length > 0),
     'every tab carries a helper hint',
+  );
+});
+
+test('pipelineNavGroups: groups every non-overview route by operator job', () => {
+  const groups = pipelineNavGroups('pl_42');
+  assert.deepEqual(
+    groups.map(({ id, label, tabs }) => ({
+      id,
+      label,
+      tabs: tabs.map((tab) => [tab.tab, tab.label, tab.href]),
+    })),
+    [
+      {
+        id: 'configure',
+        label: 'Configure',
+        tabs: [
+          ['routing', 'Gateway & routing', '/runtime/pipelines/pl_42/routing'],
+          ['api', 'API', '/runtime/pipelines/pl_42/api'],
+          ['versions', 'Versions', '/runtime/pipelines/pl_42/versions'],
+        ],
+      },
+      {
+        id: 'govern',
+        label: 'Govern',
+        tabs: [
+          ['policy', 'Policy', '/runtime/pipelines/pl_42/policy'],
+          ['guardrails', 'Guardrails', '/runtime/pipelines/pl_42/guardrails'],
+        ],
+      },
+      {
+        id: 'assure',
+        label: 'Assure',
+        tabs: [
+          ['quality', 'Quality', '/runtime/pipelines/pl_42/quality'],
+          ['drift', 'Drift', '/runtime/pipelines/pl_42/drift'],
+        ],
+      },
+      {
+        id: 'observe',
+        label: 'Observe',
+        tabs: [
+          ['observability', 'Observability', '/runtime/pipelines/pl_42/observability'],
+          ['audit', 'Audit', '/runtime/pipelines/pl_42/audit'],
+          ['cost', 'Cost', '/runtime/pipelines/pl_42/cost'],
+        ],
+      },
+    ],
+  );
+
+  const groupedTabs = groups.flatMap((group) => group.tabs.map((tab) => tab.tab));
+  assert.deepEqual(
+    groupedTabs,
+    pipelineTabs('pl_42')
+      .slice(1)
+      .map((tab) => tab.tab),
   );
 });
 

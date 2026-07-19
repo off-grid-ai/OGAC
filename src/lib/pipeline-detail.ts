@@ -2,12 +2,12 @@
 //
 // A Pipeline is the governed chokepoint; its detail surface is the reference master→detail view. Every
 // saved pipeline lives at /pipelines/<id>/<tab>; this pure logic decides which tab a URL selects and
-// builds the tab hrefs. No React, no router — unit-testable in test/pipeline-detail.test.ts. The
-// PipelineDetailNav component is a thin renderer over `pipelineTabs`.
+// builds the tab hrefs and grouped entity-local navigation. No React, no router — unit-testable in
+// test/pipeline-detail.test.ts. The PipelineDetailNav component is a thin renderer over this model.
 //
-// Tabs (Overview · Gateway & Routing · Policy · Guardrails · Quality · Drift · Observability · Audit ·
-// Cost · API · Versions). Overview / Gateway & Routing / Versions are FUNCTIONAL now; the telemetry +
-// quality tabs are scaffolded placeholders a fan-out phase fills.
+// Overview is the direct landing item. The remaining routes are grouped by operator job:
+// Configure (Gateway & routing · API · Versions), Govern (Policy · Guardrails), Assure (Quality ·
+// Drift), and Observe (Observability · Audit · Cost).
 
 export type PipelineTab =
   | 'overview'
@@ -31,8 +31,20 @@ export interface PipelineTabDef {
   hint: string;
 }
 
+export type PipelineNavGroupId = 'configure' | 'govern' | 'assure' | 'observe';
+
+export interface PipelineNavGroupDef {
+  id: PipelineNavGroupId;
+  label: string;
+  tabs: PipelineTabDef[];
+}
+
+interface PipelineTabMeta extends Omit<PipelineTabDef, 'href'> {
+  group?: PipelineNavGroupId;
+}
+
 // The tabs in reading order. `overview` is the landing (/pipelines/<id>); the rest hang off it.
-const TAB_META: { tab: PipelineTab; label: string; hint: string }[] = [
+const TAB_META: PipelineTabMeta[] = [
   {
     tab: 'overview',
     label: 'Overview',
@@ -40,37 +52,83 @@ const TAB_META: { tab: PipelineTab; label: string; hint: string }[] = [
   },
   {
     tab: 'routing',
-    label: 'Gateway & Routing',
+    label: 'Gateway & routing',
     hint: 'The gateway it runs on + the routing/egress leash',
+    group: 'configure',
+  },
+  {
+    tab: 'api',
+    label: 'API',
+    hint: 'Provisioned endpoint + key to consume this pipeline',
+    group: 'configure',
+  },
+  {
+    tab: 'versions',
+    label: 'Versions',
+    hint: 'Immutable version history — every publish and edit',
+    group: 'configure',
   },
   {
     tab: 'policy',
     label: 'Policy',
     hint: 'ABAC policy overlay — inherits org defaults, tightens locked controls',
+    group: 'govern',
   },
   {
     tab: 'guardrails',
     label: 'Guardrails',
     hint: 'PII masking, injection, grounding — scoped to this pipeline',
+    group: 'govern',
   },
-  { tab: 'quality', label: 'Quality', hint: 'Evals + golden set run in this pipeline’s context' },
-  { tab: 'drift', label: 'Drift', hint: 'Quality drift over this pipeline’s run history' },
+  {
+    tab: 'quality',
+    label: 'Quality',
+    hint: 'Evals + golden set run in this pipeline’s context',
+    group: 'assure',
+  },
+  {
+    tab: 'drift',
+    label: 'Drift',
+    hint: 'Quality drift over this pipeline’s run history',
+    group: 'assure',
+  },
   {
     tab: 'observability',
     label: 'Observability',
     hint: 'Traces, latency, and tokens for this pipeline’s runs',
+    group: 'observe',
   },
-  { tab: 'audit', label: 'Audit', hint: 'Every governed decision this pipeline made' },
-  { tab: 'cost', label: 'Cost', hint: 'Spend attributed to this pipeline → its gateway/model' },
-  { tab: 'api', label: 'API', hint: 'Provisioned endpoint + key to consume this pipeline' },
   {
-    tab: 'versions',
-    label: 'Versions',
-    hint: 'Immutable version history — every publish and edit',
+    tab: 'audit',
+    label: 'Audit',
+    hint: 'Every governed decision this pipeline made',
+    group: 'observe',
+  },
+  {
+    tab: 'cost',
+    label: 'Cost',
+    hint: 'Spend attributed to this pipeline → its gateway/model',
+    group: 'observe',
   },
 ];
 
+const NAV_GROUPS: ReadonlyArray<{ id: PipelineNavGroupId; label: string }> = [
+  { id: 'configure', label: 'Configure' },
+  { id: 'govern', label: 'Govern' },
+  { id: 'assure', label: 'Assure' },
+  { id: 'observe', label: 'Observe' },
+];
+
 const KNOWN: PipelineTab[] = TAB_META.map((m) => m.tab);
+
+function pipelineTabDef(pipelineId: string, meta: PipelineTabMeta): PipelineTabDef {
+  return {
+    tab: meta.tab,
+    label: meta.label,
+    hint: meta.hint,
+    href: pipelineTabHref(pipelineId, meta.tab),
+  };
+}
 
 // ─── pipelineTabHref — the canonical URL for one pipeline tab ─────────────────────────────────────
 // `overview` is the pipeline's landing (/pipelines/<id>); the rest hang off it. Keeping the base tab
@@ -82,7 +140,19 @@ export function pipelineTabHref(pipelineId: string, tab: PipelineTab): string {
 
 // ─── pipelineTabs — the tabs for a given pipeline, with hrefs ─────────────────────────────────────
 export function pipelineTabs(pipelineId: string): PipelineTabDef[] {
-  return TAB_META.map((m) => ({ ...m, href: pipelineTabHref(pipelineId, m.tab) }));
+  return TAB_META.map((tab) => pipelineTabDef(pipelineId, tab));
+}
+
+// ─── pipelineNavGroups — lifecycle rail sections in operator-task order ──────────────────────────
+// Overview stays a direct item. Each remaining canonical route appears exactly once in a disclosure
+// group, so the renderer never owns or duplicates the information architecture.
+export function pipelineNavGroups(pipelineId: string): PipelineNavGroupDef[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    tabs: TAB_META.filter((tab) => tab.group === group.id).map((tab) =>
+      pipelineTabDef(pipelineId, tab),
+    ),
+  }));
 }
 
 // ─── activeTabForPath — which tab a URL selects, scoped to a pipeline ─────────────────────────────
