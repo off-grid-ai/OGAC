@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure';
 import {
   activeTabForPath,
@@ -113,6 +113,22 @@ export function PipelineDetailRail({
   const overview = tabs[0];
   const activeTab = tabs.find((tab) => tab.tab === active) ?? overview;
 
+  const navigation = (
+    <>
+      <nav aria-label={`${name} sections`} className="space-y-1">
+        <PipelineNavLink tab={overview} active={active === 'overview'} />
+
+        {groups.map((group) => (
+          <PipelineNavGroup key={group.id} group={group} activeTab={active} />
+        ))}
+      </nav>
+
+      <p className="mt-3 border-t border-border/80 px-2 pt-3 text-[11px] leading-relaxed text-muted-foreground">
+        {activeTab.hint}
+      </p>
+    </>
+  );
+
   return (
     <aside className="min-w-0 lg:sticky lg:top-0 lg:w-56 lg:self-start" aria-label="Pipeline">
       <div className="mb-3 min-w-0 border-b border-border/80 pb-3">
@@ -127,7 +143,10 @@ export function PipelineDetailRail({
         </p>
       </div>
 
-      <Disclosure className="border-border bg-card shadow-none lg:border-0 lg:bg-transparent">
+      <Disclosure
+        className="border-border bg-card shadow-none lg:hidden"
+        data-pipeline-navigation="narrow"
+      >
         <DisclosureTrigger className="min-h-11 px-3 py-2 text-left lg:hidden">
           <span className="min-w-0">
             <span className="block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -139,20 +158,14 @@ export function PipelineDetailRail({
           </span>
         </DisclosureTrigger>
 
-        <DisclosureContent className="p-2 lg:block lg:p-0">
-          <nav aria-label={`${name} sections`} className="space-y-1">
-            <PipelineNavLink tab={overview} active={active === 'overview'} />
-
-            {groups.map((group) => (
-              <PipelineNavGroup key={group.id} group={group} activeTab={active} />
-            ))}
-          </nav>
-
-          <p className="mt-3 border-t border-border/80 px-2 pt-3 text-[11px] leading-relaxed text-muted-foreground">
-            {activeTab.hint}
-          </p>
-        </DisclosureContent>
+        <DisclosureContent className="p-2">{navigation}</DisclosureContent>
       </Disclosure>
+
+      {/* A closed native details element suppresses all descendants regardless of descendant CSS.
+          Keep the wide rail outside the narrow disclosure so the lifecycle groups remain visible. */}
+      <div className="hidden lg:block" data-pipeline-navigation="wide">
+        {navigation}
+      </div>
     </aside>
   );
 }

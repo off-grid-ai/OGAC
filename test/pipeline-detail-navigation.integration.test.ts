@@ -38,7 +38,14 @@ test('pipeline lifecycle rail renders canonical grouped links with one active ro
     assert.match(html, new RegExp(`href="/runtime/pipelines/pl_42${route}"`));
   }
 
-  assert.match(html, /href="\/runtime\/pipelines\/pl_42\/audit" aria-current="page"/);
+  assert.equal(
+    (
+      html.match(
+        /<a(?=[^>]*aria-current="page")(?=[^>]*href="\/runtime\/pipelines\/pl_42\/audit")[^>]*>/g,
+      ) ?? []
+    ).length,
+    2,
+  );
   assert.match(html, /<details[^>]+data-slot="disclosure"[^>]+open=""[^>]*>.*?>Observe</s);
   assert.doesNotMatch(
     html,
@@ -56,8 +63,29 @@ test('pipeline lifecycle rail composes the shared disclosure primitive', () => {
     }),
   );
 
-  assert.equal((html.match(/data-slot="disclosure"/g) ?? []).length, 5);
-  assert.equal((html.match(/data-slot="disclosure-trigger"/g) ?? []).length, 5);
-  assert.equal((html.match(/data-slot="disclosure-content"/g) ?? []).length, 5);
-  assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1);
+  assert.match(html, /<details[^>]+data-pipeline-navigation="narrow"[^>]*>.*Pipeline navigation/s);
+  assert.match(html, /<div class="hidden lg:block" data-pipeline-navigation="wide">/);
+  assert.equal((html.match(/data-slot="disclosure"/g) ?? []).length, 9);
+  assert.equal((html.match(/data-slot="disclosure-trigger"/g) ?? []).length, 9);
+  assert.equal((html.match(/data-slot="disclosure-content"/g) ?? []).length, 9);
+  assert.equal((html.match(/aria-current="page"/g) ?? []).length, 2);
+});
+
+test('wide lifecycle navigation is not trapped inside the closed narrow disclosure', () => {
+  const html = renderToStaticMarkup(
+    createElement(PipelineDetailRail, {
+      pipelineId: 'pl_42',
+      name: 'Cross-Sell Advisor',
+      active: 'overview',
+    }),
+  );
+
+  const wideRailStart = html.indexOf('data-pipeline-navigation="wide"');
+  const narrowDisclosureEnd = html.indexOf('</details>');
+
+  assert.ok(wideRailStart > narrowDisclosureEnd);
+  assert.match(html.slice(wideRailStart), />Configure</);
+  assert.match(html.slice(wideRailStart), />Govern</);
+  assert.match(html.slice(wideRailStart), />Assure</);
+  assert.match(html.slice(wideRailStart), />Observe</);
 });
