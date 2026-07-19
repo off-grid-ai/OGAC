@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import ts from 'typescript';
 import { canonicalPath } from '../src/modules/route-migrations.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -35,6 +36,95 @@ function routePageExists(pathname: string): boolean {
   }
 
   return visit(`${ROOT}src/app/(console)`, 0);
+}
+
+const INTENTIONAL_LEGACY_ROUTE_IMPLEMENTATIONS = new Set([
+  'src/app/(console)/data/pipelines/page.tsx',
+  'src/app/(console)/insights/evals/[id]/page.tsx',
+  'src/app/(console)/insights/page.tsx',
+  'src/app/(console)/storage/page.tsx',
+]);
+
+function sourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const candidate = `${directory}/${entry.name}`;
+    return entry.isDirectory()
+      ? sourceFiles(candidate)
+      : /\.[cm]?[jt]sx?$/.test(entry.name)
+        ? [candidate]
+        : [];
+  });
+}
+
+function staticNavigationTarget(node: ts.Node): string | undefined {
+  if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isTemplateExpression(node)) return `${node.head.text}__dynamic__`;
+  return undefined;
+}
+
+function isRetiredNavigationTarget(target: string | undefined): boolean {
+  if (!target?.startsWith('/')) return false;
+  const pathname = target.split(/[?#]/, 1)[0].replace('__dynamic__', 'entity');
+  return canonicalPath(pathname) !== pathname;
+}
+
+function retiredNavigationProducers(path: string): string[] {
+  const source = readFileSync(path, 'utf8');
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const violations: string[] = [];
+  const record = (node: ts.Node, target: string | undefined) => {
+    if (!isRetiredNavigationTarget(target)) return;
+    const { line } = file.getLineAndCharacterOfPosition(node.getStart(file));
+    violations.push(`${path.slice(ROOT.length)}:${line + 1} → ${target}`);
+  };
+
+  function visit(node: ts.Node) {
+    if (ts.isJsxAttribute(node) && node.name.text === 'href' && node.initializer) {
+      const expression = ts.isStringLiteral(node.initializer)
+        ? node.initializer
+        : ts.isJsxExpression(node.initializer)
+          ? node.initializer.expression
+          : undefined;
+      if (expression) record(node, staticNavigationTarget(expression));
+    }
+
+    if (
+      ts.isPropertyAssignment(node) &&
+      ((ts.isIdentifier(node.name) && node.name.text === 'href') ||
+        (ts.isStringLiteral(node.name) && node.name.text === 'href'))
+    ) {
+      record(node, staticNavigationTarget(node.initializer));
+    }
+
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : '';
+      if (
+        ['push', 'replace', 'redirect', 'permanentRedirect'].includes(name) &&
+        node.arguments[0]
+      ) {
+        record(node, staticNavigationTarget(node.arguments[0]));
+      }
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isPropertyAccessExpression(node.left) &&
+      node.left.name.text === 'href'
+    ) {
+      record(node, staticNavigationTarget(node.right));
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(file);
+  return violations;
 }
 
 test('representative legacy links resolve to checked-in canonical route pages', () => {
@@ -137,6 +227,14 @@ test('canonical gateway and orchestration journeys never emit retired collection
   assert.match(createJob, /router\.push\(`\/data\/flows\/orchestration\/\$\{job\.id\}`\)/);
   assert.match(jobActions, /router\.push\('\/data\/flows\/orchestration'\)/);
   assert.doesNotMatch(`${createJob}\n${jobActions}`, /\/data\/etl/);
+});
+
+test('user-facing navigation producers emit canonical paths directly', () => {
+  const violations = sourceFiles(`${ROOT}src`)
+    .filter((path) => !INTENTIONAL_LEGACY_ROUTE_IMPLEMENTATIONS.has(path.slice(ROOT.length)))
+    .flatMap(retiredNavigationProducers);
+
+  assert.deepEqual(violations, []);
 });
 
 test('gateway model and API management places are durable routes', () => {
