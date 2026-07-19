@@ -52,11 +52,14 @@ function FilterBar({
   );
 }
 
-function DegradationNotice({ analytics }: Readonly<{ analytics: Analytics }>) {
-  if (!analytics.drift.flagged && !analytics.perf.flagged) return null;
+function DegradationNotice({
+  analytics,
+  includeDrift = true,
+}: Readonly<{ analytics: Analytics; includeDrift?: boolean }>) {
+  if ((!includeDrift || !analytics.drift.flagged) && !analytics.perf.flagged) return null;
   return (
     <div className="space-y-2" role="status">
-      {analytics.drift.flagged ? (
+      {includeDrift && analytics.drift.flagged ? (
         <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
           <AlertTriangle className="size-4" />
           Drift detected: blocked/redacted rate {(analytics.drift.recent * 100).toFixed(0)}% recent
@@ -126,7 +129,9 @@ function UsageTraffic({ analytics }: Readonly<{ analytics: Analytics }>) {
 function UsageLatency({ analytics }: Readonly<{ analytics: Analytics }>) {
   return (
     <div className="space-y-6">
-      {analytics.perf.flagged ? <DegradationNotice analytics={analytics} /> : null}
+      {analytics.perf.flagged ? (
+        <DegradationNotice analytics={analytics} includeDrift={false} />
+      ) : null}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm">Average latency per day</CardTitle>

@@ -63,10 +63,7 @@ export type InsightsUsageDestinationId = InsightsUsageDestination['id'];
 export type InsightsCostDestination = (typeof INSIGHTS_COST_DESTINATIONS)[number];
 export type InsightsCostDestinationId = InsightsCostDestination['id'];
 
-export type InsightsUsageCostSearchParams = Record<
-  string,
-  string | readonly string[] | undefined
->;
+export type InsightsUsageCostSearchParams = InsightsSearchParams;
 
 export function insightsUsageDestination(
   rawId: string | null | undefined,
@@ -84,17 +81,5 @@ export function insightsCostDestination(
  * Keep date/range, pipeline, status, and any future URL-owned filters intact when a base or legacy
  * route hands the operator to a durable leaf. Navigation changes the place, never the filter state.
  */
-export function insightsUsageCostRouteWithSearchParams(
-  route: string,
-  rawParams: InsightsUsageCostSearchParams,
-): string {
-  const params = new URLSearchParams();
-  for (const [key, rawValue] of Object.entries(rawParams)) {
-    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
-    for (const value of values) {
-      if (value !== undefined) params.append(key, value);
-    }
-  }
-  const query = params.toString();
-  return query ? `${route}?${query}` : route;
-}
+export const insightsUsageCostRouteWithSearchParams = insightsRouteWithSearchParams;
+import { insightsRouteWithSearchParams, type InsightsSearchParams } from '@/lib/insights-routes';
