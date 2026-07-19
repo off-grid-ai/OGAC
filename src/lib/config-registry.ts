@@ -62,7 +62,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s1.local:4000',
+    default: 'http://offgrid-s1.local:4000', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description:
       'Backwards-compatible default for both inference and control until their explicit URLs are set.',
   },
@@ -224,7 +224,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s1.local:8080',
+    default: 'http://offgrid-s1.local:8080', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'Admin API base for user/client management.',
   },
   {
@@ -264,7 +264,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s1.local:6333',
+    default: 'http://offgrid-s1.local:6333', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'Vector store for Brain/RAG.',
   },
   {
@@ -275,7 +275,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s1.local:9200',
+    default: 'http://offgrid-s1.local:9200', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'SIEM / gateway analytics / logs.',
   },
   {
@@ -286,7 +286,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-g6.local:8931',
+    default: 'http://offgrid-g6.local:8931', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'LLM observability.',
   },
   {
@@ -306,7 +306,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-g6.local:8932',
+    default: 'http://offgrid-g6.local:8932', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'Feature flags.',
   },
   {
@@ -410,7 +410,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s2.local:9644',
+    default: 'http://offgrid-s2.local:9644', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'Cluster health, broker, partition, and topic inspection boundary.',
   },
   {
@@ -421,7 +421,7 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s2.local:18083',
+    default: 'http://offgrid-s2.local:18083', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
     description: 'Optional Schema Registry HTTP boundary for subject and version management.',
   },
   {
