@@ -51,7 +51,7 @@ export default async function AppRunsListPage({
           {/* App filter chips (URL-driven). */}
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/build/apps/runs"
+              href="/operations/runs"
               className={`rounded-md border px-2 py-1 text-xs ${
                 appId
                   ? 'border-border text-muted-foreground'
@@ -63,7 +63,7 @@ export default async function AppRunsListPage({
             {apps.map((a) => (
               <Link
                 key={a.id}
-                href={`/build/apps/runs?appId=${encodeURIComponent(a.id)}`}
+                href={`/operations/runs?appId=${encodeURIComponent(a.id)}`}
                 className={`rounded-md border px-2 py-1 text-xs ${
                   appId === a.id
                     ? 'border-primary/40 bg-primary/10 text-primary'
@@ -105,7 +105,7 @@ export default async function AppRunsListPage({
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Link
-                          href={`/build/apps/runs/${encodeURIComponent(r.id)}`}
+                          href={`/operations/runs/${encodeURIComponent(r.id)}`}
                           className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                         >
                           {r.status === 'awaiting_human' ? 'Review' : 'Watch'}{' '}

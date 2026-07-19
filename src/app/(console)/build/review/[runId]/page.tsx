@@ -47,7 +47,7 @@ export default async function ReviewDetailPage({
         <div className="w-full space-y-6">
           <div>
             <Link
-              href="/build/review"
+              href="/solutions/reviews"
               className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" /> Review queue

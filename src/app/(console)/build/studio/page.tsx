@@ -55,7 +55,7 @@ export default async function StudioPage() {
             </p>
           </div>
           <Button asChild>
-            <Link href="/build/studio/new?mode=chat">
+            <Link href="/solutions/apps/new?mode=chat">
               <Lightning weight="fill" className="size-4" />
               New app
             </Link>

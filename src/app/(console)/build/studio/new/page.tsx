@@ -42,7 +42,7 @@ export default async function StudioNewPage() {
         <div className="w-full space-y-5">
           <div>
             <Link
-              href="/build/studio"
+              href="/solutions/apps"
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" />

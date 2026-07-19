@@ -31,7 +31,7 @@ export default async function AppRunPage({
         <div className="space-y-6">
           <div>
             <Link
-              href="/build/apps/runs"
+              href="/operations/runs"
               className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" /> All runs

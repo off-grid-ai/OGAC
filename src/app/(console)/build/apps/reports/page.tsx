@@ -61,7 +61,7 @@ export default async function AppReportsPage({
           {/* App filter chips (URL-driven). */}
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/build/apps/reports"
+              href="/insights/outcomes"
               className={`rounded-md border px-2 py-1 text-xs ${
                 appId
                   ? 'border-border text-muted-foreground'
@@ -73,7 +73,7 @@ export default async function AppReportsPage({
             {apps.map((a) => (
               <Link
                 key={a.id}
-                href={`/build/apps/reports?appId=${encodeURIComponent(a.id)}`}
+                href={`/insights/outcomes?appId=${encodeURIComponent(a.id)}`}
                 className={`rounded-md border px-2 py-1 text-xs ${
                   appId === a.id
                     ? 'border-primary/40 bg-primary/10 text-primary'

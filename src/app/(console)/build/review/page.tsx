@@ -85,7 +85,7 @@ export default async function ReviewInboxPage() {
               {items.map((item) => (
                 <Link
                   key={item.runId}
-                  href={`/build/review/${encodeURIComponent(item.runId)}`}
+                  href={`/solutions/reviews/${encodeURIComponent(item.runId)}`}
                   className="group flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/[0.04] p-4 transition-colors hover:border-amber-500/70 hover:bg-amber-500/[0.07]"
                 >
                   <div className="flex items-center justify-between gap-2">
