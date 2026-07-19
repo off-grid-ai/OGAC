@@ -123,6 +123,12 @@ A list is a way *in*, not the whole story. **Wherever the console shows a collec
 
 Substantial work is executed by a fleet of parallel subagents orchestrated by the main session — not one linear thread. The standard:
 
+For service inventory, integration, capability exposure, or fleet verification work, every agent must
+first follow [`docs/SERVICE_EXPANSION_AGENT_BRIEF.md`](docs/SERVICE_EXPANSION_AGENT_BRIEF.md). It is the
+single shared prompt for the 49-entry ontology, four verification gates, evidence contract, systems of
+record, and parallel file ownership. Agent-specific prompts should name only the assigned family,
+owned file set, and deliverable; they must not independently rediscover or redefine this contract.
+
 - **Parallel workers, 3 at a time.** Decompose work into worktree-isolated subagents that run concurrently in a rolling window of ~3, each on a DISJOINT file-set so they never merge-conflict. As each lands: review against the engineering standards, merge, run a **local production build gate** (typecheck + tests do NOT catch build/route errors — build before deploy), deploy, verify, then launch the next from the backlog. One agent owns nav/shared-file changes per round; the others avoid them.
 - **Commit early, commit often — never lose progress (MANDATORY for every agent).** A worktree branch's commits are the ONLY durable record if a session hits its limit or an agent dies mid-run (uncommitted working-tree changes are lost; committed ones survive on disk and can be merged next session). So each agent MUST make **small, meaningful, incremental commits as it goes** — after each coherent unit (a pure module + its test, a wired route, a fixed file) — NOT one big commit at the end, and NEVER leave a large uncommitted working tree while continuing to work. Commit WIP with a clear message rather than risk losing it; the gates run at merge, not per-commit, so frequent commits are free. The orchestrator, in turn, **merges + pushes each landed branch to the remote promptly** (the remote is the real backup) and does not batch many agents' work into one late push.
 - **The gap agent.** Any gap, regression, or "not fully done" is logged to the repo's gaps doc (`docs/GAPS_BACKLOG.md`). A standing gap agent is woken whenever there are gaps: it picks them up, closes them, and marks them resolved with evidence. Gaps are surfaced honestly, never hidden.
