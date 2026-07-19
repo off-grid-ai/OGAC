@@ -7,6 +7,7 @@ import {
   CONFIGURATION_DESTINATIONS,
   EDGE_DESTINATIONS,
   HEALTH_DESTINATIONS,
+  NODE_DESTINATIONS,
 } from '../src/lib/operations-destinations.ts';
 import { contextualModule } from '../src/modules/contextual-navigation.ts';
 
@@ -21,6 +22,25 @@ test('Operations contextual modules consume the canonical destination arrays', (
   );
   assert.deepEqual(contextualModule('operations-edge').destinations, EDGE_DESTINATIONS);
   assert.deepEqual(contextualModule('operations-admin').destinations, ADMIN_DESTINATIONS);
+  assert.deepEqual(contextualModule('operations-nodes').destinations, NODE_DESTINATIONS);
+});
+
+test('physical-node directories share contextual navigation without wrapping entity details', () => {
+  for (const resource of ['nodes', 'clusters']) {
+    const base = `src/app/(console)/operations/${resource}`;
+    const directory = `${base}/(directory)`;
+    assert.match(read(`${directory}/layout.tsx`), /ContextualModuleShell/);
+    assert.match(read(`${directory}/layout.tsx`), /moduleId="operations-nodes"/);
+    assert.doesNotMatch(read(`${directory}/page.tsx`), /PageFrame|<h1\b/i);
+    assert.match(
+      read(`${base}/[${resource === 'nodes' ? 'nodeId' : 'clusterId'}]/page.tsx`),
+      /PageFrame/,
+    );
+    assert.doesNotMatch(
+      read(`${base}/[${resource === 'nodes' ? 'nodeId' : 'clusterId'}]/page.tsx`),
+      /ContextualModuleShell/,
+    );
+  }
 });
 
 test('every Operations collection has a base redirect, contextual layout, and leaf route', () => {

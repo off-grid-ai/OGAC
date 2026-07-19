@@ -26,14 +26,14 @@ test('representative legacy links resolve to checked-in canonical route pages', 
 });
 
 test('registry-driven operation resources have list and dynamic detail routes', () => {
-  for (const pathname of [
-    '/operations/nodes',
-    '/operations/nodes/[nodeId]',
-    '/operations/clusters',
-    '/operations/clusters/[clusterId]',
-    '/operations/services',
-    '/operations/services/[serviceId]',
-  ]) {
+  for (const pathname of ['/operations/nodes/[nodeId]', '/operations/clusters/[clusterId]']) {
+    assert.ok(existsSync(routeFile(pathname)), `${pathname} is missing`);
+  }
+  for (const pathname of ['/operations/nodes', '/operations/clusters']) {
+    const directoryPage = `${ROOT}src/app/(console)${pathname}/(directory)/page.tsx`;
+    assert.ok(existsSync(directoryPage), `${pathname} directory is missing`);
+  }
+  for (const pathname of ['/operations/services', '/operations/services/[serviceId]']) {
     assert.ok(existsSync(routeFile(pathname)), `${pathname} is missing`);
   }
 });
@@ -68,8 +68,8 @@ test('fleet route shells consume the registry and never encode deployment member
   assert.match(source, /fetch\('\/api\/v1\/gateway\/fleet'/);
   assert.match(source, /deriveClusters\(nodes \?\? \[\]\)/);
   assert.doesNotMatch(source, /\b(?:S1|S2|g1|g2|g4|g5|g7|g8|Qwythos)\b/i);
-  assert.match(source, /\/operations\/nodes\/\$\{encodeURIComponent\(node\.name\)\}/);
-  assert.match(source, /\/operations\/clusters\/\$\{encodeURIComponent\(cluster\.head\.name\)\}/);
+  assert.match(source, /topologyResourceHref\('nodes', node\.name\)/);
+  assert.match(source, /topologyResourceHref\('clusters', cluster\.head\.name\)/);
 });
 
 test('chat keeps its conversation rail off-canvas until the thread has desktop room', () => {

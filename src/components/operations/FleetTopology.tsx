@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { deriveClusters, type FleetNode } from '@/lib/fleet';
+import { topologyResourceHref } from '@/lib/operations-destinations';
 
 type TopologyMode = 'nodes' | 'clusters' | 'node' | 'cluster';
 
@@ -101,7 +102,7 @@ export function FleetTopology({
             Cluster:{' '}
             <Link
               className="text-primary hover:underline"
-              href={`/operations/clusters/${encodeURIComponent(cluster.head.name)}`}
+              href={topologyResourceHref('clusters', cluster.head.name)}
             >
               {cluster.head.name}
             </Link>
@@ -130,7 +131,7 @@ export function FleetTopology({
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {members.map((node) => (
-            <Link key={node.name} href={`/operations/nodes/${encodeURIComponent(node.name)}`}>
+            <Link key={node.name} href={topologyResourceHref('nodes', node.name)}>
               <Card className="h-full transition-colors hover:border-primary/50">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between font-mono text-base">
@@ -154,17 +155,11 @@ export function FleetTopology({
   if (mode === 'clusters') {
     return (
       <div className="w-full space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Compute clusters</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Derived live from fleet registry head/member relationships.
-          </p>
-        </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {topology.clusters.map((cluster) => (
             <Link
               key={cluster.head.name}
-              href={`/operations/clusters/${encodeURIComponent(cluster.head.name)}`}
+              href={topologyResourceHref('clusters', cluster.head.name)}
             >
               <Card className="h-full transition-colors hover:border-primary/50">
                 <CardHeader>
@@ -188,15 +183,9 @@ export function FleetTopology({
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Physical nodes</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every instance is populated from the fleet registry; routes contain no fixed node names.
-        </p>
-      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {nodes.map((node) => (
-          <Link key={node.name} href={`/operations/nodes/${encodeURIComponent(node.name)}`}>
+          <Link key={node.name} href={topologyResourceHref('nodes', node.name)}>
             <Card className="h-full transition-colors hover:border-primary/50">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between font-mono text-base">
