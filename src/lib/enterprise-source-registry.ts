@@ -36,8 +36,7 @@ export interface EnterpriseSourceDefinition {
   nextAction: string;
 }
 
-const FLEET_SOURCE =
-  '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml' as const;
+const FLEET_SOURCE = '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml' as const;
 
 export const ENTERPRISE_SOURCE_DEFINITIONS: readonly EnterpriseSourceDefinition[] = [
   {
@@ -56,7 +55,8 @@ export const ENTERPRISE_SOURCE_DEFINITIONS: readonly EnterpriseSourceDefinition[
     managementRoute: '/data/sources',
     seedEndpoint: 'postgres://corebank@127.0.0.1:5433/corebank',
     seededWorkflowEvidence: ['lender delinquency', 'claims and policy lookup'],
-    nextAction: 'Keep connector health, schema discovery, sync, and governed query evidence current.',
+    nextAction:
+      'Keep connector health, schema discovery, sync, and governed query evidence current.',
   },
   {
     id: 'enterprise-source-policyadmin',
@@ -74,7 +74,8 @@ export const ENTERPRISE_SOURCE_DEFINITIONS: readonly EnterpriseSourceDefinition[
     managementRoute: '/data/sources',
     seedEndpoint: 'mysql://policyadmin@127.0.0.1:3307/policyadmin',
     seededWorkflowEvidence: ['reimbursement approval', 'advisor and policy operations'],
-    nextAction: 'Keep connector health, schema discovery, sync, and governed query evidence current.',
+    nextAction:
+      'Keep connector health, schema discovery, sync, and governed query evidence current.',
   },
   {
     id: 'enterprise-source-erp',
@@ -110,7 +111,8 @@ export const ENTERPRISE_SOURCE_DEFINITIONS: readonly EnterpriseSourceDefinition[
     managementRoute: '/data/sources',
     seedEndpoint: 'kafka://127.0.0.1:19092',
     seededWorkflowEvidence: [],
-    nextAction: 'Wire a tenant-scoped producer/consumer workflow before claiming product integration.',
+    nextAction:
+      'Wire a tenant-scoped producer/consumer workflow before claiming product integration.',
   },
   {
     id: 'enterprise-source-minio',
