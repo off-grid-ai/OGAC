@@ -82,7 +82,7 @@ export default async function WarehouseTableDetailPage({
               <p className="mt-1 text-xs text-muted-foreground">{name}</p>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href={`/data/query?sql=${encodeURIComponent(previewSql)}`}>
+              <Link href={`/data/warehouse/query?sql=${encodeURIComponent(previewSql)}`}>
                 Query this table
               </Link>
             </Button>

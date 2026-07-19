@@ -57,7 +57,7 @@ export function RunCodePanel({
   function selectLanguage(lang: RunLanguage) {
     const params = new URLSearchParams(searchParams.toString());
     params.set('lang', lang);
-    router.push(`/build/sandbox?${params.toString()}`, { scroll: false });
+    router.push(`/solutions/test?${params.toString()}`, { scroll: false });
   }
 
   async function run() {
