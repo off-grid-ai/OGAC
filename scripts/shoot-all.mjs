@@ -1,209 +1,478 @@
 #!/usr/bin/env node
-// ─────────────────────────────────────────────────────────────────────────────
-// shoot-all.mjs — capture EVERY navigable route (+ key state changes) and emit a
-// manifest a vision pass can audit. Reusable: point it at any host, tenant, theme,
-// or viewport and it crawls the whole console.
+// Capture every CANONICAL console route and emit a machine-readable visual release manifest.
+// Historical redirect aliases remain deployed for bookmarks but are excluded from primary coverage
+// through src/modules/route-migrations.mjs, the same IA contract used by Next.
 //
-//   node scripts/shoot-all.mjs \
-//     --base=https://bharatunion-onprem-console.getoffgridai.co \
-//     --user=demo-bank@getoffgridai.co --pass=OffGridDemo2026! \
-//     --theme=light --viewport=wide --out=.shots/bank-light
+// Safe production authentication (preferred):
+//   OFFGRID_VISUAL_USER=demo-bank@getoffgridai.co \
+//   OFFGRID_VISUAL_PASSWORD='…' \
+//   node scripts/shoot-all.mjs --base=https://bharatunion-onprem-console.getoffgridai.co \
+//     --states=off --public=off --folds=on --out=/tmp/vision-release-bank
 //
-// Flags (all optional; sensible defaults):
-//   --base=<url>        console origin (default: http://localhost:3000)
-//   --user= --pass=     sign-in creds (skipped if --user omitted — public routes only)
-//   --theme=light|dark  (default light) — sets the next-themes cookie + prefers-color-scheme
-//   --viewport=wide|mobile|<w>x<h>   (default wide=1440x900; mobile=390x844)
-//   --out=<dir>         output dir (default .shots/<host>-<theme>-<viewport>)
-//   --only=<substr>     only routes containing this substring (repeatable, comma-sep)
-//   --states=on|off     also capture state-changes (open first create dialog on lists) (default on)
-//   --public=on|off     include public routes (/,/docs,/features,…) (default on)
-//   --routes-root=<dir> app dir to discover routes from (default src/app)
+// Permission-checked auth file (must be chmod 600):
+//   OFFGRID_VISUAL_AUTH_FILE=/secure/visual-auth.json node scripts/shoot-all.mjs …
+//   # JSON: {"user":"…","password":"…"}
 //
-// Output: <out>/*.png  +  <out>/manifest.json  (route,url,file,status,title,consoleErrors,ok,notes)
-// The manifest is the contract for the vision audit: a reviewer reads each PNG and
-// checks it against {route,title} — does it render, make sense, and work.
-// ─────────────────────────────────────────────────────────────────────────────
+// Legacy --user/--pass flags remain compatible, but expose the password in the process list.
+// Output: <out>/*.png + <out>/manifest.json. Any real navigation, browser-console, page-runtime,
+// screenshot, error-boundary, unresolved-dynamic-route, or document-overflow failure exits nonzero.
 import { chromium } from 'playwright';
-import { readdirSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import {
+  batchItems,
+  dynamicSegmentCoverage,
+  isCanonicalRoute,
+  pageDirectoryRecord,
+  pageFailureReasons,
+  resolveVisualAuth,
+  selectCanonicalRouteRecords,
+  visualGateExitCode,
+} from './lib/visual-harness-policy.mjs';
 
-const arg = (k, d) => {
-  const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
-  return hit ? hit.slice(k.length + 3) : d;
-};
-const BASE = (arg('base', 'http://localhost:3000')).replace(/\/$/, '');
-const USER = arg('user', '');
-const PASS = arg('pass', '');
+function argValues(key) {
+  return process.argv
+    .filter((value) => value.startsWith(`--${key}=`))
+    .map((value) => value.slice(key.length + 3));
+}
+
+function arg(key, fallback = '') {
+  return argValues(key)[0] ?? fallback;
+}
+
+const BASE = arg('base', 'http://localhost:3000').replace(/\/$/, '');
 const THEME = arg('theme', 'light');
-const FOLDS = arg('folds', 'off') !== 'off'; // capture per-viewport fold segments for tall pages (readable review)
-const FOLD_CAP = Number(arg('fold-cap', '5')); // max fold segments per page
+const FOLDS = arg('folds', 'off') !== 'off';
+const FOLD_CAP = Number(arg('fold-cap', '5'));
 const VIEWPORT_RAW = arg('viewport', 'wide');
 const STATES = arg('states', 'on') !== 'off';
 const PUBLIC = arg('public', 'on') !== 'off';
 const ROUTES_ROOT = arg('routes-root', 'src/app');
-const ONLY = arg('only', '').split(',').map((s) => s.trim()).filter(Boolean);
+const BATCH_SIZE = Number(arg('batch-size', '30'));
+const ONLY = argValues('only')
+  .flatMap((value) => value.split(','))
+  .map((value) => value.trim())
+  .filter(Boolean);
 const host = new URL(BASE).hostname.split('.')[0] || 'local';
 const OUT = arg('out', `.shots/${host}-${THEME}-${VIEWPORT_RAW}`);
 
-const VP = VIEWPORT_RAW === 'mobile' ? { width: 390, height: 844 }
-  : VIEWPORT_RAW === 'wide' ? { width: 1440, height: 900 }
-  : (() => { const [w, h] = VIEWPORT_RAW.split('x').map(Number); return { width: w || 1440, height: h || 900 }; })();
+const VP =
+  VIEWPORT_RAW === 'mobile'
+    ? { width: 390, height: 844 }
+    : VIEWPORT_RAW === 'wide'
+      ? { width: 1440, height: 900 }
+      : (() => {
+          const [width, height] = VIEWPORT_RAW.split('x').map(Number);
+          return { width: width || 1440, height: height || 900 };
+        })();
 
-// ── Route discovery: walk the app dir for page.tsx, strip (route-group) + /page.tsx ──
-function discoverRoutes(root) {
-  const out = [];
-  const walk = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) { if (e.name !== 'api') walk(p); }
-      else if (e.name === 'page.tsx') {
-        let r = '/' + relative(root, dir).split('/').filter((s) => !/^\(.*\)$/.test(s)).join('/');
-        r = r.replace(/\/+$/, '') || '/';
-        out.push(r);
+function readAuthFile(path) {
+  if (!path) return {};
+  const mode = statSync(path).mode & 0o777;
+  if (mode & 0o077) {
+    throw new Error(`Visual auth file must not be group/world accessible (chmod 600 ${path}).`);
+  }
+  const parsed = JSON.parse(readFileSync(path, 'utf8'));
+  return {
+    user: String(parsed.user ?? parsed.username ?? parsed.email ?? ''),
+    password: String(parsed.password ?? ''),
+  };
+}
+
+function discoverRouteRecords(root) {
+  const records = [];
+  function walk(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'api') walk(path);
+      } else if (entry.name === 'page.tsx') {
+        records.push(pageDirectoryRecord(relative(root, directory)));
       }
     }
-  };
+  }
   walk(root);
-  return [...new Set(out)].sort();
+  return records;
 }
 
-const isDynamic = (r) => /\[[^\]]+\]/.test(r);
-const slug = (r) => (r === '/' ? 'root' : r.replace(/^\//, '').replace(/[/[\]]/g, '_')).replace(/_+/g, '_');
+const isDynamic = (route) => /\[[^\]]+\]/.test(route);
+const slug = (route) =>
+  (route === '/' ? 'root' : route.replace(/^\//, '').replace(/[/[\]]/g, '_')).replace(/_+/g, '_');
+const isNoise = (text) => /cloudflareinsights\.com|beacon\.min\.js/i.test(text);
 
-// Resolve a dynamic template to a concrete URL by scraping the nearest list page for a real id,
-// left-to-right for each [seg]. Returns null if any id can't be resolved (logged, skipped).
-async function resolveConcrete(page, template) {
-  const segs = template.split('/').filter(Boolean);
-  const concrete = [];
-  for (let i = 0; i < segs.length; i++) {
-    if (!/^\[.*\]$/.test(segs[i])) { concrete.push(segs[i]); continue; }
-    const prefix = '/' + concrete.join('/');
-    try {
-      await page.goto(BASE + prefix, { waitUntil: 'networkidle', timeout: 30000 });
-      await page.waitForTimeout(500);
-      const childRe = new RegExp('^' + prefix.replace(/[/]/g, '\\/') + '\\/([^/?#]+)');
-      const hrefs = await page.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')));
-      let id = null;
-      for (const h of hrefs) {
-        if (!h) continue;
-        const m = h.match(childRe);
-        if (m && m[1] && !/^\[/.test(m[1]) && !['new', 'runs', 'reports'].includes(m[1])) { id = m[1]; break; }
-      }
-      if (!id) return null;
-      concrete.push(id);
-    } catch { return null; }
+async function login(page, auth) {
+  if (!auth.user) return;
+  await page.goto(`${BASE}/signin`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  await page.waitForSelector('input[type="password"]', { timeout: 20_000 });
+  await page.fill('input[name="username"], input[type="email"], input[type="text"]', auth.user);
+  await page.fill('input[type="password"]', auth.password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.toString().includes('/signin'), { timeout: 30_000 });
+  if (new URL(page.url()).pathname.startsWith('/signin')) {
+    throw new Error('Visual harness authentication did not leave the sign-in page.');
   }
-  return '/' + concrete.join('/');
+  await page.waitForTimeout(1_000);
 }
 
-async function shoot(page, route, url, rec) {
-  const errors = [];
-  // Ignore harmless third-party noise: the Cloudflare web-analytics beacon trips a CSP
-  // report on every page — it's not an app error, so it must not flip `ok` to false.
-  const isNoise = (t) => /cloudflareinsights\.com|beacon\.min\.js/i.test(t);
-  const onErr = (m) => { if (m.type() === 'error' && !isNoise(m.text())) errors.push(m.text().slice(0, 200)); };
-  page.on('console', onErr);
-  let status = 0;
-  try {
-    const resp = await page.goto(BASE + url, { waitUntil: 'networkidle', timeout: 35000 });
-    status = resp?.status() ?? 0;
-    await page.waitForTimeout(900);
-  } catch (e) { errors.push('nav: ' + e.message.slice(0, 120)); }
-  const title = await page.title().catch(() => '');
-  const file = `${slug(route)}.png`;
-  try { await page.screenshot({ path: join(OUT, file), fullPage: true }); } catch (e) { errors.push('shot: ' + e.message.slice(0, 80)); }
-  // Fold segments: on tall pages a single full-page shot downscales to unreadable for a vision model.
-  // Capture readable per-viewport folds (scroll by viewport height) so nothing below the fold is missed.
-  if (FOLDS) {
-    try {
-      const vh = VP.height;
-      const total = await page.evaluate(() => document.documentElement.scrollHeight);
-      const nFolds = Math.min(FOLD_CAP, Math.max(1, Math.ceil(total / vh)));
-      if (nFolds > 1) {
-        for (let i = 0; i < nFolds; i++) {
-          await page.evaluate((y) => window.scrollTo(0, y), i * vh);
-          await page.waitForTimeout(300);
-          const ff = `${slug(route)}__fold${i + 1}.png`;
-          await page.screenshot({ path: join(OUT, ff), fullPage: false });
-          rec.push({ route: `${route} [fold ${i + 1}/${nFolds}]`, url, file: ff, status, title, consoleErrors: [], ok: true, notes: 'fold segment' });
-        }
-        await page.evaluate(() => window.scrollTo(0, 0));
-      }
-    } catch { /* fold capture is best-effort */ }
-  }
-  page.off('console', onErr);
-  const body = (await page.textContent('body').catch(() => '')) || '';
-  const brokenState = /application error|unhandled|something went wrong|500|stack trace/i.test(body);
-  rec.push({ route, url, file, status, title, consoleErrors: errors.slice(0, 5),
-    ok: status > 0 && status < 400 && !brokenState && !errors.length, notes: brokenState ? 'broken-state text on page' : '' });
-}
-
-(async () => {
-  mkdirSync(OUT, { recursive: true });
-  let routes = discoverRoutes(ROUTES_ROOT);
-  // classify: console (under (console)) vs public — discovery already stripped groups, so
-  // split by a known public allowlist.
-  const PUBLIC_ROUTES = ['/', '/docs', '/features', '/fleet-control', '/handbook', '/journey', '/signin'];
-  if (!PUBLIC) routes = routes.filter((r) => !PUBLIC_ROUTES.includes(r));
-  if (ONLY.length) routes = routes.filter((r) => ONLY.some((o) => r.includes(o)));
-
-  const browser = await chromium.launch();
-  const ctx = await browser.newContext({
-    ignoreHTTPSErrors: true, viewport: VP, colorScheme: THEME === 'dark' ? 'dark' : 'light',
-    // 2× DPI so full-page shots stay legible when a vision model downscales them.
+async function createSession(browser, auth) {
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    viewport: VP,
+    colorScheme: THEME === 'dark' ? 'dark' : 'light',
     deviceScaleFactor: 2,
   });
-  // next-themes reads a cookie/localStorage; set both for determinism.
-  await ctx.addCookies([{ name: 'theme', value: THEME, url: BASE }]);
-  const page = await ctx.newPage();
+  await context.addCookies([{ name: 'theme', value: THEME, url: BASE }]);
+  await context.addInitScript((theme) => {
+    try {
+      localStorage.setItem('theme', theme);
+    } catch {
+      // Public pages without storage access still receive colorScheme + the theme cookie.
+    }
+  }, THEME);
+  const page = await context.newPage();
+  await login(page, auth);
+  return { context, page };
+}
 
-  if (USER) {
-    await page.goto(BASE + '/signin', { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForSelector('input[type="password"]', { timeout: 20000 });
-    await page.fill('input[name="username"], input[type="email"], input[type="text"]', USER);
-    await page.fill('input[type="password"]', PASS);
-    await page.click('button[type="submit"]');
-    await page.waitForURL((u) => !u.toString().includes('/signin'), { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(1500);
+/*
+ * Contextual level-3 destinations use [destination] pages. Expanding every rendered destination
+ * link makes the live IA itself the source of exact coverage, while entity collections still use
+ * one representative seeded id so a large tenant cannot make release verification unbounded.
+ */
+async function resolveConcreteRoutes(page, template) {
+  const segments = template.split('/').filter(Boolean);
+  let candidates = [[]];
+  for (const segment of segments) {
+    if (!/^\[.*\]$/.test(segment)) {
+      candidates = candidates.map((candidate) => [...candidate, segment]);
+      continue;
+    }
+    const nextCandidates = [];
+    for (const concrete of candidates) {
+      const prefix = `/${concrete.join('/')}`;
+      let ids = [];
+      try {
+        await page.goto(BASE + prefix, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        await page.waitForTimeout(700);
+        const childPattern = new RegExp(`^${prefix.replace(/[/]/g, '\\/')}\\/([^/?#]+)`);
+        const hrefs = await page.$$eval('a[href]', (anchors) =>
+          anchors.map((anchor) => anchor.getAttribute('href')),
+        );
+        ids = [
+          ...new Set(
+            hrefs
+              .map((href) => href?.match(childPattern)?.[1])
+              .filter((id) => Boolean(id && !id.startsWith('['))),
+          ),
+        ];
+      } catch {
+        ids = [];
+      }
+      if (dynamicSegmentCoverage(segment) === 'first') {
+        ids = ids.filter((id) => !['new', 'runs', 'reports'].includes(id)).slice(0, 1);
+      }
+      for (const id of ids) nextCandidates.push([...concrete, id]);
+    }
+    if (!nextCandidates.length) return [];
+    candidates = nextCandidates;
+  }
+  return candidates
+    .map((segmentsForRoute) => `/${segmentsForRoute.join('/')}`)
+    .filter((route) => isCanonicalRoute(route));
+}
+
+async function inspectCurrentPage(page) {
+  const bodyText = (await page.textContent('body').catch(() => '')) || '';
+  const layoutOverflowPx = await page
+    .evaluate(() => {
+      const documentWidth = Math.max(
+        document.documentElement?.scrollWidth ?? 0,
+        document.body?.scrollWidth ?? 0,
+      );
+      return Math.max(0, Math.ceil(documentWidth - window.innerWidth));
+    })
+    .catch(() => 0);
+  return { bodyText, layoutOverflowPx };
+}
+
+async function shoot(page, route, url, records, { authenticated, template = route }) {
+  const consoleErrors = [];
+  const pageErrors = [];
+  const onConsole = (message) => {
+    if (message.type() === 'error' && !isNoise(message.text())) {
+      consoleErrors.push(message.text().slice(0, 240));
+    }
+  };
+  const onPageError = (error) => pageErrors.push(String(error.message || error).slice(0, 240));
+  page.on('console', onConsole);
+  page.on('pageerror', onPageError);
+
+  let status = 0;
+  let captureError = '';
+  try {
+    const response = await page.goto(BASE + url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 35_000,
+    });
+    status = response?.status() ?? 0;
+    await page.waitForTimeout(1_200);
+  } catch (error) {
+    pageErrors.push(`navigation: ${String(error.message || error).slice(0, 180)}`);
   }
 
-  const rec = [];
-  const dynamic = [];
-  for (const route of routes) {
-    if (isDynamic(route)) { dynamic.push(route); continue; }
-    process.stdout.write(`· ${route}\n`);
-    await shoot(page, route, route, rec);
-    // state-change: open the first create/new dialog on list-ish pages (bounded, best-effort).
-    if (STATES && /(^\/build\/(tools|evals)|connectors|domains|teams|access|prompts|secrets|pipelines$|studio$)/.test(route)) {
-      try {
-        const btn = page.locator('button:has-text("New"), button:has-text("Create"), button:has-text("Add")').first();
-        if (await btn.count()) {
-          await btn.click({ timeout: 3000 });
-          await page.waitForTimeout(800);
-          await page.screenshot({ path: join(OUT, `${slug(route)}__create.png`), fullPage: true });
-          rec.push({ route: route + ' [create dialog]', url: route, file: `${slug(route)}__create.png`, status: 200, title: 'state:create', consoleErrors: [], ok: true, notes: 'state-change capture' });
-          await page.keyboard.press('Escape').catch(() => {});
-        }
-      } catch { /* no create affordance — fine */ }
+  const title = await page.title().catch(() => '');
+  const file = `${slug(route)}.png`;
+  try {
+    await page.screenshot({ path: join(OUT, file), fullPage: true });
+  } catch (error) {
+    captureError = String(error.message || error).slice(0, 180);
+  }
+
+  if (FOLDS && !captureError) {
+    try {
+      const totalHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+      const foldCount = Math.min(FOLD_CAP, Math.max(1, Math.ceil(totalHeight / VP.height)));
+      for (let index = 0; index < foldCount; index += 1) {
+        if (foldCount === 1) break;
+        await page.evaluate((offset) => window.scrollTo(0, offset), index * VP.height);
+        await page.waitForTimeout(250);
+        const foldFile = `${slug(route)}__fold${index + 1}.png`;
+        await page.screenshot({ path: join(OUT, foldFile), fullPage: false });
+        records.push({
+          route: `${route} [fold ${index + 1}/${foldCount}]`,
+          template,
+          url,
+          file: foldFile,
+          status,
+          title,
+          consoleErrors: [],
+          pageErrors: [],
+          layoutOverflowPx: 0,
+          ok: true,
+          notes: 'fold segment',
+        });
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+    } catch (error) {
+      captureError = `fold capture: ${String(error.message || error).slice(0, 160)}`;
     }
   }
 
-  // dynamic routes: resolve one real id each, capture.
-  for (const route of dynamic) {
-    const url = await resolveConcrete(page, route);
-    if (!url) { rec.push({ route, url: null, file: null, status: 0, title: '', consoleErrors: [], ok: false, notes: 'could not resolve a real id (empty collection?)' }); process.stdout.write(`× ${route} (no id)\n`); continue; }
-    process.stdout.write(`· ${route} → ${url}\n`);
-    await shoot(page, route, url, rec);
+  const { bodyText, layoutOverflowPx } = await inspectCurrentPage(page);
+  const redirectedToSignin =
+    authenticated && route !== '/signin' && new URL(page.url()).pathname.startsWith('/signin');
+  page.off('console', onConsole);
+  page.off('pageerror', onPageError);
+  const reasons = pageFailureReasons({
+    status,
+    bodyText,
+    consoleErrors,
+    pageErrors,
+    captureError,
+    layoutOverflowPx,
+    redirectedToSignin,
+  });
+  records.push({
+    route,
+    template,
+    url,
+    file,
+    status,
+    title,
+    consoleErrors: [...new Set(consoleErrors)].slice(0, 8),
+    pageErrors: [...new Set(pageErrors)].slice(0, 8),
+    layoutOverflowPx,
+    ok: reasons.length === 0,
+    notes: reasons.join('; '),
+  });
+}
+
+function shouldCaptureCreateState(route) {
+  return /^(?:\/solutions\/(?:apps|tools|quality)|\/data\/(?:sources|domains|flows)|\/governance\/(?:access|teams|secrets|policies)|\/work\/prompts)(?:\/[^/]+)?$/.test(
+    route,
+  );
+}
+
+async function captureCreateState(page, route, records) {
+  if (!STATES || !shouldCaptureCreateState(route)) return;
+  const button = page
+    .locator('button[type="button"]:not([aria-disabled="true"])')
+    .filter({ hasText: /^(?:New|Create|Add|Register|Invite)\b/i })
+    .first();
+  if (!(await button.count())) return;
+
+  const consoleErrors = [];
+  const pageErrors = [];
+  const onConsole = (message) => {
+    if (message.type() === 'error' && !isNoise(message.text())) consoleErrors.push(message.text());
+  };
+  const onPageError = (error) => pageErrors.push(String(error.message || error));
+  page.on('console', onConsole);
+  page.on('pageerror', onPageError);
+  let captureError = '';
+  try {
+    await button.click({ timeout: 3_000 });
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: join(OUT, `${slug(route)}__create.png`), fullPage: true });
+  } catch (error) {
+    captureError = String(error.message || error).slice(0, 180);
+  }
+  const { bodyText, layoutOverflowPx } = await inspectCurrentPage(page);
+  const reasons = pageFailureReasons({
+    status: 200,
+    bodyText,
+    consoleErrors,
+    pageErrors,
+    captureError,
+    layoutOverflowPx,
+  });
+  records.push({
+    route: `${route} [create dialog]`,
+    url: route,
+    file: `${slug(route)}__create.png`,
+    status: 200,
+    title: 'state:create',
+    consoleErrors: [...new Set(consoleErrors)].slice(0, 8),
+    pageErrors: [...new Set(pageErrors)].slice(0, 8),
+    layoutOverflowPx,
+    ok: reasons.length === 0,
+    notes: reasons.length ? reasons.join('; ') : 'state-change capture',
+  });
+  page.off('console', onConsole);
+  page.off('pageerror', onPageError);
+  await page.keyboard.press('Escape').catch(() => {});
+}
+
+async function runBatch(browser, batch, records, auth, capturedRoutes) {
+  const { context, page } = await createSession(browser, auth);
+  try {
+    for (const record of batch) {
+      const route = record.route;
+      if (isDynamic(route)) {
+        const concreteRoutes = await resolveConcreteRoutes(page, route);
+        if (!concreteRoutes.length) {
+          records.push({
+            route,
+            template: route,
+            url: null,
+            file: null,
+            status: 0,
+            title: '',
+            consoleErrors: [],
+            pageErrors: [],
+            layoutOverflowPx: 0,
+            ok: false,
+            notes: 'canonical dynamic route could not resolve a seeded entity',
+          });
+          process.stdout.write(`× ${route} (no canonical entity id)\n`);
+          continue;
+        }
+        for (const concrete of concreteRoutes) {
+          if (capturedRoutes.has(concrete)) continue;
+          capturedRoutes.add(concrete);
+          process.stdout.write(`· ${route} → ${concrete}\n`);
+          await shoot(page, concrete, concrete, records, {
+            authenticated: Boolean(auth.user),
+            template: route,
+          });
+        }
+      } else {
+        if (capturedRoutes.has(route)) continue;
+        capturedRoutes.add(route);
+        process.stdout.write(`· ${route}\n`);
+        await shoot(page, route, route, records, { authenticated: Boolean(auth.user) });
+        await captureCreateState(page, route, records);
+      }
+    }
+  } finally {
+    await context.close();
+  }
+}
+
+async function main() {
+  if (!Number.isInteger(BATCH_SIZE) || BATCH_SIZE < 1) {
+    throw new Error('--batch-size must be a positive integer.');
+  }
+  if (!Number.isInteger(FOLD_CAP) || FOLD_CAP < 1) {
+    throw new Error('--fold-cap must be a positive integer.');
+  }
+  const authFile = arg('auth-file', process.env.OFFGRID_VISUAL_AUTH_FILE || '');
+  const auth = resolveVisualAuth({
+    cli: { user: arg('user'), password: arg('pass') },
+    env: process.env,
+    file: readAuthFile(authFile),
+  });
+  if (auth.error) throw new Error(auth.error);
+  if (argValues('pass').length) {
+    process.stderr.write(
+      'warning: --pass is retained for compatibility but is visible in process arguments; prefer OFFGRID_VISUAL_PASSWORD or --auth-file.\n',
+    );
+  }
+  if (!auth.user && !PUBLIC) {
+    throw new Error(
+      'Authenticated console crawl requested with --public=off, but no visual auth was supplied.',
+    );
   }
 
-  writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({
-    base: BASE, theme: THEME, viewport: VP, capturedAt: new Date().toISOString(),
-    total: rec.length, ok: rec.filter((r) => r.ok).length, failed: rec.filter((r) => !r.ok),
-    shots: rec,
-  }, null, 2));
-  await browser.close();
-  const bad = rec.filter((r) => !r.ok);
-  console.log(`\n${rec.length} captured → ${OUT} · ok=${rec.filter((r) => r.ok).length} · needs-review=${bad.length}`);
-  for (const b of bad) console.log(`  ⚠ ${b.route} [${b.status}] ${b.notes} ${b.consoleErrors[0] || ''}`);
-})();
+  const discovered = discoverRouteRecords(ROUTES_ROOT);
+  const eligible = auth.user
+    ? discovered
+    : discovered.filter((record) => record.surface === 'public');
+  const selection = selectCanonicalRouteRecords(eligible, {
+    includePublic: auth.user ? PUBLIC : true,
+    only: ONLY,
+  });
+  if (!selection.routes.length) {
+    throw new Error(
+      auth.user
+        ? 'No canonical routes matched this visual crawl.'
+        : 'No public routes matched. Supply safe auth to crawl authenticated console routes.',
+    );
+  }
+
+  mkdirSync(OUT, { recursive: true });
+  const records = [];
+  const capturedRoutes = new Set();
+  const browser = await chromium.launch();
+  try {
+    for (const batch of batchItems(selection.routes, BATCH_SIZE)) {
+      await runBatch(browser, batch, records, auth, capturedRoutes);
+    }
+  } finally {
+    await browser.close();
+  }
+
+  const manifest = {
+    base: BASE,
+    theme: THEME,
+    viewport: VP,
+    capturedAt: new Date().toISOString(),
+    authentication: auth.user ? 'authenticated' : 'public-only',
+    batchSize: BATCH_SIZE,
+    routeInventory: {
+      discovered: discovered.length,
+      canonicalTemplatesSelected: selection.routes.length,
+      canonicalConcreteRoutesCaptured: capturedRoutes.size,
+      legacyAliasesExcluded: selection.aliases,
+    },
+    total: records.length,
+    ok: records.filter((record) => record.ok).length,
+    failed: records.filter((record) => !record.ok),
+    shots: records,
+  };
+  writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+  const failures = manifest.failed;
+  console.log(
+    `\n${records.length} captured → ${OUT} · ok=${manifest.ok} · failed=${failures.length} · canonical-routes=${selection.routes.length} · legacy-aliases-excluded=${selection.aliases.length}`,
+  );
+  for (const failure of failures) {
+    console.log(`  ⚠ ${failure.route} [${failure.status}] ${failure.notes}`);
+  }
+  process.exitCode = visualGateExitCode(records);
+}
+
+main().catch((error) => {
+  process.stderr.write(`visual harness failed: ${String(error.message || error)}\n`);
+  process.exitCode = 1;
+});
