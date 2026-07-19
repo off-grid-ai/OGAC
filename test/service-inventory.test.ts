@@ -5,6 +5,9 @@ import {
   EXPECTED_ENTERPRISE_SOURCE_COUNT,
   EXPECTED_LOGICAL_INVENTORY_COUNT,
   EXPECTED_PLATFORM_SERVICE_COUNT,
+  filterServiceInventory,
+  isServiceInventoryFamily,
+  isServiceInventoryOwner,
   reconcileServiceInventory,
 } from '../src/lib/service-inventory.ts';
 
@@ -102,4 +105,30 @@ test('all 49 records carry routes, system-of-record provenance, and an honest ne
     assert.ok(entry.deployment.systemOfRecords.length > 0, `${entry.id} has provenance`);
     assert.ok(entry.nextAction.trim(), `${entry.id} has next action`);
   }
+});
+
+test('URL-style inventory filters search identity and narrow by family and IA owner', () => {
+  const entries = reconcileServiceInventory({ platformServices: canonicalServices() }).entries;
+
+  assert.deepEqual(
+    filterServiceInventory(entries, { query: 'telemetry' }).map((entry) => entry.id),
+    ['otel-collector'],
+  );
+  assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);
+  assert.equal(filterServiceInventory(entries, { owner: 'data-sources' }).length, 6);
+  assert.deepEqual(
+    filterServiceInventory(entries, {
+      query: 'claims',
+      family: 'enterprise-source',
+      owner: 'data-sources',
+    }).map((entry) => entry.id),
+    ['enterprise-source-corebank', 'enterprise-source-kafka'],
+  );
+});
+
+test('inventory filter guards accept only canonical URL values', () => {
+  assert.equal(isServiceInventoryFamily('runtime'), true);
+  assert.equal(isServiceInventoryFamily('unknown'), false);
+  assert.equal(isServiceInventoryOwner('operations-services'), true);
+  assert.equal(isServiceInventoryOwner('operations'), false);
 });

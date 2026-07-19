@@ -21,6 +21,17 @@ export const EXPECTED_PLATFORM_SERVICE_COUNT = 43;
 export const EXPECTED_ENTERPRISE_SOURCE_COUNT = 6;
 export const EXPECTED_LOGICAL_INVENTORY_COUNT = 49;
 
+export const SERVICE_INVENTORY_FAMILIES = [
+  'data',
+  'runtime',
+  'governance',
+  'observability',
+  'operations',
+  'enterprise-source',
+] as const;
+
+export const SERVICE_INVENTORY_OWNERS = ['operations-services', 'data-sources'] as const;
+
 export type ServiceInventoryFamily =
   | 'data'
   | 'runtime'
@@ -83,6 +94,12 @@ export interface ServiceInventoryReconciliation {
   totalCount: number;
   exactContract: boolean;
   issues: readonly ServiceInventoryIssue[];
+}
+
+export interface ServiceInventoryFilter {
+  query?: string;
+  family?: ServiceInventoryFamily | '';
+  owner?: ServiceInventoryOwner | '';
 }
 
 type CapabilityAuditLookup = (serviceId: string) => ServiceCapabilityAudit | null;
@@ -342,4 +359,34 @@ export function reconcileServiceInventory({
     exactContract: issues.length === 0,
     issues,
   };
+}
+
+/** URL-filterable inventory refinement. An empty filter always preserves the exact source order. */
+export function filterServiceInventory(
+  entries: readonly LogicalServiceInventoryEntry[],
+  { query = '', family = '', owner = '' }: ServiceInventoryFilter,
+): LogicalServiceInventoryEntry[] {
+  const needle = query.trim().toLowerCase();
+  return entries.filter((entry) => {
+    if (family && entry.family !== family) return false;
+    if (owner && entry.owner !== owner) return false;
+    if (!needle) return true;
+    return [
+      entry.id,
+      entry.label,
+      entry.description,
+      entry.family,
+      entry.role,
+      entry.owner,
+      entry.nextAction,
+    ].some((value) => value.toLowerCase().includes(needle));
+  });
+}
+
+export function isServiceInventoryFamily(value: string): value is ServiceInventoryFamily {
+  return (SERVICE_INVENTORY_FAMILIES as readonly string[]).includes(value);
+}
+
+export function isServiceInventoryOwner(value: string): value is ServiceInventoryOwner {
+  return (SERVICE_INVENTORY_OWNERS as readonly string[]).includes(value);
 }

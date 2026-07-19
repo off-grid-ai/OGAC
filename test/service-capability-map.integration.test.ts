@@ -6,12 +6,18 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ServiceCapabilityMap } from '../src/components/services/ServiceCapabilityMap.tsx';
 import { SERVICE_CAPABILITY_AUDITS } from '../src/lib/service-capability-map.ts';
+import { reconcileServiceInventory } from '../src/lib/service-inventory.ts';
+import { getServices } from '../src/lib/services-directory.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const APP = resolve(ROOT, 'src/app/(console)');
 
 function source(path: string): string {
   return readFileSync(resolve(ROOT, path), 'utf8');
+}
+
+function inventory() {
+  return reconcileServiceInventory({ platformServices: getServices() });
 }
 
 function routeModule(pathnameWithQuery: string): string {
@@ -42,6 +48,8 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.match(page, /requireModuleForUser\('services'\)/);
   assert.match(page, /<PageFrame>/);
   assert.match(page, /SERVICE_CAPABILITY_AUDITS/);
+  assert.match(page, /reconcileServiceInventory/);
+  assert.match(page, /getRuntimeServiceTopologyRegistry/);
   assert.match(page, /selectedServiceId=/);
   assert.match(component, /className="w-full space-y-6"/);
   assert.match(component, /CAPABILITY_GATES\.map/);
@@ -55,6 +63,8 @@ test('audited service summary cards stack identity, metadata, and description wi
   const html = renderToStaticMarkup(
     createElement(ServiceCapabilityMap, {
       audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: inventory(),
+      inventoryFilter: {},
       selectedServiceId: null,
     }),
   );
@@ -70,6 +80,47 @@ test('audited service summary cards stack identity, metadata, and description wi
   assert.match(html, /flex min-w-0 flex-wrap/);
   assert.match(html, /max-w-full min-w-0 shrink whitespace-normal break-all/);
   assert.match(html, /leading-relaxed/);
+});
+
+test('full inventory renders the exact 49/5/44 contract without inventing pending coverage', () => {
+  const html = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: inventory(),
+      inventoryFilter: {},
+      selectedServiceId: null,
+    }),
+  );
+
+  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 49);
+  assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 3);
+  assert.match(html, /Total inventory<\/p><p[^>]*>49<\/p>/);
+  assert.match(html, /Capability audited<\/p><p[^>]*>5<\/p>/);
+  assert.match(html, /Audit pending<\/p><p[^>]*>44<\/p>/);
+  assert.equal((html.match(/>audited<\/span>/g) ?? []).length, 5);
+  assert.equal((html.match(/>pending<\/span>/g) ?? []).length, 44);
+  assert.match(html, /43 platform entries live in Operations \/ Services/);
+  assert.match(html, /Six enterprise systems live in Data/);
+});
+
+test('inventory filtering is URL-backed, searchable, and preserves an audited selection', () => {
+  const html = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      inventory: inventory(),
+      inventoryFilter: { query: 'telemetry', family: 'observability' },
+      selectedServiceId: 'otel-collector',
+    }),
+  );
+
+  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 1);
+  assert.match(html, /data-service-inventory-row="otel-collector"/);
+  assert.match(html, /action="\/operations\/services\/capability-map"/);
+  assert.match(html, /name="q"/);
+  assert.match(html, /name="family"/);
+  assert.match(html, /name="owner"/);
+  assert.match(html, /name="service" value="otel-collector"/);
+  assert.match(html, /1\/49 entries/);
 });
 
 test('every mapped capability links to an existing console route module', () => {
