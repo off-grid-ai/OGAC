@@ -81,6 +81,12 @@ The orchestrator assigns disjoint families and file sets. A worker must not edit
 worker's shared navigation, registry, or component files. One agent owns shared IA/registry projection
 per wave; family agents expose narrow handoff APIs. Commit coherent slices early and report the SHA.
 
+The shared checkout also means `.next`, `coverage/`, and other generated directories are global.
+Workers run focused tests, formatting, and typecheck; the orchestrator schedules production build,
+full coverage, duplication, screenshot, push, and deploy gates **exclusively**, after workers stop their
+dev servers. Never run two Next builds or two c8 commands concurrently—their artifacts can invalidate
+an otherwise good visual or coverage result.
+
 Recommended lanes:
 
 - **Inventory/IA projection** — 49-entry reconciliation, canonical routes, capability-map projection.
