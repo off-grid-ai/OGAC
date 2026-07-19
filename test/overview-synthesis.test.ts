@@ -162,7 +162,7 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   const block = byLabel.get('Blocking decisions (24h)')!;
   assert.equal(block.value, '4');
   assert.equal(block.tone, 'warn');
-  assert.equal(block.href, '/governance');
+  assert.equal(block.href, '/governance/posture');
   assert.match(block.hint!, /1 policy · 2 audit · 1 redaction/);
 
   assert.equal(byLabel.get('Policy engine')!.value, 'OPA');
@@ -187,7 +187,7 @@ test('cost tiles report spend, on-prem dividend, and over-budget keys', () => {
   const over = byLabel.get('Keys over budget')!;
   assert.equal(over.value, '1'); // analytics-team at 140%
   assert.equal(over.tone, 'bad');
-  cost.forEach((t) => assert.equal(t.href, '/insights/finops'));
+  cost.forEach((t) => assert.equal(t.href, '/runtime/api-budgets'));
 });
 
 test('health summary counts up/down and tones amber on partial outage', () => {
@@ -196,7 +196,7 @@ test('health summary counts up/down and tones amber on partial outage', () => {
   assert.equal(health.total, 3);
   assert.equal(health.tone, 'warn'); // 1 of 3 down
   assert.equal(health.tile.value, '2/3 up');
-  assert.equal(health.tile.href, '/gateway/services');
+  assert.equal(health.tile.href, '/operations/services');
   assert.equal(health.items.length, 3);
 });
 

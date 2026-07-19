@@ -81,7 +81,7 @@ export function BlockingFeed({ blocking }: Readonly<{ blocking: OperatorHome['bl
   return (
     <Section
       title={`Blocking decisions (last ${blocking.windowHours}h)`}
-      href="/governance"
+      href="/governance/posture"
       linkLabel="Governance"
     >
       <Card className="shadow-sm">
@@ -164,7 +164,7 @@ export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['ac
         {activity.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             Nothing has run yet. Kick off your first agent from{' '}
-            <Link href="/workspace/chat" className="text-primary hover:underline">
+            <Link href="/work/chat" className="text-primary hover:underline">
               chat
             </Link>
             .

@@ -15,13 +15,13 @@ test('matchFeatures finds a feature by an action keyword, not just its title', (
 });
 
 test('matchFeatures matches egress/leash → control', () => {
-  assert.ok(matchFeatures('egress').some((f) => f.href === '/governance'));
-  assert.ok(matchFeatures('leash').some((f) => f.href === '/governance'));
+  assert.ok(matchFeatures('egress').some((f) => f.href === '/governance/posture'));
+  assert.ok(matchFeatures('leash').some((f) => f.href === '/governance/posture'));
 });
 
 test('matchFeatures matches baseline → drift and budget → finops', () => {
-  assert.ok(matchFeatures('baseline').some((f) => f.href === '/insights/drift'));
-  assert.ok(matchFeatures('budget').some((f) => f.href === '/insights/finops'));
+  assert.ok(matchFeatures('baseline').some((f) => f.href === '/insights/quality/drift'));
+  assert.ok(matchFeatures('budget').some((f) => f.href === '/runtime/api-budgets'));
 });
 
 test('matchFeatures matches on title substring too', () => {

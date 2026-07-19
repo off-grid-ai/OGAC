@@ -39,7 +39,7 @@ export function NewEtlJobButton({ hasConnectors }: Readonly<{ hasConnectors: boo
         return;
       }
       const job = (await res.json()) as { id: string };
-      router.push(`/data/etl/${job.id}`);
+      router.push(`/data/flows/orchestration/${job.id}`);
     } finally {
       setBusy(false);
     }
@@ -73,8 +73,8 @@ export function NewEtlJobButton({ hasConnectors }: Readonly<{ hasConnectors: boo
           />
           {!hasConnectors ? (
             <p className="text-xs text-amber-600">
-              You have no source connectors yet — add one under Connectors first, or create the job and
-              connect a source later.
+              You have no source connectors yet — add one under Connectors first, or create the job
+              and connect a source later.
             </p>
           ) : null}
         </div>

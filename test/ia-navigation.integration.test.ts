@@ -125,6 +125,20 @@ test('canonical service journeys do not emit legacy navigation links', () => {
   assert.doesNotMatch(`${directory}\n${detail}`, /\/gateway\/services/);
 });
 
+test('canonical gateway and orchestration journeys never emit retired collection paths', () => {
+  const gateways = readFileSync(`${ROOT}src/components/gateways/GatewaysManager.tsx`, 'utf8');
+  const gateway = readFileSync(`${ROOT}src/components/gateways/GatewayDetail.tsx`, 'utf8');
+  const createJob = readFileSync(`${ROOT}src/components/data/etl/NewEtlJobButton.tsx`, 'utf8');
+  const jobActions = readFileSync(`${ROOT}src/components/data/EtlJobActions.tsx`, 'utf8');
+
+  assert.match(gateways, /\/runtime\/gateways\/\$\{gw\.id\}/);
+  assert.match(gateway, /router\.push\('\/runtime\/gateways'\)/);
+  assert.doesNotMatch(`${gateways}\n${gateway}`, /\/gateway\/registry/);
+  assert.match(createJob, /router\.push\(`\/data\/flows\/orchestration\/\$\{job\.id\}`\)/);
+  assert.match(jobActions, /router\.push\('\/data\/flows\/orchestration'\)/);
+  assert.doesNotMatch(`${createJob}\n${jobActions}`, /\/data\/etl/);
+});
+
 test('gateway model and API management places are durable routes', () => {
   const legacyPage = readFileSync(`${ROOT}src/app/(console)/gateway/ai/page.tsx`, 'utf8');
   const modelsPage = readFileSync(

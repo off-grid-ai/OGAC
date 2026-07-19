@@ -99,7 +99,7 @@ function GatewayCard({
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="min-w-0">
           <Link
-            href={`/gateway/registry/${gw.id}`}
+            href={`/runtime/gateways/${gw.id}`}
             className="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
           >
             {gw.name}
@@ -149,11 +149,16 @@ function GatewayCard({
           </span>
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" asChild>
-              <Link href={`/gateway/registry/${gw.id}`}>
+              <Link href={`/runtime/gateways/${gw.id}`}>
                 Open <ArrowRight className="size-3.5" />
               </Link>
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => onEdit(gw)} aria-label={`Edit ${gw.name}`}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onEdit(gw)}
+              aria-label={`Edit ${gw.name}`}
+            >
               <Pencil className="size-4" />
             </Button>
             <Button
@@ -201,7 +206,11 @@ export function GatewayFormSheet({
     setError(null);
     if (gateway) {
       setName(gateway.name);
-      setKind((GATEWAY_KINDS as readonly string[]).includes(gateway.kind) ? (gateway.kind as GatewayKind) : 'compat');
+      setKind(
+        (GATEWAY_KINDS as readonly string[]).includes(gateway.kind)
+          ? (gateway.kind as GatewayKind)
+          : 'compat',
+      );
       setBaseUrl(gateway.baseUrl);
       setDefaultModel(gateway.defaultModel);
       setEnabled(gateway.enabled);
@@ -283,7 +292,11 @@ export function GatewayFormSheet({
           <Label htmlFor="gw-baseurl">Base URL{kind === 'compat' ? '' : ' (optional)'}</Label>
           <Input
             id="gw-baseurl"
-            placeholder={kind === 'compat' ? 'https://openrouter.ai/api/v1' : 'well-known default used if blank'}
+            placeholder={
+              kind === 'compat'
+                ? 'https://openrouter.ai/api/v1'
+                : 'well-known default used if blank'
+            }
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
           />
@@ -368,7 +381,12 @@ export function GatewaysManager({ gateways }: Readonly<{ gateways: GatewayView[]
 
   const onDelete = useCallback(
     async (gw: GatewayView) => {
-      if (!confirm(`Delete gateway "${gw.name}"? Pipelines bound to it will fall back to the org default.`)) return;
+      if (
+        !confirm(
+          `Delete gateway "${gw.name}"? Pipelines bound to it will fall back to the org default.`,
+        )
+      )
+        return;
       const res = await fetch(`/api/v1/admin/gateways/${gw.id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success(`Gateway "${gw.name}" deleted`);
@@ -405,7 +423,13 @@ export function GatewaysManager({ gateways }: Readonly<{ gateways: GatewayView[]
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {gateways.map((gw) => (
-            <GatewayCard key={gw.id} gw={gw} onEdit={onEdit} onToggle={onToggle} onDelete={onDelete} />
+            <GatewayCard
+              key={gw.id}
+              gw={gw}
+              onEdit={onEdit}
+              onToggle={onToggle}
+              onDelete={onDelete}
+            />
           ))}
         </div>
       )}

@@ -216,7 +216,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
     value: blocking.total.toLocaleString(),
     hint: blocking.total > 0 ? blockingBreakdown(blocking.items) : 'nothing stopped — all clear',
     tone: blocking.total > 0 ? 'warn' : 'good',
-    href: '/governance',
+    href: '/governance/posture',
   });
   if (policy) {
     posture.push({
@@ -243,7 +243,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: pct(analytics.egressRate),
       hint: analytics.egressRate > 0 ? 'some data left the box' : 'fully on-prem — nothing left',
       tone: analytics.egressRate > 0 ? 'warn' : 'good',
-      href: '/governance',
+      href: '/governance/posture',
     });
   }
 
@@ -255,7 +255,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: `$${finops.totals.costUsd.toFixed(2)}`,
       hint: `${finops.totals.requests.toLocaleString()} requests billed`,
       tone: 'muted',
-      href: '/insights/finops',
+      href: '/runtime/api-budgets',
     });
     // localShare arrives as a whole-number percent (0..100) from finops.
     const localShare = finops.totals.localShare;
@@ -264,7 +264,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: `${Math.round(localShare)}%`,
       hint: 'ran free on your own hardware',
       tone: localShare >= 90 ? 'good' : localShare > 0 ? 'muted' : 'warn',
-      href: '/insights/finops',
+      href: '/runtime/api-budgets',
     });
     const overBudget = finops.byKey.filter((k) => k.pct !== null && k.pct >= 100).length;
     cost.push({
@@ -275,7 +275,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
           ? 'capped — raise the limit or investigate'
           : `${finops.byKey.length} keys within budget`,
       tone: overBudget > 0 ? 'bad' : 'good',
-      href: '/insights/finops',
+      href: '/runtime/api-budgets',
     });
   }
 
@@ -295,7 +295,7 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
       value: total ? `${up}/${total} up` : '—',
       hint: down === 0 ? 'every service responding' : `${down} not responding`,
       tone: healthTone,
-      href: '/gateway/services',
+      href: '/operations/services',
     },
     items: services.map((s) => ({ id: s.id, label: s.label, status: s.status, ms: s.ms })),
   };

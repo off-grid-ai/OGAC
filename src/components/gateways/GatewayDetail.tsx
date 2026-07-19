@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  ArrowLeft,
-  Copy,
-  Cpu,
-  Globe,
-  Lock,
-  Pencil,
-  Trash,
-} from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeft, Copy, Cpu, Globe, Lock, Pencil, Trash } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -122,7 +114,8 @@ function NodePool() {
       try {
         const r = await fetch('/api/v1/gateway/nodes', { cache: 'no-store' });
         const d = (await r.json()) as { available?: boolean; nodes?: NodeView[] };
-        if (live) setState({ loading: false, available: Boolean(d.available), nodes: d.nodes ?? [] });
+        if (live)
+          setState({ loading: false, available: Boolean(d.available), nodes: d.nodes ?? [] });
       } catch {
         if (live) setState({ loading: false, available: false, nodes: [] });
       }
@@ -139,8 +132,8 @@ function NodePool() {
           <Cpu className="size-4 text-primary" /> Node pool
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Live fleet nodes fronting this gateway, probed through the aggregator. Health is the strict
-          probe truth — never faked.
+          Live fleet nodes fronting this gateway, probed through the aggregator. Health is the
+          strict probe truth — never faked.
         </p>
       </CardHeader>
       <CardContent>
@@ -168,7 +161,9 @@ function NodePool() {
                   <TableRow key={n.name}>
                     <TableCell>
                       <div className="text-xs text-foreground">{n.name}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">{toDisplayHost(n.host)}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground">
+                        {toDisplayHost(n.host)}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {n.model ? modelLabel(n.model) : '—'}
@@ -285,11 +280,16 @@ export function GatewayDetail({
   }, [isOnPrem, fleetModelBaseline]);
 
   const onDelete = useCallback(async () => {
-    if (!confirm(`Delete gateway "${gateway.name}"? Pipelines bound to it will fall back to the org default.`)) return;
+    if (
+      !confirm(
+        `Delete gateway "${gateway.name}"? Pipelines bound to it will fall back to the org default.`,
+      )
+    )
+      return;
     const res = await fetch(`/api/v1/admin/gateways/${gateway.id}`, { method: 'DELETE' });
     if (res.ok) {
       toast.success(`Gateway "${gateway.name}" deleted`);
-      router.push('/gateway/registry');
+      router.push('/runtime/gateways');
       router.refresh();
     } else {
       toast.error('Failed to delete gateway');
@@ -298,7 +298,10 @@ export function GatewayDetail({
 
   const facts = [
     { label: 'Kind', value: KIND_LABEL[gateway.kind] ?? gateway.kind },
-    { label: 'Egress', value: gateway.egressClass === 'on-prem' ? 'stays on-prem' : 'leaves (cloud)' },
+    {
+      label: 'Egress',
+      value: gateway.egressClass === 'on-prem' ? 'stays on-prem' : 'leaves (cloud)',
+    },
     { label: 'Default model', value: gateway.defaultModel || '—' },
     { label: 'Enabled', value: gateway.enabled ? 'yes' : 'no' },
     { label: 'Available', value: gateway.available ? 'yes' : 'no' },
@@ -306,7 +309,8 @@ export function GatewayDetail({
 
   let credentialsNote = 'No provider key configured — this gateway is unconfigured.';
   if (isOnPrem) {
-    credentialsNote = 'Served by the fleet — no outbound key. Aggregator auth is handled server-side.';
+    credentialsNote =
+      'Served by the fleet — no outbound key. Aggregator auth is handled server-side.';
   } else if (gateway.configured) {
     credentialsNote = 'A provider key is configured (stored server-side; never shown here).';
   }
@@ -314,7 +318,7 @@ export function GatewayDetail({
   return (
     <div className="w-full space-y-6">
       <Link
-        href="/gateway/registry"
+        href="/runtime/gateways"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
@@ -333,7 +337,7 @@ export function GatewayDetail({
         <div className="flex items-center gap-2">
           {/* Edit deep-links back to the list's URL-driven edit panel — one sheet, no fork. */}
           <Button size="sm" variant="outline" asChild>
-            <Link href={`/gateway/registry?panel=edit-gateway&id=${gateway.id}`}>
+            <Link href={`/runtime/gateways?panel=edit-gateway&id=${gateway.id}`}>
               <Pencil className="size-4" /> Edit
             </Link>
           </Button>
@@ -356,7 +360,9 @@ export function GatewayDetail({
                 {f.label}
               </CardTitle>
             </CardHeader>
-            <CardContent className="truncate text-sm font-medium text-foreground">{f.value}</CardContent>
+            <CardContent className="truncate text-sm font-medium text-foreground">
+              {f.value}
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -369,8 +375,9 @@ export function GatewayDetail({
             <Globe className="size-4 text-primary" /> Endpoint
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            A per-tenant gateway URL, unguessable and tenant-scoped. Point the tenant’s clients at it;
-            the aggregator resolves the tenant from the host. Uses the shared gateway until provisioned.
+            A per-tenant gateway URL, unguessable and tenant-scoped. Point the tenant’s clients at
+            it; the aggregator resolves the tenant from the host. Uses the shared gateway until
+            provisioned.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -418,7 +425,9 @@ export function GatewayDetail({
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Base URL</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Base URL
+              </div>
               <div className="mt-1 break-all font-mono text-xs text-foreground">
                 {gateway.baseUrl
                   ? toDisplayHost(gateway.baseUrl)
@@ -428,11 +437,15 @@ export function GatewayDetail({
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Credentials</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Credentials
+              </div>
               <div className="mt-1 text-xs text-muted-foreground">{credentialsNote}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Health</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Health
+              </div>
               <div className="mt-1 text-xs text-foreground">{gateway.detail}</div>
             </div>
           </CardContent>

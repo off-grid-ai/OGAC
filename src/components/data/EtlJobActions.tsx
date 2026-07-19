@@ -25,7 +25,9 @@ export function EtlJobActions({ jobId }: Readonly<{ jobId: string }>) {
         message?: string;
       };
       if (body.status === 'succeeded') {
-        toast.success(`Moved ${body.rowsWritten ?? 0} rows · ${body.redacted ?? 0} values redacted`);
+        toast.success(
+          `Moved ${body.rowsWritten ?? 0} rows · ${body.redacted ?? 0} values redacted`,
+        );
       } else {
         toast.error(body.message || 'The run failed');
       }
@@ -47,7 +49,7 @@ export function EtlJobActions({ jobId }: Readonly<{ jobId: string }>) {
         return;
       }
       toast.success('Job deleted');
-      router.push('/data/etl');
+      router.push('/data/flows/orchestration');
     } catch {
       toast.error('Could not delete the job');
     } finally {
