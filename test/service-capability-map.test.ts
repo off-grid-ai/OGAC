@@ -11,19 +11,70 @@ import {
 
 const AUDITED_IDS = ['evidently', 'presidio', 'streaming', 'otel-collector', 'litellm'];
 
-test('registry exhaustively names the five audited services and versions', () => {
+test('registry exhaustively names four current audits and one visibly stale audit record', () => {
   assert.deepEqual(
     SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId),
     AUDITED_IDS,
   );
   assert.deepEqual(
     SERVICE_CAPABILITY_AUDITS.map((audit) => audit.upstreamVersion),
-    ['0.4.40', '2.2.356', '24.2.7', '0.116.0', 'main-stable (mutable image tag)'],
+    [
+      '0.4.40',
+      '2.2.356',
+      '24.2.7',
+      '0.116.0 (stale; deployed fleet 0.156.0)',
+      'main-stable (mutable image tag)',
+    ],
+  );
+  assert.deepEqual(
+    SERVICE_CAPABILITY_AUDITS.map((audit) => audit.auditState),
+    ['current', 'current', 'current', 'stale', 'current'],
   );
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
     assert.equal(audit.auditedAt, '2026-07-19');
+    assert.equal(Boolean(audit.auditStateEvidence), audit.auditState === 'stale');
     assert.ok(audit.items.length >= 7, `${audit.serviceId} has a real capability denominator`);
   }
+});
+
+test('stale OTel audit does not verify availability for the deployed 0.156.0 denominator', () => {
+  const audit = getServiceCapabilityAudit('otel-collector');
+  assert.ok(audit);
+  assert.equal(audit.auditState, 'stale');
+  assert.match(audit.auditStateEvidence ?? '', /do not re-audit the 0\.156\.0 upstream/);
+  assert.ok(audit.items.every((item) => item.gates.upstream.status === 'no'));
+  assert.ok(audit.items.every((item) => item.gates.upstream.evidence.includes('0.156.0')));
+  assert.ok(audit.items.every((item) => item.gap.startsWith('Re-audit the deployed')));
+  const summary = summarizeServiceCapabilityAudit('otel-collector');
+  assert.equal(summary.status, 'audited');
+  if (summary.status === 'audited') assert.equal(summary.auditState, 'stale');
+});
+
+test('Redpanda audit reflects native lifecycle and proof UI without claiming live workflow use', () => {
+  const audit = getServiceCapabilityAudit('streaming');
+  assert.ok(audit);
+  const byId = new Map(audit.items.map((item) => [item.id, item]));
+  const produce = byId.get('produce-records');
+  const consume = byId.get('consume-records');
+  const schemas = byId.get('schema-registry');
+  const topics = byId.get('topic-lifecycle');
+  const proof = byId.get('bfsi-stream-proof');
+
+  assert.match(produce?.summary ?? '', /native Kafka protocol/);
+  assert.equal(produce?.gates.workflow.status, 'no');
+  assert.equal(consume?.uiHref, '/operations/services/streaming?manage=workflows');
+  assert.equal(consume?.gates.adapter.status, 'yes');
+  assert.equal(consume?.gates.ui.status, 'partial');
+  assert.equal(consume?.gates.workflow.status, 'no');
+  assert.equal(schemas?.gates.adapter.status, 'yes');
+  assert.equal(schemas?.gates.ui.status, 'yes');
+  assert.equal(schemas?.gates.workflow.status, 'no');
+  assert.equal(topics?.gates.adapter.status, 'yes');
+  assert.equal(topics?.gates.ui.status, 'yes');
+  assert.equal(topics?.gates.workflow.status, 'no');
+  assert.equal(proof?.gates.adapter.status, 'yes');
+  assert.equal(proof?.gates.ui.status, 'yes');
+  assert.equal(proof?.gates.workflow.status, 'no');
 });
 
 test('every capability has four independent evidence gates, a real route, and a concrete gap', () => {
@@ -86,6 +137,7 @@ test('unmapped services are not audited, never represented as zero or full cover
 test('coverage percentage is safe for an explicit empty audited denominator', () => {
   const empty: AuditedCapabilitySummary = {
     status: 'audited',
+    auditState: 'current',
     verifiedGates: 0,
     partialGates: 0,
     totalGates: 0,

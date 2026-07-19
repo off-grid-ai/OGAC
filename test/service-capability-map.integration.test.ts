@@ -80,6 +80,7 @@ test('audited service summary cards stack identity, metadata, and description wi
   assert.match(html, /flex min-w-0 flex-wrap/);
   assert.match(html, /max-w-full min-w-0 shrink whitespace-normal break-all/);
   assert.match(html, /leading-relaxed/);
+  assert.match(html, /version 0\.116\.0 \(stale; deployed fleet 0\.156\.0\)/);
 });
 
 test('full inventory renders the exact 49/5/44 contract without inventing pending coverage', () => {

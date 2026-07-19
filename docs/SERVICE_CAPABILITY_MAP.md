@@ -53,8 +53,15 @@ LiteLLM currently uses `main-stable`, a mutable image tag. The map calls that ou
 inventing a fixed version. Pin the image digest before treating that upstream denominator as
 reproducible.
 
-The initial audited set is Evidently 0.4.40, Presidio 2.2.356, Redpanda 24.2.7, OpenTelemetry
-Collector 0.116.0, and the mutable LiteLLM `main-stable` image.
+The registry contains five versioned audit records: Evidently 0.4.40, Presidio 2.2.356, Redpanda
+24.2.7, OpenTelemetry Collector 0.116.0, and the mutable LiteLLM `main-stable` image. Four are
+current. The OTel record is explicitly stale because the fleet replaced failing 0.116.0 with pinned
+0.156.0. Fleet records prove that 0.156.0 is deployed and exported one trace to Jaeger; they do not
+re-audit its upstream capability denominator. Until that audit happens, every OTel Available gate is
+`no` (not verified), while the historical adapter, UI, and workflow evidence remains visible.
+
+“Five audit records” therefore does not mean “five current audits”: the exact state is four current,
+one stale, and 44 services with no versioned audit record.
 
 ## Systems of record
 

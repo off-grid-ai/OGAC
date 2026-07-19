@@ -43,12 +43,15 @@ export interface ServiceCapabilityAudit {
   upstreamVersion: string;
   versionSource: string;
   auditedAt: string;
+  auditState: 'current' | 'stale';
+  auditStateEvidence: string | null;
   summary: string;
   items: readonly ServiceCapabilityItem[];
 }
 
 export interface AuditedCapabilitySummary {
   status: 'audited';
+  auditState: ServiceCapabilityAudit['auditState'];
   verifiedGates: number;
   partialGates: number;
   totalGates: number;
@@ -98,6 +101,24 @@ function capability(
   };
 }
 
+function enforceStaleAuditAvailability(audit: ServiceCapabilityAudit): ServiceCapabilityAudit {
+  if (audit.auditState !== 'stale' || !audit.auditStateEvidence) return audit;
+  const reAuditGap =
+    'Re-audit the deployed upstream denominator before treating availability as current.';
+  return {
+    ...audit,
+    summary: `Stale audit — ${audit.auditStateEvidence} ${audit.summary}`,
+    items: audit.items.map((item) => ({
+      ...item,
+      gap: `${reAuditGap}${item.gap ? ` ${item.gap}` : ''}`,
+      gates: {
+        ...item.gates,
+        upstream: { status: 'no', evidence: audit.auditStateEvidence ?? reAuditGap },
+      },
+    })),
+  };
+}
+
 const DRIFT_ROUTE = '/insights/quality/drift';
 const PRESIDIO_ROUTE = '/governance/guardrails/overview';
 const REDPANDA_ROUTE = '/operations/services/streaming';
@@ -111,6 +132,8 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
     upstreamVersion: '0.4.40',
     versionSource: 'deploy/sidecars/drift/requirements.txt',
     auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'The live sidecar runs one DataDriftPreset over a single eval-score column. The broader catalog is visible, but most selections are not implemented by the sidecar contract.',
     items: [
@@ -248,6 +271,8 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
     upstreamVersion: '2.2.356',
     versionSource: 'deploy/docker-compose.yml',
     auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'Text analysis, replacement anonymization, org recognizers, deny lists, and thresholds are integrated into the data-redaction path. Language and advanced anonymizer operations remain narrow.',
     items: [
@@ -403,8 +428,10 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
     upstreamVersion: '24.2.7',
     versionSource: 'deploy/docker-compose.yml',
     auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
-      'The console has an honest admin, REST Proxy, and Schema Registry workbench. Registered Kafka sources are still catalog-only, so manual produce and consume controls are not a production data flow.',
+      'The console combines Redpanda Admin and Schema Registry HTTP APIs with native Kafka topic, producer, and bounded-consumer operations. The deterministic BFSI proof is wired but not fleet-verified, so it is not a production data flow.',
     items: [
       capability(
         'cluster-health',
@@ -445,15 +472,15 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
       capability(
         'produce-records',
         'Produce JSON records',
-        'Publish keyed or unkeyed JSON records through the REST Proxy.',
+        'Publish keyed or unkeyed JSON objects through the native Kafka protocol.',
         `${REDPANDA_ROUTE}?manage=topics`,
         'Open producer workbench',
         'The control is an admin workbench only. Wire governed pipeline output to a registered stream and record delivery outcomes before calling this a business workflow.',
         [
           'yes',
-          'The REST Proxy accepts topic records.',
+          'Redpanda accepts keyed Kafka records through its Kafka-compatible protocol.',
           'yes',
-          'The adapter validates topic and value and produces one JSON record.',
+          'The native Kafka adapter validates the topic and JSON object, disables auto-creation, and publishes one record.',
           'yes',
           'The Topics view provides a JSON producer.',
           'no',
@@ -462,18 +489,18 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
       ),
       capability(
         'consume-records',
-        'Consume JSON records',
-        'Create a temporary consumer, subscribe, poll records, and close it.',
-        `${REDPANDA_ROUTE}?manage=consumer`,
-        'Open consumer workbench',
-        'Kafka connectors are explicitly catalog-only. Implement offset-safe stream ingestion, retries, tenancy, and pipeline checkpoints before this reaches production data flows.',
+        'Consume correlated JSON records',
+        'Create a bounded temporary native Kafka consumer and return the event matching one correlation id.',
+        `${REDPANDA_ROUTE}?manage=workflows`,
+        'Open workflow proof',
+        'The proof consumer is bounded and correlation-specific, not a durable ingest surface. Add offset-safe stream ingestion, retries, tenancy, and pipeline checkpoints before production use.',
         [
           'yes',
-          'The REST Proxy exposes consumer lifecycle and polling.',
+          'Redpanda supports Kafka consumer groups, subscriptions, and record polling.',
           'yes',
-          'The adapter creates, subscribes, polls, and deletes a temporary consumer.',
-          'yes',
-          'The Consumer view exposes a temporary poll.',
+          'The native adapter creates a temporary group, subscribes, finds the correlated event, and disconnects on success or timeout.',
+          'partial',
+          'The workflow proof displays consumed partition and offset evidence; there is no standalone durable consumer workbench.',
           'no',
           'No registered source or pipeline consumes records through this adapter.',
         ],
@@ -484,14 +511,14 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
         'List subjects, register AVRO, JSON, or Protobuf versions, and delete subjects or versions.',
         `${REDPANDA_ROUTE}?manage=schemas`,
         'Manage schemas',
-        'The API supports version delete, but the current UI deletes whole subjects only and always submits JSON. Add version history, compatibility checks, format selection, and governed flow binding.',
+        'Subject and version lifecycle is wired. Add compatibility mode, compatibility dry-runs, references, metadata, and a live governed-flow binding.',
         [
           'yes',
           'Redpanda Schema Registry supports subject and version lifecycle.',
           'yes',
           'The adapter lists, creates, and deletes subjects and versions across three formats.',
-          'partial',
-          'The UI lists subjects and registers JSON, but has no version detail or version delete control.',
+          'yes',
+          'The Schemas view lists subjects and version history, registers AVRO, JSON, or Protobuf, and deletes versions or whole subjects with confirmation.',
           'no',
           'No production stream validates records against a console-managed schema.',
         ],
@@ -499,19 +526,37 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
       capability(
         'topic-lifecycle',
         'Topic create, configure, and delete',
-        'Manage partition counts, replication, retention, and topic lifecycle.',
+        'Create topics with bounded defaults, increase partition counts, change retention, and delete with exact-name confirmation.',
         `${REDPANDA_ROUTE}?manage=topics`,
-        'Inspect topic inventory',
-        'Only topic inventory exists. Add validated lifecycle APIs, destructive confirmation, audit events, and workload ownership checks.',
+        'Manage topic lifecycle',
+        'The native mutation path is landed, but the fleet broker metadata is not reachable from the Console host. Verify it live and add workload ownership checks before production use.',
         [
           'yes',
           'Redpanda supports topic lifecycle and configuration.',
+          'yes',
+          'The native adapter creates and deletes topics, increases partitions, and changes bounded retention.',
+          'yes',
+          'The Topics view provides create, detail, update, and exact-name-confirmed delete actions.',
           'no',
-          'The adapter has no topic mutation methods.',
+          'No fleet-verified workflow provisions or retires topics through the Console.',
+        ],
+      ),
+      capability(
+        'bfsi-stream-proof',
+        'Lender and insurance stream proof',
+        'Register a JSON event contract, publish a correlated BFSI event, consume that exact event, and report partition and offset evidence.',
+        `${REDPANDA_ROUTE}?manage=workflows`,
+        'Run workflow proof',
+        'The code and focused boundary test pass, but the fleet has no working Console-originated native Kafka endpoint and no production app or pipeline binding.',
+        [
+          'yes',
+          'Redpanda provides the Schema Registry and native Kafka primitives required for the proof.',
+          'yes',
+          'runBfsiStreamJourney composes schema registration, topic creation when absent, correlated produce, and bounded consume.',
+          'yes',
+          'The Workflow proof view exposes deterministic lender-delinquency and insurance-claim journeys and displays returned evidence.',
           'no',
-          'The Topics view is read-only apart from producing records.',
-          'no',
-          'No workflow provisions or retires topics.',
+          'Focused boundary evidence is not a live fleet round-trip or a production business workflow.',
         ],
       ),
       capability(
@@ -570,12 +615,16 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
       ),
     ],
   },
-  {
+  enforceStaleAuditAvailability({
     serviceId: 'otel-collector',
     serviceLabel: 'OpenTelemetry Collector',
-    upstreamVersion: '0.116.0',
-    versionSource: 'deploy/docker-compose.yml',
+    upstreamVersion: '0.116.0 (stale; deployed fleet 0.156.0)',
+    versionSource:
+      'deploy/docker-compose.yml; ../onprem-fleet-orchestration/deploy/onprem/SERVER_STATE.md',
     auditedAt: '2026-07-19',
+    auditState: 'stale',
+    auditStateEvidence:
+      'The fleet replaced failing 0.116.0 with 0.156.0; local records prove deployment and one trace round-trip, but do not re-audit the 0.156.0 upstream capability denominator.',
     summary:
       'The console emits OTLP/HTTP traces and verifies that trace ingest accepts a real envelope. Collector pipelines are static deployment config, with trace and metric read-back in separate backends.',
     items: [
@@ -724,13 +773,15 @@ const AUDITS: readonly ServiceCapabilityAudit[] = [
         ],
       ),
     ],
-  },
+  }),
   {
     serviceId: 'litellm',
     serviceLabel: 'LiteLLM',
     upstreamVersion: 'main-stable (mutable image tag)',
     versionSource: 'deploy/docker-compose.yml',
     auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'The router config generator, management read-back, and inference endpoint seam are built. The live model-door cutover and callback delivery remain unverified, so routing and enforcement do not count as production use.',
     items: [
@@ -933,6 +984,7 @@ export function summarizeServiceCapabilityAudit(serviceId: string): ServiceCapab
   );
   return {
     status: 'audited',
+    auditState: audit.auditState,
     verifiedGates: assessments.filter((assessment) => assessment.status === 'yes').length,
     partialGates: assessments.filter((assessment) => assessment.status === 'partial').length,
     totalGates: assessments.length,
