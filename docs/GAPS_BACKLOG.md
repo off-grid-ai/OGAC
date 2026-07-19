@@ -1103,18 +1103,14 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
 
 ## IA integration sweep (2026-07-18, commit `e8868c44`)
 
-- **[G-IA-LINKS] OPEN (P2) — the canonical-route migration still emits seven retired internal
-  URLs.** User-facing actions/search/citations in `ChatWorkspace`, `FleetTopology`, search features,
-  overview synthesis, copilot context, the overview quick actions, and the pipeline audit lens still
-  point at `/gateway/ai`, query-tab runtime URLs, or `/insights/{audit,siem,reports}`. Redirects keep
-  these links reachable, but the migration is incomplete and adds avoidable redirect hops. Point
-  every producer directly at `/runtime/models/fleet-control`, `/governance/evidence/{audit,security}`,
-  or `/governance/trust/reports`, preserving existing query parameters, and add a repository-wide
-  assertion that canonical UI producers never emit a migrated prefix.
-- **[G-IA-GATES] OPEN (P1) — the landed IA batch is not merge-gate green.** `npm test` fails three
-  navigation/presentation assertions: `contextual-navigation.test.ts` assumes every contextual module
-  has exactly three destinations, `route-presentation-ownership.test.ts` does not recognize
-  `ContextualModuleShell` layouts as the page-frame owner, and `sidebar-navigation.integration.test.ts`
-  still expects collection-root links after those collections became leaf disclosures. Update the
-  tests to prove the intended URL-driven hierarchy and single-frame/single-heading composition; do
-  not delete the coverage. Production build and typecheck pass at this commit.
+- **[G-IA-LINKS] ✅ RESOLVED (2026-07-19) — canonical UI producers no longer emit retired internal
+  URLs.** The migration now covers shared actions, search/citations, reused legacy implementations,
+  dynamic query targets, Runtime Gateways, Data orchestration, Overview, Copilot, and the search API.
+  `test/retired-navigation-producers.test.ts` performs a repository-wide AST audit and permits only
+  the intentional legacy redirect receivers; the final audit found zero retired navigation producers.
+- **[G-IA-GATES] ✅ RESOLVED (2026-07-19) — URL hierarchy and presentation gates match the canonical
+  IA.** Contextual-module tests now accept sibling canonical leaves, route-page verification resolves
+  dynamic segments and route groups, presentation ownership recognizes contextual shells, and sidebar
+  assertions prove active ancestor expansion plus collapsed defaults. The consolidated release passed
+  3,778 tests (3,771 pass, seven intentional skips, zero failures), typecheck, and the 225-page
+  production build before deployment; subsequent IA/UI commits retain focused tests and clean builds.
