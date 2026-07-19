@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
   Table,
@@ -56,26 +56,59 @@ function AuditSummaryCard({
   if (summary.status !== 'audited') return null;
   const coverage = capabilityCoveragePercent(summary);
   return (
-    <Card asChild className={active ? 'border-primary' : undefined}>
+    <Card
+      asChild
+      className={
+        active ? 'h-full min-w-0 overflow-hidden border-primary' : 'h-full min-w-0 overflow-hidden'
+      }
+    >
       <Link
         href={`/operations/services/capability-map?service=${encodeURIComponent(audit.serviceId)}`}
         data-og-interactive
+        data-capability-summary-card={audit.serviceId}
         aria-current={active ? 'page' : undefined}
       >
-        <CardHeader className="gap-1.5 pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <CardTitle className="text-sm">{audit.serviceLabel}</CardTitle>
-            <Badge variant="outline" className="rounded-md font-mono text-[10px] font-normal">
-              {audit.upstreamVersion}
-            </Badge>
+        <CardHeader className="pb-3">
+          <div className="col-span-full min-w-0 space-y-2">
+            <div
+              className="flex min-w-0 items-start justify-between gap-2"
+              data-capability-summary-identity={audit.serviceId}
+            >
+              <CardTitle className="min-w-0 break-words text-sm leading-snug">
+                {audit.serviceLabel}
+              </CardTitle>
+            </div>
+            <div
+              className="flex min-w-0 flex-wrap items-start gap-1.5"
+              data-capability-summary-metadata={audit.serviceId}
+              aria-label={`${audit.serviceLabel} audit metadata`}
+            >
+              <Badge
+                variant="outline"
+                className="max-w-full min-w-0 shrink whitespace-normal break-all rounded-md text-left font-mono text-[10px] leading-tight font-normal"
+              >
+                version {audit.upstreamVersion}
+              </Badge>
+              <Badge
+                variant="outline"
+                className="max-w-full min-w-0 shrink whitespace-normal break-all rounded-md text-left font-mono text-[10px] leading-tight font-normal"
+                title={audit.versionSource}
+              >
+                source {audit.versionSource}
+              </Badge>
+            </div>
+            <CardDescription
+              className="min-w-0 text-[11px] leading-relaxed"
+              data-capability-summary-description={audit.serviceId}
+            >
+              {summary.productionItems}/{summary.totalItems} capabilities reach a production
+              workflow
+            </CardDescription>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {summary.productionItems}/{summary.totalItems} capabilities reach a production workflow
-          </p>
         </CardHeader>
-        <CardContent className="space-y-2 pt-0">
+        <CardContent className="mt-auto min-w-0 space-y-2 pt-0">
           <Progress value={coverage} max={100} aria-label={`${coverage}% verified audit gates`} />
-          <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
             <span>
               {summary.verifiedGates}/{summary.totalGates} verified gates
             </span>
@@ -234,7 +267,7 @@ export function ServiceCapabilityMap({
             />
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {audits.map((audit) => (
             <AuditSummaryCard
               key={audit.serviceId}

@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolve } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ServiceCapabilityMap } from '../src/components/services/ServiceCapabilityMap.tsx';
 import { SERVICE_CAPABILITY_AUDITS } from '../src/lib/service-capability-map.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -46,6 +49,27 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.match(component, /<Progress/);
   assert.match(component, /Show all audited services/);
   assert.doesNotMatch(component, /mx-auto/);
+});
+
+test('audited service summary cards stack identity, metadata, and description without overlap', () => {
+  const html = renderToStaticMarkup(
+    createElement(ServiceCapabilityMap, {
+      audits: SERVICE_CAPABILITY_AUDITS,
+      selectedServiceId: null,
+    }),
+  );
+
+  assert.match(html, /sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/);
+  assert.equal((html.match(/data-capability-summary-card=/g) ?? []).length, 5);
+  assert.equal((html.match(/data-capability-summary-identity=/g) ?? []).length, 5);
+  assert.equal((html.match(/data-capability-summary-metadata=/g) ?? []).length, 5);
+  assert.equal((html.match(/data-capability-summary-description=/g) ?? []).length, 5);
+  assert.equal((html.match(/>version /g) ?? []).length, 5);
+  assert.equal((html.match(/>source /g) ?? []).length, 5);
+  assert.match(html, /col-span-full min-w-0/);
+  assert.match(html, /flex min-w-0 flex-wrap/);
+  assert.match(html, /max-w-full min-w-0 shrink whitespace-normal break-all/);
+  assert.match(html, /leading-relaxed/);
 });
 
 test('every mapped capability links to an existing console route module', () => {
