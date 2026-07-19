@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildBfsiStreamContract,
   groupTopics,
   normalizePartitions,
   parseSchema,
+  parseTopicCreate,
+  parseTopicUpdate,
   requiredName,
 } from '../src/lib/redpanda-model.ts';
 
@@ -64,4 +67,35 @@ test('validates names and schemas at the pure boundary', () => {
 test('ignores malformed partition payloads', () => {
   assert.deepEqual(normalizePartitions(null), []);
   assert.deepEqual(normalizePartitions([null, 1, { ns: 'kafka' }]), []);
+});
+
+test('validates bounded topic create and update contracts', () => {
+  assert.deepEqual(parseTopicCreate({ name: ' lender.delinquency-events ' }), {
+    name: 'lender.delinquency-events',
+    partitions: 1,
+    replicationFactor: 1,
+    retentionMs: 604_800_000,
+  });
+  assert.deepEqual(parseTopicUpdate({ partitions: 3, retentionMs: 86_400_000 }), {
+    partitions: 3,
+    retentionMs: 86_400_000,
+  });
+  assert.throws(() => parseTopicCreate({ name: 'x', partitions: 0 }), /partitions/);
+  assert.throws(() => parseTopicCreate({ name: 'x', replicationFactor: 4 }), /replicationFactor/);
+  assert.throws(() => parseTopicUpdate({}), /partitions or retentionMs/);
+  assert.throws(() => parseTopicUpdate({ retentionMs: 1 }), /retentionMs/);
+});
+
+test('builds deterministic BFSI stream contracts with caller-owned correlation ids', () => {
+  const lender = buildBfsiStreamContract('lender-delinquency', 'evt-lender-1');
+  assert.equal(lender.topic, 'lender.delinquency-events');
+  assert.equal(lender.subject, 'lender.delinquency-events-value');
+  assert.equal(lender.sample.eventId, 'evt-lender-1');
+  assert.match(lender.schema, /daysPastDue/);
+
+  const insurer = buildBfsiStreamContract('insurance-claim', 'evt-claim-1');
+  assert.equal(insurer.topic, 'insurance.claim-events');
+  assert.equal(insurer.sample.eventId, 'evt-claim-1');
+  assert.match(insurer.schema, /estimatedIndemnity/);
+  assert.throws(() => buildBfsiStreamContract('other', 'evt'), /journey must be/);
 });
