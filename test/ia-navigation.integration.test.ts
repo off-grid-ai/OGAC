@@ -189,6 +189,7 @@ test('fleet route shells consume the registry and never encode deployment member
   assert.doesNotMatch(source, /\b(?:S1|S2|g1|g2|g4|g5|g7|g8|Qwythos)\b/i);
   assert.match(source, /topologyResourceHref\('nodes', node\.name\)/);
   assert.match(source, /topologyResourceHref\('clusters', cluster\.head\.name\)/);
+  assert.match(source, /grid grid-cols-2 gap-x-4 gap-y-3/);
 });
 
 test('chat keeps its conversation rail off-canvas until the thread has desktop room', () => {
@@ -200,6 +201,11 @@ test('chat keeps its conversation rail off-canvas until the thread has desktop r
     'the narrow-layout backdrop and chats-menu trigger must switch together',
   );
   assert.doesNotMatch(source, /md:static md:z-auto md:translate-x-0/);
+  assert.doesNotMatch(source, /<select|\/workspace\/(?:projects|prompts|artifacts)/);
+  assert.doesNotMatch(source, /href="\/work\/(?:projects|prompts|artifacts)"/);
+  assert.match(source, /<DropdownMenuRadioGroup value=\{model\} onValueChange=\{setModel\}>/);
+  assert.match(source, /data-og-surface="raised"/);
+  assert.match(source, /aria-label="Message Off Grid AI"/);
 });
 
 test('canonical service journeys do not emit legacy navigation links', () => {

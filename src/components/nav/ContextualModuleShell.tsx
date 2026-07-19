@@ -17,7 +17,8 @@ import {
 export function ContextualModuleShell({
   moduleId,
   children,
-}: Readonly<{ moduleId: ContextualModuleId; children: ReactNode }>) {
+  actions,
+}: Readonly<{ moduleId: ContextualModuleId; children: ReactNode; actions?: ReactNode }>) {
   const pathname = usePathname();
   const module = contextualModule(moduleId);
   const destination =
@@ -26,11 +27,18 @@ export function ContextualModuleShell({
   return (
     <PageFrame>
       <section aria-labelledby={`context-heading-${destination.id}`} className="w-full space-y-6">
-        <header className="space-y-1.5 border-b border-border/80 pb-4">
-          <h2 id={`context-heading-${destination.id}`} className="text-base font-medium">
-            {destination.label}
-          </h2>
-          <p className="max-w-3xl text-xs text-muted-foreground">{destination.description}</p>
+        <header className="flex flex-col gap-3 border-b border-border/80 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1.5">
+            <h2 id={`context-heading-${destination.id}`} className="text-base font-medium">
+              {destination.label}
+            </h2>
+            <p className="max-w-3xl text-xs text-muted-foreground">{destination.description}</p>
+          </div>
+          {actions ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+              {actions}
+            </div>
+          ) : null}
         </header>
         <div data-og-context-content>{children}</div>
       </section>

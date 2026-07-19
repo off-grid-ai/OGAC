@@ -5,14 +5,13 @@ import {
   At,
   Books,
   Warning,
+  CaretDown,
   CaretLeft,
   CaretRight,
   Check,
   ClockCounterClockwise,
   Copy,
-  Cube,
   FileText,
-  FolderOpen,
   FolderSimplePlus,
   GearSix,
   Brain,
@@ -33,11 +32,9 @@ import {
   Sparkle,
   SpeakerHigh,
   Stop,
-  TextAlignLeft,
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -1574,31 +1571,6 @@ export function ChatWorkspace({
             <span className="truncate">{headerTitle}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
-                from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
-            <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
-              <Link
-                href="/workspace/projects"
-                title="Projects"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <FolderOpen className="size-4" />
-              </Link>
-              <Link
-                href="/workspace/prompts"
-                title="Prompts library"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <TextAlignLeft className="size-4" />
-              </Link>
-              <Link
-                href="/workspace/artifacts"
-                title="Artifacts"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Cube className="size-4" />
-              </Link>
-            </div>
             <button
               onClick={toggleTemporary}
               className={cn(
@@ -1635,19 +1607,38 @@ export function ChatWorkspace({
                 <span>⚠ gateway offline</span>
               </a>
             ) : (
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="max-w-[8rem] rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground sm:max-w-none"
-              >
-                {models.length === 0 ? <option value="">no models</option> : null}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {modelLabel(m.id)}
-                    {modelSuffix(m)}
-                  </option>
-                ))}
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="max-w-[13rem] justify-between gap-2 rounded-lg bg-background/80 font-mono text-xs font-normal shadow-sm sm:max-w-[22rem]"
+                    aria-label="Choose model"
+                    disabled={models.length === 0}
+                  >
+                    <span className="truncate">
+                      {activeModel
+                        ? `${modelLabel(activeModel.id)}${modelSuffix(activeModel)}`
+                        : 'No models available'}
+                    </span>
+                    <CaretDown className="size-3.5 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Run this chat with</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
+                    {models.map((candidate) => (
+                      <DropdownMenuRadioItem key={candidate.id} value={candidate.id}>
+                        <span className="min-w-0 truncate font-mono text-xs">
+                          {modelLabel(candidate.id)}
+                          {modelSuffix(candidate)}
+                        </span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
@@ -1979,150 +1970,10 @@ export function ChatWorkspace({
               hidden
               onChange={(e) => attachImage(e.target.files)}
             />
-            <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
-              {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
-              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={cn(
-                      'p-1.5 hover:text-foreground',
-                      thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
-                    )}
-                    title="Tools"
-                  >
-                    <Plus className="size-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onSelect={() => docRef.current?.click()} disabled={uploading}>
-                    <Paperclip className="mr-2 size-4" /> Attach file
-                  </DropdownMenuItem>
-                  {activeModel?.vision ? (
-                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
-                      <ImageSquare className="mr-2 size-4" /> Attach image
-                    </DropdownMenuItem>
-                  ) : null}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={orgKnowledge}
-                    onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Globe className="mr-2 size-4" /> Search org knowledge
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={thinking}
-                    onCheckedChange={(v) => setThinking(Boolean(v))}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Lightning className="mr-2 size-4" /> Extended thinking
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      // Insert an `@` and focus the composer so the mention picker opens.
-                      const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
-                      setInput(next);
-                      requestAnimationFrame(() => {
-                        const el = textareaRef.current;
-                        if (el) {
-                          el.focus();
-                          el.setSelectionRange(next.length, next.length);
-                          caretRef.current = next.length;
-                        }
-                      });
-                    }}
-                  >
-                    <At className="mr-2 size-4" /> Reference memory or knowledge…
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
-                    <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <button
-                onClick={audio.toggleRecording}
-                disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
-                className={cn(
-                  'p-1.5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40',
-                  micButtonTint,
-                )}
-                title={audio.micLabel}
-              >
-                <Microphone className="size-5" />
-              </button>
-              {(audio.sttModels.length > 0 || audio.ttsModels.length > 0) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="p-1.5 text-muted-foreground hover:text-foreground"
-                      title="Voice settings — dictation & read-aloud engine"
-                      aria-label="Voice settings"
-                    >
-                      <SpeakerHigh className="size-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-64">
-                    {audio.sttModels.length > 0 && (
-                      <>
-                        <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={audio.sttModel}
-                          onValueChange={audio.setSttModel}
-                        >
-                          {audio.sttModels.map((m) => (
-                            <DropdownMenuRadioItem
-                              key={m.id}
-                              value={m.id}
-                              className="flex-col items-start"
-                            >
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </>
-                    )}
-                    {audio.ttsModels.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={audio.ttsModel}
-                          onValueChange={audio.setTtsModel}
-                        >
-                          {audio.ttsModels.map((m) => (
-                            <DropdownMenuRadioItem
-                              key={m.id}
-                              value={m.id}
-                              className="flex-col items-start"
-                            >
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                        {audio.ttsVoices && audio.ttsVoices.length > 0 && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Voice</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup
-                              value={audio.ttsVoice}
-                              onValueChange={audio.setTtsVoice}
-                            >
-                              {audio.ttsVoices.map((v) => (
-                                <DropdownMenuRadioItem key={v.id} value={v.id}>
-                                  {v.label}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+            <div
+              data-og-surface="raised"
+              className="rounded-2xl border border-border/80 bg-card/95 shadow-[0_10px_30px_-22px_hsl(var(--foreground)/0.45)] transition-[border-color,box-shadow] focus-within:border-primary/45 focus-within:shadow-[0_14px_36px_-24px_hsl(var(--primary)/0.65)]"
+            >
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -2141,19 +1992,192 @@ export function ChatWorkspace({
                 placeholder={
                   activeModel?.image
                     ? 'Describe an image to generate…'
-                    : 'Message the model…  (/ for skills, @ to reference memory or knowledge)'
+                    : 'Ask Off Grid AI… Use / for skills and @ for context'
                 }
-                className="max-h-40 min-h-[2.75rem] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm outline-none"
+                aria-label="Message Off Grid AI"
+                className="max-h-48 min-h-16 w-full resize-none overflow-y-auto bg-transparent px-4 pb-2 pt-3.5 text-sm leading-6 outline-none placeholder:text-muted-foreground/80"
               />
-              {streaming ? (
-                <Button size="icon" variant="outline" onClick={stop} title="Stop">
-                  <Stop className="size-4" />
-                </Button>
-              ) : (
-                <Button size="icon" onClick={send} disabled={!input.trim()} title="Send">
-                  <PaperPlaneRight className="size-4" />
-                </Button>
-              )}
+              <div className="flex items-center justify-between gap-3 px-2 pb-2">
+                <div className="flex min-w-0 items-center gap-0.5">
+                  {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
+                  <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'size-8 rounded-lg',
+                          thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
+                        )}
+                        title="Tools"
+                        aria-label="Open chat tools"
+                      >
+                        <Plus className="size-4.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-56">
+                      <DropdownMenuItem
+                        onSelect={() => docRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        <Paperclip className="mr-2 size-4" /> Attach file
+                      </DropdownMenuItem>
+                      {activeModel?.vision ? (
+                        <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                          <ImageSquare className="mr-2 size-4" /> Attach image
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={orgKnowledge}
+                        onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Globe className="mr-2 size-4" /> Search org knowledge
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={thinking}
+                        onCheckedChange={(v) => setThinking(Boolean(v))}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Lightning className="mr-2 size-4" /> Extended thinking
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          // Insert an `@` and focus the composer so the mention picker opens.
+                          const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
+                          setInput(next);
+                          requestAnimationFrame(() => {
+                            const el = textareaRef.current;
+                            if (el) {
+                              el.focus();
+                              el.setSelectionRange(next.length, next.length);
+                              caretRef.current = next.length;
+                            }
+                          });
+                        }}
+                      >
+                        <At className="mr-2 size-4" /> Reference memory or knowledge…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
+                        <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={audio.toggleRecording}
+                    disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
+                    className={cn('size-8 rounded-lg', micButtonTint)}
+                    title={audio.micLabel}
+                    aria-label={audio.micLabel}
+                  >
+                    <Microphone className="size-4.5" />
+                  </Button>
+                  {(audio.sttModels.length > 0 || audio.ttsModels.length > 0) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-lg text-muted-foreground"
+                          title="Voice settings — dictation & read-aloud engine"
+                          aria-label="Voice settings"
+                        >
+                          <SpeakerHigh className="size-4.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        {audio.sttModels.length > 0 && (
+                          <>
+                            <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup
+                              value={audio.sttModel}
+                              onValueChange={audio.setSttModel}
+                            >
+                              {audio.sttModels.map((m) => (
+                                <DropdownMenuRadioItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="flex-col items-start"
+                                >
+                                  <span>{m.label}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {m.notes}
+                                  </span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </>
+                        )}
+                        {audio.ttsModels.length > 0 && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup
+                              value={audio.ttsModel}
+                              onValueChange={audio.setTtsModel}
+                            >
+                              {audio.ttsModels.map((m) => (
+                                <DropdownMenuRadioItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="flex-col items-start"
+                                >
+                                  <span>{m.label}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {m.notes}
+                                  </span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                            {audio.ttsVoices && audio.ttsVoices.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Voice</DropdownMenuLabel>
+                                <DropdownMenuRadioGroup
+                                  value={audio.ttsVoice}
+                                  onValueChange={audio.setTtsVoice}
+                                >
+                                  {audio.ttsVoices.map((v) => (
+                                    <DropdownMenuRadioItem key={v.id} value={v.id}>
+                                      {v.label}
+                                    </DropdownMenuRadioItem>
+                                  ))}
+                                </DropdownMenuRadioGroup>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+                {streaming ? (
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="size-9 rounded-xl"
+                    onClick={stop}
+                    title="Stop"
+                  >
+                    <Stop className="size-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="icon"
+                    className="size-9 rounded-xl shadow-sm"
+                    onClick={send}
+                    disabled={!input.trim()}
+                    title="Send"
+                    aria-label="Send message"
+                  >
+                    <PaperPlaneRight className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Runs on your on-prem gateways · nothing leaves your network

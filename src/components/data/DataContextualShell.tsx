@@ -14,12 +14,18 @@ export function DataContextualShell({
   children,
   destinations,
   moduleId,
+  actions,
 }: Readonly<{
   children: ReactNode;
   destinations: readonly ContextualDestination[];
   moduleId: ContextualModuleId;
+  actions?: ReactNode;
 }>) {
   const pathname = usePathname();
   if (!isDataManagementLeaf(destinations, pathname)) return children;
-  return <ContextualModuleShell moduleId={moduleId}>{children}</ContextualModuleShell>;
+  return (
+    <ContextualModuleShell moduleId={moduleId} actions={actions}>
+      {children}
+    </ContextualModuleShell>
+  );
 }

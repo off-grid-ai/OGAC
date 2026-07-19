@@ -12,24 +12,24 @@ type TopologyMode = 'nodes' | 'clusters' | 'node' | 'cluster';
 
 function NodeFacts({ node }: Readonly<{ node: FleetNode }>) {
   return (
-    <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-      <div>
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+      <div className="min-w-0">
         <dt className="text-xs text-muted-foreground">Role</dt>
-        <dd>{node.role}</dd>
+        <dd className="truncate">{node.role}</dd>
       </div>
-      <div>
+      <div className="min-w-0">
         <dt className="text-xs text-muted-foreground">Host</dt>
-        <dd className="font-mono text-xs">
+        <dd className="break-all font-mono text-xs leading-5">
           {node.host}:{node.port}
         </dd>
       </div>
-      <div>
+      <div className="min-w-0">
         <dt className="text-xs text-muted-foreground">Model</dt>
-        <dd>{node.model || 'No model assigned'}</dd>
+        <dd className="break-words leading-5">{node.model || 'No model assigned'}</dd>
       </div>
-      <div>
+      <div className="min-w-0">
         <dt className="text-xs text-muted-foreground">Routing</dt>
-        <dd>
+        <dd className="break-words leading-5">
           {node.clusterHead ? 'Cluster worker' : node.enabled ? 'Enabled' : 'Out of rotation'}
         </dd>
       </div>

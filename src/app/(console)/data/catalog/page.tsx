@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import { AddAssetButton } from '@/components/data-catalog/AddAssetButton';
-import { SeedCatalogButton } from '@/components/data-catalog/SeedCatalogButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listAssets, listAllClassifications } from '@/lib/data-catalog-store';
@@ -74,11 +72,6 @@ export default async function DataCatalogPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex justify-end gap-2">
-        <SeedCatalogButton />
-        <AddAssetButton />
-      </div>
-
       {/* Stat band — fills the width. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Datasets" value={String(assets.length)} />

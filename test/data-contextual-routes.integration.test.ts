@@ -71,3 +71,25 @@ test('nested Data entity details keep their standalone presentation', () => {
     delete process.env.NEXT_TEST_PATHNAME;
   }
 });
+
+test('a Data leaf can compose its actions into the owning contextual header', () => {
+  process.env.NEXT_TEST_PATHNAME = '/data/catalog';
+  try {
+    const html = renderToStaticMarkup(
+      createElement(
+        DataContextualShell,
+        {
+          destinations: CATALOG_DESTINATIONS,
+          moduleId: 'data-catalog',
+          actions: createElement('button', null, 'Add dataset'),
+        },
+        createElement('div', { 'data-test-content': true }, 'Catalog content'),
+      ),
+    );
+
+    assert.match(html, /<header[^>]*>.*Add dataset.*<\/header>/s);
+    assert.ok(html.indexOf('Add dataset') < html.indexOf('data-test-content'));
+  } finally {
+    delete process.env.NEXT_TEST_PATHNAME;
+  }
+});
