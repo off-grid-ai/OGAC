@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -27,12 +29,16 @@ export function SkeletonPageHeader({ action = true }: Readonly<{ action?: boolea
 /** A horizontal band of stat tiles — mirrors the `grid grid-cols-2 lg:grid-cols-4` stat rows. */
 export function SkeletonStatBand({ count = 4 }: Readonly<{ count?: number }>) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+        <Card
+          key={i}
+          className="gap-3 border-border/60 p-5 [&_[data-slot=skeleton]]:[animation-delay:calc(var(--og-motion-micro)*var(--skeleton-phase))]"
+          style={{ '--skeleton-phase': i % 4 } as CSSProperties}
+        >
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-8 w-20" />
-        </div>
+        </Card>
       ))}
     </div>
   );
@@ -47,11 +53,13 @@ export function SkeletonCardGrid({
   className?: string;
 }>) {
   return (
-    <div
-      className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', className)}
-    >
+    <div className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', className)}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+        <Card
+          key={i}
+          className="gap-4 border-border/60 p-5 [&_[data-slot=skeleton]]:[animation-delay:calc(var(--og-motion-micro)*var(--skeleton-phase))]"
+          style={{ '--skeleton-phase': i % 4 } as CSSProperties}
+        >
           <div className="flex items-center gap-3">
             <Skeleton className="size-9 rounded-lg" />
             <div className="flex-1 space-y-2">
@@ -65,7 +73,7 @@ export function SkeletonCardGrid({
             <Skeleton className="h-6 w-16 rounded-full" />
             <Skeleton className="h-6 w-20 rounded-full" />
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );
@@ -74,7 +82,7 @@ export function SkeletonCardGrid({
 /** A full-width table placeholder — mirrors list surfaces rendered as rows. */
 export function SkeletonTable({ rows = 8, cols = 5 }: Readonly<{ rows?: number; cols?: number }>) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <Card className="gap-0 overflow-hidden border-border/60 p-0">
       <div className="flex items-center gap-4 border-b bg-muted/40 px-4 py-3">
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className={cn('h-3.5', i === 0 ? 'w-40' : 'w-24')} />
@@ -89,7 +97,7 @@ export function SkeletonTable({ rows = 8, cols = 5 }: Readonly<{ rows?: number; 
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -99,21 +107,29 @@ export function SkeletonDetailBody() {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+          <Card
+            key={i}
+            className="gap-3 border-border/60 p-5 [&_[data-slot=skeleton]]:[animation-delay:calc(var(--og-motion-micro)*var(--skeleton-phase))]"
+            style={{ '--skeleton-phase': i % 4 } as CSSProperties}
+          >
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-3 w-full" />
             <Skeleton className="h-3 w-5/6" />
             <Skeleton className="h-3 w-2/3" />
-          </div>
+          </Card>
         ))}
       </div>
       <div className="space-y-4">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+          <Card
+            key={i}
+            className="gap-3 border-border/60 p-5 [&_[data-slot=skeleton]]:[animation-delay:calc(var(--og-motion-micro)*var(--skeleton-phase))]"
+            style={{ '--skeleton-phase': (i + 3) % 4 } as CSSProperties}
+          >
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-6 w-28" />
             <Skeleton className="h-3 w-24" />
-          </div>
+          </Card>
         ))}
       </div>
     </div>
@@ -134,7 +150,7 @@ export function PageSkeleton({
   action?: boolean;
 }>) {
   return (
-    <div className="w-full space-y-6" aria-busy="true" aria-live="polite">
+    <div className="w-full space-y-5" aria-busy="true" aria-live="polite">
       <SkeletonPageHeader action={action} />
       {stats > 0 ? <SkeletonStatBand count={stats} /> : null}
       <SkeletonCardGrid count={cards} />
