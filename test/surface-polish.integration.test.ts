@@ -30,7 +30,8 @@ test('policy templates flow through one responsive grid and carry quiet group an
   assert.equal((html.match(/data-template-group="Model governance"/g) ?? []).length, 2);
   assert.equal((html.match(/data-template-group="Operations"/g) ?? []).length, 1);
   assert.match(html, /data-variant="outline"/);
-  assert.match(html, /border-destructive\/25 text-destructive/);
+  assert.match(html, /border-border bg-muted\/60 text-foreground/);
+  assert.doesNotMatch(html, /border-destructive\/25 text-destructive/);
   assert.doesNotMatch(html, /data-variant="destructive"|bg-destructive(?:\s|\/)/);
   assert.doesNotMatch(html, /<section/);
 });

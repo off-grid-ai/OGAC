@@ -93,3 +93,30 @@ test('a Data leaf can compose its actions into the owning contextual header', ()
     delete process.env.NEXT_TEST_PATHNAME;
   }
 });
+
+test('a Data contextual action stays scoped to its owning management leaf', () => {
+  for (const [path, visible] of [
+    ['/data/catalog', true],
+    ['/data/catalog/governance', false],
+  ] as const) {
+    process.env.NEXT_TEST_PATHNAME = path;
+    try {
+      const html = renderToStaticMarkup(
+        createElement(
+          DataContextualShell,
+          {
+            destinations: CATALOG_DESTINATIONS,
+            moduleId: 'data-catalog',
+            actions: createElement('button', null, 'Add dataset'),
+            actionRoutes: ['/data/catalog'],
+          },
+          createElement('div', null, 'Catalog content'),
+        ),
+      );
+
+      assert.equal(html.includes('Add dataset'), visible);
+    } finally {
+      delete process.env.NEXT_TEST_PATHNAME;
+    }
+  }
+});

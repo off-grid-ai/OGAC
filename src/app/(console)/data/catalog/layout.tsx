@@ -9,6 +9,7 @@ export default function CatalogLayout({ children }: Readonly<{ children: ReactNo
     <DataContextualShell
       moduleId="data-catalog"
       destinations={CATALOG_DESTINATIONS}
+      actionRoutes={[CATALOG_DESTINATIONS[0].route]}
       actions={
         <>
           <SeedCatalogButton />

@@ -15,16 +15,20 @@ export function DataContextualShell({
   destinations,
   moduleId,
   actions,
+  actionRoutes,
 }: Readonly<{
   children: ReactNode;
   destinations: readonly ContextualDestination[];
   moduleId: ContextualModuleId;
   actions?: ReactNode;
+  /** Exact management leaves whose contextual header owns `actions`. */
+  actionRoutes?: readonly string[];
 }>) {
   const pathname = usePathname();
   if (!isDataManagementLeaf(destinations, pathname)) return children;
+  const contextualActions = !actionRoutes || actionRoutes.includes(pathname) ? actions : undefined;
   return (
-    <ContextualModuleShell moduleId={moduleId} actions={actions}>
+    <ContextualModuleShell moduleId={moduleId} actions={contextualActions}>
       {children}
     </ContextualModuleShell>
   );

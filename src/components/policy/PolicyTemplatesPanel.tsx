@@ -127,7 +127,7 @@ function TemplateCard({
                 'mr-1.5 bg-transparent text-[10px]',
                 template.rule.effect === 'allow'
                   ? 'border-primary/30 text-primary'
-                  : 'border-destructive/25 text-destructive',
+                  : 'border-border bg-muted/60 text-foreground',
               )}
             >
               {template.rule.effect}
