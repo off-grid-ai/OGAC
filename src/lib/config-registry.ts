@@ -30,6 +30,24 @@ export interface ConfigKeyDef {
    * is unchanged. Covers `url` types plus host-bearing strings (Redis, Temporal address, …).
    */
   hostValue?: boolean;
+  /** True for comma-separated host[:port] values such as Kafka bootstrap broker lists. */
+  hostListValue?: boolean;
+}
+
+type HostConfigValue = Pick<ConfigKeyDef, 'hostValue' | 'hostListValue'>;
+
+function mapHostConfigValue(
+  def: HostConfigValue,
+  value: string,
+  mapHost: (input: string) => string,
+): string {
+  if (def.hostListValue) {
+    return value
+      .split(',')
+      .map((entry) => mapHost(entry.trim()))
+      .join(',');
+  }
+  return def.hostValue ? mapHost(value) : value;
 }
 
 /**
@@ -37,9 +55,9 @@ export interface ConfigKeyDef {
  * (never a raw IP/loopback). Everything else is returned as-is. Zero-IO — safe to unit-test
  * and to call from a client component. `def` may be looked up by key via CONFIG_REGISTRY.
  */
-export function configDisplayValue(def: Pick<ConfigKeyDef, 'hostValue'>, value: string): string {
+export function configDisplayValue(def: HostConfigValue, value: string): string {
   if (!value) return value;
-  return def.hostValue ? toDisplayHost(value) : value;
+  return mapHostConfigValue(def, value, toDisplayHost);
 }
 
 /**
@@ -47,9 +65,9 @@ export function configDisplayValue(def: Pick<ConfigKeyDef, 'hostValue'>, value: 
  * is mapped back to the real connect target before it's persisted, so connectivity is
  * unchanged. Non-host values pass through. Pure, zero-IO.
  */
-export function configConnectValue(def: Pick<ConfigKeyDef, 'hostValue'>, value: string): string {
+export function configConnectValue(def: HostConfigValue, value: string): string {
   if (!value) return value;
-  return def.hostValue ? toConnectHost(value) : value;
+  return mapHostConfigValue(def, value, toConnectHost);
 }
 
 export const CONFIG_REGISTRY: ConfigKeyDef[] = [
@@ -410,8 +428,9 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s2.local:9644', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
-    description: 'Cluster health, broker, partition, and topic inspection boundary.',
+    default: 'http://offgrid-s1.local:8943', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
+    description:
+      'Cluster health and broker inspection through the Console host edge boundary. Override this deployment contract in the server environment when topology changes.',
   },
   {
     key: 'OFFGRID_REDPANDA_SCHEMA_URL',
@@ -421,8 +440,30 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     secret: false,
     restartRequired: true,
     hostValue: true,
-    default: 'http://offgrid-s2.local:18083', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
-    description: 'Optional Schema Registry HTTP boundary for subject and version management.',
+    default: 'http://offgrid-s1.local:8946', // NOSONAR -- private fleet mDNS; this internal service has no TLS listener.
+    description:
+      'Schema Registry through the Console host edge boundary. Override this deployment contract in the server environment when topology changes.',
+  },
+  {
+    key: 'OFFGRID_REDPANDA_BROKERS',
+    group: 'Services',
+    label: 'Redpanda Kafka bootstrap brokers',
+    type: 'string',
+    secret: false,
+    restartRequired: true,
+    hostListValue: true,
+    description:
+      'Comma-separated Kafka bootstrap endpoints used by native topic, produce, consume, and proof actions. No default is assumed: broker metadata must be reachable from the Console host.',
+  },
+  {
+    key: 'OFFGRID_REDPANDA_CLIENT_ID',
+    group: 'Services',
+    label: 'Redpanda Kafka client ID',
+    type: 'string',
+    secret: false,
+    restartRequired: true,
+    default: 'offgrid-console',
+    description: 'Kafka client identity emitted by Console-native Redpanda operations.',
   },
   {
     key: 'OFFGRID_REDPANDA_REST_URL',

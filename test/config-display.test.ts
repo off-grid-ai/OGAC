@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { CONFIG_REGISTRY, configConnectValue, configDisplayValue } from '@/lib/config-registry';
 
 const host = { hostValue: true } as const;
+const hostList = { hostListValue: true } as const;
 const plain = { hostValue: false } as const;
 
 test('host-bearing value displays as mDNS (no raw IP/loopback)', () => {
@@ -17,6 +18,17 @@ test('display maps back to the real connect target on save (round-trip)', () => 
   assert.equal(configConnectValue(host, 'http://offgrid-s1.local:8800'), 'http://127.0.0.1:8800/');
   assert.equal(configConnectValue(host, 'http://offgrid-g6.local:8931'), 'http://127.0.0.1:8931/');
   assert.equal(configConnectValue(host, 'redis://offgrid-s1.local:6379'), 'redis://127.0.0.1:6379');
+});
+
+test('comma-separated host lists map every broker without collapsing the list', () => {
+  assert.equal(
+    configDisplayValue(hostList, '127.0.0.1:19092,192.168.1.67:29092'),
+    'offgrid-s1.local:19092,offgrid-s1.local:29092',
+  );
+  assert.equal(
+    configConnectValue(hostList, 'offgrid-s1.local:19092,offgrid-g6.local:29092'),
+    '127.0.0.1:19092,127.0.0.1:29092',
+  );
 });
 
 test('non-host values pass through untouched both ways', () => {
@@ -79,4 +91,31 @@ test('host-bearing defaults round-trip to a working loopback target', () => {
       assert.ok(/127\.0\.0\.1|offgrid-|getoffgridai/.test(connect), `${def.key}: ${connect}`);
     }
   }
+});
+
+test('Redpanda registry follows the dynamic edge contract and exposes native Kafka settings', () => {
+  const definitions = new Map(CONFIG_REGISTRY.map((definition) => [definition.key, definition]));
+  const admin = definitions.get('OFFGRID_REDPANDA_ADMIN_URL');
+  const schema = definitions.get('OFFGRID_REDPANDA_SCHEMA_URL');
+  const brokers = definitions.get('OFFGRID_REDPANDA_BROKERS');
+  const clientId = definitions.get('OFFGRID_REDPANDA_CLIENT_ID');
+
+  assert.equal(admin?.default, 'http://offgrid-s1.local:8943');
+  assert.equal(schema?.default, 'http://offgrid-s1.local:8946');
+  assert.equal(configConnectValue(admin!, admin!.default!), 'http://127.0.0.1:8943/');
+  assert.equal(configConnectValue(schema!, schema!.default!), 'http://127.0.0.1:8946/');
+
+  assert.equal(brokers?.type, 'string');
+  assert.equal(brokers?.hostListValue, true);
+  assert.equal(brokers?.default, undefined, 'Kafka reachability must not be invented');
+  assert.match(brokers?.description ?? '', /broker metadata must be reachable/i);
+
+  assert.equal(clientId?.default, 'offgrid-console');
+  assert.equal(clientId?.hostValue, undefined);
+  assert.ok(
+    [...definitions.values()]
+      .filter(({ key }) => key.startsWith('OFFGRID_REDPANDA_'))
+      .every(({ default: value }) => !value?.includes('offgrid-s2')),
+    'the retired offgrid-s2 node must not remain in Redpanda configuration defaults',
+  );
 });

@@ -19,6 +19,23 @@ OFFGRID_REDPANDA_BROKERS=offgrid-g6.local:19092
 OFFGRID_REDPANDA_CLIENT_ID=offgrid-console
 ```
 
+The configuration registry exposes all four settings. The Admin and Schema defaults displayed to an
+operator are `http://offgrid-s1.local:8943` and `http://offgrid-s1.local:8946`; on save they map back
+to the S1 loopback edge listeners shown above. They identify the stable Console-host boundary, not a
+hard-coded Redpanda node, so the fleet can move the upstream service without changing Console IA or
+public configuration. `OFFGRID_REDPANDA_BROKERS` deliberately has no registry default because a
+bootstrap socket is not a valid contract until its advertised broker metadata is reachable from the
+Console host. `OFFGRID_REDPANDA_CLIENT_ID` defaults to `offgrid-console` and is not a credential.
+
+The runtime contract is therefore:
+
+| Setting                       | Required path                              | Registry fallback | Meaning                                                                    |
+| ----------------------------- | ------------------------------------------ | ----------------- | -------------------------------------------------------------------------- |
+| `OFFGRID_REDPANDA_ADMIN_URL`  | broker/cluster inspection                  | S1 edge `:8943`   | HTTP Admin API boundary                                                    |
+| `OFFGRID_REDPANDA_SCHEMA_URL` | schema lifecycle and proofs                | S1 edge `:8946`   | HTTP Schema Registry boundary                                              |
+| `OFFGRID_REDPANDA_BROKERS`    | native topic/produce/consume/proof actions | none              | reachable Kafka bootstrap list whose advertised metadata is also reachable |
+| `OFFGRID_REDPANDA_CLIENT_ID`  | native Kafka actions                       | `offgrid-console` | non-secret client identity                                                 |
+
 `OFFGRID_REDPANDA_BROKERS` is required for every native Kafka action. It must name a bootstrap
 listener whose broker metadata is also reachable from the Console host; a reachable bootstrap socket
 alone is insufficient. The current g6 compose listener advertises `127.0.0.1:19092`, so the example
