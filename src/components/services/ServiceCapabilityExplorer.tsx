@@ -198,66 +198,91 @@ function InventoryFilters({ filter }: Readonly<{ filter: ServiceInventoryFilter 
     <form
       action="/operations/services/capability-map"
       method="get"
-      className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
+      className="grid gap-2"
       role="search"
     >
       {filter.family ? <input type="hidden" name="family" value={filter.family} /> : null}
-      <div className="relative min-w-0">
-        <MagnifyingGlass
-          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          type="search"
-          name="q"
-          defaultValue={filter.query}
-          placeholder="Search services"
-          aria-label="Search service inventory"
-          className="pl-8"
-        />
+      <div
+        role="group"
+        aria-label="Service search controls"
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
+      >
+        <div className="relative min-w-0">
+          <MagnifyingGlass
+            className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            name="q"
+            defaultValue={filter.query}
+            placeholder="Search services"
+            aria-label="Search service inventory"
+            className="w-full pl-8"
+          />
+        </div>
+        <Button type="submit" size="sm">
+          Apply
+        </Button>
       </div>
-      <Button type="submit" size="sm">
-        Apply
-      </Button>
-      <NativeSelect
-        name="owner"
-        defaultValue={filter.owner}
-        aria-label="Filter services by IA owner"
-        className="col-span-1"
+
+      <div
+        role="group"
+        aria-label="Service inventory filters"
+        className="grid grid-cols-2 gap-2"
       >
-        <option value="">Both IA owners</option>
-        {SERVICE_INVENTORY_OWNERS.map((owner) => (
-          <option key={owner} value={owner}>
-            {OWNER_LABELS[owner]}
-          </option>
-        ))}
-      </NativeSelect>
-      <NativeSelect name="audit" defaultValue={filter.audit} aria-label="Filter by audit recency">
-        <option value="">Any audit state</option>
-        {SERVICE_INVENTORY_AUDIT_STATES.map((audit) => (
-          <option key={audit} value={audit}>
-            {AUDIT_LABELS[audit]} audit
-          </option>
-        ))}
-      </NativeSelect>
-      <NativeSelect
-        name="readiness"
-        defaultValue={filter.readiness}
-        aria-label="Filter by operational readiness"
-      >
-        <option value="">Any readiness</option>
-        {SERVICE_INVENTORY_READINESS_STATES.map((readiness) => (
-          <option key={readiness} value={readiness}>
-            {READINESS_LABELS[readiness]}
-          </option>
-        ))}
-      </NativeSelect>
-      <div className="flex items-center justify-end">
-        {hasFilter ? (
-          <Button asChild variant="ghost" size="sm">
-            <Link href={serviceCapabilityMapHref()}>Clear</Link>
-          </Button>
-        ) : null}
+        <div className="min-w-0">
+          <NativeSelect
+            name="owner"
+            defaultValue={filter.owner}
+            aria-label="Filter services by IA owner"
+            className="w-full"
+          >
+            <option value="">Both IA owners</option>
+            {SERVICE_INVENTORY_OWNERS.map((owner) => (
+              <option key={owner} value={owner}>
+                {OWNER_LABELS[owner]}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="min-w-0">
+          <NativeSelect
+            name="audit"
+            defaultValue={filter.audit}
+            aria-label="Filter by audit recency"
+            className="w-full"
+          >
+            <option value="">Any audit state</option>
+            {SERVICE_INVENTORY_AUDIT_STATES.map((audit) => (
+              <option key={audit} value={audit}>
+                {AUDIT_LABELS[audit]} audit
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="min-w-0">
+          <NativeSelect
+            name="readiness"
+            defaultValue={filter.readiness}
+            aria-label="Filter by operational readiness"
+            className="w-full"
+          >
+            <option value="">Any readiness</option>
+            {SERVICE_INVENTORY_READINESS_STATES.map((readiness) => (
+              <option key={readiness} value={readiness}>
+                {READINESS_LABELS[readiness]}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex min-w-0 items-center justify-end">
+          {hasFilter ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={serviceCapabilityMapHref()}>Clear</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </form>
   );

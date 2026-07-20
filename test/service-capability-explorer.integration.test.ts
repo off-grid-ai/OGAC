@@ -83,6 +83,23 @@ test('filter navigation preserves facets while clearing the previous service sel
   );
 });
 
+test('filter controls keep search actions and facet widths in independent responsive grids', () => {
+  const html = renderExplorer();
+
+  assert.match(
+    html,
+    /role="group" aria-label="Service search controls" class="grid grid-cols-\[minmax\(0,1fr\)_auto\] gap-2"/,
+  );
+  assert.match(
+    html,
+    /role="group" aria-label="Service inventory filters" class="grid grid-cols-2 gap-2"/,
+  );
+  assert.match(html, /placeholder="Search services"/);
+  assert.match(html, />Both IA owners</);
+  assert.match(html, />Any audit state</);
+  assert.match(html, />Any readiness</);
+});
+
 test('audit and readiness facets narrow all 48 services and survive every explorer link', () => {
   const expectedEntries = inventory().entries.filter(
     (entry) =>
