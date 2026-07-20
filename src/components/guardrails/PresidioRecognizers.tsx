@@ -20,8 +20,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toggleMessage } from '@/lib/toast-messages';
 
-// Custom Presidio recognizers management surface. Full CRUD over console-owned recognizers that
-// become Presidio `ad_hoc_recognizers` on every /analyze call: a regex `pattern` recognizer (regex
+// Custom Presidio data-movement recognizers. Full CRUD over console-owned recognizers that
+// become Presidio `ad_hoc_recognizers` on data redaction `/analyze` calls: a regex recognizer
 // + context words that boost confidence) or a `deny_list` recognizer (literal terms). Add/edit is
 // an INLINE panel (no modal), delete-with-confirmation, and a per-row enable toggle. Talks to
 // /api/v1/admin/guardrails/recognizers[/:id]; refreshes the server component after each mutation.
@@ -153,9 +153,9 @@ export function PresidioRecognizers({ recognizers }: Readonly<{ recognizers: Rec
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Custom PII patterns applied by the PII detector as ad-hoc recognizers on every scan — no
-          server-side config needed. A pattern matches a regex (with optional context words); a
-          deny list flags literal terms.
+          Custom PII patterns for Presidio data-movement redaction. They do not change the static
+          prompt/output scanner policy managed by the fleet. A pattern matches a regex (with
+          optional context words); a deny list flags literal terms.
         </p>
         {!open ? (
           <Button size="sm" variant="outline" onClick={openCreate}>

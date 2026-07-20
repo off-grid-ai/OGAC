@@ -68,7 +68,7 @@ async function destinationContent(
   if (destination.id === 'recognizers') {
     const recognizers = await listRecognizers(orgId).catch(() => []);
     return (
-      <ManagementCard title="Custom recognizers & deny lists">
+      <ManagementCard title="Data-movement recognizers & deny lists">
         <PresidioRecognizers recognizers={recognizers} />
       </ManagementCard>
     );

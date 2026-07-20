@@ -13,6 +13,7 @@ test('guardrails destinations are stable, unique child routes', () => {
   );
   assert.equal(new Set(GUARDRAILS_DESTINATIONS.map((destination) => destination.route)).size, 6);
   assert.equal(guardrailsDestination('recognizers')?.route, '/governance/guardrails/recognizers');
+  assert.match(guardrailsDestination('recognizers')?.description ?? '', /data-movement redaction/);
   assert.equal(guardrailsDestination('unknown'), undefined);
 });
 

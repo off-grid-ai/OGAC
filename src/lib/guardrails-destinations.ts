@@ -19,8 +19,9 @@ export const GUARDRAILS_DESTINATIONS = [
   },
   {
     id: 'recognizers',
-    label: 'Recognizers',
-    description: 'Manage custom PII patterns, context terms, and deny lists.',
+    label: 'Data recognizers',
+    description:
+      'Manage custom PII patterns, context terms, and deny lists for Presidio data-movement redaction.',
     route: '/governance/guardrails/recognizers',
   },
   {
