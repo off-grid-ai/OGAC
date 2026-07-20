@@ -127,7 +127,7 @@ const ag = (label: string, systemPrompt: string): AppStepSpec => ({ kind: 'agent
 const hu = (label: string): AppStepSpec => ({ kind: 'human', label });
 const out = (label: string): AppStepSpec => ({ kind: 'output', label, sink: 'report' });
 
-// ── BANK apps (org_bharat) — 6 governed use cases ──
+// ── BANK apps (org_bharat) — governed use cases ──
 export const BANK_APPS: readonly AppSpecSeed[] = [
   {
     key: 'kyc-rekyc',
@@ -192,13 +192,29 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     title: 'Cross-Sell Advisor',
     summary:
       'Next-best-action for relationship managers — suggest products from the customer holding pattern; aggregate insights only, individual PII masked.',
-    pipelineName: 'Cross-Sell Advisor',
+    pipelineName: 'RM cross-sell',
     steps: [
-      q('Pull the customer holdings', 'customer data'),
+      q('Pull the customer context', 'customer data'),
       ag('Recommend next best action', 'From the customer holding pattern, suggest the next-best product with a one-line rationale. Aggregate insights only — never expose individual PII. Amounts in $.'),
+      hu('Relationship manager decision'),
       out('Cross-sell recommendation'),
     ],
     runs: { done: 8, awaitingReview: 0 },
+  },
+  {
+    key: 'delinquency-intervention',
+    title: 'Delinquency Intervention',
+    summary:
+      'Prioritise early-delinquency accounts, recommend a compliant treatment, and require collector approval before recording the intervention report.',
+    pipelineName: 'Collections intervention',
+    steps: [
+      q('Read the loan accounts', 'loan accounts'),
+      q('Read repayment history', 'repayment history'),
+      ag('Prioritise intervention', 'Rank accounts at risk of rolling into 30+ DPD. Recommend a policy-compliant treatment and cite the repayment evidence used.'),
+      hu('Collector approval'),
+      out('Collections intervention report'),
+    ],
+    runs: { done: 6, awaitingReview: 2 },
   },
   {
     key: 'fnol-triage',
@@ -217,7 +233,7 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
   },
 ];
 
-// ── INSURER apps (org_suraksha) — 6 governed use cases (bind to Suraksha's domains) ──
+// ── INSURER apps (org_suraksha) — governed use cases (bind to Suraksha's domains) ──
 export const INSURER_APPS: readonly AppSpecSeed[] = [
   {
     key: 'fnol-motor',
@@ -261,6 +277,21 @@ export const INSURER_APPS: readonly AppSpecSeed[] = [
       ag('Assess claim risk', 'Cross-check the death claim against the policy in-force date and premium history. Flag early-claim (within 3 years), non-disclosure or fraud-risk indicators for investigation, else fast-track. Amounts in $.'),
       hu('Claims committee review'),
       out('Claim assessment + risk flag'),
+    ],
+    runs: { done: 6, awaitingReview: 2 },
+  },
+  {
+    key: 'indemnity-fast-track',
+    title: 'Indemnity Claim Fast Track',
+    summary:
+      'Cross-check claim documents and the in-force policy, recommend fast-track or investigation, and require a claims officer decision.',
+    pipelineName: 'Indemnity claims',
+    steps: [
+      q('Read the claim documents', 'claim documents'),
+      q('Check the policy', 'policies'),
+      ag('Assess indemnity eligibility', 'Cross-check the submitted evidence against the in-force policy. Recommend fast-track, refer for investigation, or reject with cited reasons.'),
+      hu('Claims officer decision'),
+      out('Indemnity assessment report'),
     ],
     runs: { done: 6, awaitingReview: 2 },
   },

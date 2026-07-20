@@ -59,6 +59,11 @@ export interface CompatibilityResult {
   pipelineId: string | null;
 }
 
+export interface BlueprintRuntimeCandidate {
+  app: Pick<AppSpec, 'pipelineId' | 'published' | 'steps'>;
+  pipeline: Pick<PipelineView, 'id' | 'name' | 'status' | 'dataAllowlist'> | null;
+}
+
 /**
  * Persisted Apps predate the current flat AppStep contract: production seed rows keep step-specific
  * fields under `config`. Normalize that untyped JSONB at the solution boundary so compatibility is
@@ -306,11 +311,33 @@ export function evaluateSolutionCompatibility(
   >,
   app: Pick<AppSpec, 'pipelineId' | 'published' | 'steps'>,
   pipeline: Pick<PipelineView, 'id' | 'name' | 'status' | 'dataAllowlist'> | null,
+  availableDataDomains?: readonly string[],
+): CompatibilityResult {
+  const errors: string[] = [];
+  if (!blueprint.adoptable)
+    errors.push('blueprint is a hypothesis and has no adoptable runtime asset');
+  errors.push(
+    ...evaluateSolutionRuntimeBinding(blueprint, app, pipeline, availableDataDomains).errors,
+  );
+  return { compatible: errors.length === 0, errors, pipelineId: app.pipelineId ?? null };
+}
+
+/**
+ * The actual tenant binding gate, independent of a persisted catalog claim. This is used to derive
+ * `adoptable` from the tenant's Apps, pipelines, and declared data domains; deployment then applies
+ * the same gate again. A manually edited flag can therefore never manufacture runtime readiness.
+ */
+export function evaluateSolutionRuntimeBinding(
+  blueprint: Pick<
+    SolutionBlueprint,
+    'tombstonedAt' | 'requiredDataDomains' | 'requiredCapabilities' | 'requiredPipelineName'
+  >,
+  app: Pick<AppSpec, 'pipelineId' | 'published' | 'steps'>,
+  pipeline: Pick<PipelineView, 'id' | 'name' | 'status' | 'dataAllowlist'> | null,
+  availableDataDomains?: readonly string[],
 ): CompatibilityResult {
   const errors: string[] = [];
   if (blueprint.tombstonedAt) errors.push('blueprint is retired');
-  if (!blueprint.adoptable)
-    errors.push('blueprint is a hypothesis and has no adoptable runtime asset');
   if (!app.published) errors.push('App must be published');
   if (!app.pipelineId) errors.push('App has no explicit governed pipeline binding');
   if (!pipeline) errors.push('bound pipeline does not exist');
@@ -329,8 +356,14 @@ export function evaluateSolutionCompatibility(
       .map((step) => canonical(step.domain)),
   );
   const ceiling = new Set((pipeline?.dataAllowlist ?? []).map(canonical));
+  const declaredDomains = availableDataDomains
+    ? new Set(availableDataDomains.map(canonical))
+    : null;
   for (const required of blueprint.requiredDataDomains) {
     const token = canonical(required);
+    if (declaredDomains && !declaredDomains.has(token)) {
+      errors.push(`tenant has no declared data domain: ${required}`);
+    }
     if (!appDomains.has(token)) errors.push(`App graph does not read required domain: ${required}`);
     if (!ceiling.has(token)) errors.push(`pipeline does not allow required domain: ${required}`);
   }
@@ -340,6 +373,21 @@ export function evaluateSolutionCompatibility(
     if (!capabilities.has(required)) errors.push(`App graph lacks capability: ${required}`);
   }
   return { compatible: errors.length === 0, errors, pipelineId: app.pipelineId ?? null };
+}
+
+/** True only when at least one real tenant runtime graph satisfies the complete Blueprint contract. */
+export function hasAdoptableRuntimeBinding(
+  blueprint: Pick<
+    SolutionBlueprint,
+    'tombstonedAt' | 'requiredDataDomains' | 'requiredCapabilities' | 'requiredPipelineName'
+  >,
+  candidates: readonly BlueprintRuntimeCandidate[],
+  availableDataDomains: readonly string[],
+): boolean {
+  return candidates.some(
+    ({ app, pipeline }) =>
+      evaluateSolutionRuntimeBinding(blueprint, app, pipeline, availableDataDomains).compatible,
+  );
 }
 
 export function withEstimatedRoi(

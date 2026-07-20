@@ -10,6 +10,22 @@ This is not a live-deployment report. Gate states are the retained canonical aud
 means Available / Integrated / UI exposed / Used in a workflow. For a stale audit, `A=N` means the
 selected immutable deployment identity is not current—not that the capability is necessarily absent.
 
+## Product-contract status (2026-07-20)
+
+The catalog contract gap is closed in code without inflating proof:
+
+- `lending-delinquency-intervention` now has an exact published App/pipeline seed over declared
+  `loan accounts` and `repayment history` domains;
+- `insurance-indemnity-fast-track` has an exact published App/pipeline seed over declared
+  `claim documents` and `policies` domains; and
+- `bank-rm-cross-sell` is a reusable outcome contract backed by an exact seeded runtime and a
+  mandatory relationship-manager decision.
+
+`adoptable` is now derived per tenant from the real published App graph, exact published pipeline,
+hard data ceiling, required capabilities, and declared tenant domains. It is no longer granted by a
+catalog checkbox. The three contracts still have `proof.status:unverified`: the runtime/action/evidence
+gaps below remain release blockers for any production-proof claim.
+
 ## Minimum closure set
 
 The minimum union is **12 audited capability items**, one unaudited runtime seam (`app-worker`), and
@@ -53,8 +69,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 - `enterprise-source-policyadmin/sql-read`.
 - `enterprise-source-minio/object-read-write`.
 - An audited `app-worker` human-review/resume seam.
-- Make `insurance-indemnity-fast-track` adoptable; it is currently `adoptable:false` with
-  `proof.status:unverified`.
+- Retain live evidence that `insurance-indemnity-fast-track` resolves adoptable for the insurer
+  tenant after the exact seed is applied; `proof.status` remains `unverified`.
 - Add a governed claim-disposition/write-back contract. No item in the 151-capability denominator
   currently proves writing the decision into the policy/claims system. A report alone is decision
   support, not complete orchestration.
@@ -84,8 +100,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 - `enterprise-source-corebank/sql-read`.
 - `enterprise-source-crm/rest-read` and `enterprise-source-crm/write-sync-webhooks`.
 - An audited `app-worker` human-review/resume seam.
-- Make `lending-delinquency-intervention` adoptable; it is currently `adoptable:false` with
-  `proof.status:unverified`.
+- Retain live evidence that `lending-delinquency-intervention` resolves adoptable for the bank
+  tenant after the exact seed is applied; `proof.status` remains `unverified`.
 
 ### Ordered implementation
 
@@ -113,8 +129,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 - `enterprise-source-corebank/sql-read`.
 - `enterprise-source-crm/rest-read` and `enterprise-source-crm/write-sync-webhooks`.
 - An audited `app-worker` seam with an RM acceptance/rejection step to control mis-selling risk.
-- Create a reusable cross-sell blueprint and outcome contract. The current seeded App and pipeline are
-  fixtures; seeded run counts are not workflow or ROI proof.
+- Retain live evidence for the reusable `bank-rm-cross-sell` contract. Its App and pipeline remain
+  seeded runtime fixtures; seeded run counts are not workflow or ROI proof.
 
 ### Ordered implementation
 
@@ -137,7 +153,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 
 ## Consolidated delivery order
 
-1. **Product contracts:** make indemnity and delinquency adoptable; create cross-sell's blueprint.
+1. **Product contracts (code complete):** apply the catalog/runtime seed and retain tenant-scoped
+   adoptability evidence for indemnity, delinquency, and cross-sell.
 2. **Action seams:** S3 claim documents, claims write-back, and CRM write-back.
 3. **Runtime proof:** audit `app-worker`; pin/reverify Gateway, OPA, Temporal, and source identities.
 4. **Evidence spine:** Qdrant provider/filter attribution and Marquez delivery receipts.

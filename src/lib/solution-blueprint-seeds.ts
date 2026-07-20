@@ -1,6 +1,6 @@
 import type { SolutionBlueprintInput } from '@/lib/solution-blueprints';
 
-export const SOLUTION_BLUEPRINT_CATALOG_VERSION = 2;
+export const SOLUTION_BLUEPRINT_CATALOG_VERSION = 3;
 
 export interface SeededSolutionBlueprint {
   key: string;
@@ -75,6 +75,40 @@ export const SEEDED_SOLUTION_BLUEPRINTS: readonly SeededSolutionBlueprint[] = [
           annualOperatingCost: 0,
           rationale:
             'Enter the insurer-specific capacity and settlement hypothesis before adoption.',
+        },
+      },
+      proof: { status: 'unverified', summary: '', evidenceLinks: [] },
+    },
+  },
+  {
+    key: 'bank-rm-cross-sell',
+    input: {
+      title: 'RM Cross-Sell Next Best Action',
+      summary:
+        'Ground the next-best-action in approved customer context and require relationship-manager acceptance before it becomes customer-facing work.',
+      industry: 'Banking',
+      process: 'Relationship management · cross-sell',
+      businessOwner: 'Head of Relationship Banking',
+      requiredDataDomains: ['customer data'],
+      requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
+      requiredPipelineName: 'RM cross-sell',
+      sourceTemplateKey: 'cross-sell-next-best-action',
+      adoptable: false,
+      outcome: {
+        metricName: 'Accepted cross-sell conversion rate',
+        metricUnit: '% of RM-approved recommendations',
+        direction: 'increase',
+        measurementWindow: '90-day customer cohort',
+        baseline: { value: 8, label: 'Example baseline — replace before adoption' },
+        target: { value: 12, label: 'Example target — approve before adoption' },
+        measured: null,
+        roi: {
+          currency: 'USD',
+          annualBenefit: 0,
+          implementationCost: 0,
+          annualOperatingCost: 0,
+          rationale:
+            'Enter incremental revenue, RM capacity, implementation cost, and compliance assumptions before adoption.',
         },
       },
       proof: { status: 'unverified', summary: '', evidenceLinks: [] },

@@ -7,10 +7,10 @@ import {
 import { validateBlueprint } from '../src/lib/solution-blueprints.ts';
 
 test('starter catalog is versioned, valid and never fabricates proof or measured results', () => {
-  assert.equal(SOLUTION_BLUEPRINT_CATALOG_VERSION, 2);
+  assert.equal(SOLUTION_BLUEPRINT_CATALOG_VERSION, 3);
   assert.deepEqual(
     SEEDED_SOLUTION_BLUEPRINTS.map((seed) => seed.key),
-    ['lending-delinquency-intervention', 'insurance-indemnity-fast-track'],
+    ['lending-delinquency-intervention', 'insurance-indemnity-fast-track', 'bank-rm-cross-sell'],
   );
   for (const seed of SEEDED_SOLUTION_BLUEPRINTS) {
     assert.deepEqual(validateBlueprint(seed.input), []);
@@ -30,4 +30,10 @@ test('high-value use cases require dedicated runtime contracts, not unrelated de
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[0].input.sourceTemplateKey, 'delinquency-intervention');
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[1].input.requiredPipelineName, 'Indemnity claims');
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[1].input.sourceTemplateKey, 'indemnity-fast-track');
+  assert.equal(SEEDED_SOLUTION_BLUEPRINTS[2].input.requiredPipelineName, 'RM cross-sell');
+  assert.deepEqual(SEEDED_SOLUTION_BLUEPRINTS[2].input.requiredCapabilities, [
+    'grounded-inference',
+    'human-approval',
+    'report-output',
+  ]);
 });

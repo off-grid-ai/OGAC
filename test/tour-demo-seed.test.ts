@@ -129,13 +129,21 @@ test('appRunId is distinct per index (N runs per app are unique + stable)', () =
 });
 
 // ─── Content richness per surface ─────────────────────────────────────────────────────────────────
-test('each tenant seeds 6 governed apps, domain-appropriate', () => {
-  assert.equal(BANK_APPS.length, 6);
-  assert.equal(INSURER_APPS.length, 6);
+test('each tenant seeds its governed apps, including the flagship outcome contract', () => {
+  assert.equal(BANK_APPS.length, 7);
+  assert.equal(INSURER_APPS.length, 7);
   assert.ok(BANK_APPS.some((a) => a.title.includes('KYC')));
   assert.ok(BANK_APPS.some((a) => a.title.includes('Loan')));
   assert.ok(INSURER_APPS.some((a) => a.title.includes('FNOL')));
   assert.ok(INSURER_APPS.some((a) => a.title.includes('Death-Claim')));
+  assert.ok(BANK_APPS.some((a) => a.title === 'Delinquency Intervention'));
+  assert.ok(INSURER_APPS.some((a) => a.title === 'Indemnity Claim Fast Track'));
+  assert.ok(
+    BANK_APPS.find((a) => a.title === 'Cross-Sell Advisor')?.steps.some(
+      (step) => step.kind === 'human',
+    ),
+    'cross-sell requires an RM decision before the report',
+  );
 });
 
 test('appsFor / agentsFor / teamsFor / knowledgeFor select by flavour', () => {

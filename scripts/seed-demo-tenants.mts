@@ -253,11 +253,11 @@ async function seedApps(profile: TenantProfile, ownerId: string, pipelineByName:
     const { steps, edges } = buildAppGraph(spec);
     let id = byTitle.get(spec.title.trim().toLowerCase());
     if (!id) {
-      const app = await createApp(profile.orgId, ownerId, { title: spec.title, summary: spec.summary, visibility: 'org', steps, edges, pipelineId });
+      const app = await createApp(profile.orgId, ownerId, { title: spec.title, summary: spec.summary, visibility: 'org', published: true, steps, edges, pipelineId });
       id = app.id;
     } else {
       // Self-heal on re-run: re-push the valid steps/edges + binding (updateApp re-validates the whole spec).
-      await updateApp(id, profile.orgId, { steps, edges, pipelineId });
+      await updateApp(id, profile.orgId, { published: true, steps, edges, pipelineId });
     }
     // App runs — one per status from the app's run counts; a stable id per (app,n).
     const statuses = runStatuses(spec);

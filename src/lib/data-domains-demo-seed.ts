@@ -131,6 +131,20 @@ export const SEED_DOMAINS: SeedDomainSpec[] = [
     resource: 'claims',
     opHints: { limit: 20 },
   },
+  {
+    label: 'loan accounts',
+    aliases: ['loans', 'loan book', 'borrower accounts', 'delinquent accounts'],
+    connectorKey: 'corebank',
+    resource: 'accounts',
+    opHints: { limit: 20 },
+  },
+  {
+    label: 'repayment history',
+    aliases: ['repayments', 'payment history', 'loan payments', 'dpd history'],
+    connectorKey: 'corebank',
+    resource: 'transactions',
+    opHints: { limit: 20 },
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

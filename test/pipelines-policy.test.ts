@@ -205,9 +205,9 @@ test('nextVersion: increments; guards a bad current', () => {
 
 // ─── seed: stable ids + org isolation ─────────────────────────────────────────────────────────────────
 
-test('planSeedPipelines: stable, org-scoped ids; six BFSI templates bound to the on-prem gateway', () => {
+test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-prem gateway', () => {
   const def = planSeedPipelines('default');
-  assert.equal(def.length, 6);
+  assert.equal(def.length, 9);
   assert.ok(def.every((p) => p.isTemplate), 'all are templates');
   assert.ok(def.every((p) => p.status === 'published'), 'templates are published');
   assert.equal(def[0].id, samplePipelineId('default', SAMPLE_KEY_OF(def[0].name)));
@@ -254,6 +254,9 @@ function SAMPLE_KEY_OF(name: string): string {
     'KYC Verification': 'kyc-verification',
     'Fraud Screening': 'fraud-screening',
     'Cross-Sell Advisor': 'cross-sell-advisor',
+    'Collections intervention': 'collections-intervention',
+    'Indemnity claims': 'indemnity-claims',
+    'RM cross-sell': 'rm-cross-sell',
   };
   return map[name] ?? name;
 }

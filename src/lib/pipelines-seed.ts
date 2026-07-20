@@ -64,7 +64,7 @@ function bfsiRouting(): PipelineRouting {
   };
 }
 
-// Six Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/USD
+// Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/USD
 // context). Overlays TIGHTEN org defaults (e.g. force PII masking on).
 export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
   {
@@ -126,6 +126,36 @@ export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
     routing: bfsiRouting(),
     policyOverlay: {},
     guardrailOverlay: { requirePiiMasking: { mode: 'default', bool: true } },
+  },
+  {
+    key: 'collections-intervention',
+    name: 'Collections intervention',
+    description:
+      'Early-delinquency prioritisation with grounded treatment recommendations, collector approval, and an auditable report.',
+    dataAllowlist: ['loan accounts', 'repayment history'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
+  },
+  {
+    key: 'indemnity-claims',
+    name: 'Indemnity claims',
+    description:
+      'Indemnity assessment over claim documents and in-force policies with mandatory claims-officer review.',
+    dataAllowlist: ['claim documents', 'policies'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
+  },
+  {
+    key: 'rm-cross-sell',
+    name: 'RM cross-sell',
+    description:
+      'Next-best-action recommendations grounded in CRM customer context, with relationship-manager acceptance to control mis-selling risk.',
+    dataAllowlist: ['customer data'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
   },
 ] as const;
 

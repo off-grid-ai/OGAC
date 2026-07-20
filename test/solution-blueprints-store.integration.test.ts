@@ -24,6 +24,7 @@ test(
     const store = await import('@/lib/solution-blueprints-store');
     const { createApp, publishApp, updateApp } = await import('@/lib/apps-store');
     const { createPipeline } = await import('@/lib/pipelines');
+    const { createDomain } = await import('@/lib/data-domains-store');
     const { db } = await import('@/db');
     const { sql } = await import('drizzle-orm');
 
@@ -42,6 +43,7 @@ test(
         await db.execute(sql`DELETE FROM solution_blueprint_versions WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${org}`);
         await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${org}`);
+        await db.execute(sql`DELETE FROM data_domains WHERE org_id = ${org}`);
       }
       await db.execute(
         sql`DELETE FROM app_runs WHERE id IN (${runIds[0]}, ${runIds[1]}, ${runIds[2]}, ${runIds[3]})`,
@@ -53,13 +55,13 @@ test(
 
     const seedsA = await store.listSolutionBlueprints(ORG_A);
     const seedsB = await store.listSolutionBlueprints(ORG_B);
-    assert.equal(seedsA.length, 2);
-    assert.equal(seedsB.length, 2);
+    assert.equal(seedsA.length, 3);
+    assert.equal(seedsB.length, 3);
     assert.ok(seedsA.every((item) => item.proof.status === 'unverified'));
     assert.ok(seedsA.every((item) => item.adoptable === false));
     assert.ok(!seedsB.some((item) => item.id === seedsA[0].id));
     assert.equal(await store.deleteSolutionBlueprint(seedsA[1].id, ORG_A), true);
-    assert.equal((await store.listSolutionBlueprints(ORG_A)).length, 1);
+    assert.equal((await store.listSolutionBlueprints(ORG_A)).length, 2);
     assert.equal(
       (await store.listSolutionBlueprints(ORG_A, true)).filter((item) => item.tombstonedAt).length,
       1,
@@ -74,6 +76,15 @@ test(
         dataAllowlist: ['loan accounts'],
       },
       'owner@test.local',
+      ORG_A,
+    );
+    await createDomain(
+      {
+        label: 'loan accounts',
+        aliases: ['loans'],
+        connectorId: 'con-test-corebank',
+        resource: 'accounts',
+      },
       ORG_A,
     );
     const draftApp = await createApp(ORG_A, 'owner@test.local', {
@@ -114,7 +125,7 @@ test(
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'] as const,
       requiredPipelineName: 'Collections intervention',
       sourceTemplateKey: 'collections-intervention',
-      adoptable: true,
+      adoptable: false,
       outcome: {
         metricName: '30+ DPD',
         metricUnit: '%',
@@ -135,6 +146,11 @@ test(
     };
     const created = await store.createSolutionBlueprint(ORG_A, input, 'author@test.local');
     assert.equal(created.currentVersion, 1);
+    assert.equal(
+      created.adoptable,
+      true,
+      'the exact tenant App, pipeline, and declared domain derive readiness despite the stored flag',
+    );
     const appBoundary = await db.execute(sql`
       SELECT id, tableoid::regclass::text AS relation
       FROM apps WHERE id = ${appId}`);

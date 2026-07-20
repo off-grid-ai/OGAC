@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   evaluateSolutionCompatibility,
+  hasAdoptableRuntimeBinding,
   normalizeCompatibilityApp,
   splitList,
   validateBlueprint,
@@ -110,6 +111,20 @@ test('compatibility binds the published App graph to the exact governed pipeline
     errors: [],
     pipelineId: 'pl_collections',
   });
+});
+
+test('catalog adoptability is derived from an exact tenant runtime and declared data binding', () => {
+  const blueprint = { ...validBlueprint(), tombstonedAt: null };
+  const candidates = [{ app, pipeline }];
+  assert.equal(hasAdoptableRuntimeBinding(blueprint, candidates, []), false);
+  assert.equal(hasAdoptableRuntimeBinding(blueprint, candidates, ['loan accounts']), true);
+
+  const missingDomain = evaluateSolutionCompatibility(blueprint, app, pipeline, []);
+  assert.equal(missingDomain.compatible, false);
+  assert.match(
+    missingDomain.errors.join('\n'),
+    /tenant has no declared data domain: loan accounts/,
+  );
 });
 
 test('legacy seeded App JSONB is normalized before solution compatibility evaluation', () => {

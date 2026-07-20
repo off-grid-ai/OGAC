@@ -48,8 +48,8 @@ export default async function BlueprintDetailPage({
               </Link>
             ) : (
               <p className="max-w-md text-xs text-muted-foreground">
-                Hypothesis only. Create and verify the matching App and governed pipeline before
-                marking this Blueprint adoptable.
+                Runtime incomplete. Publish the matching App and governed pipeline, and declare
+                every required tenant data domain; readiness updates automatically.
               </p>
             )}
           </div>

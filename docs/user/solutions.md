@@ -6,21 +6,26 @@ Solution Blueprints capture a reusable BFSI outcome hypothesis: the business own
 runtime capabilities, governed pipeline, KPI baseline and target, economic assumptions, and any
 auditable benchmark evidence. They do not contain a tenant's measured result.
 
-Use **Solutions › Library** to inspect a Blueprint. The two starter entries — delinquency
-intervention and indemnity claim fast-track — are intentionally marked **Hypothesis only** and
-**unverified**. They do not point to a real App/template/pipeline asset, so the Console will not offer
-them for adoption. Their example baselines and targets are prompts for customer discovery, not
-claims that Off Grid has already proved those values. Make a Blueprint adoptable only when its
-runtime contract names assets that really exist; mark it verified only after attaching evidence that
-another operator can open and audit.
+Use **Solutions › Library** to inspect a Blueprint. The starter catalog covers delinquency
+intervention, indemnity claim fast-track, and RM cross-sell. Runtime readiness is not an editable
+claim: the Console derives it for the current tenant from a published App, its exact published
+governed pipeline, the pipeline's hard data ceiling, and the tenant's declared data domains. A bank
+tenant can therefore expose delinquency and cross-sell while an insurer exposes indemnity without
+cross-tenant leakage. Missing any binding keeps the Blueprint unavailable.
+
+All three starter benchmarks remain **unverified**. Their example baselines and targets are prompts
+for customer discovery, not claims that Off Grid has proved those values. Runtime readiness means
+the use case can be adopted; it does not mean its business outcome or production reliability has
+been proved. Mark proof verified only after attaching evidence another operator can open and audit.
 
 ## Adopt a Blueprint
 
 1. Open the Blueprint and choose **Deploy through an existing App**. The selected Blueprint stays in
    the URL and is preselected on the adoption screen.
 2. Choose a compatible App. The Console only offers published Apps whose actual graph contains every
-   required data domain and capability, and whose exact published pipeline has the required data
-   ceiling. A label match is not sufficient.
+   required data domain and capability, whose exact published pipeline has the required hard data
+   ceiling, and whose tenant has declared each domain. A label match or catalog checkbox is not
+   sufficient.
 3. Choose **Adopt Blueprint**. The deployment pins the current immutable Blueprint version and the
    App's exact pipeline. Later Blueprint edits create a new version and never rewrite the adopted
    contract.
@@ -30,6 +35,17 @@ another operator can open and audit.
 
 If no App is compatible, fix or publish the App and pipeline first. The Console will not create a
 nominal “active” deployment that cannot execute the advertised contract.
+
+## What remains unproved in the starter catalog
+
+- **Indemnity:** governed claim-document object retrieval, claims-system disposition/write-back,
+  worker pause/resume and recovery evidence, and measured claims/day/cycle-time/leakage.
+- **Delinquency:** governed CRM task/write-back, worker recovery evidence, attributed retrieval and
+  lineage receipts, and measured roll-rate/cure-rate/collector capacity/avoided loss.
+- **Cross-sell:** governed CRM opportunity/write-back, attributed product-rule retrieval and
+  lineage, and measured conversion/incremental revenue/RM capacity/mis-selling exceptions.
+- **All three:** immutable live Gateway/OPA/Temporal/source identities and a retained end-to-end
+  production journey. Seeded runs and an adoptable runtime contract are not that proof.
 
 ## Record an operator KPI claim
 

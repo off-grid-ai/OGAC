@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { SolutionBlueprint, SolutionBlueprintInput } from '@/lib/solution-blueprints';
 import { splitList } from '@/lib/solution-blueprints';
@@ -53,7 +52,8 @@ function editable(blueprint: SolutionBlueprint): EditableBlueprint {
     requiredCapabilities: blueprint.requiredCapabilities,
     requiredPipelineName: blueprint.requiredPipelineName,
     sourceTemplateKey: blueprint.sourceTemplateKey,
-    adoptable: blueprint.adoptable,
+    // Runtime readiness is server-derived from this tenant's App, pipeline, and data-domain graph.
+    adoptable: false,
     outcome: blueprint.outcome,
     proof: blueprint.proof,
   };
@@ -161,19 +161,15 @@ export function BlueprintForm({ blueprint }: Readonly<{ blueprint?: SolutionBlue
           />
         </Field>
       </div>
-      <div className="flex items-center justify-between gap-4 rounded-md border p-4">
+      <div className="rounded-md border p-4">
         <div>
-          <p className="text-sm font-medium">Adoptable runtime</p>
+          <p className="text-sm font-medium">Runtime readiness is automatic</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Turn this on only when a published App and governed pipeline implement this exact
-            contract. Hypotheses stay visible but cannot be deployed.
+            This Blueprint becomes adoptable only when this tenant has a published App, an exact
+            published governed pipeline, and every declared data domain required below. It cannot be
+            enabled with a catalog checkbox.
           </p>
         </div>
-        <Switch
-          aria-label="Allow this Blueprint to be adopted"
-          checked={model.adoptable}
-          onCheckedChange={(checked) => set('adoptable', checked)}
-        />
       </div>
       <Field label="What business outcome does this solve?">
         <Textarea required value={model.summary} onChange={(e) => set('summary', e.target.value)} />

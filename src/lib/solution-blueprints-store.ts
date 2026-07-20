@@ -22,6 +22,7 @@ import { computeReportMetrics } from '@/lib/app-reports';
 import { toAppRunView } from '@/lib/app-runs-view';
 import {
   evaluateSolutionCompatibility,
+  hasAdoptableRuntimeBinding,
   normalizeCompatibilityApp,
   type SolutionBlueprint,
   type SolutionBlueprintInput,
@@ -35,6 +36,7 @@ import {
   validateObservation,
   withEstimatedRoi,
 } from '@/lib/solution-blueprints';
+import { listDomains } from '@/lib/data-domains-store';
 import { getPipeline } from '@/lib/pipelines';
 import { hash12 } from '@/lib/tour-demo-seed';
 
@@ -97,6 +99,32 @@ function toBlueprint(
     createdAt: catalog.createdAt,
     updatedAt: catalog.updatedAt,
   };
+}
+
+/** Resolve catalog readiness from this tenant's real graph; persisted seed/editor flags are ignored. */
+async function withRuntimeAdoptability(
+  orgId: string,
+  blueprints: SolutionBlueprint[],
+): Promise<SolutionBlueprint[]> {
+  if (!blueprints.length) return [];
+  const [appRows, domains] = await Promise.all([
+    db.select().from(apps).where(eq(apps.orgId, orgId)).orderBy(asc(apps.title)),
+    listDomains(orgId),
+  ]);
+  const candidates = await Promise.all(
+    appRows.map(async (app) => {
+      const normalized = normalizeCompatibilityApp(app);
+      return {
+        app: normalized,
+        pipeline: normalized.pipelineId ? await getPipeline(normalized.pipelineId, orgId) : null,
+      };
+    }),
+  );
+  const domainLabels = domains.map((domain) => domain.label);
+  return blueprints.map((blueprint) => ({
+    ...blueprint,
+    adoptable: hasAdoptableRuntimeBinding(blueprint, candidates, domainLabels),
+  }));
 }
 
 function toDeployment(row: SolutionDeploymentRow): SolutionDeployment {
@@ -224,9 +252,10 @@ export async function listSolutionBlueprints(
   const results = await Promise.all(
     catalogs.map((catalog) => catalogWithVersion(catalog.id, orgId)),
   );
-  return results
+  const blueprints = results
     .filter((value) => value !== null)
     .map(({ catalog, version }) => toBlueprint(catalog, version));
+  return withRuntimeAdoptability(orgId, blueprints);
 }
 
 export async function getSolutionBlueprint(
@@ -236,7 +265,8 @@ export async function getSolutionBlueprint(
 ): Promise<SolutionBlueprint | null> {
   await seedBlueprints(orgId);
   const result = await catalogWithVersion(id, orgId, version);
-  return result ? toBlueprint(result.catalog, result.version) : null;
+  if (!result) return null;
+  return (await withRuntimeAdoptability(orgId, [toBlueprint(result.catalog, result.version)]))[0];
 }
 
 export async function listSolutionBlueprintVersions(
@@ -397,17 +427,19 @@ export interface SolutionDeploymentCandidate {
 export async function listSolutionDeploymentCandidates(
   orgId: string,
 ): Promise<SolutionDeploymentCandidate[]> {
-  const [blueprints, appRows] = await Promise.all([
+  const [blueprints, appRows, domains] = await Promise.all([
     listSolutionBlueprints(orgId),
     db.select().from(apps).where(eq(apps.orgId, orgId)).orderBy(asc(apps.title)),
+    listDomains(orgId),
   ]);
+  const domainLabels = domains.map((domain) => domain.label);
   return Promise.all(
     appRows.map(async (app) => {
       const appSpec = normalizeCompatibilityApp(app);
       const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
       const evaluated = blueprints.map((blueprint) => ({
         blueprint,
-        result: evaluateSolutionCompatibility(blueprint, appSpec, pipeline),
+        result: evaluateSolutionCompatibility(blueprint, appSpec, pipeline, domainLabels),
       }));
       return {
         appId: app.id,
@@ -450,7 +482,13 @@ async function compatibleBinding(orgId: string, input: SolutionDeploymentInput) 
   if (!app[0]) throw new SolutionValidationError(['unknown app']);
   const appSpec = normalizeCompatibilityApp(app[0]);
   const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
-  const compatibility = evaluateSolutionCompatibility(blueprint, appSpec, pipeline);
+  const domains = await listDomains(orgId);
+  const compatibility = evaluateSolutionCompatibility(
+    blueprint,
+    appSpec,
+    pipeline,
+    domains.map((domain) => domain.label),
+  );
   if (!compatibility.compatible || !compatibility.pipelineId) {
     throw new SolutionConflictError(
       'App is not compatible with the selected blueprint version',
@@ -586,7 +624,13 @@ export async function assertSolutionRuntimeBinding(
     if (!blueprint) throw new SolutionValidationError(['unknown blueprint version']);
     const appSpec = normalizeCompatibilityApp(app);
     const pipeline = appSpec.pipelineId ? await getPipeline(appSpec.pipelineId, orgId) : null;
-    const compatibility = evaluateSolutionCompatibility(blueprint, appSpec, pipeline);
+    const domains = await listDomains(orgId);
+    const compatibility = evaluateSolutionCompatibility(
+      blueprint,
+      appSpec,
+      pipeline,
+      domains.map((domain) => domain.label),
+    );
     if (!compatibility.compatible || compatibility.pipelineId !== row.pipelineId) {
       throw new SolutionConflictError(
         'App is not compatible with the pinned solution deployment',

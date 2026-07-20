@@ -47,8 +47,8 @@ export default async function SolutionLibraryPage() {
                     <h2 className="mt-1 font-medium">{blueprint.title}</h2>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {blueprint.adoptable
-                        ? 'Adoptable runtime'
-                        : 'Hypothesis only - no runtime asset'}
+                        ? 'Runtime contract satisfied'
+                        : 'Runtime bindings incomplete'}
                     </p>
                   </div>
                   <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
