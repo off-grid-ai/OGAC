@@ -104,11 +104,15 @@ test('a human step drives the run to awaiting_human (mid-workflow pause)', () =>
   assert.equal(deriveRunStatus(state.steps), 'awaiting_human');
 });
 
-test('buildAgentQuery threads prior-step output as context', () => {
-  const prior: StepResult[] = [{ stepId: 's1', kind: 'connector-query', status: 'done', output: 'quota: 3/5' }];
+test('buildAgentQuery threads decisions as context without duplicating governed connector sources', () => {
+  const prior: StepResult[] = [
+    { stepId: 's1', kind: 'connector-query', status: 'done', output: 'account: sensitive row' },
+    { stepId: 's2', kind: 'human', status: 'done', output: 'reviewer approved' },
+  ];
   const q = buildAgentQuery({ id: 's2', label: 'decide', kind: 'agent', agentId: 'ag1' }, prior);
   assert.match(q, /CONTEXT FROM PRIOR STEPS/);
-  assert.match(q, /quota: 3\/5/);
+  assert.match(q, /reviewer approved/);
+  assert.doesNotMatch(q, /sensitive row/);
   assert.match(q, /TASK: decide/);
 });
 

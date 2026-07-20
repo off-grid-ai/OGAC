@@ -334,14 +334,15 @@ export function defaultDeps(): AppRunDeps {
 }
 
 // ─── threading prior outputs into a downstream agent step ────────────────────────────────────────
-// A downstream agent must see what upstream steps produced. We build a compact CONTEXT block from
-// the prior step outputs and prepend it to the agent's query, so the governed pipeline retrieves +
-// answers WITH that context in-band (runAgent takes a single query string; this is how earlier-step
-// results reach it without changing runAgent's signature).
+// A downstream agent must see what upstream steps produced. Non-connector outputs (earlier agent
+// decisions, human review) stay in-band in a compact CONTEXT block. Connector evidence does NOT:
+// it already travels through `providedSourcesFromPriorResults`, where it remains independently
+// maskable, citeable and groundable. Copying those rows into the query duplicates sensitive data,
+// forces redundant guardrail scans and collapses source provenance into prompt text.
 export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): string {
   const label = step.label || step.id;
   const contextBlocks = priorResults
-    .filter((r) => r.output?.trim())
+    .filter((r) => r.kind !== 'connector-query' && r.output?.trim())
     .map((r) => `- [${r.kind}] ${r.output!.trim()}`);
   if (contextBlocks.length === 0) return label;
   return `CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}\n\nTASK: ${label}`;
