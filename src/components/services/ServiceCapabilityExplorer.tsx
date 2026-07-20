@@ -229,7 +229,7 @@ function InventoryFilters({ filter }: Readonly<{ filter: ServiceInventoryFilter 
       <div
         role="group"
         aria-label="Service inventory filters"
-        className="grid grid-cols-2 gap-2"
+        className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1"
       >
         <div className="min-w-0">
           <NativeSelect

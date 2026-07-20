@@ -92,7 +92,7 @@ test('filter controls keep search actions and facet widths in independent respon
   );
   assert.match(
     html,
-    /role="group" aria-label="Service inventory filters" class="grid grid-cols-2 gap-2"/,
+    /role="group" aria-label="Service inventory filters" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1"/,
   );
   assert.match(html, /placeholder="Search services"/);
   assert.match(html, />Both IA owners</);
