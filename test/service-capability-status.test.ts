@@ -9,6 +9,9 @@ const STATUS_LEDGER = new URL('../docs/SERVICE_CAPABILITY_STATUS.md', import.met
 
 test('service capability tracker names every canonical inventory entry exactly once', async () => {
   const markdown = await readFile(STATUS_LEDGER, 'utf8');
+  const perServiceLedger = markdown
+    .split('## Per-service ledger')[1]
+    ?.split('## Pending audit actions')[0];
   const canonicalIds = [
     ...getServices().map((service) => service.id),
     ...ENTERPRISE_SOURCE_DEFINITIONS.map((source) => source.id),
@@ -16,9 +19,10 @@ test('service capability tracker names every canonical inventory entry exactly o
 
   assert.equal(canonicalIds.length, 48);
   assert.equal(new Set(canonicalIds).size, 48);
+  assert.ok(perServiceLedger, 'per-service ledger section must exist');
 
   for (const id of canonicalIds) {
-    const ledgerRows = markdown
+    const ledgerRows = perServiceLedger
       .split('\n')
       .filter((line) => line.startsWith('|') && line.includes(`\`${id}\``));
     assert.equal(ledgerRows.length, 1, `${id} must have exactly one tracker row`);

@@ -8,18 +8,18 @@ live deployment.
 
 ## Current checkpoint
 
-| Field                        | State                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------ |
-| Updated                      | 2026-07-20                                                                     |
-| Release branch               | `codex/modernize-console-sidebar`                                              |
-| Registry checkpoint          | Source snapshot through `7f4f8d61`; this is not a deployed-SHA assertion       |
-| Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                        |
-| Versioned capability audits  | 36 records: 19 current, 17 stale                                               |
-| Audited denominator          | 151 capability items / 604 four-gate assessments                               |
-| Audit backlog                | 12 entries have no versioned denominator yet                                   |
-| Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint  |
-| Enterprise-source projection | Defect repair in progress; release integration and UI confirmation outstanding |
-| Live verification            | Not asserted by this ledger                                                    |
+| Field                        | State                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| Updated                      | 2026-07-20                                                                    |
+| Release branch               | `codex/modernize-console-sidebar`                                             |
+| Registry checkpoint          | Source snapshot through `7f4f8d61`; this is not a deployed-SHA assertion      |
+| Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                       |
+| Versioned capability audits  | 36 records: 19 current, 17 stale                                              |
+| Audited denominator          | 151 capability items / 604 four-gate assessments                              |
+| Audit backlog                | 12 entries have no versioned denominator yet                                  |
+| Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint |
+| Enterprise-source projection | Repaired in `7f4f8d61`; live UI confirmation remains outstanding              |
+| Live verification            | Not asserted by this ledger                                                   |
 
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
@@ -47,12 +47,12 @@ forwarders, seeds, images, or a successful ping do not upgrade readiness.
 
 ## Active lanes
 
-| Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                                    |
-| ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `9107dd5b` | Visual and live verification pending                                |
-| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `f3f081d2` | 12 audited, 12 pending; live evidence gaps retained                 |
-| Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained                          |
-| Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Fix enterprise-source projection; then verify one immutable release |
+| Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                    |
+| ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
+| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `7f4f8d61` | Visual and live verification pending                |
+| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `f3f081d2` | 12 audited, 12 pending; live evidence gaps retained |
+| Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained          |
+| Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Build and verify one immutable release              |
 
 ## Per-service ledger
 
@@ -155,16 +155,15 @@ For each stale record:
 
 ## Prioritized release gaps
 
-| Priority | Gap                                                                                                                                      | Release acceptance                                                                                                                                                      |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0       | Enterprise-source audit evidence is not yet consistently projected into the selected inventory/detail experience; repair is in progress. | All six sources preserve their canonical audit state, counts, evidence, gaps, and management route in the shared explorer, with focused projection tests.               |
-| P0       | Twelve services have no pinned capability denominator.                                                                                   | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
-| P0       | Seventeen audits are stale.                                                                                                              | Apply the re-verification recipe against immutable selected versions; stale upstream gates remain unavailable until then.                                               |
-| P0       | Readiness is 47 unverified and 1 partial.                                                                                                | Supply signed/timestamped topology evidence for deployment, reachability, functional behavior, seed state, and Console use; do not infer it from optional fallbacks.    |
-| P1       | Only 65/151 capabilities are fully integrated, 79/151 are fully UI-exposed, and 42/151 have full workflow evidence.                      | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
-| P1       | The capability map is an exhaustive ledger but still costly to scan and scroll.                                                          | Add URL-driven family/service local navigation, sticky summary/filter context, progressive disclosure, and direct gap-to-management links while retaining all evidence. |
-| P1       | Workflow evidence is not yet organized as repeatable BFSI proof.                                                                         | Retain deterministic indemnity, delinquency, and cross-sell journeys with before/after operational and financial measures.                                              |
-| P2       | Capability breadth can be mistaken for customer value.                                                                                   | Publish intentional non-support and replacement rationale; product dashboards lead with outcomes, active work, exceptions, next actions, and proof—not service names.   |
+| Priority | Gap                                                                                                                 | Release acceptance                                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Twelve services have no pinned capability denominator.                                                              | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
+| P0       | Seventeen audits are stale.                                                                                         | Apply the re-verification recipe against immutable selected versions; stale upstream gates remain unavailable until then.                                               |
+| P0       | Readiness is 47 unverified and 1 partial.                                                                           | Supply signed/timestamped topology evidence for deployment, reachability, functional behavior, seed state, and Console use; do not infer it from optional fallbacks.    |
+| P1       | Only 65/151 capabilities are fully integrated, 79/151 are fully UI-exposed, and 42/151 have full workflow evidence. | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
+| P1       | The capability map is an exhaustive ledger but still costly to scan and scroll.                                     | Add URL-driven family/service local navigation, sticky summary/filter context, progressive disclosure, and direct gap-to-management links while retaining all evidence. |
+| P1       | Workflow evidence is not yet organized as repeatable BFSI proof.                                                    | Retain deterministic indemnity, delinquency, and cross-sell journeys with before/after operational and financial measures.                                              |
+| P2       | Capability breadth can be mistaken for customer value.                                                              | Publish intentional non-support and replacement rationale; product dashboards lead with outcomes, active work, exceptions, next actions, and proof—not service names.   |
 
 ## Usable, consumable, sellable priorities
 
@@ -185,12 +184,12 @@ capacity evidence so it is **sellable**. Seeds and screenshots are fixtures, not
 ## Release gates
 
 - [x] All 48 entries are represented by the canonical source projection.
-- [ ] Enterprise-source selected-state projection is repaired and independently verified.
+- [x] Enterprise-source selected-state projection is repaired and independently verified in focused tests.
 - [x] Family, owner, audit-state, readiness, and text filters live in the URL/history stack.
 - [ ] Every selected service shows deployment, routes, readiness evidence, workflow evidence, gaps,
       and next action even when its capability denominator is not audited.
 - [x] Versioned family records are integrated into the canonical registry without duplicated facts.
-- [ ] Focused logic and navigation tests pass (route ownership repair in progress).
+- [x] Focused logic and navigation tests pass (34/34 at `7f4f8d61`).
 - [ ] Typecheck and one exclusive production build pass.
 - [ ] Wide and narrow light/dark screenshots are readable with no page-level overflow.
 - [ ] Exact SHA is pushed and deployed over SSH.
