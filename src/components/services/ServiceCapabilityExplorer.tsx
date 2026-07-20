@@ -143,7 +143,7 @@ function FamilyNavigation({
   }
 
   return (
-    <nav aria-label="Service families" className="flex min-w-0 gap-1 overflow-x-auto pb-1">
+    <nav aria-label="Service families" className="flex min-w-0 flex-wrap gap-1">
       <Button
         asChild
         variant={!filter.family ? 'secondary' : 'ghost'}
@@ -583,7 +583,7 @@ export function ServiceCapabilityExplorer({
             </Link>
           </Button>
         </div>
-        <div className="grid gap-3 pb-3 xl:grid-cols-[minmax(28rem,40rem)_minmax(0,1fr)] xl:items-center">
+        <div className="grid gap-3 pb-3">
           <OverviewRail inventory={inventory} />
           <FamilyNavigation filter={inventoryFilter} inventory={inventory} />
         </div>

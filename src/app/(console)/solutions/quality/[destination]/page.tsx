@@ -4,7 +4,13 @@ import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
 import { RunEvalSuiteButton } from '@/components/evals/RunEvalSuiteButton';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -80,10 +86,10 @@ function GoldenCasesDestination({
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Used by pipelines ({boundPipelines.length})</CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <CardDescription className="text-xs">
             Pipeline-bound cases run in that pipeline&apos;s context. Org-wide cases remain reusable
             across Apps.
-          </p>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {boundPipelines.length === 0 ? (
@@ -145,13 +151,13 @@ function RunsDestination({
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Execution filters</CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <CardDescription className="text-xs">
             Each execution opens an immutable scorecard. Trends, drift, and release gates stay in{' '}
             <Link href="/solutions/quality/performance" className="text-primary hover:underline">
               this Quality workspace
             </Link>
             .
-          </p>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {view.suites.length === 0 ? (

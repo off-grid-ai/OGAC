@@ -55,6 +55,14 @@ test('Quality executions resolves its canonical runs segment instead of treating
 
 test('Quality card guidance uses the shared description row without header overlap', () => {
   const cards = [
+    [
+      'src/app/(console)/solutions/quality/[destination]/page.tsx',
+      'Used by pipelines',
+    ],
+    [
+      'src/app/(console)/solutions/quality/[destination]/page.tsx',
+      'Execution filters',
+    ],
     ['src/app/(console)/solutions/quality/performance/page.tsx', 'Score history'],
     ['src/app/(console)/solutions/quality/drift/page.tsx', 'Current drift evidence'],
     ['src/app/(console)/solutions/quality/drift/page.tsx', 'Run a drift check'],
