@@ -8,98 +8,28 @@
  * the exact gap operators need to close.
  */
 
-export const CAPABILITY_GATES = ['upstream', 'adapter', 'ui', 'workflow'] as const;
+import {
+  CAPABILITY_GATES,
+  defineCapability as capability,
+  type AuditedCapabilitySummary,
+  type ServiceCapabilityAudit,
+  type ServiceCapabilitySummary,
+} from './service-capability-contract';
 
-export type CapabilityGate = (typeof CAPABILITY_GATES)[number];
-export type CapabilityGateStatus = 'yes' | 'partial' | 'no';
-
-export const CAPABILITY_GATE_LABELS: Readonly<Record<CapabilityGate, string>> = {
-  upstream: 'Available',
-  adapter: 'Integrated',
-  ui: 'UI exposed',
-  workflow: 'Used in workflow',
-};
-
-export interface CapabilityGateAssessment {
-  status: CapabilityGateStatus;
-  evidence: string;
-}
-
-export interface ServiceCapabilityItem {
-  id: string;
-  name: string;
-  summary: string;
-  /** The closest real console place where an operator can use or inspect this capability. */
-  uiHref: string;
-  uiLabel: string;
-  /** Concrete remaining work. Empty only when all four gates are verified. */
-  gap: string;
-  gates: Readonly<Record<CapabilityGate, CapabilityGateAssessment>>;
-}
-
-export interface ServiceCapabilityAudit {
-  serviceId: string;
-  serviceLabel: string;
-  upstreamVersion: string;
-  versionSource: string;
-  auditedAt: string;
-  auditState: 'current' | 'stale';
-  auditStateEvidence: string | null;
-  summary: string;
-  items: readonly ServiceCapabilityItem[];
-}
-
-export interface AuditedCapabilitySummary {
-  status: 'audited';
-  auditState: ServiceCapabilityAudit['auditState'];
-  verifiedGates: number;
-  partialGates: number;
-  totalGates: number;
-  productionItems: number;
-  totalItems: number;
-}
-
-export interface NotAuditedCapabilitySummary {
-  status: 'not-audited';
-}
-
-export type ServiceCapabilitySummary = AuditedCapabilitySummary | NotAuditedCapabilitySummary;
-
-type GateInput = readonly [
-  CapabilityGateStatus,
-  string,
-  CapabilityGateStatus,
-  string,
-  CapabilityGateStatus,
-  string,
-  CapabilityGateStatus,
-  string,
-];
-
-function capability(
-  id: string,
-  name: string,
-  summary: string,
-  uiHref: string,
-  uiLabel: string,
-  gap: string,
-  input: GateInput,
-): ServiceCapabilityItem {
-  return {
-    id,
-    name,
-    summary,
-    uiHref,
-    uiLabel,
-    gap,
-    gates: {
-      upstream: { status: input[0], evidence: input[1] },
-      adapter: { status: input[2], evidence: input[3] },
-      ui: { status: input[4], evidence: input[5] },
-      workflow: { status: input[6], evidence: input[7] },
-    },
-  };
-}
+export {
+  CAPABILITY_GATE_LABELS,
+  CAPABILITY_GATES,
+  defineCapability,
+  type AuditedCapabilitySummary,
+  type CapabilityGate,
+  type CapabilityGateAssessment,
+  type CapabilityGateInput,
+  type CapabilityGateStatus,
+  type NotAuditedCapabilitySummary,
+  type ServiceCapabilityAudit,
+  type ServiceCapabilityItem,
+  type ServiceCapabilitySummary,
+} from './service-capability-contract';
 
 function enforceStaleAuditAvailability(audit: ServiceCapabilityAudit): ServiceCapabilityAudit {
   if (audit.auditState !== 'stale' || !audit.auditStateEvidence) return audit;

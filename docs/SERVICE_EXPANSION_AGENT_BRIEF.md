@@ -24,7 +24,10 @@ unsupported upstream capability instead of silently omitting it or inflating cov
 4. `src/lib/runtime-service-topology.ts` and `src/lib/operational-services.ts` — Console registry.
 5. `src/lib/service-capability-map.ts` and `docs/SERVICE_CAPABILITY_MAP.md` — audited capability
    denominators and evidence. Reuse them; do not copy their facts into another registry.
-6. `../brand/DESIGN_PHILOSOPHY.md` and
+6. `docs/SERVICE_CAPABILITY_STATUS.md` — the resume-safe 49-entry tracker, active ownership,
+   release gates, and last committed handoffs. Read it before discovery and update it through the
+   integration owner after every committed slice.
+7. `../brand/DESIGN_PHILOSOPHY.md` and
    `../component-library-animations` — UI source of truth. Reuse or extend its primitives.
 
 Container/image counts are deployment detail, not the product ontology. Never infer the 49 entries
@@ -106,7 +109,12 @@ Real workflow evidence:
 Fleet health evidence:
 Known gaps (with backlog ids):
 Not verified:
+Next resumable action:
 ```
+
+The orchestrator applies that handoff to `docs/SERVICE_CAPABILITY_STATUS.md` before closing or
+reassigning the lane. Workers do not create private scratch trackers or redefine another worker's
+state.
 
 ## Non-negotiable honesty rules
 
