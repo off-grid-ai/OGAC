@@ -177,7 +177,7 @@ export interface LineageEvent {
 
 export interface LineagePort {
   meta: AdapterMeta;
-  emit(event: LineageEvent): Promise<void>;
+  emit(event: LineageEvent): Promise<import('@/lib/lineage-delivery').LineageDeliveryReceipt>;
 }
 
 // Provenance signing — make an answer/export tamper-evident. HMAC (default) is a shared-secret
