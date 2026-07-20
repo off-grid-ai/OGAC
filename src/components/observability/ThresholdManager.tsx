@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -109,7 +109,9 @@ function AddRuleForm({ onDone }: Readonly<{ onDone: () => void }>) {
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Severity</Label>
+        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Severity
+        </Label>
         <select
           value={severity}
           onChange={(e) => setSeverity(e.target.value as 'warning' | 'critical')}
@@ -185,10 +187,11 @@ export function ThresholdManager() {
           <Bell className="size-4 text-primary" />
           Alert thresholds &amp; baseline
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
+        <CardDescription className="text-xs">
           Fire alerts when a drift score or eval pass-rate crosses a bound. Reset the drift baseline
-          after a deliberate model/prompt change so the next window measures against fresh reference.
-        </p>
+          after a deliberate model/prompt change so the next window measures against fresh
+          reference.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <AddRuleForm onDone={load} />
@@ -264,7 +267,12 @@ export function ThresholdManager() {
               <p className="text-[10px] text-muted-foreground">Baseline never reset.</p>
             )}
           </div>
-          <Button onClick={resetBaseline} disabled={resetting} variant="outline" className="gap-1.5">
+          <Button
+            onClick={resetBaseline}
+            disabled={resetting}
+            variant="outline"
+            className="gap-1.5"
+          >
             <ArrowCounterClockwise className={resetting ? 'size-4 animate-spin' : 'size-4'} />
             Reset baseline
           </Button>

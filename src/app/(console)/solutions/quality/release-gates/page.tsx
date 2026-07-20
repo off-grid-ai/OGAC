@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ThresholdManager } from '@/components/observability/ThresholdManager';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -77,10 +77,10 @@ export default async function QualityReleaseGatesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Pipeline release gates</CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <CardDescription className="text-xs">
             A publish job runs the evaluators attached to that pipeline. Passing publishes. Failing
             blocks unless an operator uses the audited override on the pipeline Quality view.
-          </p>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (

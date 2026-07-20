@@ -1,6 +1,6 @@
 import { DriftCatalog } from '@/components/drift/DriftCatalog';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -54,9 +54,9 @@ export default async function QualityDriftPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Current drift evidence</CardTitle>
-            <p className="text-xs text-muted-foreground">
+            <CardDescription className="text-xs">
               {data?.note ?? error ?? 'No drift evidence was returned.'}
-            </p>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {!data || data.features.length === 0 ? (
@@ -110,9 +110,9 @@ export default async function QualityDriftPage() {
       <Card className="h-fit xl:col-span-2">
         <CardHeader>
           <CardTitle className="text-sm">Run a drift check</CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <CardDescription className="text-xs">
             Choose a supported preset or method. The result states which engine actually ran.
-          </p>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <DriftCatalog engineStatus={engineStatus} />

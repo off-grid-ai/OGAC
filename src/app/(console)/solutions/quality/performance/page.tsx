@@ -3,7 +3,7 @@ import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -125,10 +125,10 @@ export default async function QualityPerformancePage() {
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-sm">Score history</CardTitle>
-            <p className="text-xs text-muted-foreground">
+            <CardDescription className="text-xs">
               Oldest result is on the left. Every point links back to an immutable execution record
               below.
-            </p>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {performance.trend.length === 0 ? (

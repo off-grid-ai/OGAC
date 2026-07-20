@@ -37,6 +37,25 @@ test('Quality root reveals current posture before configuration CRUD', () => {
   assert.match(rootPage, /redirect\('\/solutions\/quality\/performance'\)/);
 });
 
+test('Quality card guidance uses the shared description row without header overlap', () => {
+  const cards = [
+    ['src/app/(console)/solutions/quality/performance/page.tsx', 'Score history'],
+    ['src/app/(console)/solutions/quality/drift/page.tsx', 'Current drift evidence'],
+    ['src/app/(console)/solutions/quality/drift/page.tsx', 'Run a drift check'],
+    ['src/app/(console)/solutions/quality/release-gates/page.tsx', 'Pipeline release gates'],
+    ['src/components/observability/ThresholdManager.tsx', 'Alert thresholds'],
+  ] as const;
+
+  for (const [path, title] of cards) {
+    const header = [...source(path).matchAll(/<CardHeader[\s\S]*?<\/CardHeader>/g)].find((match) =>
+      match[0].includes(title),
+    )?.[0];
+    assert.ok(header, `${path} must render the ${title} card header`);
+    assert.match(header, /<CardDescription\b/);
+    assert.doesNotMatch(header, /<p\b/);
+  }
+});
+
 test('retired Insights Quality routes preserve query state and redirect to canonical ownership', () => {
   const redirects = {
     'src/app/(console)/insights/quality/drift/page.tsx': '/solutions/quality/drift',
