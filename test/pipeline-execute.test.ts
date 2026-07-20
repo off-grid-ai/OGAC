@@ -197,3 +197,17 @@ test('a post-guardrail warn does NOT suppress the completion (recorded, non-bloc
   assert.equal(res.status, 'ok');
   if (res.status === 'ok') assert.ok(res.checks.some((c) => c.name === 'grounding' && c.verdict === 'warn'));
 });
+
+test('a post-guardrail block holds the raw completion', async () => {
+  const { deps, audits } = makeDeps({
+    async runGuardrail(phase) {
+      return phase === 'post'
+        ? { checks: [{ name: 'pii', verdict: 'blocked' as const }], outcome: 'blocked' as const }
+        : { checks: [], outcome: 'ok' as const };
+    },
+  });
+  const res = await executePipelineRun('r', PIPELINE, allowVerdict(), null, { input: 'q' }, 'o', 'c', deps);
+  assert.equal(res.status, 'blocked');
+  if (res.status === 'blocked') assert.match(res.reason, /output guardrail/);
+  assert.ok(audits.some((audit) => audit.outcome === 'blocked'));
+});
