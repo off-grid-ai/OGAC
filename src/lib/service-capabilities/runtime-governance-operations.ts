@@ -5,12 +5,12 @@ import {
 } from '../service-capability-contract';
 
 /**
- * Runtime/governance/operations lane of the 43-service platform inventory.
+ * Runtime/governance/operations lane of the canonical platform inventory.
  *
  * Only services with a bounded, versioned operator-outcome denominator appear in `AUDITS`.
  * The rest remain explicitly unaudited so the canonical projection renders “not audited”, never
  * an invented 0% or 100%. Existing LiteLLM and Presidio audits stay owned by the canonical legacy
- * registry until the orchestrator moves them; this file does not duplicate their evidence.
+ * registry here so each service has exactly one family owner.
  */
 
 type CapabilitySpec = readonly [
@@ -28,6 +28,7 @@ interface AuditSpec {
   serviceLabel: string;
   upstreamVersion: string;
   versionSource: string;
+  denominatorSource: string;
   auditState?: ServiceCapabilityAudit['auditState'];
   auditStateEvidence?: string;
   summary: string;
@@ -40,6 +41,7 @@ function audit(spec: AuditSpec): ServiceCapabilityAudit {
     serviceLabel: spec.serviceLabel,
     upstreamVersion: spec.upstreamVersion,
     versionSource: spec.versionSource,
+    denominatorSource: spec.denominatorSource,
     auditedAt: '2026-07-20',
     auditState: spec.auditState ?? 'stale',
     auditStateEvidence:
@@ -54,6 +56,8 @@ function audit(spec: AuditSpec): ServiceCapabilityAudit {
 
 const FLEET_EVIDENCE =
   '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md and SERVER_STATE.md, verified 2026-07-20';
+const PRESIDIO_ROUTE = '/governance/guardrails/overview';
+const ROUTER_ROUTE = '/runtime/models/routing';
 
 export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
@@ -61,6 +65,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Console',
     upstreamVersion: '61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
     versionSource: `${FLEET_EVIDENCE} release stamp`,
+    denominatorSource:
+      'src/app/(console) route tree; src/lib/tenancy-policy.ts; src/lib/adapters contracts',
     auditStateEvidence:
       'The fleet verified this immutable release, but the current working release has moved beyond it and is not deployed.',
     summary:
@@ -127,6 +133,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'AI Gateway',
     upstreamVersion: 'Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
     versionSource: `${FLEET_EVIDENCE}; packages/gateway and scripts/gateway-aggregator.mjs`,
+    denominatorSource:
+      'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts',
     auditStateEvidence:
       'The fleet verified this first-party gateway release, but the current working release is newer and not deployed.',
     summary:
@@ -193,6 +201,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Identity & SSO',
     upstreamVersion: '26.0.7',
     versionSource: 'deploy/docker-compose.yml (quay.io/keycloak/keycloak:26.0.7)',
+    denominatorSource: 'https://www.keycloak.org/docs/26.0.7/server_admin/',
     summary:
       'Relevant denominator: human SSO, service accounts, tenant access, session/revocation controls, and identity lifecycle. Full realm administration is intentionally abstracted.',
     capabilities: [
@@ -257,6 +266,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Durable Workflows',
     upstreamVersion: 'Temporal Server 1.25.2 / UI 2.32.0',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://docs.temporal.io/',
     summary:
       'Relevant denominator: durable app/agent/chat dispatch, run lifecycle, schedules, retries, visibility, cancellation, and worker readiness.',
     capabilities: [
@@ -321,6 +331,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Policy Engine',
     upstreamVersion: '0.70.0',
     versionSource: 'deploy/docker-compose.yml (openpolicyagent/opa:0.70.0)',
+    denominatorSource: 'https://www.openpolicyagent.org/docs/v0.70.0/',
     summary:
       'Relevant denominator: policy/module/data lifecycle, decision evaluation, bundles, decision logs, and failure posture. Rego stays behind governed product modules.',
     capabilities: [
@@ -385,6 +396,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Secrets Vault',
     upstreamVersion: '2.1.0',
     versionSource: 'deploy/docker-compose.yml (openbao/openbao:2.1.0)',
+    denominatorSource: 'https://openbao.org/docs/2.1.x/',
     summary:
       'Relevant denominator: secret CRUD, connector and service credentials, leases, mounts, rotation, auth, policy, audit, and recovery. Root administration is excluded.',
     capabilities: [
@@ -449,6 +461,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Feature Flags',
     upstreamVersion: '6.6 mutable minor tag',
     versionSource: 'deploy/docker-compose.yml (unleashorg/unleash-server:6.6)',
+    denominatorSource: 'https://docs.getunleash.io/reference',
     auditStateEvidence:
       'The configured 6.6 tag is not digest-pinned; the live immutable upstream version is unknown.',
     summary:
@@ -497,6 +510,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Redis',
     upstreamVersion: '7.4 mutable alpine tag',
     versionSource: 'deploy/docker-compose.yml (redis:7.4-alpine)',
+    denominatorSource: 'https://redis.io/docs/latest/develop/',
     auditStateEvidence:
       'The configured 7.4-alpine tag is not digest-pinned and live backend selection is not recorded.',
     summary:
@@ -545,6 +559,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'BI & Dashboards',
     upstreamVersion: '4.1.1',
     versionSource: 'deploy/docker-compose.yml (apache/superset:4.1.1)',
+    denominatorSource: 'https://superset.apache.org/docs/6.0.0/intro',
     summary:
       'Relevant operator denominator: governed dashboard provisioning, native chart read-back, embedded access, and bounded authoring. Superset remains the query engine; the Console owns the operator experience.',
     capabilities: [
@@ -627,6 +642,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Device Management',
     upstreamVersion: '4.87.0',
     versionSource: 'deploy/docker-compose.yml (fleetdm/fleet:v4.87.0)',
+    denominatorSource: 'https://fleetdm.com/docs/rest-api/rest-api',
     summary:
       'Relevant Community-edition denominator: host inventory, live/saved queries, software/CVE visibility, and policies. Premium MDM control is explicitly unsupported without licensing.',
     capabilities: [
@@ -686,6 +702,358 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
       ],
     ],
   }),
+  {
+    serviceId: 'presidio',
+    serviceLabel: 'Presidio',
+    upstreamVersion: '2.2.356',
+    versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://microsoft.github.io/presidio/api-docs/',
+    auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
+    summary:
+      'Text analysis, replacement anonymization, org recognizers, deny lists, and thresholds are integrated into the data-redaction path. Language and advanced anonymizer operations remain narrow.',
+    items: [
+      defineCapability(
+        'text-analysis',
+        'Text entity analysis',
+        'Detect built-in PII entities and return typed spans with confidence scores.',
+        '/governance/guardrails/test',
+        'Test live detection',
+        '',
+        [
+          'yes',
+          'The analyzer image exposes /analyze.',
+          'yes',
+          'scanWithPresidio posts a typed analyze request and applies returned spans.',
+          'yes',
+          'The Guardrails test surface runs the active engine.',
+          'yes',
+          'The selected data-redaction adapter runs in app and data-movement policy checks.',
+        ],
+      ),
+      defineCapability(
+        'replace-anonymization',
+        'Replacement anonymization',
+        'Send analyzed spans to the anonymizer and replace values with entity markers.',
+        '/governance/guardrails/test',
+        'Test live redaction',
+        '',
+        [
+          'yes',
+          'The anonymizer image exposes /anonymize with replace operators.',
+          'yes',
+          'The adapter calls analyzer then anonymizer and has a span-safe local fallback.',
+          'yes',
+          'The test surface displays the redacted result and active engine.',
+          'yes',
+          'Data-redaction workflows consume the returned redacted text.',
+        ],
+      ),
+      defineCapability(
+        'pattern-recognizers',
+        'Custom pattern recognizers',
+        'Create org-scoped regex and context recognizers and send them per analyze request.',
+        '/governance/guardrails/recognizers',
+        'Manage recognizers',
+        '',
+        [
+          'yes',
+          'Presidio accepts ad_hoc_recognizers with regex patterns and context.',
+          'yes',
+          'Stored recognizers are normalized and merged into every analyze request.',
+          'yes',
+          'The recognizers route provides create, update, enable, and delete controls.',
+          'yes',
+          'The same org policy is loaded by the real data-redaction adapter.',
+        ],
+      ),
+      defineCapability(
+        'deny-lists',
+        'Custom deny lists',
+        'Flag fixed org-specific terms as a named PII entity.',
+        '/governance/guardrails/recognizers',
+        'Manage deny lists',
+        '',
+        [
+          'yes',
+          'PatternRecognizer supports deny_list values.',
+          'yes',
+          'Deny lists are translated into enabled ad hoc recognizers.',
+          'yes',
+          'The recognizer manager supports deny-list CRUD.',
+          'yes',
+          'Enabled deny lists are loaded into production analyze requests.',
+        ],
+      ),
+      defineCapability(
+        'confidence-thresholds',
+        'Global and per-entity thresholds',
+        'Set an org floor and stricter or looser thresholds by entity type.',
+        '/governance/guardrails/thresholds',
+        'Manage thresholds',
+        '',
+        [
+          'yes',
+          'The analyzer accepts a request score threshold.',
+          'yes',
+          'The global floor is sent upstream and per-entity thresholds are enforced on returned scores.',
+          'yes',
+          'The thresholds route edits the org policy.',
+          'yes',
+          'The real adapter loads and applies the org threshold policy.',
+        ],
+      ),
+      defineCapability(
+        'languages',
+        'Language selection and multilingual analysis',
+        'Choose a supported language and recognizer set for each analysis request.',
+        PRESIDIO_ROUTE,
+        'Inspect Presidio status',
+        'The adapter has a language parameter but every production call defaults to en. Add supported-language discovery, validation, and an org or pipeline setting before advertising multilingual detection.',
+        [
+          'yes',
+          'Presidio supports language-specific recognizers.',
+          'partial',
+          'The request builder accepts language, but the registered port never supplies a non-English value.',
+          'no',
+          'There is no language control on the Guardrails surface.',
+          'no',
+          'Production scans are fixed to English.',
+        ],
+      ),
+      defineCapability(
+        'advanced-anonymizers',
+        'Mask, hash, encrypt, redact, and custom operators',
+        'Apply an anonymizer operator per entity instead of fixed replacement markers.',
+        '/governance/guardrails/masking',
+        'Open masking policy',
+        'The adapter hard-codes replace. Add a validated operator policy, secret-backed encryption keys, reversible-data handling, and UI controls before exposing advanced operators.',
+        [
+          'yes',
+          'Presidio anonymizer ships multiple operator types.',
+          'partial',
+          'The analyzer-to-anonymizer flow is wired, but only replace is constructed.',
+          'no',
+          'Masking rules do not configure Presidio anonymizer operators.',
+          'no',
+          'No production workflow selects a non-replace operator.',
+        ],
+      ),
+      defineCapability(
+        'image-redaction',
+        'Image PII redaction',
+        'Detect and redact PII in images and scanned documents.',
+        PRESIDIO_ROUTE,
+        'Inspect Presidio status',
+        'The deployed analyzer/anonymizer pair has no image-redactor adapter, API route, or review UI.',
+        [
+          'yes',
+          'Presidio provides an image redactor capability.',
+          'no',
+          'No image-redactor service or adapter is registered.',
+          'no',
+          'No image redaction UI exists.',
+          'no',
+          'No document or media workflow invokes Presidio image redaction.',
+        ],
+      ),
+    ],
+  },
+  {
+    serviceId: 'litellm',
+    serviceLabel: 'LiteLLM',
+    upstreamVersion: 'main-stable (mutable image tag)',
+    versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://docs.litellm.ai/docs/',
+    auditedAt: '2026-07-19',
+    auditState: 'current',
+    auditStateEvidence: null,
+    summary:
+      'The router config generator, management read-back, and inference endpoint seam are built. The live model-door cutover and callback delivery remain unverified, so routing and enforcement do not count as production use.',
+    items: [
+      defineCapability(
+        'openai-proxy',
+        'OpenAI-compatible inference proxy',
+        'Serve chat and model requests through a single OpenAI-compatible model door.',
+        ROUTER_ROUTE,
+        'Inspect inference wiring',
+        'The endpoint resolver can select LiteLLM, but the audited deployment has no verified live cutover. Run chat and governed pipeline traffic through the selected provider and record the serving deployment.',
+        [
+          'yes',
+          'LiteLLM Proxy exposes OpenAI-compatible inference APIs.',
+          'yes',
+          'The gateway endpoint seam resolves LiteLLM URL and bearer credentials.',
+          'yes',
+          'The Routing view shows the selected inference door.',
+          'partial',
+          'Production request paths support the seam, but live LiteLLM cutover is not verified.',
+        ],
+      ),
+      defineCapability(
+        'load-balance-failover',
+        'Load balancing, retries, and failover',
+        'Route a model alias across fleet and cloud deployments with health-aware retry policy.',
+        ROUTER_ROUTE,
+        'Inspect routing health',
+        'Generated config enables routing policy, but no live multi-node failure drill proves failover on the production model door.',
+        [
+          'yes',
+          'LiteLLM Router supports deployment groups, health-aware balancing, retries, and fallbacks.',
+          'yes',
+          'The generated config defines model groups, retry policy, and deployment metadata.',
+          'yes',
+          'The Routing view displays deployment health.',
+          'no',
+          'No verified production cutover or failure drill exists.',
+        ],
+      ),
+      defineCapability(
+        'deployment-inventory',
+        'Deployment inventory and health',
+        'Read configured models and merge them with healthy and unhealthy endpoint state.',
+        ROUTER_ROUTE,
+        'Inspect deployments',
+        '',
+        [
+          'yes',
+          'LiteLLM exposes model info and health endpoints.',
+          'yes',
+          'safeRouterView merges /model/info and /health without fabricating missing deployments.',
+          'yes',
+          'The Routing view renders deployment, model, egress, vision, and health.',
+          'yes',
+          'Operations can inspect the configured LiteLLM service independently of model-door selection.',
+        ],
+      ),
+      defineCapability(
+        'budgets-rate-limits',
+        'Budgets and RPM/TPM limits',
+        'Enforce spend and request limits on virtual keys.',
+        ROUTER_ROUTE,
+        'Inspect key budget',
+        'The adapter reads only the caller or master key snapshot and the UI is read-only. Add tenant-safe key selection, CRUD, enforced-limit verification, and audit records.',
+        [
+          'yes',
+          'LiteLLM supports per-key budget, RPM, and TPM controls.',
+          'partial',
+          'The adapter reads one /key/info snapshot but does not create or update limits.',
+          'partial',
+          'The Routing view displays the returned budget and limits but cannot manage them.',
+          'no',
+          'No production request is verified to stop at a LiteLLM budget or rate limit.',
+        ],
+      ),
+      defineCapability(
+        'virtual-keys',
+        'Virtual key lifecycle',
+        'Create, rotate, revoke, scope, and inspect LiteLLM virtual keys.',
+        ROUTER_ROUTE,
+        'Inspect current key snapshot',
+        'Only /key/info read-back exists. Add a credential-brokered lifecycle API and UI without exposing raw keys after creation.',
+        [
+          'yes',
+          'LiteLLM exposes virtual key management APIs.',
+          'partial',
+          'The adapter can inspect one key but has no lifecycle operations.',
+          'partial',
+          'A budget snapshot is visible; key management is absent.',
+          'no',
+          'No business workflow provisions or revokes LiteLLM keys.',
+        ],
+      ),
+      defineCapability(
+        'provider-pools',
+        'Fleet and cloud provider pools',
+        'Generate deployment entries for on-prem nodes and approved cloud providers.',
+        '/runtime/models/providers',
+        'Inspect model providers',
+        'The generator consumes fleet and environment inputs, but the console does not own a validated LiteLLM config publish or reload transaction.',
+        [
+          'yes',
+          'LiteLLM supports many providers behind model aliases.',
+          'yes',
+          'buildLiteLLMConfig maps fleet nodes and cloud providers to model_list entries.',
+          'partial',
+          'Provider status is visible, but it is not a LiteLLM pool editor.',
+          'no',
+          'No production workflow publishes and reloads generated config through the console.',
+        ],
+      ),
+      defineCapability(
+        'structured-callbacks',
+        'Structured request logging callbacks',
+        'Send completion outcomes, deployment, tokens, caller, latency, and status into traffic records.',
+        '/runtime/models/traffic',
+        'Open model traffic',
+        'The pure payload mapper exists, but the concrete callback receiver and OpenSearch writer are missing. The traffic UI is not proof that LiteLLM callbacks are flowing.',
+        [
+          'yes',
+          'LiteLLM emits StandardLoggingPayload callbacks.',
+          'partial',
+          'litellmPayloadToTrafficRecord is implemented; no callback process invokes and persists it.',
+          'partial',
+          'Traffic and logs surfaces exist but do not identify a LiteLLM callback source.',
+          'no',
+          'No production LiteLLM callback reaches the traffic index.',
+        ],
+      ),
+      defineCapability(
+        'spend-analytics',
+        'Spend and cost analytics',
+        'Attribute request cost by key, model, deployment, team, and time window.',
+        '/insights/cost',
+        'Open cost insights',
+        'The budget snapshot reports one spend total, while callback cost is deliberately not mapped into TrafficRecord. Add a canonical cost event and reconcile it with existing accounting.',
+        [
+          'yes',
+          'LiteLLM calculates spend and exposes cost data.',
+          'partial',
+          'One key spend value is read; request-level cost is not persisted.',
+          'partial',
+          'Cost insights exist, but they are not fed by LiteLLM cost records.',
+          'no',
+          'No production accounting workflow consumes LiteLLM-attributed cost.',
+        ],
+      ),
+      defineCapability(
+        'response-cache',
+        'Response caching',
+        'Cache eligible model responses with explicit privacy, scope, and expiry policy.',
+        ROUTER_ROUTE,
+        'Inspect router capabilities',
+        'No LiteLLM cache is configured or surfaced. Define tenant-safe cache keys, PII exclusions, retention, and purge controls before enabling it.',
+        [
+          'yes',
+          'LiteLLM supports response cache backends.',
+          'no',
+          'The generated config has no cache section.',
+          'no',
+          'No LiteLLM cache state or controls exist.',
+          'no',
+          'No production request uses LiteLLM response caching.',
+        ],
+      ),
+      defineCapability(
+        'proxy-guardrails',
+        'Proxy guardrails and policy hooks',
+        'Run supported guardrails in the proxy before or after model calls.',
+        ROUTER_ROUTE,
+        'Inspect router capabilities',
+        'Governance remains in the Off Grid pipeline spine. That is a valid ownership choice, but LiteLLM guardrail capability is not integrated and must not be counted.',
+        [
+          'yes',
+          'LiteLLM supports proxy guardrail integrations.',
+          'no',
+          'No LiteLLM guardrail is configured or adapted.',
+          'no',
+          'The Router view has no proxy guardrail controls.',
+          'no',
+          'Production governance runs in the Off Grid policy and guardrail spine instead.',
+        ],
+      ),
+    ],
+  },
 ] as const satisfies readonly ServiceCapabilityAudit[];
 
 /**
@@ -695,7 +1063,6 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
  */
 export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [
   'edge-gateway',
-  'provit',
   'llm-guard',
   'gateway-control',
   'agent-worker',
@@ -709,11 +1076,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [
   'fleet-forwarder',
 ] as const;
 
-/** Existing item-level audits remain in the canonical registry and must not be duplicated. */
-export const RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS = ['litellm', 'presidio'] as const;
-
 export const RUNTIME_GOVERNANCE_OPERATIONS_SERVICE_IDS = [
   ...RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.map((record) => record.serviceId),
   ...RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS,
-  ...RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS,
 ] as const;

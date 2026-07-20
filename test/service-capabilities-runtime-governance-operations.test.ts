@@ -3,7 +3,6 @@ import test from 'node:test';
 
 import {
   RUNTIME_GOVERNANCE_OPERATIONS_AUDITS,
-  RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS,
   RUNTIME_GOVERNANCE_OPERATIONS_SERVICE_IDS,
   RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS,
 } from '../src/lib/service-capabilities/runtime-governance-operations.ts';
@@ -11,9 +10,9 @@ import { CAPABILITY_GATES } from '../src/lib/service-capability-contract.ts';
 import { reconcileServiceInventory } from '../src/lib/service-inventory.ts';
 import { getServices } from '../src/lib/services-directory.ts';
 
-test('runtime, governance, and operations evidence accounts for its canonical 25 services', () => {
+test('runtime, governance, and operations evidence accounts for its canonical 24 services', () => {
   const ids = [...RUNTIME_GOVERNANCE_OPERATIONS_SERVICE_IDS];
-  assert.equal(ids.length, 25);
+  assert.equal(ids.length, 24);
   assert.equal(new Set(ids).size, ids.length);
 
   assert.deepEqual(
@@ -38,7 +37,6 @@ test('runtime, governance, and operations evidence accounts for its canonical 25
       'opa',
       'openbao',
       'presidio',
-      'provit',
       'redis',
       'status-page',
       'superset',
@@ -61,18 +59,18 @@ test('runtime, governance, and operations evidence accounts for its canonical 25
         selected.filter((entry) => entry.family === family).length,
       ]),
     ),
-    { runtime: 7, governance: 6, operations: 12 },
+    { runtime: 7, governance: 6, operations: 11 },
   );
 
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 10);
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 13);
-  assert.deepEqual(RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS, ['litellm', 'presidio']);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 12);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 12);
 });
 
 test('audited services have version evidence and honest item-level four-gate evidence', () => {
   for (const audit of RUNTIME_GOVERNANCE_OPERATIONS_AUDITS) {
     assert.ok(audit.upstreamVersion.trim(), `${audit.serviceId} must name a version`);
     assert.ok(audit.versionSource.trim(), `${audit.serviceId} must name the version source`);
+    assert.ok(audit.denominatorSource.trim(), `${audit.serviceId} must name a denominator source`);
     assert.ok(audit.items.length > 0, `${audit.serviceId} must have a non-empty denominator`);
     assert.equal(new Set(audit.items.map((item) => item.id)).size, audit.items.length);
 
@@ -96,12 +94,9 @@ test('audited services have version evidence and honest item-level four-gate evi
   }
 });
 
-test('unaudited and delegated services do not masquerade as new denominators', () => {
+test('unaudited services do not masquerade as new denominators', () => {
   const audited = new Set(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.map((record) => record.serviceId));
   for (const id of RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS) {
     assert.ok(!audited.has(id), `${id} must remain not audited`);
-  }
-  for (const id of RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS) {
-    assert.ok(!audited.has(id), `${id} evidence must remain owned by the canonical legacy audit`);
   }
 });
