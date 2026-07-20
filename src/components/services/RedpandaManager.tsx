@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -385,7 +385,7 @@ export function RedpandaManager() {
 
         {tab === 'schemas' && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(24rem,1.2fr)]">
-            <Card className="shadow-none">
+            <Card className="min-w-0 shadow-none">
               <CardHeader>
                 <CardTitle className="text-sm">Schema subjects</CardTitle>
               </CardHeader>
@@ -433,13 +433,13 @@ export function RedpandaManager() {
                 ) : null}
               </CardContent>
             </Card>
-            <Card className="shadow-none">
+            <Card className="min-w-0 shadow-none">
               <CardHeader>
-                <CardTitle className="text-sm">Create or update schema</CardTitle>
-                <p className="text-[11px] text-muted-foreground">
+                <CardTitle className="min-w-0 text-sm">Create or update schema</CardTitle>
+                <CardDescription className="text-[11px]">
                   Registering the same subject creates its next version under the active
                   compatibility policy.
-                </p>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input
@@ -475,13 +475,13 @@ export function RedpandaManager() {
 
         {tab === 'workflows' && (
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="shadow-none">
+            <Card className="min-w-0 shadow-none">
               <CardHeader>
-                <CardTitle className="text-sm">Prove a business event end to end</CardTitle>
-                <p className="text-xs text-muted-foreground">
+                <CardTitle className="min-w-0 text-sm">Prove a business event end to end</CardTitle>
+                <CardDescription className="text-xs">
                   Registers the JSON contract, publishes a correlated event through native Kafka,
                   consumes that exact event, and returns offsets as auditable evidence.
-                </p>
+                </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
                 <Button
@@ -499,13 +499,15 @@ export function RedpandaManager() {
                 </Button>
               </CardContent>
             </Card>
-            <Card className="shadow-none">
-              <CardHeader className="flex-row items-center gap-2">
-                <CheckCircle className="size-4 text-primary" />
-                <CardTitle className="text-sm">Latest proof</CardTitle>
+            <Card className="min-w-0 shadow-none">
+              <CardHeader>
+                <div className="flex min-w-0 items-center gap-2">
+                  <CheckCircle className="size-4 shrink-0 text-primary" />
+                  <CardTitle className="min-w-0 text-sm">Latest proof</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
-                <pre className="max-h-80 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-[11px]">
+              <CardContent className="min-w-0">
+                <pre className="max-h-80 max-w-full overflow-auto rounded-md border border-border bg-muted/30 p-3 text-[11px]">
                   {result === null
                     ? 'No workflow proof recorded in this session.'
                     : JSON.stringify(result, null, 2)}
