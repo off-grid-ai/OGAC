@@ -56,6 +56,13 @@ per-card policy lifecycle, India recognizer injection, output-specific scanning,
 degradation visibility, and upstream telemetry remain partial or absent. No live gate was inferred
 from source tests.
 
+Replacement implications are release work, not a documentation footnote. Before continued use,
+retain the selected image digest, SBOM, Python dependency lock, and scanner-model hashes; isolate the
+service and own vulnerability triage because upstream will not ship fixes. A maintained replacement
+must stay behind the existing guardrail port, implement distinct prompt and output contracts, expose
+degradation and telemetry, and dual-run the bank/insurance adversarial plus redaction corpus before
+cutover. Until that evidence exists, the Console must not claim current upstream security coverage.
+
 ## Evidence roll-up
 
 These totals are calculated from the 164 versioned capability records currently owned by the two
@@ -110,7 +117,7 @@ The lane is the work owner. `current` and `stale` reflect the existing versioned
 | Runtime           | `agent-worker`                  | pending              | runtime/governance/operations |
 | Runtime           | `app-worker`                    | current              | runtime/governance/operations |
 | Runtime           | `chat-worker`                   | pending              | runtime/governance/operations |
-| Governance        | `llm-guard`                     | current, archived 0.3.16 | runtime/governance/operations |
+| Governance        | `llm-guard`                     | current audit; archived upstream; mutable image | runtime/governance/operations |
 | Governance        | `keycloak`                      | stale                | runtime/governance/operations |
 | Governance        | `opa`                           | stale                | runtime/governance/operations |
 | Governance        | `openbao`                       | stale                | runtime/governance/operations |

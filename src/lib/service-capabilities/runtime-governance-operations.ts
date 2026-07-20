@@ -206,7 +206,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     upstreamVersion:
       'LLM Guard / llm-guard-api 0.3.16 (tag 32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce; upstream archived and unmaintained)',
     versionSource:
-      'off-grid-ai/onprem-fleet-orchestration@bc74d828e02db7566b32191650cb58360f9178ae deploy/onprem/services-node-b.yml (laiyer/llm-guard-api:0.3.16), SERVICE_MAP.md, and SERVER_STATE.md; upstream v0.3.16 tag 32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce',
+      'off-grid-ai/onprem-fleet-orchestration@bc74d828e02db7566b32191650cb58360f9178ae deploy/onprem/services-node-b.yml (mutable laiyer/llm-guard-api:0.3.16 image tag; live digest not retained), SERVICE_MAP.md, and SERVER_STATE.md; upstream v0.3.16 tag 32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce',
     denominatorSource:
       'https://github.com/protectai/llm-guard/tree/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard_api; https://github.com/protectai/llm-guard/blob/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard/input_scanners/__init__.py; https://github.com/protectai/llm-guard/blob/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard/output_scanners/__init__.py; current upstream README archive warning',
     auditState: 'current',
