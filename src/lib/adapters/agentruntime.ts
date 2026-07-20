@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   type AgentRunWorkflowInput,
   type AgentRunWorkflowResult,
@@ -318,6 +319,49 @@ export async function cancelWorkflow(
   } catch (e) {
     const msg = (e as Error).message ?? '';
     const notFound = /not found|no execution|WorkflowNotFound/i.test(msg);
+    return {
+      ok: false,
+      reason: notFound ? 'not_found' : 'unreachable',
+      error: notFound ? 'workflow not found' : `Temporal unreachable: ${msg}`,
+    };
+  }
+}
+
+/**
+ * Reset (REPLAY) a finished workflow: re-run it from the first workflow task, preserving the audit
+ * history as a new run of the same workflow id. We locate the first WorkflowTaskCompleted event
+ * (identified by its attribute presence, robust to the enum's wire form) and reset to it. Signals
+ * are reapplied by default, so a HITL workflow replays through its recorded approval to completion.
+ * NEVER throws — unconfigured/unreachable/missing-workflow is reported in the result.
+ */
+export async function resetWorkflow(workflowId: string): Promise<WorkflowMutationResult> {
+  if (!durableEnabled(process.env))
+    return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
+  const cfg = durableConfigFromEnv(process.env);
+  try {
+    const client = await temporalClient(cfg);
+    const desc = await client.workflow.getHandle(workflowId).describe();
+    const runId = desc.runId;
+    const hist = await client.workflowService.getWorkflowExecutionHistory({
+      namespace: cfg.namespace,
+      execution: { workflowId, runId },
+    });
+    const events = hist.history?.events ?? [];
+    const firstTask = events.find((e) => e.workflowTaskCompletedEventAttributes != null);
+    if (!firstTask?.eventId) {
+      return { ok: false, reason: 'unreachable', error: 'no completed workflow task to reset to' };
+    }
+    await client.workflowService.resetWorkflowExecution({
+      namespace: cfg.namespace,
+      workflowExecution: { workflowId, runId },
+      reason: 'reset (replay) from console',
+      workflowTaskFinishEventId: firstTask.eventId,
+      requestId: randomUUID(),
+    });
+    return { ok: true, workflowId };
+  } catch (e) {
+    const msg = (e as Error).message ?? '';
+    const notFound = /not found|no execution|WorkflowNotFound|workflow execution already/i.test(msg);
     return {
       ok: false,
       reason: notFound ? 'not_found' : 'unreachable',

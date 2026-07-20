@@ -81,9 +81,7 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
                   </td>
                   <td className="px-3 py-2 text-right">
                     <span className="inline-flex items-center gap-3">
-                      {r.status === 'running' || r.status === 'awaiting_human' ? (
-                        <AppRunControl runId={r.id} />
-                      ) : null}
+                      <AppRunControl runId={r.id} status={r.status} />
                       <Link
                         href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"

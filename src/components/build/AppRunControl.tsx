@@ -1,33 +1,61 @@
 'use client';
 
-import { Prohibit, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowsClockwise, ArrowCounterClockwise, Prohibit, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { type AppRunControlAction, availableAppRunControls } from '@/lib/app-run-control';
 
-// run-actions: cancel (graceful) / terminate (force) a running or paused durable app-run workflow.
-// Rendered only for in-flight runs; the server route (api/.../app-runs/[id]/cancel) enforces the
-// real eligibility + Temporal control. A router.refresh() re-reads the list after the action.
-export function AppRunControl({ runId }: { runId: string }) {
+// run-actions: the full durable app-run intervention matrix, rendered per run status.
+//   in-flight → cancel (graceful) / terminate (force)
+//   terminal  → reset (replay from start) / rerun (fresh run from the same input)
+// The server route (POST .../workflow) re-enforces eligibility + performs the Temporal control.
+
+const SPEC: Record<
+  AppRunControlAction,
+  { label: string; Icon: typeof X; tone: string; confirm?: string }
+> = {
+  cancel: { label: 'Cancel', Icon: X, tone: 'text-muted-foreground hover:text-foreground' },
+  terminate: {
+    label: 'Terminate',
+    Icon: Prohibit,
+    tone: 'text-red-600 hover:text-red-500 dark:text-red-400',
+    confirm: 'Force-terminate this run? This cannot be undone.',
+  },
+  reset: { label: 'Replay', Icon: ArrowCounterClockwise, tone: 'text-muted-foreground hover:text-foreground' },
+  rerun: { label: 'Re-run', Icon: ArrowsClockwise, tone: 'text-muted-foreground hover:text-foreground' },
+};
+
+export function AppRunControl({ runId, status }: { runId: string; status: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const actions = availableAppRunControls(status);
+  if (actions.length === 0) return null;
 
-  async function act(mode: 'cancel' | 'terminate') {
-    const verb = mode === 'terminate' ? 'Force-terminate' : 'Cancel';
-    if (!confirm(`${verb} run ${runId}?${mode === 'terminate' ? ' This cannot be undone.' : ''}`)) return;
+  async function act(action: AppRunControlAction) {
+    const spec = SPEC[action];
+    if (spec.confirm && !confirm(`${spec.confirm}\n\nRun ${runId}`)) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/v1/admin/app-runs/${encodeURIComponent(runId)}/cancel`, {
+      const res = await fetch(`/api/v1/admin/app-runs/${encodeURIComponent(runId)}/workflow`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ action }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; newRunId?: string };
       if (!res.ok) {
-        toast.error(data.error ?? `${verb} failed (${res.status})`);
+        toast.error(data.error ?? `${spec.label} failed (${res.status})`);
         return;
       }
-      toast.success(mode === 'terminate' ? 'Run terminated' : 'Cancellation requested');
+      toast.success(
+        action === 'rerun'
+          ? `Re-run dispatched${data.newRunId ? ` (${data.newRunId})` : ''}`
+          : action === 'reset'
+            ? 'Replay started'
+            : action === 'terminate'
+              ? 'Run terminated'
+              : 'Cancellation requested',
+      );
       router.refresh();
     } catch (e) {
       toast.error((e as Error).message);
@@ -38,22 +66,20 @@ export function AppRunControl({ runId }: { runId: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void act('cancel')}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-      >
-        <X className="size-3" /> Cancel
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void act('terminate')}
-        className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-500 disabled:opacity-50 dark:text-red-400"
-      >
-        <Prohibit className="size-3" /> Terminate
-      </button>
+      {actions.map((action) => {
+        const { label, Icon, tone } = SPEC[action];
+        return (
+          <button
+            key={action}
+            type="button"
+            disabled={busy}
+            onClick={() => void act(action)}
+            className={`inline-flex items-center gap-1 text-xs disabled:opacity-50 ${tone}`}
+          >
+            <Icon className="size-3" /> {label}
+          </button>
+        );
+      })}
     </span>
   );
 }
