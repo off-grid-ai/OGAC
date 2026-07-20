@@ -21,6 +21,7 @@ const DYNAMIC_ROUTE_MODULES = new Map([
   ['governance/guardrails', './governance/guardrails/[destination]/page.tsx'],
   ['governance/policies', './governance/policies/[destination]/page.tsx'],
   ['operations/health', './operations/health/[destination]/page.tsx'],
+  ['operations/edge', './operations/edge/[destination]/page.tsx'],
   ['operations/services', './operations/services/[serviceId]/page.tsx'],
   ['runtime/models', './runtime/models/[destination]/page.tsx'],
   ['solutions/quality', './solutions/quality/[destination]/page.tsx'],
@@ -95,8 +96,8 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
   );
 
   assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
-  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 38);
-  assert.deepEqual(auditCounts, { current: 21, stale: 17, pending: 10 });
+  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 39);
+  assert.deepEqual(auditCounts, { current: 22, stale: 17, pending: 9 });
   assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 4);
   assert.match(html, /Inventory<\/p><p[^>]*>48<\/p>/);
   assert.match(html, new RegExp(`Current audits<\\/p><p[^>]*>${auditCounts.current}<\\/p>`));

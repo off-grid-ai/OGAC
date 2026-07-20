@@ -62,8 +62,8 @@ test('runtime, governance, and operations evidence accounts for its canonical 24
     { runtime: 7, governance: 6, operations: 11 },
   );
 
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 14);
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 10);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 15);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 9);
 });
 
 test('LLM Guard has a pinned archived denominator without conflating Off Grid sharding', () => {

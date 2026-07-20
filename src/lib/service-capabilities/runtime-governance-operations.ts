@@ -217,7 +217,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'supervised-recovery',
         'Validated edge recovery',
         'Validate exact config and modules before restarting the supervised edge.',
-        '/operations/platform-health',
+        '/operations/health/metrics',
         'Inspect platform health',
         'Restart remains root-owned by design; expose immutable evidence rather than a browser-triggered privileged action.',
         [

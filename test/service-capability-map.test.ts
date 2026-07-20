@@ -117,6 +117,7 @@ test('network gateway audit is pinned and keeps independently incomplete UI gate
   assert.match(audit.upstreamVersion, /caddy-ratelimit v0\.1\.0/);
   assert.equal(audit.items.length, 6);
   assert.equal(audit.items.find((item) => item.id === 'waf')?.gates.workflow.status, 'yes');
+  assert.equal(audit.items.find((item) => item.id === 'waf')?.uiHref, '/operations/edge/waf');
   assert.equal(
     audit.items.find((item) => item.id === 'rate-limiting')?.gates.ui.status,
     'partial',
