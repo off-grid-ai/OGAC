@@ -7,7 +7,7 @@
 // It never re-implements a scheduling rule. The orchestrator (app-run.ts) calls `upsertAppRunState`
 // on run start and after every step transition; the read helpers back the status/review screens.
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { appRuns } from '@/db/schema';
 import type { AppRun as AppRunRow } from '@/db/schema';
@@ -72,6 +72,28 @@ export async function upsertAppRunState(
         ...(finished ? { finishedAt: new Date() } : {}),
       },
     });
+}
+
+// Mark an app run cancelled after its durable workflow was cancelled/terminated from the console
+// (run-actions). A force-terminate kills the workflow without running the cleanup that would persist
+// the terminal state, so the operator-visible row must be reconciled here — org-scoped, and only
+// from an in-flight state (never overwrite a done/error terminal record). Returns whether a row moved.
+export async function markAppRunCancelled(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<boolean> {
+  const updated = await db
+    .update(appRuns)
+    .set({ status: 'cancelled', finishedAt: new Date() })
+    .where(
+      and(
+        eq(appRuns.id, id),
+        eq(appRuns.orgId, orgId),
+        inArray(appRuns.status, ['running', 'awaiting_human', 'queued']),
+      ),
+    )
+    .returning({ id: appRuns.id });
+  return updated.length > 0;
 }
 
 // ─── reads (back the status / review / analytics screens) ────────────────────────────────────────

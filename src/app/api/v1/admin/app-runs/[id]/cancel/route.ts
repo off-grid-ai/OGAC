@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cancelWorkflow } from '@/lib/adapters/agentruntime';
 import { appWorkflowIdFor } from '@/lib/app-run-durable';
 import { decideAppRunControl, parseAppRunControlAction } from '@/lib/app-run-control';
+import { markAppRunCancelled } from '@/lib/app-run-store';
 import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
@@ -33,6 +34,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const workflowId = appWorkflowIdFor(run.appId, run.id);
   const res = await cancelWorkflow(workflowId, action);
   if (res.ok) {
+    // Reconcile the operator-visible row: a force-terminate kills the workflow without its cleanup,
+    // so persist the cancelled terminal state here (org-scoped, in-flight → cancelled).
+    await markAppRunCancelled(run.id, orgId);
     auditFromSession(gate, orgId, {
       action: action === 'terminate' ? 'apprun.workflow.terminate' : 'apprun.workflow.cancel',
       resource: `apprun:${run.id} workflow:${workflowId}`,
