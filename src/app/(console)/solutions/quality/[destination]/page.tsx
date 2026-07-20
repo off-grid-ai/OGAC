@@ -139,9 +139,9 @@ function RunsDestination({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Execution filters</CardTitle>
           <p className="text-xs text-muted-foreground">
-            This list owns individual eval executions. Scorecards, trends, and drift stay in{' '}
-            <Link href="/insights/quality" className="text-primary hover:underline">
-              Insights / Quality
+            Each execution opens an immutable scorecard. Trends, drift, and release gates stay in{' '}
+            <Link href="/solutions/quality/performance" className="text-primary hover:underline">
+              this Quality workspace
             </Link>
             .
           </p>
@@ -217,7 +217,7 @@ function RunsDestination({
                           <RunEvalSuiteButton engine={run.engine} label="Re-run" />
                         ) : null}
                         <Link
-                          href={`/insights/quality/evals/${encodeURIComponent(run.id)}`}
+                          href={`/solutions/quality/runs/${encodeURIComponent(run.id)}`}
                           className="text-xs text-primary hover:underline"
                         >
                           View run

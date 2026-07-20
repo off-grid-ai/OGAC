@@ -1,6 +1,7 @@
 'use client';
 
 import { PencilSimple, Play, Trash } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -173,7 +174,14 @@ export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) 
             <TableBody>
               {defs.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/solutions/quality/evaluators/${encodeURIComponent(d.id)}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {d.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {d.metric}
                   </TableCell>

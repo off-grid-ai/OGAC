@@ -1,6 +1,7 @@
 'use client';
 
 import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -201,7 +202,14 @@ export function GoldenCasesManager() {
             <TableBody>
               {cases.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/solutions/quality/golden-cases/${encodeURIComponent(c.id)}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="max-w-[24ch] truncate text-muted-foreground">
                     {c.query}
                   </TableCell>
