@@ -82,9 +82,8 @@ test('sanitized_output is used when sanitized_prompt is absent (output scan)', (
   assert.equal(out.redacted, 'clean');
 });
 
-test('is_valid=true (or absent) is a clean pass echoing the original', () => {
+test('is_valid=true is a clean pass echoing the original', () => {
   assert.equal(normalizeLlmGuardResponse('ok', { is_valid: true, scanners: {} }).hits, false);
-  assert.equal(normalizeLlmGuardResponse('ok', { scanners: {} }).hits, false, 'absent is_valid ⇒ valid');
   const clean = normalizeLlmGuardResponse('ok', { is_valid: true, scanners: { Toxicity: 0.0 } });
   assert.deepEqual(clean.entities, []);
   assert.equal(clean.redacted, 'ok');
@@ -97,11 +96,13 @@ test('a valid verdict with a scanner OVER threshold is still a hit (defensive)',
   assert.deepEqual(out.entities, ['Toxicity']);
 });
 
-test('a malformed / null body degrades to a clean pass, never throws', () => {
-  assert.equal(normalizeLlmGuardResponse('x', null).hits, false);
-  assert.equal(normalizeLlmGuardResponse('x', undefined).hits, false);
-  assert.equal(normalizeLlmGuardResponse('x', { scanners: 'nope' }).hits, false);
-  assert.equal(normalizeLlmGuardResponse('x', { scanners: [1, 2] }).hits, false, 'array scanners ignored');
+test('a malformed / null 2xx verdict fails closed, never masquerades as a clean scan', () => {
+  for (const malformed of [null, undefined, {}, { scanners: {} }, { is_valid: true }, { is_valid: true, scanners: [1, 2] }]) {
+    const out = normalizeLlmGuardResponse('x', malformed);
+    assert.equal(out.blocked, true);
+    assert.equal(out.hits, true);
+    assert.match(out.reason ?? '', /malformed/);
+  }
 });
 
 test('a custom threshold changes which scanners flag', () => {
@@ -232,6 +233,18 @@ test('FAIL CLOSED: a non-2xx engine response also blocks the run', async () => {
   globalThis.fetch = (async () => new Response('boom', { status: 500 })) as typeof fetch;
   const out = await llmGuardPii.scan('plain text', 'default');
   assert.equal(out.blocked, true);
+});
+
+test('FAIL CLOSED: a malformed 2xx engine response also blocks the run', async () => {
+  process.env.OFFGRID_HTTP_GUARDRAIL_URL = 'http://127.0.0.1:8000';
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: 'model not loaded' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch;
+  const out = await llmGuardPii.scan('plain text', 'default');
+  assert.equal(out.blocked, true);
+  assert.match(out.reason ?? '', /malformed/);
 });
 
 test('health probes GET /healthz; false when the probe throws', async () => {

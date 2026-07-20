@@ -60,6 +60,19 @@ function describeError(err) {
   return code ? `${err.message} (cause: ${code})` : String(err && err.message ? err.message : err);
 }
 
+function isUsableVerdict(body) {
+  return (
+    body &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    typeof body.is_valid === 'boolean' &&
+    body.scanners &&
+    typeof body.scanners === 'object' &&
+    !Array.isArray(body.scanners) &&
+    Object.values(body.scanners).every((score) => typeof score === 'number' && Number.isFinite(score))
+  );
+}
+
 // POST the prompt to one shard's /analyze/prompt. Returns { name, required, ok, status, body }.
 async function callShard(shard, payload, phase) {
   const headers = { 'content-type': 'application/json' };
@@ -78,11 +91,13 @@ async function callShard(shard, payload, phase) {
     } catch {
       /* non-json body ⇒ treat as no verdict */
     }
+    const usable = isUsableVerdict(body);
     if (!res.ok) console.error(`[guard-agg] shard ${shard.name} HTTP ${res.status}`);
+    else if (!usable) console.error(`[guard-agg] shard ${shard.name} returned a malformed verdict`);
     return {
       name: shard.name,
       required: !!shard.required,
-      ok: res.ok && !!body,
+      ok: res.ok && usable,
       status: res.status,
       body,
     };

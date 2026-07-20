@@ -13,6 +13,7 @@ let pii: Server;
 let classifiers: Server;
 let aggregator: ChildProcess;
 let aggregatorBase = '';
+let malformedRequiredVerdict = false;
 
 function listen(server: Server): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -39,6 +40,7 @@ function shard(name: 'pii' | 'classifiers'): Server {
       res.setHeader('content-type', 'application/json');
       if (req.url === '/healthz') return res.end('{"ok":true}');
       if (req.url === '/analyze/prompt') {
+        if (name === 'pii' && malformedRequiredVerdict) return res.end('{"error":"model not loaded"}');
         return res.end(
           JSON.stringify(
             name === 'pii'
@@ -173,4 +175,19 @@ test('real aggregator boundary rejects unsupported per-request scanner configura
   assert.equal(response.status, 400);
   assert.match(await response.text(), /startup-only/);
   assert.equal(seen.length, beforeCount, 'invalid request never reaches a shard');
+});
+
+test('real aggregator boundary fails closed when a required shard returns malformed 2xx JSON', async () => {
+  malformedRequiredVerdict = true;
+  try {
+    const response = await fetch(`${aggregatorBase}/analyze/prompt`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'customer secret' }),
+    });
+    assert.equal(response.status, 502);
+    assert.match(await response.text(), /guardrail shard unavailable/);
+  } finally {
+    malformedRequiredVerdict = false;
+  }
 });

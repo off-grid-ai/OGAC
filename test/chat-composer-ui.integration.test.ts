@@ -48,3 +48,18 @@ test('chat actions are non-submitting and mention rendering has a dedicated owne
   assert.match(chatSource, /function MentionSuggestionList\(/);
   assert.doesNotMatch(chatSource, /\{\(\(\) => \{/);
 });
+
+test('outbound guardrail events erase generated content and surface the established inline feedback', () => {
+  assert.match(chatSource, /function isBlockedOutboundGuardrailEvent\(event: unknown\)/);
+  assert.match(chatSource, /value\.phase === 'post' && value\.blocked === true/);
+  assert.match(chatSource, /if \(isBlockedOutboundGuardrailEvent\(evt\)\)/);
+  assert.match(chatSource, /last\.content = ''/);
+  assert.match(chatSource, /last\.reasoning = null/);
+  assert.match(chatSource, /last\.citations = null/);
+  assert.match(chatSource, /last\.error = OUTBOUND_GUARDRAIL_BLOCKED_MESSAGE/);
+  assert.match(
+    chatSource,
+    /Response blocked by output guardrails\. No generated content was released\./,
+  );
+  assert.match(chatSource, /\) : m\.error \? null : \(/);
+});

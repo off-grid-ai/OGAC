@@ -68,6 +68,20 @@ function scannerScores(v: unknown): Array<[string, number]> {
   );
 }
 
+export function isLlmGuardVerdict(raw: unknown): raw is RawLlmGuardResponse {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const verdict = raw as RawLlmGuardResponse;
+  return (
+    typeof verdict.is_valid === 'boolean' &&
+    !!verdict.scanners &&
+    typeof verdict.scanners === 'object' &&
+    !Array.isArray(verdict.scanners) &&
+    Object.values(verdict.scanners as Record<string, unknown>).every(
+      (score) => typeof score === 'number' && Number.isFinite(score),
+    )
+  );
+}
+
 /**
  * Map an LLM Guard `/analyze/*` response onto the console's normalized PiiResult. PURE — zero I/O.
  * `threshold` is the risk-score at/above which a scanner is treated as a flag (default 0.5).
@@ -79,9 +93,9 @@ export function normalizeLlmGuardResponse(
   threshold: number = LLM_GUARD_SCORE_THRESHOLD,
   engine = 'llm-guard',
 ): PiiResult {
-  const r = raw && typeof raw === 'object' ? raw : {};
-  // is_valid may be absent (treat as valid) or a real boolean. Only an explicit `false` is a fail.
-  const invalid = r.is_valid === false || r.is_valid === 'false';
+  if (!isLlmGuardVerdict(raw)) return guardrailUnavailable('malformed guardrail verdict', engine);
+  const r = raw;
+  const invalid = r.is_valid === false;
   const scores = scannerScores(r.scanners);
   // Scanners over the threshold are the primary signal. If the verdict is invalid but nothing cleared
   // the bar, fall back to any scanner with a non-zero score so we still name what tripped.
@@ -139,14 +153,14 @@ export async function postLlmGuard(
   // llm-guard-api authenticates with a bearer AUTH_TOKEN when configured.
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
   const endpoint = request.phase === 'input' ? 'prompt' : 'output';
-  const { phase: _phase, ...body } = request;
+  const { phase: _phase, ...requestBody } = request;
   const res = await fetcher(`${trimTrailingSlash(base)}/analyze/${endpoint}`, {
     method: 'POST',
     headers,
     // v0.3.16 accepts only prompt/output + optional scanners_suppress. Scanner configuration is
     // loaded from CONFIG_FILE at process start. Sending a `scanners` object here is silently ignored
     // by the stock Pydantic model and therefore forbidden by this closed request union.
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
     signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   });
   if (!res.ok) {
@@ -158,8 +172,10 @@ export async function postLlmGuard(
       .split(',')
       .map((part) => part.trim())
       .filter((part) => part && part !== 'none');
+  const responseBody = (await res.json()) as RawLlmGuardResponse;
+  if (!isLlmGuardVerdict(responseBody)) throw new Error('llm-guard returned a malformed 2xx verdict');
   return {
-    body: (await res.json()) as RawLlmGuardResponse,
+    body: responseBody,
     answeredBy: split('x-offgrid-guard-answered'),
     degraded: split('x-offgrid-guard-degraded'),
   };

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   inboundGuardrailBlocks,
   outboundGuardrailBlocks,
+  prepareOutboundRelease,
   type InboundGuardrailResult,
 } from '../src/lib/chat-run.ts';
 import type { CheckResult } from '../src/lib/checks.ts';
@@ -42,4 +44,33 @@ test('outbound: honors the completed scan verdict', () => {
   assert.equal(outboundGuardrailBlocks([blockedCheck]), true, 'a blocked check blocks the output');
   assert.equal(outboundGuardrailBlocks([passCheck]), false, 'a clean completed scan releases output');
   assert.equal(outboundGuardrailBlocks([]), false, 'an empty COMPLETED scan is clean (no checks ran, none blocked)');
+});
+
+test('outbound release erases buffered answer and reasoning until a completed scan clears them', () => {
+  const answer = 'Customer PAN ABCDE1234F';
+  const reasoning = 'Looked up private customer record';
+  assert.deepEqual(prepareOutboundRelease(answer, reasoning, null), {
+    blocked: true,
+    answer: '',
+    reasoning: '',
+  });
+  assert.deepEqual(prepareOutboundRelease(answer, reasoning, [blockedCheck]), {
+    blocked: true,
+    answer: '',
+    reasoning: '',
+  });
+  assert.deepEqual(prepareOutboundRelease(answer, reasoning, [passCheck]), {
+    blocked: false,
+    answer,
+    reasoning,
+  });
+});
+
+test('chat route buffers upstream deltas and emits only the terminal cleared release', () => {
+  const source = readFileSync('src/app/api/v1/chat/stream/route.ts', 'utf8');
+  assert.doesNotMatch(source, /send\(\{ content: delta\.content \}\)/);
+  assert.doesNotMatch(source, /send\(\{ reasoning: delta\.reasoning_content \}\)/);
+  const decision = source.indexOf('prepareOutboundRelease(full, reasoning, postChecks)');
+  const release = source.indexOf('send({ content: release.answer })');
+  assert.ok(decision >= 0 && release > decision, 'content crosses SSE only after the guardrail verdict');
 });

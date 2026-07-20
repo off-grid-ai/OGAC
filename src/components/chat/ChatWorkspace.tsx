@@ -130,6 +130,17 @@ function streamErrorReason(status: number): string {
   return `Request failed (${status}).`;
 }
 
+const OUTBOUND_GUARDRAIL_BLOCKED_MESSAGE =
+  'Response blocked by output guardrails. No generated content was released.';
+
+function isBlockedOutboundGuardrailEvent(event: unknown): boolean {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
+  const guardrail = (event as { guardrail?: unknown }).guardrail;
+  if (!guardrail || typeof guardrail !== 'object' || Array.isArray(guardrail)) return false;
+  const value = guardrail as { phase?: unknown; blocked?: unknown };
+  return value.phase === 'post' && value.blocked === true;
+}
+
 function MentionSuggestionList({
   matches,
   activeIndex,
@@ -537,7 +548,7 @@ function MessageBubble({
                 ) : null}
               </div>
             </>
-          ) : (
+          ) : m.error ? null : (
             <span className="inline-block h-4 w-2 animate-pulse bg-primary" />
           )
         ) : (
@@ -1205,6 +1216,23 @@ export function ChatWorkspace({
           buf = buf.slice(nl + 2);
           if (!chunk.startsWith('data:')) continue;
           const evt = JSON.parse(chunk.slice(5).trim());
+          if (isBlockedOutboundGuardrailEvent(evt)) {
+            // The server buffers generated output until this terminal verdict. Clear every
+            // content-bearing field defensively as well, so an older/mixed server can never leave
+            // already-received tokens, reasoning, or citations in client state after a block.
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next.at(-1);
+              if (last?.role === 'assistant') {
+                last.content = '';
+                last.reasoning = null;
+                last.citations = null;
+                last.error = OUTBOUND_GUARDRAIL_BLOCKED_MESSAGE;
+              }
+              return next;
+            });
+            continue;
+          }
           if (evt.error) {
             // Surface inline on the assistant bubble (keeps partial output) instead of a toast.
             setMessages((prev) => {
