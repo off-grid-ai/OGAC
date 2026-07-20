@@ -92,7 +92,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'yes', 'Knowledge Indexes provides create, detail, update, and delete actions.',
         'partial', 'Knowledge ingestion uses the provider-neutral port; no fleet evidence attributes a selected run to Qdrant.',
       ]),
-      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/search', 'Search knowledge', 'Persist provider, collection, and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected Qdrant.', [
+      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/indexes', 'Manage retrieval indexes', 'Persist provider, collection, and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected Qdrant.', [
         'yes', 'Qdrant supports point upsert, payloads, filtering, and vector search.',
         'yes', 'The adapter writes chunks and performs similarity retrieval against real collections.',
         'yes', 'Knowledge search and index detail expose retrieval results and records.',
