@@ -12,6 +12,7 @@ export interface NavGroup {
   id: IaSectionId;
   label: string;
   navigation: 'direct' | 'grouped';
+  dashboardRoute: string;
   sidebar: CanonicalOwnerId[];
   contextual: CanonicalOwnerId[];
 }
@@ -23,6 +24,7 @@ export const NAV_GROUPS: readonly NavGroup[] = IA_SECTIONS.map((section) => {
     id: section.id,
     label: section.label,
     navigation: section.navigation,
+    dashboardRoute: section.dashboardRoute,
     sidebar: owners.filter((owner) => owner.placement === 'sidebar').map((owner) => owner.id),
     contextual: owners.filter((owner) => owner.placement === 'contextual').map((owner) => owner.id),
   };
@@ -32,6 +34,7 @@ export interface SidebarSection {
   id: IaSectionId;
   label: string;
   navigation: 'direct' | 'grouped';
+  dashboardRoute: string;
   items: CanonicalOwner[];
 }
 
@@ -47,7 +50,15 @@ export function sidebarSections(enabledModules: readonly { id: ModuleId }[]): Si
       (owner) => owner.section === group.id && sidebarIds.has(owner.id) && enabled.has(owner.gate),
     );
     return items.length
-      ? [{ id: group.id, label: group.label, navigation: group.navigation, items }]
+      ? [
+          {
+            id: group.id,
+            label: group.label,
+            navigation: group.navigation,
+            dashboardRoute: group.dashboardRoute,
+            items,
+          },
+        ]
       : [];
   });
 }
@@ -61,6 +72,16 @@ export function sidebarSectionIdForActiveId(
   return sections.find((section) => section.items.some((item) => item.id === activeId))?.id;
 }
 
+/** Resolve the URL-owned active accordion branch, including the section dashboard itself. */
+export function sidebarSectionIdForPath(
+  sections: readonly SidebarSection[],
+  pathname: string,
+): IaSectionId | undefined {
+  const dashboardSection = sections.find((section) => section.dashboardRoute === pathname);
+  if (dashboardSection) return dashboardSection.id;
+  return sidebarSectionIdForActiveId(sections, sidebarActiveIdForPath(pathname));
+}
+
 /** All enabled canonical owners, including contextual resources. */
 export function groupModules(enabledModules: readonly { id: ModuleId }[]): SidebarSection[] {
   const enabled = new Set(enabledModules.map((module) => module.id));
@@ -69,7 +90,15 @@ export function groupModules(enabledModules: readonly { id: ModuleId }[]): Sideb
       (owner) => owner.section === group.id && enabled.has(owner.gate),
     );
     return items.length
-      ? [{ id: group.id, label: group.label, navigation: group.navigation, items }]
+      ? [
+          {
+            id: group.id,
+            label: group.label,
+            navigation: group.navigation,
+            dashboardRoute: group.dashboardRoute,
+            items,
+          },
+        ]
       : [];
   });
 }

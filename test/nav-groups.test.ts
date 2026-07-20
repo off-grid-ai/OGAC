@@ -6,6 +6,7 @@ import {
   sidebarActiveIdFor,
   sidebarActiveIdForPath,
   sidebarSectionIdForActiveId,
+  sidebarSectionIdForPath,
   sidebarSections,
 } from '../src/modules/groups.ts';
 import { CANONICAL_OWNERS, IA_SECTIONS } from '../src/modules/ownership.ts';
@@ -34,6 +35,19 @@ test('the console has exactly the eight accepted top-level jobs in order', () =>
     NAV_GROUPS.filter((group) => group.id !== 'home').every(
       (group) => group.navigation === 'grouped',
     ),
+  );
+  assert.deepEqual(
+    Object.fromEntries(NAV_GROUPS.map((group) => [group.id, group.dashboardRoute])),
+    {
+      home: '/overview',
+      work: '/work',
+      solutions: '/solutions',
+      data: '/data',
+      runtime: '/runtime',
+      governance: '/governance',
+      insights: '/insights',
+      operations: '/operations',
+    },
   );
 });
 
@@ -138,6 +152,9 @@ test('the sidebar accordion opens only the branch that owns the active item', ()
   assert.equal(sidebarSectionIdForActiveId(sections, 'reviews'), 'solutions');
   assert.equal(sidebarSectionIdForActiveId(sections, 'services'), 'operations');
   assert.equal(sidebarSectionIdForActiveId(sections, undefined), undefined);
+  assert.equal(sidebarSectionIdForPath(sections, '/solutions'), 'solutions');
+  assert.equal(sidebarSectionIdForPath(sections, '/solutions/apps/app-42'), 'solutions');
+  assert.equal(sidebarSectionIdForPath(sections, '/nowhere'), undefined);
 });
 
 test('contextual routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {

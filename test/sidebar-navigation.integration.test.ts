@@ -44,6 +44,45 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
   assert.match(html, /aria-controls="nav-section-solutions"/);
   assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 7);
   assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 7);
+
+  for (const [label, href, sectionId] of [
+    ['Work', '/work', 'work'],
+    ['Solutions', '/solutions', 'solutions'],
+    ['Data', '/data', 'data'],
+    ['AI Runtime', '/runtime', 'runtime'],
+    ['Governance', '/governance', 'governance'],
+    ['Insights', '/insights', 'insights'],
+    ['Operations', '/operations', 'operations'],
+  ]) {
+    assert.match(html, new RegExp(`<a[^>]*href="${href}"[^>]*>.*>${label}<`, 's'));
+    assert.match(
+      html,
+      new RegExp(
+        `<button(?=[^>]*aria-label="Expand ${label} navigation")(?=[^>]*aria-expanded="false")(?=[^>]*aria-controls="nav-section-${sectionId}")[^>]*>`,
+      ),
+    );
+  }
+});
+
+test('a domain dashboard has distinct selected navigation and disclosure controls', () => {
+  process.env.NEXT_TEST_PATHNAME = '/solutions';
+  try {
+    const html = renderToStaticMarkup(createElement(SidebarNav));
+
+    assert.match(
+      html,
+      /<a(?=[^>]*href="\/solutions")(?=[^>]*aria-current="page")[^>]*>.*>Solutions</s,
+    );
+    assert.match(
+      html,
+      /<button(?=[^>]*aria-label="Collapse Solutions navigation")(?=[^>]*aria-expanded="true")(?=[^>]*aria-controls="nav-section-solutions")[^>]*>/,
+    );
+    assert.match(html, /data-current-section="true"/);
+    assert.doesNotMatch(html, /<button[^>]*href="\/solutions"/);
+    assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1);
+  } finally {
+    delete process.env.NEXT_TEST_PATHNAME;
+  }
 });
 
 test('a canonical collection layout renders content without a competing horizontal nav', () => {
@@ -82,7 +121,7 @@ test('selected navigation uses the shared raised surface and quiet emerald hiera
     assert.doesNotMatch(html, /bg-foreground(?:\s|&quot;)/);
     assert.match(
       html,
-      /<button(?=[^>]*data-current-section="true")(?=[^>]*data-og-surface="raised")(?=[^>]*bg-primary\/10)[^>]*>/,
+      /<div(?=[^>]*data-current-section="true")(?=[^>]*data-og-surface="raised")(?=[^>]*bg-primary\/10)[^>]*>/,
     );
     assert.match(
       html,

@@ -57,6 +57,8 @@ export interface IaSection {
   id: IaSectionId;
   label: string;
   navigation: 'direct' | 'grouped';
+  /** Stable entry route for the section itself, independent of its child collections. */
+  dashboardRoute: string;
   purpose: string;
   ownershipRule: string;
 }
@@ -85,6 +87,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'home',
     label: 'Home',
     navigation: 'direct',
+    dashboardRoute: '/overview',
     purpose: 'See what needs attention and where to go next.',
     ownershipRule: 'Owns summaries and shortcuts, never canonical entities.',
   },
@@ -92,6 +95,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'work',
     label: 'Work',
     navigation: 'grouped',
+    dashboardRoute: '/work',
     purpose: 'Use Off Grid AI without needing platform knowledge.',
     ownershipRule: 'Owns human work objects; enterprise knowledge belongs to Data.',
   },
@@ -99,6 +103,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'solutions',
     label: 'Solutions',
     navigation: 'grouped',
+    dashboardRoute: '/solutions',
     purpose: 'Build and operate high-value business use cases.',
     ownershipRule:
       'Blueprints prove reusable value; Apps own tenant deployments; built-in Agents are reusable App components, not a parallel registry.',
@@ -107,6 +112,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'data',
     label: 'Data',
     navigation: 'grouped',
+    dashboardRoute: '/data',
     purpose: 'Turn enterprise systems into governed solution context.',
     ownershipRule: 'Owns enterprise data resources, not vendor engines.',
   },
@@ -114,6 +120,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'runtime',
     label: 'AI Runtime',
     navigation: 'grouped',
+    dashboardRoute: '/runtime',
     purpose: 'Control available AI capabilities and governed access.',
     ownershipRule:
       'Owns logical models and access contracts; physical machines belong to Operations.',
@@ -122,6 +129,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'governance',
     label: 'Governance',
     navigation: 'grouped',
+    dashboardRoute: '/governance',
     purpose: 'Define, enforce, and prove controls.',
     ownershipRule: 'Global rules and evidence live here; apps and pipelines show assignments.',
   },
@@ -129,6 +137,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'insights',
     label: 'Insights',
     navigation: 'grouped',
+    dashboardRoute: '/insights',
     purpose: 'Measure effectiveness, reliability, adoption, and economics.',
     ownershipRule: 'Owns measured results, not configuration or service health.',
   },
@@ -136,6 +145,7 @@ export const IA_SECTIONS: readonly IaSection[] = [
     id: 'operations',
     label: 'Operations',
     navigation: 'grouped',
+    dashboardRoute: '/operations',
     purpose: 'Run the execution plane, fleet, services, and recovery controls.',
     ownershipRule: 'Owns runtime instances and infrastructure.',
   },

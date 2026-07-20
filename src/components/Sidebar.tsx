@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure';
 import { getEnabledModules } from '@/lib/modules';
 import { cn } from '@/lib/utils';
@@ -14,11 +15,7 @@ import {
   contextualModuleForPath,
   type ContextualModuleId,
 } from '@/modules/contextual-navigation';
-import {
-  sidebarActiveIdForPath,
-  sidebarSectionIdForActiveId,
-  sidebarSections,
-} from '@/modules/groups';
+import { sidebarActiveIdForPath, sidebarSectionIdForPath, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 
 const ACTIVE_NAV_ITEM = 'border-primary/30 bg-primary/10 font-medium text-foreground';
@@ -38,7 +35,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   // contextual resources that deliberately highlight their owning collection. Pure resolution lives
   // in groups.ts so the desktop rail and mobile drawer cannot drift.
   const activeId = sidebarActiveIdForPath(pathname);
-  const activeSectionId = sidebarSectionIdForActiveId(sections, activeId);
+  const activeSectionId = sidebarSectionIdForPath(sections, pathname);
   const activeContextualModule = contextualModuleForPath(pathname);
   // Inactive domains start collapsed. Deep links expose their active ancestors, and both levels can
   // still be collapsed manually after that reveal.
@@ -81,6 +78,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
         {sections.map((section) => {
           const expanded = openSectionId === section.id;
           const containsActiveItem = activeSectionId === section.id;
+          const dashboardActive = pathname === section.dashboardRoute;
           const SectionIcon = MODULE_ICONS[section.items[0].gate];
           const directItem = section.navigation === 'direct' ? section.items[0] : undefined;
 
@@ -89,14 +87,14 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
             return (
               <div key={section.id} className="mb-1 last:mb-0">
                 <Link
-                  href={directItem.route}
+                  href={section.dashboardRoute}
                   data-og-interactive
                   data-og-surface={active ? 'raised' : undefined}
                   data-current-section={active || undefined}
                   aria-current={active ? 'page' : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    'group flex min-h-10 w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                    'group flex min-h-11 w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
                     active ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
                   )}
                 >
@@ -118,18 +116,11 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
 
           return (
             <div key={section.id} className="mb-1 last:mb-0">
-              <button
-                type="button"
-                data-og-interactive
+              <div
                 data-og-surface={containsActiveItem ? 'raised' : undefined}
-                aria-expanded={expanded}
-                aria-controls={`nav-section-${section.id}`}
                 data-current-section={containsActiveItem || undefined}
-                onClick={() =>
-                  setOpenSectionId((current) => (current === section.id ? null : section.id))
-                }
                 className={cn(
-                  'group flex min-h-10 w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                  'group flex min-h-11 w-full items-center rounded-lg border text-left text-sm font-medium transition-colors',
                   containsActiveItem
                     ? 'border-primary/25 bg-primary/10 text-foreground'
                     : expanded
@@ -137,27 +128,56 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                       : INACTIVE_NAV_ITEM,
                 )}
               >
-                <span
-                  className={cn(
-                    'grid size-7 shrink-0 place-items-center rounded-md border bg-background transition-colors',
-                    expanded || containsActiveItem
-                      ? 'border-primary/40 text-primary'
-                      : 'border-border/80 text-muted-foreground group-hover:text-foreground',
-                  )}
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="min-h-11 min-w-0 flex-1 justify-start rounded-r-none border-0 px-2.5 py-1.5 text-inherit shadow-none sm:min-h-11 hover:bg-transparent hover:text-inherit"
                 >
-                  <SectionIcon className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{section.label}</span>
-                {containsActiveItem && !expanded ? (
-                  <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                ) : null}
-                <CaretRight
-                  className={cn(
-                    'size-3.5 shrink-0 transition-transform duration-150',
-                    expanded && 'rotate-90 text-foreground',
-                  )}
-                />
-              </button>
+                  <Link
+                    href={section.dashboardRoute}
+                    data-og-interactive
+                    aria-current={dashboardActive ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <span
+                      className={cn(
+                        'grid size-7 shrink-0 place-items-center rounded-md border bg-background transition-colors',
+                        expanded || containsActiveItem
+                          ? 'border-primary/40 text-primary'
+                          : 'border-border/80 text-muted-foreground group-hover:text-foreground',
+                      )}
+                    >
+                      <SectionIcon className="size-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                    {containsActiveItem && !expanded ? (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-primary"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-og-interactive
+                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${section.label} navigation`}
+                  aria-expanded={expanded}
+                  aria-controls={`nav-section-${section.id}`}
+                  onClick={() =>
+                    setOpenSectionId((current) => (current === section.id ? null : section.id))
+                  }
+                  className="size-11 min-h-11 min-w-11 rounded-l-none border-0 text-muted-foreground shadow-none sm:size-11 sm:min-h-11 hover:text-foreground"
+                >
+                  <CaretRight
+                    className={cn(
+                      'size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none',
+                      expanded && 'rotate-90 text-foreground',
+                    )}
+                  />
+                </Button>
+              </div>
 
               <div
                 id={`nav-section-${section.id}`}
