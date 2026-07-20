@@ -62,8 +62,56 @@ test('runtime, governance, and operations evidence accounts for its canonical 24
     { runtime: 7, governance: 6, operations: 11 },
   );
 
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 12);
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 12);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 13);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 11);
+});
+
+test('app-worker has a pinned six-item denominator without inflating live proof', () => {
+  const audit = RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.find(
+    (record) => record.serviceId === 'app-worker',
+  );
+  assert.ok(audit);
+  assert.equal(audit.auditState, 'current');
+  assert.equal(audit.auditStateEvidence, null);
+  assert.match(audit.upstreamVersion, /21bd2f1a/);
+  assert.match(audit.upstreamVersion, /@temporalio\/worker 1\.20\.2/);
+  assert.match(audit.versionSource, /3e91d5d3/);
+  assert.deepEqual(
+    audit.items.map((item) => item.id),
+    [
+      'artifact-identity',
+      'task-queue-readiness',
+      'governed-step-execution',
+      'human-pause-resume',
+      'failure-recovery',
+      'output-persistence',
+    ],
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      audit.items.map((item) => [
+        item.id,
+        [
+          item.gates.upstream.status,
+          item.gates.adapter.status,
+          item.gates.ui.status,
+          item.gates.workflow.status,
+        ],
+      ]),
+    ),
+    {
+      'artifact-identity': ['yes', 'partial', 'no', 'no'],
+      'task-queue-readiness': ['yes', 'partial', 'partial', 'no'],
+      'governed-step-execution': ['yes', 'yes', 'yes', 'no'],
+      'human-pause-resume': ['yes', 'yes', 'yes', 'no'],
+      'failure-recovery': ['yes', 'partial', 'partial', 'no'],
+      'output-persistence': ['yes', 'partial', 'yes', 'no'],
+    },
+  );
+  assert.ok(
+    audit.items.every((item) => item.gates.workflow.status === 'no'),
+    'code-path evidence must not masquerade as a production app-worker workflow',
+  );
 });
 
 test('audited services have version evidence and honest item-level four-gate evidence', () => {
