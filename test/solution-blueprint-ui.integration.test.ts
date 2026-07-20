@@ -20,11 +20,11 @@ test('the rendered blueprint create journey exposes requirements, outcome, ROI a
     'Annual benefit',
     'Implementation cost',
     'Evidence status',
-    'Adoptable runtime',
+    'Runtime readiness is automatic',
   ])
     assert.match(html, new RegExp(label));
   assert.match(html, /Create blueprint/);
-  assert.match(html, /Hypotheses stay visible but cannot be deployed/);
+  assert.match(html, /It cannot be enabled with a catalog checkbox/);
 });
 
 test('deployment creation visibly binds a blueprint to a canonical App', () => {
