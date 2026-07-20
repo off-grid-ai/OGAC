@@ -12,11 +12,11 @@ live deployment.
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | Updated                      | 2026-07-20                                                                    |
 | Release branch               | `codex/modernize-console-sidebar`                                             |
-| Registry checkpoint          | Source snapshot through `58abc71e`; this is not a deployed-SHA assertion      |
+| Registry checkpoint          | Source snapshot through `5fdf5670`; this is not a deployed-SHA assertion      |
 | Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                       |
-| Versioned capability audits  | 37 records: 20 current, 17 stale                                              |
-| Audited denominator          | 157 capability items / 628 four-gate assessments                              |
-| Audit backlog                | 11 entries have no versioned denominator yet                                  |
+| Versioned capability audits  | 38 records: 21 current, 17 stale                                              |
+| Audited denominator          | 164 capability items / 656 four-gate assessments                              |
+| Audit backlog                | 10 entries have no versioned denominator yet                                  |
 | Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint |
 | Enterprise-source projection | Repaired in `7f4f8d61`; live UI confirmation remains outstanding              |
 | Live verification            | Not asserted by this ledger                                                   |
@@ -40,9 +40,25 @@ canonical agent-run id. Marquez distinguishes `accepted`, `rejected`, `unreachab
 No Qdrant or Marquez A/I/UI/W gate changes at this checkpoint: focused tests and typecheck prove
 the code contract, not the selected live deployment or a completed BFSI workflow.
 
+### LLM Guard 0.3.16 audit delta
+
+`llm-guard` now has a seven-item, version-matched denominator pinned to upstream tag
+`32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce` and fleet record
+`bc74d828e02db7566b32191650cb58360f9178ae`. The upstream repository explicitly states that the
+project and associated models are archived and no longer maintained. The fleet's two-shard design
+is an Off Grid runtime extension, not an upstream capability.
+
+The audit also corrects a material coverage claim: stock `0.3.16` loads scanners from static YAML
+and permits `scanners_suppress` per request; its request schema has no `scanners` configuration
+field. Therefore the Console's per-request India recognizer/scanner object is ignored by the
+upstream shards. Live email/secret redaction and the four configured g6 classifiers remain real;
+per-card policy lifecycle, India recognizer injection, output-specific scanning, optional-shard
+degradation visibility, and upstream telemetry remain partial or absent. No live gate was inferred
+from source tests.
+
 ## Evidence roll-up
 
-These totals are calculated from the 157 versioned capability records currently owned by the two
+These totals are calculated from the 164 versioned capability records currently owned by the two
 canonical family registries. `yes`, `partial`, and `no` describe retained audit evidence—not fleet
 health. Stale audits are deliberately normalized so their Available gate cannot be treated as
 current. A `no` therefore means "not currently evidenced against the pinned denominator", not
@@ -50,11 +66,11 @@ necessarily "the upstream product can never do this".
 
 | Gate                          |     Yes | Partial |      No |   Total |
 | ----------------------------- | ------: | ------: | ------: | ------: |
-| Available                     |     100 |       0 |      57 |     157 |
-| Integrated                    |      65 |      65 |      27 |     157 |
-| UI exposed                    |      82 |      46 |      29 |     157 |
-| Used in a production workflow |      40 |      44 |      73 |     157 |
-| **All four gates**            | **287** | **155** | **186** | **628** |
+| Available                     |     107 |       0 |      57 |     164 |
+| Integrated                    |      67 |      68 |      29 |     164 |
+| UI exposed                    |      83 |      50 |      31 |     164 |
+| Used in a production workflow |      40 |      47 |      77 |     164 |
+| **All four gates**            | **297** | **165** | **194** | **656** |
 
 Readiness is a separate projection. At this checkpoint, 47 inventory entries have no sufficient
 runtime topology evidence and one has only partial evidence. This is an evidence-state result, not a
@@ -66,7 +82,7 @@ forwarders, seeds, images, or a successful ping do not upgrade readiness.
 | Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                    |
 | ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
 | Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `7f4f8d61` | Visual and live verification pending                |
-| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `58abc71e` | 13 audited, 11 pending; Gateway/OPA/Temporal identity gaps pinned |
+| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `5fdf5670` | 14 audited, 10 pending; LLM Guard EOL and integration gaps pinned |
 | Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained          |
 | Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Build and verify one immutable release              |
 
@@ -94,7 +110,7 @@ The lane is the work owner. `current` and `stale` reflect the existing versioned
 | Runtime           | `agent-worker`                  | pending              | runtime/governance/operations |
 | Runtime           | `app-worker`                    | current              | runtime/governance/operations |
 | Runtime           | `chat-worker`                   | pending              | runtime/governance/operations |
-| Governance        | `llm-guard`                     | pending              | runtime/governance/operations |
+| Governance        | `llm-guard`                     | current, archived 0.3.16 | runtime/governance/operations |
 | Governance        | `keycloak`                      | stale                | runtime/governance/operations |
 | Governance        | `opa`                           | stale                | runtime/governance/operations |
 | Governance        | `openbao`                       | stale                | runtime/governance/operations |
@@ -137,7 +153,6 @@ useful discovery evidence but do not satisfy that contract.
 | `gateway-control`         | Pin the first-party control contract to an immutable release, enumerate node/model actions, and retain one reversible enable/disable/restart or model-switch lifecycle with audit and rollback evidence. |
 | `agent-worker`            | Stamp the worker artifact, register its Temporal queue/poller/heartbeat topology, audit the agent execution contract, and retain a durable governed run plus safe drain/restart evidence.                |
 | `chat-worker`             | Stamp and audit the `offgrid-chat` worker, then retain one governed chat correlated across guardrail, citation, lineage, provenance, and audit evidence.                                                 |
-| `llm-guard`               | Audit the pinned `0.3.16` API/scanner denominator item by item, distinguish upstream scanners from first-party sharding, and record the archived/EOL replacement risk.                                   |
 | `edge-gateway`            | Record the exact Caddy build and module list, enumerate the bounded Caddy/Coraza/rate-limit/file-routing denominator, and prove policy, rejection, file, and recovery paths.                             |
 | `cloudflared`             | Record the binary version and live-config checksum, remove duplicate/stale job ambiguity, prove one authoritative replica, and expose per-route readiness and restart evidence.                          |
 | `landing`                 | Bind the public process to a repo-owned launch definition and immutable SHA, define the first-party landing denominator, and verify the complete CTA journey visually and functionally.                  |
@@ -188,10 +203,10 @@ For each stale record:
 
 | Priority | Gap                                                                                                                 | Release acceptance                                                                                                                                                      |
 | -------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0       | Eleven services have no pinned capability denominator.                                                              | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
+| P0       | Ten services have no pinned capability denominator.                                                                 | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
 | P0       | Seventeen audits are stale.                                                                                         | Apply the re-verification recipe against immutable selected versions; stale upstream gates remain unavailable until then.                                               |
 | P0       | Readiness is 47 unverified and 1 partial.                                                                           | Supply signed/timestamped topology evidence for deployment, reachability, functional behavior, seed state, and Console use; do not infer it from optional fallbacks.    |
-| P1       | Only 65/157 capabilities are fully integrated, 82/157 are fully UI-exposed, and 40/157 have full workflow evidence. | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
+| P1       | Only 67/164 capabilities are fully integrated, 83/164 are fully UI-exposed, and 40/164 have full workflow evidence. | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
 | P1       | The capability map is an exhaustive ledger but still costly to scan and scroll.                                     | Add URL-driven family/service local navigation, sticky summary/filter context, progressive disclosure, and direct gap-to-management links while retaining all evidence. |
 | P1       | Workflow evidence is not yet organized as repeatable BFSI proof.                                                    | Retain deterministic indemnity, delinquency, and cross-sell journeys with before/after operational and financial measures.                                              |
 | P2       | Capability breadth can be mistaken for customer value.                                                              | Publish intentional non-support and replacement rationale; product dashboards lead with outcomes, active work, exceptions, next actions, and proof—not service names.   |
@@ -223,7 +238,7 @@ capacity evidence so it is **sellable**. Seeds and screenshots are fixtures, not
 - [ ] Every selected service shows deployment, routes, readiness evidence, workflow evidence, gaps,
       and next action even when its capability denominator is not audited.
 - [x] Versioned family records are integrated into the canonical registry without duplicated facts.
-- [x] Focused logic and navigation tests pass (34/34 at `7f4f8d61`).
+- [x] Focused capability logic/integration tests pass (24/24 at `5fdf5670`); prior navigation proof remains retained at `7f4f8d61`.
 - [ ] Typecheck and one exclusive production build pass.
 - [ ] Wide and narrow light/dark screenshots are readable with no page-level overflow.
 - [ ] Exact SHA is pushed and deployed over SSH.
