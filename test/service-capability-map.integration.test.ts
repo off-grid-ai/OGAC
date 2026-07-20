@@ -91,6 +91,8 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
   );
 
   assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
+  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 36);
+  assert.deepEqual(auditCounts, { current: 19, stale: 17, pending: 12 });
   assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 4);
   assert.match(html, /Inventory<\/p><p[^>]*>48<\/p>/);
   assert.match(html, new RegExp(`Current audits<\\/p><p[^>]*>${auditCounts.current}<\\/p>`));
@@ -99,6 +101,18 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
   assert.equal((html.match(/data-audit-state="current"/g) ?? []).length, auditCounts.current);
   assert.equal((html.match(/data-audit-state="stale"/g) ?? []).length, auditCounts.stale);
   assert.equal((html.match(/data-audit-state="pending"/g) ?? []).length, auditCounts.pending);
+});
+
+test('enterprise-source master state and selected audit detail use the same canonical evidence', () => {
+  const html = renderExplorer('enterprise-source-corebank');
+
+  assert.match(
+    html,
+    /data-service-inventory-row="enterprise-source-corebank"[\s\S]*?data-audit-state="stale"/,
+  );
+  assert.match(html, /Core Banking/);
+  assert.match(html, /Audited capabilities/);
+  assert.doesNotMatch(html, /Capability audit<\/p><p[^>]*>Pending/);
 });
 
 test('deep links distinguish a pending capability audit from an unknown service id', () => {

@@ -279,7 +279,12 @@ function platformRecord(
   };
 }
 
-function enterpriseSourceRecord(source: EnterpriseSourceDefinition): LogicalServiceInventoryEntry {
+function enterpriseSourceRecord(
+  source: EnterpriseSourceDefinition,
+  audit: ServiceCapabilityAudit | null,
+  summary: ServiceCapabilitySummary,
+): LogicalServiceInventoryEntry {
+  const projection = auditProjection(audit);
   return {
     id: source.id,
     label: source.label,
@@ -290,23 +295,23 @@ function enterpriseSourceRecord(source: EnterpriseSourceDefinition): LogicalServ
     deployment: {
       processes: [source.process],
       nodes: [],
-      version: source.version,
-      mutableVersion: source.mutableVersion,
+      version: projection.version ?? source.version,
+      mutableVersion: projection.mutableVersion ?? source.mutableVersion,
       systemOfRecords: [source.systemOfRecord],
     },
     readiness: UNKNOWN_READINESS,
     readinessEvidence: [],
-    capabilityAudit: { status: 'not-audited' },
-    productionWorkflowCapabilityIds: [],
+    capabilityAudit: summary,
+    productionWorkflowCapabilityIds: projection.productionWorkflowCapabilityIds,
     seededWorkflowEvidence: source.seededWorkflowEvidence,
-    explicitCapabilityGaps: [source.nextAction],
+    explicitCapabilityGaps: projection.explicitCapabilityGaps,
     routes: {
       list: source.listRoute,
       detailPattern: source.detailRoutePattern,
       management: source.managementRoute,
       capabilityMap: null,
     },
-    nextAction: source.nextAction,
+    nextAction: audit ? projection.nextAction : source.nextAction,
   };
 }
 
@@ -330,7 +335,9 @@ export function reconcileServiceInventory({
       capabilitySummaryFor(service.id),
     ),
   );
-  const enterpriseEntries = ENTERPRISE_SOURCE_DEFINITIONS.map(enterpriseSourceRecord);
+  const enterpriseEntries = ENTERPRISE_SOURCE_DEFINITIONS.map((source) =>
+    enterpriseSourceRecord(source, capabilityAuditFor(source.id), capabilitySummaryFor(source.id)),
+  );
   const entries = [...platformEntries, ...enterpriseEntries];
   const issues: ServiceInventoryIssue[] = [];
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { SERVICE_CAPABILITY_AUDITS } from '../src/lib/service-capability-map.ts';
 import { getServices, type ServiceEntry } from '../src/lib/services-directory.ts';
 import {
   EXPECTED_ENTERPRISE_SOURCE_COUNT,
@@ -82,10 +83,37 @@ test('capability coverage is projected from the canonical audit registry without
     totalItems: 4,
   });
   assert.deepEqual(postgres?.productionWorkflowCapabilityIds, ['relational-store']);
-  assert.deepEqual(corebank?.capabilityAudit, { status: 'not-audited' });
-  assert.equal(corebank?.deployment.version, '16-alpine');
+  assert.deepEqual(corebank?.capabilityAudit, {
+    status: 'audited',
+    auditState: 'stale',
+    verifiedGates: 4,
+    partialGates: 5,
+    totalGates: 12,
+    productionItems: 1,
+    totalItems: 3,
+  });
+  assert.deepEqual(corebank?.productionWorkflowCapabilityIds, ['sql-read']);
+  assert.equal(corebank?.deployment.version, '16-alpine (mutable image tag)');
   assert.equal(corebank?.deployment.mutableVersion, true);
   assert.ok((corebank?.seededWorkflowEvidence.length ?? 0) > 0);
+});
+
+test('all 36 canonical audits project consistently across the 48-entry inventory', () => {
+  const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
+  const auditStates = inventory.entries.reduce(
+    (counts, entry) => {
+      counts[serviceInventoryAuditState(entry)] += 1;
+      return counts;
+    },
+    { current: 0, stale: 0, pending: 0 },
+  );
+
+  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 36);
+  assert.deepEqual(auditStates, { current: 19, stale: 17, pending: 12 });
+  assert.equal(
+    inventory.entries.filter((entry) => entry.capabilityAudit.status === 'audited').length,
+    SERVICE_CAPABILITY_AUDITS.length,
+  );
 });
 
 test('reconciliation fails honestly for drift, duplicate ids, and unknown platform entries', () => {
