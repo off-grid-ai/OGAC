@@ -18,10 +18,16 @@ __export(activities_exports, {
 function gatewayUrl() {
   return process.env.OFFGRID_QUEUE_GATEWAY_URL || process.env.OFFGRID_GATEWAY_URL || "http://localhost:8800";
 }
+function queueGatewayHeaders(env = process.env) {
+  const bearer = env.OFFGRID_QUEUE_GATEWAY_BEARER_TOKEN?.trim();
+  if (bearer) return { authorization: `Bearer ${bearer}` };
+  const apiKey = (env.OFFGRID_QUEUE_GATEWAY_API_KEY || env.OFFGRID_GATEWAY_API_KEY)?.trim();
+  return apiKey ? { "x-api-key": apiKey } : {};
+}
 async function runInference(req) {
   const started = Date.now();
   const url = `${gatewayUrl().replace(/\/$/, "")}/v1/chat/completions`;
-  const headers = { "content-type": "application/json" };
+  const headers = { "content-type": "application/json", ...queueGatewayHeaders() };
   if (req.caller) headers["x-offgrid-caller"] = req.caller;
   if (req.corrId) headers["x-offgrid-corr-id"] = req.corrId;
   const res = await fetch(url, {
