@@ -1,5 +1,5 @@
 import { PageFrame } from '@/components/PageFrame';
-import { ServiceCapabilityMap } from '@/components/services/ServiceCapabilityMap';
+import { ServiceCapabilityExplorer } from '@/components/services/ServiceCapabilityExplorer';
 import { requireModuleForUser } from '@/lib/module-access';
 import { SERVICE_CAPABILITY_AUDITS } from '@/lib/service-capability-map';
 import {
@@ -32,7 +32,7 @@ export default async function ServiceCapabilityMapPage({
 
   return (
     <PageFrame>
-      <ServiceCapabilityMap
+      <ServiceCapabilityExplorer
         audits={SERVICE_CAPABILITY_AUDITS}
         inventory={inventory}
         inventoryFilter={{
