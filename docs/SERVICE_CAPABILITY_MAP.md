@@ -53,8 +53,8 @@ LiteLLM currently uses `main-stable`, a mutable image tag. The map calls that ou
 inventing a fixed version. Pin the image digest before treating that upstream denominator as
 reproducible.
 
-The canonical registry composes two disjoint family registries and currently contains 36 versioned
-audit records: 19 current and 17 stale. Twelve of the 48 inventory entries remain explicitly
+The canonical registry composes two disjoint family registries and currently contains 37 versioned
+audit records: 20 current and 17 stale. Eleven of the 48 inventory entries remain explicitly
 unaudited. Stale records keep their historical adapter, UI, and workflow evidence visible, but every
 Available gate is normalized to `no` until the deployed upstream denominator is re-audited.
 
