@@ -201,6 +201,16 @@ world's models, its own governance, one surface.
 
 This vision sets the priorities the roadmap executes against:
 
+**The platform model is an enterprise AI cloud installed inside the customer boundary.** Think
+“AWS for AI,” not a bundle of dashboards or Docker images. Each top-level Console domain is a
+proper product with an owned user journey, entities, lifecycle, APIs, evidence, and economics. The
+composable services underneath are managed primitives: their capabilities must be exposed through
+stable Off Grid contracts and combined into complete operator outcomes. A service being installed,
+listed, or reachable is not product completion; its valuable capabilities must be manageable from
+the appropriate product surface and proven in a real production path. Customers install Off Grid AI
+once and should be able to build, run, govern, evaluate, observe, and operate enterprise AI without
+assembling a separate platform themselves.
+
 1. **Consolidate, don't proliferate.** Six thin observability/analytics/finops/reports/siem/drift
    tiles are one job — "is my AI healthy, safe, and what is it costing." Build the *job*, not the
    tiles. Same for the governance surfaces.
