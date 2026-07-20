@@ -25,7 +25,10 @@ const AUTO_ROLLBACK_ON_DRIFT = process.env.OFFGRID_AUTO_ROLLBACK_ON_DRIFT === '1
 
 export async function runQaSweep(opts: { orgId?: string } = {}): Promise<QaSweep> {
   const at = new Date().toISOString();
-  const [evalRun, drift] = await Promise.all([getEvals().run(), getDrift().analyze()]);
+  const [evalRun, drift] = await Promise.all([
+    getEvals().run(opts.orgId),
+    getDrift().analyze({ orgId: opts.orgId }),
+  ]);
 
   const reasons: string[] = [];
   if (evalRun.score < MIN_SCORE) {

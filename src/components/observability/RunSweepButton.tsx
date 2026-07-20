@@ -17,11 +17,16 @@ export function RunSweepButton() {
     setBusy(true);
     try {
       const res = await fetch('/api/v1/admin/qa/sweep', { method: 'POST' });
-      const data = (await res.json().catch(() => ({}))) as { degraded?: boolean; score?: number };
+      const data = (await res.json().catch(() => ({}))) as {
+        degraded?: boolean;
+        eval?: { score?: number };
+        reasons?: string[];
+      };
+      const score = data.eval?.score ?? 'not recorded';
       if (data.degraded) {
-        toast.warning(`Sweep complete — degraded (score ${data.score ?? '—'})`);
+        toast.warning(`Sweep complete - degraded (score ${score})`);
       } else {
-        toast.success(`Sweep complete — healthy (score ${data.score ?? '—'})`);
+        toast.success(`Sweep complete - healthy (score ${score})`);
       }
       router.refresh();
     } catch {
