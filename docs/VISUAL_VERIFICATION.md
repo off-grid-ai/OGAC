@@ -96,6 +96,12 @@ Useful scoping flags:
 ```bash
 # One or more --only flags are accepted; comma-separated fragments also work.
 node scripts/shoot-all.mjs --only=solutions --only=governance,operations [other flags]
+
+# Capture exact deep links or collection URLs in addition to discovered route templates.
+node scripts/shoot-all.mjs \
+  --url=/operations/services/capability-map \
+  --url=/solutions/quality/runs \
+  [other flags]
 ```
 
 ## Evidence and verdict

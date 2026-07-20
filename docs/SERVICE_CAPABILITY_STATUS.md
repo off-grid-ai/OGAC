@@ -19,10 +19,35 @@ live deployment.
 | Audit backlog                | 10 entries have no versioned denominator yet                                  |
 | Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint |
 | Enterprise-source projection | Repaired in `7f4f8d61`; live UI confirmation remains outstanding              |
-| Live verification            | Not asserted by this ledger                                                   |
+| Live verification            | Deployed `09b508bf`; mechanical UI gate passes, narrow Quality Runs visual gate fails |
 
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
+
+### Live deployed UI verification — `09b508bf996565eba0cce1cd3454a8b50eb50f19`
+
+The live release stamp on `offgrid-s1.local` is
+`09b508bf996565eba0cce1cd3454a8b50eb50f19` with Next `BUILD_ID=offgrid-onprem`. This is older than
+the source checkpoint above: the LLM Guard denominator added by `5fdf5670` is not in the deployed
+artifact. The live capability map therefore correctly renders the deployed release as **48 entries,
+20 current audits, 17 stale audits, and 11 pending audits**; it must not be reported as the source
+checkpoint's 21/17/10 split until that later source is deployed.
+
+Authenticated Playwright verification covered Bharat Union and Suraksha at 1600x1000 and 820x1000.
+The canonical capability-map route, a selected last-inventory CRM route, the exact Quality Runs
+collection, and a seeded execution detail all returned 200 without an error boundary, console/page
+error, or horizontal page overflow. Each tenant exposed all 48 service rows; the bounded inventory
+list scrolled to the final `enterprise-source-crm` row, the family rail used local `overflow-x:auto`,
+and the selected CRM evidence remained visible. Both tenants exposed 24 seeded Quality executions;
+the 820px table used a local horizontal scroller rather than overflowing the page.
+
+The visual gate is still **failed**. At 820px, both tenants render the Quality Runs “Execution
+filters” title and its explanatory paragraph at the same vertical origin (`top=434px`), causing
+visible text overlap. Wide rendering is clean. Until that narrow composition is fixed, rebuilt,
+deployed, and re-captured, this release is mechanically reachable but not visually verified.
+Evidence is retained locally under `.shots/release-verification-20260720/` (manifests, layout reports,
+and inspected PNGs); the directory is intentionally ignored because the demo banner includes login
+credentials.
 
 ### Retrieval and lineage evidence-spine delta
 
@@ -88,7 +113,7 @@ forwarders, seeds, images, or a successful ping do not upgrade readiness.
 
 | Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                    |
 | ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
-| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `7f4f8d61` | Visual and live verification pending                |
+| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Live checked at `09b508bf`; narrow Quality Runs blocker recorded | Re-run after UI fix and deployment |
 | Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `5fdf5670` | 14 audited, 10 pending; LLM Guard EOL and integration gaps pinned |
 | Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained          |
 | Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Build and verify one immutable release              |

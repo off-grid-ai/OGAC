@@ -54,6 +54,10 @@ const ONLY = argValues('only')
   .flatMap((value) => value.split(','))
   .map((value) => value.trim())
   .filter(Boolean);
+const EXTRA_URLS = argValues('url')
+  .flatMap((value) => value.split(','))
+  .map((value) => value.trim())
+  .filter((value) => value.startsWith('/'));
 const host = new URL(BASE).hostname.split('.')[0] || 'local';
 const OUT = arg('out', `.shots/${host}-${THEME}-${VIEWPORT_RAW}`);
 
@@ -452,7 +456,8 @@ async function main() {
         ({ url }) => !ONLY.length || ONLY.some((fragment) => url.includes(fragment)),
       )
     : [];
-  if (!selection.routes.length && !requiredUrlStates.length) {
+  const extraUrlStates = EXTRA_URLS.map((url) => ({ id: `explicit:${url}`, url }));
+  if (!selection.routes.length && !requiredUrlStates.length && !extraUrlStates.length) {
     throw new Error(
       auth.user
         ? 'No canonical routes matched this visual crawl.'
@@ -471,7 +476,7 @@ async function main() {
     }
     requiredUrlStatesCaptured = await runRequiredUrlStates(
       browser,
-      requiredUrlStates,
+      [...requiredUrlStates, ...extraUrlStates],
       records,
       auth,
       capturedRoutes,
@@ -492,6 +497,7 @@ async function main() {
       canonicalTemplatesSelected: selection.routes.length,
       canonicalConcreteRoutesCaptured: capturedRoutes.size - requiredUrlStatesCaptured,
       requiredUrlStatesSelected: requiredUrlStates.map(({ id, url }) => ({ id, url })),
+      explicitUrlsSelected: extraUrlStates,
       requiredUrlStatesCaptured,
       legacyAliasesExcluded: selection.aliases,
     },

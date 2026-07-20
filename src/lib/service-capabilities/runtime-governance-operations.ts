@@ -132,6 +132,104 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     ],
   }),
   audit({
+    serviceId: 'edge-gateway',
+    serviceLabel: 'Network Gateway',
+    upstreamVersion: 'Caddy v2.11.4; Coraza Caddy v2.5.0; caddy-ratelimit v0.1.0',
+    versionSource:
+      'onprem-fleet-orchestration deploy/onprem/edge-runtime-contract.json at bcd5b63; live binary SHA b3764397458fc383c803898b56d5144178dbd9e4742502f3361dff03cd128b5f; live config SHA a5a4b4c29eb214a13cd77d4d5cda00ad0cac4c00b256f9937944cb998b31dd0a',
+    denominatorSource:
+      'https://github.com/caddyserver/caddy/tree/v2.11.4; https://github.com/corazawaf/coraza-caddy/tree/v2.5.0; https://github.com/mholt/caddy-ratelimit/tree/v0.1.0',
+    auditState: 'current',
+    summary:
+      'Bounded network-edge denominator: host/path proxying, WAF, per-client rate limiting, guarded file delivery, access evidence, and supervised recovery. Cloudflare owns public TLS termination.',
+    capabilities: [
+      [
+        'http-routing',
+        'Host and path routing',
+        'Route public hosts and bounded API paths to their canonical on-prem owners.',
+        '/operations/edge',
+        'Inspect edge routes',
+        'Route creation and mutation stay deployment-owned; the Console exposes live evidence, not an unsafe ad-hoc proxy editor.',
+        [
+          'yes', 'Caddy v2.11.4 provides host/path matching, reverse proxy, rewrite, and static responses.',
+          'yes', 'The versioned Caddyfile owns the active gateway, AI, webhook, Console, and auxiliary routes.',
+          'partial', 'The Edge overview exposes configured traffic and posture but does not mutate the deployment file.',
+          'yes', 'Live root, API, file, and webhook routes reached their intended handlers.',
+        ],
+      ],
+      [
+        'waf',
+        'Web application firewall',
+        'Reject scanner, injection, traversal, and script payloads before application code.',
+        '/operations/edge/waf',
+        'Manage WAF intent',
+        'The Console persists desired WAF intent but cannot yet validate and apply/reload it through the host-owned recovery contract.',
+        [
+          'yes', 'Coraza Caddy v2.5.0 and Coraza v3.7.0 are compiled into the pinned binary.',
+          'yes', 'The versioned edge snippet executes Coraza before terminal route handlers.',
+          'partial', 'WAF status and intent CRUD exist; applying that intent remains deployment-owned.',
+          'yes', 'A live sqlmap user-agent request was rejected with HTTP 403.',
+        ],
+      ],
+      [
+        'rate-limiting',
+        'Per-client rate limiting',
+        'Bound abusive clients with route-specific sliding-window limits.',
+        '/operations/edge/traffic',
+        'Inspect traffic',
+        'Rate policy is visible in traffic evidence but has no safe Console edit/apply workflow.',
+        [
+          'yes', 'caddy-ratelimit v0.1.0 provides keyed sliding-window limits and Retry-After responses.',
+          'yes', 'Rate limiting is ordered after Coraza and before every terminal handle.',
+          'partial', 'Operators can inspect traffic but cannot edit or publish rate zones.',
+          'yes', 'The live verifier isolated a synthetic client key and observed HTTP 429 after the configured threshold.',
+        ],
+      ],
+      [
+        'guarded-file-delivery',
+        'Policy-owned file delivery',
+        'Serve stable file URLs without bypassing object visibility, tenant, or owner policy.',
+        '/work/files',
+        'Manage files',
+        '',
+        [
+          'yes', 'Caddy supports path handling, rewrite, and reverse proxy composition.',
+          'yes', 'Only /files/media/* is rewritten to the canonical Console file API; arbitrary buckets return 404.',
+          'yes', 'The Files surface owns upload, visibility, access, and deletion.',
+          'yes', 'Live proof returned 404 for an anonymous private object, 200 with service auth, and 200 for a public seed, then deleted the probe.',
+        ],
+      ],
+      [
+        'access-evidence',
+        'Access and rejection evidence',
+        'Inspect edge traffic and blocked requests from the active JSON access stream.',
+        '/operations/edge/blocked-requests',
+        'Inspect blocked requests',
+        '',
+        [
+          'yes', 'Caddy v2.11.4 emits structured JSON access logs with rotation.',
+          'yes', 'The deploy excludes the runtime log, preserving its inode while Caddy is running.',
+          'yes', 'Traffic and Blocked requests consume the canonical edge log adapter.',
+          'yes', 'The live verifier observed the current log path grow across allowed and rejected probes.',
+        ],
+      ],
+      [
+        'supervised-recovery',
+        'Validated edge recovery',
+        'Validate exact config and modules before restarting the supervised edge.',
+        '/operations/platform-health',
+        'Inspect platform health',
+        'Restart remains root-owned by design; expose immutable evidence rather than a browser-triggered privileged action.',
+        [
+          'yes', 'Caddy provides config validation and supervised lifecycle commands.',
+          'yes', 'The fleet recovery contract checks version, binary/config hashes, modules, launchd, policy paths, and log growth.',
+          'partial', 'Platform health reports readiness but does not perform privileged host lifecycle actions.',
+          'yes', 'Candidate validation, launchd kickstart, and all fail-closed live checks passed on S1.',
+        ],
+      ],
+    ],
+  }),
+  audit({
     serviceId: 'gateway',
     serviceLabel: 'AI Gateway',
     upstreamVersion: 'Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
@@ -1336,7 +1434,6 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
  * `not-audited`.
  */
 export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [
-  'edge-gateway',
   'gateway-control',
   'agent-worker',
   'chat-worker',

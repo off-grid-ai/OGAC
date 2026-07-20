@@ -11,10 +11,10 @@ import {
   type AuditedCapabilitySummary,
 } from '../src/lib/service-capability-map.ts';
 
-test('canonical registry composes 38 unique versioned audits without the removed product', () => {
+test('canonical registry composes 39 unique versioned audits without the removed product', () => {
   const ids = SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId);
 
-  assert.equal(ids.length, 38);
+  assert.equal(ids.length, 39);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(ids.includes('provit'), false);
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
@@ -103,9 +103,28 @@ test('summary counts only verified gates and production workflow evidence', () =
 });
 
 test('unaudited and unknown services stay unscored', () => {
-  assert.equal(getServiceCapabilityAudit('edge-gateway'), null);
-  assert.deepEqual(summarizeServiceCapabilityAudit('edge-gateway'), { status: 'not-audited' });
+  assert.equal(getServiceCapabilityAudit('cloudflared'), null);
+  assert.deepEqual(summarizeServiceCapabilityAudit('cloudflared'), { status: 'not-audited' });
   assert.deepEqual(summarizeServiceCapabilityAudit('does-not-exist'), { status: 'not-audited' });
+});
+
+test('network gateway audit is pinned and keeps independently incomplete UI gates honest', () => {
+  const audit = getServiceCapabilityAudit('edge-gateway');
+  assert.ok(audit);
+  assert.equal(audit.auditState, 'current');
+  assert.match(audit.upstreamVersion, /Caddy v2\.11\.4/);
+  assert.match(audit.upstreamVersion, /Coraza Caddy v2\.5\.0/);
+  assert.match(audit.upstreamVersion, /caddy-ratelimit v0\.1\.0/);
+  assert.equal(audit.items.length, 6);
+  assert.equal(audit.items.find((item) => item.id === 'waf')?.gates.workflow.status, 'yes');
+  assert.equal(
+    audit.items.find((item) => item.id === 'rate-limiting')?.gates.ui.status,
+    'partial',
+  );
+  assert.equal(
+    audit.items.find((item) => item.id === 'guarded-file-delivery')?.gates.ui.status,
+    'yes',
+  );
 });
 
 test('coverage percentage is safe for an explicit empty audited denominator', () => {
