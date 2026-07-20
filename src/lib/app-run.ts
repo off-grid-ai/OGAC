@@ -948,11 +948,17 @@ function aggregateOutcome(results: StepResult[]): string {
   return '';
 }
 
-function summarizeRows(label: string, resource: string, rows: unknown[], count: number): string {
-  const shown = rows.slice(0, 5);
+// A governed source must contain enough of the live result to substantiate the decision it drives.
+// Five rows silently hid most small reference tables (for example 15/20 rate-card rows), allowing
+// the model to make a global comparison that grounding could not verify. Keep the prompt bounded,
+// but retain complete small operational tables and state explicitly when a larger result is clipped.
+export const MAX_GOVERNED_SOURCE_ROWS = 20;
+export function summarizeRows(label: string, resource: string, rows: unknown[], count: number): string {
+  const shown = rows.slice(0, MAX_GOVERNED_SOURCE_ROWS);
   const head = `${label} (${resource}): ${count} row(s).`;
   if (shown.length === 0) return head;
-  return `${head}\n${JSON.stringify(shown)}`;
+  const coverage = count > shown.length ? ` Showing ${shown.length} of ${count}.` : '';
+  return `${head}${coverage}\n${JSON.stringify(shown)}`;
 }
 
 function errorResult(step: AppStep, detail: string): StepResult {

@@ -12,9 +12,11 @@ import {
   type AppRunDeps,
   buildAgentQuery,
   executeStep,
+  MAX_GOVERNED_SOURCE_ROWS,
   providedSourcesFromPriorResults,
   resolveDomainByIdOrLabel,
   runApp,
+  summarizeRows,
   type StepResult,
 } from '@/lib/app-run';
 import { resolveDomain } from '@/lib/data-domains';
@@ -138,6 +140,18 @@ test('providedSourcesFromPriorResults carries only governed connector evidence',
       score: 1,
     },
   ]);
+});
+
+test('summarizeRows keeps complete small reference tables and labels larger truncation', () => {
+  const complete = Array.from({ length: MAX_GOVERNED_SOURCE_ROWS }, (_, id) => ({ id }));
+  const completeSummary = summarizeRows('rate card', 'pricing', complete, complete.length);
+  assert.match(completeSummary, /"id":19/);
+  assert.doesNotMatch(completeSummary, /Showing/);
+
+  const larger = [...complete, { id: 20 }];
+  const clipped = summarizeRows('rate card', 'pricing', larger, larger.length);
+  assert.match(clipped, /Showing 20 of 21/);
+  assert.doesNotMatch(clipped, /"id":20/);
 });
 
 test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {
