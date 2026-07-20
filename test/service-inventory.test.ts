@@ -6,10 +6,14 @@ import {
   EXPECTED_LOGICAL_INVENTORY_COUNT,
   EXPECTED_PLATFORM_SERVICE_COUNT,
   filterServiceInventory,
+  isServiceInventoryAuditState,
   isServiceInventoryFamily,
   isServiceInventoryOwner,
+  isServiceInventoryReadinessState,
   reconcileServiceInventory,
   serviceCapabilityMapHref,
+  serviceInventoryAuditState,
+  serviceInventoryReadinessState,
 } from '../src/lib/service-inventory.ts';
 
 function canonicalServices(): ServiceEntry[] {
@@ -23,7 +27,7 @@ function canonicalServices(): ServiceEntry[] {
   }
 }
 
-test('canonical inventory reconciles exactly 43 platform plus 6 enterprise sources to 49', () => {
+test('canonical inventory reconciles exactly 42 platform plus 6 enterprise sources to 48', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   assert.deepEqual(
     {
@@ -41,7 +45,7 @@ test('canonical inventory reconciles exactly 43 platform plus 6 enterprise sourc
       issues: [],
     },
   );
-  assert.equal(new Set(inventory.entries.map((entry) => entry.id)).size, 49);
+  assert.equal(new Set(inventory.entries.map((entry) => entry.id)).size, 48);
 });
 
 test('inventory keeps platform services and enterprise sources under different IA owners', () => {
@@ -49,7 +53,7 @@ test('inventory keeps platform services and enterprise sources under different I
   const platform = inventory.entries.filter((entry) => entry.owner === 'operations-services');
   const sources = inventory.entries.filter((entry) => entry.owner === 'data-sources');
 
-  assert.equal(platform.length, 43);
+  assert.equal(platform.length, 42);
   assert.equal(sources.length, 6);
   assert.ok(platform.every((entry) => entry.routes.list === '/operations/services'));
   assert.ok(sources.every((entry) => entry.routes.list === '/data/sources'));
@@ -97,7 +101,7 @@ test('reconciliation fails honestly for drift, duplicate ids, and unknown platfo
   assert.ok(inventory.issues.some((issue) => issue.code === 'unclassified-platform'));
 });
 
-test('all 49 records carry routes, system-of-record provenance, and an honest next action', () => {
+test('all 48 records carry routes, system-of-record provenance, and an honest next action', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   for (const entry of inventory.entries) {
     assert.match(entry.routes.list, /^\//);
@@ -108,7 +112,7 @@ test('all 49 records carry routes, system-of-record provenance, and an honest ne
   }
 });
 
-test('URL-style inventory filters search identity and narrow by family and IA owner', () => {
+test('URL-style inventory filters search identity, IA facets, audit recency, and readiness', () => {
   const entries = reconcileServiceInventory({ platformServices: canonicalServices() }).entries;
 
   assert.deepEqual(
@@ -117,6 +121,7 @@ test('URL-style inventory filters search identity and narrow by family and IA ow
   );
   assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);
   assert.equal(filterServiceInventory(entries, { owner: 'data-sources' }).length, 6);
+  assert.equal(filterServiceInventory(entries, { readiness: 'unverified' }).length, 48);
   assert.deepEqual(
     filterServiceInventory(entries, {
       query: 'claims',
@@ -132,6 +137,93 @@ test('inventory filter guards accept only canonical URL values', () => {
   assert.equal(isServiceInventoryFamily('unknown'), false);
   assert.equal(isServiceInventoryOwner('operations-services'), true);
   assert.equal(isServiceInventoryOwner('operations'), false);
+  assert.equal(isServiceInventoryAuditState('stale'), true);
+  assert.equal(isServiceInventoryAuditState('audited'), false);
+  assert.equal(isServiceInventoryReadinessState('attention'), true);
+  assert.equal(isServiceInventoryReadinessState('failed'), false);
+});
+
+test('audit and readiness facets derive only from canonical inventory evidence', () => {
+  const entries = reconcileServiceInventory({ platformServices: canonicalServices() }).entries;
+  const base = entries[0];
+  assert.ok(base);
+  const auditedSummary = {
+    status: 'audited' as const,
+    verifiedGates: 0,
+    partialGates: 0,
+    totalGates: 0,
+    productionItems: 0,
+    totalItems: 0,
+  };
+  const current = {
+    ...base,
+    id: 'current',
+    capabilityAudit: { ...auditedSummary, auditState: 'current' as const },
+    deployment: { ...base.deployment, mutableVersion: true, version: 'latest' },
+  };
+  const stale = {
+    ...base,
+    id: 'stale',
+    capabilityAudit: { ...auditedSummary, auditState: 'stale' as const },
+    deployment: { ...base.deployment, mutableVersion: false, version: '1.0.0' },
+  };
+  const pending = {
+    ...base,
+    id: 'pending',
+    capabilityAudit: { status: 'not-audited' as const },
+    deployment: { ...base.deployment, mutableVersion: true, version: 'stale' },
+  };
+
+  assert.equal(serviceInventoryAuditState(current), 'current');
+  assert.equal(serviceInventoryAuditState(stale), 'stale');
+  assert.equal(serviceInventoryAuditState(pending), 'pending');
+  assert.deepEqual(
+    filterServiceInventory([current, stale, pending], { audit: 'current' }).map(
+      (entry) => entry.id,
+    ),
+    ['current'],
+  );
+  assert.deepEqual(
+    filterServiceInventory([current, stale, pending], { audit: 'stale' }).map((entry) => entry.id),
+    ['stale'],
+  );
+  assert.deepEqual(
+    filterServiceInventory([current, stale, pending], { audit: 'pending' }).map(
+      (entry) => entry.id,
+    ),
+    ['pending'],
+  );
+
+  const withReadiness = (states: Array<'pass' | 'fail' | 'unknown' | 'not-applicable'>) => ({
+    ...pending,
+    readiness: {
+      deployed: states[0] ?? 'unknown',
+      reachable: states[1] ?? 'unknown',
+      functional: states[2] ?? 'unknown',
+      seeded: states[3] ?? 'unknown',
+      'console-used': states[4] ?? 'unknown',
+    },
+  });
+  const verified = withReadiness(['pass', 'pass', 'pass', 'pass', 'pass']);
+  const partial = withReadiness(['pass', 'pass', 'unknown', 'not-applicable', 'pass']);
+  const attention = withReadiness(['pass', 'fail', 'unknown']);
+  const unverified = withReadiness([]);
+  assert.equal(serviceInventoryReadinessState(verified), 'verified');
+  assert.equal(serviceInventoryReadinessState(partial), 'partial');
+  assert.equal(serviceInventoryReadinessState(attention), 'attention');
+  assert.equal(serviceInventoryReadinessState(unverified), 'unverified');
+  assert.deepEqual(
+    filterServiceInventory([verified, partial, attention, unverified], { readiness: 'verified' }),
+    [verified],
+  );
+  assert.deepEqual(
+    filterServiceInventory([verified, partial, attention, unverified], { readiness: 'partial' }),
+    [partial],
+  );
+  assert.deepEqual(
+    filterServiceInventory([verified, partial, attention, unverified], { readiness: 'attention' }),
+    [attention],
+  );
 });
 
 test('capability map URLs preserve explicit search, facets, and service selection', () => {
@@ -142,8 +234,10 @@ test('capability map URLs preserve explicit search, facets, and service selectio
       query: 'trace id',
       family: 'observability',
       owner: 'operations-services',
+      audit: 'stale',
+      readiness: 'partial',
     }),
-    '/operations/services/capability-map?service=otel+collector&q=trace+id&family=observability&owner=operations-services',
+    '/operations/services/capability-map?service=otel+collector&q=trace+id&family=observability&owner=operations-services&audit=stale&readiness=partial',
   );
   assert.equal(
     serviceCapabilityMapHref({ serviceId: 'otel-collector', query: '   ' }),

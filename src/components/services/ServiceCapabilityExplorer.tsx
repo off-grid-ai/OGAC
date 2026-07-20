@@ -24,9 +24,13 @@ import {
 } from '@/lib/service-capability-map';
 import {
   filterServiceInventory,
+  SERVICE_INVENTORY_AUDIT_STATES,
   SERVICE_INVENTORY_FAMILIES,
   SERVICE_INVENTORY_OWNERS,
+  SERVICE_INVENTORY_READINESS_STATES,
   serviceCapabilityMapHref,
+  serviceInventoryAuditState,
+  serviceInventoryReadinessState,
   type LogicalServiceInventoryEntry,
   type ServiceInventoryFamily,
   type ServiceInventoryFilter,
@@ -61,18 +65,28 @@ const OWNER_LABELS: Readonly<Record<(typeof SERVICE_INVENTORY_OWNERS)[number], s
   'data-sources': 'Data / Sources',
 };
 
-function operationalState(entry: LogicalServiceInventoryEntry): {
-  label: string;
-  variant: 'default' | 'secondary' | 'outline' | 'destructive';
-} {
-  const states = Object.values(entry.readiness);
-  if (states.includes('fail')) return { label: 'attention', variant: 'destructive' };
-  const passing = states.filter((state) => state === 'pass').length;
-  const unknown = states.filter((state) => state === 'unknown').length;
-  if (passing > 0 && unknown === 0) return { label: 'verified', variant: 'default' };
-  if (passing > 0) return { label: 'partial evidence', variant: 'secondary' };
-  return { label: 'not verified', variant: 'outline' };
-}
+const AUDIT_LABELS: Readonly<Record<(typeof SERVICE_INVENTORY_AUDIT_STATES)[number], string>> = {
+  current: 'current',
+  stale: 'stale',
+  pending: 'pending',
+};
+
+const READINESS_LABELS: Readonly<
+  Record<(typeof SERVICE_INVENTORY_READINESS_STATES)[number], string>
+> = {
+  verified: 'verified',
+  partial: 'partial evidence',
+  attention: 'attention',
+  unverified: 'not verified',
+};
+
+const AUDIT_VARIANTS: Readonly<
+  Record<(typeof SERVICE_INVENTORY_AUDIT_STATES)[number], 'default' | 'secondary' | 'outline'>
+> = {
+  current: 'default',
+  stale: 'secondary',
+  pending: 'outline',
+};
 
 function GateBadge({ assessment }: Readonly<{ assessment: CapabilityGateAssessment }>) {
   return (
@@ -88,13 +102,11 @@ function GateBadge({ assessment }: Readonly<{ assessment: CapabilityGateAssessme
 }
 
 function OverviewRail({ inventory }: Readonly<{ inventory: ServiceInventoryReconciliation }>) {
-  const audited = inventory.entries.filter(
-    (entry) => entry.capabilityAudit.status === 'audited',
-  ).length;
-  const operational = inventory.entries.filter((entry) => {
-    const readiness = Object.values(entry.readiness);
-    return readiness.some((state) => state === 'pass') && !readiness.includes('fail');
-  }).length;
+  const auditCounts = new Map<(typeof SERVICE_INVENTORY_AUDIT_STATES)[number], number>();
+  for (const entry of inventory.entries) {
+    const state = serviceInventoryAuditState(entry);
+    auditCounts.set(state, (auditCounts.get(state) ?? 0) + 1);
+  }
 
   return (
     <div
@@ -103,11 +115,11 @@ function OverviewRail({ inventory }: Readonly<{ inventory: ServiceInventoryRecon
     >
       {[
         { label: 'Inventory', value: inventory.totalCount },
-        { label: 'Audited', value: audited },
-        { label: 'Operational evidence', value: operational },
-        { label: 'Pending audit', value: inventory.totalCount - audited },
+        { label: 'Current audits', value: auditCounts.get('current') ?? 0 },
+        { label: 'Stale audits', value: auditCounts.get('stale') ?? 0 },
+        { label: 'Pending audits', value: auditCounts.get('pending') ?? 0 },
       ].map((stat) => (
-        <div key={stat.label} className="min-w-0 px-3 py-2">
+        <div key={stat.label} className="min-w-0 px-3 py-2" data-inventory-stat={stat.label}>
           <p className="truncate font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
             {stat.label}
           </p>
@@ -120,11 +132,9 @@ function OverviewRail({ inventory }: Readonly<{ inventory: ServiceInventoryRecon
 
 function FamilyNavigation({
   filter,
-  selectedServiceId,
   inventory,
 }: Readonly<{
   filter: ServiceInventoryFilter;
-  selectedServiceId: string | null;
   inventory: ServiceInventoryReconciliation;
 }>) {
   const counts = new Map<ServiceInventoryFamily, number>();
@@ -144,7 +154,8 @@ function FamilyNavigation({
           href={serviceCapabilityMapHref({
             query: filter.query,
             owner: filter.owner,
-            serviceId: selectedServiceId,
+            audit: filter.audit,
+            readiness: filter.readiness,
           })}
           aria-current={!filter.family ? 'page' : undefined}
         >
@@ -164,7 +175,8 @@ function FamilyNavigation({
               query: filter.query,
               family,
               owner: filter.owner,
-              serviceId: selectedServiceId,
+              audit: filter.audit,
+              readiness: filter.readiness,
             })}
             aria-current={filter.family === family ? 'page' : undefined}
           >
@@ -177,11 +189,10 @@ function FamilyNavigation({
   );
 }
 
-function InventoryFilters({
-  filter,
-  selectedServiceId,
-}: Readonly<{ filter: ServiceInventoryFilter; selectedServiceId: string | null }>) {
-  const hasFilter = Boolean(filter.query?.trim() || filter.family || filter.owner);
+function InventoryFilters({ filter }: Readonly<{ filter: ServiceInventoryFilter }>) {
+  const hasFilter = Boolean(
+    filter.query?.trim() || filter.family || filter.owner || filter.audit || filter.readiness,
+  );
 
   return (
     <form
@@ -190,7 +201,6 @@ function InventoryFilters({
       className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
       role="search"
     >
-      {selectedServiceId ? <input type="hidden" name="service" value={selectedServiceId} /> : null}
       {filter.family ? <input type="hidden" name="family" value={filter.family} /> : null}
       <div className="relative min-w-0">
         <MagnifyingGlass
@@ -207,7 +217,7 @@ function InventoryFilters({
         />
       </div>
       <Button type="submit" size="sm">
-        Search
+        Apply
       </Button>
       <NativeSelect
         name="owner"
@@ -222,10 +232,30 @@ function InventoryFilters({
           </option>
         ))}
       </NativeSelect>
+      <NativeSelect name="audit" defaultValue={filter.audit} aria-label="Filter by audit recency">
+        <option value="">Any audit state</option>
+        {SERVICE_INVENTORY_AUDIT_STATES.map((audit) => (
+          <option key={audit} value={audit}>
+            {AUDIT_LABELS[audit]} audit
+          </option>
+        ))}
+      </NativeSelect>
+      <NativeSelect
+        name="readiness"
+        defaultValue={filter.readiness}
+        aria-label="Filter by operational readiness"
+      >
+        <option value="">Any readiness</option>
+        {SERVICE_INVENTORY_READINESS_STATES.map((readiness) => (
+          <option key={readiness} value={readiness}>
+            {READINESS_LABELS[readiness]}
+          </option>
+        ))}
+      </NativeSelect>
       <div className="flex items-center justify-end">
         {hasFilter ? (
           <Button asChild variant="ghost" size="sm">
-            <Link href={serviceCapabilityMapHref({ serviceId: selectedServiceId })}>Clear</Link>
+            <Link href={serviceCapabilityMapHref()}>Clear</Link>
           </Button>
         ) : null}
       </div>
@@ -248,9 +278,7 @@ function ServiceMasterList({
         <div>
           <p className="text-sm text-foreground">No services match these filters.</p>
           <Button asChild variant="link" size="sm" className="mt-1">
-            <Link href={serviceCapabilityMapHref({ serviceId: selectedServiceId })}>
-              Clear filters
-            </Link>
+            <Link href={serviceCapabilityMapHref()}>Clear filters</Link>
           </Button>
         </div>
       </div>
@@ -261,7 +289,8 @@ function ServiceMasterList({
     <ol className="divide-y divide-border" aria-label="Filtered service inventory">
       {entries.map((entry) => {
         const selected = entry.id === selectedServiceId;
-        const operational = operationalState(entry);
+        const audit = serviceInventoryAuditState(entry);
+        const readiness = serviceInventoryReadinessState(entry);
         return (
           <li key={entry.id}>
             <Link
@@ -273,17 +302,18 @@ function ServiceMasterList({
               <span className="flex min-w-0 items-start justify-between gap-2">
                 <span className="min-w-0 truncate text-xs text-foreground">{entry.label}</span>
                 <Badge
-                  variant={entry.capabilityAudit.status === 'audited' ? 'default' : 'outline'}
+                  variant={AUDIT_VARIANTS[audit]}
                   className="rounded-md px-1.5 py-0 font-mono text-[9px] font-normal"
+                  data-audit-state={audit}
                 >
-                  {entry.capabilityAudit.status === 'audited' ? 'audited' : 'pending'}
+                  {AUDIT_LABELS[audit]}
                 </Badge>
               </span>
               <span className="mt-1 flex min-w-0 items-center justify-between gap-2 font-mono text-[9px] text-muted-foreground">
                 <span className="truncate">
                   {entry.family === 'unclassified' ? 'Unclassified' : FAMILY_LABELS[entry.family]}
                 </span>
-                <span className="shrink-0">{operational.label}</span>
+                <span className="shrink-0">{READINESS_LABELS[readiness]}</span>
               </span>
             </Link>
           </li>
@@ -294,7 +324,7 @@ function ServiceMasterList({
 }
 
 function PendingAuditDetail({ entry }: Readonly<{ entry: LogicalServiceInventoryEntry }>) {
-  const operational = operationalState(entry);
+  const readiness = serviceInventoryReadinessState(entry);
   return (
     <div className="space-y-4 p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -318,7 +348,7 @@ function PendingAuditDetail({ entry }: Readonly<{ entry: LogicalServiceInventory
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Operational evidence', value: operational.label },
+          { label: 'Operational evidence', value: READINESS_LABELS[readiness] },
           { label: 'Capability audit', value: 'Pending' },
           { label: 'Deployed nodes', value: entry.deployment.nodes.join(', ') || 'Not recorded' },
           { label: 'Version', value: entry.deployment.version ?? 'Not audited' },
@@ -350,7 +380,10 @@ function PendingAuditDetail({ entry }: Readonly<{ entry: LogicalServiceInventory
   );
 }
 
-function AuditedServiceDetail({ audit }: Readonly<{ audit: ServiceCapabilityAudit }>) {
+function AuditedServiceDetail({
+  audit,
+  entry,
+}: Readonly<{ audit: ServiceCapabilityAudit; entry: LogicalServiceInventoryEntry }>) {
   const summary = summarizeServiceCapabilityAudit(audit.serviceId);
   if (summary.status !== 'audited') return null;
   const coverage = capabilityCoveragePercent(summary);
@@ -364,6 +397,12 @@ function AuditedServiceDetail({ audit }: Readonly<{ audit: ServiceCapabilityAudi
           </p>
           <h2 className="text-base text-foreground">{audit.serviceLabel}</h2>
           <p className="max-w-5xl text-xs leading-relaxed text-muted-foreground">{audit.summary}</p>
+          <Button asChild variant="outline" size="sm" className="mt-2">
+            <Link href={entry.routes.management}>
+              Open management
+              <ArrowSquareOut className="size-3.5" aria-hidden="true" />
+            </Link>
+          </Button>
         </div>
         <div className="space-y-2">
           <Progress
@@ -455,7 +494,7 @@ function ExplorerWelcome({ inventory }: Readonly<{ inventory: ServiceInventoryRe
         </p>
         <Badge variant={inventory.exactContract ? 'default' : 'destructive'} className="rounded-md">
           {inventory.exactContract
-            ? '49-entry contract matched'
+            ? `${inventory.totalCount}-entry contract matched`
             : 'Inventory reconciliation failed'}
         </Badge>
       </div>
@@ -521,11 +560,7 @@ export function ServiceCapabilityExplorer({
         </div>
         <div className="grid gap-3 pb-3 xl:grid-cols-[minmax(28rem,40rem)_minmax(0,1fr)] xl:items-center">
           <OverviewRail inventory={inventory} />
-          <FamilyNavigation
-            filter={inventoryFilter}
-            selectedServiceId={selectedServiceId}
-            inventory={inventory}
-          />
+          <FamilyNavigation filter={inventoryFilter} inventory={inventory} />
         </div>
       </header>
 
@@ -535,7 +570,7 @@ export function ServiceCapabilityExplorer({
           aria-label="Service capability inventory"
         >
           <div className="sticky top-0 z-10 border-b border-border bg-background p-3">
-            <InventoryFilters filter={inventoryFilter} selectedServiceId={selectedServiceId} />
+            <InventoryFilters filter={inventoryFilter} />
             <p className="mt-2 font-mono text-[9px] text-muted-foreground" aria-live="polite">
               {visibleEntries.length}/{inventory.totalCount} services shown
             </p>
@@ -550,8 +585,8 @@ export function ServiceCapabilityExplorer({
         </aside>
 
         <main className="min-h-0 min-w-0 lg:overflow-y-auto" aria-label="Selected service detail">
-          {selectedAudit ? (
-            <AuditedServiceDetail audit={selectedAudit} />
+          {selectedAudit && selectedEntry ? (
+            <AuditedServiceDetail audit={selectedAudit} entry={selectedEntry} />
           ) : selectedEntry ? (
             <PendingAuditDetail entry={selectedEntry} />
           ) : selectedServiceId ? (

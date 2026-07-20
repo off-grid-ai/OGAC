@@ -3,8 +3,10 @@ import { ServiceCapabilityExplorer } from '@/components/services/ServiceCapabili
 import { requireModuleForUser } from '@/lib/module-access';
 import { SERVICE_CAPABILITY_AUDITS } from '@/lib/service-capability-map';
 import {
+  isServiceInventoryAuditState,
   isServiceInventoryFamily,
   isServiceInventoryOwner,
+  isServiceInventoryReadinessState,
   reconcileServiceInventory,
 } from '@/lib/service-inventory';
 import { getRuntimeServiceTopologyRegistry } from '@/lib/runtime-service-topology';
@@ -24,6 +26,8 @@ export default async function ServiceCapabilityMapPage({
   const rawQuery = typeof params.q === 'string' ? params.q : '';
   const rawFamily = typeof params.family === 'string' ? params.family : '';
   const rawOwner = typeof params.owner === 'string' ? params.owner : '';
+  const rawAudit = typeof params.audit === 'string' ? params.audit : '';
+  const rawReadiness = typeof params.readiness === 'string' ? params.readiness : '';
   const topology = getRuntimeServiceTopologyRegistry().list();
   const inventory = reconcileServiceInventory({
     platformServices: topology.map((entry) => entry.service),
@@ -39,6 +43,8 @@ export default async function ServiceCapabilityMapPage({
           query: rawQuery,
           family: isServiceInventoryFamily(rawFamily) ? rawFamily : '',
           owner: isServiceInventoryOwner(rawOwner) ? rawOwner : '',
+          audit: isServiceInventoryAuditState(rawAudit) ? rawAudit : '',
+          readiness: isServiceInventoryReadinessState(rawReadiness) ? rawReadiness : '',
         }}
         selectedServiceId={selectedServiceId ?? null}
       />

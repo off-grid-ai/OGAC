@@ -17,9 +17,9 @@ import {
   type ReadinessSummary,
 } from './service-topology';
 
-export const EXPECTED_PLATFORM_SERVICE_COUNT = 43;
+export const EXPECTED_PLATFORM_SERVICE_COUNT = 42;
 export const EXPECTED_ENTERPRISE_SOURCE_COUNT = 6;
-export const EXPECTED_LOGICAL_INVENTORY_COUNT = 49;
+export const EXPECTED_LOGICAL_INVENTORY_COUNT = 48;
 
 export const SERVICE_INVENTORY_FAMILIES = [
   'data',
@@ -32,6 +32,15 @@ export const SERVICE_INVENTORY_FAMILIES = [
 
 export const SERVICE_INVENTORY_OWNERS = ['operations-services', 'data-sources'] as const;
 
+export const SERVICE_INVENTORY_AUDIT_STATES = ['current', 'stale', 'pending'] as const;
+
+export const SERVICE_INVENTORY_READINESS_STATES = [
+  'verified',
+  'partial',
+  'attention',
+  'unverified',
+] as const;
+
 export type ServiceInventoryFamily =
   | 'data'
   | 'runtime'
@@ -42,6 +51,10 @@ export type ServiceInventoryFamily =
   | 'unclassified';
 
 export type ServiceInventoryOwner = 'operations-services' | 'data-sources';
+
+export type ServiceInventoryAuditState = (typeof SERVICE_INVENTORY_AUDIT_STATES)[number];
+
+export type ServiceInventoryReadinessState = (typeof SERVICE_INVENTORY_READINESS_STATES)[number];
 
 export interface ServiceInventoryRoutes {
   list: string;
@@ -100,6 +113,8 @@ export interface ServiceInventoryFilter {
   query?: string;
   family?: ServiceInventoryFamily | '';
   owner?: ServiceInventoryOwner | '';
+  audit?: ServiceInventoryAuditState | '';
+  readiness?: ServiceInventoryReadinessState | '';
 }
 
 export interface ServiceCapabilityMapUrlState extends ServiceInventoryFilter {
@@ -154,7 +169,6 @@ const PLATFORM_SERVICE_IDS_BY_FAMILY: Readonly<
   operations: [
     'console',
     'edge-gateway',
-    'provit',
     'redis',
     'superset',
     'fleetdm',
@@ -297,7 +311,7 @@ function enterpriseSourceRecord(source: EnterpriseSourceDefinition): LogicalServ
 }
 
 /**
- * Reconcile the two IA owners into one logical 49-entry projection without duplicating entities.
+ * Reconcile the two IA owners into one logical 48-entry projection without duplicating entities.
  * The function remains pure: callers inject the live service registry/topology, while capability
  * evidence is referenced from the canonical capability registry rather than copied here.
  */
@@ -368,12 +382,14 @@ export function reconcileServiceInventory({
 /** URL-filterable inventory refinement. An empty filter always preserves the exact source order. */
 export function filterServiceInventory(
   entries: readonly LogicalServiceInventoryEntry[],
-  { query = '', family = '', owner = '' }: ServiceInventoryFilter,
+  { query = '', family = '', owner = '', audit = '', readiness = '' }: ServiceInventoryFilter,
 ): LogicalServiceInventoryEntry[] {
   const needle = query.trim().toLowerCase();
   return entries.filter((entry) => {
     if (family && entry.family !== family) return false;
     if (owner && entry.owner !== owner) return false;
+    if (audit && serviceInventoryAuditState(entry) !== audit) return false;
+    if (readiness && serviceInventoryReadinessState(entry) !== readiness) return false;
     if (!needle) return true;
     return [
       entry.id,
@@ -395,18 +411,52 @@ export function isServiceInventoryOwner(value: string): value is ServiceInventor
   return (SERVICE_INVENTORY_OWNERS as readonly string[]).includes(value);
 }
 
+export function isServiceInventoryAuditState(value: string): value is ServiceInventoryAuditState {
+  return (SERVICE_INVENTORY_AUDIT_STATES as readonly string[]).includes(value);
+}
+
+export function isServiceInventoryReadinessState(
+  value: string,
+): value is ServiceInventoryReadinessState {
+  return (SERVICE_INVENTORY_READINESS_STATES as readonly string[]).includes(value);
+}
+
+/** Audit recency is projected from the canonical capability summary, never inferred in the UI. */
+export function serviceInventoryAuditState(
+  entry: LogicalServiceInventoryEntry,
+): ServiceInventoryAuditState {
+  if (entry.capabilityAudit.status !== 'audited') return 'pending';
+  return entry.capabilityAudit.auditState;
+}
+
+/** Collapse the canonical readiness gates into one filterable operator state. */
+export function serviceInventoryReadinessState(
+  entry: LogicalServiceInventoryEntry,
+): ServiceInventoryReadinessState {
+  const states = Object.values(entry.readiness);
+  if (states.includes('fail')) return 'attention';
+  const passing = states.filter((state) => state === 'pass').length;
+  if (passing > 0 && !states.includes('unknown')) return 'verified';
+  if (passing > 0) return 'partial';
+  return 'unverified';
+}
+
 /** Preserve the capability-map navigation state in one canonical, shareable URL. */
 export function serviceCapabilityMapHref({
   serviceId = null,
   query = '',
   family = '',
   owner = '',
+  audit = '',
+  readiness = '',
 }: ServiceCapabilityMapUrlState = {}): string {
   const params = new URLSearchParams();
   if (serviceId) params.set('service', serviceId);
   if (query.trim()) params.set('q', query);
   if (family) params.set('family', family);
   if (owner) params.set('owner', owner);
+  if (audit) params.set('audit', audit);
+  if (readiness) params.set('readiness', readiness);
   const search = params.toString();
   return `/operations/services/capability-map${search ? `?${search}` : ''}`;
 }
