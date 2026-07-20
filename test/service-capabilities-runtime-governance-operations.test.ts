@@ -162,7 +162,9 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
       ]),
     ),
     {
-      'artifact-identity': ['yes', 'partial', 'no', 'no'],
+      // Each worker binds the deployed release SHA into its Temporal identity (<pid>@<host>#<sha8>);
+      // DescribeTaskQueue reports it live and the readiness panel surfaces it (verified SHA 2b256bbc).
+      'artifact-identity': ['yes', 'yes', 'yes', 'yes'],
       // task-queue-readiness is fully proven live: a real DescribeTaskQueue poller probe, exposed on
       // the app-worker detail page, verified on the fleet 2026-07-20 (44550@offgrid-s1 on offgrid-apps).
       'task-queue-readiness': ['yes', 'yes', 'yes', 'yes'],
@@ -184,7 +186,7 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
       .filter((item) => item.gates.workflow.status === 'no')
       .map((item) => item.id)
       .sort(),
-    ['artifact-identity', 'failure-recovery'],
+    ['failure-recovery'],
   );
 });
 
