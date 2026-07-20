@@ -99,6 +99,18 @@ test('contract WITH dom_hr allowed ⇒ connector read proceeds; run completes', 
   assert.equal(out.steps.find((s) => s.stepId === 's1')?.status, 'done');
 });
 
+test('contract using a domain label authorizes the resolved connector domain', async () => {
+  const out = await runApp(
+    LINEAR,
+    {},
+    { orgId: 'default', runId: 'r_label_allow', contract: contract({ dataAllowlist: ['quota'] }) },
+    fakeDeps(),
+  );
+
+  assert.equal(out.status, 'done');
+  assert.equal(out.steps.find((s) => s.stepId === 's1')?.status, 'done');
+});
+
 test('contract WITHOUT dom_hr in allowlist ⇒ connector read DENIED, run halts', async () => {
   const out = await runApp(
     LINEAR,

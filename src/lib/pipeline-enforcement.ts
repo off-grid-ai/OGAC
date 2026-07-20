@@ -20,6 +20,7 @@ import {
   type PermissionLevel,
   type PipelineRouting,
   PERMISSION_SCALE,
+  allowlistReferencesTokens,
   canReachData,
   deriveEgress,
   effectiveGovernance,
@@ -119,6 +120,7 @@ function levelRank(level: PermissionLevel | undefined): number {
 export function enforceDataAccess(
   contract: PipelineContract | null,
   requested: string,
+  referenceTokens: string[] = [requested],
 ): DataAccessVerdict {
   const req = (requested ?? '').trim();
   if (!contract) {
@@ -129,7 +131,14 @@ export function enforceDataAccess(
       noPipeline: true,
     };
   }
-  const allow = canReachData(contract.dataAllowlist, req);
+  // A pipeline's editor intentionally accepts a domain id, label, or alias. Runtime enforcement must
+  // therefore use the same canonical matcher as reverse-edge/navigation reads; otherwise a valid
+  // operator-authored label (for example `customer data`) resolves to a domain id and is then denied
+  // merely because the stored allowlist used another stable surface form. Callers that only know an
+  // id preserve the original exact-match behaviour through the default token list.
+  const allow =
+    canReachData(contract.dataAllowlist, req) ||
+    allowlistReferencesTokens(contract.dataAllowlist, referenceTokens);
   return {
     allow,
     requested: req,

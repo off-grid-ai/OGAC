@@ -550,6 +550,7 @@ async function executeConnectorStep(
   // then by LABEL/ALIAS via the rule engine (no-guess). See resolveDomainByIdOrLabel (GAP #106-a).
   const domains = await deps.listDomains(ctx.orgId);
   const { resolveDomain } = await import('@/lib/data-domains');
+  const { domainMatchTokens } = await import('@/lib/pipelines-policy');
   const resolved = resolveDomainByIdOrLabel(step.domain, domains, resolveDomain);
   if (!resolved) {
     return errorResult(step, `no data-domain binds "${step.domain}" (unbound — not guessed)`);
@@ -557,7 +558,11 @@ async function executeConnectorStep(
   // PA-16 — HARD data-allowlist ceiling. Before the connector is HIT, check the resolved data-domain
   // against the bound pipeline's allowlist (pure enforceDataAccess). Outside the ceiling ⇒ deny +
   // audit (a governed error, never a crash). No pipeline ⇒ noPipeline verdict allows it (legacy).
-  const dataVerdict = enforceDataAccess(ctx.contract ?? null, resolved.id);
+  const dataVerdict = enforceDataAccess(
+    ctx.contract ?? null,
+    resolved.id,
+    domainMatchTokens(resolved),
+  );
   if (!dataVerdict.allow) {
     auditEnforcement(
       { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
