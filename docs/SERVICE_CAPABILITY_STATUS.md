@@ -24,6 +24,22 @@ live deployment.
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
 
+### Retrieval and lineage evidence-spine delta
+
+This source checkpoint closes the narrow correlation blind spot without promoting any live gate.
+The governed agent path now persists the selected retrieval provider, Qdrant collection, search
+mode, tenant/metadata/ACL filter shape, and the OpenLineage adapter delivery outcome against the
+canonical agent-run id. Marquez distinguishes `accepted`, `rejected`, `unreachable`, and
+`not-configured`; a non-2xx response can no longer be reported as delivered.
+
+| Evidence slice                         | Source state | Retained source proof            | Still required before live verification                                                                 |
+| -------------------------------------- | ------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Qdrant provider/filter correlation     | code-wired   | `1eef2699`, `002d9c18`           | Run each flagship journey with Qdrant selected and retain the persisted run step plus matching query.   |
+| Marquez delivery receipt/failure state | code-wired   | `ced84501`, `002d9c18`           | Retain one accepted delivery and one controlled rejection/unreachable result for each flagship family. |
+
+No Qdrant or Marquez A/I/UI/W gate changes at this checkpoint: focused tests and typecheck prove
+the code contract, not the selected live deployment or a completed BFSI workflow.
+
 ## Evidence roll-up
 
 These totals are calculated from the 157 versioned capability records currently owned by the two
