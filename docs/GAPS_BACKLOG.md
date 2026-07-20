@@ -1129,3 +1129,14 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   webhook ingestion, pagination, and concurrent cross-process exactly-once semantics remain OPEN.
   Close this only after the private fleet fixture/API adds a versioned tasks resource plus an atomic
   idempotency contract and the Console proves it against that live API.
+
+## Insurance claim disposition source ownership (2026-07-20)
+
+- **[G-CLAIM-SOURCE] RESOLVED IN CODE — do not write claims through the Advisor/HR MySQL fixture.**
+  Inspection of the private fleet seed proves that `policyadmin` MySQL owns branches, advisors,
+  commissions, HR and reimbursement data; it has no claims table. The insurer claim register is
+  owned by the tenant-isolated Core Insurance PostgreSQL connector (`surcon_coreins`, table
+  `claims`). The governed disposition endpoint therefore targets only an org-owned PostgreSQL
+  connector and a fixed, parameterized `claims` statement. It never mutates PolicyAdmin MySQL.
+  Console-owned `claim_disposition_commands` records authority attribution, leased idempotency and
+  the source-result receipt without adding integration columns/tables to the customer's source.
