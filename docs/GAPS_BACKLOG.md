@@ -1117,18 +1117,21 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
 
 ## CRM governed write-back slice (2026-07-20)
 
-- **[G-CRM-TASKS] PARTIAL — typed opportunity follow-up writes are implemented; standalone CRM task
-  creation remains blocked by the deployed fixture contract.** The Console now has one tenant-scoped,
+- **[G-CRM-TASKS] RESOLVED IN CODE / DEPLOYMENT PENDING — typed opportunity follow-up and standalone
+  task writes share one governed CRM action seam.** The Console now has one tenant-scoped,
   allowlisted and idempotent action seam for bank cross-sell and lender delinquency:
   `POST /api/v1/admin/connectors/:id/actions/crm-writeback`. It reads the existing opportunity,
   rejects unsafe fields and conflicting key reuse, PATCHes only `stage`, `next_action`, and
   `offgrid_writeback`, emits an attributed audit event, and returns a signed receipt. Real HTTP
   integration evidence covers GET → PATCH → replay with exactly one mutation. The deployed CRM
-  fixture currently declares only `accounts`, `opportunities`, and `contacts`; it has no `tasks`
-  collection or documented durable idempotency/conditional-write API. Therefore generic task create,
-  webhook ingestion, pagination, and concurrent cross-process exactly-once semantics remain OPEN.
-  Close this only after the private fleet fixture/API adds a versioned tasks resource plus an atomic
-  idempotency contract and the Console proves it against that live API.
+  private fleet fixture at `onprem-fleet-orchestration@db67a7d` now owns a versioned `/v1/tasks`
+  resource with tenant scoping, bounded create/update fields, serialized mutations, durable state,
+  and a persisted idempotency ledger. Console task requests require that exact API version, pass the
+  session-derived org boundary in `x-offgrid-org-id`, emit attributed audit events, and return signed
+  receipts. Real HTTP tests prove create, update, replay, conflict, tenant propagation and fail-closed
+  version handling. Live closure remains pending the documented CRM container recreation followed by
+  Console deployment and integration verification. Generic webhook ingestion and broad CRM CRUD are
+  explicitly outside this action seam rather than being falsely claimed as implemented.
 
 ## Insurance claim disposition source ownership (2026-07-20)
 

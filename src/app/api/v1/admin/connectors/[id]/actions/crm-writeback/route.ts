@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { writeCrmOpportunityFollowUp } from '@/lib/adapters/crm-writeback';
+import { writeCrmTask } from '@/lib/adapters/crm-task-writeback';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { listConnectors } from '@/lib/store';
@@ -27,10 +28,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const connector = (await listConnectors(orgId)).find((candidate) => candidate.id === id);
   if (!connector) return NextResponse.json({ error: 'unknown connector' }, { status: 404 });
 
-  const result = await writeCrmOpportunityFollowUp(connector, body, orgId);
+  const taskOperation = body && typeof body === 'object' && !Array.isArray(body)
+    && ((body as Record<string, unknown>).operation === 'create-task'
+      || (body as Record<string, unknown>).operation === 'update-task');
+  const result = taskOperation
+    ? await writeCrmTask(connector, body, orgId)
+    : await writeCrmOpportunityFollowUp(connector, body, orgId);
   if (!result.ok) {
     auditFromSession(gate, orgId, {
-      action: 'connector.crm.writeback',
+      action: taskOperation ? 'connector.crm.task.writeback' : 'connector.crm.writeback',
       resource: `connector:${id}`,
       outcome: result.code === 'invalid-command' ? 'blocked' : 'error',
     });
@@ -41,8 +47,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   auditFromSession(gate, orgId, {
-    action: 'connector.crm.writeback',
-    resource: `connector:${id}/opportunity:${result.receipt.opportunityId}`,
+    action: taskOperation ? 'connector.crm.task.writeback' : 'connector.crm.writeback',
+    resource: taskOperation
+      ? `connector:${id}/task:${'taskId' in result.receipt ? result.receipt.taskId : 'unknown'}`
+      : `connector:${id}/opportunity:${'opportunityId' in result.receipt ? result.receipt.opportunityId : 'unknown'}`,
     outcome: 'ok',
   });
   return NextResponse.json(result, { status: result.receipt.replayed ? 200 : 201 });

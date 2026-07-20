@@ -41,12 +41,14 @@ export interface RestConnectorRequest {
   path: string[];
   body?: Record<string, unknown>;
   query?: Record<string, string>;
+  headers?: Record<string, string>;
 }
 
 export interface RestConnectorResponse {
   ok: boolean;
   status: number;
   body: unknown;
+  headers: Record<string, string>;
 }
 
 // Resolve a target's credential from the vault (by `id`) into a ready-to-use exec target. Falls back
@@ -319,6 +321,7 @@ export async function execRestConnectorRequest(
     const response = await fetch(url, {
       method: request.method,
       headers: {
+        ...(request.headers ?? {}),
         ...resolved.authHeader,
         ...(request.body ? { 'content-type': 'application/json' } : {}),
       },
@@ -329,7 +332,12 @@ export async function execRestConnectorRequest(
     const body = contentType.includes('application/json')
       ? await response.json().catch(() => null)
       : await response.text().catch(() => '');
-    return { ok: response.ok, status: response.status, body };
+    return {
+      ok: response.ok,
+      status: response.status,
+      body,
+      headers: Object.fromEntries(response.headers.entries()),
+    };
   } catch {
     return null;
   }
