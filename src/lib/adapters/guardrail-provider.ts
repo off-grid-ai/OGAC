@@ -9,8 +9,9 @@
 // SOLID seam:
 //   • normalizeLlmGuardResponse() — PURE, zero-IO, exhaustively unit-testable. Maps LLM Guard's
 //     /analyze verdict JSON onto the console's normalized PiiResult.
-//   • llmGuardPii — the thin I/O adapter: POST the text + the console-generated scanner config (which
-//     folds in the India recognizers — see llm-guard-config.ts) and normalize the answer.
+//   • llmGuardPii — the thin I/O adapter: POST stock v0.3.16 request bodies to the phase-correct
+//     endpoint and normalize the answer. Scanner selection/configuration is a startup YAML concern
+//     owned by the fleet, never an ignored per-request field.
 //
 // FAIL CLOSED (a guardrail must not be bypassable by killing the engine):
 //   • CONFIGURED (URL set) but unreachable / errored ⇒ return `{ blocked:true }` — the run is DENIED
@@ -19,8 +20,6 @@
 //     configured" state the UI surfaces. The step did not screen; it never pretends it did.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-import { buildLlmGuardScannerConfig, type LlmGuardScannerConfig } from '../llm-guard-config';
-import type { NormalizedRecognizer } from '../presidio-recognizers';
 import type { PiiPort, PiiResult } from './types';
 
 const env = process.env;
@@ -46,6 +45,16 @@ export interface RawLlmGuardResponse {
   scanners?: unknown;
   sanitized_prompt?: unknown;
   sanitized_output?: unknown;
+}
+
+export type LlmGuardAnalyzeRequest =
+  | { phase: 'input'; prompt: string; scanners_suppress?: string[] }
+  | { phase: 'output'; prompt: string; output: string; scanners_suppress?: string[] };
+
+export interface LlmGuardAnalyzeResponse {
+  body: RawLlmGuardResponse;
+  answeredBy: string[];
+  degraded: string[];
 }
 
 // The default risk-score above which a scanner counts as "flagged". LLM Guard scores are 0..1.
@@ -120,28 +129,40 @@ function trimTrailingSlash(url: string): string {
 
 // POST the prompt + the console's scanner config to LLM Guard's /analyze/prompt and return its raw
 // JSON. Throws on non-2xx / network so the caller can FAIL CLOSED (block the run).
-async function postLlmGuard(
+export async function postLlmGuard(
   base: string,
   apiKey: string | undefined,
-  text: string,
-  scanners: LlmGuardScannerConfig,
-): Promise<RawLlmGuardResponse> {
+  request: LlmGuardAnalyzeRequest,
+  fetcher: typeof fetch = fetch,
+): Promise<LlmGuardAnalyzeResponse> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   // llm-guard-api authenticates with a bearer AUTH_TOKEN when configured.
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-  const res = await fetch(`${trimTrailingSlash(base)}/analyze/prompt`, {
+  const endpoint = request.phase === 'input' ? 'prompt' : 'output';
+  const { phase: _phase, ...body } = request;
+  const res = await fetcher(`${trimTrailingSlash(base)}/analyze/${endpoint}`, {
     method: 'POST',
     headers,
-    // `scanners` carries the console's scanner config INCLUDING the folded-in India recognizers, so
-    // the engine screens Indian PII (PAN/Aadhaar/IFSC/UPI) it would otherwise miss (G-LG-2).
-    body: JSON.stringify({ prompt: text, scanners }),
+    // v0.3.16 accepts only prompt/output + optional scanners_suppress. Scanner configuration is
+    // loaded from CONFIG_FILE at process start. Sending a `scanners` object here is silently ignored
+    // by the stock Pydantic model and therefore forbidden by this closed request union.
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new Error(`llm-guard POST ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
   }
-  return (await res.json()) as RawLlmGuardResponse;
+  const split = (name: string): string[] =>
+    (res.headers.get(name) ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part && part !== 'none');
+  return {
+    body: (await res.json()) as RawLlmGuardResponse,
+    answeredBy: split('x-offgrid-guard-answered'),
+    degraded: split('x-offgrid-guard-degraded'),
+  };
 }
 
 // The blocked (fail-closed) verdict returned when LLM Guard is CONFIGURED but unreachable. PURE.
@@ -182,9 +203,6 @@ export function guardrailNotConfigured(engine = 'llm-guard'): PiiResult {
 // FAIL CLOSED: configured + unreachable ⇒ the run is BLOCKED (never a silent fall-open). NOT
 // configured ⇒ an explicit "not configured" state (never a faked clean pass).
 //
-// `orgId` scopes the org's custom recognizers, which are folded into the scanner config ALONGSIDE
-// the always-on India defaults. Loading them is best-effort — a config-load failure degrades to
-// "India defaults only" (still a real screen), NOT to a bypass.
 export const llmGuardPii: PiiPort = {
   meta: {
     id: 'llm-guard',
@@ -194,23 +212,49 @@ export const llmGuardPii: PiiPort = {
     render: 'headless',
     embedUrl: env.OFFGRID_HTTP_GUARDRAIL_URL,
     description:
-      'The authoritative content-guardrail engine — self-hosted LLM Guard scanners (PII/Anonymize with the India recognizers folded in, Secrets, PromptInjection, Toxicity, Bias, BanTopics, Language, Regex, TokenLimit). POSTs the text + the console scanner config to /analyze/prompt. FAIL CLOSED: configured + unreachable blocks the run; not configured is surfaced as "guardrails not configured" (never a silent fall-open). Configure OFFGRID_HTTP_GUARDRAIL_URL (+ _API_KEY = AUTH_TOKEN).',
+      'The authoritative content-guardrail engine. Input uses /analyze/prompt; generated output uses /analyze/output with its prompt context. Scanner configuration, including India recognizers, is loaded from the fleet CONFIG_FILE at startup. FAIL CLOSED when configured but unreachable.',
   },
-  async scan(text, orgId) {
+  async scan(text) {
     const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
     // Honest "not configured": no URL ⇒ the step did NOT screen. The UI reports this as "guardrails
     // not configured yet" (calm) via the registry's `configured` flag. Never a faked clean pass.
     if (!url) return guardrailNotConfigured();
 
-    const scanners = await loadScannerConfig(orgId);
     try {
-      const raw = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, text, scanners);
-      return normalizeLlmGuardResponse(text, raw);
+      const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
+        phase: 'input',
+        prompt: text,
+      });
+      return {
+        ...normalizeLlmGuardResponse(text, response.body),
+        answeredBy: response.answeredBy,
+        degraded: response.degraded,
+      };
     } catch (err) {
       // FAIL CLOSED — configured but the engine could not screen. Block the run with a clear reason;
       // log the concrete cause so "why blocked?" is answerable from the logs, not guessed at.
       const reason = describeError(err);
       console.error('[llm-guard] engine unreachable — FAILING CLOSED (run blocked):', reason);
+      return guardrailUnavailable(reason);
+    }
+  },
+  async scanOutput(prompt, output) {
+    const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
+    if (!url) return guardrailNotConfigured();
+    try {
+      const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
+        phase: 'output',
+        prompt,
+        output,
+      });
+      return {
+        ...normalizeLlmGuardResponse(output, response.body),
+        answeredBy: response.answeredBy,
+        degraded: response.degraded,
+      };
+    } catch (err) {
+      const reason = describeError(err);
+      console.error('[llm-guard] output engine unreachable — FAILING CLOSED (run blocked):', reason);
       return guardrailUnavailable(reason);
     }
   },
@@ -228,25 +272,3 @@ export const llmGuardPii: PiiPort = {
     }
   },
 };
-
-// Best-effort load of the org's custom recognizers, folded into the scanner config alongside the
-// India defaults. A load failure (no DB, missing table, no request scope) degrades to "defaults
-// only" — it NEVER throws (which would be caught by scan()'s fail-closed and wrongly block a run for
-// a config-load hiccup). Isolated so scan() stays thin.
-async function loadScannerConfig(orgId?: string): Promise<LlmGuardScannerConfig> {
-  let recognizers: NormalizedRecognizer[] = [];
-  try {
-    const { listRecognizers } = await import('../presidio-recognizers');
-    const resolvedOrg = orgId?.trim()
-      ? orgId.trim()
-      : await (await import('../tenancy')).currentOrgId();
-    const recs = await listRecognizers(resolvedOrg);
-    recognizers = recs as unknown as NormalizedRecognizer[];
-  } catch (err) {
-    console.warn(
-      '[llm-guard] recognizer load failed, using India defaults only:',
-      describeError(err),
-    );
-  }
-  return buildLlmGuardScannerConfig(recognizers);
-}

@@ -174,8 +174,9 @@ export async function runOutboundGuardrails(
   answer: string,
   model: string,
   orgId?: string,
+  prompt = '',
 ): Promise<CheckResult[]> {
-  return runChecks('post', { phase: 'post', output: answer, model, orgId });
+  return runChecks('post', { phase: 'post', input: prompt, output: answer, model, orgId });
 }
 
 // ─── W2: trust artifacts — lineage + provenance, mirroring agentrun.ts ──────────────────────────

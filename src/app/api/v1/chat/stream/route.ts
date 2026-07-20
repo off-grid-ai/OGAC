@@ -692,7 +692,14 @@ export async function POST(req: Request) {
       // it as a block, and a completed screen with a blocked verdict also blocks. When blocked, tell
       // the client to withhold/redact the raw output rather than trust an un-cleared answer.
       const postChecks: CheckResult[] | null = full
-        ? await runOutboundGuardrails(full, effectiveModel, orgId).catch(() => null)
+        ? await runOutboundGuardrails(
+            full,
+            effectiveModel,
+            orgId,
+            String(content).trim()
+              ? String(content)
+              : ([...prior].reverse().find((m) => m.role === 'user')?.content ?? ''),
+          ).catch(() => null)
         : [];
       const outboundBlocked = full ? outboundGuardrailBlocks(postChecks) : false;
       if (outboundBlocked) {

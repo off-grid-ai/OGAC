@@ -100,11 +100,35 @@ test('optional shard failure → degraded, verdict stands on the answering shard
   assert.equal(merged.sanitized_prompt, 'Email [REDACTED_EMAIL_ADDRESS_1]');
 });
 
-test('duplicate scanner name keeps the riskier (lower) score', () => {
+test('duplicate scanner name keeps the riskier higher score (negative means pass in v0.3.16)', () => {
   const a = { name: 'a', required: true, ok: true, body: { is_valid: true, scanners: { Toxicity: 0.9 } } };
   const b = { name: 'b', required: false, ok: true, body: { is_valid: true, scanners: { Toxicity: 0.1 } } };
   const { merged } = mergeGuardResponses('x', [a, b]);
-  assert.equal(merged.scanners.Toxicity, 0.1);
+  assert.equal(merged.scanners.Toxicity, 0.9);
+});
+
+test('output phase merges sanitized_output and never invents sanitized_prompt', () => {
+  const original = 'Raj PAN is ABCDE1234F';
+  const pii = {
+    name: 'pii',
+    required: true,
+    ok: true,
+    body: {
+      is_valid: false,
+      scanners: { Sensitive: 0.92 },
+      sanitized_output: 'Raj PAN is [REDACTED]',
+    },
+  };
+  const classifiers = {
+    name: 'classifiers',
+    required: false,
+    ok: true,
+    body: { is_valid: true, scanners: { Toxicity: -1 }, sanitized_output: original },
+  };
+  const { merged } = mergeGuardResponses(original, [pii, classifiers], 'output');
+  assert.equal(merged.is_valid, false);
+  assert.equal(merged.sanitized_output, 'Raj PAN is [REDACTED]');
+  assert.equal('sanitized_prompt' in merged, false);
 });
 
 test('malformed / empty inputs never throw and degrade sensibly', () => {

@@ -61,6 +61,7 @@ export interface ExecuteDeps {
     text: string,
     orgId: string,
     model: string,
+    promptContext?: string,
   ) => Promise<{ checks: CheckResult[]; outcome: 'ok' | 'redacted' | 'blocked' }>;
   /** PII scan → a redacted form of the text (for the mask-before-model substitution). */
   scanPii: (text: string, orgId: string) => Promise<{ hits: boolean; redacted?: string; entities: string[]; engine: string }>;
@@ -226,7 +227,13 @@ export async function executePipelineRun(
 
   // 4. Guardrails (output) — scan the answer before it leaves (recorded; non-blocking, mirrors the
   //    agent-run path where the output scan is observational, so a governed answer is still returned).
-  const post = await deps.runGuardrail('post', text, orgId, completion.model || plan.model);
+  const post = await deps.runGuardrail(
+    'post',
+    text,
+    orgId,
+    completion.model || plan.model,
+    modelPrompt,
+  );
 
   const usage = completion.usage ?? { prompt: 0, completion: 0, total: 0 };
   deps.audit('pipeline.invoke', 'ok', `executed on ${completion.model || plan.model}`, completion.model || plan.model, usage.total);

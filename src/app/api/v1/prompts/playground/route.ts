@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 4) Outbound guardrail scan on the answer (recorded, non-blocking — mirrors chat).
-  const postChecks = output ? await runOutboundGuardrails(output, model).catch(() => []) : [];
+  const postChecks = output ? await runOutboundGuardrails(output, model, undefined, prompt).catch(() => []) : [];
 
   return NextResponse.json({
     rendered: prompt,

@@ -51,7 +51,7 @@ function scannerPairs(body) {
  *   degraded — names of OPTIONAL shards that failed (verdict still stands on the answering shards)
  *   answered — names of shards that returned a usable verdict
  */
-export function mergeGuardResponses(original, shards) {
+export function mergeGuardResponses(original, shards, phase = 'input') {
   const list = Array.isArray(shards) ? shards : [];
   const blocked = list.some((s) => s && s.required && !s.ok);
   const degraded = list.filter((s) => s && !s.required && !s.ok).map((s) => s.name);
@@ -66,17 +66,18 @@ export function mergeGuardResponses(original, shards) {
     const body = s.body;
     if (body && (body.is_valid === false || body.is_valid === 'false')) anyInvalid = true;
     for (const [name, score] of scannerPairs(body)) {
-      // Disjoint sets in practice; if a name repeats, keep the riskier (lower) score so a trip on
-      // any shard is never masked by a clean score elsewhere.
-      scanners[name] = name in scanners ? Math.min(scanners[name], score) : score;
+      // v0.3.16 uses negative scores for a pass and larger positive scores for risk. If a scanner is
+      // duplicated across shards, retain the higher/riskier score so a trip is never masked.
+      scanners[name] = name in scanners ? Math.max(scanners[name], score) : score;
     }
-    // The redacting shard is the one whose sanitized_prompt differs from the original.
-    const sp = isObj(body) ? body.sanitized_prompt : undefined;
+    const sanitizedField = phase === 'output' ? 'sanitized_output' : 'sanitized_prompt';
+    const sp = isObj(body) ? body[sanitizedField] : undefined;
     if (typeof sp === 'string' && sp !== original) sanitized = sp;
   }
 
+  const sanitizedField = phase === 'output' ? 'sanitized_output' : 'sanitized_prompt';
   return {
-    merged: { is_valid: !anyInvalid, scanners, sanitized_prompt: sanitized },
+    merged: { is_valid: !anyInvalid, scanners, [sanitizedField]: sanitized },
     blocked,
     degraded,
     answered,

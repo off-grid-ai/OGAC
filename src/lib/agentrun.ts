@@ -891,6 +891,9 @@ export async function runAgent(
   // 'blocked'): a broken egress DLP screen must not let unscanned output leave.
   t = Date.now();
   const postScreen = await screenGuardrail('post', {
+    // LLM Guard's output scanners require the prompt that produced this answer. Use the exact
+    // post-masking query the model saw, not an empty placeholder or the unmasked source.
+    input: modelQuery,
     output: answer,
     model: ANSWER_MODEL,
     orgId: attribution.org,
