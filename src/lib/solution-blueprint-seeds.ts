@@ -92,7 +92,7 @@ export const SEEDED_SOLUTION_BLUEPRINTS: readonly SeededSolutionBlueprint[] = [
       requiredDataDomains: ['customer data'],
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
       requiredPipelineName: 'RM cross-sell',
-      sourceTemplateKey: 'cross-sell-next-best-action',
+      sourceTemplateKey: 'cross-sell',
       adoptable: false,
       outcome: {
         metricName: 'Accepted cross-sell conversion rate',

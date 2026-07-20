@@ -31,6 +31,7 @@ test('high-value use cases require dedicated runtime contracts, not unrelated de
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[1].input.requiredPipelineName, 'Indemnity claims');
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[1].input.sourceTemplateKey, 'indemnity-fast-track');
   assert.equal(SEEDED_SOLUTION_BLUEPRINTS[2].input.requiredPipelineName, 'RM cross-sell');
+  assert.equal(SEEDED_SOLUTION_BLUEPRINTS[2].input.sourceTemplateKey, 'cross-sell');
   assert.deepEqual(SEEDED_SOLUTION_BLUEPRINTS[2].input.requiredCapabilities, [
     'grounded-inference',
     'human-approval',
