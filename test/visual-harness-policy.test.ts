@@ -8,10 +8,24 @@ import {
   isCanonicalRoute,
   pageDirectoryRecord,
   pageFailureReasons,
+  REQUIRED_STREAMING_VISUAL_STATES,
   resolveVisualAuth,
   selectCanonicalRouteRecords,
   visualGateExitCode,
 } from '../scripts/lib/visual-harness-policy.mjs';
+
+test('required Redpanda visual states are complete and URL-driven', () => {
+  assert.deepEqual(
+    REQUIRED_STREAMING_VISUAL_STATES.map(({ id, url }) => [id, url]),
+    [
+      ['streaming-topics', '/operations/services/streaming?manage=topics'],
+      ['streaming-schemas', '/operations/services/streaming?manage=schemas'],
+      ['streaming-workflows', '/operations/services/streaming?manage=workflows'],
+      ['streaming-capability-map', '/operations/services/capability-map?service=streaming'],
+    ],
+  );
+  assert.equal(new Set(REQUIRED_STREAMING_VISUAL_STATES.map(({ url }) => url)).size, 4);
+});
 
 test('page directories preserve console ownership while stripping route groups', () => {
   assert.deepEqual(pageDirectoryRecord('(console)/solutions/quality/[destination]'), {

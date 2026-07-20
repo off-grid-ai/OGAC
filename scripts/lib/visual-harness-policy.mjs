@@ -1,5 +1,18 @@
 import { canonicalPath } from '../../src/modules/route-migrations.mjs';
 
+export const REQUIRED_STREAMING_VISUAL_STATES = Object.freeze([
+  Object.freeze({ id: 'streaming-topics', url: '/operations/services/streaming?manage=topics' }),
+  Object.freeze({ id: 'streaming-schemas', url: '/operations/services/streaming?manage=schemas' }),
+  Object.freeze({
+    id: 'streaming-workflows',
+    url: '/operations/services/streaming?manage=workflows',
+  }),
+  Object.freeze({
+    id: 'streaming-capability-map',
+    url: '/operations/services/capability-map?service=streaming',
+  }),
+]);
+
 const ERROR_BOUNDARY_PATTERNS = Object.freeze([
   /application error:\s*(?:a client-side|a server-side) exception/i,
   /something went wrong here/i,

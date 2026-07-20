@@ -25,6 +25,7 @@ import {
   isCanonicalRoute,
   pageDirectoryRecord,
   pageFailureReasons,
+  REQUIRED_STREAMING_VISUAL_STATES,
   resolveVisualAuth,
   selectCanonicalRouteRecords,
   visualGateExitCode,
@@ -97,7 +98,10 @@ function discoverRouteRecords(root) {
 
 const isDynamic = (route) => /\[[^\]]+\]/.test(route);
 const slug = (route) =>
-  (route === '/' ? 'root' : route.replace(/^\//, '').replace(/[/[\]]/g, '_')).replace(/_+/g, '_');
+  (route === '/' ? 'root' : route.replace(/^\//, '').replace(/[^a-zA-Z0-9_-]+/g, '_')).replace(
+    /_+/g,
+    '_',
+  );
 const isNoise = (text) => /cloudflareinsights\.com|beacon\.min\.js/i.test(text);
 
 async function login(page, auth) {
@@ -389,6 +393,27 @@ async function runBatch(browser, batch, records, auth, capturedRoutes) {
   }
 }
 
+async function runRequiredUrlStates(browser, states, records, auth, capturedRoutes) {
+  if (!states.length) return 0;
+  let captured = 0;
+  const { context, page } = await createSession(browser, auth);
+  try {
+    for (const state of states) {
+      if (capturedRoutes.has(state.url)) continue;
+      capturedRoutes.add(state.url);
+      captured += 1;
+      process.stdout.write(`· ${state.url}\n`);
+      await shoot(page, state.url, state.url, records, {
+        authenticated: true,
+        template: state.url.split('?')[0],
+      });
+    }
+  } finally {
+    await context.close();
+  }
+  return captured;
+}
+
 async function main() {
   if (!Number.isInteger(BATCH_SIZE) || BATCH_SIZE < 1) {
     throw new Error('--batch-size must be a positive integer.');
@@ -422,7 +447,12 @@ async function main() {
     includePublic: auth.user ? PUBLIC : true,
     only: ONLY,
   });
-  if (!selection.routes.length) {
+  const requiredUrlStates = auth.user
+    ? REQUIRED_STREAMING_VISUAL_STATES.filter(
+        ({ url }) => !ONLY.length || ONLY.some((fragment) => url.includes(fragment)),
+      )
+    : [];
+  if (!selection.routes.length && !requiredUrlStates.length) {
     throw new Error(
       auth.user
         ? 'No canonical routes matched this visual crawl.'
@@ -433,11 +463,19 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   const records = [];
   const capturedRoutes = new Set();
+  let requiredUrlStatesCaptured = 0;
   const browser = await chromium.launch();
   try {
     for (const batch of batchItems(selection.routes, BATCH_SIZE)) {
       await runBatch(browser, batch, records, auth, capturedRoutes);
     }
+    requiredUrlStatesCaptured = await runRequiredUrlStates(
+      browser,
+      requiredUrlStates,
+      records,
+      auth,
+      capturedRoutes,
+    );
   } finally {
     await browser.close();
   }
@@ -452,7 +490,9 @@ async function main() {
     routeInventory: {
       discovered: discovered.length,
       canonicalTemplatesSelected: selection.routes.length,
-      canonicalConcreteRoutesCaptured: capturedRoutes.size,
+      canonicalConcreteRoutesCaptured: capturedRoutes.size - requiredUrlStatesCaptured,
+      requiredUrlStatesSelected: requiredUrlStates.map(({ id, url }) => ({ id, url })),
+      requiredUrlStatesCaptured,
       legacyAliasesExcluded: selection.aliases,
     },
     total: records.length,

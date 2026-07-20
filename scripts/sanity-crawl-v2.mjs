@@ -12,8 +12,10 @@
 //
 //   BASE=... USER_EMAIL=... PASS=... OUT=/tmp/sx STATIC_ROUTES=/tmp/static_routes.txt \
 //   DYNAMIC_TEMPLATES=/tmp/dynamic_templates.txt MAX=1200 node scripts/sanity-crawl-v2.mjs
+// Set MOBILE=1 to repeat the same route/state crawl at 390×844.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { REQUIRED_STREAMING_VISUAL_STATES } from './lib/visual-harness-policy.mjs';
 
 const BASE = (process.env.BASE || 'https://onprem-console.getoffgridai.co').replace(/\/$/, '');
 const OUT = process.env.OUT || '/tmp/sx';
@@ -21,6 +23,7 @@ const USER = process.env.USER_EMAIL || process.env.USER || 'demo-bank@getoffgrid
 const PASS = process.env.PASS || 'OffGridDemo2026!';
 const MAX = Number(process.env.MAX || 1200);
 const THEME = process.env.THEME || 'light';
+const VIEWPORT = process.env.MOBILE ? { width: 390, height: 844 } : { width: 1600, height: 1000 };
 const STATIC = (process.env.STATIC_ROUTES ? readFileSync(process.env.STATIC_ROUTES, 'utf8').split('\n') : []).map((s) => s.trim()).filter(Boolean);
 const TEMPLATES = (process.env.DYNAMIC_TEMPLATES ? readFileSync(process.env.DYNAMIC_TEMPLATES, 'utf8').split('\n') : []).map((s) => s.trim()).filter(Boolean);
 mkdirSync(`${OUT}/shots`, { recursive: true });
@@ -77,7 +80,7 @@ function expandTemplate(t) {
 }
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 
 console.log(`login ${USER} @ ${BASE}`);
@@ -92,7 +95,10 @@ await wait(600);
 
 const results = [];
 const seen = new Set();
-const queue = [...STATIC.map((r) => `${BASE}/${r}`)];
+const queue = [
+  ...STATIC.map((r) => `${BASE}/${r}`),
+  ...REQUIRED_STREAMING_VISUAL_STATES.map(({ url }) => `${BASE}${url}`),
+];
 let dynamicExpandedOnce = false;
 
 async function visit(key, { captureTabs = true } = {}) {
@@ -156,7 +162,7 @@ while (queue.length && results.length < MAX) {
 await browser.close();
 const fails = results.filter((r) => !r.pass && !r.stateOnly);
 const states = results.filter((r) => r.stateOnly).length;
-const report = { base: BASE, total: results.length, pages: results.length - states, tabStates: states,
+const report = { base: BASE, viewport: VIEWPORT, total: results.length, pages: results.length - states, tabStates: states,
   passed: results.filter((r) => r.pass).length, failed: fails.length, fails, results };
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 console.log(`\n=== TOTAL captured: ${results.length}  (pages ${report.pages} + tab-states ${states})  passed ${report.passed}  failed ${fails.length} ===`);

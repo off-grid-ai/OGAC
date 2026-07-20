@@ -15,6 +15,7 @@
 // Output: OUT/shots/*.png + OUT/report.json + OUT/report.md
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { REQUIRED_STREAMING_VISUAL_STATES } from './lib/visual-harness-policy.mjs';
 
 const BASE = (process.env.BASE || 'https://onprem-console.getoffgridai.co').replace(/\/$/, '');
 const OUT = process.env.OUT || '/tmp/sanity';
@@ -35,6 +36,7 @@ const SEEDS = [
   'governance', 'governance/regulatory', 'governance/provenance', 'audit', 'lineage',
   'insights', 'insights/analytics', 'insights/platform', 'finops',
   'access', 'secrets', 'storage', 'integrations', 'fleet', 'provit', 'settings',
+  ...REQUIRED_STREAMING_VISUAL_STATES.map(({ url }) => url.replace(/^\//, '')),
 ];
 
 // A path is "the same place" ignoring its query string; normalize so we don't recrawl ?tab= as new
