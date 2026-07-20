@@ -74,7 +74,8 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.match(page, /selectedServiceId=/);
   assert.match(component, /h-full min-h-0 w-full/);
   assert.match(component, /CAPABILITY_GATES\.map/);
-  assert.match(component, /<Table>/);
+  assert.match(component, /data-capability-records/);
+  assert.doesNotMatch(component, /<Table>/);
   assert.match(component, /<Progress/);
   assert.match(component, /aria-label="Service families"/);
   assert.match(component, /aria-label="Service families" className="flex min-w-0 flex-wrap gap-1"/);

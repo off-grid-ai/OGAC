@@ -55,6 +55,45 @@ test('capability explorer keeps the 48-entry inventory in an independently scrol
   assert.doesNotMatch(html, /mx-auto|max-w-2xl|max-w-3xl/);
 });
 
+test('narrow navigation renders either the service list or the selected detail with a filter-preserving back link', () => {
+  const filtered = renderExplorer('otel-collector', {
+    query: 'telemetry',
+    family: 'observability',
+    owner: 'operations-services',
+    audit: 'current',
+    readiness: 'verified',
+  });
+  const unselected = renderExplorer();
+
+  assert.match(filtered, /class="hidden lg:flex[^\"]*" aria-label="Service capability inventory"/);
+  assert.match(filtered, /class="block[^\"]*lg:overflow-y-auto" aria-label="Selected service detail"/);
+  assert.match(filtered, /> Back to services<\/a>/);
+  assert.match(
+    filtered,
+    /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=observability&amp;owner=operations-services&amp;audit=current&amp;readiness=verified"/,
+  );
+  assert.match(unselected, /class="flex[^\"]*" aria-label="Service capability inventory"/);
+  assert.match(unselected, /class="hidden lg:block[^\"]*" aria-label="Selected service detail"/);
+  assert.doesNotMatch(unselected, /Back to services/);
+});
+
+test('audited capabilities use responsive records without an internally scrolling evidence table', () => {
+  const audit = SERVICE_CAPABILITY_AUDITS.find((candidate) => candidate.serviceId === 'streaming');
+  assert.ok(audit);
+  const html = renderExplorer('streaming');
+
+  assert.equal((html.match(/data-capability-record="/g) ?? []).length, audit.items.length);
+  assert.match(html, /data-capability-records/);
+  assert.match(html, /grid-cols-2[^\"]*sm:grid-cols-4/);
+  assert.doesNotMatch(html, /data-slot="table-container"/);
+  assert.doesNotMatch(html, /<table/);
+  for (const gate of ['Available', 'Integrated', 'UI exposed', 'Used in workflow']) {
+    assert.match(html, new RegExp(`>${gate}<`));
+  }
+  assert.match(html, /Concrete gap/);
+  assert.match(html, /Open streaming service/);
+});
+
 test('filter navigation preserves facets while clearing the previous service selection', () => {
   const inventoryFilter = {
     query: 'telemetry',

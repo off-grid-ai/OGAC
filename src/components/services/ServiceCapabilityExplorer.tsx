@@ -7,14 +7,6 @@ import { NativeSelect } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   CAPABILITY_GATE_LABELS,
   CAPABILITY_GATES,
   capabilityCoveragePercent,
@@ -455,55 +447,56 @@ function AuditedServiceDetail({
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-56 px-4">Capability</TableHead>
-                {CAPABILITY_GATES.map((gate) => (
-                  <TableHead key={gate} className="min-w-28">
-                    {CAPABILITY_GATE_LABELS[gate]}
-                  </TableHead>
-                ))}
-                <TableHead className="min-w-64">Concrete gap</TableHead>
-                <TableHead className="min-w-36 pr-4">Operator route</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {audit.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="px-4 py-3 align-top whitespace-normal">
-                    <p className="text-xs text-foreground">{item.name}</p>
+      <div className="grid gap-3 2xl:grid-cols-2" data-capability-records>
+        {audit.items.map((item) => {
+          const headingId = `capability-${audit.serviceId}-${item.id}`;
+          return (
+            <Card key={item.id} aria-labelledby={headingId} data-capability-record={item.id}>
+              <CardHeader className="border-b border-border p-4">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle id={headingId} className="text-xs">
+                      {item.name}
+                    </CardTitle>
                     <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
                       {item.summary}
                     </p>
-                  </TableCell>
+                  </div>
+                  <Link
+                    href={item.uiHref}
+                    className="inline-flex shrink-0 items-center gap-1 text-[10px] text-primary outline-none hover:underline focus-visible:underline"
+                  >
+                    {item.uiLabel}
+                    <ArrowSquareOut className="size-3 shrink-0" aria-hidden="true" />
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4">
+                <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-4">
                   {CAPABILITY_GATES.map((gate) => (
-                    <TableCell key={gate} className="py-3 align-top whitespace-normal">
-                      <GateBadge assessment={item.gates[gate]} />
-                    </TableCell>
+                    <div key={gate} className="min-w-0 bg-card p-2">
+                      <dt className="min-h-6 font-mono text-[9px] leading-tight uppercase tracking-wide text-muted-foreground">
+                        {CAPABILITY_GATE_LABELS[gate]}
+                      </dt>
+                      <dd className="mt-1">
+                        <GateBadge assessment={item.gates[gate]} />
+                      </dd>
+                    </div>
                   ))}
-                  <TableCell className="py-3 align-top whitespace-normal">
-                    <p className="text-[10px] leading-relaxed text-muted-foreground">
-                      {item.gap || 'No gap in the audited four-gate path.'}
-                    </p>
-                  </TableCell>
-                  <TableCell className="py-3 pr-4 align-top whitespace-normal">
-                    <Link
-                      href={item.uiHref}
-                      className="inline-flex items-center gap-1 text-[10px] text-primary outline-none hover:underline focus-visible:underline"
-                    >
-                      {item.uiLabel}
-                      <ArrowSquareOut className="size-3 shrink-0" aria-hidden="true" />
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </dl>
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                    Concrete gap
+                  </p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                    {item.gap || 'No gap in the audited four-gate path.'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -562,6 +555,7 @@ export function ServiceCapabilityExplorer({
   const selectedAudit = selectedServiceId
     ? (audits.find((audit) => audit.serviceId === selectedServiceId) ?? null)
     : null;
+  const masterHref = serviceCapabilityMapHref(inventoryFilter);
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
@@ -591,7 +585,7 @@ export function ServiceCapabilityExplorer({
 
       <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(18rem,23rem)_minmax(0,1fr)] lg:overflow-hidden">
         <aside
-          className="flex max-h-[55vh] min-h-72 flex-col overflow-hidden border-b border-border bg-card/30 lg:h-full lg:max-h-none lg:min-h-0 lg:border-r lg:border-b-0"
+          className={`${selectedServiceId ? 'hidden lg:flex' : 'flex'} max-h-[55vh] min-h-72 flex-col overflow-hidden border-b border-border bg-card/30 lg:h-full lg:max-h-none lg:min-h-0 lg:border-r lg:border-b-0`}
           aria-label="Service capability inventory"
         >
           <div className="sticky top-0 z-10 border-b border-border bg-background p-3">
@@ -609,7 +603,19 @@ export function ServiceCapabilityExplorer({
           </div>
         </aside>
 
-        <main className="min-h-0 min-w-0 lg:overflow-y-auto" aria-label="Selected service detail">
+        <main
+          className={`${selectedServiceId ? 'block' : 'hidden lg:block'} min-h-0 min-w-0 lg:overflow-y-auto`}
+          aria-label="Selected service detail"
+        >
+          {selectedServiceId ? (
+            <div className="border-b border-border p-3 lg:hidden">
+              <Button asChild variant="ghost" size="sm">
+                <Link href={masterHref}>
+                  <ArrowLeft className="size-3.5" aria-hidden="true" /> Back to services
+                </Link>
+              </Button>
+            </div>
+          ) : null}
           {selectedAudit && selectedEntry ? (
             <AuditedServiceDetail audit={selectedAudit} entry={selectedEntry} />
           ) : selectedEntry ? (
