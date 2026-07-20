@@ -13,7 +13,7 @@ import {
   type GovernanceControls,
   type PipelineShape,
 } from '../src/lib/pipelines-policy.ts';
-import { planSeedPipelines, samplePipelineId } from '../src/lib/pipelines-seed.ts';
+import { planSeedPipelines, samplePipelineId, seedPipelineNeedsUpdate } from '../src/lib/pipelines-seed.ts';
 
 // ─── validation ────────────────────────────────────────────────────────────────────────────────────
 
@@ -219,8 +219,8 @@ test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-
   assert.ok(bharat.every((p) => p.gatewayId === 'gw_seed_org_bharat_onprem-cluster'));
   assert.deepEqual(
     bharat.find((pipeline) => pipeline.name === 'Cross-Sell Advisor')?.dataAllowlist,
-    ['customer data'],
-    'cross-sell references the canonical seeded tenant domain, not imaginary tables',
+    ['customer data', 'pricing rate card'],
+    'cross-sell references both canonical evidence domains, not imaginary tables',
   );
   // Org isolation: ids never collide across orgs.
   const defIds = new Set(def.map((p) => p.id));
@@ -229,6 +229,16 @@ test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-
 
 test('planSeedPipelines: is deterministic (idempotent re-seed)', () => {
   assert.deepEqual(planSeedPipelines('default'), planSeedPipelines('default'));
+});
+
+test('seedPipelineNeedsUpdate: reconciles stale contracts without rewriting identical seeds', () => {
+  const desired = planSeedPipelines('org_bharat').find((p) => p.name === 'Cross-Sell Advisor');
+  assert.ok(desired);
+  assert.equal(seedPipelineNeedsUpdate(desired, desired), false);
+  assert.equal(
+    seedPipelineNeedsUpdate({ ...desired, dataAllowlist: ['customer data'] }, desired),
+    true,
+  );
 });
 
 // gap PA-13 — a fresh seed must be CLEAN: it declares pipeline TEMPLATES only and carries NO API-key

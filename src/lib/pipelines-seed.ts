@@ -21,6 +21,37 @@ export interface SamplePipelineSpec {
   guardrailOverlay: Record<string, unknown>;
 }
 
+export type SeedPipelineComparable = Pick<
+  SeedPipelinePlan,
+  | 'name'
+  | 'description'
+  | 'gatewayId'
+  | 'dataAllowlist'
+  | 'routing'
+  | 'policyOverlay'
+  | 'guardrailOverlay'
+  | 'isTemplate'
+  | 'status'
+>;
+
+/** Avoid both stale seed contracts and version churn when an existing deployment is re-seeded. */
+export function seedPipelineNeedsUpdate(
+  current: SeedPipelineComparable,
+  desired: SeedPipelineComparable,
+): boolean {
+  return (
+    current.name !== desired.name ||
+    current.description !== desired.description ||
+    current.gatewayId !== desired.gatewayId ||
+    current.isTemplate !== desired.isTemplate ||
+    current.status !== desired.status ||
+    JSON.stringify(current.dataAllowlist) !== JSON.stringify(desired.dataAllowlist) ||
+    JSON.stringify(current.routing) !== JSON.stringify(desired.routing) ||
+    JSON.stringify(current.policyOverlay) !== JSON.stringify(desired.policyOverlay) ||
+    JSON.stringify(current.guardrailOverlay) !== JSON.stringify(desired.guardrailOverlay)
+  );
+}
+
 // A standard BFSI leash: PII stays on the box, anything classed `restricted` is blocked from egress,
 // everything else may go local. Reused across the templates so the intent is legible + DRY.
 function bfsiRouting(): PipelineRouting {
@@ -125,7 +156,7 @@ export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
     // These are semantic domain references resolved against the tenant registry at run time. Keep
     // the template aligned with the canonical Bharat seed (`customer data` → CRM accounts) instead
     // of naming imaginary tables that no connector/domain owns.
-    dataAllowlist: ['customer data'],
+    dataAllowlist: ['customer data', 'pricing rate card'],
     routing: bfsiRouting(),
     policyOverlay: {},
     guardrailOverlay: { requirePiiMasking: { mode: 'default', bool: true } },

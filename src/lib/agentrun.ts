@@ -22,6 +22,7 @@ import {
   runAgentLoop,
 } from '@/lib/agent-loop';
 import {
+  decisionPolicySource,
   effectiveRunId,
   maskRetrievalHits,
   retrievalHitMaskingText,
@@ -702,6 +703,11 @@ export async function runAgent(
       );
     }
     routed = retrieval.routed;
+  }
+  const policySource =
+    agent.grounded === false ? null : decisionPolicySource(agent.id, agent.systemPrompt);
+  if (policySource && !routed.hits.some((hit) => hit.ref === policySource.ref)) {
+    routed = { ...routed, hits: [...routed.hits, policySource] };
   }
   mark(
     'retrieve',

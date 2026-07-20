@@ -195,7 +195,8 @@ export const BANK_APPS: readonly AppSpecSeed[] = [
     pipelineName: 'RM cross-sell',
     steps: [
       q('Pull the customer context', 'customer data'),
-      ag('Recommend next best action', 'From the customer holding pattern, suggest the next-best product with a one-line rationale. Aggregate insights only — never expose individual PII. Amounts in $.'),
+      q('Pull the eligible product rate card', 'pricing rate card'),
+      ag('Recommend next best action', 'Decision policy: Prioritize the industry with the most CRM accounts, then select the rate-card scheme with the smallest minimum group size; break a tie using the lowest base rate for the 31-40 age band. Using only the governed CRM and rate-card sources, return exactly two sentences: "Evidence: <aggregate CRM count and exact rate-card facts>. Recommendation: prioritize <industry> with <scheme> because <policy-based rationale>." Never include account or owner names.'),
       hu('Relationship manager decision'),
       out('Cross-sell recommendation'),
     ],

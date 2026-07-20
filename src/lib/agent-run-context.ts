@@ -81,6 +81,34 @@ export function retrievalMode(
   return grounded ? 'retrieve' : 'skip';
 }
 
+const DECISION_POLICY_PREFIX = /^\s*Decision policy:\s*(.+?)\s*$/im;
+const MAX_DECISION_POLICY_CHARS = 1_000;
+
+/**
+ * Turn an explicitly-authored decision rule into a first-class governed source.
+ *
+ * Recommendations are not facts that raw customer rows can entail by themselves: the trace also
+ * needs the operator-authored rule that maps evidence to an action. Only the deliberately labelled
+ * `Decision policy:` line is admitted. Ordinary system instructions never become evidence, which
+ * prevents an agent from making its own answer self-justifying. The bounded one-line source then
+ * follows the same masking, grounding, citation and provenance path as every retrieved source.
+ */
+export function decisionPolicySource(
+  agentId: string,
+  systemPrompt: string | undefined,
+): RetrievalHit | null {
+  const policy = systemPrompt?.match(DECISION_POLICY_PREFIX)?.[1]?.trim();
+  if (!policy) return null;
+  return {
+    sourceId: agentId,
+    sourceKind: 'kb',
+    title: 'Governed decision policy',
+    snippet: policy.slice(0, MAX_DECISION_POLICY_CHARS),
+    ref: `agent:${agentId}:decision-policy`,
+    score: 1,
+  };
+}
+
 export type PiiScanAttempt = { ok: true; scan: PiiScanLike } | { ok: false; error: unknown };
 
 export interface MaskRetrievalHitsResult {

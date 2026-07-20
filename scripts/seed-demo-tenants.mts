@@ -60,9 +60,9 @@ import {
   COMPLIANCE_ADOPTION,
 } from '../src/lib/tour-demo-seed.ts';
 import { createGateway, listGatewayRows } from '../src/lib/gateways.ts';
-import { createPipeline, listPipelines } from '../src/lib/pipelines.ts';
+import { createPipeline, listPipelines, updatePipeline } from '../src/lib/pipelines.ts';
 import { planSeedGateways } from '../src/lib/gateways-seed.ts';
-import { planSeedPipelines, SAMPLE_PIPELINES, samplePipelineId } from '../src/lib/pipelines-seed.ts';
+import { planSeedPipelines, SAMPLE_PIPELINES, samplePipelineId, seedPipelineNeedsUpdate } from '../src/lib/pipelines-seed.ts';
 import { createApp, listApps, updateApp } from '../src/lib/apps-store.ts';
 import { upsertAppRunState } from '../src/lib/app-run-store.ts';
 import { createConnector, listConnectors, createTool, listTools, createCustomAgent, listCustomAgents } from '../src/lib/store.ts';
@@ -108,14 +108,23 @@ async function seedGateways(profile: TenantProfile): Promise<void> {
 
 // ─── 3. Pipelines (idempotent by stable id; templates published so apps can bind). ──
 async function seedPipelines(profile: TenantProfile, ownerId: string): Promise<Map<string, string>> {
-  const existing = new Set((await listPipelines(profile.orgId)).map((p) => p.id));
+  const existing = new Map((await listPipelines(profile.orgId)).map((p) => [p.id, p]));
   for (const p of planSeedPipelines(profile.orgId)) {
-    if (existing.has(p.id)) continue;
-    await createPipeline(
-      { id: p.id, name: p.name, description: p.description, visibility: 'org', gatewayId: p.gatewayId, dataAllowlist: p.dataAllowlist, routing: p.routing, policyOverlay: p.policyOverlay, guardrailOverlay: p.guardrailOverlay, status: p.status, isTemplate: p.isTemplate },
-      ownerId,
-      profile.orgId,
-    );
+    const current = existing.get(p.id);
+    if (!current) {
+      await createPipeline(
+        { id: p.id, name: p.name, description: p.description, visibility: 'org', gatewayId: p.gatewayId, dataAllowlist: p.dataAllowlist, routing: p.routing, policyOverlay: p.policyOverlay, guardrailOverlay: p.guardrailOverlay, status: p.status, isTemplate: p.isTemplate },
+        ownerId,
+        profile.orgId,
+      );
+    } else if (seedPipelineNeedsUpdate(current, p)) {
+      await updatePipeline(
+        p.id,
+        { name: p.name, description: p.description, gatewayId: p.gatewayId, dataAllowlist: p.dataAllowlist, routing: p.routing, policyOverlay: p.policyOverlay, guardrailOverlay: p.guardrailOverlay, status: p.status, isTemplate: p.isTemplate },
+        profile.orgId,
+        ownerId,
+      );
+    }
   }
   // name → id map so apps bind by pipeline NAME (as tour-demo-seed specs reference).
   const byName = new Map<string, string>();

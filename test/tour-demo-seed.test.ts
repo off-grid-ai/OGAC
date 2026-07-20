@@ -144,6 +144,25 @@ test('each tenant seeds its governed apps, including the flagship outcome contra
     ),
     'cross-sell requires an RM decision before the report',
   );
+  const crossSell = BANK_APPS.find((a) => a.title === 'Cross-Sell Advisor');
+  assert.ok(
+    crossSell?.steps.some(
+      (step) => step.kind === 'connector-query' && step.domain === 'customer data',
+    ),
+    'cross-sell reads governed CRM evidence',
+  );
+  assert.ok(
+    crossSell?.steps.some(
+      (step) => step.kind === 'connector-query' && step.domain === 'pricing rate card',
+    ),
+    'cross-sell reads governed rate-card evidence',
+  );
+  assert.ok(
+    crossSell?.steps.some(
+      (step) => step.kind === 'agent' && step.systemPrompt?.startsWith('Decision policy:'),
+    ),
+    'cross-sell declares its governed recommendation policy explicitly',
+  );
 });
 
 test('appsFor / agentsFor / teamsFor / knowledgeFor select by flavour', () => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  decisionPolicySource,
   effectiveRunId,
   maskRetrievalHits,
   retrievalHitMaskingText,
@@ -154,4 +155,35 @@ test('retrievalMode: governed workflow sources win; otherwise grounded retrieves
   assert.equal(retrievalMode(false, [source]), 'provided');
   assert.equal(retrievalMode(true, []), 'retrieve');
   assert.equal(retrievalMode(false, undefined), 'skip');
+});
+
+test('decisionPolicySource exposes only an explicit governed decision policy as citeable evidence', () => {
+  const source = decisionPolicySource(
+    'agent_cross_sell',
+    'Decision policy: Prioritize the largest customer segment and select the eligible product with the lowest group-size threshold.\n\nReturn one recommendation.',
+  );
+
+  assert.deepEqual(source, {
+    sourceId: 'agent_cross_sell',
+    sourceKind: 'kb',
+    title: 'Governed decision policy',
+    snippet:
+      'Prioritize the largest customer segment and select the eligible product with the lowest group-size threshold.',
+    ref: 'agent:agent_cross_sell:decision-policy',
+    score: 1,
+  });
+  assert.equal(
+    decisionPolicySource('agent_cross_sell', 'Recommend whatever seems best.'),
+    null,
+    'ordinary instructions must never become self-justifying evidence',
+  );
+});
+
+test('decisionPolicySource is one line and bounded before entering model/citation prompts', () => {
+  const source = decisionPolicySource(
+    'agent_long',
+    `Before.\nDecision policy: ${'x'.repeat(1_500)}\nDo not include this instruction.`,
+  );
+  assert.equal(source?.snippet.length, 1_000);
+  assert.doesNotMatch(source?.snippet ?? '', /Do not include/);
 });
