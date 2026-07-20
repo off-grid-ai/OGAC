@@ -984,6 +984,10 @@ export async function runAgent(
     output: answer,
     model: ANSWER_MODEL,
     orgId: attribution.org,
+    // When the pipeline requires PII masking, an output PII hit is RELEASED as a masked answer
+    // (verdict 'redacted' + redactedText) rather than fail-closed blocked — we substitute the
+    // sanitized answer below before signing. Without masking required this stays a hard block.
+    requirePiiMasking: requireMasking,
   });
   const postChecks = postScreen.checks;
   mark('guard', 'post', postScreen.detail, [], t);
@@ -1002,6 +1006,25 @@ export async function runAgent(
         provenance: null,
       },
       attribution.org,
+    );
+  }
+
+  // Output PII masking (PA-16c, output side). When the pipeline required masking and the output guard
+  // released a sanitized answer (verdict 'redacted' + redactedText), SUBSTITUTE it for the raw answer
+  // now — before provenance signing, persistence, and any downstream release. This is the sanitized
+  // output substitution the fail-closed output block (checks.ts piiOutputVerdict) was waiting for:
+  // the raw PII answer is never signed, persisted, or returned. No masking / no sanitized form ⇒ the
+  // screen already resolved 'blocked' above (fail-closed), so we never reach here with unmasked PII.
+  const outputMask = postScreen.checks.find((c) => c.name === 'pii')?.redactedText;
+  if (typeof outputMask === 'string' && outputMask !== answer) {
+    answer = outputMask;
+    mark('mask', 'llm-guard', 'masked PII in generated output before release', [], t);
+    auditEnforcement(
+      enforceCtx,
+      'pipeline.pii.mask',
+      `output:agent:${agentId}`,
+      'redacted',
+      'masked PII in generated output before release',
     );
   }
 
