@@ -38,6 +38,7 @@ export async function retrieveAgentSources(
     query: string;
     k: number;
     orgId: string;
+    correlationId?: string;
     contract: PipelineContract | null;
     asker: Asker;
   },
@@ -84,6 +85,7 @@ export async function retrieveAgentSources(
     { asker: input.asker },
     {
       orgId: input.orgId,
+      correlationId: input.correlationId,
       asker: input.asker,
       structuredAccess,
     },

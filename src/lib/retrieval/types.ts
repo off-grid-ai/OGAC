@@ -5,6 +5,7 @@
 import type { RetrievalOptions } from './query';
 import type { DataDomain } from '@/lib/data-domains';
 import type { Asker } from '@/lib/retrieval/acl';
+import type { RetrievalExecutionEvidence } from './evidence';
 
 export type { RetrievalOptions } from './query';
 
@@ -13,6 +14,8 @@ export type SourceKind = 'kb' | 'database' | 'tool';
 /** Request-scoped I/O context. Optional for backwards compatibility; production agent runs pass it. */
 export interface RetrievalContext {
   orgId?: string;
+  /** Canonical governed-run id used to correlate retrieval with audit/trace/lineage evidence. */
+  correlationId?: string;
   /** The authenticated asker whose document ACL must be enforced by the Brain. */
   asker?: Asker;
   /**
@@ -59,4 +62,6 @@ export interface RouteResult {
   query: string;
   decision: RouteDecision;
   hits: RetrievalHit[];
+  /** Null only when retrieval was deliberately skipped (for example an ungrounded agent). */
+  evidence: RetrievalExecutionEvidence | null;
 }

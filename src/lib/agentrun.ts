@@ -37,6 +37,7 @@ import { emitSpan } from '@/lib/otel';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import { enforceModelCall } from '@/lib/pipeline-enforcement';
 import { retrieveAgentSources } from '@/lib/agent-retrieval';
+import { retrievalExecutionSummary } from '@/lib/retrieval/evidence';
 import { scoreInteraction } from '@/lib/qa/scoring';
 import { shipRunAudit } from '@/lib/siem';
 import { recordAudit } from '@/lib/store';
@@ -642,12 +643,14 @@ export async function runAgent(
       query,
       hits: [] as RetrievalHit[],
       decision: { intent: [], reason: 'ungrounded agent' },
+      evidence: null,
     };
   } else {
     const retrieval = await retrieveAgentSources({
       query,
       k: 6,
       orgId: attribution.org,
+      correlationId: runId,
       contract,
       asker: context?.asker ?? { subject: caller, roles: [] },
     });
@@ -686,7 +689,9 @@ export async function runAgent(
     'router',
     agent.grounded === false
       ? 'skipped (ungrounded agent)'
-      : `intent ${routed.decision.intent.join(', ')}`,
+      : `intent ${routed.decision.intent.join(', ')}; ${
+          routed.evidence ? retrievalExecutionSummary(routed.evidence) : 'evidence=unavailable'
+        }`,
     routed.hits.map((h) => h.ref),
     t,
   );
