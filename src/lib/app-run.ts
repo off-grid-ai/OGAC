@@ -958,7 +958,20 @@ export function summarizeRows(label: string, resource: string, rows: unknown[], 
   const head = `${label} (${resource}): ${count} row(s).`;
   if (shown.length === 0) return head;
   const coverage = count > shown.length ? ` Showing ${shown.length} of ${count}.` : '';
-  return `${head}${coverage}\n${JSON.stringify(shown)}`;
+  // Repeating every object key for a 20-row reference table bloats the guardrail/model payload and
+  // can exceed a content-scanner deadline. Columnar JSON preserves every value and relationship
+  // while naming each field once. Small results stay in the friendlier row-object form.
+  if (shown.length <= 5 || shown.some((row) => !row || typeof row !== 'object' || Array.isArray(row))) {
+    return `${head}${coverage}\n${JSON.stringify(shown)}`;
+  }
+  const columns = Array.from(
+    new Set(shown.flatMap((row) => Object.keys(row as Record<string, unknown>))),
+  );
+  const values = shown.map((row) => {
+    const record = row as Record<string, unknown>;
+    return columns.map((column) => record[column] ?? null);
+  });
+  return `${head}${coverage}\n${JSON.stringify({ columns, rows: values })}`;
 }
 
 function errorResult(step: AppStep, detail: string): StepResult {

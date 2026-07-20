@@ -145,7 +145,9 @@ test('providedSourcesFromPriorResults carries only governed connector evidence',
 test('summarizeRows keeps complete small reference tables and labels larger truncation', () => {
   const complete = Array.from({ length: MAX_GOVERNED_SOURCE_ROWS }, (_, id) => ({ id }));
   const completeSummary = summarizeRows('rate card', 'pricing', complete, complete.length);
-  assert.match(completeSummary, /"id":19/);
+  assert.match(completeSummary, /"columns":\["id"\]/);
+  assert.match(completeSummary, /\[19\]/);
+  assert.doesNotMatch(completeSummary, /"id":19/);
   assert.doesNotMatch(completeSummary, /Showing/);
 
   const larger = [...complete, { id: 20 }];
