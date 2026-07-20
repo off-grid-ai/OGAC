@@ -28,6 +28,7 @@ export interface DomainDashboardModule {
 export interface DomainDashboardModel {
   id: DomainDashboardId;
   title: string;
+  headline: string;
   purpose: string;
   summary: string;
   primaryAction: { label: string; href: string };
@@ -38,6 +39,7 @@ export interface DomainDashboardModel {
 }
 
 interface DomainDefinition {
+  headline: string;
   summary: string;
   primaryAction: { label: string; href: string };
   secondaryAction: { label: string; href: string };
@@ -45,42 +47,49 @@ interface DomainDefinition {
 
 const DOMAIN_DEFINITIONS: Record<DomainDashboardId, DomainDefinition> = {
   work: {
+    headline: 'Do more with governed company context',
     summary:
       'Use governed company context to do more of your work, without needing to understand the platform underneath it.',
     primaryAction: { label: 'Open chat', href: '/work/chat' },
     secondaryAction: { label: 'Browse projects', href: '/work/projects' },
   },
   solutions: {
+    headline: 'Turn high-value processes into governed AI',
     summary:
       'Codify important business processes into reusable AI apps, then prove and improve their value through every run.',
     primaryAction: { label: 'Build an app', href: '/solutions/apps/new' },
     secondaryAction: { label: 'Browse library', href: '/solutions/library' },
   },
   data: {
+    headline: 'Make enterprise context reusable intelligence',
     summary:
       "Turn the organization's data and context into governed intelligence that every approved solution can reuse.",
     primaryAction: { label: 'Manage sources', href: '/data/sources' },
     secondaryAction: { label: 'Open catalog', href: '/data/catalog' },
   },
   runtime: {
+    headline: 'Run reliable private intelligence on your infrastructure',
     summary:
       'Give the organization reliable, private intelligence on infrastructure it controls, with cloud access only where policy permits it.',
     primaryAction: { label: 'Review models', href: '/runtime/models' },
     secondaryAction: { label: 'Manage pipelines', href: '/runtime/pipelines' },
   },
   governance: {
+    headline: 'Set controls once and inherit them everywhere',
     summary:
       'Set organizational controls once so every app, model request, and data flow inherits them, with evidence for each decision.',
     primaryAction: { label: 'Review posture', href: '/governance/posture' },
     secondaryAction: { label: 'Open policies', href: '/governance/policies' },
   },
   insights: {
+    headline: 'Prove business impact, quality, and ROI',
     summary:
       'Prove where AI makes work faster, better, or cheaper, and where quality, adoption, or ROI still needs attention.',
     primaryAction: { label: 'Review outcomes', href: '/insights/outcomes' },
     secondaryAction: { label: 'Inspect AI behavior', href: '/insights/ai' },
   },
   operations: {
+    headline: 'Keep your private AI cloud ready for work',
     summary:
       'Keep the installed private AI cloud healthy and recoverable without assembling or operating a pile of separate tools.',
     primaryAction: { label: 'Open runs', href: '/operations/runs' },
@@ -115,6 +124,7 @@ export function buildDomainDashboard(
   return {
     id,
     title: section.label,
+    headline: definition.headline,
     purpose: section.purpose,
     summary: definition.summary,
     primaryAction: definition.primaryAction,

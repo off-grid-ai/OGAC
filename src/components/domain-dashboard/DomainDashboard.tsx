@@ -16,12 +16,14 @@ export function DomainDashboard({ model }: Readonly<{ model: DomainDashboardMode
     <section aria-labelledby={`${model.id}-dashboard-title`} className="w-full space-y-6">
       <div className="border-b border-border pb-5">
         <div className="max-w-4xl">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Domain overview</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            {model.title} overview
+          </p>
           <h1
             id={`${model.id}-dashboard-title`}
             className="mt-2 text-2xl font-normal text-foreground"
           >
-            {model.title}
+            {model.headline}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">{model.summary}</p>
         </div>
