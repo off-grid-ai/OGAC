@@ -163,7 +163,9 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
     ),
     {
       'artifact-identity': ['yes', 'partial', 'no', 'no'],
-      'task-queue-readiness': ['yes', 'partial', 'partial', 'no'],
+      // task-queue-readiness is fully proven live: a real DescribeTaskQueue poller probe, exposed on
+      // the app-worker detail page, verified on the fleet 2026-07-20 (44550@offgrid-s1 on offgrid-apps).
+      'task-queue-readiness': ['yes', 'yes', 'yes', 'yes'],
       'governed-step-execution': ['yes', 'yes', 'yes', 'no'],
       'human-pause-resume': ['yes', 'yes', 'yes', 'no'],
       'failure-recovery': ['yes', 'partial', 'partial', 'no'],
@@ -171,8 +173,10 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
     },
   );
   assert.ok(
-    audit.items.every((item) => item.gates.workflow.status === 'no'),
-    'code-path evidence must not masquerade as a production app-worker workflow',
+    audit.items
+      .filter((item) => item.id !== 'task-queue-readiness')
+      .every((item) => item.gates.workflow.status === 'no'),
+    'code-path evidence must not masquerade as a production app-worker workflow (except the live-proven queue readiness)',
   );
 });
 
@@ -182,12 +186,16 @@ test('stale common execution spine records name exact immutable-identity blocker
   );
   const gateway = audits.get('gateway');
   const opa = audits.get('opa');
-  const temporal = audits.get('temporal');
   assert.ok(gateway);
   assert.ok(opa);
-  assert.ok(temporal);
 
-  for (const audit of [gateway, opa, temporal]) {
+  // temporal graduated to `current` on 2026-07-20 once its live image digests were locked in
+  // SERVER_STATE.md; it is no longer part of the stale execution spine.
+  const temporal = audits.get('temporal');
+  assert.ok(temporal);
+  assert.equal(temporal.auditState, 'current');
+
+  for (const audit of [gateway, opa]) {
     assert.equal(audit.auditState, 'stale');
     assert.ok(audit.auditStateEvidence);
     assert.match(
@@ -199,7 +207,6 @@ test('stale common execution spine records name exact immutable-identity blocker
 
   assert.match(gateway.auditStateEvidence ?? '', /does not restart the aggregator/);
   assert.match(opa.auditStateEvidence ?? '', /OFFGRID_ADAPTER_POLICY=opa/);
-  assert.match(temporal.auditStateEvidence ?? '', /both containers/);
 
   const gatewayGovernance = gateway.items.find((item) => item.id === 'request-governance');
   const opaDecisions = opa.items.find((item) => item.id === 'policy-decisions');

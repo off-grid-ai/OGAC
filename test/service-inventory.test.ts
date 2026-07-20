@@ -109,7 +109,7 @@ test('all 39 canonical audits project consistently across the 48-entry inventory
   );
 
   assert.equal(SERVICE_CAPABILITY_AUDITS.length, 39);
-  assert.deepEqual(auditStates, { current: 22, stale: 17, pending: 9 });
+  assert.deepEqual(auditStates, { current: 23, stale: 16, pending: 9 });
   assert.equal(
     inventory.entries.filter((entry) => entry.capabilityAudit.status === 'audited').length,
     SERVICE_CAPABILITY_AUDITS.length,
