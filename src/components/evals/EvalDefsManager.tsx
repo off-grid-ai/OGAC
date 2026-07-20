@@ -16,18 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -66,16 +55,14 @@ interface RunResult {
 }
 
 // Full CRUD for saved eval definitions + RUN with per-metric results. The parent passes a `reloadKey`
-// bump (incremented after a template is applied) to trigger a reload. URL-panel state is kept simple
-// here (local edit/delete dialogs) since the catalog owns the primary add flow.
+// bump (incremented after a template is applied) to trigger a reload. Editing belongs to the
+// evaluator's URL-driven detail route; destructive confirmation stays local because it is an action.
 export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) {
   const router = useRouter();
   const [defs, setDefs] = useState<EvalDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<EvalDef | null>(null);
-  const [editing, setEditing] = useState<EvalDef | null>(null);
-  const [saving, setSaving] = useState(false);
   const [lastRun, setLastRun] = useState<{ defId: string; result: RunResult } | null>(null);
 
   const load = useCallback(async () => {
@@ -103,33 +90,6 @@ export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) 
     } else {
       const e = await r.json().catch(() => null);
       toast.error(e?.error ?? 'Eval run failed');
-    }
-  }
-
-  async function saveEdit() {
-    if (!editing) return;
-    setSaving(true);
-    const r = await fetch(`/api/v1/admin/eval-defs/${editing.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        name: editing.name,
-        metric: editing.metric,
-        engine: editing.engine,
-        direction: editing.direction,
-        threshold: editing.threshold,
-        suite: editing.suite,
-        description: editing.description,
-      }),
-    });
-    setSaving(false);
-    if (r.ok) {
-      toast.success('Eval updated');
-      setEditing(null);
-      void load();
-    } else {
-      const e = await r.json().catch(() => null);
-      toast.error(e?.error ?? 'Could not save');
     }
   }
 
@@ -205,13 +165,13 @@ export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) 
                         <Play className="mr-1 size-3" />
                         {running === d.id ? 'Running…' : 'Run'}
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="Edit eval"
-                        onClick={() => setEditing({ ...d })}
-                      >
-                        <PencilSimple className="size-4" />
+                      <Button asChild size="icon" variant="ghost">
+                        <Link
+                          aria-label="Edit evaluator"
+                          href={`/solutions/quality/evaluators/${encodeURIComponent(d.id)}?panel=edit`}
+                        >
+                          <PencilSimple className="size-4" />
+                        </Link>
                       </Button>
                       <Button
                         size="icon"
@@ -283,65 +243,6 @@ export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) 
           </div>
         )}
       </CardContent>
-
-      {/* Edit — name, threshold, description. */}
-      <Sheet open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Edit eval</SheetTitle>
-            <SheetDescription>
-              Adjust the pass threshold and label. Metric + checker come from the template.
-            </SheetDescription>
-          </SheetHeader>
-          {editing && (
-            <SheetBody>
-              <div className="space-y-1.5">
-                <Label htmlFor="ed-name">Name</Label>
-                <Input
-                  id="ed-name"
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ed-threshold">
-                  Pass threshold ({editing.direction === 'higher-better' ? '≥' : '≤'}{' '}
-                  {Math.round(editing.threshold * 100)}%)
-                </Label>
-                <Input
-                  id="ed-threshold"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={editing.threshold}
-                  onChange={(e) =>
-                    setEditing({ ...editing, threshold: Number(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-1 rounded-md border border-border bg-muted/20 p-3 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Metric</span>
-                  <span className="font-mono">{editing.metric}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Checker</span>
-                  <span>{evalEngineLabel(editing.engine)}</span>
-                </div>
-              </div>
-            </SheetBody>
-          )}
-          <SheetFooter>
-            <Button variant="ghost" onClick={() => setEditing(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={saveEdit} disabled={saving}>
-              {saving ? 'Saving…' : 'Save changes'}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
 
       {/* Delete confirmation. */}
       <Dialog open={pendingDelete !== null} onOpenChange={(o) => !o && setPendingDelete(null)}>

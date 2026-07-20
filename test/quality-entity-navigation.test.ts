@@ -9,6 +9,8 @@ test('evaluator and golden-case lists link to real canonical detail routes', () 
   const evaluatorList = source('src/components/evals/EvalDefsManager.tsx');
   const caseList = source('src/components/evals/GoldenCasesManager.tsx');
   assert.match(evaluatorList, /\/solutions\/quality\/evaluators\/\$\{encodeURIComponent\(d\.id\)\}/);
+  assert.match(evaluatorList, /\?panel=edit/);
+  assert.doesNotMatch(evaluatorList, /setEditing|<Sheet/);
   assert.match(caseList, /\/solutions\/quality\/golden-cases\/\$\{encodeURIComponent\(c\.id\)\}/);
   assert.equal(
     existsSync(new URL('src/app/(console)/solutions/quality/evaluators/[id]/page.tsx', root)),
