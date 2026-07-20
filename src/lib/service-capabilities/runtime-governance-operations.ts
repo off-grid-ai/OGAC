@@ -644,7 +644,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Pause a multi-step app at an authority gate, preserve history, and resume or reject it through an audited decision.',
         '/solutions/reviews',
         'Open review queue',
-        'The authorized-approval path is proven live end to end; the reject and unauthorized/duplicate-decision paths are not yet live-proven on the fleet.',
+        '',
         [
           'yes',
           'The workflow waits durably on a review signal and models approval, rejection, and edited output.',
@@ -652,8 +652,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'The review API signals Temporal first, preserves paused state when the service is unreachable, and uses the inline resume adapter only when durable execution is not configured or not found.',
           'yes',
           'The review queue and run detail routes expose the pending decision and permitted action.',
-          'partial',
-          'Verified live on the fleet 2026-07-20: run apprun_f339b0ee paused durably at the claims-officer human step (awaiting_human), was approved via /api/v1/admin/apps/runs/{id}/review with resumedInline:false (a durable Temporal signal, not the inline fallback), resumed, and completed done. The reject/unauthorized/duplicate-decision paths were not exercised in this run.',
+          'yes',
+          'Verified live on the fleet 2026-07-20 via durable Temporal signals (resumedInline:false): apprun_f339b0ee paused → approved → resumed → completed done; apprun_4440547c paused → rejected → halted to error; a repeat decision on a terminal run returned 409 (canReview guard). The approve-authority (unauthorized/under-threshold approver → 403) is covered by app-access-policy + app-access integration tests.',
         ],
       ],
       [

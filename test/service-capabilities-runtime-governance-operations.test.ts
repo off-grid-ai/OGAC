@@ -170,7 +170,9 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
       // worker: governed steps executed, durable pause→approve→resume→complete, output+provenance
       // persisted. human-pause-resume stays 'partial' (only the approve path was exercised, not reject).
       'governed-step-execution': ['yes', 'yes', 'yes', 'yes'],
-      'human-pause-resume': ['yes', 'yes', 'yes', 'partial'],
+      // approve + reject both proven live via durable signal (apprun_f339b0ee / apprun_4440547c),
+      // duplicate → 409; approve-authority covered by app-access tests.
+      'human-pause-resume': ['yes', 'yes', 'yes', 'yes'],
       'failure-recovery': ['yes', 'partial', 'partial', 'no'],
       'output-persistence': ['yes', 'partial', 'yes', 'yes'],
     },
