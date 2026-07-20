@@ -566,7 +566,7 @@ export function ServiceCapabilityExplorer({
 
       <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(18rem,23rem)_minmax(0,1fr)] lg:overflow-hidden">
         <aside
-          className="flex min-h-72 flex-col border-b border-border bg-card/30 lg:h-full lg:min-h-0 lg:border-r lg:border-b-0"
+          className="flex max-h-[55vh] min-h-72 flex-col overflow-hidden border-b border-border bg-card/30 lg:h-full lg:max-h-none lg:min-h-0 lg:border-r lg:border-b-0"
           aria-label="Service capability inventory"
         >
           <div className="sticky top-0 z-10 border-b border-border bg-background p-3">
@@ -575,7 +575,7 @@ export function ServiceCapabilityExplorer({
               {visibleEntries.length}/{inventory.totalCount} services shown
             </p>
           </div>
-          <div className="min-h-0 flex-1 lg:overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <ServiceMasterList
               entries={visibleEntries}
               filter={inventoryFilter}

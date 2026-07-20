@@ -76,6 +76,8 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.match(component, /<Table>/);
   assert.match(component, /<Progress/);
   assert.match(component, /aria-label="Service families"/);
+  assert.match(component, /max-h-\[55vh\][^\"]*overflow-hidden/);
+  assert.match(component, /min-h-0 flex-1 overflow-y-auto/);
   assert.doesNotMatch(component, /mx-auto/);
 });
 
