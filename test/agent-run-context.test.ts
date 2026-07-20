@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   effectiveRunId,
+  maskRetrievalHits,
+  retrievalHitMaskingText,
   retrievalMode,
   resolveRunAttribution,
 } from '../src/lib/agent-run-context.ts';
@@ -24,6 +26,60 @@ test('resolveRunAttribution: context wins (durable path — resolved actor/org/p
   assert.deepEqual(a.actor, actor);
   assert.equal(a.org, 'org_2');
   assert.equal(a.project, 'proj_x');
+});
+
+test('maskRetrievalHits screens title and snippet and never retains the raw customer label', () => {
+  const hit = {
+    sourceId: 'step-1',
+    sourceKind: 'database' as const,
+    title: 'Account for Alice Shah',
+    snippet: 'PAN ABCDE1234F',
+    ref: 'corebank:accounts',
+    score: 1,
+  };
+  assert.equal(retrievalHitMaskingText(hit), 'Account for Alice Shah\nPAN ABCDE1234F');
+
+  const result = maskRetrievalHits([hit], true, [
+    {
+      ok: true,
+      scan: {
+        hits: true,
+        redacted: 'Account for [REDACTED_PERSON]\nPAN [REDACTED_PAN]',
+      },
+    },
+  ]);
+  assert.equal(result.block, false);
+  assert.deepEqual(result.maskedRefs, ['corebank:accounts']);
+  assert.equal(result.hits[0]?.title, 'Governed source 1');
+  assert.equal(result.hits[0]?.snippet, 'Account for [REDACTED_PERSON]\nPAN [REDACTED_PAN]');
+  assert.doesNotMatch(JSON.stringify(result.hits), /Alice Shah|ABCDE1234F/);
+});
+
+test('maskRetrievalHits fails the entire evidence batch closed on a failed or missing scan', () => {
+  const hits = [
+    {
+      sourceId: 'step-1',
+      sourceKind: 'database' as const,
+      title: 'accounts',
+      snippet: 'sensitive row',
+      ref: 'crm:accounts',
+      score: 1,
+    },
+  ];
+  const failed = maskRetrievalHits(hits, true, [
+    { ok: false, error: new Error('detector offline') },
+  ]);
+  assert.equal(failed.block, true);
+  assert.equal(failed.hits.length, 0);
+  assert.match(failed.reason ?? '', /crm:accounts.*detector offline/);
+
+  const missing = maskRetrievalHits(hits, true, []);
+  assert.equal(missing.block, true);
+  assert.match(missing.reason ?? '', /1 source.*0 scan result/);
+
+  const notRequired = maskRetrievalHits(hits, false, []);
+  assert.equal(notRequired.block, false);
+  assert.deepEqual(notRequired.hits, hits);
 });
 
 test('resolveRunAttribution: no context → derive from caller (inline path, unchanged)', () => {
@@ -61,8 +117,14 @@ test('effectiveRunId: honors a context-supplied id (durable), else mints', () =>
     'run_abcd1234',
   );
   // Blank/absent → mint.
-  assert.equal(effectiveRunId(undefined, () => 'run_minted'), 'run_minted');
-  assert.equal(effectiveRunId('   ', () => 'run_minted'), 'run_minted');
+  assert.equal(
+    effectiveRunId(undefined, () => 'run_minted'),
+    'run_minted',
+  );
+  assert.equal(
+    effectiveRunId('   ', () => 'run_minted'),
+    'run_minted',
+  );
 });
 
 test('C4: a threaded runId yields the identical four-plane correlation as an inline run', () => {

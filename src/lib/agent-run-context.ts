@@ -19,6 +19,8 @@ import { actorFrom } from '@/lib/audit-event';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import type { Asker } from '@/lib/retrieval/acl';
 import type { RetrievalHit } from '@/lib/retrieval/types';
+import { maskOrBlock } from '@/lib/pii-escalation';
+import type { PiiScanLike } from '@/lib/guardrail-rules-runtime';
 
 /**
  * The caller context for a governed agent run. Resolved AT SUBMIT TIME from the request (same source
@@ -77,6 +79,68 @@ export function retrievalMode(
 ): RetrievalMode {
   if ((providedSources?.length ?? 0) > 0) return 'provided';
   return grounded ? 'retrieve' : 'skip';
+}
+
+export type PiiScanAttempt = { ok: true; scan: PiiScanLike } | { ok: false; error: unknown };
+
+export interface MaskRetrievalHitsResult {
+  block: boolean;
+  hits: RetrievalHit[];
+  maskedRefs: string[];
+  reason: string | null;
+}
+
+/**
+ * The exact text submitted to the masker for one retrieval hit. Titles can contain customer data
+ * too, so both the title and snippet cross the masking boundary together.
+ */
+export function retrievalHitMaskingText(hit: RetrievalHit): string {
+  return `${hit.title}\n${hit.snippet}`;
+}
+
+/**
+ * PURE — apply completed PII scans to every source that will enter the model prompt. When masking
+ * is required, raw retrieval titles are replaced by stable generic labels and only the screened
+ * title+snippet text is retained. Any missing/failed/unavailable scan blocks the whole batch: a
+ * partially screened evidence set must never reach the model.
+ */
+export function maskRetrievalHits(
+  hits: readonly RetrievalHit[],
+  required: boolean,
+  attempts: readonly PiiScanAttempt[],
+): MaskRetrievalHitsResult {
+  if (!required || hits.length === 0) {
+    return { block: false, hits: [...hits], maskedRefs: [], reason: null };
+  }
+  if (attempts.length !== hits.length) {
+    return {
+      block: true,
+      hits: [],
+      maskedRefs: [],
+      reason: `PII masking required for ${hits.length} source(s), but ${attempts.length} scan result(s) were supplied`,
+    };
+  }
+
+  const safe: RetrievalHit[] = [];
+  const maskedRefs: string[] = [];
+  for (const [index, hit] of hits.entries()) {
+    const decision = maskOrBlock(true, retrievalHitMaskingText(hit), attempts[index]!);
+    if (decision.block) {
+      return {
+        block: true,
+        hits: [],
+        maskedRefs,
+        reason: `source ${hit.ref} blocked: ${decision.reason}`,
+      };
+    }
+    if (decision.masked) maskedRefs.push(hit.ref);
+    safe.push({
+      ...hit,
+      title: `Governed source ${index + 1}`,
+      snippet: decision.text,
+    });
+  }
+  return { block: false, hits: safe, maskedRefs, reason: null };
 }
 
 /**

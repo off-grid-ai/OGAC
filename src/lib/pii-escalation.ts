@@ -117,7 +117,20 @@ export function maskOrBlock(
   if (!scanResult.ok) {
     const reason =
       scanResult.error instanceof Error ? scanResult.error.message : String(scanResult.error);
-    return { block: true, text, masked: false, reason: `PII masking required but the masker failed: ${reason}` };
+    return {
+      block: true,
+      text,
+      masked: false,
+      reason: `PII masking required but the masker failed: ${reason}`,
+    };
+  }
+  if (scanResult.scan.blocked) {
+    return {
+      block: true,
+      text,
+      masked: false,
+      reason: `PII masking required but the masker could not screen: ${scanResult.scan.reason ?? 'guardrail unavailable'}`,
+    };
   }
   const esc = applyPiiEscalation(text, true, scanResult.scan);
   return { block: false, text: esc.text, masked: esc.masked, reason: null };

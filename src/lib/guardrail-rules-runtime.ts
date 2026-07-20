@@ -217,6 +217,10 @@ export function applyGuardrailRules(
 export interface PiiScanLike {
   hits: boolean;
   redacted?: string;
+  /** A configured detector that could not screen. Mandatory masking must treat this as a terminal
+   * failure, not forward the adapter's diagnostic placeholder as though it were sanitized text. */
+  blocked?: boolean;
+  reason?: string;
 }
 
 /**

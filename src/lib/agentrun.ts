@@ -23,6 +23,8 @@ import {
 } from '@/lib/agent-loop';
 import {
   effectiveRunId,
+  maskRetrievalHits,
+  retrievalHitMaskingText,
   type RunContext,
   resolveRunAttribution,
   retrievalMode,
@@ -709,8 +711,8 @@ export async function runAgent(
       : sourceMode === 'provided'
         ? `${routed.hits.length} source(s) supplied by governed upstream workflow steps`
         : `intent ${routed.decision.intent.join(', ')}; ${
-          routed.evidence ? retrievalExecutionSummary(routed.evidence) : 'evidence=unavailable'
-        }`,
+            routed.evidence ? retrievalExecutionSummary(routed.evidence) : 'evidence=unavailable'
+          }`,
     routed.hits.map((h) => h.ref),
     t,
   );
@@ -841,6 +843,66 @@ export async function runAgent(
       );
     } else if (scanResult.ok) {
       mark('mask', scanResult.scan.engine, 'no PII to mask', [], t);
+    }
+
+    // Retrieval evidence is a separate part of the model prompt. Screening only the question while
+    // forwarding raw source snippets would leak exactly the customer data the pipeline overlay is
+    // meant to protect. Scan every hit concurrently, fail the entire batch closed, and replace the
+    // routed hits with their safe forms before compose/autonomous planning and citation persistence.
+    const sourceAttempts = await Promise.all(
+      routed.hits.map(async (hit) => {
+        try {
+          return {
+            ok: true as const,
+            scan: await getPii().scan(retrievalHitMaskingText(hit), attribution.org),
+          };
+        } catch (error) {
+          return { ok: false as const, error };
+        }
+      }),
+    );
+    const sourceMasking = maskRetrievalHits(routed.hits, true, sourceAttempts);
+    if (sourceMasking.block) {
+      mark('mask', 'block', sourceMasking.reason ?? 'source PII masking failed', [], t);
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.pii.mask',
+        `sources:agent:${agentId}`,
+        'error',
+        sourceMasking.reason ?? 'source PII masking failed',
+      );
+      auditRun('blocked');
+      return persist(
+        runId,
+        {
+          agentId,
+          query,
+          answer: '',
+          status: 'blocked',
+          steps,
+          citations: [],
+          checks: [
+            ...preChecks,
+            {
+              name: 'pii-mask',
+              verdict: 'blocked' as const,
+              detail: sourceMasking.reason ?? undefined,
+            },
+          ],
+          provenance: null,
+        },
+        attribution.org,
+      );
+    }
+    routed = { ...routed, hits: sourceMasking.hits };
+    if (routed.hits.length > 0) {
+      mark(
+        'mask',
+        'sources',
+        `${routed.hits.length} governed source(s) screened; ${sourceMasking.maskedRefs.length} redacted`,
+        sourceMasking.maskedRefs,
+        t,
+      );
     }
   }
 
