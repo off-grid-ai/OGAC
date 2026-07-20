@@ -16,6 +16,15 @@ import { getServices } from '../src/lib/services-directory.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const APP = resolve(ROOT, 'src/app/(console)');
+const DYNAMIC_ROUTE_MODULES = new Map([
+  ['data/lineage', './data/lineage/[destination]/page.tsx'],
+  ['governance/guardrails', './governance/guardrails/[destination]/page.tsx'],
+  ['governance/policies', './governance/policies/[destination]/page.tsx'],
+  ['operations/health', './operations/health/[destination]/page.tsx'],
+  ['operations/services', './operations/services/[serviceId]/page.tsx'],
+  ['runtime/models', './runtime/models/[destination]/page.tsx'],
+  ['solutions/quality', './solutions/quality/[destination]/page.tsx'],
+]);
 
 function source(path: string): string {
   return readFileSync(resolve(ROOT, path), 'utf8');
@@ -47,18 +56,8 @@ function routeModule(pathnameWithQuery: string): string {
   if (existsSync(exact)) return exact;
 
   const segments = pathname.split('/').filter(Boolean);
-  if (segments[0] === 'operations' && segments[1] === 'services' && segments.length === 3) {
-    return resolve(APP, './operations/services/[serviceId]/page.tsx');
-  }
-  if (segments[0] === 'operations' && segments[1] === 'health' && segments.length === 3) {
-    return resolve(APP, './operations/health/[destination]/page.tsx');
-  }
-  if (segments[0] === 'runtime' && segments[1] === 'models' && segments.length === 3) {
-    return resolve(APP, './runtime/models/[destination]/page.tsx');
-  }
-  if (segments[0] === 'governance' && segments[1] === 'guardrails' && segments.length === 3) {
-    return resolve(APP, './governance/guardrails/[destination]/page.tsx');
-  }
+  const dynamicModule = DYNAMIC_ROUTE_MODULES.get(segments.slice(0, 2).join('/'));
+  if (segments.length === 3 && dynamicModule) return resolve(APP, dynamicModule);
   return exact;
 }
 

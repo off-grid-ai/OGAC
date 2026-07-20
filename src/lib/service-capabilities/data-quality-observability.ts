@@ -169,7 +169,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'yes', 'Knowledge Indexes manages the backend through provider-neutral controls.',
         'partial', 'Local knowledge workflows can select LanceDB, but no retained workflow evidence attributes a run to it.',
       ]),
-      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/search', 'Search knowledge', 'Record LanceDB table and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected LanceDB.', [
+      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/indexes', 'Manage retrieval indexes', 'Record LanceDB table and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected LanceDB.', [
         'yes', 'LanceDB provides vector search and SQL-style filtering.',
         'yes', 'The adapter writes and queries real LanceDB tables.',
         'yes', 'Knowledge search displays scored records.',
