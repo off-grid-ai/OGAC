@@ -28,7 +28,10 @@ test('performance view reports insufficient history without inventing a baseline
   assert.equal(partial.latestScore, 100);
   assert.equal(partial.currentMean, 50);
   assert.equal(partial.baselineMean, null);
-  assert.deepEqual(partial.trend.map((point) => point.runId), ['old', 'new']);
+  assert.deepEqual(
+    partial.trend.map((point) => point.runId),
+    ['old', 'new'],
+  );
 });
 
 test('performance view compares equal recent and baseline windows', () => {
@@ -62,31 +65,52 @@ test('release gate portfolio projects every persisted operator state', () => {
   definitions.push({ id: 'library', pipelineId: null });
   const jobs = [
     {
-      jobId: 'old-c', pipelineId: 'c', status: 'blocked' as const,
-      createdAt: '2026-07-01T00:00:00Z', overridden: false, summary: 'old',
+      jobId: 'old-c',
+      pipelineId: 'c',
+      status: 'blocked' as const,
+      createdAt: '2026-07-01T00:00:00Z',
+      overridden: false,
+      summary: 'old',
     },
     {
-      jobId: 'new-c', pipelineId: 'c', status: 'gating' as const,
-      createdAt: '2026-07-02T00:00:00Z', overridden: false, summary: null,
+      jobId: 'new-c',
+      pipelineId: 'c',
+      status: 'gating' as const,
+      createdAt: '2026-07-02T00:00:00Z',
+      overridden: false,
+      summary: null,
     },
     {
-      jobId: 'd', pipelineId: 'd', status: 'blocked' as const,
-      createdAt: null, overridden: false, summary: 'below threshold',
+      jobId: 'd',
+      pipelineId: 'd',
+      status: 'blocked' as const,
+      createdAt: null,
+      overridden: false,
+      summary: 'below threshold',
     },
     {
-      jobId: 'e', pipelineId: 'e', status: 'published' as const,
-      createdAt: '2026-07-03T00:00:00Z', overridden: true, summary: 'override audited',
+      jobId: 'e',
+      pipelineId: 'e',
+      status: 'published' as const,
+      createdAt: '2026-07-03T00:00:00Z',
+      overridden: true,
+      summary: 'override audited',
     },
     {
-      jobId: 'f', pipelineId: 'f', status: 'published' as const,
-      createdAt: '2026-07-04T00:00:00Z', overridden: false, summary: null,
+      jobId: 'f',
+      pipelineId: 'f',
+      status: 'published' as const,
+      createdAt: '2026-07-04T00:00:00Z',
+      overridden: false,
+      summary: null,
     },
   ];
 
   const view = buildReleaseGatePortfolio(pipelines, definitions, jobs);
-  assert.deepEqual(view.map((row) => row.status), [
-    'ungated', 'not-run', 'running', 'blocked', 'overridden', 'passed',
-  ]);
+  assert.deepEqual(
+    view.map((row) => row.status),
+    ['ungated', 'not-run', 'running', 'blocked', 'overridden', 'passed'],
+  );
   assert.match(view[0].summary, /without a quality verdict/);
   assert.match(view[1].summary, /not run yet/);
   assert.match(view[2].summary, /running/);

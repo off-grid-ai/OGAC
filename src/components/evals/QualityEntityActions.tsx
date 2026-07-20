@@ -95,7 +95,9 @@ export function EvalDefinitionActions({ definition }: Readonly<{ definition: Eva
 
   async function run() {
     setRunning(true);
-    const response = await fetch(`/api/v1/admin/eval-defs/${definition.id}/run`, { method: 'POST' });
+    const response = await fetch(`/api/v1/admin/eval-defs/${definition.id}/run`, {
+      method: 'POST',
+    });
     setRunning(false);
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.run?.id) {
@@ -159,9 +161,7 @@ export function EvalDefinitionActions({ definition }: Readonly<{ definition: Eva
                 max={1}
                 step={0.05}
                 value={draft.threshold}
-                onChange={(event) =>
-                  setDraft({ ...draft, threshold: Number(event.target.value) })
-                }
+                onChange={(event) => setDraft({ ...draft, threshold: Number(event.target.value) })}
               />
             </div>
             <div className="space-y-1.5">
@@ -182,7 +182,9 @@ export function EvalDefinitionActions({ definition }: Readonly<{ definition: Eva
             </div>
           </SheetBody>
           <SheetFooter>
-            <Button variant="ghost" onClick={panel.hide} disabled={saving}>Cancel</Button>
+            <Button variant="ghost" onClick={panel.hide} disabled={saving}>
+              Cancel
+            </Button>
             <Button onClick={() => void save()} disabled={saving}>
               {saving ? 'Saving...' : 'Save changes'}
             </Button>
@@ -199,8 +201,12 @@ export function EvalDefinitionActions({ definition }: Readonly<{ definition: Eva
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => void remove()}>Delete</Button>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void remove()}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -271,23 +277,41 @@ export function GoldenCaseActions({ goldenCase }: Readonly<{ goldenCase: GoldenC
           <SheetBody>
             <div className="space-y-1.5">
               <Label htmlFor="quality-case-name">Name</Label>
-              <Input id="quality-case-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+              <Input
+                id="quality-case-name"
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="quality-case-query">Input</Label>
-              <Textarea id="quality-case-query" value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })} />
+              <Textarea
+                id="quality-case-query"
+                value={draft.query}
+                onChange={(event) => setDraft({ ...draft, query: event.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="quality-case-expected">Expected result</Label>
-              <Textarea id="quality-case-expected" value={draft.expected} onChange={(event) => setDraft({ ...draft, expected: event.target.value })} />
+              <Textarea
+                id="quality-case-expected"
+                value={draft.expected}
+                onChange={(event) => setDraft({ ...draft, expected: event.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="quality-case-suite">Suite</Label>
-              <Input id="quality-case-suite" value={draft.suite} onChange={(event) => setDraft({ ...draft, suite: event.target.value })} />
+              <Input
+                id="quality-case-suite"
+                value={draft.suite}
+                onChange={(event) => setDraft({ ...draft, suite: event.target.value })}
+              />
             </div>
           </SheetBody>
           <SheetFooter>
-            <Button variant="ghost" onClick={panel.hide} disabled={saving}>Cancel</Button>
+            <Button variant="ghost" onClick={panel.hide} disabled={saving}>
+              Cancel
+            </Button>
             <Button onClick={() => void save()} disabled={saving}>
               {saving ? 'Saving...' : 'Save changes'}
             </Button>
@@ -304,8 +328,12 @@ export function GoldenCaseActions({ goldenCase }: Readonly<{ goldenCase: GoldenC
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => void remove()}>Delete</Button>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void remove()}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

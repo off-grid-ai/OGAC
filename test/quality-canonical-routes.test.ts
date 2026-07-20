@@ -11,7 +11,8 @@ test('canonical Quality routes expose executions, drift, performance, and releas
     'src/app/(console)/solutions/quality/drift/page.tsx',
     'src/app/(console)/solutions/quality/performance/page.tsx',
     'src/app/(console)/solutions/quality/release-gates/page.tsx',
-  ]) assert.equal(existsSync(new URL(path, root)), true, path);
+  ])
+    assert.equal(existsSync(new URL(path, root)), true, path);
 
   const run = source('src/app/(console)/solutions/quality/runs/[id]/page.tsx');
   const drift = source('src/app/(console)/solutions/quality/drift/page.tsx');

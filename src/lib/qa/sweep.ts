@@ -82,7 +82,12 @@ export async function runQaSweep(opts: { orgId?: string } = {}): Promise<QaSweep
     at,
     degraded,
     reasons,
-    eval: { engine: evalRun.engine, score: evalRun.score, passed: evalRun.passed, total: evalRun.total },
+    eval: {
+      engine: evalRun.engine,
+      score: evalRun.score,
+      passed: evalRun.passed,
+      total: evalRun.total,
+    },
     drift: { engine: drift.engine, status: drift.status, note: drift.note },
     ...(autoRollback ? { autoRollback } : {}),
   };

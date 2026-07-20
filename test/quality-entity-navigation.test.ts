@@ -8,7 +8,10 @@ const source = (path: string) => readFileSync(new URL(path, root), 'utf8');
 test('evaluator and golden-case lists link to real canonical detail routes', () => {
   const evaluatorList = source('src/components/evals/EvalDefsManager.tsx');
   const caseList = source('src/components/evals/GoldenCasesManager.tsx');
-  assert.match(evaluatorList, /\/solutions\/quality\/evaluators\/\$\{encodeURIComponent\(d\.id\)\}/);
+  assert.match(
+    evaluatorList,
+    /\/solutions\/quality\/evaluators\/\$\{encodeURIComponent\(d\.id\)\}/,
+  );
   assert.match(evaluatorList, /\?panel=edit/);
   assert.doesNotMatch(evaluatorList, /setEditing|<Sheet/);
   assert.match(caseList, /\/solutions\/quality\/golden-cases\/\$\{encodeURIComponent\(c\.id\)\}/);
@@ -33,7 +36,10 @@ test('quality entity detail routes are tenant-scoped and expose real management 
   assert.match(actions, /method: 'PATCH'/);
   assert.match(actions, /method: 'DELETE'/);
   assert.match(actions, /eval-defs\/\$\{definition\.id\}\/run/);
-  assert.match(actions, /router\.push\(`\/solutions\/quality\/runs\/\$\{encodeURIComponent\(body\.run\.id\)\}`\)/);
+  assert.match(
+    actions,
+    /router\.push\(`\/solutions\/quality\/runs\/\$\{encodeURIComponent\(body\.run\.id\)\}`\)/,
+  );
   assert.match(actions, /new URLSearchParams\(params\.toString\(\)\)/);
   assert.match(actions, /router\.replace\(urlWithPanel\(false\)/);
 });

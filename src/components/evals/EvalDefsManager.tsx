@@ -194,7 +194,8 @@ export function EvalDefsManager({ reloadKey }: Readonly<{ reloadKey: number }>) 
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">
-                Last run · {lastRun.result.run.score}% · {evalEngineLabel(lastRun.result.computedBy)}
+                Last run · {lastRun.result.run.score}% ·{' '}
+                {evalEngineLabel(lastRun.result.computedBy)}
               </span>
               <span className="font-mono text-[10px] text-muted-foreground">
                 {lastRun.result.run.id}

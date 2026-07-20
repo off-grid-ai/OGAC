@@ -203,14 +203,11 @@ export function normalizeDrift(input: RawDriftInput): DriftView {
   // Adapter DriftReport path.
   const features = featuresFromMetrics(src.metrics);
   const status = normalizeStatus(src.status);
-  const strongest = features.reduce<number | null>(
-    (max, f) => {
-      if (f.score === null) return max;
-      if (max === null) return f.score;
-      return Math.max(max, f.score);
-    },
-    null,
-  );
+  const strongest = features.reduce<number | null>((max, f) => {
+    if (f.score === null) return max;
+    if (max === null) return f.score;
+    return Math.max(max, f.score);
+  }, null);
   return {
     engine,
     status,

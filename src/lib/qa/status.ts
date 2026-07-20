@@ -33,4 +33,3 @@ export async function readQaStatus(orgId: string): Promise<QaStatus> {
     online: { configured: scoringConfigured(), enabled: onlineEnabled },
   };
 }
-

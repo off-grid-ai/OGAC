@@ -11,7 +11,9 @@ import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EvaluatorDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function EvaluatorDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('evals');
   const { id } = await params;
   const definition = await getEvalDef(id, await currentOrgId());
@@ -21,7 +23,10 @@ export default async function EvaluatorDetailPage({ params }: Readonly<{ params:
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-3">
-          <Link href="/solutions/quality/evaluators" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+          <Link
+            href="/solutions/quality/evaluators"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="size-3.5" /> Evaluators
           </Link>
           <div>
@@ -35,19 +40,44 @@ export default async function EvaluatorDetailPage({ params }: Readonly<{ params:
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Fact label="Checker"><Badge variant="outline">{evalEngineLabel(definition.engine)}</Badge></Fact>
-        <Fact label="Metric"><span className="font-mono text-sm">{definition.metric}</span></Fact>
-        <Fact label="Pass threshold"><span className="text-xl">{definition.direction === 'higher-better' ? '>=' : '<='} {Math.round(definition.threshold * 100)}%</span></Fact>
-        <Fact label="Golden suite"><Badge variant="secondary">{definition.suite}</Badge></Fact>
+        <Fact label="Checker">
+          <Badge variant="outline">{evalEngineLabel(definition.engine)}</Badge>
+        </Fact>
+        <Fact label="Metric">
+          <span className="font-mono text-sm">{definition.metric}</span>
+        </Fact>
+        <Fact label="Pass threshold">
+          <span className="text-xl">
+            {definition.direction === 'higher-better' ? '>=' : '<='}{' '}
+            {Math.round(definition.threshold * 100)}%
+          </span>
+        </Fact>
+        <Fact label="Golden suite">
+          <Badge variant="secondary">{definition.suite}</Badge>
+        </Fact>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-sm">Release ownership</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm">Release ownership</CardTitle>
+        </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
           {definition.pipelineId ? (
-            <p>This evaluator gates <Link className="text-primary hover:underline" href={`/runtime/pipelines/${definition.pipelineId}/quality`}>pipeline {definition.pipelineId}</Link>. Run it here for a scorecard or publish through the pipeline Quality view for a persisted release-gate decision.</p>
+            <p>
+              This evaluator gates{' '}
+              <Link
+                className="text-primary hover:underline"
+                href={`/runtime/pipelines/${definition.pipelineId}/quality`}
+              >
+                pipeline {definition.pipelineId}
+              </Link>
+              . Run it here for a scorecard or publish through the pipeline Quality view for a
+              persisted release-gate decision.
+            </p>
           ) : (
-            <p>This is an org-wide evaluator. Attach it to a pipeline before it can block a release.</p>
+            <p>
+              This is an org-wide evaluator. Attach it to a pipeline before it can block a release.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -56,6 +86,14 @@ export default async function EvaluatorDetailPage({ params }: Readonly<{ params:
 }
 
 function Fact({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">{label}</CardTitle></CardHeader><CardContent>{children}</CardContent></Card>;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }
-

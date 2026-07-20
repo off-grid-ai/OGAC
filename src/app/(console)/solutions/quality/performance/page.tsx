@@ -4,7 +4,14 @@ import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { listEvalRuns } from '@/lib/evals';
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
@@ -37,28 +44,166 @@ export default async function QualityPerformancePage() {
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl space-y-3"><p className="text-xs text-muted-foreground">Recent executions are compared in equal windows. Degraded means the current mean is at least 15 points below the prior window; warning starts at 7 points. No verdict is shown until four runs exist.</p><div className="flex flex-wrap gap-2"><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/golden-cases">Maintain golden cases</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/evaluators">Configure evaluators</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/runs">Inspect executions</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/release-gates">Review release gates</Link></Button></div></div>
+        <div className="max-w-3xl space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Recent executions are compared in equal windows. Degraded means the current mean is at
+            least 15 points below the prior window; warning starts at 7 points. No verdict is shown
+            until four runs exist.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/solutions/quality/golden-cases">Maintain golden cases</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/solutions/quality/evaluators">Configure evaluators</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/solutions/quality/runs">Inspect executions</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/solutions/quality/release-gates">Review release gates</Link>
+            </Button>
+          </div>
+        </div>
         <RunSweepButton />
       </div>
 
-      {alerts.map((alert) => <div key={`${alert.metric}-${alert.rule.op}-${alert.rule.value}`} className={alert.severity === 'critical' ? 'border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive' : 'border border-border bg-muted/40 px-3 py-2 text-xs'}>Threshold breached: {alert.message}</div>)}
+      {alerts.map((alert) => (
+        <div
+          key={`${alert.metric}-${alert.rule.op}-${alert.rule.value}`}
+          className={
+            alert.severity === 'critical'
+              ? 'border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive'
+              : 'border border-border bg-muted/40 px-3 py-2 text-xs'
+          }
+        >
+          Threshold breached: {alert.message}
+        </div>
+      ))}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric label="Performance"><Badge variant="secondary" className={STATUS_CLASS[performance.status]}>{performance.status}</Badge></Metric>
-        <Metric label="Latest score"><span className="text-2xl">{performance.latestScore === null ? 'not recorded' : `${performance.latestScore}%`}</span></Metric>
-        <Metric label="Current mean"><span className="text-2xl">{performance.currentMean === null ? 'not recorded' : `${performance.currentMean}%`}</span></Metric>
-        <Metric label="Change"><span className="text-2xl">{performance.delta === null ? 'not available' : `${performance.delta > 0 ? '+' : ''}${performance.delta} pts`}</span></Metric>
-        <Metric label="Online scoring"><span className="text-sm">{status?.online.configured ? (status.online.enabled ? 'configured and enabled' : 'configured, flag paused') : 'not configured'}</span><Link className="mt-2 block text-xs text-primary hover:underline" href="/operations/services/evidently">Drift engine evidence</Link></Metric>
+        <Metric label="Performance">
+          <Badge variant="secondary" className={STATUS_CLASS[performance.status]}>
+            {performance.status}
+          </Badge>
+        </Metric>
+        <Metric label="Latest score">
+          <span className="text-2xl">
+            {performance.latestScore === null ? 'not recorded' : `${performance.latestScore}%`}
+          </span>
+        </Metric>
+        <Metric label="Current mean">
+          <span className="text-2xl">
+            {performance.currentMean === null ? 'not recorded' : `${performance.currentMean}%`}
+          </span>
+        </Metric>
+        <Metric label="Change">
+          <span className="text-2xl">
+            {performance.delta === null
+              ? 'not available'
+              : `${performance.delta > 0 ? '+' : ''}${performance.delta} pts`}
+          </span>
+        </Metric>
+        <Metric label="Online scoring">
+          <span className="text-sm">
+            {status?.online.configured
+              ? status.online.enabled
+                ? 'configured and enabled'
+                : 'configured, flag paused'
+              : 'not configured'}
+          </span>
+          <Link
+            className="mt-2 block text-xs text-primary hover:underline"
+            href="/operations/services/evidently"
+          >
+            Drift engine evidence
+          </Link>
+        </Metric>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-5">
-        <Card className="xl:col-span-2"><CardHeader><CardTitle className="text-sm">Score history</CardTitle><p className="text-xs text-muted-foreground">Oldest result is on the left. Every point links back to an immutable execution record below.</p></CardHeader><CardContent>{performance.trend.length === 0 ? <p className="py-12 text-center text-xs text-muted-foreground">No execution history yet.</p> : <ScoreTrendChart data={performance.trend} />}</CardContent></Card>
-        <Card className="xl:col-span-3"><CardHeader><CardTitle className="text-sm">Recorded executions</CardTitle></CardHeader><CardContent>{runs.length === 0 ? <p className="py-12 text-center text-xs text-muted-foreground">Create golden cases and run an evaluator to establish the baseline.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Run</TableHead><TableHead>Engine</TableHead><TableHead className="text-right">Score</TableHead><TableHead className="text-right">Passed</TableHead><TableHead>Started</TableHead></TableRow></TableHeader><TableBody>{runs.map((run) => <TableRow key={run.id}><TableCell><Link className="font-mono text-xs text-primary hover:underline" href={`/solutions/quality/runs/${encodeURIComponent(run.id)}`}>{run.id}</Link></TableCell><TableCell><Badge variant="outline">{run.engine}</Badge></TableCell><TableCell className="text-right">{run.score}%</TableCell><TableCell className="text-right text-xs">{run.passed}/{run.total}</TableCell><TableCell className="whitespace-nowrap text-xs text-muted-foreground">{run.startedAt.slice(0, 16).replace('T', ' ')}</TableCell></TableRow>)}</TableBody></Table></div>}</CardContent></Card>
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm">Score history</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Oldest result is on the left. Every point links back to an immutable execution record
+              below.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {performance.trend.length === 0 ? (
+              <p className="py-12 text-center text-xs text-muted-foreground">
+                No execution history yet.
+              </p>
+            ) : (
+              <ScoreTrendChart data={performance.trend} />
+            )}
+          </CardContent>
+        </Card>
+        <Card className="xl:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-sm">Recorded executions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {runs.length === 0 ? (
+              <p className="py-12 text-center text-xs text-muted-foreground">
+                Create golden cases and run an evaluator to establish the baseline.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Run</TableHead>
+                      <TableHead>Engine</TableHead>
+                      <TableHead className="text-right">Score</TableHead>
+                      <TableHead className="text-right">Passed</TableHead>
+                      <TableHead>Started</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {runs.map((run) => (
+                      <TableRow key={run.id}>
+                        <TableCell>
+                          <Link
+                            className="font-mono text-xs text-primary hover:underline"
+                            href={`/solutions/quality/runs/${encodeURIComponent(run.id)}`}
+                          >
+                            {run.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{run.engine}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{run.score}%</TableCell>
+                        <TableCell className="text-right text-xs">
+                          {run.passed}/{run.total}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {run.startedAt.slice(0, 16).replace('T', ' ')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
 function Metric({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">{label}</CardTitle></CardHeader><CardContent>{children}</CardContent></Card>;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }

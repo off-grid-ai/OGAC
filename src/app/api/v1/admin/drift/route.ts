@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import {
-  buildDriftRunConfig,
-  type DriftMethodOverride,
-} from '@/lib/drift-catalog';
+import { buildDriftRunConfig, type DriftMethodOverride } from '@/lib/drift-catalog';
 import { readDriftView } from '@/lib/drift-view';
 import { currentOrgId } from '@/lib/tenancy';
 

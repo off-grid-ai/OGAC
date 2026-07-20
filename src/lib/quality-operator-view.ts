@@ -79,12 +79,7 @@ export function buildQualityPerformance(runs: QualityRunInput[]): QualityPerform
 }
 
 export type GatePortfolioStatus =
-  | 'ungated'
-  | 'not-run'
-  | 'running'
-  | 'passed'
-  | 'blocked'
-  | 'overridden';
+  'ungated' | 'not-run' | 'running' | 'passed' | 'blocked' | 'overridden';
 
 export interface GatePipelineInput {
   id: string;
@@ -161,7 +156,8 @@ export function buildReleaseGatePortfolio(
           attachedEvals,
           status: 'not-run' as const,
           lastCheckedAt: null,
-          summary: 'The gate has not run yet. Publish from the pipeline Quality view to evaluate it.',
+          summary:
+            'The gate has not run yet. Publish from the pipeline Quality view to evaluate it.',
         };
       }
       let status: GatePortfolioStatus;
@@ -185,4 +181,3 @@ export function buildReleaseGatePortfolio(
     })
     .sort((a, b) => a.pipelineName.localeCompare(b.pipelineName));
 }
-
