@@ -63,6 +63,8 @@ export type AuditAction =
   | 'connector.update'
   | 'connector.delete'
   | 'connector.crm.writeback'
+  | 'claim.document.write'
+  | 'claim.document.read'
   | 'backup.run'
   // access events
   | 'access.machine.issue'
