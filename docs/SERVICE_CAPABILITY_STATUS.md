@@ -157,7 +157,7 @@ The lane is the work owner. `current` and `stale` reflect the existing versioned
 | Observability     | `otel-collector`                | stale                | data/quality                  |
 | Observability     | `jaeger`                        | current              | data/quality                  |
 | Operations        | `console`                       | stale                | runtime/governance/operations |
-| Operations        | `edge-gateway`                  | pending              | runtime/governance/operations |
+| Operations        | `edge-gateway`                  | current              | runtime/governance/operations |
 | Operations        | `redis`                         | stale                | runtime/governance/operations |
 | Operations        | `superset`                      | stale                | runtime/governance/operations |
 | Operations        | `fleetdm`                       | stale                | runtime/governance/operations |
@@ -185,7 +185,6 @@ useful discovery evidence but do not satisfy that contract.
 | `gateway-control`         | Pin the first-party control contract to an immutable release, enumerate node/model actions, and retain one reversible enable/disable/restart or model-switch lifecycle with audit and rollback evidence. |
 | `agent-worker`            | Stamp the worker artifact, register its Temporal queue/poller/heartbeat topology, audit the agent execution contract, and retain a durable governed run plus safe drain/restart evidence.                |
 | `chat-worker`             | Stamp and audit the `offgrid-chat` worker, then retain one governed chat correlated across guardrail, citation, lineage, provenance, and audit evidence.                                                 |
-| `edge-gateway`            | Record the exact Caddy build and module list, enumerate the bounded Caddy/Coraza/rate-limit/file-routing denominator, and prove policy, rejection, file, and recovery paths.                             |
 | `cloudflared`             | Record the binary version and live-config checksum, remove duplicate/stale job ambiguity, prove one authoritative replica, and expose per-route readiness and restart evidence.                          |
 | `landing`                 | Bind the public process to a repo-owned launch definition and immutable SHA, define the first-party landing denominator, and verify the complete CTA journey visually and functionally.                  |
 | `status-page`             | Bind the status process to exact source/version, define freshness and dependency semantics, and verify that an operator can move from a reported problem to the owning management surface.               |
