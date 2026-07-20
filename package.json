@@ -19,6 +19,7 @@
     "smoke:prod": "bash deploy/smoke-prod.sh",
     "regression": "npm run coverage:check && npm run test:integration && npm run smoke:api",
     "worker:agents": "tsx scripts/temporal-worker.mts",
+    "worker:inference": "tsx scripts/inference-worker.mts",
     "worker:apps": "tsx scripts/app-worker.mts",
     "worker:chat": "tsx scripts/chat-worker.mts",
     "trigger:email": "tsx scripts/email-trigger.mts",
