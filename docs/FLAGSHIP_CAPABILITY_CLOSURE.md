@@ -26,6 +26,11 @@ hard data ceiling, required capabilities, and declared tenant domains. It is no 
 catalog checkbox. The three contracts still have `proof.status:unverified`: the runtime/action/evidence
 gaps below remain release blockers for any production-proof claim.
 
+Release application is isolated in `scripts/apply-flagship-solution-contracts.mts`. Its default mode
+does not reconcile contract rows. `--apply` requires the exact deployed Console SHA and reconciles
+only the three contract-owned Apps/pipelines, missing required domain declarations, and catalog
+seed rows; it preserves unrelated rows and refuses operator-owned naming/binding collisions.
+
 ## Minimum closure set
 
 The minimum union is **12 audited capability items**, one unaudited runtime seam (`app-worker`), and

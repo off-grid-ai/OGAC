@@ -235,11 +235,11 @@ async function catalogWithVersion(
   return definition ? { catalog, version: definition } : null;
 }
 
-export async function listSolutionBlueprints(
+/** Read the tenant catalog exactly as persisted; release verification must never seed on read. */
+export async function listPersistedSolutionBlueprints(
   orgId: string,
   includeRetired = false,
 ): Promise<SolutionBlueprint[]> {
-  await seedBlueprints(orgId);
   const catalogs = await db
     .select()
     .from(solutionBlueprints)
@@ -256,6 +256,14 @@ export async function listSolutionBlueprints(
     .filter((value) => value !== null)
     .map(({ catalog, version }) => toBlueprint(catalog, version));
   return withRuntimeAdoptability(orgId, blueprints);
+}
+
+export async function listSolutionBlueprints(
+  orgId: string,
+  includeRetired = false,
+): Promise<SolutionBlueprint[]> {
+  await seedBlueprints(orgId);
+  return listPersistedSolutionBlueprints(orgId, includeRetired);
 }
 
 export async function getSolutionBlueprint(

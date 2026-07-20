@@ -53,6 +53,11 @@ test(
       await db.execute(sql`DELETE FROM pipelines WHERE id = ${pipelineId}`);
     });
 
+    assert.deepEqual(
+      await store.listPersistedSolutionBlueprints(ORG_A),
+      [],
+      'release verification reads persisted state without applying the catalog seed',
+    );
     const seedsA = await store.listSolutionBlueprints(ORG_A);
     const seedsB = await store.listSolutionBlueprints(ORG_B);
     assert.equal(seedsA.length, 3);

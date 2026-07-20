@@ -47,6 +47,30 @@ nominal “active” deployment that cannot execute the advertised contract.
 - **All three:** immutable live Gateway/OPA/Temporal/source identities and a retained end-to-end
   production journey. Seeded runs and an adoptable runtime contract are not that proof.
 
+## Apply and verify only the flagship contracts
+
+The focused release helper does not run the broad tenant demo seed. It touches only the three
+flagship Apps, their deterministic pipelines, missing required domain declarations, and the
+versioned Blueprint catalog. It never creates connectors and refuses ambiguous or operator-owned
+App/domain collisions.
+
+Verify the current tenant state without reconciling or seeding contract rows:
+
+```bash
+npx tsx scripts/apply-flagship-solution-contracts.mts
+```
+
+Only after the matching Console commit is deployed, apply and re-verify with the full deployed SHA:
+
+```bash
+OFFGRID_DEPLOYED_CONSOLE_SHA="$(git rev-parse HEAD)" \
+  npx tsx scripts/apply-flagship-solution-contracts.mts --apply
+```
+
+The apply command refuses to run when the deployed SHA is missing, abbreviated, or different from
+the local release SHA. Missing prerequisite Core Banking/CRM/Policy Admin connectors are reported;
+the helper does not widen its scope to create or repair infrastructure.
+
 ## Record an operator KPI claim
 
 Open **Solutions › Deployed** and choose a deployment. Record one bounded production window at a
