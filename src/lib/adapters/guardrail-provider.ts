@@ -21,12 +21,14 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 import type { PiiPort, PiiResult } from './types';
+import { GUARDRAIL_REQUEST_TIMEOUT_MS } from '@/lib/guardrail-timeout';
 
 const env = process.env;
 
-// A fetch timeout that survives environments where AbortSignal.timeout is unavailable-ish; 6s is
-// generous for a remote classifier while still bounded so a hung engine can't stall a run.
-const CHECK_TIMEOUT_MS = 6000;
+// The on-prem scanners can need model warm-up and must screen complete governed evidence sets.
+// The shared timeout contract is env-configurable and the fail-closed screen owns a slightly larger
+// outer envelope so it never races a legitimate response.
+export const CHECK_TIMEOUT_MS = GUARDRAIL_REQUEST_TIMEOUT_MS;
 
 // LLM Guard's response (POST /analyze/prompt):
 //   { is_valid: boolean, scanners: { "<ScannerName>": <risk score 0..1>, … }, sanitized_prompt: "…" }

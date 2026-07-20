@@ -21,11 +21,12 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 import { type CheckContext, type CheckResult, outcomeFromChecks, runChecks } from '@/lib/checks';
+import { GUARDRAIL_SCREEN_TIMEOUT_MS } from '@/lib/guardrail-timeout';
+export { GUARDRAIL_SCREEN_TIMEOUT_MS } from '@/lib/guardrail-timeout';
 
 // A guardrail screen must not outlive this budget — a hung engine can't stall (or silently open) a
-// run. The PiiPort's own fetch timeout is 6s; we allow a little headroom for the whole check chain,
-// then fail closed. Overridable per call for tests.
-export const GUARDRAIL_SCREEN_TIMEOUT_MS = 8000;
+// run. The shared timeout contract leaves a small outer-envelope margin for normalization and the
+// remaining synchronous checks. Overridable per call for tests.
 
 export interface ScreenVerdict {
   /** The terminal screen outcome. An error/timeout is ALWAYS 'blocked' (fail-closed). */

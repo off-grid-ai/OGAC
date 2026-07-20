@@ -58,7 +58,11 @@ test('G-ADV-GOV-3b: screenGuardrail times a hung engine out to a BLOCK (never re
   // A tiny timeout budget; runChecks will hit the real PII port (not configured in test ⇒ a fast
   // 'warn'), so to force the timeout we assert the constant is finite and drive screenOutcome with a
   // timeout error directly — the wrapper's catch is exercised in 3c with a throwing port.
-  assert.ok(Number.isFinite(GUARDRAIL_SCREEN_TIMEOUT_MS) && GUARDRAIL_SCREEN_TIMEOUT_MS > 0);
+  assert.equal(
+    GUARDRAIL_SCREEN_TIMEOUT_MS,
+    65_000,
+    'the outer fail-closed envelope must leave headroom for a legitimate 60s scanner request',
+  );
   const timedOut = screenOutcome('pre', [], new Error('guardrail pre screen timed out after 5ms'));
   assert.equal(timedOut.outcome, 'blocked');
 });

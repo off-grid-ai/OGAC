@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import {
+  CHECK_TIMEOUT_MS,
   guardrailNotConfigured,
   guardrailUnavailable,
   llmGuardPii,
   normalizeLlmGuardResponse,
   postLlmGuard,
 } from '../src/lib/adapters/guardrail-provider.ts';
+import {
+  DEFAULT_GUARDRAIL_TIMEOUT_MS,
+  guardrailTimeoutMs,
+} from '../src/lib/guardrail-timeout.ts';
+
+test('real LLM Guard requests use the global sixty-second guard timeout', () => {
+  assert.equal(CHECK_TIMEOUT_MS, 60_000);
+  assert.equal(DEFAULT_GUARDRAIL_TIMEOUT_MS, 60_000);
+  assert.equal(guardrailTimeoutMs('90000'), 90_000);
+  assert.equal(guardrailTimeoutMs('invalid'), 60_000);
+  assert.equal(guardrailTimeoutMs('0'), 60_000);
+});
 
 // LLM Guard is THE authoritative content-guardrail engine. Tests cover three layers:
 //   • normalizeLlmGuardResponse — PURE mapping of LLM Guard's /analyze verdict onto PiiResult.
