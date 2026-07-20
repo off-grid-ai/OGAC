@@ -237,6 +237,7 @@ export interface DriftReadResult {
 // per-column method / drift-share threshold). Kept structural (not importing the adapter type) so
 // this file's pure core stays import-free at module load.
 export interface ReadDriftOptions {
+  orgId?: string;
   preset?: string | null;
   method?: string | null;
   columnMethods?: Record<string, string>;

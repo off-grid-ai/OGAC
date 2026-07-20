@@ -18,13 +18,22 @@ test('canonical Quality routes expose executions, drift, performance, and releas
   const performance = source('src/app/(console)/solutions/quality/performance/page.tsx');
   const gates = source('src/app/(console)/solutions/quality/release-gates/page.tsx');
   assert.match(run, /getEvalRun\(id, await currentOrgId\(\)\)/);
-  assert.match(drift, /readDriftView\(\)/);
+  assert.match(drift, /readDriftView\(\{ orgId: await currentOrgId\(\) \}\)/);
   assert.match(drift, /<DriftCatalog/);
   assert.match(performance, /readQaStatus\(orgId\)/);
   assert.match(performance, /<RunSweepButton/);
   assert.match(gates, /buildReleaseGatePortfolio/);
   assert.match(gates, /<ThresholdManager/);
   assert.match(gates, /\/runtime\/pipelines\/\$\{row\.pipelineId\}\/quality/);
+  assert.match(performance, /\/solutions\/quality\/golden-cases/);
+  assert.match(performance, /\/solutions\/quality\/release-gates/);
+  assert.match(performance, /\/operations\/services\/evidently/);
+  assert.doesNotMatch(performance, /\/gateway\/services/);
+});
+
+test('Quality root reveals current posture before configuration CRUD', () => {
+  const rootPage = source('src/app/(console)/solutions/quality/page.tsx');
+  assert.match(rootPage, /redirect\('\/solutions\/quality\/performance'\)/);
 });
 
 test('retired Insights Quality routes preserve query state and redirect to canonical ownership', () => {

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { listEvalRuns } from '@/lib/evals';
@@ -36,7 +37,7 @@ export default async function QualityPerformancePage() {
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <p className="max-w-3xl text-xs text-muted-foreground">Recent executions are compared in equal windows. Degraded means the current mean is at least 15 points below the prior window; warning starts at 7 points. No verdict is shown until four runs exist.</p>
+        <div className="max-w-3xl space-y-3"><p className="text-xs text-muted-foreground">Recent executions are compared in equal windows. Degraded means the current mean is at least 15 points below the prior window; warning starts at 7 points. No verdict is shown until four runs exist.</p><div className="flex flex-wrap gap-2"><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/golden-cases">Maintain golden cases</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/evaluators">Configure evaluators</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/runs">Inspect executions</Link></Button><Button asChild size="sm" variant="outline"><Link href="/solutions/quality/release-gates">Review release gates</Link></Button></div></div>
         <RunSweepButton />
       </div>
 
@@ -47,7 +48,7 @@ export default async function QualityPerformancePage() {
         <Metric label="Latest score"><span className="text-2xl">{performance.latestScore === null ? 'not recorded' : `${performance.latestScore}%`}</span></Metric>
         <Metric label="Current mean"><span className="text-2xl">{performance.currentMean === null ? 'not recorded' : `${performance.currentMean}%`}</span></Metric>
         <Metric label="Change"><span className="text-2xl">{performance.delta === null ? 'not available' : `${performance.delta > 0 ? '+' : ''}${performance.delta} pts`}</span></Metric>
-        <Metric label="Online scoring"><span className="text-sm">{status?.online.configured ? (status.online.enabled ? 'configured and enabled' : 'configured, flag paused') : 'not configured'}</span></Metric>
+        <Metric label="Online scoring"><span className="text-sm">{status?.online.configured ? (status.online.enabled ? 'configured and enabled' : 'configured, flag paused') : 'not configured'}</span><Link className="mt-2 block text-xs text-primary hover:underline" href="/operations/services/evidently">Drift engine evidence</Link></Metric>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-5">
@@ -61,4 +62,3 @@ export default async function QualityPerformancePage() {
 function Metric({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">{label}</CardTitle></CardHeader><CardContent>{children}</CardContent></Card>;
 }
-

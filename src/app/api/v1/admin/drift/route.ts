@@ -5,6 +5,7 @@ import {
   type DriftMethodOverride,
 } from '@/lib/drift-catalog';
 import { readDriftView } from '@/lib/drift-view';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json(await readDriftView());
+  return NextResponse.json(await readDriftView({ orgId: await currentOrgId() }));
 }
 
 // Run drift with a selection from the standard drift catalog. The body names a catalog item id
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
   });
 
   const result = await readDriftView({
+    orgId: await currentOrgId(),
     preset: config.preset,
     method: config.method,
     columnMethods: config.columnMethods,

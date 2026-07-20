@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function QualityRoot() {
-  redirect('/solutions/quality/evaluators');
+  redirect('/solutions/quality/performance');
 }

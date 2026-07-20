@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { getDrift } from '@/lib/adapters/registry';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ const STATUS_CLASS: Record<DriftDisplayStatus, string> = {
 
 export default async function QualityDriftPage() {
   await requireModuleForUser('drift');
-  const { data, error } = await readDriftView();
+  const { data, error } = await readDriftView({ orgId: await currentOrgId() });
   const adapter = getDrift().meta;
   const engineStatus = {
     evidentlySelected: adapter.id === 'evidently',
@@ -61,4 +62,3 @@ export default async function QualityDriftPage() {
 function Signal({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return <Card><CardHeader className="pb-2"><CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">{label}</CardTitle></CardHeader><CardContent>{children}</CardContent></Card>;
 }
-
