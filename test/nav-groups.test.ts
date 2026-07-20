@@ -90,7 +90,7 @@ test('every standalone collection is in the sidebar and contextual resources dec
     'secrets',
     'trust',
     'usage',
-    'quality-results',
+    'quality-definitions',
     'edge',
     'managed-devices',
     'configuration',
@@ -106,10 +106,14 @@ test('every standalone collection is in the sidebar and contextual resources dec
   const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
   assert.deepEqual(
     contextual.map((owner) => owner.id),
-    ['agents', 'sandbox', 'clusters'],
+    ['agents', 'sandbox', 'quality-results', 'clusters'],
   );
   assert.equal(contextual.find((owner) => owner.id === 'agents')?.sidebarParent, 'apps');
   assert.equal(contextual.find((owner) => owner.id === 'sandbox')?.sidebarParent, 'apps');
+  assert.equal(
+    contextual.find((owner) => owner.id === 'quality-results')?.sidebarParent,
+    'quality-definitions',
+  );
   assert.equal(contextual.find((owner) => owner.id === 'clusters')?.sidebarParent, 'nodes');
 });
 
@@ -138,7 +142,8 @@ test('the sidebar accordion opens only the branch that owns the active item', ()
 
 test('contextual routes highlight their declared sidebar parent and dynamic routes keep ownership', () => {
   assert.equal(sidebarActiveIdFor('clusters'), 'nodes');
-  assert.equal(sidebarActiveIdFor('quality-results'), 'quality-results');
+  assert.equal(sidebarActiveIdFor('quality-results'), 'quality-definitions');
+  assert.equal(sidebarActiveIdForPath('/insights/quality/drift'), 'quality-definitions');
   assert.equal(sidebarActiveIdForPath('/operations/clusters/from-registry'), 'nodes');
   assert.equal(sidebarActiveIdForPath('/operations/services/langfuse'), 'services');
   assert.equal(

@@ -17,7 +17,12 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
     ['Warehouse', '/data/warehouse'],
     ['Teams', '/governance/teams'],
     ['Guardrails', '/governance/guardrails/overview'],
-    ['Quality', '/insights/quality/scorecards'],
+    ['Quality', '/solutions/quality/evaluators'],
+    ['Golden cases', '/solutions/quality/golden-cases'],
+    ['Executions', '/solutions/quality/runs'],
+    ['Drift', '/solutions/quality/drift'],
+    ['Performance', '/solutions/quality/performance'],
+    ['Release gates', '/solutions/quality/release-gates'],
     ['Configuration', '/operations/configuration/settings'],
     ['Clusters', '/operations/clusters'],
     ['Backups', '/operations/backups'],
@@ -31,6 +36,11 @@ test('the rendered sidebar is the only global collection hierarchy', () => {
   assert.ok((html.match(/data-og-interactive="true"/g) ?? []).length > 8);
   assert.match(html, /href="\/overview"[^>]*>.*Home/s);
   assert.doesNotMatch(html, /aria-controls="nav-section-home"/);
+  assert.doesNotMatch(
+    html,
+    /href="\/insights\/quality/,
+    'legacy quality insights must not create a second sidebar destination',
+  );
   assert.match(html, /aria-controls="nav-section-solutions"/);
   assert.equal((html.match(/aria-expanded="false"/g) ?? []).length, 7);
   assert.equal((html.match(/id="nav-section-[^"]+" hidden=""/g) ?? []).length, 7);
@@ -59,6 +69,30 @@ test('a level-3 deep link exposes its active ancestors and remains collapsible',
     assert.match(html, /aria-label="Tools destinations"/);
     assert.match(html, /aria-label="Quality destinations"/);
     assert.doesNotMatch(html, /href="\/solutions\/tools\?tab=/);
+  } finally {
+    delete process.env.NEXT_TEST_PATHNAME;
+  }
+});
+
+test('selected navigation uses the shared raised surface and quiet emerald hierarchy', () => {
+  process.env.NEXT_TEST_PATHNAME = '/solutions/quality/performance';
+  try {
+    const html = renderToStaticMarkup(createElement(SidebarNav));
+
+    assert.doesNotMatch(html, /bg-foreground(?:\s|&quot;)/);
+    assert.match(
+      html,
+      /<button(?=[^>]*data-current-section="true")(?=[^>]*data-og-surface="raised")(?=[^>]*bg-primary\/10)[^>]*>/,
+    );
+    assert.match(
+      html,
+      /<summary(?=[^>]*data-active="true")(?=[^>]*data-og-surface="raised")(?=[^>]*bg-primary\/10)[^>]*>/,
+    );
+    assert.match(
+      html,
+      /<a(?=[^>]*href="\/solutions\/quality\/performance")(?=[^>]*data-og-surface="raised")(?=[^>]*aria-current="page")(?=[^>]*bg-primary\/10)[^>]*>/,
+    );
+    assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1);
   } finally {
     delete process.env.NEXT_TEST_PATHNAME;
   }

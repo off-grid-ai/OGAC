@@ -21,6 +21,10 @@ import {
 } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 
+const ACTIVE_NAV_ITEM = 'border-primary/30 bg-primary/10 font-medium text-foreground';
+const INACTIVE_NAV_ITEM =
+  'border-transparent text-muted-foreground hover:border-border/80 hover:bg-muted/70 hover:text-foreground';
+
 // The nav body (logo header + grouped rows + docs footer). Rendered in TWO places — the fixed
 // desktop `<aside>` below and the mobile slide-in drawer (Topbar) — so it lives here ONCE as the
 // single source of truth (DRY). `onNavigate` lets the drawer close itself when a row is tapped;
@@ -87,21 +91,20 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                 <Link
                   href={directItem.route}
                   data-og-interactive
+                  data-og-surface={active ? 'raised' : undefined}
                   data-current-section={active || undefined}
                   aria-current={active ? 'page' : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    'group flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                    'group flex min-h-10 w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                    active ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
                   )}
                 >
                   <span
                     className={cn(
                       'grid size-7 shrink-0 place-items-center rounded-md border transition-colors',
                       active
-                        ? 'border-background/20 bg-background/10 text-background'
+                        ? 'border-primary/30 bg-background/70 text-primary'
                         : 'border-border/80 bg-background text-muted-foreground group-hover:text-foreground',
                     )}
                   >
@@ -118,6 +121,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
               <button
                 type="button"
                 data-og-interactive
+                data-og-surface={containsActiveItem ? 'raised' : undefined}
                 aria-expanded={expanded}
                 aria-controls={`nav-section-${section.id}`}
                 data-current-section={containsActiveItem || undefined}
@@ -125,10 +129,12 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                   setOpenSectionId((current) => (current === section.id ? null : section.id))
                 }
                 className={cn(
-                  'group flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
-                  expanded
-                    ? 'bg-muted/70 text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  'group flex min-h-10 w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
+                  containsActiveItem
+                    ? 'border-primary/25 bg-primary/10 text-foreground'
+                    : expanded
+                      ? 'border-border/80 bg-muted/70 text-foreground'
+                      : INACTIVE_NAV_ITEM,
                 )}
               >
                 <span
@@ -179,12 +185,11 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                       >
                         <DisclosureTrigger
                           data-og-interactive
+                          data-og-surface={active ? 'raised' : undefined}
                           data-active={active || undefined}
                           className={cn(
-                            'min-h-9 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-                            active
-                              ? 'bg-foreground font-medium text-background'
-                              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                            'min-h-9 rounded-md border px-2.5 py-1.5 text-[13px] transition-colors',
+                            active ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
                           )}
                         >
                           {item.label}
@@ -198,14 +203,13 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                                   key={destination.id}
                                   href={destination.route}
                                   data-og-interactive
+                                  data-og-surface={destinationActive ? 'raised' : undefined}
                                   data-active={destinationActive || undefined}
                                   onClick={onNavigate}
                                   aria-current={destinationActive ? 'page' : undefined}
                                   className={cn(
-                                    'relative flex min-h-8 items-center rounded-md px-2 py-1 text-[12px] transition-colors',
-                                    destinationActive
-                                      ? 'bg-primary/10 font-medium text-primary'
-                                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                                    'relative flex min-h-8 items-center rounded-md border px-2 py-1 text-[12px] transition-colors',
+                                    destinationActive ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
                                   )}
                                 >
                                   <span
@@ -229,14 +233,13 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                       key={item.id}
                       href={item.route}
                       data-og-interactive
+                      data-og-surface={active ? 'raised' : undefined}
                       data-active={active || undefined}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
-                        'group relative flex min-h-9 items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
-                        active
-                          ? 'bg-foreground font-medium text-background'
-                          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                        'group relative flex min-h-9 items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px] transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.99]',
+                        active ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
                       )}
                     >
                       <span
@@ -252,7 +255,7 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                           className={cn(
                             'rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em]',
                             active
-                              ? 'border-background/20 text-background/70'
+                              ? 'border-primary/30 text-foreground'
                               : 'border-border text-muted-foreground',
                           )}
                         >

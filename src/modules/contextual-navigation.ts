@@ -52,6 +52,9 @@ export type ContextualDestinationId =
   | 'primitives'
   | 'evaluators'
   | 'golden-cases'
+  | 'executions'
+  | 'performance'
+  | 'release-gates'
   | 'runs'
   | 'overview'
   | 'rules'
@@ -197,10 +200,28 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         route: '/solutions/quality/golden-cases',
       },
       {
-        id: 'runs',
+        id: 'executions',
         label: 'Executions',
         description: 'Launch, re-run, and inspect individual evaluation executions.',
         route: '/solutions/quality/runs',
+      },
+      {
+        id: 'drift',
+        label: 'Drift',
+        description: 'Compare deployed behavior with the active quality baseline.',
+        route: '/solutions/quality/drift',
+      },
+      {
+        id: 'performance',
+        label: 'Performance',
+        description: 'Inspect score trends, degradation, and operational quality.',
+        route: '/solutions/quality/performance',
+      },
+      {
+        id: 'release-gates',
+        label: 'Release gates',
+        description: 'Define the quality thresholds required before release.',
+        route: '/solutions/quality/release-gates',
       },
     ],
   },

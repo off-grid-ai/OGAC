@@ -476,12 +476,13 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
   },
   {
     id: 'quality-results',
-    section: 'insights',
-    label: 'Quality',
-    description: 'Eval results, drift, scorecards, and quality trends.',
+    section: 'solutions',
+    label: 'Legacy quality insights',
+    description: 'Compatibility routes consolidated into the canonical Quality operator loop.',
     route: '/insights/quality',
     gate: 'drift',
-    placement: 'sidebar',
+    placement: 'contextual',
+    sidebarParent: 'quality-definitions',
   },
   {
     id: 'cost',
