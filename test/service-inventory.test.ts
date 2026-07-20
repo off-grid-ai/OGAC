@@ -72,7 +72,16 @@ test('capability coverage is projected from the canonical audit registry without
   assert.deepEqual(evidently?.productionWorkflowCapabilityIds, []);
   assert.ok((evidently?.explicitCapabilityGaps.length ?? 0) > 0);
   assert.ok((presidio?.productionWorkflowCapabilityIds.length ?? 0) > 0);
-  assert.deepEqual(postgres?.capabilityAudit, { status: 'not-audited' });
+  assert.deepEqual(postgres?.capabilityAudit, {
+    status: 'audited',
+    auditState: 'current',
+    verifiedGates: 9,
+    partialGates: 5,
+    totalGates: 16,
+    productionItems: 1,
+    totalItems: 4,
+  });
+  assert.deepEqual(postgres?.productionWorkflowCapabilityIds, ['relational-store']);
   assert.deepEqual(corebank?.capabilityAudit, { status: 'not-audited' });
   assert.equal(corebank?.deployment.version, '16-alpine');
   assert.equal(corebank?.deployment.mutableVersion, true);
@@ -117,7 +126,7 @@ test('URL-style inventory filters search identity, IA facets, audit recency, and
 
   assert.deepEqual(
     filterServiceInventory(entries, { query: 'telemetry' }).map((entry) => entry.id),
-    ['otel-collector'],
+    ['victoriametrics', 'otel-collector'],
   );
   assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);
   assert.equal(filterServiceInventory(entries, { owner: 'data-sources' }).length, 6);
