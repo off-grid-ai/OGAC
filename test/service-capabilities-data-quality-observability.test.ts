@@ -60,6 +60,15 @@ test('every capability record has exact version provenance and honest four-gate 
     assert.equal(record.auditedAt, '2026-07-20');
     assert.ok(record.upstreamVersion.trim(), `${record.serviceId} must name the audited version`);
     assert.ok(record.versionSource.trim(), `${record.serviceId} must name its version source`);
+    assert.ok(
+      record.denominatorSource.trim(),
+      `${record.serviceId} must name the primary capability denominator`,
+    );
+    assert.doesNotMatch(
+      record.denominatorSource,
+      /^(?:\.\.\/)?deploy\/docker-compose/,
+      `${record.serviceId} denominator must not be a generic deployment file`,
+    );
     assert.ok(record.summary.trim());
     assert.ok(record.items.length >= 3, `${record.serviceId} must have a meaningful denominator`);
     assert.equal(new Set(record.items.map((item) => item.id)).size, record.items.length);
@@ -139,6 +148,48 @@ test('fleet evidence distinguishes deployed health from production capability us
     audit('victoriametrics').items.find((item) => item.id === 'metrics-query')?.gap ?? '',
     /zero application series/,
   );
+});
+
+test('provider-neutral ports do not masquerade as selected backend workflow evidence', () => {
+  const qdrant = audit('qdrant');
+  for (const id of ['collections', 'points-search', 'payload-filtering']) {
+    const item = qdrant.items.find((entry) => entry.id === id);
+    assert.equal(item?.gates.workflow.status, 'partial');
+    assert.match(item?.gates.workflow.evidence ?? '', /provider-neutral|does not attribute/i);
+    assert.match(item?.gap ?? '', /Qdrant|selected provider/i);
+  }
+
+  const lancedb = audit('lancedb');
+  for (const id of ['tables-schema', 'vector-search']) {
+    const item = lancedb.items.find((entry) => entry.id === id);
+    assert.equal(item?.gates.workflow.status, 'partial');
+    assert.match(item?.gates.workflow.evidence ?? '', /no retained|not service-attributed/i);
+    assert.match(item?.gap ?? '', /LanceDB|selected provider/i);
+  }
+
+  const seaweedfs = audit('seaweedfs').items.find((entry) => entry.id === 'object-read-write');
+  assert.equal(seaweedfs?.gates.workflow.status, 'partial');
+  assert.match(seaweedfs?.gates.workflow.evidence ?? '', /no retained fleet proof/i);
+  assert.match(seaweedfs?.gap ?? '', /live put\/get\/delete journey/i);
+});
+
+test('version identities are exact or explicitly stale and bounded', () => {
+  const postgres = audit('postgres');
+  assert.equal(postgres.upstreamVersion, 'pgvector/pgvector:0.8.0-pg16 (PostgreSQL 16 base)');
+  assert.match(postgres.versionSource, /postgres image/);
+  assert.match(postgres.denominatorSource, /postgresql\.org\/docs\/16/);
+  assert.match(postgres.denominatorSource, /pgvector\/pgvector\/blob\/v0\.8\.0/);
+
+  const warehouse = audit('warehouse');
+  assert.equal(warehouse.auditState, 'stale');
+  assert.match(warehouse.auditStateEvidence ?? '', /mutable minor-series tag/);
+  assert.ok(warehouse.items.every((item) => item.gates.upstream.status === 'no'));
+
+  for (const id of ENTERPRISE_SOURCE_IDS) {
+    assert.match(audit(id).denominatorSource, /enterprise-source-registry\.ts/);
+    assert.match(audit(id).denominatorSource, /connector-policy\.ts/);
+    assert.match(audit(id).denominatorSource, /connector-exec\.ts/);
+  }
 });
 
 test('enterprise sources preserve exact fixture versions and connector reality', () => {

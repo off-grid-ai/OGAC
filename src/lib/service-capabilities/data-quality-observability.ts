@@ -14,6 +14,8 @@ import {
 const AUDITED_AT = '2026-07-20';
 const FLEET_RECORD =
   '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md; ../onprem-fleet-orchestration/deploy/onprem/SERVER_STATE.md';
+const ENTERPRISE_SOURCE_DENOMINATOR =
+  'src/lib/enterprise-source-registry.ts (fixture ontology); src/lib/connector-policy.ts (supported connector types); src/lib/connector-exec.ts (bounded read contract)';
 
 function stale(audit: ServiceCapabilityAudit): ServiceCapabilityAudit {
   if (audit.auditState !== 'stale' || !audit.auditStateEvidence) return audit;
@@ -36,8 +38,10 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   {
     serviceId: 'postgres',
     serviceLabel: 'PostgreSQL',
-    upstreamVersion: '16.6-alpine',
-    versionSource: 'deploy/docker-compose.yml',
+    upstreamVersion: 'pgvector/pgvector:0.8.0-pg16 (PostgreSQL 16 base)',
+    versionSource: 'deploy/docker-compose.yml (postgres image)',
+    denominatorSource:
+      'https://www.postgresql.org/docs/16/; https://github.com/pgvector/pgvector/blob/v0.8.0/README.md',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -75,29 +79,30 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Qdrant',
     upstreamVersion: 'v1.12.5',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://api.qdrant.tech/v-1-12-x/api-reference',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
     summary:
-      'Qdrant is a live vector backend behind the knowledge adapter. Collection and document workflows are exposed; advanced cluster operations are not.',
+      'Qdrant is a configured vector-backend option behind the knowledge adapter. Collection and document controls are exposed, but no service-attributed fleet record proves Qdrant served a selected workflow.',
     items: [
-      capability('collections', 'Collection lifecycle', 'Create, inspect, configure, and delete vector collections.', '/data/knowledge/indexes', 'Manage indexes', '', [
+      capability('collections', 'Collection lifecycle', 'Create, inspect, configure, and delete vector collections.', '/data/knowledge/indexes', 'Manage indexes', 'Record the selected provider and Qdrant collection identifier on a live ingestion run before treating provider-neutral index use as Qdrant workflow proof.', [
         'yes', 'Qdrant 1.12.5 exposes collection CRUD and collection metadata APIs.',
         'yes', 'The Qdrant knowledge adapter maps index lifecycle to collection operations.',
         'yes', 'Knowledge Indexes provides create, detail, update, and delete actions.',
-        'yes', 'Knowledge ingestion provisions and uses configured vector indexes.',
+        'partial', 'Knowledge ingestion uses the provider-neutral port; no fleet evidence attributes a selected run to Qdrant.',
       ]),
-      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/search', 'Search knowledge', '', [
+      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/search', 'Search knowledge', 'Persist provider, collection, and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected Qdrant.', [
         'yes', 'Qdrant supports point upsert, payloads, filtering, and vector search.',
         'yes', 'The adapter writes chunks and performs similarity retrieval against real collections.',
         'yes', 'Knowledge search and index detail expose retrieval results and records.',
-        'yes', 'Brain retrieval uses the configured vector backend in application workflows.',
+        'partial', 'Brain retrieval uses the configured vector port, but the retained workflow evidence does not attribute execution to Qdrant.',
       ]),
-      capability('payload-filtering', 'Payload schema and filtering', 'Filter retrieval by tenant, source, and metadata and manage payload indexes.', '/data/knowledge/indexes', 'Inspect index metadata', 'Tenant/source filtering is integrated, but payload-index lifecycle and query-planning evidence are not surfaced. Add index recommendations and safe lifecycle controls.', [
+      capability('payload-filtering', 'Payload schema and filtering', 'Filter retrieval by tenant, source, and metadata and manage payload indexes.', '/data/knowledge/indexes', 'Inspect index metadata', 'Tenant/source filtering is integrated, but selected Qdrant execution, payload-index lifecycle, and query-planning evidence are not surfaced. Add provider attribution, index recommendations, and safe lifecycle controls.', [
         'yes', 'Qdrant supports payload filters and payload indexes.',
         'partial', 'Retrieval sends metadata filters, but no adapter manages payload-index lifecycle.',
         'partial', 'Index detail shows metadata without payload-index controls.',
-        'yes', 'Governed retrieval applies organization and source boundaries.',
+        'partial', 'The provider-neutral retrieval policy applies organization and source boundaries; selected Qdrant execution is not service-attributed.',
       ]),
       capability('snapshots-cluster', 'Snapshots, aliases, and cluster operations', 'Back up collections, move shards, manage aliases, and inspect consensus state.', '/operations/services/qdrant', 'Inspect Qdrant', 'No snapshot, alias, shard, or consensus adapter is exposed. Add guarded backup/restore and cluster evidence before treating Qdrant as console-managed.', [
         'yes', 'Qdrant 1.12.5 includes snapshot, alias, shard, and distributed-cluster APIs.',
@@ -112,6 +117,8 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Marquez',
     upstreamVersion: '0.50.0',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://github.com/MarquezProject/marquez/blob/0.50.0/api/src/main/resources/openapi.yml',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -149,23 +156,24 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'LanceDB',
     upstreamVersion: '0.30.0',
     versionSource: 'package.json (@lancedb/lancedb ^0.30.0; package-lock.json resolved 0.30.0)',
+    denominatorSource: 'https://lancedb.github.io/lancedb/js/',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
     summary:
-      'Embedded LanceDB is a swappable local knowledge backend. Table and vector operations are wired through the shared knowledge port; distributed administration is not applicable to this embedded release.',
+      'Embedded LanceDB is a swappable local knowledge backend. Table and vector operations are wired through the shared knowledge port, but no service-attributed record proves LanceDB was selected for a live workflow.',
     items: [
-      capability('tables-schema', 'Table and schema lifecycle', 'Create vector tables, inspect schema, and delete local indexes.', '/data/knowledge/indexes', 'Manage indexes', '', [
+      capability('tables-schema', 'Table and schema lifecycle', 'Create vector tables, inspect schema, and delete local indexes.', '/data/knowledge/indexes', 'Manage indexes', 'Persist the selected provider and LanceDB table identity on a live index lifecycle run.', [
         'yes', 'LanceDB 0.30.0 supports embedded table create, open, list, and drop operations.',
         'yes', 'The LanceDB adapter implements the shared knowledge index lifecycle.',
         'yes', 'Knowledge Indexes manages the backend through provider-neutral controls.',
-        'yes', 'Local knowledge workflows can use LanceDB as the selected backend.',
+        'partial', 'Local knowledge workflows can select LanceDB, but no retained workflow evidence attributes a run to it.',
       ]),
-      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/search', 'Search knowledge', '', [
+      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/search', 'Search knowledge', 'Record LanceDB table and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected LanceDB.', [
         'yes', 'LanceDB provides vector search and SQL-style filtering.',
         'yes', 'The adapter writes and queries real LanceDB tables.',
         'yes', 'Knowledge search displays scored records.',
-        'yes', 'Brain retrieval uses the same provider-neutral knowledge port.',
+        'partial', 'Brain retrieval uses the provider-neutral knowledge port; selected LanceDB execution is not service-attributed.',
       ]),
       capability('record-maintenance', 'Record update and deletion', 'Inspect, update, and remove indexed records by source or identifier.', '/data/knowledge/indexes', 'Inspect index records', 'Bulk source cleanup is wired, but arbitrary record edit and compaction evidence are incomplete. Add bounded record maintenance with verification.', [
         'yes', 'LanceDB supports update, delete, and table maintenance operations.',
@@ -186,17 +194,19 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'SeaweedFS',
     upstreamVersion: '3.80',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://github.com/seaweedfs/seaweedfs/tree/3.80; https://github.com/seaweedfs/seaweedfs/wiki/Amazon-S3-API',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
     summary:
-      'SeaweedFS supplies S3-compatible artifact storage. Application read/write paths are live; bucket administration, lifecycle, replication, and repair stay deployment-owned.',
+      'SeaweedFS is the configured S3-compatible artifact store. Application storage paths are wired, but the current fleet evidence does not attribute an object round-trip to SeaweedFS.',
     items: [
-      capability('object-read-write', 'S3 object read and write', 'Store, retrieve, list, and delete documents, media, and artifacts.', '/data/sources', 'Manage stored data', '', [
+      capability('object-read-write', 'S3 object read and write', 'Store, retrieve, list, and delete documents, media, and artifacts.', '/data/sources', 'Manage stored data', 'Persist endpoint/service identity, bucket, object key, and correlation for a live put/get/delete journey before claiming SeaweedFS workflow use.', [
         'yes', 'SeaweedFS 3.80 exposes an S3-compatible object API.',
         'yes', 'Storage adapters use the configured S3 endpoint for object lifecycle operations.',
         'yes', 'Data and artifact surfaces expose uploads, retrieval, and deletion.',
-        'yes', 'Documents, media, and generated artifacts use the deployed object store.',
+        'partial', 'Documents, media, and artifacts use the storage abstraction; no retained fleet proof attributes an object round-trip to SeaweedFS.',
       ]),
       capability('buckets-credentials', 'Buckets and access credentials', 'Create buckets and manage scoped object-store credentials and policies.', '/operations/services/seaweedfs', 'Inspect SeaweedFS', 'Buckets and credentials are deployment configuration, not console CRUD. Add tenant-safe policy management and secret-backed rotation before exposing them.', [
         'yes', 'SeaweedFS S3 supports buckets, identities, and actions.',
@@ -218,14 +228,16 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
       ]),
     ],
   },
-  {
+  stale({
     serviceId: 'warehouse',
     serviceLabel: 'ClickHouse Warehouse',
     upstreamVersion: '24.8-alpine',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://clickhouse.com/docs/en/operations/system-tables',
     auditedAt: AUDITED_AT,
-    auditState: 'current',
-    auditStateEvidence: null,
+    auditState: 'stale',
+    auditStateEvidence:
+      'The clickhouse/clickhouse-server:24.8-alpine image is a mutable minor-series tag, so source does not establish the exact deployed patch-level capability denominator.',
     summary:
       'ClickHouse is the analytics warehouse. SQL exploration and Airbyte-loaded BFSI datasets are live; privileged schema and cluster administration are not console-managed.',
     items: [
@@ -254,12 +266,14 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'no', 'No production workflow changes cluster state through the console.',
       ]),
     ],
-  },
+  }),
   {
     serviceId: 'airbyte',
     serviceLabel: 'Airbyte',
     upstreamVersion: '0.63.15',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://reference.airbyte.com/; https://github.com/airbytehq/airbyte/tree/v0.63.15',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -297,6 +311,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Redpanda',
     upstreamVersion: '24.2.7',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://docs.redpanda.com/24.2/reference/',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -340,6 +355,8 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Data Quality',
     upstreamVersion: 'native compatibility API (Great Expectations 0.18.19 optional, not installed)',
     versionSource: 'deploy/sidecars/great-expectations/requirements.txt; deploy/sidecars/great-expectations/app.py',
+    denominatorSource:
+      'deploy/sidecars/great-expectations/app.py (SUPPORTED contract); src/lib/data-quality-model.ts',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -377,6 +394,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Kestra',
     upstreamVersion: 'latest (mutable image tag)',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://kestra.io/docs/api-reference/open-source/',
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
@@ -406,6 +424,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'OpenSearch',
     upstreamVersion: '2.18.0',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://docs.opensearch.org/2.18/api-reference/',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -443,6 +462,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Langfuse',
     upstreamVersion: '3.30.0',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://langfuse.com/docs; https://github.com/langfuse/langfuse/tree/v3.30.0',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -480,6 +501,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Evidently',
     upstreamVersion: '0.4.40',
     versionSource: 'deploy/sidecars/drift/requirements.txt',
+    denominatorSource: 'https://github.com/evidentlyai/evidently/tree/v0.4.40',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -514,6 +536,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Ragas',
     upstreamVersion: '0.2.6',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/ragas-sidecar/requirements.txt',
+    denominatorSource: 'https://docs.ragas.io/en/v0.2.6/references/metrics/',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -542,6 +565,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'VictoriaMetrics',
     upstreamVersion: 'v1.106.1',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://docs.victoriametrics.com/victoriametrics/; https://github.com/VictoriaMetrics/VictoriaMetrics/tree/v1.106.1',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -567,6 +592,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'VictoriaLogs',
     upstreamVersion: 'v1.3.2-victorialogs',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource:
+      'https://docs.victoriametrics.com/victorialogs/; https://github.com/VictoriaMetrics/VictoriaMetrics/tree/v1.3.2-victorialogs/app/vlselect',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -592,6 +619,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'OpenTelemetry Collector',
     upstreamVersion: '0.116.0 (stale; deployed fleet 0.156.0)',
     versionSource: `deploy/docker-compose.yml; ${FLEET_RECORD}`,
+    denominatorSource:
+      'https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.116.0; https://opentelemetry.io/docs/collector/configuration/',
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
@@ -630,6 +659,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Jaeger',
     upstreamVersion: '1.62.0',
     versionSource: 'deploy/docker-compose.yml',
+    denominatorSource: 'https://www.jaegertracing.io/docs/1.62/apis/',
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -658,6 +688,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Core Banking',
     upstreamVersion: '16-alpine (mutable image tag)',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
@@ -681,6 +712,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Policy Administration',
     upstreamVersion: '8 (mutable image tag)',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
@@ -704,6 +736,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Finance ERP',
     upstreamVersion: 'latest (mutable image tag)',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
@@ -727,6 +760,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'Kafka-compatible Events',
     upstreamVersion: '24.2.7',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -749,6 +783,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'S3-compatible Data Lake',
     upstreamVersion: 'RELEASE.2025-04-08T15-41-24Z',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'current',
     auditStateEvidence: null,
@@ -771,6 +806,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     serviceLabel: 'CRM',
     upstreamVersion: '20-alpine (mutable image tag)',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
     auditedAt: AUDITED_AT,
     auditState: 'stale',
     auditStateEvidence:
