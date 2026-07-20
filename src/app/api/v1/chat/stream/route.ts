@@ -612,9 +612,10 @@ export async function POST(req: Request) {
       // threw/timed out yields null (NOT an empty "clean" list) so outboundGuardrailBlocks() treats
       // it as a block, and a completed screen with a blocked verdict also blocks. When blocked, tell
       // the client to withhold/redact the raw output rather than trust an un-cleared answer.
-      const postChecks: CheckResult[] | null = full
+      const guardrailCandidate = reasoning ? `${reasoning}\n${full}` : full;
+      const postChecks: CheckResult[] | null = guardrailCandidate
         ? await runOutboundGuardrails(
-            full,
+            guardrailCandidate,
             effectiveModel,
             orgId,
             String(content).trim()

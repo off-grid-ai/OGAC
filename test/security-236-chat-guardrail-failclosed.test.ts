@@ -73,4 +73,10 @@ test('chat route buffers upstream deltas and emits only the terminal cleared rel
   const decision = source.indexOf('prepareOutboundRelease(full, reasoning, postChecks)');
   const release = source.indexOf('send({ content: release.answer })');
   assert.ok(decision >= 0 && release > decision, 'content crosses SSE only after the guardrail verdict');
+  assert.match(
+    source,
+    /const guardrailCandidate = reasoning \? `\$\{reasoning\}\\n\$\{full\}` : full/,
+    'reasoning and answer share one outbound release gate',
+  );
+  assert.match(source, /runOutboundGuardrails\(\s*guardrailCandidate,/);
 });
