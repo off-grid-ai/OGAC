@@ -68,6 +68,7 @@
     "drizzle-orm": "^0.45.2",
     "highlight.js": "^11.11.1",
     "kafkajs": "^2.2.4",
+    "kafkajs-snappy": "1.1.0",
     "motion": "^12.40.0",
     "mssql": "^12.7.0",
     "mysql2": "^3.22.5",

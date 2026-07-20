@@ -1,4 +1,5 @@
 import kafkaJs from 'kafkajs';
+import SnappyCodec from 'kafkajs-snappy';
 import {
   buildBfsiStreamContract,
   groupTopics,
@@ -30,7 +31,12 @@ export interface RedpandaOverview {
 }
 
 type Fetcher = typeof fetch;
-const { ConfigResourceTypes, Kafka, logLevel } = kafkaJs;
+const { CompressionCodecs, CompressionTypes, ConfigResourceTypes, Kafka, logLevel } = kafkaJs;
+
+// The fleet seed is written by rpk using Snappy. KafkaJS intentionally ships without optional
+// compression implementations, so consumers must install the codec before decoding existing
+// batches. Registration is process-global and idempotent.
+CompressionCodecs[CompressionTypes.Snappy] = SnappyCodec;
 
 export interface NativeKafkaPort {
   listTopics(): Promise<string[]>;
@@ -180,6 +186,11 @@ export function createNativeKafkaPort(config: RedpandaConfig): NativeKafkaPort {
           timeoutMs,
         );
       });
+      const removeCrashListener = consumer.on(consumer.events.CRASH, ({ payload }) => {
+        rejectMatch?.(
+          payload.error instanceof Error ? payload.error : new Error('consumer failed'),
+        );
+      });
       const run = consumer
         .run({
           eachMessage: async ({ partition, message }) => {
@@ -199,6 +210,7 @@ export function createNativeKafkaPort(config: RedpandaConfig): NativeKafkaPort {
         return await match;
       } finally {
         if (timeout) clearTimeout(timeout);
+        removeCrashListener();
         await consumer.stop().catch(() => undefined);
         await run.catch(() => undefined);
         await consumer.disconnect().catch(() => undefined);

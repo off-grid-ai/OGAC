@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import test from 'node:test';
+import kafkaJs from 'kafkajs';
 import {
   consumeRecords,
   createTopic,
@@ -16,6 +17,16 @@ import {
   type NativeKafkaPort,
   type RedpandaConfig,
 } from '../src/lib/adapters/redpanda.ts';
+
+test('installs the Snappy codec used by existing Redpanda records', async () => {
+  const input = Buffer.from('{"eventId":"snappy-proof"}');
+  const codec = kafkaJs.CompressionCodecs[kafkaJs.CompressionTypes.Snappy]();
+
+  const compressed = await codec.compress({ buffer: input });
+  const decompressed = Buffer.from(await codec.decompress(compressed));
+
+  assert.equal(decompressed.toString(), input.toString());
+});
 
 test('uses real Admin, Schema Registry, and REST Proxy HTTP boundaries', async (t) => {
   const calls: Array<{ method: string; url: string; body: unknown }> = [];
