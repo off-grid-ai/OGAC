@@ -18,6 +18,7 @@ import type { Actor } from '@/lib/audit-event';
 import { actorFrom } from '@/lib/audit-event';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 import type { Asker } from '@/lib/retrieval/acl';
+import type { RetrievalHit } from '@/lib/retrieval/types';
 
 /**
  * The caller context for a governed agent run. Resolved AT SUBMIT TIME from the request (same source
@@ -58,6 +59,24 @@ export interface RunContext {
    * absent/null ⇒ no pipeline tag (a run with no bound pipeline is unchanged).
    */
   pipelineId?: string | null;
+  /**
+   * Sources already read and authorized by an owning workflow step. App orchestration uses this to
+   * hand exact connector evidence into a grounded child agent without making the agent perform an
+   * unrelated second retrieval. The sources still pass through model, guardrail, grounding, and
+   * provenance stages inside runAgent.
+   */
+  providedSources?: RetrievalHit[];
+}
+
+export type RetrievalMode = 'provided' | 'retrieve' | 'skip';
+
+/** Decide where an agent's evidence comes from. Governed provided sources take precedence. */
+export function retrievalMode(
+  grounded: boolean,
+  providedSources: readonly RetrievalHit[] | undefined,
+): RetrievalMode {
+  if ((providedSources?.length ?? 0) > 0) return 'provided';
+  return grounded ? 'retrieve' : 'skip';
 }
 
 /**

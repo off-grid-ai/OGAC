@@ -217,6 +217,11 @@ test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-
 
   const bharat = planSeedPipelines('org_bharat');
   assert.ok(bharat.every((p) => p.gatewayId === 'gw_seed_org_bharat_onprem-cluster'));
+  assert.deepEqual(
+    bharat.find((pipeline) => pipeline.name === 'Cross-Sell Advisor')?.dataAllowlist,
+    ['customer data'],
+    'cross-sell references the canonical seeded tenant domain, not imaginary tables',
+  );
   // Org isolation: ids never collide across orgs.
   const defIds = new Set(def.map((p) => p.id));
   assert.ok(bharat.every((p) => !defIds.has(p.id)), 'ids are org-scoped, never shared');

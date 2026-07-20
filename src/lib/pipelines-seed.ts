@@ -122,7 +122,10 @@ export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
     name: 'Cross-Sell Advisor',
     description:
       'Next-best-action advisor for relationship managers — suggests products from the customer holding pattern; aggregate insights only, individual PII masked.',
-    dataAllowlist: ['customer-master', 'product-catalog', 'holdings'],
+    // These are semantic domain references resolved against the tenant registry at run time. Keep
+    // the template aligned with the canonical Bharat seed (`customer data` → CRM accounts) instead
+    // of naming imaginary tables that no connector/domain owns.
+    dataAllowlist: ['customer data'],
     routing: bfsiRouting(),
     policyOverlay: {},
     guardrailOverlay: { requirePiiMasking: { mode: 'default', bool: true } },

@@ -21,7 +21,12 @@ import {
   parseAgentAction,
   runAgentLoop,
 } from '@/lib/agent-loop';
-import { effectiveRunId, type RunContext, resolveRunAttribution } from '@/lib/agent-run-context';
+import {
+  effectiveRunId,
+  type RunContext,
+  resolveRunAttribution,
+  retrievalMode,
+} from '@/lib/agent-run-context';
 import { buildAgentToolCatalog, isAutonomousAgent } from '@/lib/agent-tools-catalog';
 import { type AgentDef, resolveAgent } from '@/lib/agents';
 import { outcomeFromStatus } from '@/lib/audit-event';
@@ -630,7 +635,8 @@ export async function runAgent(
   // prompt) and 'none' for an ungrounded one (a pure prompt, no data leaves).
   const contract = context?.contract ?? null;
   const enforceCtx = { orgId: attribution.org, actor: caller, runId, contract };
-  const dataClass = agent.grounded === false ? 'none' : 'general';
+  const sourceMode = retrievalMode(agent.grounded !== false, context?.providedSources);
+  const dataClass = sourceMode === 'skip' ? 'none' : 'general';
 
   // 3. Resolve + authorize + retrieve. The helper reads the org's declared domain metadata, resolves
   // this query to the REAL domain id, checks that id against the pipeline, and only then calls the
@@ -638,7 +644,18 @@ export async function runAgent(
   // declared-domain id and keep their legacy behavior; ungrounded agents still retrieve nothing.
   t = Date.now();
   let routed: Awaited<ReturnType<typeof route>>;
-  if (agent.grounded === false) {
+  if (sourceMode === 'provided') {
+    const hits = [...(context?.providedSources ?? [])];
+    routed = {
+      query,
+      hits,
+      decision: {
+        intent: Array.from(new Set(hits.map((hit) => hit.sourceKind))),
+        reason: 'sources supplied by governed upstream workflow steps',
+      },
+      evidence: null,
+    };
+  } else if (sourceMode === 'skip') {
     routed = {
       query,
       hits: [] as RetrievalHit[],
@@ -687,9 +704,11 @@ export async function runAgent(
   mark(
     'retrieve',
     'router',
-    agent.grounded === false
+    sourceMode === 'skip'
       ? 'skipped (ungrounded agent)'
-      : `intent ${routed.decision.intent.join(', ')}; ${
+      : sourceMode === 'provided'
+        ? `${routed.hits.length} source(s) supplied by governed upstream workflow steps`
+        : `intent ${routed.decision.intent.join(', ')}; ${
           routed.evidence ? retrievalExecutionSummary(routed.evidence) : 'evidence=unavailable'
         }`,
     routed.hits.map((h) => h.ref),

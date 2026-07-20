@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   effectiveRunId,
+  retrievalMode,
   resolveRunAttribution,
 } from '../src/lib/agent-run-context.ts';
 import { correlationIds } from '../src/lib/correlation.ts';
@@ -75,4 +76,20 @@ test('C4: a threaded runId yields the identical four-plane correlation as an inl
   assert.match(ids.lineageRunId, /^[0-9a-f-]{36}$/); // deterministic UUIDv5
   // Deterministic: same runId → same lineage UUID every time (no state/randomness).
   assert.equal(correlationIds(runId).lineageRunId, ids.lineageRunId);
+});
+
+test('retrievalMode: governed workflow sources win; otherwise grounded retrieves and ungrounded skips', () => {
+  const source = {
+    sourceId: 'step-1',
+    sourceKind: 'database' as const,
+    title: 'corebank:accounts',
+    snippet: '1 row',
+    ref: 'corebank:accounts',
+    score: 1,
+  };
+
+  assert.equal(retrievalMode(true, [source]), 'provided');
+  assert.equal(retrievalMode(false, [source]), 'provided');
+  assert.equal(retrievalMode(true, []), 'retrieve');
+  assert.equal(retrievalMode(false, undefined), 'skip');
 });

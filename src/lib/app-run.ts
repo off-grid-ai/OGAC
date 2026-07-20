@@ -54,6 +54,7 @@ import {
   enforceModelCall,
 } from '@/lib/pipeline-enforcement';
 import type { Asker } from '@/lib/retrieval/acl';
+import type { RetrievalHit } from '@/lib/retrieval/types';
 
 // ─── The exported contract types (2B depends on these) ──────────────────────────────────────────
 
@@ -346,6 +347,24 @@ export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): stri
   return `CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}\n\nTASK: ${label}`;
 }
 
+/**
+ * Project connector outputs into the canonical source shape consumed by a grounded agent. The
+ * connector step has already resolved the tenant domain and passed the pipeline data ceiling, so
+ * these are the exact authorized sources for the downstream decision—not a cue to search again.
+ */
+export function providedSourcesFromPriorResults(priorResults: StepResult[]): RetrievalHit[] {
+  return priorResults
+    .filter((result) => result.kind === 'connector-query' && result.output?.trim())
+    .map((result) => ({
+      sourceId: result.stepId,
+      sourceKind: 'database' as const,
+      title: result.refs?.[0]?.name ?? `App step ${result.stepId}`,
+      snippet: result.output!.trim(),
+      ref: result.refs?.[0]?.name ?? `app-step:${result.stepId}`,
+      score: 1,
+    }));
+}
+
 // ─── resolveDomainByIdOrLabel — GAP #106-a: id FIRST, then label/alias (pure) ─────────────────────
 // The compiler emits `step.domain = <domain id>` (e.g. `dom_inv`), but the label/alias rule engine
 // (`resolveDomain`) matches human phrases, not ids — so a saved compiled spec's reads returned null
@@ -518,6 +537,7 @@ async function executeAgentStep(
     contract: ctx.contract ?? null,
     pipelineId: ctx.pipelineId ?? ctx.contract?.pipelineId ?? null,
     asker: ctx.asker,
+    providedSources: providedSourcesFromPriorResults(priorResults),
   });
   if (!run) return errorResult(step, `unknown agent: ${agentId}`);
   if (run.status === 'denied' || run.status === 'blocked') {

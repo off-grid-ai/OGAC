@@ -12,6 +12,7 @@ import {
   type AppRunDeps,
   buildAgentQuery,
   executeStep,
+  providedSourcesFromPriorResults,
   resolveDomainByIdOrLabel,
   runApp,
   type StepResult,
@@ -111,6 +112,30 @@ test('buildAgentQuery threads prior-step output as context', () => {
   assert.match(q, /TASK: decide/);
 });
 
+test('providedSourcesFromPriorResults carries only governed connector evidence', () => {
+  const sources = providedSourcesFromPriorResults([
+    {
+      stepId: 's1',
+      kind: 'connector-query',
+      status: 'done',
+      output: 'accounts: 5 rows',
+      refs: [{ name: 'crm:accounts' }],
+    },
+    { stepId: 's2', kind: 'guardrail', status: 'done', output: 'clean' },
+  ]);
+
+  assert.deepEqual(sources, [
+    {
+      sourceId: 's1',
+      sourceKind: 'database',
+      title: 'crm:accounts',
+      snippet: 'accounts: 5 rows',
+      ref: 'crm:accounts',
+      score: 1,
+    },
+  ]);
+});
+
 test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {
   const r = await executeStep(LINEAR, LINEAR.steps[0], [], { orgId: 'default', runId: 'r3' }, fakeDeps());
   // s0 is connector-query here; check a real human step:
@@ -126,11 +151,24 @@ test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {
 });
 
 test('runApp executes a 3-step spec in order to completion (connector→agent→output)', async () => {
-  const out = await runApp(LINEAR, {}, { orgId: 'default', runId: 'r4' }, fakeDeps());
+  let agentContext: import('@/lib/agent-run-context').RunContext | undefined;
+  const out = await runApp(
+    LINEAR,
+    {},
+    { orgId: 'default', runId: 'r4' },
+    fakeDeps({
+      async runAgent(agentId, query, _caller, _review, _org, context) {
+        agentContext = context;
+        return { id: `run_${agentId}`, answer: `decided from: ${query}`, status: 'done', citations: [] };
+      },
+    }),
+  );
   assert.equal(out.status, 'done');
   assert.deepEqual(out.steps.map((s) => s.stepId), ['s1', 's2', 's3']);
   // the agent step saw the connector output threaded in
   assert.match(out.steps[1].output ?? '', /decided from:/);
+  assert.equal(agentContext?.providedSources?.[0]?.ref, 'con_hr:employee_quota');
+  assert.match(agentContext?.providedSources?.[0]?.snippet ?? '', /reimbursement quota/);
 });
 
 test('runApp stops at awaiting_human when a human step is hit', async () => {
