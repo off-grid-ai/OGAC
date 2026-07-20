@@ -46,7 +46,10 @@ if (passwordEnabled) {
     Credentials({
       id: 'password',
       name: 'Off Grid AI',
-      credentials: { username: { label: 'Email' }, password: { label: 'Password', type: 'password' } },
+      credentials: {
+        username: { label: 'Email' },
+        password: { label: 'Password', type: 'password' },
+      },
       authorize: async (creds) => {
         const { authenticatePassword } = await import('@/lib/auth/identity');
         return authenticatePassword(String(creds?.username ?? ''), String(creds?.password ?? ''));
@@ -94,14 +97,17 @@ export const authConfig = {
     },
   },
   callbacks: {
-    // Allow post-login redirects back to any *.getoffgridai.co surface (provit, status, landing)
+    // Allow post-login redirects back to gated sibling *.getoffgridai.co surfaces.
     // — the gated services sign in via the console, so their callbackUrl is a sibling subdomain.
     // NextAuth's default rejects cross-origin callbacks, which stranded users on the console.
     redirect({ url, baseUrl }) {
       try {
         const u = new URL(url, baseUrl);
-        if (u.origin === baseUrl || /(^|\.)getoffgridai\.co$/i.test(u.hostname)) return u.toString();
-      } catch { /* fall through */ }
+        if (u.origin === baseUrl || /(^|\.)getoffgridai\.co$/i.test(u.hostname))
+          return u.toString();
+      } catch {
+        /* fall through */
+      }
       return baseUrl;
     },
     // eslint-disable-next-line complexity
@@ -110,14 +116,17 @@ export const authConfig = {
       // We map the first recognised app role (admin > editor > viewer) to our internal role.
       if (account?.provider === 'keycloak' && profile) {
         const kc = profile as Record<string, unknown>;
-        const realmRoles: string[] = (kc['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
+        const realmRoles: string[] =
+          (kc['realm_access'] as { roles?: string[] } | undefined)?.roles ?? [];
         const resourceRoles: string[] = Object.values(
-          (kc['resource_access'] as Record<string, { roles?: string[] }> | undefined) ?? {}
+          (kc['resource_access'] as Record<string, { roles?: string[] }> | undefined) ?? {},
         ).flatMap((r) => r.roles ?? []);
         const all = [...realmRoles, ...resourceRoles];
         // Also accept a top-level `role` claim if set in Keycloak's token mapper.
         const direct = typeof kc['role'] === 'string' ? kc['role'] : null;
-        token.role = direct ?? (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
+        token.role =
+          direct ??
+          (all.includes('admin') ? 'admin' : all.includes('editor') ? 'editor' : 'viewer');
         // Carry the tenant org if the OIDC token maps it (harmless, future-proof — the ROPC/password
         // path below is the one in use today). Same claim shapes as identity's orgFrom.
         const oidcOrg = orgFromClaims(kc);
@@ -135,11 +144,18 @@ export const authConfig = {
       // (NextAuth-populated) plus the raw profile email, so it works regardless of
       // which login path set the role above.
       const adminEmails = (process.env.OFFGRID_ADMIN_EMAILS ?? '')
-        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-      const profileEmail = profile && typeof (profile as Record<string, unknown>)['email'] === 'string'
-        ? ((profile as Record<string, unknown>)['email'] as string)
-        : '';
-      const email = (profileEmail || (typeof token.email === 'string' ? token.email : '') || '').toLowerCase();
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+      const profileEmail =
+        profile && typeof (profile as Record<string, unknown>)['email'] === 'string'
+          ? ((profile as Record<string, unknown>)['email'] as string)
+          : '';
+      const email = (
+        profileEmail ||
+        (typeof token.email === 'string' ? token.email : '') ||
+        ''
+      ).toLowerCase();
       if (email && adminEmails.includes(email)) token.role = 'admin';
       return token;
     },

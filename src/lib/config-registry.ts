@@ -378,16 +378,6 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     description: 'Durable workflow engine (agents queue).',
   },
   {
-    key: 'OFFGRID_PROVIT_URL',
-    group: 'Services',
-    label: 'Provit URL',
-    type: 'url',
-    secret: false,
-    restartRequired: true,
-    hostValue: true,
-    description: 'Prove It (visual QA) product surface.',
-  },
-  {
     key: 'OFFGRID_PRESIDIO_ANALYZER_URL',
     group: 'Services',
     label: 'Presidio analyzer URL',

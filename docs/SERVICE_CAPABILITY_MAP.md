@@ -53,22 +53,23 @@ LiteLLM currently uses `main-stable`, a mutable image tag. The map calls that ou
 inventing a fixed version. Pin the image digest before treating that upstream denominator as
 reproducible.
 
-The registry contains five versioned audit records: Evidently 0.4.40, Presidio 2.2.356, Redpanda
-24.2.7, OpenTelemetry Collector 0.116.0, and the mutable LiteLLM `main-stable` image. Four are
-current. The OTel record is explicitly stale because the fleet replaced failing 0.116.0 with pinned
-0.156.0. Fleet records prove that 0.156.0 is deployed and exported one trace to Jaeger; they do not
-re-audit its upstream capability denominator. Until that audit happens, every OTel Available gate is
-`no` (not verified), while the historical adapter, UI, and workflow evidence remains visible.
+The canonical registry composes two disjoint family registries and currently contains 36 versioned
+audit records: 19 current and 17 stale. Twelve of the 48 inventory entries remain explicitly
+unaudited. Stale records keep their historical adapter, UI, and workflow evidence visible, but every
+Available gate is normalized to `no` until the deployed upstream denominator is re-audited.
 
-“Five audit records” therefore does not mean “five current audits”: the exact state is four current,
-one stale, and 44 services with no versioned audit record.
+The map separates version provenance from denominator provenance. `versionSource` names the image,
+package, first-party SHA, or deployment record that establishes identity. `denominatorSource` names
+the primary upstream contract used to enumerate relevant operator outcomes. A compose pin alone is
+not proof of an upstream capability list.
 
 ## Systems of record
 
 Use the right owner for each fact:
 
-- `src/lib/service-capability-map.ts` is the console system of record for the audited capability
-  denominator, four gate assessments, evidence, operator routes, and concrete gaps.
+- `src/lib/service-capability-map.ts` is the canonical projection and duplicate-owner gate.
+  `src/lib/service-capabilities/*` owns each disjoint family denominator, four gate assessments,
+  evidence, operator routes, and concrete gaps.
 - `src/lib/services-directory.ts` and the runtime topology registry own which logical services the
   console lists. They do not own capability coverage.
 - `deploy/docker-compose.yml`, `deploy/sidecars/drift/requirements.txt`, and

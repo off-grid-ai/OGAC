@@ -215,41 +215,6 @@ citations are a subset of what the asker could open by hand - grounding is never
 [Policy](/docs/guides/policy).`,
     },
     {
-      slug: 'guides/provit',
-      title: 'Provit',
-      description:
-        'Point it at a repo; it maps every behavior, runs each end to end, and judges the result with vision.',
-      body: `Provit answers a question every team dreads: does the app still do what it's supposed to.
-Point it at a repository and it maps the app into behaviors, runs each one end to end, and judges the
-recording with a vision model - so "it works" becomes evidence, not a hope. Provit is a first-class
-console module, brokered through the console's own auth, fleet, and budgets.
-
-## What you can do here
-
-- **Run its intelligence** - the feature-mapping, test-synthesis, and copilot engine, driven from the
-  console rather than a separate tool.
-- **Upload a file** - send a file to Provit through the console's own [Storage](/docs/guides/storage),
-  so an artifact goes in without leaving your infrastructure.
-- **See your repos and runs** - repos your org maps stay private to your org; free demo runs live in
-  the public gallery.
-- **Open Provit** - jump to the full product with the reachability status shown inline, so you know
-  it's live before you go.
-
-## It rides the console's gateway
-
-Provit does not run its own model gateway. Its intelligence - feature mapping, test synthesis, the
-copilot, and the vision judge - runs on **this console's** [gateway](/docs/guides/gateway). Point a
-Provit instance at the console and every one of those calls inherits the same fleet, routing,
-governance, and [budgets](/docs/guides/budgets) as the rest of the platform. Nothing about Provit
-sits outside the leash.
-
-## Private by default
-
-Repos and runs are scoped by the console's access rules (ABAC on the \`provit\` resource, plus
-tenancy): you see the public library, your own org's repos, and your own private ones - nothing
-else. A fresh account simply shows an empty list, never someone else's work.`,
-    },
-    {
       slug: 'guides/studio',
       title: 'Studio',
       description: 'Build a working assistant in plain language - no technical setup.',

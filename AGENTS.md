@@ -55,10 +55,12 @@ cd deploy && make secrets      # OpenBao only
 ```
 
 Two traps that make a deploy silently no-op (both handled by `push.sh`, documented in DEPLOY.md):
+
 1. **`git` is dead on the SERVER** (no Xcode CLT) — `git pull` fails silently, code stays stale. Deploy via rsync, not git.
 2. **`shared/` monorepo isn't on the server** — the `@offgrid/*` file: deps must be rsync'd or the build fails with "Module not found".
 
 Other essentials:
+
 - The console runs **natively** (`next start` on `:3000`), **no pm2**. Restart = `pkill -f next-server` then relaunch.
 - Non-interactive SSH has a minimal PATH — always call node by absolute path (`/usr/local/bin/node node_modules/.bin/next`).
 - `drizzle-kit push` hangs over SSH; apply schema changes with the `pg` client directly (see DEPLOY.md § Database migrations).
@@ -75,6 +77,7 @@ Other essentials:
 ```
 
 **Before running in production:**
+
 1. Fill in `.env.production` — copy `.env.local`, then:
    - Replace `DATABASE_URL` password (not `offgrid:offgrid`)
    - Add Keycloak env vars (see below)
@@ -84,6 +87,7 @@ Other essentials:
 3. Run `./deploy/prod.sh verify` after starting to confirm headers + rate limiter are live
 
 **What hardening is in place:**
+
 - Security headers (CSP, HSTS, X-Frame-Options, etc.) — `next.config.mjs`
 - Rate limiter 60 req/min per IP on `/api/*` — `src/middleware.ts`
 - Dev login disabled via `AUTH_DEV_LOGIN=false` in `.env.production`
@@ -95,7 +99,6 @@ NextAuth v5. Providers activate based on env vars — Google, Microsoft Entra, K
 
 Service accounts use `Authorization: Bearer <OFFGRID_ADMIN_TOKEN>` — middleware passes these through to handler-level verification.
 
-
 ## Design
 
 Inherit the shared Off Grid design philosophy from `../brand/DESIGN_PHILOSOPHY.md` (the source of truth — brutalist/terminal, Menlo mono, emerald accent, tokens in `@offgrid/design`). Platform specifics: this repo has no separate design doc yet — follow the shared philosophy and the tokens directly.
@@ -106,17 +109,17 @@ This is a desktop-first operator console on wide (≥1440px) screens. **Content 
 
 - **Never wrap a full PAGE in `mx-auto max-w-2xl/3xl/4xl`.** That centers content in a skinny column and leaves 30–50% of a wide screen empty. Page shells fill the width (the console `<main>` already pads with `p-6`); a page's root should be full-width (`w-full`, or at most `max-w-7xl`/`max-w-[110rem]` for the very widest surfaces).
 - **Lay out with responsive grids/columns**, not one tall centered stack: `grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`. Card lists are grids. A form + its help/preview sit side-by-side on `lg+`, not stacked in a narrow column. Stat rows are multi-column bands.
-- **The ONLY thing that stays narrow is a single reading/measure column** — long prose, or one focused input (a chat composer, a single textarea) — cap those at ~`max-w-2xl`/`prose` *inside* a full-width page, never by centering the whole page.
+- **The ONLY thing that stays narrow is a single reading/measure column** — long prose, or one focused input (a chat composer, a single textarea) — cap those at ~`max-w-2xl`/`prose` _inside_ a full-width page, never by centering the whole page.
 - Still responsive: columns stack on narrow/tablet; wide tables/diagrams scroll inside their own `overflow-x-auto`, the page body never scrolls horizontally.
 - Verify against a wide viewport: if a full-page surface leaves a large empty gutter on either side, it's a bug — fix it before calling the work done.
 
 ### List → detail everywhere (default IA for every entity collection)
 
-A list is a way *in*, not the whole story. **Wherever the console shows a collection of entities, an item should open a real, deep-linkable DETAIL view** — its own route/URL (`/thing/[id]`), not a flat table row you can't drill into and not a cramped modal for something that's actually a "place." Apply this as much as possible.
+A list is a way _in_, not the whole story. **Wherever the console shows a collection of entities, an item should open a real, deep-linkable DETAIL view** — its own route/URL (`/thing/[id]`), not a flat table row you can't drill into and not a cramped modal for something that's actually a "place." Apply this as much as possible.
 
 - **Master → detail.** Row/card click → a dedicated detail page showing the full entity + all its actions (edit, delete, the entity's sub-resources, its history/runs, related items). The per-app lifecycle shell (`/apps/[id]` with Build/Input/Runs/Review/Reports) and the project detail page are the reference pattern — generalize it.
 - **URL-driven** (per the nav rule): the detail is a route, shareable and Back-coherent — never client-only `useState` for "which item is open."
-- A **modal/side-panel is fine for a quick create/edit form**, but not as the only way to see an entity that has depth. If it has sub-resources, status over time, or its own actions, it's a detail *page*.
+- A **modal/side-panel is fine for a quick create/edit form**, but not as the only way to see an entity that has depth. If it has sub-resources, status over time, or its own actions, it's a detail _page_.
 - When you build or touch a list surface, give it (or wire it to) a detail view. A pure list/table with nowhere to click through is the bare minimum, not finished — same bar as the full-CRUD rule above.
 
 ## Multi-agent operating model (how we build here)
@@ -125,7 +128,7 @@ Substantial work is executed by a fleet of parallel subagents orchestrated by th
 
 For service inventory, integration, capability exposure, or fleet verification work, every agent must
 first follow [`docs/SERVICE_EXPANSION_AGENT_BRIEF.md`](docs/SERVICE_EXPANSION_AGENT_BRIEF.md). It is the
-single shared prompt for the 49-entry ontology, four verification gates, evidence contract, systems of
+single shared prompt for the 48-entry ontology, four verification gates, evidence contract, systems of
 record, and parallel file ownership. Agent-specific prompts should name only the assigned family,
 owned file set, and deliverable; they must not independently rediscover or redefine this contract.
 

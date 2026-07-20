@@ -60,16 +60,6 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     auth: 'public',
     kind: 'gateway',
   },
-  {
-    id: 'provit',
-    label: 'Provit',
-    description:
-      'Prove It — visual QA brokered through the console: intelligence engine (map repos, test copilot), gateway (shared), file upload, repos, runs.',
-    url: process.env.OFFGRID_PROVIT_URL ?? 'https://provit.getoffgridai.co',
-    auth: 'session',
-    kind: 'product',
-  },
-
   // ── Control-plane persistence + authoritative integration engines ─────────────────────────────
   {
     id: 'postgres',

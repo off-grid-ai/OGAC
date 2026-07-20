@@ -37,7 +37,10 @@ export interface ServiceCapabilityAudit {
   serviceId: string;
   serviceLabel: string;
   upstreamVersion: string;
+  /** Deployment or package record that establishes the version identity. */
   versionSource: string;
+  /** Primary upstream contract used to enumerate the relevant operator-outcome denominator. */
+  denominatorSource: string;
   auditedAt: string;
   auditState: 'current' | 'stale';
   auditStateEvidence: string | null;

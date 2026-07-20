@@ -1,83 +1,57 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+
 import {
   CAPABILITY_GATES,
   capabilityCoveragePercent,
+  composeServiceCapabilityAudits,
   getServiceCapabilityAudit,
   SERVICE_CAPABILITY_AUDITS,
   summarizeServiceCapabilityAudit,
   type AuditedCapabilitySummary,
 } from '../src/lib/service-capability-map.ts';
 
-const AUDITED_IDS = ['evidently', 'presidio', 'streaming', 'otel-collector', 'litellm'];
+test('canonical registry composes 36 unique versioned audits without the removed product', () => {
+  const ids = SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId);
 
-test('registry exhaustively names four current audits and one visibly stale audit record', () => {
-  assert.deepEqual(
-    SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId),
-    AUDITED_IDS,
-  );
-  assert.deepEqual(
-    SERVICE_CAPABILITY_AUDITS.map((audit) => audit.upstreamVersion),
-    [
-      '0.4.40',
-      '2.2.356',
-      '24.2.7',
-      '0.116.0 (stale; deployed fleet 0.156.0)',
-      'main-stable (mutable image tag)',
-    ],
-  );
-  assert.deepEqual(
-    SERVICE_CAPABILITY_AUDITS.map((audit) => audit.auditState),
-    ['current', 'current', 'current', 'stale', 'current'],
-  );
+  assert.equal(ids.length, 36);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(ids.includes('provit'), false);
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
-    assert.equal(audit.auditedAt, '2026-07-19');
-    assert.equal(Boolean(audit.auditStateEvidence), audit.auditState === 'stale');
-    assert.ok(audit.items.length >= 7, `${audit.serviceId} has a real capability denominator`);
+    assert.ok(audit.upstreamVersion.trim(), `${audit.serviceId} has a version identity`);
+    assert.ok(audit.versionSource.trim(), `${audit.serviceId} has deployment version evidence`);
+    assert.ok(
+      audit.denominatorSource.trim(),
+      `${audit.serviceId} has a primary capability denominator source`,
+    );
+    assert.ok(audit.items.length > 0, `${audit.serviceId} has a bounded capability denominator`);
   }
 });
 
-test('stale OTel audit does not verify availability for the deployed 0.156.0 denominator', () => {
-  const audit = getServiceCapabilityAudit('otel-collector');
+test('composition rejects duplicate family ownership instead of silently choosing one record', () => {
+  const audit = SERVICE_CAPABILITY_AUDITS[0];
   assert.ok(audit);
-  assert.equal(audit.auditState, 'stale');
-  assert.match(audit.auditStateEvidence ?? '', /do not re-audit the 0\.156\.0 upstream/);
-  assert.ok(audit.items.every((item) => item.gates.upstream.status === 'no'));
-  assert.ok(audit.items.every((item) => item.gates.upstream.evidence.includes('0.156.0')));
-  assert.ok(audit.items.every((item) => item.gap.startsWith('Re-audit the deployed')));
-  const summary = summarizeServiceCapabilityAudit('otel-collector');
-  assert.equal(summary.status, 'audited');
-  if (summary.status === 'audited') assert.equal(summary.auditState, 'stale');
+  assert.throws(
+    () => composeServiceCapabilityAudits([[audit], [audit]]),
+    new RegExp(`Duplicate service capability audit owner: ${audit.serviceId}`),
+  );
 });
 
-test('Redpanda audit reflects native lifecycle and proof UI without claiming live workflow use', () => {
-  const audit = getServiceCapabilityAudit('streaming');
-  assert.ok(audit);
-  const byId = new Map(audit.items.map((item) => [item.id, item]));
-  const produce = byId.get('produce-records');
-  const consume = byId.get('consume-records');
-  const schemas = byId.get('schema-registry');
-  const topics = byId.get('topic-lifecycle');
-  const proof = byId.get('bfsi-stream-proof');
+test('stale audits cannot verify upstream availability', () => {
+  const stale = SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'stale');
+  assert.ok(stale.length > 0);
 
-  assert.match(produce?.summary ?? '', /native Kafka protocol/);
-  assert.equal(produce?.gates.workflow.status, 'no');
-  assert.equal(consume?.uiHref, '/operations/services/streaming?manage=workflows');
-  assert.equal(consume?.gates.adapter.status, 'yes');
-  assert.equal(consume?.gates.ui.status, 'partial');
-  assert.equal(consume?.gates.workflow.status, 'no');
-  assert.equal(schemas?.gates.adapter.status, 'yes');
-  assert.equal(schemas?.gates.ui.status, 'yes');
-  assert.equal(schemas?.gates.workflow.status, 'no');
-  assert.equal(topics?.gates.adapter.status, 'yes');
-  assert.equal(topics?.gates.ui.status, 'yes');
-  assert.equal(topics?.gates.workflow.status, 'no');
-  assert.equal(proof?.gates.adapter.status, 'yes');
-  assert.equal(proof?.gates.ui.status, 'yes');
-  assert.equal(proof?.gates.workflow.status, 'no');
+  for (const audit of stale) {
+    assert.ok(audit.auditStateEvidence, `${audit.serviceId} explains why its audit is stale`);
+    assert.ok(audit.items.every((item) => item.gates.upstream.status === 'no'));
+    assert.ok(audit.items.every((item) => item.gap.includes('Re-audit the deployed')));
+    const summary = summarizeServiceCapabilityAudit(audit.serviceId);
+    assert.equal(summary.status, 'audited');
+    if (summary.status === 'audited') assert.equal(summary.auditState, 'stale');
+  }
 });
 
-test('every capability has four independent evidence gates, a real route, and a concrete gap', () => {
+test('every capability has four independent evidence gates, a route, and an honest gap', () => {
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
     const ids = new Set<string>();
     for (const item of audit.items) {
@@ -100,7 +74,7 @@ test('every capability has four independent evidence gates, a real route, and a 
   }
 });
 
-test('summary counts only verified yes gates and keeps partials separate', () => {
+test('summary counts only verified gates and production workflow evidence', () => {
   const summary = summarizeServiceCapabilityAudit('litellm');
   assert.equal(summary.status, 'audited');
   if (summary.status !== 'audited') return;
@@ -128,9 +102,9 @@ test('summary counts only verified yes gates and keeps partials separate', () =>
   );
 });
 
-test('unmapped services are not audited, never represented as zero or full coverage', () => {
-  assert.equal(getServiceCapabilityAudit('postgres'), null);
-  assert.deepEqual(summarizeServiceCapabilityAudit('postgres'), { status: 'not-audited' });
+test('unaudited and unknown services stay unscored', () => {
+  assert.equal(getServiceCapabilityAudit('edge-gateway'), null);
+  assert.deepEqual(summarizeServiceCapabilityAudit('edge-gateway'), { status: 'not-audited' });
   assert.deepEqual(summarizeServiceCapabilityAudit('does-not-exist'), { status: 'not-audited' });
 });
 

@@ -6,7 +6,7 @@ route taxonomy, or definition of "integrated".
 
 ## Outcome
 
-The Console must account for the fleet's **49 logical composable entries**: 43 platform services and
+The Console must account for **48 logical composable entries**: 42 platform services and
 operational dependencies plus six enterprise source systems. Every entry must be visible in the
 service inventory. Relevant upstream capabilities must be classified honestly and, when supported,
 must have a real adapter/API/UI/workflow path. An image, container, health check, or read-only status
@@ -24,13 +24,13 @@ unsupported upstream capability instead of silently omitting it or inflating cov
 4. `src/lib/runtime-service-topology.ts` and `src/lib/operational-services.ts` — Console registry.
 5. `src/lib/service-capability-map.ts` and `docs/SERVICE_CAPABILITY_MAP.md` — audited capability
    denominators and evidence. Reuse them; do not copy their facts into another registry.
-6. `docs/SERVICE_CAPABILITY_STATUS.md` — the resume-safe 49-entry tracker, active ownership,
+6. `docs/SERVICE_CAPABILITY_STATUS.md` — the resume-safe 48-entry tracker, active ownership,
    release gates, and last committed handoffs. Read it before discovery and update it through the
    integration owner after every committed slice.
 7. `../brand/DESIGN_PHILOSOPHY.md` and
    `../component-library-animations` — UI source of truth. Reuse or extend its primitives.
 
-Container/image counts are deployment detail, not the product ontology. Never infer the 49 entries
+Container/image counts are deployment detail, not the product ontology. Never infer the 48 entries
 from `docker images`.
 
 ## The four gates
@@ -48,7 +48,7 @@ Evaluate every audited capability independently:
 Only verified gates count. Partial work remains partial. Never round up or turn "not audited" into
 zero percent. A capability can be healthy but not selected by production; state that explicitly.
 
-## Required record for each of the 49 entries
+## Required record for each of the 48 entries
 
 - stable id and operator-facing name;
 - family and role (data, runtime, governance, observability, operations, enterprise source);
@@ -66,7 +66,7 @@ zero percent. A capability can be healthy but not selected by production; state 
 
 For one service family at a time:
 
-1. Reconcile the 49-entry inventory; never hard-code an eight-node or container-derived list.
+1. Reconcile the 48-entry inventory; never hard-code an eight-node or container-derived list.
 2. Pin or record the upstream version and audit capabilities from primary upstream documentation.
 3. Implement pure capability/policy models in `src/lib`; keep I/O behind adapters.
 4. Wire real service APIs through thin routes with tenant/auth/error boundaries.
@@ -92,7 +92,7 @@ an otherwise good visual or coverage result.
 
 Recommended lanes:
 
-- **Inventory/IA projection** — 49-entry reconciliation, canonical routes, capability-map projection.
+- **Inventory/IA projection** — 48-entry reconciliation, canonical routes, capability-map projection.
 - **Data/messaging/quality** — Airbyte, Kestra, warehouse, Redpanda, Presidio, Great Expectations,
   Evidently and related stores.
 - **Runtime/governance/observability** — gateways, LiteLLM, models, guardrails, secrets, OTel, Jaeger,

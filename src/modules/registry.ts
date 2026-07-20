@@ -38,7 +38,6 @@ export type ModuleId =
   | 'teams'
   | 'admin'
   | 'storage'
-  | 'provit'
   | 'api-docs'
   | 'agent-runs'
   | 'runs'
@@ -362,15 +361,6 @@ export const MODULES: readonly ModuleDef[] = [
       'Upload, browse, and share files — stored on-prem, never leaves your infrastructure. Public/private per file, S3-compatible URL.',
     route: '/work/files',
     service: 'files',
-  },
-  {
-    id: 'provit',
-    label: 'Provit',
-    description:
-      'Visual QA — catch visual regressions and review UI changes before they ship. Coming soon.',
-    route: '/operations/visual-qa',
-    service: 'provit',
-    comingSoon: true,
   },
   {
     id: 'api-docs',

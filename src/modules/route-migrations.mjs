@@ -103,7 +103,6 @@ export const IA_ROUTE_MIGRATIONS = Object.freeze([
   { from: '/operations/config', to: '/operations/configuration', children: true },
   { from: '/operations/api-docs', to: '/runtime/api', children: true },
   { from: '/operations/messaging', to: '/operations/configuration/messaging', children: true },
-  { from: '/provit', to: '/operations/visual-qa', children: true },
 ]);
 
 export function nextRedirects(migrations = IA_ROUTE_MIGRATIONS) {

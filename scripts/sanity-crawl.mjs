@@ -30,12 +30,42 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // Seed routes so the crawl covers surfaces not linked from the home shell. Section landing pages;
 // the BFS then discovers their detail views + tabs by following in-app links.
 const SEEDS = [
-  '', 'chat', 'studio', 'agents', 'tools', 'evals', 'observability', 'knowledge',
-  'data', 'data/connectors', 'data/domains', 'data/warehouse', 'data/quality', 'data/etl',
-  'gateway', 'gateways', 'pipelines', 'control', 'policy', 'guardrails', 'prompts',
-  'governance', 'governance/regulatory', 'governance/provenance', 'audit', 'lineage',
-  'insights', 'insights/analytics', 'insights/platform', 'finops',
-  'access', 'secrets', 'storage', 'integrations', 'fleet', 'provit', 'settings',
+  '',
+  'chat',
+  'studio',
+  'agents',
+  'tools',
+  'evals',
+  'observability',
+  'knowledge',
+  'data',
+  'data/connectors',
+  'data/domains',
+  'data/warehouse',
+  'data/quality',
+  'data/etl',
+  'gateway',
+  'gateways',
+  'pipelines',
+  'control',
+  'policy',
+  'guardrails',
+  'prompts',
+  'governance',
+  'governance/regulatory',
+  'governance/provenance',
+  'audit',
+  'lineage',
+  'insights',
+  'insights/analytics',
+  'insights/platform',
+  'finops',
+  'access',
+  'secrets',
+  'storage',
+  'integrations',
+  'fleet',
+  'settings',
   ...REQUIRED_STREAMING_VISUAL_STATES.map(({ url }) => url.replace(/^\//, '')),
 ];
 
@@ -49,7 +79,9 @@ const norm = (u) => {
     url.hash = '';
     ['ts', 'r', 'cache'].forEach((p) => url.searchParams.delete(p));
     return url.pathname + (url.search || '');
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 const slug = (p) => (p.replace(/^\//, '') || 'home').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 90);
 
@@ -89,43 +121,71 @@ while (queue.length && results.length < MAX) {
   const errs = [];
   const api5xx = [];
   const onErr = (e) => errs.push(String(e.message || e).slice(0, 160));
-  const onResp = (r) => { const u = r.url(); if (u.includes('/api/') && r.status() >= 500) api5xx.push(`${r.status()} ${u.replace(BASE, '')}`); };
+  const onResp = (r) => {
+    const u = r.url();
+    if (u.includes('/api/') && r.status() >= 500)
+      api5xx.push(`${r.status()} ${u.replace(BASE, '')}`);
+  };
   page.on('pageerror', onErr);
   page.on('response', onResp);
 
   let status = 0;
   try {
-    const resp = await page.goto(`${BASE}${key}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const resp = await page.goto(`${BASE}${key}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
     status = resp ? resp.status() : 0;
     await wait(1600);
-  } catch (e) { errs.push('NAV: ' + String(e.message).slice(0, 120)); }
+  } catch (e) {
+    errs.push('NAV: ' + String(e.message).slice(0, 120));
+  }
 
   // blank / error-boundary heuristic
-  const health = await page.evaluate(() => {
-    const txt = (document.body?.innerText || '').trim();
-    const lc = txt.toLowerCase();
-    return {
-      textLen: txt.length,
-      errorBoundary: /something went wrong|application error|unhandled|500|this page could not|failed to load/i.test(lc)
-        && txt.length < 1200,
-      title: document.title,
-    };
-  }).catch(() => ({ textLen: 0, errorBoundary: true, title: '' }));
+  const health = await page
+    .evaluate(() => {
+      const txt = (document.body?.innerText || '').trim();
+      const lc = txt.toLowerCase();
+      return {
+        textLen: txt.length,
+        errorBoundary:
+          /something went wrong|application error|unhandled|500|this page could not|failed to load/i.test(
+            lc,
+          ) && txt.length < 1200,
+        title: document.title,
+      };
+    })
+    .catch(() => ({ textLen: 0, errorBoundary: true, title: '' }));
 
   const file = `${slug(key)}.png`;
   await page.screenshot({ path: `${OUT}/shots/${file}`, fullPage: false }).catch(() => {});
 
-  const pass = status && status < 400 && !health.errorBoundary && health.textLen > 40 && api5xx.length === 0;
-  results.push({ path: key, status, textLen: health.textLen, errorBoundary: health.errorBoundary, api5xx, errs, file, pass });
+  const pass =
+    status && status < 400 && !health.errorBoundary && health.textLen > 40 && api5xx.length === 0;
+  results.push({
+    path: key,
+    status,
+    textLen: health.textLen,
+    errorBoundary: health.errorBoundary,
+    api5xx,
+    errs,
+    file,
+    pass,
+  });
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${status}  ${key}  (${results.length}/${seen.size})`);
 
   // discover in-app links + external generated links
-  const hrefs = await page.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter(Boolean)).catch(() => []);
+  const hrefs = await page
+    .$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter(Boolean))
+    .catch(() => []);
   for (const h of hrefs) {
     if (/^(mailto:|tel:|#|javascript:)/.test(h)) continue;
     const n = norm(h);
-    if (n) { if (!seen.has(n)) queue.push(`${BASE}${n}`); }
-    else if (/^https?:\/\//.test(h) && !h.startsWith(BASE)) { if (!external.includes(h)) external.push(h.slice(0, 300)); }
+    if (n) {
+      if (!seen.has(n)) queue.push(`${BASE}${n}`);
+    } else if (/^https?:\/\//.test(h) && !h.startsWith(BASE)) {
+      if (!external.includes(h)) external.push(h.slice(0, 300));
+    }
   }
 
   page.off('pageerror', onErr);
@@ -144,14 +204,26 @@ for (const url of external.slice(0, 12)) {
     const st = resp ? resp.status() : 0;
     extResults.push({ url, status: st, textLen: len, file, pass: st > 0 && st < 400 && len > 40 });
     console.log(`EXT ${st} ${url}`);
-  } catch (e) { extResults.push({ url, status: 0, err: String(e.message).slice(0, 120), pass: false }); }
+  } catch (e) {
+    extResults.push({ url, status: 0, err: String(e.message).slice(0, 120), pass: false });
+  }
 }
 
 await browser.close();
 
 const fails = results.filter((r) => !r.pass);
-const report = { base: BASE, theme: THEME, viewport: VIEWPORT, user: USER, total: results.length,
-  passed: results.length - fails.length, failed: fails.length, external: extResults.length, results, extResults };
+const report = {
+  base: BASE,
+  theme: THEME,
+  viewport: VIEWPORT,
+  user: USER,
+  total: results.length,
+  passed: results.length - fails.length,
+  failed: fails.length,
+  external: extResults.length,
+  results,
+  extResults,
+};
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 
 const md = [
@@ -161,10 +233,15 @@ const md = [
   `**${report.passed}/${report.total} pages passed health check** · ${extResults.length} external links followed`,
   ``,
   fails.length ? `## FAILURES (${fails.length})` : `## No failures`,
-  ...fails.map((f) => `- \`${f.path}\` — status ${f.status}, textLen ${f.textLen}${f.errorBoundary ? ', ERROR-BOUNDARY' : ''}${f.api5xx.length ? ', api5xx: ' + f.api5xx.join('; ') : ''}${f.errs.length ? ', errs: ' + f.errs.join(' | ') : ''}`),
+  ...fails.map(
+    (f) =>
+      `- \`${f.path}\` — status ${f.status}, textLen ${f.textLen}${f.errorBoundary ? ', ERROR-BOUNDARY' : ''}${f.api5xx.length ? ', api5xx: ' + f.api5xx.join('; ') : ''}${f.errs.length ? ', errs: ' + f.errs.join(' | ') : ''}`,
+  ),
   ``,
   `## External / generated links`,
   ...extResults.map((e) => `- ${e.pass ? 'ok' : 'FAIL'} ${e.status || '-'} ${e.url}`),
 ].join('\n');
 writeFileSync(`${OUT}/report.md`, md);
-console.log(`\n=== ${report.passed}/${report.total} passed, ${fails.length} failed, ${extResults.length} external. Report: ${OUT}/report.md ===`);
+console.log(
+  `\n=== ${report.passed}/${report.total} passed, ${fails.length} failed, ${extResults.length} external. Report: ${OUT}/report.md ===`,
+);
