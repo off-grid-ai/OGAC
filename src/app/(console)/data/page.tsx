@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { AddConnectorButton } from '@/components/data/AddConnectorButton';
 import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
@@ -19,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
@@ -52,11 +54,51 @@ export default async function DataPage() {
     listDocuments(org),
     qdrantCount(),
   ]);
+  const failedJobs = jobs.filter((job) => job.status === 'error' || job.status === 'failed').length;
+  const dashboard = buildDomainDashboard('data', {
+    facts: [
+      {
+        label: 'Connected sources',
+        value: `${connectors.filter((connector) => connector.status === 'connected').length} / ${connectors.length}`,
+        description: 'Configured sources currently marked connected.',
+        href: '/data/sources',
+        state:
+          connectors.length && connectors.every((connector) => connector.status === 'connected')
+            ? 'good'
+            : 'attention',
+      },
+      {
+        label: 'Datasets',
+        value: datasets.length.toLocaleString(),
+        description: `${datasets.reduce((sum, dataset) => sum + dataset.rows, 0).toLocaleString()} cataloged rows.`,
+        href: '/data/catalog',
+      },
+      {
+        label: 'Ingest attention',
+        value: failedJobs.toLocaleString(),
+        description: 'Ingest jobs currently marked failed or error.',
+        href: '/data/flows',
+        state: failedJobs ? 'attention' : 'good',
+      },
+      {
+        label: 'Knowledge index',
+        value: qCount === null ? 'Unavailable' : `${qCount.toLocaleString()} vectors`,
+        description:
+          qCount === null
+            ? 'The vector index did not respond.'
+            : `${brainDocs.length.toLocaleString()} source documents available for indexing.`,
+        href: '/data/knowledge',
+        state: qCount === null ? 'attention' : 'neutral',
+      },
+    ],
+  });
 
   return (
     <PageFrame>
       {
         <div className="space-y-6">
+          <DomainDashboard model={dashboard} />
+
           {/* Data-plane engine health — the live warehouse/pipelines/streaming/quality engines. */}
           <DataPlaneHealthBand />
 

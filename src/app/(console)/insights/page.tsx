@@ -7,6 +7,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
 import { LangfuseRegistryPanel } from '@/components/observability/LangfuseRegistryPanel';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
@@ -27,6 +28,7 @@ import {
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import type { DriftReport } from '@/lib/adapters/types';
 import { listAgentRuns } from '@/lib/agentrun';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { listEvalRuns } from '@/lib/evals';
 import {
   resolveRange,
@@ -238,6 +240,48 @@ export default async function ObservabilityPage({
   const latest = evals[0];
   const trend = [...evals].reverse().map((r, i) => ({ label: `#${i + 1}`, score: r.score }));
   const online = scoringConfigured();
+  const dashboard = buildDomainDashboard('insights', {
+    facts: [
+      {
+        label: 'Latest eval score',
+        value: latest ? `${latest.score}%` : 'No runs',
+        description: latest
+          ? `${latest.passed} of ${latest.total} cases passed.`
+          : 'Run an eval to establish measured quality.',
+        href: '/insights/quality/scorecards',
+        state: latest ? (latest.score >= 85 ? 'good' : 'attention') : 'attention',
+      },
+      {
+        label: 'Drift posture',
+        value: drift.status,
+        description: `${drift.engine} evaluated ${drift.metrics.length} drift metrics.`,
+        href: '/insights/quality/drift',
+        state: drift.status === 'stable' ? 'good' : 'attention',
+      },
+      {
+        label: 'Recent agent runs',
+        value: runs.length.toLocaleString(),
+        description: 'Runs in the current governed activity window.',
+        href: '/insights/ai/traces',
+      },
+      {
+        label: 'Online scoring',
+        value: onlineState(online, onlineEnabled),
+        description: online
+          ? 'Runtime scoring configuration detected.'
+          : 'Using local evaluation records.',
+        href: '/solutions/quality',
+        state: online && !onlineEnabled ? 'attention' : 'neutral',
+      },
+    ],
+    activities: runs.slice(0, 6).map((run) => ({
+      id: run.id,
+      label: run.agentId,
+      detail: `${run.status}: ${run.query}`,
+      timestamp: run.startedAt.slice(0, 10),
+      href: `/solutions/agents/${run.agentId}/runs/${run.id}`,
+    })),
+  });
 
   // Live alert evaluation against the operator's console-owned threshold rules. Drift score is the
   // PSI metric (0..1-ish population stability index); eval pass-rate is the latest score as a fraction.
@@ -266,6 +310,8 @@ export default async function ObservabilityPage({
     <PageFrame>
       {
         <div className="space-y-6">
+          <DomainDashboard model={dashboard} />
+
           <div className="flex items-start justify-between gap-4">
             <p className="max-w-2xl text-sm text-muted-foreground">
               Agent QA &amp; observability. Offline eval scores, drift (PSI), and the online

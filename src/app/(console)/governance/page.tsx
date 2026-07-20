@@ -1,4 +1,5 @@
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { AddRoutingRuleButton } from '@/components/control/AddRoutingRuleButton';
 import { AuditSearch } from '@/components/control/AuditSearch';
 import { PolicyEditor } from '@/components/control/PolicyEditor';
@@ -19,6 +20,7 @@ import {
 import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { fleetModelTags, modelLabel } from '@/lib/model-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
 import { modelOptions } from '@/lib/policy-catalog';
@@ -76,11 +78,53 @@ export default async function ControlPage() {
     .catch(() => [] as { model: string; role: string }[]);
   const liveModelTags = fleetModelTags(nodes);
   const pickableModels = modelOptions(liveModelTags);
+  const blockedEvents = events.filter((event) => event.outcome === 'blocked').length;
+  const dashboard = buildDomainDashboard('governance', {
+    facts: [
+      {
+        label: 'Policy version',
+        value: `v${policy.version}`,
+        description: policy.egressAllowed
+          ? 'Cloud egress is allowed by policy.'
+          : 'Cloud egress is blocked by policy.',
+        href: '/governance/policies',
+        state: policy.egressAllowed ? 'attention' : 'good',
+      },
+      {
+        label: 'Active routing rules',
+        value: `${routes.filter((route) => route.enabled).length} / ${routes.length}`,
+        description: 'Enabled routing decisions applied in priority order.',
+        href: '/governance/policies',
+      },
+      {
+        label: 'Blocked events',
+        value: blockedEvents.toLocaleString(),
+        description: 'Blocked requests in the current audit window.',
+        href: '/governance/evidence/audit',
+        state: blockedEvents ? 'attention' : 'good',
+      },
+      {
+        label: 'Users',
+        value: users.length.toLocaleString(),
+        description: 'Organization identities with assigned access.',
+        href: '/governance/access',
+      },
+    ],
+    activities: events.slice(0, 6).map((event) => ({
+      id: event.id,
+      label: `${modelLabel(event.model)} - ${event.outcome}`,
+      detail: `${event.deviceId} - ${event.tokens.toLocaleString()} tokens`,
+      timestamp: event.ts.slice(0, 10),
+      href: '/governance/evidence/audit',
+    })),
+  });
 
   return (
     <PageFrame>
       {
         <div className="space-y-6">
+          <DomainDashboard model={dashboard} />
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <PolicyEditor
               initial={policy}
