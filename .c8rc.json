@@ -22,6 +22,7 @@
     "src/lib/adapters/sandbox.ts",
     "src/lib/adapters/qdrant.ts",
     "src/lib/adapters/redis.ts",
+    "src/lib/adapters/worker-readiness.ts",
 
     "// db-stores: Drizzle/pg CRUD stores — raw DB reads/writes, no decision logic (exercised by the *.integration.test.ts suites against a real DB).",
     "src/lib/agent-runs-store.ts",

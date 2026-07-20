@@ -14,6 +14,7 @@ import type { ServiceHealth } from '@/lib/service-health';
 import type { ServiceControl } from '@/lib/services-directory';
 import { READINESS_GATES } from '@/lib/service-topology';
 import { RedpandaManager } from './RedpandaManager';
+import { WorkerReadinessPanel } from './WorkerReadinessPanel';
 import { GATE_LABEL, HEALTH_UI, READINESS_UI, withLiveReachability } from './ServiceReadiness';
 
 interface Sample {
@@ -28,6 +29,9 @@ interface Sample {
 // samples while the page is open, honestly labelled "this session"), the real management action
 // that exists (re-probe now, open the surface, jump to its logs), and an HONEST note about why the
 // service can't be restarted from the console (per serviceControl — no dead buttons).
+// The durable-worker services whose detail page carries the live task-queue readiness panel.
+const DURABLE_WORKER_SERVICE_IDS = new Set(['temporal', 'app-worker', 'agent-worker', 'chat-worker']);
+
 export function ServiceDetail({
   service,
   control,
@@ -370,6 +374,7 @@ export function ServiceDetail({
       </div>
 
       {service.management === 'redpanda' && <RedpandaManager />}
+      {DURABLE_WORKER_SERVICE_IDS.has(service.id) && <WorkerReadinessPanel />}
     </div>
   );
 }
