@@ -82,6 +82,16 @@ export function isLlmGuardVerdict(raw: unknown): raw is RawLlmGuardResponse {
   );
 }
 
+function isPhaseCompleteVerdict(
+  raw: unknown,
+  phase: LlmGuardAnalyzeRequest['phase'],
+): raw is RawLlmGuardResponse {
+  if (!isLlmGuardVerdict(raw)) return false;
+  return phase === 'input'
+    ? typeof raw.sanitized_prompt === 'string'
+    : typeof raw.sanitized_output === 'string';
+}
+
 /**
  * Map an LLM Guard `/analyze/*` response onto the console's normalized PiiResult. PURE — zero I/O.
  * `threshold` is the risk-score at/above which a scanner is treated as a flag (default 0.5).
@@ -173,7 +183,9 @@ export async function postLlmGuard(
       .map((part) => part.trim())
       .filter((part) => part && part !== 'none');
   const responseBody = (await res.json()) as RawLlmGuardResponse;
-  if (!isLlmGuardVerdict(responseBody)) throw new Error('llm-guard returned a malformed 2xx verdict');
+  if (!isPhaseCompleteVerdict(responseBody, request.phase)) {
+    throw new Error('llm-guard returned a malformed 2xx verdict');
+  }
   return {
     body: responseBody,
     answeredBy: split('x-offgrid-guard-answered'),

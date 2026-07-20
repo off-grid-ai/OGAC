@@ -205,7 +205,7 @@ test('request union serializes scanners_suppress but cannot serialize unsupporte
     { phase: 'input', prompt: 'hello', scanners_suppress: ['Toxicity'] },
     (async (_input: RequestInfo | URL, init?: RequestInit) => {
       seenBody = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ is_valid: true, scanners: {} }), {
+      return new Response(JSON.stringify({ is_valid: true, scanners: {}, sanitized_prompt: 'hello' }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });

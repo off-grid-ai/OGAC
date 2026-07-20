@@ -721,7 +721,7 @@ export async function POST(req: Request) {
         : null;
 
       // ── W1: DURABLE RUN — record the governed chat run via the Temporal spine (gated by
-      // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable. The
+      // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable.
       // The durable record receives only cleared content; a blocked run has an empty answer.
       const completionStatus = release.answer ? 'done' : 'error';
       const runInput: ChatRunWorkflowInput = {

@@ -60,7 +60,7 @@ function describeError(err) {
   return code ? `${err.message} (cause: ${code})` : String(err && err.message ? err.message : err);
 }
 
-function isUsableVerdict(body) {
+function isUsableVerdict(body, phase) {
   return (
     body &&
     typeof body === 'object' &&
@@ -69,7 +69,10 @@ function isUsableVerdict(body) {
     body.scanners &&
     typeof body.scanners === 'object' &&
     !Array.isArray(body.scanners) &&
-    Object.values(body.scanners).every((score) => typeof score === 'number' && Number.isFinite(score))
+    Object.values(body.scanners).every((score) => typeof score === 'number' && Number.isFinite(score)) &&
+    (phase === 'output'
+      ? typeof body.sanitized_output === 'string'
+      : typeof body.sanitized_prompt === 'string')
   );
 }
 
@@ -91,7 +94,7 @@ async function callShard(shard, payload, phase) {
     } catch {
       /* non-json body ⇒ treat as no verdict */
     }
-    const usable = isUsableVerdict(body);
+    const usable = isUsableVerdict(body, phase);
     if (!res.ok) console.error(`[guard-agg] shard ${shard.name} HTTP ${res.status}`);
     else if (!usable) console.error(`[guard-agg] shard ${shard.name} returned a malformed verdict`);
     return {
