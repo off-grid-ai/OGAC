@@ -32,4 +32,6 @@ test('quality entity detail routes are tenant-scoped and expose real management 
   assert.match(actions, /method: 'DELETE'/);
   assert.match(actions, /eval-defs\/\$\{definition\.id\}\/run/);
   assert.match(actions, /router\.push\(`\/solutions\/quality\/runs\/\$\{encodeURIComponent\(body\.run\.id\)\}`\)/);
+  assert.match(actions, /new URLSearchParams\(params\.toString\(\)\)/);
+  assert.match(actions, /router\.replace\(urlWithPanel\(false\)/);
 });

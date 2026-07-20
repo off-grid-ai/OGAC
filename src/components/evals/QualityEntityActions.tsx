@@ -50,11 +50,17 @@ function useEditPanel() {
   const pathname = usePathname();
   const params = useSearchParams();
   const open = params.get('panel') === 'edit';
+  function urlWithPanel(next: boolean): string {
+    const query = new URLSearchParams(params.toString());
+    if (next) query.set('panel', 'edit');
+    else query.delete('panel');
+    return query.size ? `${pathname}?${query.toString()}` : pathname;
+  }
   return {
     router,
     open,
-    show: () => router.push(`${pathname}?panel=edit`, { scroll: false }),
-    hide: () => router.back(),
+    show: () => router.push(urlWithPanel(true), { scroll: false }),
+    hide: () => router.replace(urlWithPanel(false), { scroll: false }),
   };
 }
 
@@ -306,4 +312,3 @@ export function GoldenCaseActions({ goldenCase }: Readonly<{ goldenCase: GoldenC
     </div>
   );
 }
-
