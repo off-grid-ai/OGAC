@@ -4,6 +4,32 @@ This is the shared execution brief for every agent that audits, integrates, expo
 Off Grid service. Read it before discovery. Do not create a competing inventory, capability scale,
 route taxonomy, or definition of "integrated".
 
+## Zero-discovery bootstrap
+
+This document is the universal prompt. The orchestrator's task message supplies only three things:
+
+```text
+Assigned family:
+Owned files (disjoint from other agents):
+Required deliverable/evidence:
+```
+
+Everything else comes from the systems of record below. Do **not** spend a turn broadly scanning the
+repository, counting Docker images, reconstructing fleet topology, inventing a capability taxonomy,
+or asking another agent to repeat prior discovery. Start from the assigned rows in
+`docs/SERVICE_CAPABILITY_STATUS.md`, then open only the linked canonical records and the code needed
+for that family.
+
+If two records disagree, do not silently choose one or start a new inventory. Record the conflict in
+`docs/GAPS_BACKLOG.md`, preserve the more conservative gate state, and send the exact conflicting
+paths and values to the integration owner. The canonical inventory count is the value enforced by
+`src/lib/service-inventory.ts`; historical release notes are evidence for their release, not the
+current ontology.
+
+Before editing, confirm the assigned file set does not overlap another active lane. During the task,
+commit each coherent slice. At handoff, report only the compact evidence template in **Parallel
+ownership** below; do not write a second narrative audit.
+
 ## Outcome
 
 The Console must account for **48 logical composable entries**: 42 platform services and
@@ -77,6 +103,21 @@ For one service family at a time:
 8. Update Console docs and fleet records in the same commit as behavior/config changes.
 9. Run focused real tests, coverage/typecheck/build, rendered wide+narrow visual checks, deploy the
    exact immutable SHA, then run fleet health and integration verification.
+
+## Definition of done for an assigned service
+
+An assigned service is complete only when the same immutable version has all applicable artifacts:
+
+- one canonical inventory entry and one versioned upstream capability denominator;
+- a real adapter/API call path with auth, tenancy, bounded failures, and lifecycle semantics;
+- a discoverable URL-driven list/detail/management surface using the shared component library;
+- relevant create/update/delete and operational actions, not merely health or read-only cards;
+- at least one bank or insurance workflow exercising the real path with retained audit evidence;
+- focused unit/integration coverage plus build and visual evidence for the touched journey;
+- matching Console documentation, fleet configuration/state documentation, and gap status.
+
+If any artifact is absent, hand it off as `partial` or `not verified` with the exact next action. An
+agent may finish its owned slice without claiming the service itself is complete.
 
 ## Parallel ownership
 
