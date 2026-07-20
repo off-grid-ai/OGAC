@@ -1,13 +1,6 @@
-import { ThresholdManager } from '@/components/observability/ThresholdManager';
-import { requireModuleForUser } from '@/lib/module-access';
+import { redirect } from 'next/navigation';
+import { insightsRouteWithSearchParams, type InsightsSearchParams } from '@/lib/insights-routes';
 
-export const dynamic = 'force-dynamic';
-
-export default async function QualityThresholdsPage() {
-  await requireModuleForUser('observability');
-  return (
-    <div className="w-full">
-      <ThresholdManager />
-    </div>
-  );
+export default async function LegacyQualityThresholdsPage({ searchParams }: Readonly<{ searchParams: Promise<InsightsSearchParams> }>) {
+  redirect(insightsRouteWithSearchParams('/solutions/quality/release-gates', await searchParams));
 }
