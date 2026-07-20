@@ -1,6 +1,7 @@
 import { ArrowRight, Play, Pulse } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AppRunControl } from '@/components/build/AppRunControl';
 import { StatusBadge } from '@/components/build/AppRunStatus';
 import { progress } from '@/lib/app-runs-view';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
@@ -79,13 +80,18 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
                     {r.startedAt ? new Date(r.startedAt).toLocaleString() : '—'}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <Link
-                      href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      {r.status === 'awaiting_human' ? 'Review' : 'Watch'}{' '}
-                      <ArrowRight className="size-3" />
-                    </Link>
+                    <span className="inline-flex items-center gap-3">
+                      {r.status === 'running' || r.status === 'awaiting_human' ? (
+                        <AppRunControl runId={r.id} />
+                      ) : null}
+                      <Link
+                        href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        {r.status === 'awaiting_human' ? 'Review' : 'Watch'}{' '}
+                        <ArrowRight className="size-3" />
+                      </Link>
+                    </span>
                   </td>
                 </tr>
               );
