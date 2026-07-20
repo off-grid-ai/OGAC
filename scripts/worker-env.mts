@@ -22,6 +22,9 @@
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { hostname } from 'node:os';
+import { workerIdentity } from '../src/lib/worker-artifact-identity.ts';
 
 // `@next/env` is a CJS module whose ESM-interop shape differs between tsx (esbuild) and node's
 // native strip-types resolver. `createRequire` loads it as plain CJS, which resolves identically
@@ -60,4 +63,23 @@ export function missingRequiredEnv(
     const v = env[key];
     return v === undefined || v.trim() === '';
   });
+}
+
+// The deployed release SHA (artifact-identity): prefer OFFGRID_RELEASE_SHA, else the immutable
+// deploy stamp push.sh writes (deploy/.deployed-sha), else 'dev' for a local checkout. Absolute
+// path from the console root so it resolves under launchd's arbitrary WorkingDirectory.
+export function releaseSha(): string {
+  const env = process.env.OFFGRID_RELEASE_SHA?.trim();
+  if (env) return env;
+  try {
+    return readFileSync(join(consoleRoot, 'deploy', '.deployed-sha'), 'utf8').trim() || 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+
+// The Temporal worker identity that BINDS this poller to its deployed artifact: <pid>@<host>#<sha8>.
+// Set as Worker.create({ identity }) so DescribeTaskQueue reports the artifact SHA on every poller.
+export function workerIdentityString(): string {
+  return workerIdentity(process.pid, hostname(), releaseSha());
 }

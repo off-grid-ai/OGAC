@@ -24,7 +24,7 @@
 // would run too late — the Pool would already be built with a passwordless connection string, and
 // every query would fail with `SASL: ... client password must be a string`. See worker-env.mts.
 
-import { missingRequiredEnv } from './worker-env.mts';
+import { missingRequiredEnv, workerIdentityString } from './worker-env.mts';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -56,6 +56,7 @@ async function main(): Promise<void> {
 
   const connection = await NativeConnection.connect({ address: cfg.temporalAddress });
   const worker = await Worker.create({
+    identity: workerIdentityString(),
     connection,
     namespace: cfg.namespace,
     taskQueue: cfg.taskQueue,

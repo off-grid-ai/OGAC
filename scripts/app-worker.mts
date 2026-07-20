@@ -16,7 +16,7 @@
 // ⚠️ IMPORT ORDER IS LOAD-BEARING: `./worker-env.mts` MUST be first (loads .env.* before @/db builds
 // its pg Pool — see temporal-worker.mts for the full SASL rationale).
 
-import { missingRequiredEnv } from './worker-env.mts';
+import { missingRequiredEnv, workerIdentityString } from './worker-env.mts';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -45,6 +45,7 @@ async function main(): Promise<void> {
 
   const connection = await NativeConnection.connect({ address: cfg.temporalAddress });
   const worker = await Worker.create({
+    identity: workerIdentityString(),
     connection,
     namespace: cfg.namespace,
     taskQueue: cfg.taskQueue,

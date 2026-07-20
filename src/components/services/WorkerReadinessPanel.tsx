@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { QueueReadiness, WorkerReadinessSummary } from '@/lib/task-queue-readiness';
+import { parseWorkerIdentity } from '@/lib/worker-artifact-identity';
 
 // Live durable-worker readiness for the worker/temporal service detail. Proves — from real
 // DescribeTaskQueue poller evidence — that a compatible worker is draining each durable queue, the
@@ -81,12 +82,23 @@ export function WorkerReadinessPanel() {
                 </p>
                 {q.pollers.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
-                    {q.pollers.map((p) => (
-                      <li key={p.identity} className="font-mono text-[10px] text-muted-foreground">
-                        {p.identity}
-                        {p.lastAccessTime ? ` · ${new Date(p.lastAccessTime).toLocaleTimeString()}` : ''}
-                      </li>
-                    ))}
+                    {q.pollers.map((p) => {
+                      const parsed = parseWorkerIdentity(p.identity);
+                      return (
+                        <li key={p.identity} className="font-mono text-[10px] text-muted-foreground">
+                          {parsed ? `${parsed.pid}@${parsed.host}` : p.identity}
+                          {parsed?.sha ? (
+                            <span
+                              className="ml-1 rounded bg-muted px-1 text-foreground"
+                              title="deployed worker artifact SHA"
+                            >
+                              {parsed.sha}
+                            </span>
+                          ) : null}
+                          {p.lastAccessTime ? ` · ${new Date(p.lastAccessTime).toLocaleTimeString()}` : ''}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
