@@ -12,7 +12,7 @@ live deployment.
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | Updated                      | 2026-07-20                                                                    |
 | Release branch               | `codex/modernize-console-sidebar`                                             |
-| Registry checkpoint          | Source snapshot through `9dbc876b`; this is not a deployed-SHA assertion      |
+| Registry checkpoint          | Source snapshot through `58abc71e`; this is not a deployed-SHA assertion      |
 | Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                       |
 | Versioned capability audits  | 37 records: 20 current, 17 stale                                              |
 | Audited denominator          | 157 capability items / 628 four-gate assessments                              |
@@ -35,10 +35,10 @@ necessarily "the upstream product can never do this".
 | Gate                          |     Yes | Partial |      No |   Total |
 | ----------------------------- | ------: | ------: | ------: | ------: |
 | Available                     |     100 |       0 |      57 |     157 |
-| Integrated                    |      67 |      63 |      27 |     157 |
+| Integrated                    |      65 |      65 |      27 |     157 |
 | UI exposed                    |      82 |      46 |      29 |     157 |
-| Used in a production workflow |      42 |      44 |      71 |     157 |
-| **All four gates**            | **291** | **153** | **184** | **628** |
+| Used in a production workflow |      40 |      44 |      73 |     157 |
+| **All four gates**            | **287** | **155** | **186** | **628** |
 
 Readiness is a separate projection. At this checkpoint, 47 inventory entries have no sufficient
 runtime topology evidence and one has only partial evidence. This is an evidence-state result, not a
@@ -50,7 +50,7 @@ forwarders, seeds, images, or a successful ping do not upgrade readiness.
 | Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                    |
 | ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
 | Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `7f4f8d61` | Visual and live verification pending                |
-| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `9dbc876b` | 13 audited, 11 pending; live evidence gaps retained |
+| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `58abc71e` | 13 audited, 11 pending; Gateway/OPA/Temporal identity gaps pinned |
 | Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained          |
 | Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Build and verify one immutable release              |
 
@@ -132,6 +132,22 @@ useful discovery evidence but do not satisfy that contract.
 
 ## Stale audit re-verification recipe
 
+### Common execution spine re-verification
+
+The first ordered re-verification pass retained all three common-spine audits as `stale`. Functional
+or reachability evidence was not promoted into immutable version evidence:
+
+| Service    | Exact retained evidence                                                                 | Blocking automation/evidence gap                                                                                                                                                       |
+| ---------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gateway    | Historical source release and current authenticated model/routing probes                | `push.sh` does not restart the aggregator; capture a repo-owned launch manifest plus running script checksum, expected source SHA, PID start time, and restart evidence in `recover.sh`. |
+| OPA        | Fleet manifest tag, loopback-only bind, policy adapter code, and generic governed denial | Lock and verify the live container Image ID/RepoDigest, assert `OFFGRID_ADAPTER_POLICY=opa`, and correlate direct OPA allow/deny responses with Console decision records.                |
+| Temporal   | Fleet manifest tags and C4 `202 + workflowId` durable-dispatch proof                     | Lock and verify live Server/UI Image IDs and RepoDigests; the successful workflow proves dispatch, not which server artifacts executed it.                                              |
+
+OPA integration and workflow coverage was reduced where the retained denial could have come from
+the first-party ABAC fallback. Gateway request-governance coverage was reduced where separate guard
+and gateway records lacked one correlated request. These are evidence corrections, not reported
+outages.
+
 The 17 stale records are `warehouse`, `kestra`, `gateway`, `temporal`, `keycloak`, `opa`, `openbao`,
 `unleash`, `otel-collector`, `console`, `redis`, `superset`, `fleetdm`,
 `enterprise-source-corebank`, `enterprise-source-policyadmin`, `enterprise-source-erp`, and
@@ -159,7 +175,7 @@ For each stale record:
 | P0       | Eleven services have no pinned capability denominator.                                                              | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
 | P0       | Seventeen audits are stale.                                                                                         | Apply the re-verification recipe against immutable selected versions; stale upstream gates remain unavailable until then.                                               |
 | P0       | Readiness is 47 unverified and 1 partial.                                                                           | Supply signed/timestamped topology evidence for deployment, reachability, functional behavior, seed state, and Console use; do not infer it from optional fallbacks.    |
-| P1       | Only 67/157 capabilities are fully integrated, 82/157 are fully UI-exposed, and 42/157 have full workflow evidence. | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
+| P1       | Only 65/157 capabilities are fully integrated, 82/157 are fully UI-exposed, and 40/157 have full workflow evidence. | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
 | P1       | The capability map is an exhaustive ledger but still costly to scan and scroll.                                     | Add URL-driven family/service local navigation, sticky summary/filter context, progressive disclosure, and direct gap-to-management links while retaining all evidence. |
 | P1       | Workflow evidence is not yet organized as repeatable BFSI proof.                                                    | Retain deterministic indemnity, delinquency, and cross-sell journeys with before/after operational and financial measures.                                              |
 | P2       | Capability breadth can be mistaken for customer value.                                                              | Publish intentional non-support and replacement rationale; product dashboards lead with outcomes, active work, exceptions, next actions, and proof—not service names.   |
