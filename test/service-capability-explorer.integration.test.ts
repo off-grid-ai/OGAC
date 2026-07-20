@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ServiceCapabilityExplorer } from '../src/components/services/ServiceCapabilityExplorer.tsx';
 import { SERVICE_CAPABILITY_AUDITS } from '../src/lib/service-capability-map.ts';
 import {
+  filterServiceInventory,
   reconcileServiceInventory,
   serviceInventoryAuditState,
   serviceInventoryReadinessState,
@@ -55,14 +56,19 @@ test('capability explorer keeps the 48-entry inventory in an independently scrol
 });
 
 test('filter navigation preserves facets while clearing the previous service selection', () => {
-  const html = renderExplorer('otel-collector', {
+  const inventoryFilter = {
     query: 'telemetry',
-    family: 'observability',
-    owner: 'operations-services',
-  });
+    family: 'observability' as const,
+    owner: 'operations-services' as const,
+  };
+  const reconciled = inventory();
+  const expectedEntries = filterServiceInventory(reconciled.entries, inventoryFilter);
+  const html = renderExplorer('otel-collector', inventoryFilter, reconciled);
 
-  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 1);
-  assert.match(html, /data-service-inventory-row="otel-collector"/);
+  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, expectedEntries.length);
+  for (const entry of expectedEntries) {
+    assert.match(html, new RegExp(`data-service-inventory-row="${entry.id}"`));
+  }
   assert.doesNotMatch(html, /name="service" value="otel-collector"/);
   assert.match(html, /name="family" value="observability"/);
   assert.match(html, /name="q" value="telemetry"/);
