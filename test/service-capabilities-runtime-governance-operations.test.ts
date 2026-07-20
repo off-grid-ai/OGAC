@@ -114,6 +114,48 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
   );
 });
 
+test('stale common execution spine records name exact immutable-identity blockers', () => {
+  const audits = new Map(
+    RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.map((record) => [record.serviceId, record]),
+  );
+  const gateway = audits.get('gateway');
+  const opa = audits.get('opa');
+  const temporal = audits.get('temporal');
+  assert.ok(gateway);
+  assert.ok(opa);
+  assert.ok(temporal);
+
+  for (const audit of [gateway, opa, temporal]) {
+    assert.equal(audit.auditState, 'stale');
+    assert.ok(audit.auditStateEvidence);
+    assert.match(
+      audit.auditStateEvidence,
+      /(checksum|digest|Image ID|RepoDigest)/i,
+      `${audit.serviceId} identifies the missing immutable runtime evidence`,
+    );
+  }
+
+  assert.match(gateway.auditStateEvidence ?? '', /does not restart the aggregator/);
+  assert.match(opa.auditStateEvidence ?? '', /OFFGRID_ADAPTER_POLICY=opa/);
+  assert.match(temporal.auditStateEvidence ?? '', /both containers/);
+
+  const gatewayGovernance = gateway.items.find((item) => item.id === 'request-governance');
+  const opaDecisions = opa.items.find((item) => item.id === 'policy-decisions');
+  const opaLifecycle = opa.items.find((item) => item.id === 'policy-lifecycle');
+  assert.ok(gatewayGovernance);
+  assert.ok(opaDecisions);
+  assert.ok(opaLifecycle);
+  assert.deepEqual(
+    [gatewayGovernance.gates.adapter.status, gatewayGovernance.gates.workflow.status],
+    ['partial', 'partial'],
+  );
+  assert.deepEqual(
+    [opaDecisions.gates.adapter.status, opaDecisions.gates.workflow.status],
+    ['partial', 'no'],
+  );
+  assert.equal(opaLifecycle.gates.workflow.status, 'no');
+});
+
 test('audited services have version evidence and honest item-level four-gate evidence', () => {
   for (const audit of RUNTIME_GOVERNANCE_OPERATIONS_AUDITS) {
     assert.ok(audit.upstreamVersion.trim(), `${audit.serviceId} must name a version`);

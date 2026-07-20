@@ -132,11 +132,12 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'gateway',
     serviceLabel: 'AI Gateway',
     upstreamVersion: 'Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
-    versionSource: `${FLEET_EVIDENCE}; packages/gateway and scripts/gateway-aggregator.mjs`,
+    versionSource:
+      'Historical Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e; scripts/gateway-aggregator.mjs source owner 55064461a42a76a332392e19ea724a06732203b1; onprem fleet SERVER_STATE.md at bc74d828e02db7566b32191650cb58360f9178ae',
     denominatorSource:
       'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts',
     auditStateEvidence:
-      'The fleet verified this first-party gateway release, but the current working release is newer and not deployed.',
+      'Historical auth and routing proof exists, but deploy/push.sh explicitly does not restart the aggregator and the live process has no repo-owned launch artifact or deployed-source stamp. Record the running script checksum, launch manifest revision, PID start time, and expected Console SHA in recover.sh before treating its identity as current.',
     summary:
       'Bounded first-party denominator: authenticated inference, model discovery, fleet routing, and request governance. Direct backend access is not part of the operator contract.',
     capabilities: [
@@ -182,16 +183,16 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Apply tenancy, policy, guardrails, routing, and audit to inference requests.',
         '/governance/posture',
         'Inspect governance posture',
-        '',
+        'The deployed aggregator proves authentication, attribution, and routing, while policy and guardrails run in the surrounding Console spine. Correlate one allowed and one denied inference across tenant, policy, guard, gateway traffic, and audit evidence before counting the gateway contract as complete.',
         [
           'yes',
           'The first-party gateway release supports the Off Grid governance contract.',
-          'yes',
-          'Policy, guardrail, credential, traffic, and audit adapters are wired.',
+          'partial',
+          'Credential, routing, attribution, and traffic paths are in the aggregator; policy and guardrails are enforced by the surrounding Console spine rather than a deployed gateway policy plug-in.',
           'yes',
           'Governance and runtime surfaces expose effective controls and evidence.',
-          'yes',
-          'Governed denial and merged guard scans passed in the recovery gate.',
+          'partial',
+          'Governed denial and merged guard scans passed separately, but the retained evidence does not correlate both with the same gateway request and traffic record.',
         ],
       ],
     ],
@@ -265,8 +266,11 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'temporal',
     serviceLabel: 'Durable Workflows',
     upstreamVersion: 'Temporal Server 1.25.2 / UI 2.32.0',
-    versionSource: 'deploy/docker-compose.yml',
+    versionSource:
+      'onprem-fleet-orchestration deploy/onprem/services-node-a.yml at 480a8881f77ea49dcd2bf666edbd598750687a21 (configured tags temporalio/auto-setup:1.25.2 and temporalio/ui:2.32.0)',
     denominatorSource: 'https://docs.temporal.io/',
+    auditStateEvidence:
+      'The private manifest pins version tags and the fleet proves durable dispatch, but recover.sh does not capture the live Temporal Server/UI container Image IDs or RepoDigests. Add a digest lock and compare docker inspect .Image plus RepoDigests for both containers before upgrading this audit.',
     summary:
       'Relevant denominator: durable app/agent/chat dispatch, run lifecycle, schedules, retries, visibility, cancellation, and worker readiness.',
     capabilities: [
@@ -285,7 +289,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'Operations runs and app/agent run detail pages expose durable state.',
           'yes',
-          'The fleet gate proved the Console durable-run surface and a durable denial path.',
+          'The fleet C4 gate retained a 202 response with workflowId for an eligible governed run, then correlated its completed output and actor evidence; this proves dispatch but not the unrecorded server image digest.',
         ],
       ],
       [
@@ -453,8 +457,11 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'opa',
     serviceLabel: 'Policy Engine',
     upstreamVersion: '0.70.0',
-    versionSource: 'deploy/docker-compose.yml (openpolicyagent/opa:0.70.0)',
+    versionSource:
+      'onprem-fleet-orchestration deploy/onprem/services-node-a.yml at 480a8881f77ea49dcd2bf666edbd598750687a21 (configured tag openpolicyagent/opa:0.70.0)',
     denominatorSource: 'https://www.openpolicyagent.org/docs/v0.70.0/',
+    auditStateEvidence:
+      'The private manifest pins a version tag and the fleet proves a loopback-bound process, but recover.sh records neither the live container Image ID nor RepoDigest. It also does not assert OFFGRID_ADAPTER_POLICY=opa or execute an engine-attributed decision. Add a digest lock, docker-inspect comparison, selected-adapter assertion, and direct allow/deny decision correlation before upgrading this audit.',
     summary:
       'Relevant denominator: policy/module/data lifecycle, decision evaluation, bundles, decision logs, and failure posture. Rego stays behind governed product modules.',
     capabilities: [
@@ -464,16 +471,16 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Evaluate tenant-scoped allow/deny decisions and preserve explainable evidence.',
         '/governance/policies/decisions',
         'Inspect decisions',
-        '',
+        'Prove the selected production adapter is OPA, exercise direct allow and deny decisions against the exact live image digest, and correlate the OPA reason with the Console decision record. The current fallback-capable denial is not engine attribution.',
         [
           'yes',
           'OPA 0.70.0 provides policy evaluation and decision APIs.',
-          'yes',
-          'The policy adapter evaluates real requests and records decisions.',
+          'partial',
+          'The OPA adapter evaluates offgrid/authz and records decisions, but selection is environment-driven and falls back to first-party ABAC when OPA is unreachable; the fleet does not retain the selected adapter.',
           'yes',
           'Policies and evidence routes expose rules and decisions.',
-          'yes',
-          'The fleet gate proved a governed denial.',
+          'no',
+          'The fleet proves a governed denial and an OPA loopback bind separately, but it does not attribute that decision to OPA rather than the first-party ABAC fallback.',
         ],
       ],
       [
@@ -490,8 +497,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'Console policy rules/modules exist; complete deployed reload and rollback evidence is missing.',
           'yes',
           'Rules, templates, modules, and decisions have canonical nested routes.',
-          'partial',
-          'Seeded policies exist, but publish/reload/rollback were not all live-proven.',
+          'no',
+          'No retained fleet evidence proves create, compile, publish, reload, invalid-policy rejection, or rollback against the deployed OPA container.',
         ],
       ],
       [
